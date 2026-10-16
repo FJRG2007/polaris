@@ -39,7 +39,12 @@ export async function saveServiceGpuAction(
     if (!parsed.success) return { error: await reply("gpu.saveFailed") };
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
-        const outcome = await gpu.setServiceGpu(applicationId, access.ownerId, user.id, parsed.data);
+        const outcome = await gpu.setServiceGpu(
+            applicationId,
+            access.ownerId,
+            user.id,
+            parsed.data
+        );
         if (outcome.refusal) return { error: await reply(`gpu.${outcome.refusal}`) };
         if (!outcome.saved) return { redeployed: false };
         await recordDeployAudit({
@@ -50,7 +55,8 @@ export async function saveServiceGpuAction(
             metadata: { useGpu: parsed.data }
         });
         revalidatePath(DEPLOY_PATH);
-        if (outcome.restartFailed) return { redeployed: false, restartError: await reply("gpu.restartFailed") };
+        if (outcome.restartFailed)
+            return { redeployed: false, restartError: await reply("gpu.restartFailed") };
         return { redeployed: outcome.redeployed };
     } catch {
         return { error: await reply("gpu.saveFailed") };

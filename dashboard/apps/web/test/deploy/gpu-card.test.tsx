@@ -31,7 +31,12 @@ const WITH_CARD: ServiceGpuView = {
     cards: [{ index: 0, name: "NVIDIA A2", memoryTotalBytes: 16 * 1024 ** 3 }],
     memoryUsedBytes: null
 };
-const NO_CARD: ServiceGpuView = { enabled: false, refusal: "noGpu", cards: [], memoryUsedBytes: null };
+const NO_CARD: ServiceGpuView = {
+    enabled: false,
+    refusal: "noGpu",
+    cards: [],
+    memoryUsedBytes: null
+};
 
 function Card({
     view,
@@ -43,7 +48,16 @@ function Card({
     onToggle?: (enabled: boolean) => void;
 }) {
     const t = useTranslations("deployService");
-    return <GpuCardBody view={view} canConfigure={canConfigure} pending={false} note={null} onToggle={onToggle} t={t} />;
+    return (
+        <GpuCardBody
+            view={view}
+            canConfigure={canConfigure}
+            pending={false}
+            note={null}
+            onToggle={onToggle}
+            t={t}
+        />
+    );
 }
 
 function show(props: Parameters<typeof Card>[0]) {
@@ -60,7 +74,9 @@ describe("whether a service may be given a card", () => {
     });
 
     it("looks up the machine the service runs on", () => {
-        expect(machineSubjectOf({ kind: "local", hostId: null, runtime: "compose" })).toBe(LOCAL_HOST_SUBJECT);
+        expect(machineSubjectOf({ kind: "local", hostId: null, runtime: "compose" })).toBe(
+            LOCAL_HOST_SUBJECT
+        );
         expect(machineSubjectOf({ kind: "remote", hostId: "h1", runtime: "compose" })).toBe("h1");
     });
 });

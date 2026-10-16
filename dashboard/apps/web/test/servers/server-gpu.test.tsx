@@ -11,7 +11,12 @@ import type { MachineGpus } from "@/lib/gpu/gpu-live";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GpuBody } from "@/app/(app)/apps/servers/server-gpu";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { MAX_GPU_CONTAINERS, machineGpuView, NO_GPUS, type MachineGpuView } from "@/lib/gpu/gpu-view";
+import {
+    MAX_GPU_CONTAINERS,
+    machineGpuView,
+    NO_GPUS,
+    type MachineGpuView
+} from "@/lib/gpu/gpu-view";
 
 const A = "GPU-aaaaaaaa-0000-0000-0000-000000000000";
 const B = "GPU-bbbbbbbb-0000-0000-0000-000000000000";
@@ -53,7 +58,9 @@ function Body({ view, error = false }: { view: MachineGpuView | null; error?: bo
 }
 
 function html(view: MachineGpuView | null, options: { error?: boolean; locale?: Locale } = {}) {
-    return renderToStaticMarkup(withMessages(<Body view={view} error={options.error} />, options.locale));
+    return renderToStaticMarkup(
+        withMessages(<Body view={view} error={options.error} />, options.locale)
+    );
 }
 
 describe("the machine's cards as the page draws them", () => {
@@ -90,7 +97,9 @@ describe("the GPU section", () => {
         const english = html(NO_GPUS);
         expect(english).toContain("No NVIDIA card found on this machine.");
         expect(english).not.toContain("Containers on the cards");
-        expect(html(NO_GPUS, { locale: "es-ES" })).toContain("No hay ninguna tarjeta NVIDIA en esta máquina.");
+        expect(html(NO_GPUS, { locale: "es-ES" })).toContain(
+            "No hay ninguna tarjeta NVIDIA en esta máquina."
+        );
     });
 
     it("shows each card, the containers on them, and a missing figure as not measured", () => {
@@ -122,8 +131,12 @@ describe("the GPU section", () => {
         const markup = html(view);
         expect(markup).toContain("NVIDIA GeForce RTX 4090");
         expect(markup).not.toContain("big");
-        expect(markup).toContain("Only an administrator sees the containers on this machine&#x27;s cards.");
-        expect(html(view, { locale: "es-ES" })).toContain("Solo un administrador ve los contenedores");
+        expect(markup).toContain(
+            "Only an administrator sees the containers on this machine&#x27;s cards."
+        );
+        expect(html(view, { locale: "es-ES" })).toContain(
+            "Solo un administrador ve los contenedores"
+        );
     });
 
     it("waits on a skeleton, and says when the reading failed", () => {

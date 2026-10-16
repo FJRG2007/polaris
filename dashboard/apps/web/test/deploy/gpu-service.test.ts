@@ -38,7 +38,12 @@ describe("turning a service's GPU on or off", () => {
     it("saves it and starts the running release again", async () => {
         const outcome = await setServiceGpu("app-1", "owner-1", "user-1", true);
         expect(update).toHaveBeenCalledWith({ where: { id: "app-1" }, data: { useGpu: true } });
-        expect(outcome).toEqual({ refusal: null, saved: true, redeployed: true, restartFailed: false });
+        expect(outcome).toEqual({
+            refusal: null,
+            saved: true,
+            redeployed: true,
+            restartFailed: false
+        });
     });
 
     it("refuses without saving where the machine has no card", async () => {
@@ -60,6 +65,11 @@ describe("turning a service's GPU on or off", () => {
         restartFromKeptImage.mockRejectedValue(new Error("engine unreachable"));
         const outcome = await setServiceGpu("app-1", "owner-1", "user-1", true);
         expect(update).toHaveBeenCalledOnce();
-        expect(outcome).toEqual({ refusal: null, saved: true, redeployed: false, restartFailed: true });
+        expect(outcome).toEqual({
+            refusal: null,
+            saved: true,
+            redeployed: false,
+            restartFailed: true
+        });
     });
 });

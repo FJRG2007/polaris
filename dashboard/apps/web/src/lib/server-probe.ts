@@ -146,7 +146,8 @@ export function parseProbe(output: string): ServerMetrics {
         if (!value) continue;
         if (key === "gpu" || key === "gpuproc") continue;
         if (key === "container" || key === "process") {
-            const consumer = key === "container" ? containerConsumer(value) : processConsumer(value);
+            const consumer =
+                key === "container" ? containerConsumer(value) : processConsumer(value);
             if (consumer) consumers.push(consumer);
             continue;
         }
@@ -161,7 +162,8 @@ export function parseProbe(output: string): ServerMetrics {
         cpuCount: numberOf(fields.get("cpus")),
         loadAverage: numberOf(fields.get("load")),
         memoryTotalBytes: memoryTotal,
-        memoryUsedBytes: memoryTotal !== null && memoryAvailable !== null ? memoryTotal - memoryAvailable : null,
+        memoryUsedBytes:
+            memoryTotal !== null && memoryAvailable !== null ? memoryTotal - memoryAvailable : null,
         diskTotalBytes: numberOf(fields.get("disk_total")),
         diskUsedBytes: numberOf(fields.get("disk_used")),
         netRxBytes: numberOf(fields.get("net_rx")),
@@ -200,7 +202,11 @@ function processConsumer(value: string): ServerConsumer | null {
 /** Heaviest first, by CPU and then by memory, cut to what a panel can show. */
 function rank(consumers: ServerConsumer[]): ServerConsumer[] {
     return consumers
-        .sort((a, b) => (b.cpuPercent ?? 0) - (a.cpuPercent ?? 0) || (b.memoryBytes ?? 0) - (a.memoryBytes ?? 0))
+        .sort(
+            (a, b) =>
+                (b.cpuPercent ?? 0) - (a.cpuPercent ?? 0) ||
+                (b.memoryBytes ?? 0) - (a.memoryBytes ?? 0)
+        )
         .slice(0, CONSUMER_LIMIT);
 }
 

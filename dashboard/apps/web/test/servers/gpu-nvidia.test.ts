@@ -67,7 +67,10 @@ describe("an nvidia-smi reading", () => {
     });
 
     it("keeps a bounded number of cards", () => {
-        const lines = Array.from({ length: 40 }, (_, index) => `gpu=${index}, GPU-${index}, 1, 1, 1, 1, 1, Card`);
+        const lines = Array.from(
+            { length: 40 },
+            (_, index) => `gpu=${index}, GPU-${index}, 1, 1, 1, 1, 1, Card`
+        );
         expect(nvidia.parseGpuReport(lines.join("\n")).gpus).toHaveLength(nvidia.MAX_GPUS);
     });
 });
@@ -75,10 +78,16 @@ describe("an nvidia-smi reading", () => {
 describe("a card's processes, by container", () => {
     it("adds up each container's memory across the cards it holds", () => {
         const report = nvidia.parseGpuReport(OUTPUT);
-        const usage = nvidia.gpuUsageByContainer(report, [{ id: CONTAINER }, { id: OTHER.slice(0, 12) }]);
+        const usage = nvidia.gpuUsageByContainer(report, [
+            { id: CONTAINER },
+            { id: OTHER.slice(0, 12) }
+        ]);
         expect(usage.get(CONTAINER)).toEqual({
             memoryUsedBytes: 1600 * 1024 * 1024,
-            gpuUuids: ["GPU-11111111-2222-3333-4444-555555555555", "GPU-66666666-7777-8888-9999-000000000000"]
+            gpuUuids: [
+                "GPU-11111111-2222-3333-4444-555555555555",
+                "GPU-66666666-7777-8888-9999-000000000000"
+            ]
         });
         // A listing that gives the short id still finds its container.
         expect(usage.get(OTHER.slice(0, 12))?.memoryUsedBytes).toBe(300 * 1024 * 1024);
@@ -86,7 +95,9 @@ describe("a card's processes, by container", () => {
     });
 
     it("leaves out a process on the host and one in a container that is not listed", () => {
-        const usage = nvidia.gpuUsageByContainer(nvidia.parseGpuReport(OUTPUT), [{ id: "c".repeat(64) }]);
+        const usage = nvidia.gpuUsageByContainer(nvidia.parseGpuReport(OUTPUT), [
+            { id: "c".repeat(64) }
+        ]);
         expect(usage.size).toBe(0);
     });
 });
@@ -118,7 +129,9 @@ describe("the script", () => {
     });
 
     it("does nothing on a machine without nvidia-smi", () => {
-        expect(nvidia.GPU_SCRIPT.startsWith("if command -v nvidia-smi >/dev/null 2>&1; then\n")).toBe(true);
+        expect(
+            nvidia.GPU_SCRIPT.startsWith("if command -v nvidia-smi >/dev/null 2>&1; then\n")
+        ).toBe(true);
         expect(nvidia.GPU_SCRIPT.trimEnd().endsWith("fi")).toBe(true);
     });
 });
@@ -133,6 +146,9 @@ describe("a server's probe", () => {
     });
 
     it("has no card on a machine without nvidia-smi", () => {
-        expect(parseProbe(["os=Debian 12", "load=0.1"].join("\n")).gpu).toEqual({ gpus: [], processes: [] });
+        expect(parseProbe(["os=Debian 12", "load=0.1"].join("\n")).gpu).toEqual({
+            gpus: [],
+            processes: []
+        });
     });
 });

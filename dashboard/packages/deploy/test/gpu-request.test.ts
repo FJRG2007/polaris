@@ -6,14 +6,24 @@
 
 import { describe, expect, it } from "vitest";
 import type { AppDeployPlan } from "../src/runtime/driver.js";
-import { appComposeSpec, deployBlockLines, forCompose, renderComposeYaml } from "../src/compose-spec.js";
+import {
+    appComposeSpec,
+    deployBlockLines,
+    forCompose,
+    renderComposeYaml
+} from "../src/compose-spec.js";
 
 const NETWORK = "polaris-proxy";
 
 function appPlan(limits?: AppDeployPlan["limits"]): AppDeployPlan {
     return {
         ref: { name: "trainer", project: "polaris-abcd1234" },
-        build: { method: "image", name: "trainer", contextPath: "/ctx", imageRef: "nvidia/cuda:12.4.1-base-ubuntu22.04" },
+        build: {
+            method: "image",
+            name: "trainer",
+            contextPath: "/ctx",
+            imageRef: "nvidia/cuda:12.4.1-base-ubuntu22.04"
+        },
         env: {},
         replicas: 1,
         domains: [],
@@ -24,7 +34,11 @@ function appPlan(limits?: AppDeployPlan["limits"]): AppDeployPlan {
 
 describe("a GPU request", () => {
     it("renders every card as an nvidia device reservation", () => {
-        const spec = appComposeSpec(appPlan({ gpus: "all" }), "nvidia/cuda:12.4.1-base-ubuntu22.04", NETWORK);
+        const spec = appComposeSpec(
+            appPlan({ gpus: "all" }),
+            "nvidia/cuda:12.4.1-base-ubuntu22.04",
+            NETWORK
+        );
         expect(spec.services[0]!.gpus).toBe("all");
         const yaml = renderComposeYaml(forCompose(spec), "/vol", "/mnt");
         expect(yaml).toContain(

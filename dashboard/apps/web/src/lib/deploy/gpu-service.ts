@@ -60,7 +60,10 @@ async function loadApp(applicationId: string, ownerId: string): Promise<GpuApp> 
     return app;
 }
 
-export async function getServiceGpu(applicationId: string, ownerId: string): Promise<ServiceGpuView> {
+export async function getServiceGpu(
+    applicationId: string,
+    ownerId: string
+): Promise<ServiceGpuView> {
     const app = await loadApp(applicationId, ownerId);
     const machine = machineGpus(machineSubjectOf(app.target));
     const latest = app.useGpu
@@ -99,7 +102,12 @@ export async function setServiceGpu(
     ownerId: string,
     userId: string,
     enabled: boolean
-): Promise<{ refusal: GpuRefusal | null; saved: boolean; redeployed: boolean; restartFailed: boolean }> {
+): Promise<{
+    refusal: GpuRefusal | null;
+    saved: boolean;
+    redeployed: boolean;
+    restartFailed: boolean;
+}> {
     const app = await loadApp(applicationId, ownerId);
     const unchanged = { refusal: null, saved: false, redeployed: false, restartFailed: false };
     if (app.useGpu === enabled) return unchanged;
@@ -113,7 +121,10 @@ export async function setServiceGpu(
     try {
         await restartFromKeptImage(applicationId, ownerId, userId, "settings");
     } catch (error) {
-        console.error("polaris: a service could not be restarted after its GPU setting changed:", error);
+        console.error(
+            "polaris: a service could not be restarted after its GPU setting changed:",
+            error
+        );
         return { ...saved, restartFailed: true };
     }
     return { ...saved, redeployed: true };

@@ -96,7 +96,9 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
             const samples = await driver.statsMany([...names.values()]);
             // The machine's cards as the host pass read them this tick, which
             // runs first. Null on a machine without one, which is most of them.
-            const gpus = machineGpus(key === "local" ? LOCAL_HOST_SUBJECT : key.slice("host:".length));
+            const gpus = machineGpus(
+                key === "local" ? LOCAL_HOST_SUBJECT : key.slice("host:".length)
+            );
             for (const app of group) {
                 const stats = samples.get(names.get(app.id) ?? "");
                 // Not running this tick. That is an absent sample rather than a

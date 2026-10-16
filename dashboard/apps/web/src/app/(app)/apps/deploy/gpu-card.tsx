@@ -46,7 +46,11 @@ export function GpuCard({
     }, [applicationId]);
 
     if (!view) {
-        return error ? <CardError title={t("gpu.title")} message={error} /> : <CardSkeleton title={t("gpu.title")} rows={1} />;
+        return error ? (
+            <CardError title={t("gpu.title")} message={error} />
+        ) : (
+            <CardSkeleton title={t("gpu.title")} rows={1} />
+        );
     }
 
     function toggle(enabled: boolean) {
@@ -68,7 +72,16 @@ export function GpuCard({
         });
     }
 
-    return <GpuCardBody view={view} canConfigure={canConfigure} pending={pending} note={note} onToggle={toggle} t={t} />;
+    return (
+        <GpuCardBody
+            view={view}
+            canConfigure={canConfigure}
+            pending={pending}
+            note={note}
+            onToggle={toggle}
+            t={t}
+        />
+    );
 }
 
 /** The card without its reads, for tests. */
@@ -101,14 +114,18 @@ export function GpuCardBody({
                 <div className="flex items-start justify-between gap-3 rounded-md bg-surface p-3">
                     <span className="min-w-0">
                         <span className="text-xs font-medium">{t("gpu.use")}</span>
-                        {why ? <span className="block text-xs text-muted-foreground">{why}</span> : null}
+                        {why ? (
+                            <span className="block text-xs text-muted-foreground">{why}</span>
+                        ) : null}
                         {view.cards.length > 0 ? (
                             <span
                                 className="block truncate text-xs text-muted-foreground"
                                 title={view.cards.map((card) => card.name).join(", ")}
                             >
                                 {t("gpu.cards", {
-                                    list: view.cards.map((card) => `${card.index}: ${card.name}`).join(", ")
+                                    list: view.cards
+                                        .map((card) => `${card.index}: ${card.name}`)
+                                        .join(", ")
                                 })}
                             </span>
                         ) : null}

@@ -23,8 +23,12 @@ export async function GET(
     const { id } = await params;
     const subjectId = hostSubject(id);
     if (!(await subjectBelongsToOwner("host", subjectId, user.id))) {
-        return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.notFound") },
+            { status: 404 }
+        );
     }
-    const showContainers = subjectId !== LOCAL_HOST_SUBJECT || (await userHasManage(user, "system.manage"));
+    const showContainers =
+        subjectId !== LOCAL_HOST_SUBJECT || (await userHasManage(user, "system.manage"));
     return Response.json(machineGpuView(machineGpus(subjectId), showContainers));
 }

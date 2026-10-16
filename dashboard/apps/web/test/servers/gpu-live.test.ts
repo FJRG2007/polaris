@@ -91,7 +91,9 @@ describe("the machine Polaris runs on", () => {
             output: `gpu=0, ${CARD}, 5, 100, 4096, 40, [N/A], NVIDIA A2\n`
         });
         const report = await live.readLocalGpus();
-        expect(report?.gpus.map((gpu) => [gpu.index, gpu.name, gpu.powerWatts])).toEqual([[0, "NVIDIA A2", null]]);
+        expect(report?.gpus.map((gpu) => [gpu.index, gpu.name, gpu.powerWatts])).toEqual([
+            [0, "NVIDIA A2", null]
+        ]);
     });
 
     it("asks a machine without a card once an hour, not every minute", async () => {

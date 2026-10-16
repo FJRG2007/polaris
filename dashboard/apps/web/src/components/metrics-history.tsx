@@ -408,4 +408,12 @@ export function MetricsHistory<T extends { t: number } = Point>({
 }
 
 /** Re-exported for the screens that already take them from here. */
-export { CONSUMPTION_METRICS, formatRate, GPU_METRICS, percent, PLAYER_METRICS, ratioPercent, type MetricSpec };
+export {
+    CONSUMPTION_METRICS,
+    formatRate,
+    GPU_METRICS,
+    percent,
+    PLAYER_METRICS,
+    ratioPercent,
+    type MetricSpec
+};

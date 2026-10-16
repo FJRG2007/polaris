@@ -772,7 +772,11 @@ export function SettingsTab({
             {section(2).shown && (
                 <SettingsSection {...head(2)}>
                     <ScalingSection applicationId={app.id} onChanged={onChanged} />
-                    <GpuCard applicationId={app.id} canConfigure={configure} onChanged={onChanged} />
+                    <GpuCard
+                        applicationId={app.id}
+                        canConfigure={configure}
+                        onChanged={onChanged}
+                    />
                 </SettingsSection>
             )}
 

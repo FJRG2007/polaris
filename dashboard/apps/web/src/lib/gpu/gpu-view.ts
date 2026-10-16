@@ -31,13 +31,26 @@ export interface MachineGpuView {
     readonly containersHidden: boolean;
 }
 
-export const NO_GPUS: MachineGpuView = { at: null, gpus: [], containers: [], moreContainers: 0, containersHidden: false };
+export const NO_GPUS: MachineGpuView = {
+    at: null,
+    gpus: [],
+    containers: [],
+    moreContainers: 0,
+    containersHidden: false
+};
 
 /** `showContainers` false keeps the cards and leaves out what runs on them: the
  *  machine Polaris runs on carries every user's containers. */
 export function machineGpuView(entry: MachineGpus | null, showContainers = true): MachineGpuView {
     if (!entry || entry.gpus.length === 0) return NO_GPUS;
-    if (!showContainers) return { at: entry.at, gpus: entry.gpus, containers: [], moreContainers: 0, containersHidden: true };
+    if (!showContainers)
+        return {
+            at: entry.at,
+            gpus: entry.gpus,
+            containers: [],
+            moreContainers: 0,
+            containersHidden: true
+        };
     const indexOf = new Map(entry.gpus.map((gpu) => [gpu.uuid, gpu.index]));
     const rows = [...entry.containers]
         .map(([name, usage]) => ({

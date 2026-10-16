@@ -38,7 +38,9 @@ export function ServerGpu({ metricsId }: { metricsId: string }) {
             <GpuBody view={data} error={Boolean(error) && !data} t={t} />
             {data && data.gpus.length > 0 ? (
                 <>
-                    <h3 className="mt-2 text-xs font-medium text-muted-foreground">{t("gpu.history")}</h3>
+                    <h3 className="mt-2 text-xs font-medium text-muted-foreground">
+                        {t("gpu.history")}
+                    </h3>
                     <MetricsHistory
                         endpoint={`${base}/metrics/history`}
                         live={`${base}/metrics/stream`}
@@ -69,7 +71,8 @@ export function GpuBody({
             <Skeleton className="h-20 w-full" />
         );
     }
-    if (view.gpus.length === 0) return <p className="text-xs text-muted-foreground">{t("gpu.none")}</p>;
+    if (view.gpus.length === 0)
+        return <p className="text-xs text-muted-foreground">{t("gpu.none")}</p>;
     return (
         <div className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -78,9 +81,13 @@ export function GpuBody({
                 ))}
             </div>
             <div className="flex flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">{t("gpu.containers")}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                    {t("gpu.containers")}
+                </span>
                 {view.containersHidden ? (
-                    <span className="text-xs text-muted-foreground">{t("gpu.containersHidden")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("gpu.containersHidden")}
+                    </span>
                 ) : view.containers.length === 0 ? (
                     <span className="text-xs text-muted-foreground">{t("gpu.noContainers")}</span>
                 ) : (
@@ -113,7 +120,10 @@ function GpuCard({ gpu, t }: { gpu: GpuReading; t: NamespaceTranslator<"servers"
     const missing = t("gpu.notMeasured");
     const memory =
         gpu.memoryUsedBytes !== null && gpu.memoryTotalBytes !== null
-            ? t("gpu.of", { used: formatBytes(gpu.memoryUsedBytes), total: formatBytes(gpu.memoryTotalBytes) })
+            ? t("gpu.of", {
+                  used: formatBytes(gpu.memoryUsedBytes),
+                  total: formatBytes(gpu.memoryTotalBytes)
+              })
             : gpu.memoryUsedBytes !== null
               ? formatBytes(gpu.memoryUsedBytes)
               : missing;
@@ -124,7 +134,9 @@ function GpuCard({ gpu, t }: { gpu: GpuReading; t: NamespaceTranslator<"servers"
     return (
         <div className="flex min-w-0 flex-col gap-2 rounded-md bg-muted/40 px-3 py-2">
             <div className="flex min-w-0 items-baseline gap-2">
-                <span className="shrink-0 text-xs font-medium">{t("gpu.card", { index: gpu.index })}</span>
+                <span className="shrink-0 text-xs font-medium">
+                    {t("gpu.card", { index: gpu.index })}
+                </span>
                 <span className="min-w-0 truncate text-xs text-muted-foreground" title={gpu.name}>
                     {gpu.name}
                 </span>
@@ -132,20 +144,28 @@ function GpuCard({ gpu, t }: { gpu: GpuReading; t: NamespaceTranslator<"servers"
             <Bar
                 label={t("gpu.use")}
                 share={gpu.utilizationPercent === null ? null : gpu.utilizationPercent / 100}
-                caption={gpu.utilizationPercent === null ? missing : `${Math.round(gpu.utilizationPercent)}%`}
+                caption={
+                    gpu.utilizationPercent === null
+                        ? missing
+                        : `${Math.round(gpu.utilizationPercent)}%`
+                }
             />
             <Bar label={t("gpu.memory")} share={memoryShare} caption={memory} />
             <div className="grid grid-cols-2 gap-2 text-xs">
                 <span className="flex min-w-0 flex-col">
                     <span className="text-muted-foreground">{t("gpu.temperature")}</span>
                     <span className="tabular-nums">
-                        {gpu.temperatureC === null ? missing : t("gpu.celsius", { value: Math.round(gpu.temperatureC) })}
+                        {gpu.temperatureC === null
+                            ? missing
+                            : t("gpu.celsius", { value: Math.round(gpu.temperatureC) })}
                     </span>
                 </span>
                 <span className="flex min-w-0 flex-col">
                     <span className="text-muted-foreground">{t("gpu.power")}</span>
                     <span className="tabular-nums">
-                        {gpu.powerWatts === null ? missing : t("gpu.watts", { value: Math.round(gpu.powerWatts) })}
+                        {gpu.powerWatts === null
+                            ? missing
+                            : t("gpu.watts", { value: Math.round(gpu.powerWatts) })}
                     </span>
                 </span>
             </div>

@@ -191,7 +191,9 @@ export function summarizeGpus(gpus: readonly GpuReading[]): GpuSummary | null {
     const sum = (values: number[]) => values.reduce((acc, value) => acc + value, 0);
     return {
         utilizationPercent:
-            utilization.length > 0 ? Math.round((sum(utilization) / utilization.length) * 100) / 100 : null,
+            utilization.length > 0
+                ? Math.round((sum(utilization) / utilization.length) * 100) / 100
+                : null,
         memoryUsedBytes: used.length > 0 ? sum(used) : null,
         memoryTotalBytes: total.length > 0 ? sum(total) : null,
         temperatureC: temperature.length > 0 ? Math.max(...temperature) : null,

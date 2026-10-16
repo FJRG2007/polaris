@@ -126,14 +126,23 @@ export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[]
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
     // i18n-ignore every label here is said through components.metrics.labels where drawn
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "cpu",
+        label: "CPU",
+        value: (point) => point.cpuPercent,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
     {
         key: "mem",
         label: "Memory", // i18n-ignore
         value: (point) => point.memUsedBytes,
         share: (point) => {
             const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
-            return share === null || point.memTotalBytes === null ? null : { share, total: point.memTotalBytes };
+            return share === null || point.memTotalBytes === null
+                ? null
+                : { share, total: point.memTotalBytes };
         },
         describe: (point) => {
             const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
@@ -150,7 +159,9 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         value: (point) => point.diskUsedBytes,
         share: (point) => {
             const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
-            return share === null || point.diskTotalBytes === null ? null : { share, total: point.diskTotalBytes };
+            return share === null || point.diskTotalBytes === null
+                ? null
+                : { share, total: point.diskTotalBytes };
         },
         describe: (point) => {
             const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
@@ -190,7 +201,14 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
  */
 export const GPU_METRICS: MetricSpec[] = [
     // i18n-ignore every label here is said through components.metrics.labels where drawn
-    { key: "gpu", label: "GPU", value: (point) => point.gpuPercent ?? null, format: percent, tone: "primary", max: 100 },
+    {
+        key: "gpu",
+        label: "GPU",
+        value: (point) => point.gpuPercent ?? null,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
     {
         key: "gpu-mem",
         label: "GPU memory", // i18n-ignore
