@@ -104,7 +104,10 @@ export const EVIDENCE_CHANGE_ACTIONS: Readonly<Record<EvidenceArea, readonly str
         "deploy.tcp_proxy.add",
         "deploy.tcp_proxy.remove",
         "deploy.domain.cert.set",
-        "deploy.domain.cert.clear"
+        "deploy.domain.cert.clear",
+        "deploy.domain.cutover.switch",
+        "deploy.domain.cutover.rollback",
+        "deploy.domain.cutover.finish"
     ],
     firewall: [
         "deploy.waf.set",
