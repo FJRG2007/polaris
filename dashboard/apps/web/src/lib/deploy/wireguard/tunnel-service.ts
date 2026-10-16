@@ -35,7 +35,9 @@ export type TunnelRefusalCode =
     | "hostname"
     | "hostnameTaken"
     | "full"
-    | "noAddress";
+    | "noAddress"
+    | "unreachable"
+    | "edge";
 
 export class TunnelRefusal extends Error {
     public constructor(public readonly code: TunnelRefusalCode) {
@@ -317,6 +319,11 @@ async function bringUp(ownerId: string, id: string): Promise<void> {
     const host = row.publicTarget.kind === "local" ? await getPublicIp() : (row.publicTarget.host?.address ?? null);
     if (!host) throw new TunnelRefusal("noAddress");
     const endpoint = `${host.includes(":") ? `[${host}]` : host}:${row.listenPort}`;
+    // Before the public end starts: it joins the edge's network, which a server
+    // with no edge yet does not have.
+    if (row.publicTarget.kind !== "local" && row.publicTarget.hostId) {
+        await ensureEdge(row.publicTarget.hostId, ownerId, row.publicTarget.proxyNetwork);
+    }
     const app = row.application;
     const origin = `${serviceName(app.environment.project.slug, app.slug, app.id)}:${containerPortOf(app)}`;
 
@@ -399,4 +406,22 @@ async function publishRoutes(ownerId: string, target: TunnelRow["publicTarget"])
         auth: connection.auth,
         hostKey: connection.hostKey
     }).pushFile(wg.TUNNEL_ROUTE_FILE, yaml);
+}
+
+/**
+ * A public server that has never had anything deployed to it has no edge yet, and a
+ * route file there is read by nobody. Set it up the same way the Servers screen
+ * does - nothing runs there to interrupt. An edge that runs but does not read the
+ * pushed directory is the operator's to repair (setting it up again stops what it
+ * serves for a moment), so that is refused with the reason instead.
+ */
+async function ensureEdge(hostId: string, ownerId: string, proxyNetwork: string): Promise<void> {
+    const { readServerEdge, prepareServerEdge, withSetupLock } = await import("@/lib/deploy/server-edge");
+    const edge = await readServerEdge(hostId, ownerId);
+    if (edge.error) throw new TunnelRefusal("unreachable");
+    if (!edge.traefik) {
+        await withSetupLock(hostId, () => prepareServerEdge(hostId, ownerId, proxyNetwork));
+        return;
+    }
+    if (!edge.pushable) throw new TunnelRefusal("edge");
 }
