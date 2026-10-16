@@ -1,0 +1,431 @@
+/**
+ * The canvas editor's arithmetic, pure so the editor, the server and the tests
+ * agree on it: where nodes without a position are drawn, which lane a node
+ * belongs to, whether a connection may be made, what a copy carries, and which
+ * earlier values a field may reference.
+ *
+ * Nothing here draws anything. The canvas calls these and renders the result.
+ */
+
+import { z } from "zod";
+import * as graphs from "./automation-graph.js";
+
+/** The size every node card is drawn at, in board units. */
+export const CANVAS_NODE = { width: 240, height: 72 } as const;
+/** Room between layout columns and rows. */
+export const CANVAS_GAP = { x: 96, y: 36 } as const;
+/** How far the "Always, at the end" lane sits below the main flow. */
+export const FINALLY_LANE_GAP = 140;
+/** The pseudo-node on the Always lane's edge that a connection starts the lane from. */
+export const FINALLY_SOURCE = "$finally";
+
+export type Lane = "main" | "finally" | "loose";
+
+/** Which lane each node is in: reached from a trigger, reached from the Always lane's start, or neither yet. */
+export function lanesOf(graph: graphs.AutomationGraph): Map<string, Lane> {
+    const main = new Set<string>();
+    for (const trigger of graphs.triggerNodes(graph)) for (const id of graphs.reachableFrom(graph, trigger.id)) main.add(id);
+    const lane = graphs.finallyNodes(graph);
+    const out = new Map<string, Lane>();
+    for (const node of graph.nodes) out.set(node.id, lane.has(node.id) ? "finally" : main.has(node.id) ? "main" : "loose");
+    return out;
+}
+
+/** Columns by longest path from the roots, so every edge runs left to right. Cycles (a broken draft) end the walk. */
+function columns(graph: graphs.AutomationGraph, ids: ReadonlySet<string>): Map<string, number> {
+    const inbound = new Map<string, number>([...ids].map((id) => [id, 0]));
+    for (const edge of graph.edges) if (ids.has(edge.from.node) && ids.has(edge.to.node)) inbound.set(edge.to.node, inbound.get(edge.to.node)! + 1);
+    const column = new Map<string, number>();
+    const queue = graph.nodes.filter((node) => ids.has(node.id) && inbound.get(node.id) === 0).map((node) => node.id);
+    for (const id of queue) column.set(id, 0);
+    while (queue.length) {
+        const at = queue.shift()!;
+        for (const edge of graph.edges) {
+            if (edge.from.node !== at || !ids.has(edge.to.node)) continue;
+            column.set(edge.to.node, Math.max(column.get(edge.to.node) ?? 0, column.get(at)! + 1));
+            const left = inbound.get(edge.to.node)! - 1;
+            inbound.set(edge.to.node, left);
+            if (left === 0) queue.push(edge.to.node);
+        }
+    }
+    for (const id of ids) if (!column.has(id)) column.set(id, 0);
+    return column;
+}
+
+function placeBand(graph: graphs.AutomationGraph, ids: ReadonlySet<string>, top: number, into: Map<string, { x: number; y: number }>): number {
+    if (ids.size === 0) return top;
+    const column = columns(graph, ids);
+    const rows = new Map<number, number>();
+    let bottom = top;
+    for (const node of graph.nodes) {
+        if (!ids.has(node.id)) continue;
+        const at = column.get(node.id)!;
+        const row = rows.get(at) ?? 0;
+        rows.set(at, row + 1);
+        const y = top + row * (CANVAS_NODE.height + CANVAS_GAP.y);
+        into.set(node.id, { x: at * (CANVAS_NODE.width + CANVAS_GAP.x), y });
+        bottom = Math.max(bottom, y + CANVAS_NODE.height);
+    }
+    return bottom;
+}
+
+/**
+ * Where every node is drawn. Stored positions win; a node without one (every
+ * graph built in the list view) is laid out by lane: the main flow on top, the
+ * Always lane below it, nodes wired to neither under both. `tidy` lays out
+ * every node, stored position or not.
+ */
+export function layoutGraph(graph: graphs.AutomationGraph, options: { tidy?: boolean } = {}): graphs.AutomationGraph {
+    if (!options.tidy && graph.nodes.every((node) => node.position)) return graph;
+    const lanes = lanesOf(graph);
+    const pick = (lane: Lane) => new Set(graph.nodes.filter((node) => lanes.get(node.id) === lane).map((node) => node.id));
+    const placed = new Map<string, { x: number; y: number }>();
+    const mainBottom = placeBand(graph, pick("main"), 0, placed);
+    const finallyBottom = placeBand(graph, pick("finally"), mainBottom + FINALLY_LANE_GAP, placed);
+    placeBand(graph, pick("loose"), finallyBottom + FINALLY_LANE_GAP, placed);
+    return {
+        ...graph,
+        nodes: graph.nodes.map((node) => (node.position && !options.tidy ? node : { ...node, position: placed.get(node.id) ?? { x: 0, y: 0 } }))
+    };
+}
+
+export interface CanvasBox {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+}
+
+/** The box around every node and note, or null for an empty canvas. */
+export function graphBounds(graph: graphs.AutomationGraph): CanvasBox | null {
+    const boxes: CanvasBox[] = [
+        ...graph.nodes.map((node) => ({ ...(node.position ?? { x: 0, y: 0 }), ...CANVAS_NODE })),
+        ...graph.notes.map((note) => ({ ...note.position, ...note.size }))
+    ];
+    if (boxes.length === 0) return null;
+    const left = Math.min(...boxes.map((box) => box.x));
+    const top = Math.min(...boxes.map((box) => box.y));
+    const right = Math.max(...boxes.map((box) => box.x + box.width));
+    const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+    return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+/** The vertical band the Always lane is drawn in, from its nodes, or a band under the main flow when it is empty. */
+export function finallyBand(graph: graphs.AutomationGraph): { top: number; bottom: number } {
+    const lanes = lanesOf(graph);
+    const ys = (lane: Lane) => graph.nodes.filter((node) => lanes.get(node.id) === lane).map((node) => node.position?.y ?? 0);
+    const lane = ys("finally");
+    const main = ys("main");
+    const mainBottom = main.length ? Math.max(...main) + CANVAS_NODE.height : 0;
+    if (lane.length === 0) return { top: mainBottom + FINALLY_LANE_GAP / 2, bottom: mainBottom + FINALLY_LANE_GAP / 2 + CANVAS_NODE.height + 48 };
+    return { top: Math.min(...lane) - 36, bottom: Math.max(...lane) + CANVAS_NODE.height + 24 };
+}
+
+// ---------------------------------------------------------------------------
+// Connections
+// ---------------------------------------------------------------------------
+
+export type ConnectRefusal = "self" | "intoTrigger" | "unknownPort" | "duplicate" | "cycle" | "crossesLane" | "intoLaneStart" | "laneTaken";
+
+/** Why a connection from `from` to `to` may not be made, or null when it may. */
+export function connectRefusal(graph: graphs.AutomationGraph, from: { node: string; port: string }, to: string): ConnectRefusal | null {
+    const target = graph.nodes.find((node) => node.id === to);
+    if (!target) return "unknownPort";
+    if (graphs.nodeRole(target.type) === "trigger") return "intoTrigger";
+    const lanes = lanesOf(graph);
+    if (from.node === FINALLY_SOURCE) {
+        if (graph.finally.entry) return "laneTaken";
+        if (graph.edges.some((edge) => edge.to.node === to) || lanes.get(to) !== "loose") return "crossesLane";
+        return null;
+    }
+    if (from.node === to) return "self";
+    const source = graph.nodes.find((node) => node.id === from.node);
+    if (!source || !graphs.nodePorts(source.type).includes(from.port)) return "unknownPort";
+    if (graph.edges.some((edge) => edge.from.node === from.node && edge.from.port === from.port && edge.to.node === to)) return "duplicate";
+    if (to === graph.finally.entry) return "intoLaneStart";
+    if (graphs.reachableFrom(graph, to).has(from.node)) return "cycle";
+    const a = lanes.get(from.node);
+    const b = lanes.get(to);
+    if (a !== "loose" && b !== "loose" && a !== b) return "crossesLane";
+    return null;
+}
+
+/** The graph with one more connection, or the same graph when it is refused. */
+export function connect(graph: graphs.AutomationGraph, from: { node: string; port: string }, to: string): graphs.AutomationGraph {
+    if (connectRefusal(graph, from, to)) return graph;
+    if (from.node === FINALLY_SOURCE) return { ...graph, finally: { ...graph.finally, entry: to } };
+    return { ...graph, edges: [...graph.edges, { from: { ...from }, to: { node: to } }] };
+}
+
+export function edgeKey(edge: graphs.GraphEdge): string {
+    return `${edge.from.node}:${edge.from.port}>${edge.to.node}`;
+}
+
+export function disconnect(graph: graphs.AutomationGraph, key: string): graphs.AutomationGraph {
+    if (key === `${FINALLY_SOURCE}>${graph.finally.entry}`) return { ...graph, finally: { ...graph.finally, entry: null } };
+    return { ...graph, edges: graph.edges.filter((edge) => edgeKey(edge) !== key) };
+}
+
+/**
+ * The graph without some nodes and notes and every connection touching them.
+ * Removing the Always lane's first node hands the lane to the node it led to.
+ */
+export function removeFromGraph(graph: graphs.AutomationGraph, nodeIds: Iterable<string>, noteIds: Iterable<string> = []): graphs.AutomationGraph {
+    const gone = new Set(nodeIds);
+    const notesGone = new Set(noteIds);
+    let entry = graph.finally.entry;
+    while (entry && gone.has(entry)) {
+        const next = graph.edges.filter((edge) => edge.from.node === entry);
+        entry = next.length === 1 ? next[0]!.to.node : null;
+    }
+    return {
+        ...graph,
+        nodes: graph.nodes.filter((node) => !gone.has(node.id)),
+        edges: graph.edges.filter((edge) => !gone.has(edge.from.node) && !gone.has(edge.to.node)),
+        notes: graph.notes.filter((note) => !notesGone.has(note.id)),
+        finally: { ...graph.finally, entry }
+    };
+}
+
+/** Move nodes and notes by the same distance, as a drag of a selection does. */
+export function moveInGraph(graph: graphs.AutomationGraph, nodeIds: ReadonlySet<string>, noteIds: ReadonlySet<string>, dx: number, dy: number): graphs.AutomationGraph {
+    const snap = (value: number) => Math.round(value);
+    return {
+        ...graph,
+        nodes: graph.nodes.map((node) =>
+            nodeIds.has(node.id) ? { ...node, position: { x: snap((node.position?.x ?? 0) + dx), y: snap((node.position?.y ?? 0) + dy) } } : node
+        ),
+        notes: graph.notes.map((note) => (noteIds.has(note.id) ? { ...note, position: { x: snap(note.position.x + dx), y: snap(note.position.y + dy) } } : note))
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Copy and paste
+// ---------------------------------------------------------------------------
+
+const FRAGMENT_TAG = "polaris-automation-fragment";
+
+export const fragmentSchema = z.object({
+    kind: z.literal(FRAGMENT_TAG),
+    version: z.literal(1),
+    nodes: z.array(graphs.graphNodeSchema).max(graphs.AUTOMATION_LIMITS.nodes),
+    edges: z.array(graphs.graphEdgeSchema).max(graphs.AUTOMATION_LIMITS.edges),
+    notes: z.array(graphs.graphNoteSchema).max(graphs.AUTOMATION_LIMITS.notes)
+});
+export type GraphFragment = z.infer<typeof fragmentSchema>;
+
+const SECRET_KEYS = new Set(["secretId", "urlSecretId"]);
+
+/** A config with every secret reference emptied: a copy never carries a credential to another shelf. */
+export function withoutSecrets(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(withoutSecrets);
+    if (!value || typeof value !== "object") return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value)) {
+        out[key] = SECRET_KEYS.has(key) ? (key === "urlSecretId" && entry === null ? null : "") : withoutSecrets(entry);
+    }
+    return out;
+}
+
+/** The selected nodes, the connections among them, and the selected notes. Pins and secrets stay behind. */
+export function copyFragment(graph: graphs.AutomationGraph, nodeIds: ReadonlySet<string>, noteIds: ReadonlySet<string> = new Set()): GraphFragment {
+    return {
+        kind: FRAGMENT_TAG,
+        version: 1,
+        nodes: graph.nodes
+            .filter((node) => nodeIds.has(node.id))
+            .map(({ pinned: _pinned, ...node }) => ({ ...node, config: withoutSecrets(node.config) })),
+        edges: graph.edges.filter((edge) => nodeIds.has(edge.from.node) && nodeIds.has(edge.to.node)),
+        notes: graph.notes.filter((note) => noteIds.has(note.id))
+    };
+}
+
+export function fragmentText(fragment: GraphFragment): string {
+    return JSON.stringify(fragment);
+}
+
+/** A fragment out of clipboard text, or null when the text is not one. Validated, never trusted. */
+export function parseFragment(text: string): GraphFragment | null {
+    if (text.length > 2 * graphs.AUTOMATION_LIMITS.eventPayloadBytes) return null;
+    try {
+        const parsed = fragmentSchema.safeParse(JSON.parse(text));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The graph with a fragment added, every id fresh and every position moved by
+ * `offset`. Null when it would pass the node or note limit.
+ */
+export function pasteFragment(
+    graph: graphs.AutomationGraph,
+    fragment: GraphFragment,
+    offset: { x: number; y: number },
+    newId: () => string
+): { graph: graphs.AutomationGraph; nodeIds: string[]; noteIds: string[] } | null {
+    if (graph.nodes.length + fragment.nodes.length > graphs.AUTOMATION_LIMITS.nodes) return null;
+    if (graph.notes.length + fragment.notes.length > graphs.AUTOMATION_LIMITS.notes) return null;
+    if (graph.edges.length + fragment.edges.length > graphs.AUTOMATION_LIMITS.edges) return null;
+    const ids = new Map(fragment.nodes.map((node) => [node.id, newId()]));
+    const nodes: graphs.GraphNode[] = fragment.nodes.map((node) => ({
+        ...node,
+        id: ids.get(node.id)!,
+        position: { x: (node.position?.x ?? 0) + offset.x, y: (node.position?.y ?? 0) + offset.y }
+    }));
+    const edges: graphs.GraphEdge[] = fragment.edges
+        .filter((edge) => ids.has(edge.from.node) && ids.has(edge.to.node))
+        .map((edge) => ({ from: { node: ids.get(edge.from.node)!, port: edge.from.port }, to: { node: ids.get(edge.to.node)! } }));
+    const notes: graphs.GraphNote[] = fragment.notes.map((note) => ({
+        ...note,
+        id: newId(),
+        position: { x: note.position.x + offset.x, y: note.position.y + offset.y }
+    }));
+    return {
+        graph: { ...graph, nodes: [...graph.nodes, ...nodes], edges: [...graph.edges, ...edges], notes: [...graph.notes, ...notes] },
+        nodeIds: nodes.map((node) => node.id),
+        noteIds: notes.map((note) => note.id)
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Pins and versions
+// ---------------------------------------------------------------------------
+
+/** What a version stores: the draft without its pinned samples, which belong to test runs only. */
+export function withoutPins(graph: graphs.AutomationGraph): graphs.AutomationGraph {
+    if (!graph.nodes.some((node) => node.pinned !== undefined)) return graph;
+    return { ...graph, nodes: graph.nodes.map(({ pinned: _pinned, ...node }) => node) };
+}
+
+/** Whether the draft differs from the published graph in anything a run would notice (pins and positions do not count). */
+export function draftDiffers(draft: graphs.AutomationGraph, published: graphs.AutomationGraph | null): boolean {
+    if (!published) return true;
+    const shape = (graph: graphs.AutomationGraph) =>
+        JSON.stringify({
+            timeZone: graph.timeZone,
+            finally: graph.finally,
+            nodes: graph.nodes.map(({ position: _position, pinned: _pinned, ...node }) => node),
+            edges: graph.edges.map(edgeKey)
+        });
+    return shape(draft) !== shape(published);
+}
+
+// ---------------------------------------------------------------------------
+// Data mapping
+// ---------------------------------------------------------------------------
+
+/** What each core node adds to the context when there is no sample to read it from. */
+export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readonly string[]>> = {
+    "core.manual": ["id", "at", "by", "kind"],
+    "core.schedule": ["id", "at", "kind"],
+    "core.webhook": ["id", "at", "method", "query", "headers", "body"],
+    "core.if": ["matched"],
+    "core.wait": ["waitedUntil"],
+    "core.notify": ["sent"],
+    "core.http": ["status", "ok", "headers", "body"],
+    "core.chat": ["status", "ok"]
+};
+
+export interface ReferenceOption {
+    /** What goes between the braces. */
+    readonly path: string;
+    /** A short preview of the sample value, when a sample exists. */
+    readonly preview?: string;
+}
+
+export interface ReferenceGroup {
+    /** The node the values come from, or "run" for the run itself. */
+    readonly nodeId: string;
+    readonly root: string;
+    readonly fromSample: boolean;
+    readonly options: readonly ReferenceOption[];
+}
+
+function preview(value: unknown): string {
+    const text = typeof value === "string" ? value : JSON.stringify(value) ?? "";
+    return text.length > 40 ? `${text.slice(0, 39)}...` : text;
+}
+
+/** Every leaf path of a sample, depth and count bounded; a list offers its first entry. */
+export function samplePaths(value: unknown, prefix: string, limits = { depth: 5, max: 80 }): ReferenceOption[] {
+    const out: ReferenceOption[] = [];
+    const visit = (at: unknown, path: string, depth: number) => {
+        if (out.length >= limits.max) return;
+        if (at !== null && typeof at === "object" && depth < limits.depth) {
+            const entries = Array.isArray(at) ? (at.length ? [["0", at[0]] as const] : []) : Object.entries(at);
+            if (entries.length === 0) out.push({ path, preview: preview(at) });
+            for (const [key, entry] of entries) if (/^[\w-]+$/.test(key)) visit(entry, `${path}.${key}`, depth + 1);
+            return;
+        }
+        out.push({ path, preview: preview(at) });
+    };
+    visit(value, prefix, 0);
+    return out;
+}
+
+/** Nodes upstream of `nodeId`, nearest first. */
+export function upstreamOf(graph: graphs.AutomationGraph, nodeId: string): string[] {
+    const order: string[] = [];
+    const seen = new Set<string>([nodeId]);
+    let frontier = [nodeId];
+    while (frontier.length) {
+        const next: string[] = [];
+        for (const at of frontier)
+            for (const edge of graph.edges)
+                if (edge.to.node === at && !seen.has(edge.from.node)) {
+                    seen.add(edge.from.node);
+                    order.push(edge.from.node);
+                    next.push(edge.from.node);
+                }
+        frontier = next;
+    }
+    return order;
+}
+
+/**
+ * What a field of `nodeId` may reference: the trigger's values, every earlier
+ * step's output, and in the Always lane the run's outcome and every main-flow
+ * step. Paths come from a sample (a pinned one or the last test run's output)
+ * when there is one, else from what the node type is known to give.
+ */
+export function referenceOptions(graph: graphs.AutomationGraph, nodeId: string, samples: Readonly<Record<string, unknown>>): ReferenceGroup[] {
+    const lane = lanesOf(graph).get(nodeId);
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+    const upstream = new Set(upstreamOf(graph, nodeId));
+    if (lane === "finally") for (const [id, at] of lanesOf(graph)) if (at === "main") upstream.add(id);
+    const groups: ReferenceGroup[] = [];
+    const known = (node: graphs.GraphNode) => (graphs.isCoreNodeType(node.type) ? CORE_NODE_OUTPUT_PATHS[node.type] : []);
+    for (const id of upstream) {
+        const node = byId.get(id);
+        if (!node) continue;
+        const trigger = graphs.nodeRole(node.type) === "trigger";
+        const root = trigger ? "trigger" : `steps.${id}`;
+        const sample = node.pinned !== undefined ? node.pinned : samples[id];
+        const fromSample = sample !== undefined && sample !== null;
+        const options = fromSample ? samplePaths(sample, root) : known(node).map((path) => ({ path: `${root}.${path}` }));
+        groups.push({ nodeId: id, root, fromSample, options });
+    }
+    if (lane === "finally")
+        groups.push({ nodeId: "run", root: "run", fromSample: false, options: ["status", "error", "startedAt", "id"].map((path) => ({ path: `run.${path}` })) });
+    return groups;
+}
+
+/** Text with `{{path}}` put where the caret was (replacing a selection), and where the caret goes after it. */
+export function insertReference(text: string, start: number, end: number, path: string): { text: string; caret: number } {
+    const from = Math.max(0, Math.min(start, text.length));
+    const to = Math.max(from, Math.min(end, text.length));
+    const token = `{{${path}}}`;
+    return { text: text.slice(0, from) + token + text.slice(to), caret: from + token.length };
+}
+
+/** Whether a node of this type may hold a pinned sample: triggers and actions, not conditions. */
+export function canPin(type: string): boolean {
+    return graphs.nodeRole(type) !== "condition";
+}
+
+/** The node types the palette offers, by role, in a stable order. */
+export function paletteTypes(): { type: graphs.CoreNodeType; role: "trigger" | "condition" | "action" }[] {
+    return (Object.keys(graphs.CORE_NODE_META) as graphs.CoreNodeType[]).map((type) => ({ type, role: graphs.CORE_NODE_META[type].role }));
+}

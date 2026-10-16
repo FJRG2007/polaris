@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { RunRow, RunStepRow } from "@/lib/automations/service";
+import type { RunRow, StepView } from "@/lib/automations/history";
 import { Button, EmptyState, Skeleton, useToast } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronDown, ChevronRight, History, RefreshCw, X } from "lucide-react";
-import { cancelRunAction, listRunsAction, listRunStepsAction } from "../actions";
+import { cancelRunAction, getRunAction, listRunsAction } from "../actions";
 import {
     LoadFailed,
     nodeTitle,
@@ -61,7 +61,7 @@ export function RunsView({ automationId }: { automationId: string | null }) {
     const loadMore = async () => {
         if (!next) return;
         setLoadingMore(true);
-        const answer = await listRunsAction(automationId ?? undefined, next).catch(() => null);
+        const answer = await listRunsAction(automationId ?? undefined, { cursor: next }).catch(() => null);
         setLoadingMore(false);
         if (!answer?.ok) return void toast.show({ title: answer?.error || t("runs.loadFailed") });
         setOlder((current) => ({
@@ -204,8 +204,9 @@ function RunSteps({ runId }: { runId: string }) {
     const locale = useLocale();
     const words = useRunError();
     const { data, error, refresh } = useCachedAction(`polaris.automations.run.${runId}`, () =>
-        listRunStepsAction(runId)
+        getRunAction(runId).then((answer) => (answer.ok ? { ok: true as const, ...answer.run } : answer))
     );
+    const types = new Map(data?.graph?.nodes.map((node) => [node.id, node.type]) ?? []);
 
     if (error !== null && !data)
         return (
@@ -231,6 +232,7 @@ function RunSteps({ runId }: { runId: string }) {
                 <StepRow
                     key={step.id}
                     step={step}
+                    type={types.get(step.nodeId) ?? null}
                     canSeeData={data.canSeeData}
                     locale={locale}
                     words={words}
@@ -242,11 +244,13 @@ function RunSteps({ runId }: { runId: string }) {
 
 function StepRow({
     step,
+    type,
     canSeeData,
     locale,
     words
 }: {
-    step: RunStepRow;
+    step: StepView;
+    type: string | null;
     canSeeData: boolean;
     locale: string;
     words: (code: string | null) => string | null;
@@ -259,8 +263,8 @@ function StepRow({
             <div className="flex flex-wrap items-center gap-2">
                 <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">
-                        {step.type ? nodeTitle(t, step.type) : step.nodeId}
-                        {step.lane === "finally" ? (
+                        {type ? nodeTitle(t, type) : step.nodeId}
+                        {step.iteration === "f" ? (
                             <span className="ml-2 text-xs font-normal text-muted-foreground">
                                 {t("editor.always")}
                             </span>

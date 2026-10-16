@@ -26,7 +26,7 @@ vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () =
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("undici", () => ({ Agent: class {}, fetch: async () => new Response("{}") }));
 
-const service = await import("@/lib/automations/service");
+const history = await import("@/lib/automations/history");
 const actor = { id: "u1", isAdmin: false };
 const shelf = { orgId: null, userId: "u1" };
 
@@ -49,12 +49,9 @@ describe("run history", () => {
         let next: string | null | undefined;
         let pages = 0;
         do {
-            const page = await service.listRuns(
-                actor,
-                shelf,
-                automation.id as string,
-                next ?? undefined
-            );
+            const page = await history.listRuns(actor, shelf, automation.id as string, {
+                cursor: next ?? undefined
+            });
             seen.push(...page.rows.map((row) => row.id));
             next = page.next;
             pages += 1;
@@ -89,7 +86,7 @@ describe("run history", () => {
             }
         });
         access.edit = true;
-        const editor = await service.listRunSteps(actor, run.id as string);
+        const editor = await history.getRun(actor, run.id as string);
         expect(editor.steps[0]).toMatchObject({
             nodeId: "n1",
             status: "ok",
@@ -97,7 +94,7 @@ describe("run history", () => {
             output: { status: 200 }
         });
         access.edit = false;
-        const reader = await service.listRunSteps(actor, run.id as string);
+        const reader = await history.getRun(actor, run.id as string);
         expect(reader.canSeeData).toBe(false);
         expect(reader.steps[0]).toMatchObject({ input: null, output: null });
     });

@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import * as service from "@/lib/automations/service";
+import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { RunActor } from "@/lib/automations/types";
@@ -246,32 +247,81 @@ export async function runNowAction(automationId: unknown): Promise<Result> {
     }
 }
 
-export async function listRunsAction(
-    automationId: unknown,
-    after?: unknown
-): Promise<Result<service.RunPage>> {
-    const parsed = z
-        .tuple([id.optional(), z.string().max(100).optional()])
-        .safeParse([automationId ?? undefined, after ?? undefined]);
+const runsPageInput = z.object({
+    automationId: id.optional(),
+    cursor: z.string().max(120).optional(),
+    filter: z.enum(history.RUN_FILTERS).default("all")
+});
+
+export async function listRunsAction(automationId: unknown, page: unknown = {}): Promise<Result<history.RunsPage>> {
+    const parsed = runsPageInput.safeParse({ ...(page && typeof page === "object" ? page : {}), automationId: automationId ?? undefined });
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        return {
-            ok: true,
-            ...(await service.listRuns(who, await openShelf(who), parsed.data[0], parsed.data[1]))
-        };
+        const { automationId: one, cursor, filter } = parsed.data;
+        return { ok: true, ...(await history.listRuns(who, await openShelf(who), one, { cursor, filter })) };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-export async function listRunStepsAction(
-    runId: unknown
-): Promise<Result<{ steps: service.RunStepRow[]; canSeeData: boolean }>> {
+export async function getRunAction(runId: unknown): Promise<Result<{ run: history.RunDetail }>> {
     const parsed = id.safeParse(runId);
     if (!parsed.success) return invalid();
     try {
-        return { ok: true, ...(await service.listRunSteps(await actor(), parsed.data)) };
+        return { ok: true, run: await history.getRun(await actor(), parsed.data) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const rerunInput = z.object({ runId: id, which: z.enum(["same", "published"]) });
+
+export async function rerunAction(input: unknown): Promise<Result<{ runId: string }>> {
+    const parsed = rerunInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        const runId = await history.rerun(await actor(), parsed.data.runId, parsed.data.which);
+        revalidatePath("/automations/runs");
+        return { ok: true, runId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const testRunInput = z.object({ automationId: id, triggerNodeId: z.string().min(1).max(64).optional() });
+
+export async function startTestRunAction(input: unknown): Promise<Result<{ runId: string }>> {
+    const parsed = testRunInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        const answer = await history.startTestRun(await actor(), parsed.data.automationId, parsed.data.triggerNodeId);
+        if ("problems" in answer) return { ok: false, error: (await getTranslations("automations"))("errors.notReady"), problems: answer.problems };
+        return { ok: true, runId: answer.runId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function listVersionsAction(automationId: unknown): Promise<Result<{ rows: history.VersionRow[] }>> {
+    const parsed = id.safeParse(automationId);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, rows: await history.listVersions(await actor(), parsed.data) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const restoreInput = z.object({ automationId: id, versionId: id });
+
+export async function restoreVersionAction(input: unknown): Promise<Result<{ graph: core.AutomationGraph }>> {
+    const parsed = restoreInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        const graph = await history.restoreVersion(await actor(), parsed.data.automationId, parsed.data.versionId);
+        refresh(parsed.data.automationId);
+        return { ok: true, graph };
     } catch (caught) {
         return failure(caught);
     }

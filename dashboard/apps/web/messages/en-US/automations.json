@@ -286,6 +286,8 @@
         "valueRequired": "Enter the value.",
         "urlInvalid": "Enter a full web address.",
         "basicInvalid": "Use user:password.",
-        "notReady": "It is not ready to publish. Check the steps."
+        "notReady": "It is not ready to publish. Check the steps.",
+        "noTrigger": "Add a trigger to test it.",
+        "triggerGone": "That trigger is no longer in this version."
     }
 }

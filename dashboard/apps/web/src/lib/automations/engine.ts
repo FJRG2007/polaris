@@ -78,6 +78,8 @@ export interface Firing {
     readonly firingKey: string;
     readonly cause: Record<string, unknown>;
     readonly depth: number;
+    /** A test run of the draft from the editor: never held back by the mode or the rate limit, never counted against them. */
+    readonly test?: boolean;
 }
 
 export interface StartedRun {
@@ -114,28 +116,23 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
         : core.DEFAULT_AUTOMATION_MODE;
     const [active, queued, recent] = await Promise.all([
         prisma.automationRun.count({
-            where: { automationId: automation.id, status: { in: [...core.ACTIVE_RUN_STATUSES] } }
+            where: { automationId: automation.id, test: false, status: { in: [...core.ACTIVE_RUN_STATUSES] } }
         }),
-        prisma.automationRun.count({ where: { automationId: automation.id, status: "queued" } }),
+        prisma.automationRun.count({ where: { automationId: automation.id, test: false, status: "queued" } }),
         prisma.automationRun.count({
             where: {
                 automationId: automation.id,
+                test: false,
                 queuedAt: { gte: new Date(now.getTime() - core.RATE_WINDOW_MS) },
                 status: { notIn: ["skipped", "limited", "refused"] }
             }
         })
     ]);
-    const admission: core.Admission =
-        firing.depth > L.depth
-            ? "skip"
-            : core.admitRun({
-                  mode,
-                  maxRuns: automation.maxRuns,
-                  rateLimit: automation.rateLimit,
-                  active,
-                  queued,
-                  recent
-              });
+    const admission: core.Admission = firing.test
+        ? "start"
+        : firing.depth > L.depth
+          ? "skip"
+          : core.admitRun({ mode, maxRuns: automation.maxRuns, rateLimit: automation.rateLimit, active, queued, recent });
 
     const status =
         firing.depth > L.depth
@@ -170,6 +167,7 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
                 cause: capCause(firing.cause) as object,
                 firingKey: firing.firingKey,
                 depth: firing.depth,
+                test: firing.test ?? false,
                 error,
                 queuedAt: now,
                 startedAt: status === "running" ? now : null,
@@ -198,6 +196,7 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
         for (const other of others) await cancelRun(other.id, "restarted");
     }
     if (status === "running") await beginRun(run.id, firing);
+    if (firing.test) return run;
     await prisma.automation.update({
         where: { id: automation.id },
         data: { lastRunAt: now, lastStatus: status }
@@ -344,6 +343,7 @@ async function readRun(runId: string) {
             automationId: true,
             versionId: true,
             status: true,
+            test: true,
             finally: true,
             outcome: true,
             lockToken: true,
@@ -549,6 +549,16 @@ async function executeStep(
             from: "ready"
         });
         if (done) await enqueue(run.id, core.successors(graph, node.id, ports[0]!), lane);
+        return;
+    }
+    if (run.test && node.pinned !== undefined && core.canPin(node.type)) {
+        // A pinned sample stands in for the node in a test run: nothing is sent.
+        const output = core.capStored(node.pinned, L.stepDataBytes) as object;
+        const done = await finishStep(step.id, { status: "ok", port: ports[0]!, output, from: "ready" });
+        if (done) {
+            await count(run.id, output);
+            await enqueue(run.id, core.successors(graph, node.id, ports[0]!), lane);
+        }
         return;
     }
     const impl = await serverNode(node.type);

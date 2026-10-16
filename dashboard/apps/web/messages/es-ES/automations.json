@@ -286,6 +286,8 @@
         "valueRequired": "Escribe el valor.",
         "urlInvalid": "Escribe una dirección web completa.",
         "basicInvalid": "Usa usuario:clave.",
-        "notReady": "Aún no se puede publicar. Revisa los pasos."
+        "notReady": "Aún no se puede publicar. Revisa los pasos.",
+        "noTrigger": "Añade un disparador para probar.",
+        "triggerGone": "Ese disparador ya no está aquí."
     }
 }

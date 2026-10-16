@@ -29,13 +29,15 @@ export class AutomationAccessError extends Error {
             | "notPublished"
             | "noManualTrigger"
             | "secretMissing"
+            | "noTrigger"
+            | "triggerGone"
     ) {
         super(code);
         this.name = "AutomationAccessError";
     }
 }
 
-function shelfWhere(shelf: Shelf) {
+export function shelfWhere(shelf: Shelf) {
     return shelf.orgId ? { orgId: shelf.orgId } : { userId: shelf.userId, orgId: null };
 }
 
@@ -88,7 +90,7 @@ export async function listAutomations(
     };
 }
 
-async function load(actor: RunActor, id: string, write: boolean) {
+export async function load(actor: RunActor, id: string, write: boolean) {
     const row = await prisma.automation.findUnique({
         where: { id },
         select: {
@@ -130,6 +132,10 @@ export interface AutomationDetail {
     /** The path of each webhook trigger's address, by node id. Shown only to editors. */
     readonly hooks: Readonly<Record<string, string>>;
     readonly isOrg: boolean;
+    /** The live version, to tell the draft from it. */
+    readonly publishedVersion: { readonly id: string; readonly number: number; readonly graph: core.AutomationGraph } | null;
+    /** The newest test run of the draft, whose outputs the canvas shows on each node. */
+    readonly lastTestRunId: string | null;
 }
 
 export async function getAutomation(actor: RunActor, id: string): Promise<AutomationDetail> {
@@ -149,6 +155,15 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
                 );
             }
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
+    const [live, lastTest] = await Promise.all([
+        row.publishedVersionId
+            ? prisma.automationVersion.findUnique({ where: { id: row.publishedVersionId }, select: { id: true, number: true, graph: true } })
+            : null,
+        canEdit
+            ? prisma.automationRun.findFirst({ where: { automationId: row.id, test: true }, orderBy: { queuedAt: "desc" }, select: { id: true } })
+            : null
+    ]);
+    const liveGraph = live ? core.automationGraphSchema.safeParse(live.graph) : null;
     return {
         id: row.id,
         name: row.name,
@@ -165,7 +180,9 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         localNetworkRefusal: lanAllowed ? null : row.orgId ? "orgAdminOnly" : "instanceAdminOnly",
         draft,
         hooks,
-        isOrg: row.orgId !== null
+        isOrg: row.orgId !== null,
+        publishedVersion: live && liveGraph?.success ? { id: live.id, number: live.number, graph: liveGraph.data } : null,
+        lastTestRunId: lastTest?.id ?? null
     };
 }
 
@@ -211,7 +228,7 @@ export async function createAutomation(
 }
 
 /** Secrets the graph names must be the automation's own shelf's. */
-async function checkSecrets(shelf: Shelf, graph: core.AutomationGraph): Promise<void> {
+export async function checkSecrets(shelf: Shelf, graph: core.AutomationGraph): Promise<void> {
     const ids = new Set<string>();
     const collect = (value: unknown, key?: string) => {
         if (typeof value === "string" && (key === "secretId" || key === "urlSecretId"))
@@ -257,10 +274,11 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
         select: { number: true }
     });
     const version = await prisma.automationVersion.create({
+        // Pinned samples belong to test runs of the draft, never to a live version.
         data: {
             automationId: id,
-            number: (last?.number ?? 0) + 1,
-            graph: parsed.data as object,
+            number: Math.max(0, last?.number ?? 0) + 1,
+            graph: core.withoutPins(parsed.data) as object,
             savedById: actor.id
         },
         select: { id: true }
@@ -269,7 +287,7 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
         where: { id },
         data: { publishedVersionId: version.id, runAsId: actor.id, enabled: true }
     });
-    await armVersion(id, version.id, parsed.data);
+    await armVersion(id, version.id, core.withoutPins(parsed.data));
     return [];
 }
 
@@ -339,162 +357,6 @@ export async function runNow(actor: RunActor, id: string): Promise<void> {
         dedupeKey: randomUUID()
     });
     await kickIntake();
-}
-
-export interface RunRow {
-    readonly id: string;
-    readonly automationId: string;
-    readonly automationName: string;
-    readonly status: string;
-    readonly finally: string;
-    readonly error: string | null;
-    readonly queuedAt: string;
-    readonly startedAt: string | null;
-    readonly finishedAt: string | null;
-    readonly canCancel: boolean;
-}
-
-export interface RunPage {
-    readonly rows: RunRow[];
-    /** Where the next page starts, or null on the last one. */
-    readonly next: string | null;
-}
-
-const RUNS_PAGE = 50;
-
-/** A page of runs, newest first; `after` is the `next` of the page before. */
-export async function listRuns(
-    actor: RunActor,
-    shelf: Shelf,
-    automationId?: string,
-    after?: string
-): Promise<RunPage> {
-    if (!(await mayReadShelf(actor, shelf))) return { rows: [], next: null };
-    const canEdit = await mayEditShelf(actor, shelf);
-    const cursor = after ? parseRunCursor(after) : null;
-    const rows = await prisma.automationRun.findMany({
-        where: {
-            test: false,
-            automation: shelfWhere(shelf),
-            ...(automationId ? { automationId } : {}),
-            ...(cursor
-                ? {
-                      OR: [
-                          { queuedAt: { lt: cursor.queuedAt } },
-                          { queuedAt: cursor.queuedAt, id: { lt: cursor.id } }
-                      ]
-                  }
-                : {})
-        },
-        orderBy: [{ queuedAt: "desc" }, { id: "desc" }],
-        take: RUNS_PAGE + 1,
-        select: {
-            id: true,
-            automationId: true,
-            status: true,
-            finally: true,
-            error: true,
-            queuedAt: true,
-            startedAt: true,
-            finishedAt: true,
-            automation: { select: { name: true } }
-        }
-    });
-    const page = rows.slice(0, RUNS_PAGE);
-    const last = page[page.length - 1];
-    return {
-        rows: page.map((row) => ({
-            id: row.id,
-            automationId: row.automationId,
-            automationName: row.automation.name,
-            status: row.status,
-            finally: row.finally,
-            error: row.error,
-            queuedAt: row.queuedAt.toISOString(),
-            startedAt: row.startedAt?.toISOString() ?? null,
-            finishedAt: row.finishedAt?.toISOString() ?? null,
-            canCancel: canEdit && !core.runFinished(row.status)
-        })),
-        next: rows.length > RUNS_PAGE && last ? `${last.queuedAt.toISOString()}_${last.id}` : null
-    };
-}
-
-function parseRunCursor(value: string): { queuedAt: Date; id: string } | null {
-    const at = value.indexOf("_");
-    const queuedAt = new Date(value.slice(0, at));
-    const id = value.slice(at + 1);
-    return at > 0 && !Number.isNaN(queuedAt.getTime()) && /^[0-9a-f-]{36}$/i.test(id)
-        ? { queuedAt, id }
-        : null;
-}
-
-export interface RunStepRow {
-    readonly id: string;
-    readonly nodeId: string;
-    readonly type: string | null;
-    readonly lane: "main" | "finally";
-    readonly status: string;
-    readonly error: string | null;
-    readonly startedAt: string | null;
-    readonly finishedAt: string | null;
-    /** What the step sent and got back, as stored (capped, secrets redacted). Editors only. */
-    readonly input: unknown;
-    readonly output: unknown;
-}
-
-/** One run's steps in the order they ran. */
-export async function listRunSteps(
-    actor: RunActor,
-    runId: string
-): Promise<{ steps: RunStepRow[]; canSeeData: boolean }> {
-    const run = await prisma.automationRun.findUnique({
-        where: { id: runId },
-        select: { versionId: true, automation: { select: { orgId: true, userId: true } } }
-    });
-    if (!run || !(await mayReadShelf(actor, run.automation)))
-        throw new AutomationAccessError("notFound");
-    const canSeeData = await mayEditShelf(actor, run.automation);
-    const [steps, version] = await Promise.all([
-        prisma.automationStep.findMany({
-            where: { runId },
-            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-            take: L.stepsPerRun,
-            select: {
-                id: true,
-                nodeId: true,
-                iteration: true,
-                status: true,
-                error: true,
-                startedAt: true,
-                finishedAt: true,
-                input: canSeeData,
-                output: canSeeData
-            }
-        }),
-        prisma.automationVersion.findUnique({
-            where: { id: run.versionId },
-            select: { graph: true }
-        })
-    ]);
-    const graph = core.automationGraphSchema.safeParse(version?.graph);
-    const types = new Map(
-        graph.success ? graph.data.nodes.map((node) => [node.id, node.type]) : []
-    );
-    return {
-        canSeeData,
-        steps: steps.map((step) => ({
-            id: step.id,
-            nodeId: step.nodeId,
-            type: types.get(step.nodeId) ?? null,
-            lane: step.iteration === "f" ? "finally" : "main",
-            status: step.status,
-            error: step.error,
-            startedAt: step.startedAt?.toISOString() ?? null,
-            finishedAt: step.finishedAt?.toISOString() ?? null,
-            input: canSeeData ? (step.input ?? null) : null,
-            output: canSeeData ? (step.output ?? null) : null
-        }))
-    };
 }
 
 export async function cancelRunFor(actor: RunActor, runId: string): Promise<void> {
