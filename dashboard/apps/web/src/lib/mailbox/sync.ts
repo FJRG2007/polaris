@@ -123,7 +123,12 @@ export async function syncAccount(
     // scheduled pass still finishes before the screen redraws.
     const running = passes().get(accountId);
     if (running) return running;
+    // Taken now rather than when the chain gets there: a folder catch-up that
+    // starts after this pass waits for the pass, and one this pass waited for
+    // in turn would be the two waiting on each other.
+    const folderRuns = folderRunsOf(accountId);
     const pass = settleOlder(accountId)
+        .then(() => Promise.allSettled(folderRuns))
         .then(() => onePass(accountId, options.force === true))
         .finally(() => passes().delete(accountId));
     passes().set(accountId, pass);
@@ -206,6 +211,119 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
                 "mail sync failed",
                 accountId,
                 `${step} after ${Math.round((Date.now() - started) / 1000)}s:`,
+                caught instanceof MailUnreachableError
+                    ? caught.detail || caught.message
+                    : caught instanceof Error
+                      ? caught.message
+                      : caught
+            );
+        }
+    }
+    publishMail({ accountId, kind: "folders", actorId: account.userId });
+}
+
+/**
+ * One folder brought up to date now, on a connection of its own.
+ *
+ * For the inbox listener (`idle.ts`): the server has just said the folder moved,
+ * and a whole pass over every folder to find one message is what made new mail
+ * take as long as it did. It is the same `syncFolder` a pass runs, so the rules,
+ * the junk filter, the away reply and the live frame happen exactly as they
+ * would have - just sooner.
+ *
+ * Kept out of the way of a pass: it waits for one already running (which may
+ * have read this folder before the mail landed), and a pass that starts after it
+ * waits for it in turn - two sessions storing the same rows at once is how a
+ * rule runs twice. A burst of notices while it runs is one more catch-up, not
+ * one each, and none at all when a pass is queued behind it, since that pass
+ * reads the folder anyway.
+ *
+ * Never throws, and never moves the account's own state or its `lastSyncAt`:
+ * those describe whole passes, and the schedule reads them.
+ */
+export function syncFolderNow(accountId: string, folderId: string): Promise<void> {
+    const running = folderPasses().get(folderId);
+    if (running) {
+        running.again = true;
+        return running.run;
+    }
+    // Both taken now, for the reason `syncAccount` takes its own: whatever
+    // starts after this waits for it, and waiting for that in turn would be the
+    // two waiting on each other.
+    const ahead = passes().get(accountId);
+    const older = settleOlder(accountId);
+    const entry: FolderPass = { accountId, again: false, run: Promise.resolve() };
+    entry.run = (async () => {
+        if (ahead) await ahead.catch(() => undefined);
+        await older;
+        do {
+            entry.again = false;
+            await oneFolderPass(accountId, folderId);
+            // A pass that exists now was started after this one and is waiting
+            // for it, and it reads this folder too.
+        } while (entry.again && !passes().has(accountId));
+    })().finally(() => folderPasses().delete(folderId));
+    folderPasses().set(folderId, entry);
+    return entry.run;
+}
+
+interface FolderPass {
+    readonly accountId: string;
+    /** Set when the server spoke again while this one was running. */
+    again: boolean;
+    run: Promise<void>;
+}
+
+const FOLDER_PASSES = Symbol.for("polaris.mail.folder-passes");
+
+function folderPasses(): Map<string, FolderPass> {
+    const held = globalThis as { [FOLDER_PASSES]?: Map<string, FolderPass> };
+    held[FOLDER_PASSES] ??= new Map();
+    return held[FOLDER_PASSES];
+}
+
+function folderRunsOf(accountId: string): Promise<void>[] {
+    return [...folderPasses().values()]
+        .filter((entry) => entry.accountId === accountId)
+        .map((entry) => entry.run);
+}
+
+async function oneFolderPass(accountId: string, folderId: string): Promise<void> {
+    const account = await prisma.mailAccount.findUnique({
+        where: { id: accountId },
+        select: ACCOUNT_COLUMNS
+    });
+    // A refused credential is retried by the passes on their backoff, never on
+    // a notice from the server.
+    if (!account || account.state === "auth") return;
+    try {
+        await withImap(account, async (client) => {
+            await catchUpFolder(client, accountId, folderId);
+            const folder = await prisma.mailFolder.findUnique({
+                where: { id: folderId },
+                select: { path: true }
+            });
+            if (!folder) return;
+            // The rail's number is the server's own figure, which a pass reads
+            // with the folder list. One folder's worth of it, so the count beside
+            // the inbox moves with the message that arrived in it.
+            const status = await client.status(folder.path, { unseen: true });
+            if (typeof status.unseen === "number") {
+                await prisma.mailFolder.update({
+                    where: { id: folderId },
+                    data: { unread: status.unseen }
+                });
+            }
+        });
+    } catch (caught) {
+        // The same answer a pass gives a refusal, so the listener and the
+        // passes stop offering the credential together.
+        if (caught instanceof MailAuthError) {
+            await recordCredentialRefusal(accountId, caught.message).catch(() => undefined);
+        } else {
+            console.warn(
+                "mail folder catch-up failed",
+                accountId,
                 caught instanceof MailUnreachableError
                     ? caught.detail || caught.message
                     : caught instanceof Error
@@ -343,8 +461,10 @@ const OLDER_BATCH = 200;
 export async function fetchOlder(accountId: string, folderId: string): Promise<boolean> {
     const running = olderRuns().get(folderId);
     if (running) return running.run;
-    const run = (passes().get(accountId) ?? Promise.resolve())
-        .catch(() => undefined)
+    const run = Promise.allSettled([
+        passes().get(accountId) ?? Promise.resolve(),
+        folderPasses().get(folderId)?.run ?? Promise.resolve()
+    ])
         .then(() => fetchOlderNow(accountId, folderId))
         .finally(() => olderRuns().delete(folderId));
     olderRuns().set(folderId, { accountId, run });
@@ -772,7 +892,7 @@ async function storeMessages(
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
-                        message.headers["return-receipt-to"]
+                    message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {
