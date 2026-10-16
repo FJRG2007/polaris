@@ -127,7 +127,17 @@ export {
     type DeviceAccount
 } from "./device-accounts.js";
 export { signInWithConnection, type ConnectionSignInResult } from "./connection-sign-in.js";
-export { SSO_REQUIRED_CODE, SSO_SIGN_IN_PATH, samlDomainPolicies } from "./saml-sso.js";
+export { SSO_ERROR_PATH, SSO_REQUIRED_CODE, SSO_SIGN_IN_PATH, samlDomainPolicies } from "./saml-sso.js";
+export {
+    IdpConfigError,
+    manualIdpDetails,
+    readCertificate,
+    readIdpMetadata,
+    samlPluginConfig,
+    storedIdpDetails,
+    type IdpDetails,
+    type IdpProblem
+} from "./saml-config.js";
 export {
     verifyTotpForSession,
     twoFactorEnabled,
