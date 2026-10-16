@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const COMPOSE = readFileSync(new URL("../../../../docker/docker-compose.yml", import.meta.url), "utf8");
+const COMPOSE = readFileSync(
+    new URL("../../../../docker/docker-compose.yml", import.meta.url),
+    "utf8"
+);
 
 /** The `hostd` service's block, up to the next top-level service. */
 function hostdBlock(): string {

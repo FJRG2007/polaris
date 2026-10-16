@@ -83,7 +83,9 @@ export async function register(): Promise<void> {
         .catch((error) => console.error("polaris: initial route sync failed:", error));
     void afterPredecessor()
         .then(() => syncAppRoutes())
-        .catch((error) => console.error("polaris: the route sync after the rollover failed:", error));
+        .catch((error) =>
+            console.error("polaris: the route sync after the rollover failed:", error)
+        );
 
     // Close out deploys this process cannot possibly be running: the deploy queue is
     // in memory, so anything left mid-flight by the previous process is abandoned, and

@@ -51,7 +51,10 @@ export async function otherDashboardRunning(): Promise<boolean | null> {
         if (!self.Id || !project || !service) return null;
         const filters = encodeURIComponent(
             JSON.stringify({
-                label: [`com.docker.compose.project=${project}`, `com.docker.compose.service=${service}`],
+                label: [
+                    `com.docker.compose.project=${project}`,
+                    `com.docker.compose.service=${service}`
+                ],
                 status: ["running"]
             })
         );
@@ -81,12 +84,15 @@ export async function whenAlone(
     const recheckMs = options.recheckMs ?? RECHECK_MS;
     const giveUpMs = options.giveUpMs ?? GIVE_UP_MS;
     const sleep =
-        options.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms).unref()));
+        options.sleep ??
+        ((ms: number) => new Promise<void>((done) => setTimeout(done, ms).unref()));
     for (let waited = 0; waited < giveUpMs; waited += recheckMs) {
         if ((await peers()) !== true) return work();
         await sleep(recheckMs);
     }
-    console.warn("polaris: another dashboard has been running beside this one for 30 minutes; going ahead");
+    console.warn(
+        "polaris: another dashboard has been running beside this one for 30 minutes; going ahead"
+    );
     return work();
 }
 

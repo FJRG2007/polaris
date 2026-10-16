@@ -31,7 +31,10 @@ export interface DrainOptions {
 export const DEFAULT_DRAIN: DrainOptions = { lingerMs: 3_000, deadlineMs: 15_000 };
 
 /** Drain `servers` and resolve once each has closed, or at the deadline. */
-export function drainServers(servers: Server[], options: DrainOptions = DEFAULT_DRAIN): Promise<void> {
+export function drainServers(
+    servers: Server[],
+    options: DrainOptions = DEFAULT_DRAIN
+): Promise<void> {
     for (const server of servers) {
         // Prepended so the header is set before any handler writes the head; a head
         // written with its own headers merges with it rather than replacing it.

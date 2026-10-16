@@ -4,7 +4,12 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { othersAmong, whenAlone, afterPredecessor, predecessorRetired } from "@/lib/deploy/dashboard-peers";
+import {
+    othersAmong,
+    whenAlone,
+    afterPredecessor,
+    predecessorRetired
+} from "@/lib/deploy/dashboard-peers";
 
 // No daemon to ask, as in the limited edition, which is never rolled over.
 vi.mock("@polaris/hostd-client", () => ({
@@ -61,7 +66,12 @@ describe("whenAlone", () => {
     it("goes ahead after the give-up window rather than never", async () => {
         const work = vi.fn(async () => undefined);
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-        await whenAlone(work, { peers: async () => true, recheckMs: 10, giveUpMs: 30, sleep: instant });
+        await whenAlone(work, {
+            peers: async () => true,
+            recheckMs: 10,
+            giveUpMs: 30,
+            sleep: instant
+        });
         expect(work).toHaveBeenCalledOnce();
         warn.mockRestore();
     });

@@ -17,7 +17,15 @@ import { resetEnvCache } from "@polaris/config";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { sharedServerModules } from "@/lib/app-bundles/shared-server";
 import { SHARED_CLIENT_MODULES } from "@/components/app-bundles/runtime";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync
+} from "node:fs";
 
 // What is installed here, as the lifecycle asks it.
 const installed = new Set<string>();
