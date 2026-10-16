@@ -72,6 +72,7 @@ export type CutoverFailure =
     | "target-down"
     | "no-address"
     | "record-write-failed"
+    | "rollback-write-failed"
     | "propagation-timeout";
 
 /** What the pre-flight found about the target. */
@@ -314,6 +315,7 @@ const FAILURES: readonly CutoverFailure[] = [
     "target-down",
     "no-address",
     "record-write-failed",
+    "rollback-write-failed",
     "propagation-timeout"
 ];
 

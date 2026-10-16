@@ -66,6 +66,7 @@ const FAILURE_KEYS = {
     "target-down": "cutover.failure.down",
     "no-address": "cutover.failure.noAddress",
     "record-write-failed": "cutover.failure.recordWrite",
+    "rollback-write-failed": "cutover.failure.rollbackWrite",
     "propagation-timeout": "cutover.failure.timeout"
 } as const satisfies Record<CutoverFailure, string>;
 
@@ -519,7 +520,7 @@ function CutoverState({
                                     : t("cutover.manualTtlShort")}
                             </li>
                             <li className="min-w-0">
-                                <span>{t("cutover.manualChange")}</span>
+                                <span>{t("cutover.manualChange", { ttl: LOWERED_TTL })}</span>
                                 <RecordToSet hostname={hostname} values={cutover.newValue ? [cutover.newValue] : []} />
                             </li>
                         </ol>

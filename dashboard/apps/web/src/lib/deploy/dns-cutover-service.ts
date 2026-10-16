@@ -535,7 +535,12 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
     });
 }
 
-/** Put everything back the way it was before the cutover and close it. */
+/**
+ * Put everything back the way it was before the cutover and close it. The cutover is
+ * closed first, so a second press - or the background pass reaching it at the same
+ * moment - finds nothing to do; a record Cloudflare refused reopens it, with the
+ * reason, to be tried again.
+ */
 export async function rollbackCutover(id: string, actorId: string): Promise<void> {
     const row = await loadCutover(id);
     const phase = machine.readPhase(row.phase);
@@ -547,36 +552,55 @@ export async function rollbackCutover(id: string, actorId: string): Promise<void
         oldTtl: row.oldTtl
     });
     if (effects.length === 0) return;
-    const checks = readChecks(row.checks);
-    for (const effect of effects) {
-        if (effect === "restore-record") {
-            const zone = await zoneOf(row);
-            const written = readWritten(row.recordIds);
-            if (written.created) await cf.deleteDnsRecord(zone.token, zone.zoneId, written.created);
-            const [first, ...rest] = written.records;
-            if (first) await rewrite(zone, row.hostname, first, {});
-            // The others were deleted by the switch, and come back as they were.
-            if (row.switchedAt) {
-                for (const other of rest) {
-                    await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
-                        type: "A",
-                        name: row.hostname,
-                        content: other.content,
-                        ttl: other.ttl,
-                        proxied: other.proxied
-                    });
-                }
-            }
-        } else if (effect === "move-route-back") {
-            await moveRoute(row.domainId, row.sourceApplicationId, checks.route);
-        }
-    }
-    const closed = await prisma.dnsCutover.updateMany({
+    const claimed = await prisma.dnsCutover.updateMany({
         where: { id, phase: row.phase },
         data: { phase: "rolled-back", openKey: null, finishedAt: new Date() }
     });
+    if (claimed.count === 0) return;
+    const checks = readChecks(row.checks);
+    try {
+        for (const effect of effects) {
+            if (effect === "restore-record") {
+                const zone = await zoneOf(row);
+                const written = readWritten(row.recordIds);
+                if (written.created) await cf.deleteDnsRecord(zone.token, zone.zoneId, written.created);
+                const [first, ...rest] = written.records;
+                if (first) await rewrite(zone, row.hostname, first, {});
+                for (const other of rest) {
+                    if (row.switchedAt) {
+                        // Deleted by the switch, and they come back as they were.
+                        await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
+                            type: "A",
+                            name: row.hostname,
+                            content: other.content,
+                            ttl: other.ttl,
+                            proxied: other.proxied
+                        });
+                    } else {
+                        // Only their TTL was lowered.
+                        await rewrite(zone, row.hostname, other, {});
+                    }
+                }
+            } else if (effect === "move-route-back") {
+                await moveRoute(row.domainId, row.sourceApplicationId, checks.route);
+            }
+        }
+    } catch (error) {
+        console.error(`polaris: DNS cutover ${id} could not be rolled back:`, error);
+        await prisma.dnsCutover
+            .update({
+                where: { id },
+                data: {
+                    phase: row.phase,
+                    openKey: row.openKey,
+                    finishedAt: null,
+                    failure: "rollback-write-failed"
+                }
+            })
+            .catch(() => undefined);
+        return;
+    }
     if (effects.includes("republish")) await syncAppRoutes().catch(() => undefined);
-    if (closed.count === 0) return;
     await recordDeployAudit({
         actorId,
         action: "deploy.domain.cutover.rollback",

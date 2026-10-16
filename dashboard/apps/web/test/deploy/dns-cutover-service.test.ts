@@ -318,6 +318,22 @@ describe("rolling back", () => {
         expect(state.domainApp).toBe("app-old");
     });
 
+    it("stays open when Cloudflare refuses to put the record back, and rolls back when tried again", async () => {
+        seed("c1");
+        await service.switchCutover("c1", "user-1");
+        state.saveFails = 1;
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "propagating",
+            openKey: "domain-1",
+            failure: "rollback-write-failed"
+        });
+        expect(state.audits).not.toContain("deploy.domain.cutover.rollback");
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
+        expect(state.audits.filter((action) => action === "deploy.domain.cutover.rollback")).toHaveLength(1);
+    });
+
     it("is refused once there is nothing open to roll back", async () => {
         await expect(service.openCutoverId("domain-1")).rejects.toMatchObject({ reason: "closed" });
     });
