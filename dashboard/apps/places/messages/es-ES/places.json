@@ -2205,9 +2205,9 @@
                 "step": "Paso pegado"
             },
             "removed": {
-                "trigger": "Disparador eliminado",
-                "group": "Condición eliminada",
-                "step": "Paso eliminado"
+                "trigger": "Disparador borrado",
+                "group": "Condición borrada",
+                "step": "Paso borrado"
             }
         },
         "leave": {

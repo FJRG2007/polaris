@@ -2174,15 +2174,15 @@
             "save": "Save",
             "cancel": "Cancel",
             "removeNote": "Remove note",
-            "undo": "Undo",
-            "redo": "Redo",
+            "undo": "Undo change",
+            "redo": "Redo change",
             "nameLabel": "Name shown instead of the sentence",
             "noteLabel": "Note on this block",
             "noRoom": "There is no room for another one here.",
             "renameTitle": {
-                "trigger": "Rename trigger",
-                "group": "Rename condition",
-                "step": "Rename step"
+                "trigger": "Rename this trigger",
+                "group": "Rename this condition",
+                "step": "Rename this step"
             },
             "noteTitle": {
                 "trigger": "Note on the trigger",
@@ -2195,9 +2195,9 @@
                 "step": "Step copied"
             },
             "cutDone": {
-                "trigger": "Trigger cut",
-                "group": "Condition cut",
-                "step": "Step cut"
+                "trigger": "Trigger cut out",
+                "group": "Condition cut out",
+                "step": "Step cut out"
             },
             "pasted": {
                 "trigger": "Trigger pasted",

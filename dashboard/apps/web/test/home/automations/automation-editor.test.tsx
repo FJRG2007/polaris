@@ -18,6 +18,7 @@ import type { AutomationView, RunView } from "@polaris-app/places/src/lib/automa
 import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 
 const replaced: string[] = [];
+const pushed: string[] = [];
 const saved: unknown[] = [];
 let toggleAnswer: { error?: string; automation?: AutomationView } = {};
 
@@ -25,7 +26,7 @@ vi.mock("next/navigation", async (original) => ({
     ...(await original<typeof import("next/navigation")>()),
     useRouter: () => ({
         replace: (href: string) => replaced.push(href),
-        push: vi.fn(),
+        push: (href: string) => pushed.push(href),
         refresh: vi.fn()
     })
 }));
@@ -244,6 +245,7 @@ function openMenu(name: string): void {
 
 beforeEach(() => {
     replaced.length = 0;
+    pushed.length = 0;
     saved.length = 0;
     toggleAnswer = {};
     try {
@@ -568,7 +570,9 @@ describe("the block editor", () => {
         expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
             "true"
         );
-        expect(screen.getByRole("button", { name: "Undo" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Undo change" }).hasAttribute("disabled")).toBe(
+            true
+        );
     });
 
     it("renames a block from its menu and saves the name with it", async () => {
@@ -620,7 +624,7 @@ describe("the block editor", () => {
         fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete/ }));
         await painted();
         expect(rowCount("Then")).toBe(before - 1);
-        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        fireEvent.click(screen.getByRole("button", { name: "Undo change" }));
         await painted();
         expect(rowCount("Then")).toBe(before);
     });
@@ -633,5 +637,228 @@ describe("the block editor", () => {
         fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
         await painted();
         expect(screen.queryByText("Save the new automation?")).toBeNull();
+    });
+
+    /** Opens the menu of one row of a stage and picks one of its items. */
+    const pick = async (list: string, at: number, item: RegExp) => {
+        const menus = within(screen.getByRole("list", { name: list })).getAllByRole("button", {
+            name: /^More actions/
+        });
+        fireEvent.pointerDown(menus[at]!, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: item }));
+        await painted();
+    };
+    const undoButton = () => screen.getByRole("button", { name: "Undo change" });
+    const redoButton = () => screen.getByRole("button", { name: "Redo change" });
+    const renameIn = async (list: string, at: number, name: string) => {
+        await pick(list, at, /^Rename/);
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByLabelText("Name shown instead of the sentence"), {
+            target: { value: name }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+        await painted();
+    };
+
+    it("saves a stored automation with only what was changed in it", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("When", 0, /^Add note/);
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByLabelText("Note on this block"), {
+            target: { value: "Pressed from the hall" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        expect(saved).toEqual([
+            {
+                ...inputOf(SAVED),
+                definition: {
+                    ...SAVED.definition,
+                    triggers: [{ ...SAVED.definition.triggers[0], note: "Pressed from the hall" }]
+                }
+            }
+        ]);
+    });
+
+    it("has nothing to save once every change is taken back", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Duplicate/);
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).not.toBe(
+            "true"
+        );
+        fireEvent.click(undoButton());
+        await painted();
+        expect(rowCount("Then")).toBe(1);
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
+    });
+
+    it("undoes only as far as the first change and redoes only as far as the last", async () => {
+        render(editor("auto-1"));
+        await painted();
+        expect(undoButton().hasAttribute("disabled")).toBe(true);
+        expect(redoButton().hasAttribute("disabled")).toBe(true);
+        await pick("Then", 0, /^Duplicate/);
+        expect(undoButton().hasAttribute("disabled")).toBe(false);
+        expect(redoButton().hasAttribute("disabled")).toBe(true);
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+        await painted();
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(1);
+        expect(undoButton().hasAttribute("disabled")).toBe(true);
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
+        await painted();
+        fireEvent.keyDown(window, { key: "y", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(2);
+        expect(redoButton().hasAttribute("disabled")).toBe(true);
+    });
+
+    it("leaves the editor's shortcuts alone while a field is typed into", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Duplicate/);
+        fireEvent.keyDown(screen.getAllByRole("textbox")[0]!, { key: "z", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(2);
+    });
+
+    it("saves with Ctrl+S", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+        await painted();
+        expect(saved).toHaveLength(1);
+    });
+
+    it("cuts a block with the keyboard and pastes it back where the list ends", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Duplicate/);
+        await renameIn("Then", 1, "Second one");
+        openRow("Then", 0);
+        fireEvent.keyDown(window, { key: "x", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(1);
+        expect(rowsIn("Then")[0]!.textContent).toContain("Second one");
+        fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(2);
+        expect(rowsIn("Then")[0]!.textContent).toContain("Second one");
+        expect(rowsIn("Then")[1]!.textContent).not.toContain("Second one");
+    });
+
+    it("pastes a block copied in another automation, from the row menu", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Copy/);
+        cleanup();
+        render(editor(null, "autoOff"));
+        await painted();
+        const before = rowCount("Then");
+        await pick("Then", 0, /^Paste/);
+        expect(rowCount("Then")).toBe(before + 1);
+    });
+
+    it("offers no paste where the copied block does not belong", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Copy/);
+        const menus = within(screen.getByRole("list", { name: "When" })).getAllByRole("button", {
+            name: /^More actions/
+        });
+        fireEvent.pointerDown(menus[0]!, { button: 0, ctrlKey: false });
+        await screen.findByRole("menuitem", { name: /^Copy/ });
+        expect(screen.queryByRole("menuitem", { name: /^Paste/ })).toBeNull();
+    });
+
+    it("duplicates and moves a block from its menu", async () => {
+        render(editor("auto-1"));
+        await painted();
+        await pick("Then", 0, /^Duplicate/);
+        expect(rowCount("Then")).toBe(2);
+        await renameIn("Then", 1, "Second one");
+        await pick("Then", 1, /^Move up/);
+        expect(rowsIn("Then")[0]!.textContent).toContain("Second one");
+        await pick("Then", 0, /^Move down/);
+        expect(rowsIn("Then")[1]!.textContent).toContain("Second one");
+    });
+
+    it("deletes the selected block with Ctrl+Delete", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        const before = rowCount("Then");
+        openRow("Then");
+        fireEvent.keyDown(window, { key: "Delete", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(before - 1);
+    });
+
+    it("leaves without saving when asked to", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
+        fireEvent.click(await screen.findByRole("button", { name: /^Leave without/ }));
+        await painted();
+        expect(saved).toHaveLength(0);
+        expect(pushed).toHaveLength(1);
+    });
+
+    it("saves and then leaves", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
+        fireEvent.click(await screen.findByRole("button", { name: "Save and leave" }));
+        await painted();
+        expect(saved).toHaveLength(1);
+        expect(pushed).toHaveLength(1);
+    });
+
+    it("lets a link go without asking when nothing changed", async () => {
+        render(editor("auto-1"));
+        await painted();
+        fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
+        await painted();
+        expect(screen.queryByText("Save changes?")).toBeNull();
+    });
+
+    it("edits a block beside the list on a wide screen", async () => {
+        render(editor("auto-1"));
+        await painted();
+        openRow("Then");
+        await painted();
+        expect(screen.getByRole("complementary")).toBeDefined();
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("edits a block in a sheet from the bottom on a phone", async () => {
+        const original = window.matchMedia;
+        window.matchMedia = ((query: string) => ({
+            matches: false,
+            media: query,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined
+        })) as unknown as typeof window.matchMedia;
+        try {
+            render(editor("auto-1"));
+            await painted();
+            openRow("Then");
+            await painted();
+            const sheet = await screen.findByRole("dialog");
+            expect(sheet.className).toContain("bottom-0");
+            expect(sheet.className).toContain("w-full");
+            expect(screen.queryByRole("complementary")).toBeNull();
+            fireEvent.click(within(sheet).getByRole("button", { name: "Close panel" }));
+            await painted();
+            expect(screen.queryByRole("dialog")).toBeNull();
+        } finally {
+            window.matchMedia = original;
+        }
     });
 });
