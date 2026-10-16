@@ -14229,3 +14229,95 @@ model SsoProvider {
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 }
+
+// ---------------------------------------------------------------------------
+// Server agent rollouts and the offline command queue
+// ---------------------------------------------------------------------------
+
+/// What Polaris last heard from the agent on one server. `serverId` is "local"
+/// for the machine Polaris runs on and a Host id otherwise - a soft pointer, like
+/// HostResourceRecord, because the local box need not be enrolled as a Host.
+model ServerAgent {
+    serverId      String    @id
+    // The version the agent reported, null for a server reached only over SSH,
+    // which runs no agent of its own.
+    version       String?
+    // The last time the server answered a probe.
+    heartbeatAt   DateTime?
+    // Set by an admin (or by a rollback): rollouts leave this server alone
+    // unless they target exactly this version.
+    pinnedVersion String?
+    updatedAt     DateTime  @updatedAt
+}
+
+/// One staged rollout of an agent version across servers, wave by wave.
+model AgentRollout {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    version         String
+    // The version most servers ran when it started, which a rollback pins to.
+    previousVersion String?
+    // JSON number array: the cumulative share of servers each wave reaches,
+    // e.g. [1, 10, 50, 100] where the first entry is a server count (canary).
+    waves           String    @default("[1,10,50,100]")
+    // How long an updated server must stay healthy before its wave counts.
+    healthMinutes   Int       @default(10)
+    // running | halted | done | rolled-back | cancelled
+    status          String    @default("running")
+    wave            Int       @default(0)
+    // A machine reason the screen turns into a sentence.
+    haltReason      String?
+    actorId         String?   @db.Uuid
+    // "open" while running or halted, cleared when it ends, so only one rollout
+    // is in flight at a time.
+    openKey         String?   @unique
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+    finishedAt      DateTime?
+
+    targets AgentRolloutTarget[]
+
+    @@index([status])
+}
+
+model AgentRolloutTarget {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    rolloutId    String    @db.Uuid
+    serverId     String
+    wave         Int
+    // pending | updating | verifying | healthy | failed | skipped
+    state        String    @default("pending")
+    fromVersion  String?
+    startedAt    DateTime?
+    healthySince DateTime?
+    finishedAt   DateTime?
+    error        String?
+
+    rollout AgentRollout @relation(fields: [rolloutId], references: [id], onDelete: Cascade)
+
+    @@unique([rolloutId, serverId])
+    @@index([rolloutId, wave])
+}
+
+/// A command for one server, kept until the server answers. The id is the
+/// idempotency key: the client mints it, so a retried submit is the same row.
+model ServerCommand {
+    id          String    @id @db.Uuid
+    serverId    String
+    // container.restart | container.start | container.stop | template.apply | agent.update
+    kind        String
+    // JSON arguments, validated by kind before it is stored.
+    payload     String    @default("{}")
+    // queued | delivering | done | failed | cancelled | expired
+    status      String    @default("queued")
+    actorId     String?   @db.Uuid
+    attempts    Int       @default(0)
+    createdAt   DateTime  @default(now())
+    expiresAt   DateTime
+    startedAt   DateTime?
+    finishedAt  DateTime?
+    // What the server answered, one line, or a machine reason for a refusal.
+    result      String?
+
+    @@index([serverId, status, createdAt])
+    @@index([status, expiresAt])
+}
