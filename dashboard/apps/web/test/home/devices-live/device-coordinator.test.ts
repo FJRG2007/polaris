@@ -17,7 +17,20 @@ const mocks = vi.hoisted(() => ({
     syncDevices: vi.fn(),
     getDevice: vi.fn(),
     keepListening: vi.fn(),
-    stopListening: vi.fn()
+    stopListening: vi.fn(),
+    enabledAutomations: vi.fn(),
+    runCount: vi.fn(),
+    deviceRows: vi.fn()
+}));
+
+vi.mock("@polaris-app/places/src/lib/automation-store", () => ({
+    prismaAutomationStore: { enabledAutomations: mocks.enabledAutomations }
+}));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        placeAutomationRun: { count: mocks.runCount },
+        placeDevice: { findMany: mocks.deviceRows }
+    }
 }));
 
 vi.mock("@polaris-app/places/src/lib/device-push", () => ({
@@ -64,6 +77,9 @@ beforeEach(() => {
         return { devices: 1, error: null, failed: [] };
     });
     mocks.getDevice.mockResolvedValue({ id: "door", state: "locked" });
+    mocks.enabledAutomations.mockResolvedValue([]);
+    mocks.runCount.mockResolvedValue(0);
+    mocks.deviceRows.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -273,5 +289,26 @@ describe("reading now", () => {
         const asked = watch.refreshAccounts(INSTALL, ["nuki"], 4000);
         await advance(0);
         expect(await asked).toBe("failed");
+    });
+});
+
+describe("an automation is somebody waiting", () => {
+    it("reads the account an automation reads at the watched pace with no screen open", async () => {
+        mocks.enabledAutomations.mockResolvedValue([
+            {
+                definition: {
+                    triggers: [{ id: "t", kind: "device-changed", deviceId: "door" }],
+                    conditions: { mode: "all", groups: [] },
+                    actions: []
+                }
+            }
+        ]);
+        mocks.deviceRows.mockResolvedValue([{ accountId: "nuki" }]);
+        watch.startDeviceCoordinator();
+        await advance(0);
+        expect(mocks.syncDevices).toHaveBeenCalledTimes(1);
+        // The watched cloud pace is 30 s; unwatched it would be 60 s.
+        await advance(31_000);
+        expect(mocks.syncDevices).toHaveBeenCalledTimes(2);
     });
 });
