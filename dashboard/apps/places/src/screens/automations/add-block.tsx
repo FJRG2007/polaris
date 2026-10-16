@@ -21,7 +21,18 @@ import {
     type AddStrings,
     type AddTargets
 } from "@polaris/ui/automation-add";
-import { Bell, Clock, Gauge, Hand, Hourglass, Plus, Power, Repeat, Timer, Workflow } from "lucide-react";
+import {
+    Bell,
+    Clock,
+    Gauge,
+    Hand,
+    Hourglass,
+    Plus,
+    Power,
+    Repeat,
+    Timer,
+    Workflow
+} from "lucide-react";
 
 export type AddRole = "trigger" | "condition" | "step";
 
@@ -65,7 +76,10 @@ const KINDS: Record<AddRole, readonly string[]> = {
 };
 
 /** Whether a kind of block can point at `device`; kinds that point at none are absent. */
-const FITS: Record<AddRole, Record<string, (device: DeviceView, canControl: boolean) => boolean>> = {
+const FITS: Record<
+    AddRole,
+    Record<string, (device: DeviceView, canControl: boolean) => boolean>
+> = {
     trigger: {
         change: fields.watchable,
         stays: fields.watchable,
@@ -80,11 +94,6 @@ const FITS: Record<AddRole, Record<string, (device: DeviceView, canControl: bool
         wait: fields.watchable
     }
 };
-
-/** A block made from the dialog, with the device chosen on "By target" filled in. */
-export function withTarget<T extends object>(block: T, target?: string): T {
-    return target && "deviceId" in block ? { ...block, deviceId: target } : block;
-}
 
 /** The catalog list each role's kind names are under. */
 const LABELS: Record<AddRole, string> = {
@@ -107,7 +116,7 @@ export function AddBlockButton({
     devices?: readonly DeviceView[];
     canControl?: boolean;
     /** `target` is the device chosen on "By target", when the block was picked there. */
-    onPick: (kind: string, target?: string) => void;
+    onPick: (kind: string, target?: DeviceView) => void;
     /** Present when the clipboard holds a block that belongs here. */
     onPaste?: () => void;
 }) {
@@ -125,9 +134,7 @@ export function AddBlockButton({
             id,
             label: t(`automations.add.groups.${id}`),
             icon: GROUP_ICONS[id],
-            items: KINDS[role]
-                .filter((kind) => vocabulary[kind]?.group === id)
-                .map(blockItem)
+            items: KINDS[role].filter((kind) => vocabulary[kind]?.group === id).map(blockItem)
         }))
         .filter((group) => group.items.length > 0);
     const fits = (device: DeviceView) =>
@@ -191,7 +198,12 @@ export function AddBlockButton({
                           }
                         : undefined
                 }
-                onPick={onPick}
+                onPick={(kind, target) =>
+                    onPick(
+                        kind,
+                        target ? reachable.find((device) => device.id === target) : undefined
+                    )
+                }
                 onClose={() => setOpen(false)}
             />
         </>

@@ -189,9 +189,7 @@ export function BlockRow({
                 >
                     {title}
                 </span>
-                {chips?.map((chip, index) => (
-                    <BlockChip key={index}>{chip}</BlockChip>
-                ))}
+                {chips?.map((chip, index) => <BlockChip key={index}>{chip}</BlockChip>)}
                 {!enabled && <BlockChip tone="muted">{strings.disabled}</BlockChip>}
                 {state !== "ok" && (
                     <span
@@ -273,7 +271,9 @@ export function BlockMenu({
                 className={cn("gap-2", danger && "text-danger focus:text-danger")}
             >
                 {icon}
-                <span className="min-w-0 flex-1 truncate" title={text}>{text}</span>
+                <span className="min-w-0 flex-1 truncate" title={text}>
+                    {text}
+                </span>
                 {spec && <Hint spec={spec} />}
             </DropdownMenuItem>
         ) : null;
@@ -440,7 +440,7 @@ export function BlockPanel({
         return (
             <aside
                 aria-labelledby={titleId}
-                className="relative flex max-h-[calc(100dvh-8rem)] min-w-0 shrink-0 flex-col self-start overflow-hidden rounded-lg border border-border bg-card lg:sticky lg:top-4"
+                className="relative flex max-h-[calc(100dvh-8rem-var(--notice-height))] min-w-0 shrink-0 flex-col self-start overflow-hidden rounded-lg border border-border bg-card lg:sticky lg:top-4"
                 style={{ width }}
             >
                 <ResizeHandle
@@ -743,10 +743,10 @@ export function useEditorKeys(keys: EditorKeys, active = true): void {
             };
             if (key === "s") return fire(handlers.onSave);
             if (typing(event.target)) return;
-            if (document.querySelector("[role='dialog'][data-state='open']"))
-                return;
+            if (document.querySelector("[role='dialog'][data-state='open']")) return;
             const selection = window.getSelection?.();
-            const textSelected = selection !== null && selection !== undefined && !selection.isCollapsed;
+            const textSelected =
+                selection !== null && selection !== undefined && !selection.isCollapsed;
             if (key === "z" && !event.shiftKey) return fire(handlers.onUndo);
             if ((key === "z" && event.shiftKey) || key === "y") return fire(handlers.onRedo);
             if (textSelected) return;

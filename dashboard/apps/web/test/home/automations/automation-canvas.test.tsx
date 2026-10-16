@@ -126,8 +126,9 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     runAutomationAction: async () => ({})
 }));
 
-const { AutomationEditor } =
-    await import("@polaris-app/places/src/screens/automations/automation-editor");
+const { AutomationEditor } = await import(
+    "@polaris-app/places/src/screens/automations/automation-editor"
+);
 
 class Observer {
     observe(): void {}

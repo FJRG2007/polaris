@@ -210,10 +210,12 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor } =
-    await import("@polaris-app/places/src/screens/automations/automation-editor");
-const { AutomationsView } =
-    await import("@polaris-app/places/src/screens/automations/automations-view");
+const { AutomationEditor, conditionFor, stepFor, triggerFor } = await import(
+    "@polaris-app/places/src/screens/automations/automation-editor"
+);
+const { AutomationsView } = await import(
+    "@polaris-app/places/src/screens/automations/automations-view"
+);
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -868,6 +870,19 @@ describe("the block editor", () => {
         } finally {
             window.matchMedia = original;
         }
+    });
+});
+
+describe("a block added for a device", () => {
+    const air = DEVICES.find((each) => each.id === "air")!;
+    const door = DEVICES.find((each) => each.id === "door")!;
+
+    it("starts as the editor's device picker would leave it", () => {
+        expect(triggerFor("threshold", air)).toMatchObject({ deviceId: "air", measure: "pm25" });
+        expect(conditionFor("reading", air)).toMatchObject({ deviceId: "air", measure: "pm25" });
+        expect(stepFor("device", door)).toMatchObject({ deviceId: "door", do: "lock" });
+        expect(stepFor("wait", door)).toMatchObject({ deviceId: "door", is: "" });
+        expect(triggerFor("manual", door)).not.toHaveProperty("deviceId");
     });
 });
 

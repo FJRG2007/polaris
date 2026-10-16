@@ -43,7 +43,7 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
 import { AutomationCanvas } from "./automation-canvas";
-import { AddBlockButton, withTarget } from "./add-block";
+import { AddBlockButton } from "./add-block";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
@@ -117,6 +117,22 @@ export function withOwnText<B extends Block>(
     if (value) next[field] = value;
     else delete next[field];
     return next;
+}
+
+/** A block made from the add dialog, pointed at the device chosen on "By target". */
+export function triggerFor(kind: string, target?: DeviceView): auto.Trigger {
+    const blank = auto.blankTrigger(kind as auto.TriggerKind);
+    return target ? auto.triggerOn(blank, target) : blank;
+}
+
+export function conditionFor(kind: string, target?: DeviceView): auto.Condition {
+    const blank = auto.blankCondition(kind as auto.ConditionKind);
+    return target ? auto.conditionOn(blank, target) : blank;
+}
+
+export function stepFor(kind: string, target?: DeviceView): auto.Step {
+    const blank = auto.blankStep(kind as auto.StepKind);
+    return target ? auto.stepOn(blank, target) : blank;
 }
 
 function pathOf(role: BlockRole, index: number): (string | number)[] {
@@ -226,6 +242,8 @@ export function AutomationEditor({
     } | null>(null);
     const history = useDraftHistory<Draft>();
     const draft = history.value;
+    const latestDraft = useRef(draft);
+    latestDraft.current = draft;
     const toast = useToast();
     const [selected, setSelected] = useState<{ role: BlockRole; id: string } | null>(null);
     const [dialog, setDialog] = useState<{
@@ -483,6 +501,16 @@ export function AutomationEditor({
                 {
                     label: t("automations.blocks.undo"),
                     run: async () => {
+                        const now = latestDraft.current;
+                        const listed = now ? blocksOf(now.definition, role) : [];
+                        if (listed.some((entry) => entry.id === block.id)) return null;
+                        if (listed.length >= ROOM[role]) {
+                            toast.show({
+                                key: "places-automation-removed",
+                                title: t("automations.blocks.noRoom")
+                            });
+                            return null;
+                        }
                         // Put back where it was, unless it is back already.
                         editBlocks(role, (items) =>
                             items.some((entry) => entry.id === block.id)
@@ -1156,13 +1184,7 @@ export function AutomationEditor({
                                         devices={devices}
                                         onPaste={pasteFor("trigger")}
                                         onPick={(kind, target) =>
-                                            addBlock(
-                                                "trigger",
-                                                withTarget(
-                                                    auto.blankTrigger(kind as auto.TriggerKind),
-                                                    target
-                                                )
-                                            )
+                                            addBlock("trigger", triggerFor(kind, target))
                                         }
                                     />
                                 )}
@@ -1190,14 +1212,7 @@ export function AutomationEditor({
                                                 addBlock("group", {
                                                     id: auto.nodeIdOf(),
                                                     match: "all",
-                                                    items: [
-                                                        withTarget(
-                                                            auto.blankCondition(
-                                                                kind as auto.ConditionKind
-                                                            ),
-                                                            target
-                                                        )
-                                                    ]
+                                                    items: [conditionFor(kind, target)]
                                                 })
                                             }
                                         />
@@ -1222,13 +1237,7 @@ export function AutomationEditor({
                                         canControl={canControl}
                                         onPaste={pasteFor("step")}
                                         onPick={(kind, target) =>
-                                            addBlock(
-                                                "step",
-                                                withTarget(
-                                                    auto.blankStep(kind as auto.StepKind),
-                                                    target
-                                                )
-                                            )
+                                            addBlock("step", stepFor(kind, target))
                                         }
                                     />
                                 )}
@@ -1275,12 +1284,7 @@ function TriggerCard({
     const device = "deviceId" in trigger ? byId.get(trigger.deviceId) : undefined;
     const pickDevice = (next: DeviceView) => {
         if (!("deviceId" in trigger)) return;
-        const attribute = auto.attributesFor(next.kind)[0] ?? "state";
-        if (trigger.kind === "change")
-            onChange({ ...trigger, deviceId: next.id, attribute, from: "", to: "" });
-        else if (trigger.kind === "stays")
-            onChange({ ...trigger, deviceId: next.id, attribute, is: "" });
-        else onChange({ ...trigger, deviceId: next.id });
+        onChange(auto.triggerOn(trigger, next));
     };
     return (
         <flow.NodeCard
@@ -1427,15 +1431,7 @@ function TriggerCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
-                        onChange={(next) => {
-                            const { measure: _was, ...rest } = trigger;
-                            const measure = auto.measuresFor(next.kind)[0];
-                            onChange({
-                                ...rest,
-                                deviceId: next.id,
-                                ...(measure ? { measure } : {})
-                            });
-                        }}
+                        onChange={(next) => onChange(auto.triggerOn(trigger, next))}
                     />
                     <fields.MeasurePicker
                         kind={device?.kind ?? ""}
@@ -1608,10 +1604,7 @@ function ConditionGroupCard({
                     onPick={(kind, target) =>
                         onChange({
                             ...group,
-                            items: [
-                                ...group.items,
-                                withTarget(auto.blankCondition(kind as auto.ConditionKind), target)
-                            ]
+                            items: [...group.items, conditionFor(kind, target)]
                         })
                     }
                 />
@@ -1676,14 +1669,7 @@ function ConditionCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noDevices")}
-                        onChange={(next) =>
-                            onChange({
-                                ...condition,
-                                deviceId: next.id,
-                                attribute: auto.attributesFor(next.kind)[0] ?? "state",
-                                is: ""
-                            })
-                        }
+                        onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
                     {device && (
                         <fields.AttributePicker
@@ -1732,7 +1718,9 @@ function ConditionCard({
                         onChange={(minutes) => {
                             const { forMinutes: _was, ...rest } = condition;
                             // Empty is "as soon as it is so", which is no duration at all.
-                            onChange(Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes });
+                            onChange(
+                                Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes }
+                            );
                         }}
                     />
                 </>
@@ -1746,15 +1734,7 @@ function ConditionCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
-                        onChange={(next) => {
-                            const { measure: _was, ...rest } = condition;
-                            const measure = auto.measuresFor(next.kind)[0];
-                            onChange({
-                                ...rest,
-                                deviceId: next.id,
-                                ...(measure ? { measure } : {})
-                            });
-                        }}
+                        onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
                     <fields.MeasurePicker
                         kind={device?.kind ?? ""}
@@ -1890,21 +1870,7 @@ function StepCard({
                                 ? t("automations.fields.noOperable")
                                 : t("automations.fields.noControl")
                         }
-                        onChange={(next) => {
-                            const offered = auto.stepActionsFor(next.kind);
-                            const action = offered.includes(step.do)
-                                ? step.do
-                                : (offered[0] ?? step.do);
-                            onChange({
-                                ...step,
-                                deviceId: next.id,
-                                do: action,
-                                setting: auto.blankSetting(action, next.climate, {
-                                    kind: next.kind,
-                                    settings: next.air
-                                })
-                            });
-                        }}
+                        onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
                     <flow.Field label={t("automations.fields.do")} path={[...path, "do"]}>
                         {(id, invalid) => (
@@ -1964,14 +1930,7 @@ function StepCard({
                         path={path}
                         disabled={disabled}
                         empty={t("automations.fields.noDevices")}
-                        onChange={(next) =>
-                            onChange({
-                                ...step,
-                                deviceId: next.id,
-                                attribute: auto.attributesFor(next.kind)[0] ?? "state",
-                                is: ""
-                            })
-                        }
+                        onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
                     {device && (
                         <fields.AttributePicker

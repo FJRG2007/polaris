@@ -1379,4 +1379,12 @@ describe("a condition held for a while", () => {
         later(11 * MINUTE);
         expect(await press("press-1")).not.toBe("skipped");
     });
+
+    it("does not count from an observation that has not caught up with the device", async () => {
+        await reads(readout("door", "lock", "locked"));
+        later(2 * 60 * MINUTE);
+        devices.set("door", readout("door", "lock", "unlocked"));
+        held(10);
+        expect(await press("press-1")).toBe("skipped");
+    });
 });

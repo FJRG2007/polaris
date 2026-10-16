@@ -949,7 +949,9 @@ export function createEngine(ports: EnginePorts) {
             // that long ago. Its last change is what made it match (or stop
             // matching, for "is not"), so that change is when the wait began.
             const seen = await store.observation(condition.deviceId);
-            if (!seen) return false;
+            if (!seen || same(attributeOf(seen, condition.attribute), condition.is) !== matches) {
+                return false;
+            }
             const since = sinceOf(seen, condition.attribute);
             return now.getTime() - since.getTime() >= condition.forMinutes * 60 * 1000;
         }
@@ -979,10 +981,7 @@ export function createEngine(ports: EnginePorts) {
 export type AutomationEngine = ReturnType<typeof createEngine>;
 
 /** When the attribute an observation holds last changed. */
-function sinceOf(
-    seen: Observation,
-    attribute: auto.AutomationAttribute
-): Date {
+function sinceOf(seen: Observation, attribute: auto.AutomationAttribute): Date {
     if (attribute === "door") return seen.doorSince;
     if (attribute === "reading") return seen.readingSince;
     if (attribute === "mode") return seen.modeSince;
