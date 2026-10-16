@@ -339,7 +339,9 @@ export function resolveTargets<T extends TargetBlock>(block: T, scope: TargetSco
 }
 
 /** The rooms and floors an automation names, anywhere in it. */
-export function namedPlaces(definition: AutomationDefinition): { kind: "room" | "floor"; id: string }[] {
+export function namedPlaces(
+    definition: AutomationDefinition
+): { kind: "room" | "floor"; id: string }[] {
     const blocks: unknown[] = [
         ...definition.triggers,
         ...definition.conditions.groups.flatMap((group) => group.items),
@@ -1114,20 +1116,11 @@ export function deviceIssues(
             issues.push({ path: [...path, "attribute"], message: "automations.errors.attribute" });
         }
     };
-    const watched = (
-        block: TargetBlock,
-        which: AutomationAttribute,
-        path: (string | number)[]
-    ) => {
-        for (const deviceId of named(block))
-            watchedOne(block, deviceId, which, path);
+    const watched = (block: TargetBlock, which: AutomationAttribute, path: (string | number)[]) => {
+        for (const deviceId of named(block)) watchedOne(block, deviceId, which, path);
         places(block, path);
     };
-    const sensor = (
-        block: TargetBlock,
-        path: (string | number)[],
-        measure?: ReadingMeasure
-    ) => {
+    const sensor = (block: TargetBlock, path: (string | number)[], measure?: ReadingMeasure) => {
         places(block, path);
         for (const deviceId of named(block)) {
             const device = byId.get(deviceId);

@@ -22,7 +22,12 @@ interface Room {
     floorId: string | null;
 }
 
-const db = vi.hoisted(() => ({ floors: [] as Floor[], rooms: [] as Room[], next: 0, clash: false }));
+const db = vi.hoisted(() => ({
+    floors: [] as Floor[],
+    rooms: [] as Room[],
+    next: 0,
+    clash: false
+}));
 
 vi.mock("@polaris/db", () => {
     function roomRow(room: Room) {
@@ -68,7 +73,8 @@ vi.mock("@polaris/db", () => {
                     return { id: found.id, name: found.name };
                 },
                 create: async ({ data }: { data: Omit<Floor, "id"> }) => {
-                    if (db.clash) throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
+                    if (db.clash)
+                        throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
                     const floor = { id: `floor-${++db.next}`, ...data };
                     db.floors.push(floor);
                     return floorRow(floor);
@@ -80,7 +86,8 @@ vi.mock("@polaris/db", () => {
                     where: { id: string };
                     data: { name: string };
                 }) => {
-                    if (db.clash) throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
+                    if (db.clash)
+                        throw Object.assign(new Error("Unique constraint"), { code: "P2002" });
                     const floor = db.floors.find((each) => each.id === where.id)!;
                     floor.name = data.name;
                     return floorRow(floor);

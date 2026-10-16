@@ -47,7 +47,9 @@ const TEXT_BUTTON = "h-11 shrink-0 sm:h-7";
 function floorOptions(floors: readonly FloorView[], none: string) {
     return [
         { value: "", label: none },
-        ...floors.filter((each) => !isTemp(each.id)).map((each) => ({ value: each.id, label: each.name }))
+        ...floors
+            .filter((each) => !isTemp(each.id))
+            .map((each) => ({ value: each.id, label: each.name }))
     ];
 }
 
@@ -189,7 +191,10 @@ export function RoomsDialog({
             },
             () => undefined
         );
-        void Promise.all([actions.listRoomsAction(placeId), actions.listFloorsAction(placeId)]).then(
+        void Promise.all([
+            actions.listRoomsAction(placeId),
+            actions.listFloorsAction(placeId)
+        ]).then(
             ([roomResult, floorResult]) => {
                 if (!current) return;
                 setRooms(roomResult.rooms ?? []);
@@ -235,8 +240,14 @@ export function RoomsDialog({
     const floorName = (id: string) => floors?.find((floor) => floor.id === id)?.name ?? "";
 
     const renameFloorTo = (floor: FloorView, name: string) => {
-        setFloors((list) => byName((list ?? []).map((each) => (each.id === floor.id ? { ...each, name } : each))));
-        setRooms((list) => (list ?? []).map((room) => (room.floorId === floor.id ? { ...room, floor: name } : room)));
+        setFloors((list) =>
+            byName((list ?? []).map((each) => (each.id === floor.id ? { ...each, name } : each)))
+        );
+        setRooms((list) =>
+            (list ?? []).map((room) =>
+                room.floorId === floor.id ? { ...room, floor: name } : room
+            )
+        );
     };
 
     const saveFloor = (floor: FloorView, name: string) => {
@@ -249,18 +260,33 @@ export function RoomsDialog({
 
     const saveRoom = (room: RoomView, next: { name: string; floorId: string }) => {
         const replace = (by: RoomView) =>
-            setRooms((list) => byName((list ?? []).map((each) => (each.id === room.id ? by : each))));
+            setRooms((list) =>
+                byName((list ?? []).map((each) => (each.id === room.id ? by : each)))
+            );
         void attempt(
-            () => replace({ ...room, name: next.name, floorId: next.floorId, floor: floorName(next.floorId) }),
+            () =>
+                replace({
+                    ...room,
+                    name: next.name,
+                    floorId: next.floorId,
+                    floor: floorName(next.floorId)
+                }),
             () => replace(room),
             () =>
                 actions.saveRoomAction(
                     room.id,
-                    normalizeRoomInput({ name: next.name, floor: floorName(next.floorId), floorId: next.floorId })
+                    normalizeRoomInput({
+                        name: next.name,
+                        floor: floorName(next.floorId),
+                        floorId: next.floorId
+                    })
                 ),
             (result: { room?: RoomView }) => {
                 const saved = result.room;
-                if (saved) setRooms((list) => (list ?? []).map((each) => (each.id === saved.id ? saved : each)));
+                if (saved)
+                    setRooms((list) =>
+                        (list ?? []).map((each) => (each.id === saved.id ? saved : each))
+                    );
             }
         );
     };
@@ -279,7 +305,10 @@ export function RoomsDialog({
             () => actions.saveFloorAction(null, { placeId, name }),
             (result: { floor?: FloorView }) => {
                 const saved = result.floor;
-                if (saved) setFloors((list) => byName((list ?? []).map((each) => (each.id === temp.id ? saved : each))));
+                if (saved)
+                    setFloors((list) =>
+                        byName((list ?? []).map((each) => (each.id === temp.id ? saved : each)))
+                    );
             }
         );
     };
@@ -308,7 +337,10 @@ export function RoomsDialog({
                 ),
             (result: { room?: RoomView }) => {
                 const saved = result.room;
-                if (saved) setRooms((list) => byName((list ?? []).map((each) => (each.id === temp.id ? saved : each))));
+                if (saved)
+                    setRooms((list) =>
+                        byName((list ?? []).map((each) => (each.id === temp.id ? saved : each)))
+                    );
             }
         );
     };
@@ -319,7 +351,9 @@ export function RoomsDialog({
         const target = removing;
         const onFloor = new Set(
             target.kind === "floor"
-                ? (rooms ?? []).filter((room) => room.floorId === target.floor.id).map((room) => room.id)
+                ? (rooms ?? [])
+                      .filter((room) => room.floorId === target.floor.id)
+                      .map((room) => room.id)
                 : []
         );
         setRemoving(null);
@@ -328,7 +362,9 @@ export function RoomsDialog({
                 if (target.kind === "floor") {
                     setFloors((list) => (list ?? []).filter((each) => each.id !== target.floor.id));
                     setRooms((list) =>
-                        (list ?? []).map((room) => (onFloor.has(room.id) ? { ...room, floor: "", floorId: "" } : room))
+                        (list ?? []).map((room) =>
+                            onFloor.has(room.id) ? { ...room, floor: "", floorId: "" } : room
+                        )
                     );
                 } else {
                     setRooms((list) => (list ?? []).filter((each) => each.id !== target.room.id));
@@ -337,7 +373,9 @@ export function RoomsDialog({
             () => {
                 if (target.kind === "floor") {
                     const { floor } = target;
-                    setFloors((list) => byName([...(list ?? []).filter((each) => each.id !== floor.id), floor]));
+                    setFloors((list) =>
+                        byName([...(list ?? []).filter((each) => each.id !== floor.id), floor])
+                    );
                     setRooms((list) =>
                         (list ?? []).map((room) =>
                             onFloor.has(room.id) && !room.floorId
@@ -347,7 +385,9 @@ export function RoomsDialog({
                     );
                 } else {
                     const { room } = target;
-                    setRooms((list) => byName([...(list ?? []).filter((each) => each.id !== room.id), room]));
+                    setRooms((list) =>
+                        byName([...(list ?? []).filter((each) => each.id !== room.id), room])
+                    );
                 }
             },
             () =>
@@ -359,10 +399,18 @@ export function RoomsDialog({
     };
 
     const loading = rooms === null || floors === null;
-    const removingName = removing ? (removing.kind === "floor" ? removing.floor.name : removing.room.name) : "";
-    const removingUses = removing ? (uses[removing.kind === "floor" ? removing.floor.id : removing.room.id] ?? 0) : 0;
+    const removingName = removing
+        ? removing.kind === "floor"
+            ? removing.floor.name
+            : removing.room.name
+        : "";
+    const removingUses = removing
+        ? (uses[removing.kind === "floor" ? removing.floor.id : removing.room.id] ?? 0)
+        : 0;
     const removingBody =
-        removing?.kind === "floor" ? t("roomsDialog.removeFloorBody") : t("roomsDialog.removeRoomBody");
+        removing?.kind === "floor"
+            ? t("roomsDialog.removeFloorBody")
+            : t("roomsDialog.removeRoomBody");
 
     return (
         <>
@@ -385,7 +433,9 @@ export function RoomsDialog({
                             {loading ? (
                                 <Skeleton className="h-9 w-full" />
                             ) : floors.length === 0 ? (
-                                <p className="text-xs text-foreground-subtle">{t("roomsDialog.noFloors")}</p>
+                                <p className="text-xs text-foreground-subtle">
+                                    {t("roomsDialog.noFloors")}
+                                </p>
                             ) : (
                                 <ul className="flex min-w-0 flex-col gap-2">
                                     {floors.map((floor) => (
@@ -426,7 +476,9 @@ export function RoomsDialog({
                                     {t("roomsDialog.addFloor")}
                                 </Button>
                             </div>
-                            {floorIssue && <span className="text-xs text-danger">{floorIssue}</span>}
+                            {floorIssue && (
+                                <span className="text-xs text-danger">{floorIssue}</span>
+                            )}
                         </section>
 
                         <section className="flex min-w-0 flex-col gap-2">
@@ -434,7 +486,9 @@ export function RoomsDialog({
                             {loading ? (
                                 <Skeleton className="h-9 w-full" />
                             ) : rooms.length === 0 ? (
-                                <p className="text-xs text-foreground-subtle">{t("roomsDialog.noRooms")}</p>
+                                <p className="text-xs text-foreground-subtle">
+                                    {t("roomsDialog.noRooms")}
+                                </p>
                             ) : (
                                 <ul className="flex min-w-0 flex-col gap-2">
                                     {rooms.map((room) => (
@@ -472,7 +526,10 @@ export function RoomsDialog({
                                         aria-label={t("roomsDialog.newRoomFloor")}
                                         className={FLOOR_SELECT}
                                         disabled={loading}
-                                        options={floorOptions(floors ?? [], t("roomsDialog.noFloor"))}
+                                        options={floorOptions(
+                                            floors ?? [],
+                                            t("roomsDialog.noFloor")
+                                        )}
                                     />
                                     <Button
                                         size="sm"
@@ -497,9 +554,17 @@ export function RoomsDialog({
                 open={removing !== null}
                 onOpenChange={(next) => (next ? undefined : setRemoving(null))}
                 name={removingName}
-                kind={removing?.kind === "floor" ? t("roomsDialog.floorKind") : t("roomsDialog.roomKind")}
+                kind={
+                    removing?.kind === "floor"
+                        ? t("roomsDialog.floorKind")
+                        : t("roomsDialog.roomKind")
+                }
                 requireTyping={false}
-                title={removing?.kind === "floor" ? t("roomsDialog.removeFloorTitle") : t("roomsDialog.removeRoomTitle")}
+                title={
+                    removing?.kind === "floor"
+                        ? t("roomsDialog.removeFloorTitle")
+                        : t("roomsDialog.removeRoomTitle")
+                }
                 question={t.rich("roomsDialog.removeQuestion", {
                     name: removingName,
                     em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>

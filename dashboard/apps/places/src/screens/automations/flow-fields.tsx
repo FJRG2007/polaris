@@ -230,7 +230,9 @@ export function SetCountField({
     return (
         <Field
             label={t(
-                role === "trigger" ? "automations.fields.behaviour" : "automations.fields.quantifier"
+                role === "trigger"
+                    ? "automations.fields.behaviour"
+                    : "automations.fields.quantifier"
             )}
             path={[...path, role === "trigger" ? "behaviour" : "quantifier"]}
         >

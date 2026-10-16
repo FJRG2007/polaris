@@ -27,7 +27,12 @@ export interface DeviceLookup {
 /** A lookup over a place's devices and, where given, its rooms and floors. */
 export function lookupOf(
     devices: readonly { readonly id: string; readonly name: string; readonly kind: string }[],
-    rooms: readonly { readonly id: string; readonly name: string; readonly floor: string; readonly floorId?: string }[] = []
+    rooms: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly floor: string;
+        readonly floorId?: string;
+    }[] = []
 ): DeviceLookup {
     const byId = new Map(devices.map((device) => [device.id, device]));
     const roomNames = new Map(rooms.map((room) => [room.id, room.name]));

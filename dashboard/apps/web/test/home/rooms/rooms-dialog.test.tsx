@@ -79,11 +79,15 @@ describe("the rooms and floors dialog", () => {
         fireEvent.change(screen.getByLabelText("New floor"), { target: { value: " Attic " } });
         fireEvent.click(screen.getByRole("button", { name: "Add a floor" }));
         await painted();
-        expect(calls[0]).toEqual({ action: "floor", args: [null, { placeId: "place-1", name: "Attic" }] });
-        expect(screen.getAllByLabelText("Name of the floor").map((input) => (input as HTMLInputElement).value)).toEqual([
-            "Attic",
-            "Ground floor"
-        ]);
+        expect(calls[0]).toEqual({
+            action: "floor",
+            args: [null, { placeId: "place-1", name: "Attic" }]
+        });
+        expect(
+            screen
+                .getAllByLabelText("Name of the floor")
+                .map((input) => (input as HTMLInputElement).value)
+        ).toEqual(["Attic", "Ground floor"]);
         fireEvent.change(screen.getByLabelText("New room"), { target: { value: "Hall" } });
         fireEvent.click(screen.getByRole("button", { name: "Add room" }));
         await painted();
@@ -125,7 +129,9 @@ describe("the rooms and floors dialog", () => {
         await painted();
         fireEvent.click(screen.getByRole("button", { name: "Remove Kitchen" }));
         await painted();
-        expect(screen.getByRole("dialog", { name: "Remove room" }).textContent).not.toContain("automation");
+        expect(screen.getByRole("dialog", { name: "Remove room" }).textContent).not.toContain(
+            "automation"
+        );
     });
 
     it("leaves a floor still being made alone until the server answers", async () => {
@@ -137,11 +143,17 @@ describe("the rooms and floors dialog", () => {
         fireEvent.change(screen.getByLabelText("New floor"), { target: { value: "Attic" } });
         fireEvent.click(screen.getByRole("button", { name: "Add a floor" }));
         await painted();
-        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty("disabled", true);
+        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty(
+            "disabled",
+            true
+        );
         expect(screen.getByDisplayValue("Attic")).toHaveProperty("disabled", true);
         await act(async () => release());
         await painted();
-        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty("disabled", false);
+        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty(
+            "disabled",
+            false
+        );
     });
 
     it("puts a refused removal back and says why", async () => {

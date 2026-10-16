@@ -276,12 +276,10 @@ export function AddBlockButton({
     const reachable = devices.filter(
         (device) => fits(device).length > 0 || purposesFor(device).length > 0
     );
-    const grouped = targetGroups(
-        reachable,
-        rooms,
-        (device) => kinds.groupText(device.kind, t),
-        { noFloor: t("automations.add.noFloor"), noRoom: t("automations.add.noRoom") }
-    );
+    const grouped = targetGroups(reachable, rooms, (device) => kinds.groupText(device.kind, t), {
+        noFloor: t("automations.add.noFloor"),
+        noRoom: t("automations.add.noRoom")
+    });
     const targets: AddTargets | undefined =
         reachable.length > 0
             ? {

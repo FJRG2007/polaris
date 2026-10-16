@@ -53,7 +53,11 @@ describe("a place's rooms", () => {
             LEVELS
         );
         expect(
-            groups.map((group) => [group.section, group.label, group.devices.map((each) => each.id)])
+            groups.map((group) => [
+                group.section,
+                group.label,
+                group.devices.map((each) => each.id)
+            ])
         ).toEqual([
             ["First floor", "Bedroom 2", ["bed"]],
             ["Ground floor", "Kitchen", ["lamp"]],
@@ -71,7 +75,11 @@ describe("a place's rooms", () => {
             LEVELS
         );
         expect(groups).toEqual([
-            { id: "room:r4", label: "Garage", devices: [{ id: "lamp", kind: "light", roomId: "r4" }] }
+            {
+                id: "room:r4",
+                label: "Garage",
+                devices: [{ id: "lamp", kind: "light", roomId: "r4" }]
+            }
         ]);
     });
 
@@ -159,16 +167,27 @@ describe("a block naming a room or a floor", () => {
         ).toEqual(["automations.errors.placeGone"]);
         expect(
             auto
-                .deviceIssues(definition(trigger({ kind: "floor", id: "upstairs" })), devices, context)
+                .deviceIssues(
+                    definition(trigger({ kind: "floor", id: "upstairs" })),
+                    devices,
+                    context
+                )
                 .map((issue) => issue.message)
         ).toEqual(["automations.errors.placeEmpty"]);
         expect(
-            auto.deviceIssues(definition(trigger({ kind: "room", id: "kitchen" })), devices, context)
+            auto.deviceIssues(
+                definition(trigger({ kind: "room", id: "kitchen" })),
+                devices,
+                context
+            )
         ).toEqual([]);
     });
 
     it("tells a floor with no room on it from one that is gone, given the floors", () => {
-        const floors = { ...context, floors: [{ id: "ground" }, { id: "upstairs" }, { id: "attic" }] };
+        const floors = {
+            ...context,
+            floors: [{ id: "ground" }, { id: "upstairs" }, { id: "attic" }]
+        };
         expect(
             auto
                 .deviceIssues(definition(trigger({ kind: "floor", id: "attic" })), devices, floors)
