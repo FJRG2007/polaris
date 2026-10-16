@@ -33,6 +33,7 @@ import { resolveMountTarget } from "./storage-service";
 import * as sourceUpload from "./deploy/source-upload";
 import { edgeLoginKeys } from "@/lib/edge-signing-key";
 import { hostPortForApp } from "@/lib/deploy/host-port";
+import { guardsService, mustCloseDirectPort } from "@/lib/deploy/direct-port";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
@@ -1235,10 +1236,23 @@ export async function setApplicationPublishPort(
             "Polaris serves this service's domains from here and reaches it on its server's port. Switch its domains to be served by its own server first."
         );
     }
-    if (view.publishPort === publish) return { redeployed: false };
+    // A firewall that guards a service - a login, an address list, a rule - is
+    // walked round by anybody who has its IP and port, so that port stays closed.
+    if (publish && view.local && !view.catalog && (await guardsService(applicationId))) {
+        throw new Error(
+            "This service's firewall decides who gets in, and an open port would let anybody past it. It stays reachable through its domains only."
+        );
+    }
+    if (view.publishPort === publish) {
+        await prisma.application.update({
+            where: { id: applicationId },
+            data: { publishPortChosen: publish }
+        });
+        return { redeployed: false };
+    }
     const app = await prisma.application.update({
         where: { id: applicationId },
-        data: { publishPort: publish },
+        data: { publishPort: publish, publishPortChosen: publish },
         select: { currentDeploymentId: true }
     });
     await syncAppRoutes();
@@ -2922,6 +2936,17 @@ async function buildAppPlan(
     const project = app.environment.project;
     const base = deployReleases.serviceRef(project.slug, app.slug, app.id);
     const kept = release !== undefined && deployReleases.keepsReleases(app);
+    // A service the edge answers for is reached through it alone: a port left open
+    // by the old default is closed on this deploy, which is the change-over that
+    // moves it - the new container comes up without the port and the old one,
+    // still holding it, stays up until the new one serves (see `direct-port.ts`).
+    if (app.publishPort && (await mustCloseDirectPort(app.id))) {
+        await prisma.application.update({
+            where: { id: app.id },
+            data: { publishPort: false, publishPortChosen: false }
+        });
+        app.publishPort = false;
+    }
     // Beside the running release only for the change-over, answering to the
     // service's own name as well (see `runsCutover`).
     const cutover = release !== undefined && !kept && release.cutover;
