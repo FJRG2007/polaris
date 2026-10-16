@@ -8,6 +8,7 @@
  */
 
 import { usePlacesT } from "../use-places-t";
+import { blockIcon, conditionIcon } from "./add-block";
 import { useMemo, type ReactNode } from "react";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
@@ -87,19 +88,22 @@ export function AutomationCanvas({ lookup, automationName, ...props }: Automatio
                 kinds: auto.TRIGGER_KINDS,
                 kindText: (kind) => words.triggerKindText(kind, t),
                 blank: auto.blankTrigger,
-                describe: (trigger) => words.describeTrigger(trigger, lookup, t)
+                describe: (trigger) => words.describeTrigger(trigger, lookup, t),
+                icon: (trigger) => blockIcon("trigger", trigger)
             },
             conditions: {
                 kinds: auto.CONDITION_KINDS,
                 kindText: (kind) => words.conditionKindText(kind, t),
                 blank: auto.blankCondition,
-                describe: (condition) => words.describeCondition(condition, lookup, t)
+                describe: (condition) => words.describeCondition(condition, lookup, t),
+                icon: (condition) => conditionIcon(condition)
             },
             steps: {
                 kinds: auto.STEP_KINDS,
                 kindText: (kind) => words.stepKindText(kind, t),
                 blank: auto.blankStep,
-                describe: (step) => words.describeStep(step, lookup, automationName, t)
+                describe: (step) => words.describeStep(step, lookup, automationName, t),
+                icon: (step) => blockIcon("step", step)
             },
             limits: {
                 triggers: auto.LIMITS.triggers,

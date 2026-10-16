@@ -44,7 +44,7 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
 import { AutomationCanvas } from "./automation-canvas";
-import { AddBlockButton, RoomsProvider } from "./add-block";
+import { AddBlockButton, RoomsProvider, blockIcon } from "./add-block";
 import type { RoomView } from "../../lib/room-kinds";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
@@ -871,11 +871,6 @@ export function AutomationEditor({
         />
     );
 
-    const ICONS: Record<BlockRole, ReactNode> = {
-        trigger: <Zap />,
-        group: <Filter />,
-        step: <Play />
-    };
     const sentenceOf = (role: BlockRole, block: Block): string => {
         if (role === "trigger") return words.describeTrigger(block as auto.Trigger, lookup, t);
         if (role === "step")
@@ -935,7 +930,7 @@ export function AutomationEditor({
                         <blocks.BlockRow
                             handle={handle}
                             number={role === "step" ? index + 1 : undefined}
-                            icon={ICONS[role]}
+                            icon={blockIcon(role, block)}
                             title={title}
                             chips={chipsOf(role, block)}
                             note={block.note}
@@ -977,7 +972,7 @@ export function AutomationEditor({
             <blocks.BlockPanel
                 open
                 title={selectedTitle}
-                icon={ICONS[selected.role]}
+                icon={blockIcon(selected.role, selectedBlock)}
                 strings={blockStrings}
                 sizeKey={PANEL_KEY}
                 onClose={() => setSelected(null)}

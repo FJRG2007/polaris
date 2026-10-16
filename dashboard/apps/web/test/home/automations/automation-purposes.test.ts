@@ -182,3 +182,39 @@ describe("a block's set of devices", () => {
         ]);
     });
 });
+
+describe("a stored block read back as its purpose", () => {
+    it("names the purpose each one was made from", () => {
+        for (const id of purposes.TRIGGER_PURPOSES) {
+            const on = [lock, doorSensor, motion, plug].find((each) =>
+                purposes.triggerFits(id, { ...each, batteryPercent: 50 })
+            )!;
+            const made = purposes.purposeTrigger(id, { ...on, batteryPercent: 50 })!;
+            expect(purposes.triggerPurposeOf(made)).toBe(id);
+        }
+        for (const id of purposes.CONDITION_PURPOSES) {
+            const on = [lock, doorSensor, motion, plug].find((each) =>
+                purposes.conditionFits(id, { ...each, batteryPercent: 50 })
+            )!;
+            const made = purposes.purposeCondition(id, { ...on, batteryPercent: 50 })!;
+            expect(purposes.conditionPurposeOf(made)).toBe(id);
+        }
+    });
+
+    it("is none for a block that is no purpose's, or one turned around", () => {
+        const reading: auto.Trigger = {
+            id: "trig01",
+            kind: "change",
+            deviceId: "temp",
+            attribute: "reading",
+            from: "",
+            to: "21"
+        };
+        expect(purposes.triggerPurposeOf(reading)).toBeNull();
+        expect(purposes.triggerPurposeOf({ ...reading, to: "" })).toBeNull();
+        const locked = purposes.purposeCondition("isLocked", lock)!;
+        expect(
+            purposes.conditionPurposeOf({ ...locked, negate: true } as auto.Condition)
+        ).toBeNull();
+    });
+});

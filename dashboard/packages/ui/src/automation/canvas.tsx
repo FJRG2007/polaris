@@ -99,6 +99,8 @@ export interface FlowKinds<N extends graphs.FlowItem> {
     readonly kindText: (kind: N["kind"]) => string;
     readonly blank: (kind: N["kind"]) => N;
     readonly describe: (node: N) => string;
+    /** The icon a node of this stage is drawn with; the stage's own without one. */
+    readonly icon?: (node: N) => ReactNode;
 }
 
 /** What an automation is made of, for the canvas to draw and add. */
@@ -127,6 +129,7 @@ type ViewData = {
     readonly state: NodeState;
     readonly number?: number;
     readonly readOnly: boolean;
+    readonly icon?: ReactNode;
 };
 
 type ViewNode = DiagramNode & { readonly data: ViewData };
@@ -220,6 +223,7 @@ function viewData<D extends graphs.FlowDefinition>(
                     state === "incomplete"
                         ? stateText(state, labels)
                         : vocabulary.triggers.describe(trigger),
+                icon: vocabulary.triggers.icon?.(trigger),
                 state,
                 readOnly
             };
@@ -259,6 +263,7 @@ function viewData<D extends graphs.FlowDefinition>(
                     state === "incomplete"
                         ? stateText(state, labels)
                         : vocabulary.conditions.describe(condition),
+                icon: vocabulary.conditions.icon?.(condition),
                 state,
                 readOnly
             };
@@ -272,6 +277,7 @@ function viewData<D extends graphs.FlowDefinition>(
                     state === "incomplete"
                         ? stateText(state, labels)
                         : vocabulary.steps.describe(step),
+                icon: vocabulary.steps.icon?.(step),
                 state,
                 number: node.data.index + 1,
                 readOnly
@@ -311,7 +317,16 @@ function NodeFace({
             )}
         >
             <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-medium text-muted-foreground">
-                <RoleIcon role={role} />
+                {data.icon ? (
+                    <span
+                        aria-hidden="true"
+                        className="flex size-3.5 shrink-0 items-center justify-center [&_svg]:size-3.5"
+                    >
+                        {data.icon}
+                    </span>
+                ) : (
+                    <RoleIcon role={role} />
+                )}
                 {data.number !== undefined && (
                     <span className="shrink-0 tabular-nums">{data.number}.</span>
                 )}

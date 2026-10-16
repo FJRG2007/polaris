@@ -29,6 +29,7 @@ import {
     Clock,
     DoorClosed,
     DoorOpen,
+    Filter,
     Footprints,
     Lock,
     LockOpen,
@@ -128,6 +129,33 @@ const PURPOSE_ICONS: Record<purposes.TriggerPurpose | purposes.ConditionPurpose,
     batteryIsLow: <BatteryLow />,
     isUnavailable: <Unplug />
 };
+
+/**
+ * The icon a stored block's row is drawn with: what it is for where it reads as
+ * one of the purposes (a door, a lock, a battery), else its kind's - the same
+ * icon the add dialog showed it with. A group is drawn as its first condition.
+ */
+export function blockIcon(
+    role: "trigger" | "group" | "step",
+    block: auto.Trigger | auto.ConditionGroup | auto.Step
+): ReactNode {
+    if (role === "trigger") {
+        const trigger = block as auto.Trigger;
+        const purpose = purposes.triggerPurposeOf(trigger);
+        return purpose ? PURPOSE_ICONS[purpose] : VOCABULARY.trigger[trigger.kind]?.icon;
+    }
+    if (role === "group") {
+        const first = (block as auto.ConditionGroup).items[0];
+        return first ? conditionIcon(first) : <Filter />;
+    }
+    return VOCABULARY.step[(block as auto.Step).kind]?.icon;
+}
+
+/** One condition's icon, by the same rule as a block's. */
+export function conditionIcon(condition: auto.Condition): ReactNode {
+    const purpose = purposes.conditionPurposeOf(condition);
+    return purpose ? PURPOSE_ICONS[purpose] : VOCABULARY.condition[condition.kind]?.icon;
+}
 
 const GROUP_ICONS: Record<GroupId, ReactNode> = {
     devices: <Power />,

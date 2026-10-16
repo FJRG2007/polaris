@@ -106,6 +106,49 @@ const SAVED: AutomationView = {
     updatedAt: "2026-09-30T06:00:00.000Z"
 };
 
+/** One of each kind of row, for the icon each is drawn with. */
+const ICONS_SAVED: AutomationView = {
+    ...SAVED,
+    id: "auto-icons",
+    definition: {
+        timeZone: "UTC",
+        triggers: [
+            {
+                id: "trig01",
+                kind: "change",
+                deviceId: "door",
+                attribute: "door",
+                from: "",
+                to: "open"
+            },
+            { id: "trig02", kind: "time", at: "07:00", days: [1, 2, 3, 4, 5] }
+        ],
+        conditions: {
+            match: "all",
+            groups: [
+                {
+                    id: "grp001",
+                    match: "all",
+                    items: [
+                        {
+                            id: "cond01",
+                            kind: "device",
+                            deviceId: "door",
+                            attribute: "state",
+                            is: "locked",
+                            negate: false
+                        }
+                    ]
+                }
+            ]
+        },
+        actions: [
+            { id: "step01", kind: "notify", message: "Fixture message" },
+            { id: "step02", kind: "delay", seconds: 60 }
+        ]
+    }
+};
+
 /** An evening that warms the bedroom: a step that sets a temperature. */
 const CLIMATE_SAVED: AutomationView = {
     ...SAVED,
@@ -247,9 +290,11 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
                     ? AIR_SAVED
                     : id === "auto-set"
                       ? SET_SAVED
-                      : id
-                        ? SAVED
-                        : undefined,
+                      : id === "auto-icons"
+                        ? ICONS_SAVED
+                        : id
+                          ? SAVED
+                          : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
@@ -1238,6 +1283,29 @@ describe("the add dialog", () => {
         } finally {
             window.matchMedia = original;
         }
+    });
+});
+
+describe("the icon on each row", () => {
+    it("is what the block is for, else its kind's", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-icons"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        const iconOf = (row: HTMLElement) =>
+            [...(row.querySelector("svg")?.classList ?? [])].find(
+                (name) => name.startsWith("lucide-") && name !== "lucide-icon"
+            );
+        expect(rowsIn("When").map(iconOf)).toEqual(["lucide-door-open", "lucide-clock"]);
+        expect(rowsIn("If").map(iconOf)).toEqual(["lucide-lock"]);
+        expect(rowsIn("Then").map(iconOf)).toEqual(["lucide-bell", "lucide-timer"]);
     });
 });
 
