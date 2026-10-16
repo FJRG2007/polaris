@@ -642,6 +642,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # --- Minecraft hostname routing -------------------------------------------
   # One port for every Java server. A Java client puts the address it was given
   # into the handshake, before login and before anything is encrypted, so a router
   # reading that field can send each connection to the right server: every world
