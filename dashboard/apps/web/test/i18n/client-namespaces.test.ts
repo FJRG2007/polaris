@@ -54,7 +54,10 @@ function renderedImports(source: string): string[] {
         if (match[1]) continue;
         const clause = match[2]!;
         const named = /\{([^}]*)\}/.exec(clause)?.[1] ?? "";
-        const outside = clause.replace(/\{[^}]*\}/, "").replace(/,/g, "").trim();
+        const outside = clause
+            .replace(/\{[^}]*\}/, "")
+            .replace(/,/g, "")
+            .trim();
         const draws = named
             .split(",")
             .map((part) => part.trim())
@@ -87,7 +90,13 @@ function resolveImport(from: string, specifier: string): string | undefined {
           ? resolve(dirname(from), specifier)
           : undefined;
     if (!base) return undefined;
-    const candidates = [base, `${base}.tsx`, `${base}.ts`, join(base, "index.tsx"), join(base, "index.ts")];
+    const candidates = [
+        base,
+        `${base}.tsx`,
+        `${base}.ts`,
+        join(base, "index.tsx"),
+        join(base, "index.ts")
+    ];
     return candidates.find((path) => existsSync(path) && statSync(path).isFile());
 }
 
@@ -102,8 +111,13 @@ describe("client translation namespaces", () => {
 
         const imports = new Map<string, string[]>();
         for (const [path, source] of sources) {
-            const targets = renderedImports(source).map((specifier) => resolveImport(path, specifier));
-            imports.set(path, targets.filter((target): target is string => !!target && target !== path));
+            const targets = renderedImports(source).map((specifier) =>
+                resolveImport(path, specifier)
+            );
+            imports.set(
+                path,
+                targets.filter((target): target is string => !!target && target !== path)
+            );
         }
 
         const isRoute = (path: string) => within(path, APP) && ROUTE_FILE.test(basename(path));
@@ -117,7 +131,8 @@ describe("client translation namespaces", () => {
                 seen.add(path);
                 if (!rendersOn.has(path)) rendersOn.set(path, new Set());
                 rendersOn.get(path)!.add(dirname(route));
-                for (const target of imports.get(path) ?? []) if (!isRoute(target)) stack.push(target);
+                for (const target of imports.get(path) ?? [])
+                    if (!isRoute(target)) stack.push(target);
             }
         }
         const routes = (path: string): string[] => {

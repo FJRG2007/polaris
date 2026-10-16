@@ -34,7 +34,7 @@ import { gateNoteShareRequest, noteDenialMessage } from "@/lib/notes/share-acces
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default async function PublicNotePage({ params }: { params: Promise<{ token: string; }>; }) {
+export default async function PublicNotePage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const session = await getSession();
     const signedIn = Boolean(session?.user);
@@ -48,18 +48,24 @@ export default async function PublicNotePage({ params }: { params: Promise<{ tok
         if (gate.reason === "password_required") {
             return <LinkPasswordForm token={token} unlock={unlockNoteShareAction} />;
         }
-        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage(gate.reason)} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage(gate.reason)} />
+        );
     }
 
     // Counted before it is served, and conditionally: two people opening the last
     // permitted view at the same moment must not both get it.
     if (!(await registerNoteShareView(gate.share.id))) {
-        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("exhausted")} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("exhausted")} />
+        );
     }
 
     const note = await readPublishedNote(gate.share);
     if (!note) {
-        return <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("not_found")} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await noteDenialMessage("not_found")} />
+        );
     }
 
     const format = await getDisplayFormat();
@@ -78,7 +84,10 @@ export default async function PublicNotePage({ params }: { params: Promise<{ tok
                     <CardBody className="flex flex-col gap-6">
                         <RichText value={note.body} className={RICH_TEXT_PROSE} />
                         {note.children.map((child, index) => (
-                            <section key={`${child.title}-${index}`} className="flex flex-col gap-2">
+                            <section
+                                key={`${child.title}-${index}`}
+                                className="flex flex-col gap-2"
+                            >
                                 <h2 className="border-t border-border pt-4 text-base font-semibold tracking-tight">
                                     {child.title}
                                 </h2>

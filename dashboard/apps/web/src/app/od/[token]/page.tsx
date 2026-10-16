@@ -32,11 +32,7 @@ import { openOfficeLinkAction, unlockOfficeLinkAction } from "@/app/od/actions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export default async function LinkedOfficePage({
-    params
-}: {
-    params: Promise<{ token: string }>;
-}) {
+export default async function LinkedOfficePage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
     const session = await getSession();
     const signedIn = Boolean(session?.user);
@@ -48,11 +44,15 @@ export default async function LinkedOfficePage({
                 <LinkPasswordForm
                     token={token}
                     unlock={unlockOfficeLinkAction}
-                    description={(await getTranslations("publicPages"))("office.passwordDescription")}
+                    description={(await getTranslations("publicPages"))(
+                        "office.passwordDescription"
+                    )}
                 />
             );
         }
-        return <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial(gate.reason)} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial(gate.reason)} />
+        );
     }
 
     // The opening is spent here, on the way in, and it is what writes the pass
@@ -66,7 +66,9 @@ export default async function LinkedOfficePage({
 
     const found = await readByLink(gate.visit.documentId);
     if (!found) {
-        return <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial("not_found")} />;
+        return (
+            <LinkUnavailable signedIn={signedIn} message={await officeLinkDenial("not_found")} />
+        );
     }
 
     return (
