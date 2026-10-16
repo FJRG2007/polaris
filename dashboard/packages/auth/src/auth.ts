@@ -28,6 +28,7 @@ import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
+import { samlSignUpAllowed, samlSsoPlugin } from "./saml-sso.js";
 import { followTrustedDevice, recordTrustedDevice, type DeviceOrigin } from "./two-factor.js";
 import {
     originHost,
@@ -564,7 +565,8 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
     const plugins: BetterAuthPlugin[] = [
         twoFactorPlugin(options),
         deviceAuthorizationPlugin(),
-        connectionSignInPlugin()
+        connectionSignInPlugin(),
+        samlSsoPlugin()
     ];
     const webauthn = passkeyPlugin(address);
     if (webauthn) plugins.push(webauthn);
@@ -758,6 +760,16 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             freshAge: 0
         },
         hooks: { after: recordSignInMethod },
+        databaseHooks: {
+            user: {
+                create: {
+                    // A SAML sign-in creates an account only where its provider
+                    // allows it, and only for an address in that provider's
+                    // domains. Every other way an account is made passes.
+                    before: async (user, context) => samlSignUpAllowed(user.email, context)
+                }
+            }
+        },
         plugins: buildPlugins(options, address ?? new URL(env.POLARIS_APP_URL).host),
         user: {
             additionalFields: {

@@ -127,6 +127,7 @@ export {
     type DeviceAccount
 } from "./device-accounts.js";
 export { signInWithConnection, type ConnectionSignInResult } from "./connection-sign-in.js";
+export { SSO_REQUIRED_CODE, SSO_SIGN_IN_PATH, samlDomainPolicies } from "./saml-sso.js";
 export {
     verifyTotpForSession,
     twoFactorEnabled,
