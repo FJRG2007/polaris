@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Cloud servers: create, run, resize and destroy servers at eight cloud providers, each enrolled as a Polaris server on first boot, with what they cost. An installable Polaris app.",
+    "description": "Cloud servers: create, run, resize and destroy servers at eight cloud providers, each enrolled as a Polaris server on first boot, with what they cost. A section of Servers on every Polaris.",
     "polaris": {
         "id": "cloud-servers",
         "extension": "src/lib/cloud-extension.ts#cloudServersExtension"

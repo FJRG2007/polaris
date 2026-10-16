@@ -49,6 +49,7 @@ describe("the setup screen", () => {
         const user = userEvent.setup();
         draw({ installed: ["status-pages"] });
         await user.click(screen.getByRole("checkbox", { name: /Hosting and deploys/ }));
+        await user.click(screen.getByRole("checkbox", { name: /Team workspace/ }));
         await user.click(screen.getByRole("button", { name: "Next" }));
         const boxes = screen.getAllByRole("checkbox");
         expect(boxes).toHaveLength(3);

@@ -102,7 +102,8 @@
         },
         "apps": {
             "notAnApp": "That is not an app.",
-            "appMissing": "This version of Polaris does not have that app."
+            "appMissing": "This version of Polaris does not have that app.",
+            "native": "This is part of Servers and cannot be uninstalled."
         },
         "mail": {
             "channelGone": "That email channel no longer exists.",

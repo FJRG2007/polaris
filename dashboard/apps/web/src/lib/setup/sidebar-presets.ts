@@ -27,7 +27,7 @@ export type SidebarPresetId = (typeof SIDEBAR_PRESET_IDS)[number];
  *  rail is drawn, like any other favorite. */
 export const SIDEBAR_PRESETS: Readonly<Record<SidebarPresetId, readonly string[]>> = {
     default: [],
-    hosting: ["apps", "watch", "cloud-servers", "status-pages", "security-scans", "drive"],
+    hosting: ["apps", "watch", "status-pages", "drive"],
     team: ["chat", "tasks", "drive", "mail", "calendar", "notes", "office"],
     games: ["games", "chat", "apps", "watch", "drive"],
     homelab: ["home", "apps", "watch", "drive", "vault", "tools"]

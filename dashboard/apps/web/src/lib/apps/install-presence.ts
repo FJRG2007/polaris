@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 const CACHE_TTL_MS = 15_000;
@@ -53,8 +54,10 @@ const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
 };
 
 /** Whether any non-removed install of this catalog app exists, or anything that
- *  stands in for one. */
+ *  stands in for one. Always true for an app every Polaris has. */
 export async function isAppInstalled(catalogId: string): Promise<boolean> {
+    // Part of every Polaris, with or without a row (see `native-apps`).
+    if (isNativeApp(catalogId)) return true;
     const hit = cache.get(catalogId);
     if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.present;
     const row = await prisma.installedApp.findFirst({

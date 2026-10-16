@@ -1,8 +1,9 @@
 /**
- * Cloud servers as the dashboard sees it: its screens live under
- * `/cloud-servers`, and it runs one job - an hourly read of what each server is
- * doing and costs. The job only exists while the app is installed, and loads
- * the service only when it runs.
+ * Cloud servers as the dashboard sees it: its screen is a section of Servers,
+ * `/apps/servers/cloud`, and it runs one job - an hourly read of what each
+ * server is doing and costs. Every Polaris has it; the job reads nothing until
+ * a server was created at a connected account, and loads the service only
+ * when it runs.
  */
 
 import type { AppHostTypes } from "@polaris/app-host";

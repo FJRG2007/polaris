@@ -153,12 +153,6 @@
         },
         "crm": {
             "description": "Companies, people and the deals you are working"
-        },
-        "security-scans": {
-            "description": "Malware, file changes, host hardening and image vulnerabilities"
-        },
-        "cloud-servers": {
-            "description": "Create and run servers at your cloud providers"
         }
     },
     "labels": {

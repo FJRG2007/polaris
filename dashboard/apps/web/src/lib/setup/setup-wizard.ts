@@ -24,8 +24,6 @@ export type SetupUseCase = (typeof SETUP_USE_CASES)[number];
 /** The catalog apps the wizard can install, in the order it lists them. */
 export const SETUP_APPS = [
     "status-pages",
-    "security-scans",
-    "cloud-servers",
     "calendar",
     "crm",
     "game-servers",
@@ -37,10 +35,10 @@ export type SetupApp = (typeof SETUP_APPS)[number];
 
 /** What each use case recommends installing. */
 export const USE_CASE_APPS: Readonly<Record<SetupUseCase, readonly SetupApp[]>> = {
-    hosting: ["status-pages", "security-scans", "cloud-servers"],
+    hosting: ["status-pages"],
     team: ["calendar", "crm"],
     games: ["game-servers"],
-    homelab: ["home", "tools", "security-scans"]
+    homelab: ["home", "tools"]
 };
 
 /** The apps recommended for these use cases, each once, in the wizard's order. */

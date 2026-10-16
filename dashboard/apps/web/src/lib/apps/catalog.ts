@@ -12,6 +12,7 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
+import { NATIVE_APPS, isNativeApp } from "@/lib/apps/native-apps";
 import {
     Bot,
     CalendarDays,
@@ -330,14 +331,15 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
     },
     {
         // Malware, file changes, host hardening and image vulnerabilities on
-        // the servers Polaris runs. Installing it runs nothing and downloads
-        // nothing: every scan is a one-off container pulled the first time it
-        // is needed, and uninstalling keeps every result.
+        // the servers Polaris runs. Part of Servers on every Polaris (see
+        // `native-apps`): never offered, installed or uninstalled. Being here
+        // runs nothing and downloads nothing: every scan is a one-off container
+        // pulled the first time it is needed.
         id: "security-scans",
         name: "Security scans",
         category: "Tools",
         icon: ShieldCheck,
-        opensAt: "/security",
+        opensAt: NATIVE_APPS["security-scans"],
         summary: "Malware, file changes, host hardening and image vulnerabilities on your servers.",
         description:
             "Scan app data for malware and quarantine what is found, record file fingerprints and see what changed since, audit each server's own settings and switch on its automatic security updates, and check every app's image for known vulnerabilities with a downloadable software inventory. Scans run one at a time per server, on demand or on a schedule, and nothing keeps running between them.", // i18n-ignore
@@ -348,14 +350,15 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         instanceWide: true
     },
     {
-        // Servers at the operator's cloud accounts. Installing it runs nothing
-        // but an hourly read of what those servers cost; uninstalling stops that
-        // and leaves every server and account where it was.
+        // Servers at the operator's cloud accounts. Part of Servers on every
+        // Polaris (see `native-apps`). It runs nothing but an hourly read of
+        // what the servers created here cost, which reads nothing until an
+        // account is connected and a server made at it.
         id: "cloud-servers",
         name: "Cloud servers",
         category: "Tools",
         icon: Cloud,
-        opensAt: "/cloud-servers",
+        opensAt: NATIVE_APPS["cloud-servers"],
         summary: "Create servers at your cloud providers, ready in Polaris as they boot.",
         description:
             "Connect DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud or IONOS and create servers from here. Each one joins your Polaris servers on its first boot. Switch them on and off, restart, resize and destroy them, and see what each costs where the provider publishes its prices.", // i18n-ignore
@@ -1388,7 +1391,7 @@ export function findApp(id: string): AppManifest | undefined {
  *  here - what it is called, how its dashboard is drawn - stays true of an app
  *  that is only offered from inside another one, or is no longer offered. */
 export function isOffered(app: AppManifest): boolean {
-    return !app.internal && !app.legacy;
+    return !app.internal && !app.legacy && !isNativeApp(app.id);
 }
 
 /** Apps that are installable now (declared, not coming soon). */
@@ -1406,6 +1409,8 @@ export function appHasCapability(app: AppManifest, capability: AppCapability): b
  *  Pure and client-safe, so the marketplace UI and the install service agree. */
 export function isInstallable(app: AppManifest): boolean {
     if (app.comingSoon || app.legacy) return false;
+    // Part of every Polaris: there is nothing to install.
+    if (isNativeApp(app.id)) return false;
     // A builtin app has nothing to run: installing it records that this Polaris
     // has it, and the app itself is the dashboard.
     if (app.installMethod === "builtin") return true;

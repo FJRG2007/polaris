@@ -102,6 +102,7 @@
         "noFolder": "That folder does not exist in the volume.",
         "noTool": "The audit tools could not be downloaded. Check that the server reaches the internet.",
         "daemonOutdated": "This needs a newer Polaris. Update from Settings, then try again.",
+        "noDaemon": "This Polaris runs without its host service, so it cannot check this machine. Servers added over SSH can be checked.",
         "busy": "Another host check is running on this server. Try again when it ends.",
         "lost": "The scan stopped before it finished. Try again.",
         "timeout": "The scan took too long and was stopped.",
