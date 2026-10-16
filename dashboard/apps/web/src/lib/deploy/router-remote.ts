@@ -66,10 +66,14 @@ export interface RemoteEdge {
  * dollars in it - Traefik rules are full of backticks - and every one of those is
  * a way for a shell to change what lands on disk.
  */
-export function remoteWriteScript(yaml: string, nonce = randomBytes(6).toString("hex")): string {
+export function remoteWriteScript(
+    yaml: string,
+    nonce = randomBytes(6).toString("hex"),
+    file = FILE
+): string {
     const payload = Buffer.from(yaml, "utf8").toString("base64");
-    const target = `${DYNAMIC_DIR}/${FILE}`;
-    const temporary = `${DYNAMIC_DIR}/.${FILE}.${nonce}`;
+    const target = `${DYNAMIC_DIR}/${file}`;
+    const temporary = `${DYNAMIC_DIR}/.${file}.${nonce}`;
     return [
         "set -e",
         `mkdir -p ${quoteArg(DYNAMIC_DIR)}`,
@@ -212,6 +216,19 @@ export class RemoteRouter implements Router {
         }[]
     ): Promise<void> {
         await this.run(remoteCertificatesScript(certificates));
+    }
+
+    /**
+     * Put one more Polaris-owned file in this server's dynamic directory, written
+     * the same way as the app routes: renamed into place, never truncated. For a
+     * feature that renders its own routes (WireGuard tunnels) and must not share
+     * the app routes' file. The name is the caller's constant, never input.
+     */
+    public async pushFile(file: string, yaml: string): Promise<void> {
+        if (!/^polaris-[a-z0-9-]+\.yml$/.test(file) || file === FILE) {
+            throw new Error(`Not a file Polaris may write on an edge: ${file}`);
+        }
+        await this.run(remoteWriteScript(yaml, undefined, file));
     }
 
     private async run(script: string, what = "its routes", input?: string): Promise<void> {
