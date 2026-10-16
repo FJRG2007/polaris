@@ -1591,6 +1591,7 @@
         }
     },
     "devicesView": {
+        "rooms": "Salas",
         "disconnectName": "Desconectar {name}",
         "refused": "{name} rechaza lo que Polaris usa para abrirla, así que sus dispositivos no se están leyendo. Probablemente se revocó.",
         "unreachable": "No se pudo contactar con {name}, así que sus dispositivos siguen como estaban la última vez que respondió.",
@@ -1688,6 +1689,36 @@
             "nothingToStop": "No hay nada en marcha",
             "stopName": "Parar {name}"
         }
+    },
+    "roomsDialog": {
+        "title": "Salas y plantas",
+        "description": "Pon dispositivos en salas y salas en plantas para usarlas en automatizaciones.",
+        "floors": "Plantas",
+        "rooms": "Salas",
+        "noFloors": "Aún sin plantas.",
+        "noRooms": "Aún sin salas.",
+        "noFloor": "Sin planta",
+        "floorName": "Nombre de planta",
+        "roomName": "Nombre de sala",
+        "floorOf": "Planta de {room}",
+        "saveName": "Guardar {name}",
+        "removeName": "Quitar {name}",
+        "newFloor": "Nueva planta",
+        "newFloorPlaceholder": "Planta baja",
+        "addFloor": "Añadir planta",
+        "newRoom": "Nueva sala",
+        "newRoomPlaceholder": "Cocina",
+        "newRoomFloor": "Planta de la sala nueva",
+        "addRoom": "Añadir sala",
+        "unreadable": "No se pudieron leer las salas. Reinténtalo.",
+        "floorKind": "planta",
+        "roomKind": "sala",
+        "removeFloorTitle": "Quitar planta",
+        "removeRoomTitle": "Quitar sala",
+        "removeQuestion": "¿Quitar <em>{name}</em>?",
+        "removeFloorBody": "Sus salas siguen, sin planta.",
+        "removeRoomBody": "Sus dispositivos siguen aquí, sin sala.",
+        "remove": "Quitar"
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",

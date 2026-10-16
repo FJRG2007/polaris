@@ -1591,6 +1591,7 @@
         }
     },
     "devicesView": {
+        "rooms": "Rooms",
         "disconnectName": "Disconnect {name}",
         "refused": "{name} is refusing what Polaris opens it with, so its devices are not being read. It was probably revoked.",
         "unreachable": "{name} could not be reached, so its devices are as they were when it last answered.",
@@ -1689,6 +1690,36 @@
             "stopName": "Stop {name}"
         }
     },
+    "roomsDialog": {
+        "title": "Rooms and floors",
+        "description": "Put devices in rooms, and rooms on floors, so automations can name them.",
+        "floors": "Floors",
+        "rooms": "Rooms",
+        "noFloors": "No floors yet.",
+        "noRooms": "No rooms yet.",
+        "noFloor": "No floor",
+        "floorName": "Name of the floor",
+        "roomName": "Name of the room",
+        "floorOf": "Floor of {room}",
+        "saveName": "Save {name}",
+        "removeName": "Remove {name}",
+        "newFloor": "New floor",
+        "newFloorPlaceholder": "Ground floor",
+        "addFloor": "Add a floor",
+        "newRoom": "New room",
+        "newRoomPlaceholder": "Kitchen",
+        "newRoomFloor": "Floor of the new room",
+        "addRoom": "Add room",
+        "unreadable": "The rooms could not be read. Try again.",
+        "floorKind": "floor",
+        "roomKind": "room",
+        "removeFloorTitle": "Remove floor",
+        "removeRoomTitle": "Remove room",
+        "removeQuestion": "Remove <em>{name}</em>?",
+        "removeFloorBody": "Its rooms stay, on no floor.",
+        "removeRoomBody": "Its devices stay at this place, in no room.",
+        "remove": "Remove"
+    },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",
         "readBack": "Everything else about it is read back from that account.",
@@ -1706,7 +1737,7 @@
         "newRoom": "New room",
         "loadingRooms": "Loading rooms",
         "roomHint": "Automations can pick devices by the room they are in.",
-        "roomName": "Room name",
+        "roomName": "Name of the room",
         "roomNamePlaceholder": "Kitchen",
         "floor": "Floor",
         "floorPlaceholder": "Ground floor"

@@ -28,12 +28,13 @@ import * as actions from "../actions";
 import { DeviceDialog } from "./device-dialog";
 import { ConnectDialog, type Connected } from "./connect-dialog";
 import { NukiLocalDialog } from "./nuki-local-dialog";
+import { RoomsDialog } from "./rooms-dialog";
 import * as kinds from "../../lib/device-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
-import { BatteryLow, Plus, Radio, RefreshCw, Unplug } from "lucide-react";
+import { BatteryLow, DoorOpen, Plus, Radio, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
@@ -106,6 +107,7 @@ export function DevicesView({
     const [devices, setDevices] = useState<DeviceView[] | null>(null);
     const [accounts, setAccounts] = useState<DeviceAccountView[]>([]);
     const [connecting, setConnecting] = useState(false);
+    const [arranging, setArranging] = useState(false);
     /** The account being given a new credential, where that is what the dialog is
      *  open for. Null is connecting something new. */
     const [reconnecting, setReconnecting] = useState<DeviceAccountView | null>(null);
@@ -436,6 +438,12 @@ export function DevicesView({
                 ))}
                 <span className="flex-1" />
                 {canManage && (
+                    <Button size="sm" variant="outline" onClick={() => setArranging(true)}>
+                        <DoorOpen className="size-4 shrink-0" />
+                        {t("devicesView.rooms")}
+                    </Button>
+                )}
+                {canManage && (
                     <Button size="sm" onClick={() => setConnecting(true)}>
                         <Plus className="size-4 shrink-0" />
                         {t("devicesView.connect")}
@@ -543,6 +551,12 @@ export function DevicesView({
             />
 
             <NukiLocalDialog account={linking} onClose={() => setLinking(null)} />
+            <RoomsDialog
+                open={arranging}
+                placeId={placeId}
+                onClose={() => setArranging(false)}
+                onChanged={() => void sync()}
+            />
             <ConfirmDeleteDialog
                 open={disconnecting !== null}
                 onOpenChange={(open) => (open ? undefined : setDisconnecting(null))}
