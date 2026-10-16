@@ -80,6 +80,8 @@ export function machineGpus(subjectId: string): MachineGpus | null {
 /** How long the answer "this machine has no card" is trusted before the
  *  daemon is asked again: a card is not fitted to a running machine. */
 const ABSENT_RECHECK_MS = 60 * 60_000;
+/** How long a failed reading waits before the daemon is asked again. */
+const FAILED_RECHECK_MS = 5 * 60_000;
 let localAbsentUntil = 0;
 
 /** Forget that the local machine had no card, for tests. */
@@ -103,7 +105,10 @@ export async function readLocalGpus(): Promise<GpuReport | null> {
         }
         return parseGpuReport(reading.output);
     } catch {
-        localAbsentUntil = Date.now() + ABSENT_RECHECK_MS;
+        // No daemon at all (the limited edition) or a reading that failed: asked
+        // again a few minutes on, so one slow reading on a machine that has a
+        // card does not hide it for the hour a machine without one waits.
+        localAbsentUntil = Date.now() + FAILED_RECHECK_MS;
         return null;
     }
 }

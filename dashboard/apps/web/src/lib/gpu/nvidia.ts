@@ -9,6 +9,9 @@
  * without `nvidia-smi`, so a server with no card costs one `command -v` and
  * shows no GPU section.
  *
+ * Each `nvidia-smi` call is cut off after ten seconds where `timeout` exists: a
+ * wedged driver hangs it, and the probe around it has no deadline of its own.
+ *
  * Only NVIDIA is read. AMD and Intel cards report through other tools with
  * other fields, and are left out rather than shown as an NVIDIA card would be.
  *
@@ -24,8 +27,9 @@ export const MAX_GPUS = 16;
 export const MAX_GPU_PROCESSES = 256;
 
 export const GPU_SCRIPT = `if command -v nvidia-smi >/dev/null 2>&1; then
-nvidia-smi --query-gpu=index,uuid,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,name --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 16 | while IFS= read -r line; do printf 'gpu=%s\\n' "$line"; done
-nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 256 | while IFS=', ' read -r uuid pid mem; do cid=$(grep -o -E '[0-9a-f]{64}' "/proc/$pid/cgroup" 2>/dev/null | head -n 1); printf 'gpuproc=%s,%s,%s,%s\\n' "$uuid" "$pid" "$mem" "$cid"; done
+t=; command -v timeout >/dev/null 2>&1 && t="timeout 10"
+$t nvidia-smi --query-gpu=index,uuid,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,name --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 16 | while IFS= read -r line; do printf 'gpu=%s\\n' "$line"; done
+$t nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 256 | while IFS=', ' read -r uuid pid mem; do cid=$(grep -o -E '[0-9a-f]{64}' "/proc/$pid/cgroup" 2>/dev/null | head -n 1); printf 'gpuproc=%s,%s,%s,%s\\n' "$uuid" "$pid" "$mem" "$cid"; done
 fi
 `;
 

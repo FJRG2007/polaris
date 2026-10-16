@@ -24,8 +24,9 @@ use std::time::{Duration, Instant};
 use crate::host_security::{wait_all, TOOLS_IMAGE};
 
 pub const GPU_SCRIPT: &str = r#"if command -v nvidia-smi >/dev/null 2>&1; then
-nvidia-smi --query-gpu=index,uuid,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,name --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 16 | while IFS= read -r line; do printf 'gpu=%s\n' "$line"; done
-nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 256 | while IFS=', ' read -r uuid pid mem; do cid=$(grep -o -E '[0-9a-f]{64}' "/proc/$pid/cgroup" 2>/dev/null | head -n 1); printf 'gpuproc=%s,%s,%s,%s\n' "$uuid" "$pid" "$mem" "$cid"; done
+t=; command -v timeout >/dev/null 2>&1 && t="timeout 10"
+$t nvidia-smi --query-gpu=index,uuid,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,name --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 16 | while IFS= read -r line; do printf 'gpu=%s\n' "$line"; done
+$t nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader,nounits </dev/null 2>/dev/null | head -n 256 | while IFS=', ' read -r uuid pid mem; do cid=$(grep -o -E '[0-9a-f]{64}' "/proc/$pid/cgroup" 2>/dev/null | head -n 1); printf 'gpuproc=%s,%s,%s,%s\n' "$uuid" "$pid" "$mem" "$cid"; done
 fi
 "#;
 
@@ -164,6 +165,9 @@ mod tests {
         assert!(GPU_SCRIPT.starts_with("if command -v nvidia-smi >/dev/null 2>&1; then"));
         assert!(GPU_SCRIPT.contains("head -n 16"));
         assert!(GPU_SCRIPT.contains("head -n 256"));
+        // A wedged driver hangs nvidia-smi; each call is cut off on its own.
+        assert_eq!(GPU_SCRIPT.matches("$t nvidia-smi").count(), 2);
+        assert!(GPU_SCRIPT.contains("t=\"timeout 10\""));
         assert!(GPU_SCRIPT.trim_end().ends_with("fi"));
     }
 }
