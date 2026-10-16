@@ -28,7 +28,16 @@ export interface MachineGpus {
  *  cards are still doing what they did. */
 const STALE_MS = 10 * 60_000;
 
-const latest = new Map<string, MachineGpus>();
+/** Held on globalThis: the collector is started from instrumentation, which is
+ *  bundled apart from the routes that read this, and a module-scoped Map would
+ *  be two Maps. */
+const REGISTRY = Symbol.for("polaris.gpu.live");
+
+function latestReadings(): Map<string, MachineGpus> {
+    const holder = globalThis as { [REGISTRY]?: Map<string, MachineGpus> };
+    if (!holder[REGISTRY]) holder[REGISTRY] = new Map();
+    return holder[REGISTRY];
+}
 
 /**
  * Record what a machine's cards are doing, given its containers as the engine
@@ -40,6 +49,7 @@ export function recordMachineGpus(
     report: GpuReport | null | undefined,
     containers: readonly { id: string; name: string }[]
 ): MachineGpus | null {
+    const latest = latestReadings();
     if (!report || report.gpus.length === 0) {
         latest.delete(subjectId);
         return null;
@@ -57,6 +67,7 @@ export function recordMachineGpus(
 
 /** The machine's cards as last read, or null for a machine without one. */
 export function machineGpus(subjectId: string): MachineGpus | null {
+    const latest = latestReadings();
     const entry = latest.get(subjectId);
     if (!entry) return null;
     if (Date.now() - entry.at > STALE_MS) {
@@ -70,6 +81,11 @@ export function machineGpus(subjectId: string): MachineGpus | null {
  *  daemon is asked again: a card is not fitted to a running machine. */
 const ABSENT_RECHECK_MS = 60 * 60_000;
 let localAbsentUntil = 0;
+
+/** Forget that the local machine had no card, for tests. */
+export function resetLocalGpuCheck(): void {
+    localAbsentUntil = 0;
+}
 
 /**
  * The machine Polaris runs on, read through the host daemon. Null where there is

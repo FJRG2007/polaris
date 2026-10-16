@@ -61,6 +61,16 @@ export interface MetricPoint {
      */
     netRxBytesPerSecond: number | null;
     netTxBytesPerSecond: number | null;
+    /**
+     * The machine's NVIDIA cards: busy on average, memory added up, the hottest
+     * card's temperature and the power they draw together. For a service, only
+     * the memory it holds on them. Absent or null wherever there is no card.
+     */
+    gpuPercent?: number | null;
+    gpuMemUsedBytes?: number | null;
+    gpuMemTotalBytes?: number | null;
+    gpuTempC?: number | null;
+    gpuPowerW?: number | null;
 }
 
 /**
