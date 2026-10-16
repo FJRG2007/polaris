@@ -1,0 +1,85 @@
+/**
+ * Blocks named for what they are for: each is an ordinary change trigger or
+ * device condition on the device it is pointed at, offered only where that
+ * device can answer it, and saved as the schema already takes it.
+ */
+
+import { describe, expect, it } from "vitest";
+import * as auto from "@polaris-app/places/src/lib/automation-kinds";
+import * as purposes from "@polaris-app/places/src/lib/automation-purposes";
+import type { DeviceView } from "@polaris-app/places/src/lib/device-kinds";
+
+function device(id: string, kind: string, extra: Partial<DeviceView> = {}): DeviceView {
+    return {
+        id,
+        vendor: "fixture",
+        kind,
+        name: `Fixture ${id}`,
+        zone: "",
+        placeId: "place-1",
+        model: "",
+        firmware: "",
+        state: "off",
+        doorState: "none",
+        batteryPercent: null,
+        batteryCritical: false,
+        online: true,
+        controllable: true,
+        reading: null,
+        stateAt: null,
+        ...extra
+    };
+}
+
+const lock = device("lock", "lock", { state: "locked", doorState: "closed" });
+const bareLock = device("bare", "lock", { state: "locked" });
+const doorSensor = device("contact", "sensor", { reading: { value: "Closed", unit: "" } });
+const motion = device("hall", "sensor", { reading: { value: "Still", unit: "" } });
+const thermometer = device("temp", "sensor", { reading: { value: "21", unit: "C" } });
+const plug = device("plug", "outlet");
+
+describe("purpose blocks", () => {
+    it("are a change on a lock's door sensor, or on a door sensor's reading", () => {
+        expect(purposes.purposeTrigger("opened", lock)).toMatchObject({
+            kind: "change",
+            deviceId: "lock",
+            attribute: "door",
+            from: "",
+            to: "open"
+        });
+        expect(purposes.purposeTrigger("closed", doorSensor)).toMatchObject({
+            attribute: "reading",
+            to: "Closed"
+        });
+    });
+
+    it("are offered only where the device can answer them", () => {
+        expect(purposes.triggerFits("opened", bareLock)).toBe(false);
+        expect(purposes.triggerFits("locked", bareLock)).toBe(true);
+        expect(purposes.triggerFits("motion", motion)).toBe(true);
+        expect(purposes.triggerFits("motion", thermometer)).toBe(false);
+        expect(purposes.conditionFits("isLocked", plug)).toBe(false);
+        expect(purposes.purposeCondition("moving", doorSensor)).toBeNull();
+    });
+
+    it("make conditions that pass the schema as they are", () => {
+        const condition = purposes.purposeCondition("isUnlocked", lock)!;
+        expect(condition).toMatchObject({ kind: "device", attribute: "state", is: "unlocked" });
+        const trigger = purposes.purposeTrigger("motion", motion)!;
+        const parsed = auto.automationInputSchema.safeParse({
+            placeId: "place-1",
+            name: "Hall light",
+            enabled: true,
+            definition: {
+                timeZone: "UTC",
+                triggers: [trigger],
+                conditions: {
+                    match: "all",
+                    groups: [{ id: "group1", match: "all", items: [condition] }]
+                },
+                actions: [{ id: "stepnote", kind: "notify", message: "seen" }]
+            }
+        });
+        expect(parsed.success).toBe(true);
+    });
+});

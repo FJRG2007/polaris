@@ -38,6 +38,7 @@ import * as actions from "./actions";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
 import * as auto from "../../lib/automation-kinds";
+import * as purposes from "../../lib/automation-purposes";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
@@ -121,11 +122,31 @@ export function withOwnText<B extends Block>(
 
 /** A block made from the add dialog, pointed at the device chosen on "By target". */
 export function triggerFor(kind: string, target?: DeviceView): auto.Trigger {
+    const purpose = kind.startsWith(purposes.PURPOSE_PREFIX)
+        ? kind.slice(purposes.PURPOSE_PREFIX.length)
+        : null;
+    if (purpose !== null) {
+        const made =
+            target && purposes.isTriggerPurpose(purpose)
+                ? purposes.purposeTrigger(purpose, target)
+                : null;
+        return made ?? auto.blankTrigger("change");
+    }
     const blank = auto.blankTrigger(kind as auto.TriggerKind);
     return target ? auto.triggerOn(blank, target) : blank;
 }
 
 export function conditionFor(kind: string, target?: DeviceView): auto.Condition {
+    const purpose = kind.startsWith(purposes.PURPOSE_PREFIX)
+        ? kind.slice(purposes.PURPOSE_PREFIX.length)
+        : null;
+    if (purpose !== null) {
+        const made =
+            target && purposes.isConditionPurpose(purpose)
+                ? purposes.purposeCondition(purpose, target)
+                : null;
+        return made ?? auto.blankCondition("device");
+    }
     const blank = auto.blankCondition(kind as auto.ConditionKind);
     return target ? auto.conditionOn(blank, target) : blank;
 }

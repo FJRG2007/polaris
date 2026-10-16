@@ -13,6 +13,7 @@ import { usePlacesT } from "../use-places-t";
 import { useState, type ReactNode } from "react";
 import * as kinds from "../../lib/device-kinds";
 import * as auto from "../../lib/automation-kinds";
+import * as purposes from "../../lib/automation-purposes";
 import type { PlacesKey } from "../../../messages";
 import type { DeviceView } from "../../lib/device-kinds";
 import {
@@ -24,6 +25,11 @@ import {
 import {
     Bell,
     Clock,
+    DoorClosed,
+    DoorOpen,
+    Footprints,
+    Lock,
+    LockOpen,
     Gauge,
     Hand,
     Hourglass,
@@ -63,6 +69,21 @@ const VOCABULARY: Record<AddRole, Record<string, { group: GroupId; icon: ReactNo
     }
 };
 
+const PURPOSE_ICONS: Record<purposes.TriggerPurpose | purposes.ConditionPurpose, ReactNode> = {
+    opened: <DoorOpen />,
+    closed: <DoorClosed />,
+    locked: <Lock />,
+    unlocked: <LockOpen />,
+    motion: <Footprints />,
+    still: <Footprints />,
+    open: <DoorOpen />,
+    shut: <DoorClosed />,
+    isLocked: <Lock />,
+    isUnlocked: <LockOpen />,
+    moving: <Footprints />,
+    quiet: <Footprints />
+};
+
 const GROUP_ICONS: Record<GroupId, ReactNode> = {
     devices: <Power />,
     time: <Clock />,
@@ -93,6 +114,25 @@ const FITS: Record<
         device: (device, canControl) => canControl && fields.operable(device),
         wait: fields.watchable
     }
+};
+
+/** The blocks named for what they are for, each with the test that a device
+ *  can answer it and its icon. Steps have none. */
+const PURPOSES: Record<
+    AddRole,
+    readonly { id: string; fits: (device: DeviceView) => boolean; icon: ReactNode }[]
+> = {
+    trigger: purposes.TRIGGER_PURPOSES.map((id) => ({
+        id,
+        fits: (device: DeviceView) => purposes.triggerFits(id, device),
+        icon: PURPOSE_ICONS[id]
+    })),
+    condition: purposes.CONDITION_PURPOSES.map((id) => ({
+        id,
+        fits: (device: DeviceView) => purposes.conditionFits(id, device),
+        icon: PURPOSE_ICONS[id]
+    })),
+    step: []
 };
 
 /** The catalog list each role's kind names are under. */
@@ -129,17 +169,33 @@ export function AddBlockButton({
         description: t(`automations.add.about.${role}.${kind}` as PlacesKey),
         icon: vocabulary[kind]?.icon
     });
+    const purposeItem = (entry: (typeof PURPOSES)[AddRole][number]) => ({
+        value: `${purposes.PURPOSE_PREFIX}${entry.id}`,
+        label: t(`automations.purposes.${role}.${entry.id}` as PlacesKey),
+        description: t(`automations.purposes.about.${role}.${entry.id}` as PlacesKey),
+        icon: entry.icon
+    });
+    // A purpose is offered only where some device here can answer it, and one
+    // picked by its type goes to the first that can.
+    const offered = PURPOSES[role].filter((entry) => devices.some(entry.fits));
     const groups: AddGroup[] = (["devices", "time", "other"] as const)
         .map((id) => ({
             id,
             label: t(`automations.add.groups.${id}`),
             icon: GROUP_ICONS[id],
-            items: KINDS[role].filter((kind) => vocabulary[kind]?.group === id).map(blockItem)
+            items: [
+                ...(id === "devices" ? offered.map(purposeItem) : []),
+                ...KINDS[role].filter((kind) => vocabulary[kind]?.group === id).map(blockItem)
+            ]
         }))
         .filter((group) => group.items.length > 0);
     const fits = (device: DeviceView) =>
         KINDS[role].filter((kind) => FITS[role][kind]?.(device, canControl));
-    const reachable = devices.filter((device) => fits(device).length > 0);
+    const purposesFor = (device: DeviceView) =>
+        PURPOSES[role].filter((entry) => entry.fits(device));
+    const reachable = devices.filter(
+        (device) => fits(device).length > 0 || purposesFor(device).length > 0
+    );
     const kindGroups = [...new Set(reachable.map((device) => kinds.groupText(device.kind, t)))];
     const targets: AddTargets | undefined =
         reachable.length > 0
@@ -157,7 +213,12 @@ export function AddBlockButton({
                   })),
                   itemsFor: (id) => {
                       const device = reachable.find((each) => each.id === id);
-                      return device ? fits(device).map(blockItem) : [];
+                      return device
+                          ? [
+                                ...purposesFor(device).map(purposeItem),
+                                ...fits(device).map(blockItem)
+                            ]
+                          : [];
                   }
               }
             : undefined;
@@ -198,12 +259,17 @@ export function AddBlockButton({
                           }
                         : undefined
                 }
-                onPick={(kind, target) =>
-                    onPick(
-                        kind,
-                        target ? reachable.find((device) => device.id === target) : undefined
-                    )
-                }
+                onPick={(kind, target) => {
+                    const chosen = target
+                        ? reachable.find((device) => device.id === target)
+                        : undefined;
+                    const purpose = kind.startsWith(purposes.PURPOSE_PREFIX)
+                        ? PURPOSES[role].find(
+                              (entry) => entry.id === kind.slice(purposes.PURPOSE_PREFIX.length)
+                          )
+                        : undefined;
+                    onPick(kind, chosen ?? (purpose ? devices.find(purpose.fits) : undefined));
+                }}
                 onClose={() => setOpen(false)}
             />
         </>

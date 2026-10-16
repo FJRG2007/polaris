@@ -2285,6 +2285,42 @@
                     "run": "Start another automation of this place."
                 }
             }
+        },
+        "purposes": {
+            "trigger": {
+                "opened": "A door opens",
+                "closed": "A door closes",
+                "locked": "A lock locks",
+                "unlocked": "A lock unlocks",
+                "motion": "Movement is seen",
+                "still": "Movement stops"
+            },
+            "condition": {
+                "open": "A door is open",
+                "shut": "A door is closed",
+                "isLocked": "A lock is locked",
+                "isUnlocked": "A lock is unlocked",
+                "moving": "There is movement",
+                "quiet": "All is still"
+            },
+            "about": {
+                "trigger": {
+                    "opened": "When a door or window sensor reads open.",
+                    "closed": "When a door or window sensor reads closed.",
+                    "locked": "When a lock reports it is locked.",
+                    "unlocked": "When a lock reports it is unlocked.",
+                    "motion": "When a motion sensor sees movement.",
+                    "still": "When a motion sensor stops seeing it."
+                },
+                "condition": {
+                    "open": "Only while a door or window is open.",
+                    "shut": "Only while a door or window is closed.",
+                    "isLocked": "Only while a lock is locked.",
+                    "isUnlocked": "Only while a lock is unlocked.",
+                    "moving": "Only while a motion sensor sees movement.",
+                    "quiet": "Only while a motion sensor sees nothing."
+                }
+            }
         }
     },
     "overview": {

@@ -2285,6 +2285,42 @@
                     "run": "Iniciar otra automatización de este lugar."
                 }
             }
+        },
+        "purposes": {
+            "trigger": {
+                "opened": "Puerta se abre",
+                "closed": "Puerta se cierra",
+                "locked": "Echan la llave",
+                "unlocked": "Abren la cerradura",
+                "motion": "Se ve movimiento",
+                "still": "Cesa el movimiento"
+            },
+            "condition": {
+                "open": "Puerta abierta",
+                "shut": "Puerta cerrada",
+                "isLocked": "Cerradura echada",
+                "isUnlocked": "Cerradura abierta",
+                "moving": "Hay movimiento",
+                "quiet": "Todo quieto"
+            },
+            "about": {
+                "trigger": {
+                    "opened": "Cuando un sensor de puerta o ventana marca abierto.",
+                    "closed": "Cuando un sensor de puerta o ventana marca cerrado.",
+                    "locked": "Cuando una cerradura dice que está echada.",
+                    "unlocked": "Cuando una cerradura dice que está abierta.",
+                    "motion": "Cuando un sensor de movimiento lo detecta.",
+                    "still": "Cuando un sensor de movimiento deja de verlo."
+                },
+                "condition": {
+                    "open": "Solo con una puerta o ventana abierta.",
+                    "shut": "Solo con una puerta o ventana cerrada.",
+                    "isLocked": "Solo con una cerradura echada.",
+                    "isUnlocked": "Solo con una cerradura abierta.",
+                    "moving": "Solo mientras un sensor ve movimiento.",
+                    "quiet": "Solo mientras un sensor no ve nada."
+                }
+            }
         }
     },
     "overview": {

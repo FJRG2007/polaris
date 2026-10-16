@@ -1110,6 +1110,26 @@ describe("the add dialog", () => {
         expect(rowsIn("When")[0]!.textContent).toContain("Fixture plug");
     });
 
+    it("offers what a lock is for, and adds it already pointed at the lock", async () => {
+        render(editor());
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByRole("searchbox"), {
+            target: { value: "fixture door" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: /^Fixture door/ }));
+        expect(within(dialog).queryByRole("button", { name: /^Movement is seen/ })).toBeNull();
+        fireEvent.click(within(dialog).getByRole("button", { name: /^A door opens/ }));
+        await painted();
+        expect(rowsIn("When")[0]!.textContent).toContain("Fixture door");
+        expect(triggerFor("purpose:unlocked", DEVICES.find((each) => each.id === "door"))).toMatchObject({
+            kind: "change",
+            attribute: "state",
+            to: "unlocked"
+        });
+    });
+
     it("searches every kind, whatever the case, and says when nothing matches", async () => {
         render(editor());
         await painted();
