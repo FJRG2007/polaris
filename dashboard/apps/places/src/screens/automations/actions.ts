@@ -27,7 +27,7 @@ import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
-import type { RoomView } from "../../lib/room-kinds";
+import type { FloorView, RoomView } from "../../lib/room-kinds";
 
 const { recordAudit } = host.auditService;
 const { sessionCan } = host.session;
@@ -75,19 +75,23 @@ export interface EditorContext {
     /** The place's rooms, which the add dialog groups devices by. Absent reads
      *  as none. */
     readonly rooms?: RoomView[];
+    /** The place's floors, a floor with no room on it among them. */
+    readonly floors?: FloorView[];
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list, roomList] = await Promise.all([
+    const [found, list, roomList, floorList] = await Promise.all([
         devices.listDevices(installedAppId, placeId),
         automations.listAutomations(installedAppId, placeId),
-        rooms.listRooms(installedAppId, placeId)
+        rooms.listRooms(installedAppId, placeId),
+        rooms.listFloors(installedAppId, placeId)
     ]);
     return {
         placeId,
         devices: found,
         siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
-        rooms: roomList
+        rooms: roomList,
+        floors: floorList
     };
 }
 

@@ -25,6 +25,7 @@ import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import * as people from "../lib/people";
 import * as rooms from "../lib/rooms";
+import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
@@ -1687,6 +1688,17 @@ export async function saveFloorAction(
         targetId: result.value?.id ?? String(floorId)
     });
     return { floor: result.value };
+}
+
+/** How many automations name each room and floor of a place, for the remove
+ *  confirmation to say what stops. */
+export async function placeUsesAction(
+    placeId: string
+): Promise<{ uses?: Record<string, number>; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => automations.placeUses(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { uses: result.value };
 }
 
 /** Remove a floor. Its rooms stay at the place, on none. */

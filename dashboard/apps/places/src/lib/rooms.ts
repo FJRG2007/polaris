@@ -171,6 +171,18 @@ async function nameTaken(placeId: string, name: string, except?: string): Promis
     return found !== null;
 }
 
+/** A floor write, refusing a second floor of the same name the way the check
+ *  above does when the unique key is what caught it. */
+async function floorWrite<T>(write: () => Promise<T>): Promise<T> {
+    try {
+        return await write();
+    } catch (caught) {
+        if ((caught as { code?: string } | null)?.code === "P2002")
+            throw new HomeError("A floor with that name is already here");
+        throw caught;
+    }
+}
+
 export async function createFloor(
     installedAppId: string,
     input: { placeId: string; name: string }
@@ -182,10 +194,12 @@ export async function createFloor(
     if (!place) throw new HomeError("Place not found");
     if (await nameTaken(place.id, input.name))
         throw new HomeError("A floor with that name is already here");
-    return prisma.placeFloor.create({
-        data: { installedAppId, placeId: place.id, name: input.name },
-        select: FLOOR_FIELDS
-    });
+    return floorWrite(() =>
+        prisma.placeFloor.create({
+            data: { installedAppId, placeId: place.id, name: input.name },
+            select: FLOOR_FIELDS
+        })
+    );
 }
 
 /** A floor's new name, and every room on it with it. */
@@ -197,10 +211,12 @@ export async function renameFloor(
     const floor = await requireFloor(installedAppId, id);
     if (await nameTaken(floor.placeId, name, id))
         throw new HomeError("A floor with that name is already here");
-    const [renamed] = await prisma.$transaction([
-        prisma.placeFloor.update({ where: { id }, data: { name }, select: FLOOR_FIELDS }),
-        prisma.placeRoom.updateMany({ where: { floorId: id }, data: { floor: name } })
-    ]);
+    const [renamed] = await floorWrite(() =>
+        prisma.$transaction([
+            prisma.placeFloor.update({ where: { id }, data: { name }, select: FLOOR_FIELDS }),
+            prisma.placeRoom.updateMany({ where: { floorId: id }, data: { floor: name } })
+        ])
+    );
     return renamed;
 }
 

@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { getPlace } from "./places";
 import { prisma } from "@polaris/db";
-import { listRooms } from "./rooms";
+import { listFloors, listRooms } from "./rooms";
 import { listDevices } from "./devices";
 import { HomeError } from "./home-error";
 import * as auto from "./automation-kinds";
@@ -110,6 +110,25 @@ export async function getAutomation(
     return view;
 }
 
+/** How many of a place's automations name each of its rooms and floors, by id. */
+export async function placeUses(
+    installedAppId: string,
+    placeId: string
+): Promise<Record<string, number>> {
+    const rows = await prisma.placeAutomation.findMany({
+        where: { installedAppId, placeId },
+        select: FIELDS
+    });
+    const uses: Record<string, number> = {};
+    for (const row of rows) {
+        const definition = toAutomation(row)?.definition;
+        if (!definition) continue;
+        for (const id of new Set(auto.namedPlaces(definition).map((ref) => ref.id)))
+            uses[id] = (uses[id] ?? 0) + 1;
+    }
+    return uses;
+}
+
 /**
  * What is wrong with an automation that the schema cannot see: devices that are
  * not at its place, steps a device cannot do, a step that runs an automation
@@ -122,18 +141,20 @@ export async function checkAutomation(
 ): Promise<auto.AutomationIssue[]> {
     const place = await getPlace(installedAppId, input.placeId);
     if (!place) return [{ path: ["placeId"], message: "automations.errors.place" }];
-    const [devices, others, roomList] = await Promise.all([
+    const [devices, others, roomList, floorList] = await Promise.all([
         listDevices(installedAppId, input.placeId),
         prisma.placeAutomation.findMany({
             where: { installedAppId, placeId: input.placeId },
             select: { id: true }
         }),
-        listRooms(installedAppId, input.placeId)
+        listRooms(installedAppId, input.placeId),
+        listFloors(installedAppId, input.placeId)
     ]);
     return auto.deviceIssues(input.definition, devices, {
         automationIds: others.map((other) => other.id),
         selfId,
-        rooms: roomList
+        rooms: roomList,
+        floors: floorList
     });
 }
 

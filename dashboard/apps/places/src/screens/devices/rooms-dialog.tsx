@@ -32,6 +32,25 @@ import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
 
+/** The id a row carries until the server has made it. */
+const TEMP_PREFIX = "new-";
+const isTemp = (id: string) => id.startsWith(TEMP_PREFIX);
+
+/** A name with a floor beside it: one line where there is room, the floor
+ *  under the name on a phone. */
+const ROW_WITH_FLOOR = "flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center";
+const FLOOR_SELECT = "min-w-0 flex-1 sm:w-40 sm:flex-none";
+const ICON_BUTTON = "size-11 shrink-0 p-0 sm:size-8";
+const TEXT_BUTTON = "h-11 shrink-0 sm:h-7";
+
+/** The floors a room can be put on: none, or one the server has made. */
+function floorOptions(floors: readonly FloorView[], none: string) {
+    return [
+        { value: "", label: none },
+        ...floors.filter((each) => !isTemp(each.id)).map((each) => ({ value: each.id, label: each.name }))
+    ];
+}
+
 /** What a name field says is wrong with what is in it, in the reader's words;
  *  nothing for an empty one, which is unfinished rather than wrong. */
 function useNameIssue(value: string, schema: typeof floorInputSchema | typeof roomInputSchema) {
@@ -51,6 +70,7 @@ function NameRow({
     floors,
     schema,
     label,
+    pending = false,
     onSave,
     onRemove
 }: {
@@ -60,6 +80,8 @@ function NameRow({
     floors?: readonly FloorView[];
     schema: typeof floorInputSchema | typeof roomInputSchema;
     label: string;
+    /** Still being made: shown, but nothing to do with it until it is saved. */
+    pending?: boolean;
     onSave: (next: { name: string; floorId: string }) => void;
     onRemove: () => void;
 }) {
@@ -70,57 +92,60 @@ function NameRow({
     useEffect(() => setFloor(floorId ?? ""), [floorId]);
     const issue = useNameIssue(draft, schema);
     const dirty = draft.trim() !== name || floor !== (floorId ?? "");
-    const ready = dirty && draft.trim().length > 0 && !issue;
+    const ready = !pending && dirty && draft.trim().length > 0 && !issue;
     const save = () => {
         if (ready) onSave({ name: draft.trim(), floorId: floor });
     };
     return (
         <li className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-center gap-2">
+            <div className={floors ? ROW_WITH_FLOOR : "flex min-w-0 items-center gap-2"}>
                 <Input
                     value={draft}
                     maxLength={60}
                     aria-label={label}
                     className="min-w-0 flex-1"
+                    disabled={pending}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === "Enter") save();
                     }}
                 />
-                {floors && (
-                    <Select
-                        value={floor}
-                        onValueChange={setFloor}
-                        aria-label={t("roomsDialog.floorOf", { room: name })}
-                        className="w-40 min-w-0 shrink-0"
-                        options={[
-                            { value: "", label: t("roomsDialog.noFloor") },
-                            ...floors.map((each) => ({ value: each.id, label: each.name }))
-                        ]}
-                    />
-                )}
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-8 shrink-0 p-0"
-                    aria-label={t("roomsDialog.saveName", { name })}
-                    title={t("roomsDialog.saveName", { name })}
-                    aria-disabled={!ready}
-                    disabled={!ready}
-                    onClick={save}
-                >
-                    <Check className="size-4 shrink-0" />
-                </Button>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="size-8 shrink-0 p-0"
-                    aria-label={t("roomsDialog.removeName", { name })}
-                    title={t("roomsDialog.removeName", { name })}
-                    onClick={onRemove}
-                >
-                    <Trash2 className="size-4 shrink-0" />
-                </Button>
+                <div className="flex min-w-0 items-center gap-2">
+                    {floors && (
+                        <Select
+                            value={floor}
+                            onValueChange={setFloor}
+                            aria-label={t("roomsDialog.floorOf", { room: name })}
+                            className={FLOOR_SELECT}
+                            disabled={pending}
+                            options={floorOptions(floors, t("roomsDialog.noFloor"))}
+                        />
+                    )}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={ICON_BUTTON}
+                        aria-label={t("roomsDialog.saveName", { name })}
+                        title={t("roomsDialog.saveName", { name })}
+                        aria-disabled={!ready}
+                        disabled={!ready}
+                        onClick={save}
+                    >
+                        <Check className="size-4 shrink-0" />
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={ICON_BUTTON}
+                        aria-label={t("roomsDialog.removeName", { name })}
+                        title={t("roomsDialog.removeName", { name })}
+                        aria-disabled={pending}
+                        disabled={pending}
+                        onClick={onRemove}
+                    >
+                        <Trash2 className="size-4 shrink-0" />
+                    </Button>
+                </div>
             </div>
             {issue && <span className="text-xs text-danger">{issue}</span>}
         </li>
@@ -150,6 +175,7 @@ export function RoomsDialog({
     const [newRoomFloor, setNewRoomFloor] = useState("");
     const [removing, setRemoving] = useState<Removing>(null);
     const [busy, setBusy] = useState(false);
+    const [uses, setUses] = useState<Record<string, number>>({});
     const floorIssue = useNameIssue(newFloor, floorInputSchema);
     const roomIssue = useNameIssue(newRoom, roomInputSchema);
 
@@ -157,6 +183,12 @@ export function RoomsDialog({
         if (!open) return;
         let current = true;
         setError(null);
+        void actions.placeUsesAction(placeId).then(
+            (result) => {
+                if (current) setUses(result.uses ?? {});
+            },
+            () => undefined
+        );
         void Promise.all([actions.listRoomsAction(placeId), actions.listFloorsAction(placeId)]).then(
             ([roomResult, floorResult]) => {
                 if (!current) return;
@@ -180,7 +212,8 @@ export function RoomsDialog({
     const byName = <T extends { name: string }>(list: T[]) =>
         [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
-    /** Apply `next` now, ask the server, and put `before` back if it refuses. */
+    /** Apply a change now, ask the server, and undo that change alone if it
+     *  refuses, so another change still in flight is not undone with it. */
     async function attempt<T>(
         apply: () => void,
         rollback: () => void,
@@ -201,36 +234,25 @@ export function RoomsDialog({
 
     const floorName = (id: string) => floors?.find((floor) => floor.id === id)?.name ?? "";
 
+    const renameFloorTo = (floor: FloorView, name: string) => {
+        setFloors((list) => byName((list ?? []).map((each) => (each.id === floor.id ? { ...each, name } : each))));
+        setRooms((list) => (list ?? []).map((room) => (room.floorId === floor.id ? { ...room, floor: name } : room)));
+    };
+
     const saveFloor = (floor: FloorView, name: string) => {
-        const beforeFloors = floors ?? [];
-        const beforeRooms = rooms ?? [];
         void attempt(
-            () => {
-                setFloors(byName(beforeFloors.map((each) => (each.id === floor.id ? { ...each, name } : each))));
-                setRooms(beforeRooms.map((room) => (room.floorId === floor.id ? { ...room, floor: name } : room)));
-            },
-            () => {
-                setFloors(beforeFloors);
-                setRooms(beforeRooms);
-            },
+            () => renameFloorTo(floor, name),
+            () => renameFloorTo(floor, floor.name),
             () => actions.saveFloorAction(floor.id, { name })
         );
     };
 
     const saveRoom = (room: RoomView, next: { name: string; floorId: string }) => {
-        const before = rooms ?? [];
+        const replace = (by: RoomView) =>
+            setRooms((list) => byName((list ?? []).map((each) => (each.id === room.id ? by : each))));
         void attempt(
-            () =>
-                setRooms(
-                    byName(
-                        before.map((each) =>
-                            each.id === room.id
-                                ? { ...each, name: next.name, floorId: next.floorId, floor: floorName(next.floorId) }
-                                : each
-                        )
-                    )
-                ),
-            () => setRooms(before),
+            () => replace({ ...room, name: next.name, floorId: next.floorId, floor: floorName(next.floorId) }),
+            () => replace(room),
             () =>
                 actions.saveRoomAction(
                     room.id,
@@ -246,13 +268,12 @@ export function RoomsDialog({
     const addFloor = () => {
         const name = newFloor.trim();
         if (!name || floorIssue) return;
-        const before = floors ?? [];
-        const temp: FloorView = { id: `new-${Date.now()}`, placeId, name };
+        const temp: FloorView = { id: `${TEMP_PREFIX}${Date.now()}`, placeId, name };
         setNewFloor("");
         void attempt(
-            () => setFloors(byName([...before, temp])),
+            () => setFloors((list) => byName([...(list ?? []), temp])),
             () => {
-                setFloors(before);
+                setFloors((list) => (list ?? []).filter((each) => each.id !== temp.id));
                 setNewFloor(name);
             },
             () => actions.saveFloorAction(null, { placeId, name }),
@@ -266,9 +287,8 @@ export function RoomsDialog({
     const addRoom = () => {
         const name = newRoom.trim();
         if (!name || roomIssue) return;
-        const before = rooms ?? [];
         const temp: RoomView = {
-            id: `new-${Date.now()}`,
+            id: `${TEMP_PREFIX}${Date.now()}`,
             placeId,
             name,
             floor: floorName(newRoomFloor),
@@ -276,9 +296,9 @@ export function RoomsDialog({
         };
         setNewRoom("");
         void attempt(
-            () => setRooms(byName([...before, temp])),
+            () => setRooms((list) => byName([...(list ?? []), temp])),
             () => {
-                setRooms(before);
+                setRooms((list) => (list ?? []).filter((each) => each.id !== temp.id));
                 setNewRoom(name);
             },
             () =>
@@ -296,26 +316,39 @@ export function RoomsDialog({
     const remove = async () => {
         if (!removing) return;
         setBusy(true);
-        const beforeFloors = floors ?? [];
-        const beforeRooms = rooms ?? [];
         const target = removing;
+        const onFloor = new Set(
+            target.kind === "floor"
+                ? (rooms ?? []).filter((room) => room.floorId === target.floor.id).map((room) => room.id)
+                : []
+        );
         setRemoving(null);
         await attempt(
             () => {
                 if (target.kind === "floor") {
-                    setFloors(beforeFloors.filter((each) => each.id !== target.floor.id));
-                    setRooms(
-                        beforeRooms.map((room) =>
-                            room.floorId === target.floor.id ? { ...room, floor: "", floorId: "" } : room
-                        )
+                    setFloors((list) => (list ?? []).filter((each) => each.id !== target.floor.id));
+                    setRooms((list) =>
+                        (list ?? []).map((room) => (onFloor.has(room.id) ? { ...room, floor: "", floorId: "" } : room))
                     );
                 } else {
-                    setRooms(beforeRooms.filter((each) => each.id !== target.room.id));
+                    setRooms((list) => (list ?? []).filter((each) => each.id !== target.room.id));
                 }
             },
             () => {
-                setFloors(beforeFloors);
-                setRooms(beforeRooms);
+                if (target.kind === "floor") {
+                    const { floor } = target;
+                    setFloors((list) => byName([...(list ?? []).filter((each) => each.id !== floor.id), floor]));
+                    setRooms((list) =>
+                        (list ?? []).map((room) =>
+                            onFloor.has(room.id) && !room.floorId
+                                ? { ...room, floor: floor.name, floorId: floor.id }
+                                : room
+                        )
+                    );
+                } else {
+                    const { room } = target;
+                    setRooms((list) => byName([...(list ?? []).filter((each) => each.id !== room.id), room]));
+                }
             },
             () =>
                 target.kind === "floor"
@@ -327,6 +360,9 @@ export function RoomsDialog({
 
     const loading = rooms === null || floors === null;
     const removingName = removing ? (removing.kind === "floor" ? removing.floor.name : removing.room.name) : "";
+    const removingUses = removing ? (uses[removing.kind === "floor" ? removing.floor.id : removing.room.id] ?? 0) : 0;
+    const removingBody =
+        removing?.kind === "floor" ? t("roomsDialog.removeFloorBody") : t("roomsDialog.removeRoomBody");
 
     return (
         <>
@@ -358,6 +394,7 @@ export function RoomsDialog({
                                             name={floor.name}
                                             schema={floorInputSchema}
                                             label={t("roomsDialog.floorName")}
+                                            pending={isTemp(floor.id)}
                                             onSave={(next) => saveFloor(floor, next.name)}
                                             onRemove={() => setRemoving({ kind: "floor", floor })}
                                         />
@@ -380,7 +417,7 @@ export function RoomsDialog({
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    className="shrink-0"
+                                    className={TEXT_BUTTON}
                                     aria-disabled={!newFloor.trim() || floorIssue !== null}
                                     disabled={loading || !newFloor.trim() || floorIssue !== null}
                                     onClick={addFloor}
@@ -408,13 +445,14 @@ export function RoomsDialog({
                                             floors={floors}
                                             schema={roomInputSchema}
                                             label={t("roomsDialog.roomName")}
+                                            pending={isTemp(room.id)}
                                             onSave={(next) => saveRoom(room, next)}
                                             onRemove={() => setRemoving({ kind: "room", room })}
                                         />
                                     ))}
                                 </ul>
                             )}
-                            <div className="flex min-w-0 items-center gap-2">
+                            <div className={ROW_WITH_FLOOR}>
                                 <Input
                                     value={newRoom}
                                     maxLength={60}
@@ -427,28 +465,27 @@ export function RoomsDialog({
                                         if (event.key === "Enter") addRoom();
                                     }}
                                 />
-                                <Select
-                                    value={newRoomFloor}
-                                    onValueChange={setNewRoomFloor}
-                                    aria-label={t("roomsDialog.newRoomFloor")}
-                                    className="w-40 min-w-0 shrink-0"
-                                    disabled={loading}
-                                    options={[
-                                        { value: "", label: t("roomsDialog.noFloor") },
-                                        ...(floors ?? []).map((each) => ({ value: each.id, label: each.name }))
-                                    ]}
-                                />
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="shrink-0"
-                                    aria-disabled={!newRoom.trim() || roomIssue !== null}
-                                    disabled={loading || !newRoom.trim() || roomIssue !== null}
-                                    onClick={addRoom}
-                                >
-                                    <Plus className="size-4 shrink-0" />
-                                    {t("roomsDialog.addRoom")}
-                                </Button>
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <Select
+                                        value={newRoomFloor}
+                                        onValueChange={setNewRoomFloor}
+                                        aria-label={t("roomsDialog.newRoomFloor")}
+                                        className={FLOOR_SELECT}
+                                        disabled={loading}
+                                        options={floorOptions(floors ?? [], t("roomsDialog.noFloor"))}
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className={TEXT_BUTTON}
+                                        aria-disabled={!newRoom.trim() || roomIssue !== null}
+                                        disabled={loading || !newRoom.trim() || roomIssue !== null}
+                                        onClick={addRoom}
+                                    >
+                                        <Plus className="size-4 shrink-0" />
+                                        {t("roomsDialog.addRoom")}
+                                    </Button>
+                                </div>
                             </div>
                             {roomIssue && <span className="text-xs text-danger">{roomIssue}</span>}
                         </section>
@@ -468,7 +505,9 @@ export function RoomsDialog({
                     em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
                 })}
                 description={
-                    removing?.kind === "floor" ? t("roomsDialog.removeFloorBody") : t("roomsDialog.removeRoomBody")
+                    removingUses > 0
+                        ? `${removingBody} ${t("roomsDialog.removeUsed", { count: removingUses })}`
+                        : removingBody
                 }
                 confirmLabel={t("roomsDialog.remove")}
                 pending={busy}

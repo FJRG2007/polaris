@@ -13,6 +13,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 
 const calls: { action: string; args: unknown[] }[] = [];
 const refuse = { next: "" };
+const hold: { floor: Promise<void> | null } = { floor: null };
 
 const ROOMS = [
     { id: "room-1", placeId: "place-1", name: "Kitchen", floor: "Ground floor", floorId: "floor-1" }
@@ -29,8 +30,10 @@ function answer<T>(value: T): T | { error: string } {
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listRoomsAction: async () => ({ rooms: ROOMS }),
     listFloorsAction: async () => ({ floors: FLOORS }),
+    placeUsesAction: async () => ({ uses: { "floor-1": 2 } }),
     saveFloorAction: async (...args: unknown[]) => {
         calls.push({ action: "floor", args });
+        if (hold.floor) await hold.floor;
         const input = args[1] as { name: string };
         return answer({ floor: { id: "floor-2", placeId: "place-1", name: input.name } });
     },
@@ -65,6 +68,7 @@ async function opened(): Promise<void> {
 beforeEach(() => {
     calls.length = 0;
     refuse.next = "";
+    hold.floor = null;
     Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(cleanup);
@@ -109,6 +113,35 @@ describe("the rooms and floors dialog", () => {
         await painted();
         expect(calls[0]).toEqual({ action: "deleteFloor", args: ["floor-1"] });
         expect(screen.queryAllByLabelText("Name of the floor")).toHaveLength(0);
+    });
+
+    it("says how many automations stop acting on a floor before removing it", async () => {
+        await opened();
+        fireEvent.click(screen.getByRole("button", { name: "Remove Ground floor" }));
+        await painted();
+        const confirm = screen.getByRole("dialog", { name: "Remove floor" });
+        expect(confirm.textContent).toContain("2 automations name it and will stop acting on it.");
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Remove Kitchen" }));
+        await painted();
+        expect(screen.getByRole("dialog", { name: "Remove room" }).textContent).not.toContain("automation");
+    });
+
+    it("leaves a floor still being made alone until the server answers", async () => {
+        let release = () => {};
+        hold.floor = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await opened();
+        fireEvent.change(screen.getByLabelText("New floor"), { target: { value: "Attic" } });
+        fireEvent.click(screen.getByRole("button", { name: "Add a floor" }));
+        await painted();
+        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty("disabled", true);
+        expect(screen.getByDisplayValue("Attic")).toHaveProperty("disabled", true);
+        await act(async () => release());
+        await painted();
+        expect(screen.getByRole("button", { name: "Remove Attic" })).toHaveProperty("disabled", false);
     });
 
     it("puts a refused removal back and says why", async () => {

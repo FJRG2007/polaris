@@ -167,6 +167,20 @@ describe("a block naming a room or a floor", () => {
         ).toEqual([]);
     });
 
+    it("tells a floor with no room on it from one that is gone, given the floors", () => {
+        const floors = { ...context, floors: [{ id: "ground" }, { id: "upstairs" }, { id: "attic" }] };
+        expect(
+            auto
+                .deviceIssues(definition(trigger({ kind: "floor", id: "attic" })), devices, floors)
+                .map((issue) => issue.message)
+        ).toEqual(["automations.errors.placeEmpty"]);
+        expect(
+            auto
+                .deviceIssues(definition(trigger({ kind: "floor", id: "cellar" })), devices, floors)
+                .map((issue) => issue.message)
+        ).toEqual(["automations.errors.placeGone"]);
+    });
+
     it("keeps its room when its device is changed, and is read on every device", () => {
         const kept = auto.triggerOn(trigger({ kind: "room", id: "kitchen" }), {
             ...devices[0]!

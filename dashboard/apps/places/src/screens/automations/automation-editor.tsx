@@ -401,7 +401,8 @@ export function AutomationEditor({
         return auto.deviceIssues(parsed.data.definition, devices, {
             automationIds: loaded?.context.siblings.map((sibling) => sibling.id) ?? [],
             selfId: automationId,
-            rooms: loaded?.context.rooms ?? NO_ROOMS
+            rooms: loaded?.context.rooms ?? NO_ROOMS,
+            floors: loaded?.context.floors
         });
     }, [normalized, devices, loaded, automationId]);
 

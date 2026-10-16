@@ -251,6 +251,7 @@
         "places/src/screens/devices/devices-view.tsx",
         "places/src/screens/devices/found-units.tsx",
         "places/src/screens/devices/nuki-local-dialog.tsx",
+        "places/src/screens/devices/rooms-dialog.tsx",
         "places/src/screens/devices/temperature-target.tsx",
         "places/src/screens/devices/use-device-act.ts",
         "places/src/screens/events/events-view.tsx",

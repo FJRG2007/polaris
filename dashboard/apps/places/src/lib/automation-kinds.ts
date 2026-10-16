@@ -338,16 +338,21 @@ export function resolveTargets<T extends TargetBlock>(block: T, scope: TargetSco
     } as unknown as T;
 }
 
-/** Whether anything in an automation names a room or a floor. */
-export function namesPlaces(definition: AutomationDefinition): boolean {
+/** The rooms and floors an automation names, anywhere in it. */
+export function namedPlaces(definition: AutomationDefinition): { kind: "room" | "floor"; id: string }[] {
     const blocks: unknown[] = [
         ...definition.triggers,
         ...definition.conditions.groups.flatMap((group) => group.items),
         ...definition.actions
     ];
-    return blocks.some(
-        (block) => placeTargets(block as { targets?: { kind: string; id: string }[] }).length > 0
+    return blocks.flatMap((block) =>
+        placeTargets(block as { targets?: { kind: string; id: string }[] })
     );
+}
+
+/** Whether anything in an automation names a room or a floor. */
+export function namesPlaces(definition: AutomationDefinition): boolean {
+    return namedPlaces(definition).length > 0;
 }
 
 /** An automation with every room and floor it names read into devices. */
@@ -1042,6 +1047,9 @@ export function deviceIssues(
         /** The place's rooms, which a room or a floor is checked against.
          *  Absent leaves rooms and floors unchecked. */
         readonly rooms?: TargetScope["rooms"];
+        /** The place's floors, which a floor is checked against; absent reads a
+         *  floor as there only while a room is on it. */
+        readonly floors?: readonly { readonly id: string }[];
     }
 ): AutomationIssue[] {
     const byId = new Map(devices.map((device) => [device.id, device]));
@@ -1064,7 +1072,9 @@ export function deviceIssues(
             const known =
                 ref.kind === "room"
                     ? rooms.some((room) => room.id === ref.id)
-                    : rooms.some((room) => room.floorId === ref.id);
+                    : context.floors
+                      ? context.floors.some((floor) => floor.id === ref.id)
+                      : rooms.some((room) => room.floorId === ref.id);
             if (!known) {
                 issues.push({ path: field, message: "automations.errors.placeGone" });
                 return;

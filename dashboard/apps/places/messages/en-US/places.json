@@ -1692,7 +1692,7 @@
     },
     "roomsDialog": {
         "title": "Rooms and floors",
-        "description": "Put devices in rooms, and rooms on floors, so automations can name them.",
+        "description": "Name the rooms and floors of this place so automations can use them.",
         "floors": "Floors",
         "rooms": "Rooms",
         "noFloors": "No floors yet.",
@@ -1718,6 +1718,7 @@
         "removeQuestion": "Remove <em>{name}</em>?",
         "removeFloorBody": "Its rooms stay, on no floor.",
         "removeRoomBody": "Its devices stay at this place, in no room.",
+        "removeUsed": "{count, plural, one {# automation names it and will stop acting on it.} other {# automations name it and will stop acting on it.}}",
         "remove": "Remove"
     },
     "deviceDialog": {

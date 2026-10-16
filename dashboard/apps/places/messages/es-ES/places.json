@@ -1692,7 +1692,7 @@
     },
     "roomsDialog": {
         "title": "Salas y plantas",
-        "description": "Pon dispositivos en salas y salas en plantas para usarlas en automatizaciones.",
+        "description": "Nombra las salas y plantas de este sitio para usarlas en automatizaciones.",
         "floors": "Plantas",
         "rooms": "Salas",
         "noFloors": "Aún sin plantas.",
@@ -1718,6 +1718,7 @@
         "removeQuestion": "¿Quitar <em>{name}</em>?",
         "removeFloorBody": "Sus salas siguen, sin planta.",
         "removeRoomBody": "Sus dispositivos siguen aquí, sin sala.",
+        "removeUsed": "{count, plural, one {# automatización la usa y dejará de actuar sobre ella.} other {# automatizaciones la usan y dejarán de actuar sobre ella.}}",
         "remove": "Quitar"
     },
     "deviceDialog": {
