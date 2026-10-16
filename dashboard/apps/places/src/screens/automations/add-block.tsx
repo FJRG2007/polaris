@@ -23,6 +23,7 @@ import {
     type AddTargets
 } from "@polaris/ui/automation-add";
 import {
+    BatteryLow,
     Bell,
     Clock,
     DoorClosed,
@@ -37,6 +38,7 @@ import {
     Power,
     Repeat,
     Timer,
+    Unplug,
     Workflow
 } from "lucide-react";
 
@@ -76,12 +78,16 @@ const PURPOSE_ICONS: Record<purposes.TriggerPurpose | purposes.ConditionPurpose,
     unlocked: <LockOpen />,
     motion: <Footprints />,
     still: <Footprints />,
+    batteryLow: <BatteryLow />,
+    unavailable: <Unplug />,
     open: <DoorOpen />,
     shut: <DoorClosed />,
     isLocked: <Lock />,
     isUnlocked: <LockOpen />,
     moving: <Footprints />,
-    quiet: <Footprints />
+    quiet: <Footprints />,
+    batteryIsLow: <BatteryLow />,
+    isUnavailable: <Unplug />
 };
 
 const GROUP_ICONS: Record<GroupId, ReactNode> = {

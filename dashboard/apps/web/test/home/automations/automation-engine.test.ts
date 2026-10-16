@@ -1725,3 +1725,187 @@ describe("a condition held for a while", () => {
         expect(await press("press-1")).toBe("skipped");
     });
 });
+
+describe("a device that stops answering", () => {
+    function silence(id: string, extra: Partial<auto.Trigger> = {}) {
+        automation("silent", {
+            triggers: [
+                {
+                    id: "trigsilent",
+                    kind: "change",
+                    deviceId: id,
+                    attribute: "online",
+                    from: "",
+                    to: "offline",
+                    ...extra
+                } as auto.Trigger
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "gone quiet" }]
+        });
+    }
+
+    it("is a change of its own, fired once", async () => {
+        silence("plug");
+        await reads(readout("plug", "outlet", "on"));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        expect(store.runsOf("silent")).toHaveLength(1);
+        expect(store.runsOf("silent")[0]?.cause).toMatchObject({
+            attribute: "online",
+            from: "online",
+            to: "offline"
+        });
+    });
+
+    it("keeps its last state while silent, and fires nothing it says on the way back", async () => {
+        automation("door", {
+            triggers: [
+                {
+                    id: "trigopen",
+                    kind: "change",
+                    deviceId: "lock",
+                    attribute: "door",
+                    from: "",
+                    to: "open"
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "opened" }]
+        });
+        await reads(readout("lock", "lock", "locked", { door: "closed" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "unknown", online: false }));
+        expect((await store.observation("lock"))?.door).toBe("closed");
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "open" }));
+        expect(store.runsOf("door")).toHaveLength(0);
+        expect((await store.observation("lock"))?.door).toBe("open");
+        // From there on, a change is a change again.
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "closed" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "open" }));
+        expect(store.runsOf("door")).toHaveLength(1);
+    });
+
+    it("fires its return to whatever waits for it", async () => {
+        silence("plug", { to: "online" });
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on"));
+        expect(store.runsOf("silent")).toHaveLength(1);
+    });
+
+    it("counts a row kept before this was as answering", async () => {
+        silence("plug");
+        await reads(readout("plug", "outlet", "on"));
+        const seen = await store.observation("plug");
+        const { online: _online, onlineSince: _since, ...older } = seen!;
+        store.observations.set("plug", older);
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        expect(store.runsOf("silent")).toHaveLength(1);
+    });
+
+    it("can be a condition, which silence passes rather than fails", async () => {
+        automation("check", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "device",
+                                deviceId: "plug",
+                                attribute: "online",
+                                is: "offline",
+                                negate: false
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "still quiet" }]
+        });
+        devices.set("plug", readout("plug", "outlet", "on", { online: false }));
+        await engine.runNow(store.automations.get("check")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(notified).toEqual(["still quiet"]);
+        devices.set("plug", readout("plug", "outlet", "on"));
+        await engine.runNow(store.automations.get("check")!, "Fixture person", "press-2");
+        await engine.drain();
+        expect(store.runsOf("check").map((run) => run.status)).toContain("skipped");
+    });
+
+    it("can have to stay silent for a while", async () => {
+        automation("long", {
+            triggers: [
+                {
+                    id: "trigstays",
+                    kind: "stays",
+                    deviceId: "plug",
+                    attribute: "online",
+                    is: "offline",
+                    minutes: 10
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "down a while" }]
+        });
+        await reads(readout("plug", "outlet", "on"));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        later(9 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(1);
+    });
+});
+
+describe("a battery running low", () => {
+    beforeEach(() => {
+        automation("battery", {
+            triggers: [
+                {
+                    id: "trigbattery",
+                    kind: "change",
+                    deviceId: "lock",
+                    attribute: "battery",
+                    from: "",
+                    to: "low"
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "battery low" }]
+        });
+    });
+
+    it("fires once when it turns low, and not on the first sight of one already low", async () => {
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(0);
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "ok" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(1);
+    });
+
+    it("learns a battery first reported later without calling it a change", async () => {
+        await reads(readout("lock", "lock", "locked"));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(0);
+        expect((await store.observation("lock"))?.battery).toBe("low");
+    });
+
+    it("keeps its last word when the battery stops being reported", async () => {
+        await reads(readout("lock", "lock", "locked", { battery: "ok" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked"));
+        expect((await store.observation("lock"))?.battery).toBe("ok");
+    });
+});

@@ -1816,7 +1816,9 @@
             "filter": "Its filters",
             "temperature": "Its temperature",
             "figure": "Reading: {measure}",
-            "number": "Its reading as a number"
+            "number": "Its reading as a number",
+            "online": "Whether it answers",
+            "battery": "Its battery"
         },
         "triggers": {
             "change": "A device changes",
@@ -2293,7 +2295,9 @@
                 "locked": "A lock locks",
                 "unlocked": "A lock unlocks",
                 "motion": "Movement is seen",
-                "still": "Movement stops"
+                "still": "Movement stops",
+                "batteryLow": "A battery runs low",
+                "unavailable": "A device stops answering"
             },
             "condition": {
                 "open": "A door is open",
@@ -2301,7 +2305,9 @@
                 "isLocked": "A lock is locked",
                 "isUnlocked": "A lock is unlocked",
                 "moving": "There is movement",
-                "quiet": "All is still"
+                "quiet": "All is still",
+                "batteryIsLow": "A battery is low",
+                "isUnavailable": "A device is not answering"
             },
             "about": {
                 "trigger": {
@@ -2310,7 +2316,9 @@
                     "locked": "When a lock reports it is locked.",
                     "unlocked": "When a lock reports it is unlocked.",
                     "motion": "When a motion sensor sees movement.",
-                    "still": "When a motion sensor stops seeing it."
+                    "still": "When a motion sensor stops seeing it.",
+                    "batteryLow": "When a device says its battery is low, or it falls to 20% or under.",
+                    "unavailable": "When a device can no longer be reached."
                 },
                 "condition": {
                     "open": "Only while a door or window is open.",
@@ -2318,9 +2326,19 @@
                     "isLocked": "Only while a lock is locked.",
                     "isUnlocked": "Only while a lock is unlocked.",
                     "moving": "Only while a motion sensor sees movement.",
-                    "quiet": "Only while a motion sensor sees nothing."
+                    "quiet": "Only while a motion sensor sees nothing.",
+                    "batteryIsLow": "Only while a device's battery is low.",
+                    "isUnavailable": "Only while a device cannot be reached."
                 }
             }
+        },
+        "availability": {
+            "online": "Answering",
+            "offline": "Not answering"
+        },
+        "battery": {
+            "low": "Low",
+            "ok": "Fine"
         }
     },
     "overview": {

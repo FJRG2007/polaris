@@ -1419,6 +1419,7 @@ function TriggerCard({
                     {device && trigger.kind === "stays" && (
                         <fields.AttributePicker
                             kind={device.kind}
+                            device={device}
                             value={trigger.attribute}
                             path={path}
                             disabled={disabled}
@@ -2062,6 +2063,7 @@ function StepCard({
                     {device && (
                         <fields.AttributePicker
                             kind={device.kind}
+                            device={device}
                             value={step.attribute}
                             path={path}
                             disabled={disabled}

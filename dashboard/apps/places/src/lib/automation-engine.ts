@@ -101,6 +101,14 @@ export interface Observation {
     /** A purifier's figures by measure - the dust, the humidity, the filter
      *  life - each with when it last changed. Absent for anything else. */
     readonly figures?: Readonly<Record<string, Figure>>;
+    /** Whether it was answering (online, offline), and since when. Absent on a
+     *  row from before this was kept, which was only ever written while it was. */
+    readonly online?: string;
+    readonly onlineSince?: Date;
+    /** Its battery (low, ok), and since when. Absent for a device that has
+     *  reported none. */
+    readonly battery?: string;
+    readonly batterySince?: Date;
     /** What each attribute was before its last change, so a change held for a
      *  while can still be told apart by where it came from. Absent until the
      *  first change is seen. */
@@ -200,6 +208,8 @@ export interface DeviceReadout {
     readonly filter?: string;
     readonly figures?: Readonly<Record<string, string>>;
     readonly online: boolean;
+    /** Its battery as `batteryWord` reads it (low, ok), or absent for none. */
+    readonly battery?: string;
 }
 
 export interface AutomationStore {
@@ -285,9 +295,22 @@ function iso(date: Date): string {
 
 /** The value of one attribute, as triggers and conditions compare it. */
 function attributeOf(
-    source: { state: string; door: string; reading: string; mode: string; filter?: string },
+    source: {
+        state: string;
+        door: string;
+        reading: string;
+        mode: string;
+        filter?: string;
+        online?: boolean | string;
+        battery?: string;
+    },
     attribute: auto.AutomationAttribute
 ): string {
+    // A readout says whether it answers as a flag, an observation as the word;
+    // a row from before either was kept was written while it answered.
+    if (attribute === "online")
+        return source.online === false || source.online === "offline" ? "offline" : "online";
+    if (attribute === "battery") return source.battery ?? "";
     if (attribute === "door") return source.door;
     if (attribute === "reading") return source.reading;
     if (attribute === "mode") return source.mode;
@@ -436,12 +459,17 @@ export function createEngine(ports: EnginePorts) {
      * row that was read, so however many syncs see the same change at once, one
      * of them fires the automations and the rest find nothing new. The first time
      * a device is seen is not a change.
+     *
+     * A device that stops answering is a change of its own - to offline - and
+     * nothing else it says is current until it answers again: its last state,
+     * door and readings are kept as they were. The first reading after it comes
+     * back is where it is now, not something it just did, so it is kept without
+     * firing anything but the return itself; a door that was closed when the
+     * hub dropped and reads open when it returns did not just open.
      */
     async function observe(installedAppId: string, device: DeviceReadout): Promise<Transition[]> {
-        // A device that is not answering is not doing anything we know of, and a
-        // lock on its way somewhere is not anywhere yet.
-        if (!device.online) return [];
         const now = ports.now();
+        const online = device.online ? "online" : "offline";
         const previous = await store.observation(device.id);
         const passing = device.state === "moving" || device.state === "unknown";
         const state = passing ? (previous?.state ?? device.state) : device.state;
@@ -461,6 +489,9 @@ export function createEngine(ports: EnginePorts) {
                 modeSince: now,
                 ...(device.filter ? { filter: device.filter, filterSince: now } : {}),
                 ...(device.figures ? { figures: seenFigures(device.figures) } : {}),
+                online,
+                onlineSince: now,
+                ...(device.battery ? { battery: device.battery, batterySince: now } : {}),
                 version: 0
             });
             return [];
@@ -479,6 +510,10 @@ export function createEngine(ports: EnginePorts) {
             filter: previous.filter,
             filterSince: previous.filterSince,
             figures: previous.figures ? { ...previous.figures } : undefined,
+            online: previous.online,
+            onlineSince: previous.onlineSince,
+            battery: previous.battery,
+            batterySince: previous.batterySince,
             before: { ...(previous.before ?? {}) } as Partial<
                 Record<auto.AutomationAttribute, string>
             >,
@@ -486,6 +521,27 @@ export function createEngine(ports: EnginePorts) {
             version: previous.version + 1
         };
         const version = next.version;
+        const wasOnline = previous.online !== "offline";
+        if (device.online !== wasOnline) {
+            changed.push({
+                deviceId: device.id,
+                attribute: "online",
+                from: wasOnline ? "online" : "offline",
+                to: online,
+                at: now,
+                version
+            });
+            next.before.online = wasOnline ? "online" : "offline";
+            next.online = online;
+            next.onlineSince = now;
+        }
+        // Silent: nothing it says is current, so its last values stand.
+        if (!device.online) {
+            if (changed.length === 0) return [];
+            return (await settle(installedAppId, device.id, previous, next, changed, moved, now))
+                ? changed
+                : [];
+        }
         if (state !== previous.state) {
             changed.push({
                 deviceId: device.id,
@@ -579,23 +635,71 @@ export function createEngine(ports: EnginePorts) {
             next.filter = device.filter;
             next.filterSince = now;
         }
+        // A battery that stops reporting keeps its last word rather than reading
+        // as a change to nothing; one seen for the first time is learned.
+        if (device.battery && device.battery !== previous.battery) {
+            if (previous.battery) {
+                changed.push({
+                    deviceId: device.id,
+                    attribute: "battery",
+                    from: previous.battery,
+                    to: device.battery,
+                    at: now,
+                    version
+                });
+                next.before.battery = previous.battery;
+            }
+            next.battery = device.battery;
+            next.batterySince = now;
+        }
+        if (!wasOnline) {
+            // Back: whatever else differs is where it is now, kept but not fired.
+            const returned = changed.filter((change) => change.attribute === "online");
+            return (await settle(installedAppId, device.id, previous, next, returned, moved, now))
+                ? returned
+                : [];
+        }
         if (changed.length === 0) {
             // A figure seen for the first time is not a change, but it is kept,
             // so the next one has something to be compared with.
             const learned =
                 (device.filter && !previous.filter) ||
+                (device.battery && !previous.battery) ||
+                previous.online === undefined ||
                 Object.keys(device.figures ?? {}).some((measure) => !previous.figures?.[measure]);
             if (learned) await store.swapObservation(device.id, previous, next);
             return [];
         }
+        return (await settle(installedAppId, device.id, previous, next, changed, moved, now))
+            ? changed
+            : [];
+    }
+
+    /**
+     * Keep what a device was just seen as, and fire what its changes start. The
+     * swap is what makes one reader of a change the one that fires it: false when
+     * another got there first. `moved` are the readings that changed, so the
+     * lines a "for" waits on are carried forward or started over.
+     */
+    async function settle(
+        installedAppId: string,
+        deviceId: string,
+        previous: Observation,
+        next: Observation,
+        changed: readonly Transition[],
+        moved: readonly { key: string; before: Figure; after: string }[],
+        now: Date
+    ): Promise<boolean> {
         const automations = await store.enabledAutomations(installedAppId);
-        const lines = watchedLines(automations, device.id);
+        const lines = watchedLines(automations, deviceId);
+        const held: Record<string, Readonly<Record<string, Held>>> = { ...(next.held ?? {}) };
         for (const { key, before, after } of moved) {
-            const held = heldAfter(previous.held?.[key], before, after, now, lines.get(key) ?? []);
-            if (Object.keys(held).length > 0) next.held[key] = held;
-            else delete next.held[key];
+            const kept = heldAfter(previous.held?.[key], before, after, now, lines.get(key) ?? []);
+            if (Object.keys(kept).length > 0) held[key] = kept;
+            else delete held[key];
         }
-        if (!(await store.swapObservation(device.id, previous, next))) return [];
+        const settled: Observation = { ...next, held };
+        if (!(await store.swapObservation(deviceId, previous, settled))) return false;
 
         const depth = (causeContext.getStore()?.depth ?? -1) + 1;
         for (const change of changed) {
@@ -621,11 +725,11 @@ export function createEngine(ports: EnginePorts) {
                 }
             }
         }
-        await store.wakeWaiting(device.id, now);
+        await store.wakeWaiting(deviceId, now);
         // Whatever was queued, and whatever was waiting on this device, is looked
         // at now rather than on the next tick.
         ports.wake?.(0);
-        return changed;
+        return true;
     }
 
     function matchesChange(trigger: auto.Trigger, change: Transition): boolean {
@@ -937,7 +1041,10 @@ export function createEngine(ports: EnginePorts) {
                     await finish(run, "failed", steps, "step");
                     return;
                 }
-                if (device.online && same(attributeOf(device, step.attribute), step.is)) {
+                if (
+                    (device.online || step.attribute === "online") &&
+                    same(attributeOf(device, step.attribute), step.is)
+                ) {
                     log("ok");
                     waitUntil = null;
                 } else {
@@ -1106,8 +1213,10 @@ export function createEngine(ports: EnginePorts) {
         if (condition.kind === "device") {
             const device = await ports.devices.read(automation.installedAppId, condition.deviceId);
             // A device that is gone or silent is not in any state, so "is" and
-            // "is not" both fail rather than the second passing by default.
-            if (!device || !device.online) return false;
+            // "is not" both fail rather than the second passing by default -
+            // except whether it is answering, which is just what silence says.
+            if (!device) return false;
+            if (!device.online && condition.attribute !== "online") return false;
             const matches = same(attributeOf(device, condition.attribute), condition.is);
             const passes = condition.negate ? !matches : matches;
             if (!passes || !condition.forMinutes) return passes;
@@ -1163,6 +1272,8 @@ function sinceOf(seen: Observation, attribute: auto.AutomationAttribute): Date {
     if (attribute === "reading") return seen.readingSince;
     if (attribute === "mode") return seen.modeSince;
     if (attribute === "filter") return seen.filterSince ?? seen.stateSince;
+    if (attribute === "online") return seen.onlineSince ?? seen.stateSince;
+    if (attribute === "battery") return seen.batterySince ?? seen.stateSince;
     return seen.stateSince;
 }
 

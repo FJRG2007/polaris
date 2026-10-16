@@ -16,7 +16,9 @@ export const TRIGGER_PURPOSES = [
     "locked",
     "unlocked",
     "motion",
-    "still"
+    "still",
+    "batteryLow",
+    "unavailable"
 ] as const;
 export type TriggerPurpose = (typeof TRIGGER_PURPOSES)[number];
 
@@ -26,7 +28,9 @@ export const CONDITION_PURPOSES = [
     "isLocked",
     "isUnlocked",
     "moving",
-    "quiet"
+    "quiet",
+    "batteryIsLow",
+    "isUnavailable"
 ] as const;
 export type ConditionPurpose = (typeof CONDITION_PURPOSES)[number];
 
@@ -65,13 +69,25 @@ function motionWatch(device: DeviceView, moving: boolean): Watch | null {
         : null;
 }
 
+/** A battery running low, on a device that reports one. */
+function batteryWatch(device: DeviceView): Watch | null {
+    return auto.hasBattery(device) ? { attribute: "battery", value: "low" } : null;
+}
+
+/** A device that stops answering. Every device can. */
+function silentWatch(): Watch {
+    return { attribute: "online", value: "offline" };
+}
+
 const TRIGGER_WATCH: Readonly<Record<TriggerPurpose, (device: DeviceView) => Watch | null>> = {
     opened: (device) => doorWatch(device, true),
     closed: (device) => doorWatch(device, false),
     locked: (device) => lockWatch(device, true),
     unlocked: (device) => lockWatch(device, false),
     motion: (device) => motionWatch(device, true),
-    still: (device) => motionWatch(device, false)
+    still: (device) => motionWatch(device, false),
+    batteryLow: batteryWatch,
+    unavailable: silentWatch
 };
 
 const CONDITION_WATCH: Readonly<Record<ConditionPurpose, (device: DeviceView) => Watch | null>> = {
@@ -80,7 +96,9 @@ const CONDITION_WATCH: Readonly<Record<ConditionPurpose, (device: DeviceView) =>
     isLocked: (device) => lockWatch(device, true),
     isUnlocked: (device) => lockWatch(device, false),
     moving: (device) => motionWatch(device, true),
-    quiet: (device) => motionWatch(device, false)
+    quiet: (device) => motionWatch(device, false),
+    batteryIsLow: batteryWatch,
+    isUnavailable: silentWatch
 };
 
 export function isTriggerPurpose(value: string): value is TriggerPurpose {

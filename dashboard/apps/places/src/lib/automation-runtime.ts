@@ -20,7 +20,7 @@ import { prisma } from "@polaris/db";
 import { homeInstall } from "./access";
 import { host } from "@polaris/app-host";
 import { HomeError } from "./home-error";
-import { readsDevices } from "./automation-kinds";
+import { batteryWord, readsDevices } from "./automation-kinds";
 import {
     airQuality,
     airQualityRank,
@@ -55,6 +55,9 @@ export interface ObservedRow {
     readonly doorState: string;
     readonly value: string | null;
     readonly online: boolean;
+    /** Its battery, where it reports one. Absent reads as none. */
+    readonly batteryPercent?: number | null;
+    readonly batteryCritical?: boolean;
     /** An air conditioner's settings, as stored; anything else for the rest. */
     readonly climate?: unknown;
     /** A purifier's settings and readings, as stored. */
@@ -82,6 +85,7 @@ function readout(row: ObservedRow): DeviceReadout {
         row.kind === "air" ? (air?.mode ?? "") : (climateSettings(row.climate)?.mode ?? "");
     const filter = wornFilter(air)?.state;
     const figures = figuresOf(air);
+    const battery = batteryWord(row);
     return {
         id: row.id,
         kind: row.kind,
@@ -92,6 +96,7 @@ function readout(row: ObservedRow): DeviceReadout {
         mode: row.state === "on" ? mode : "",
         ...(filter ? { filter } : {}),
         ...(figures ? { figures } : {}),
+        ...(battery ? { battery } : {}),
         online: row.online
     };
 }
@@ -115,7 +120,9 @@ export function automationEngine(): AutomationEngine {
                         value: true,
                         climate: true,
                         air: true,
-                        online: true
+                        online: true,
+                        batteryPercent: true,
+                        batteryCritical: true
                     }
                 });
                 return row ? readout(row) : null;

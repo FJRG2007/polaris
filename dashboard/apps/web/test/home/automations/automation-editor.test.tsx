@@ -605,7 +605,7 @@ describe("what a block watches on a device", () => {
         openRow("When");
         fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
         const offered = (await screen.findAllByRole("option")).map((each) => each.textContent);
-        expect(offered).toEqual(["Its state", "Its mode", "Its temperature"]);
+        expect(offered).toEqual(["Its state", "Its mode", "Whether it answers", "Its temperature"]);
     });
 
     it("says a change to what the device already is waits for the next one", async () => {

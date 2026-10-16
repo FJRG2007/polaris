@@ -75,19 +75,22 @@ export function DevicePicker({
  *  more than one. Nothing is drawn for a device with one. */
 export function AttributePicker({
     kind,
+    device,
     value,
     onChange,
     path,
     disabled
 }: {
     kind: string;
+    /** Whether it has a battery, so the battery is offered only where it does. */
+    device?: auto.BatteryReport;
     value: auto.AutomationAttribute;
     onChange: (attribute: auto.AutomationAttribute) => void;
     path: readonly (string | number)[];
     disabled?: boolean;
 }) {
     const t = usePlacesT();
-    const offered = auto.attributesFor(kind);
+    const offered = withSaved(auto.attributesFor(kind, device), value);
     if (offered.length < 2) return null;
     return (
         <Field label={t("automations.fields.watch")} path={[...path, "attribute"]}>
@@ -138,7 +141,10 @@ export function WatchPicker({
     disabled?: boolean;
 }) {
     const t = usePlacesT();
-    const attributes = auto.attributesFor(device.kind);
+    const attributes = withSaved(
+        auto.attributesFor(device.kind, device),
+        "attribute" in value ? value.attribute : undefined
+    );
     const figures = [...auto.figuresFor(device.kind, device.reading?.value)];
     // A block saved on a figure the device no longer offers (a sensor now
     // reading a word) keeps it in the list rather than showing a blank.
@@ -184,9 +190,20 @@ export function WatchPicker({
     );
 }
 
+/** The attributes offered, with one a block was saved on kept in the list - a
+ *  battery the device stopped reporting - rather than showing a blank. */
+function withSaved(
+    offered: readonly auto.AutomationAttribute[],
+    saved: auto.AutomationAttribute | undefined
+): readonly auto.AutomationAttribute[] {
+    return saved && !offered.includes(saved) ? [...offered, saved] : offered;
+}
+
 /** What a device's attribute is right now, where the editor can tell: a state,
  *  a door, a mode or a reading's word. Empty where it cannot. */
 export function currentValue(device: DeviceView, attribute: auto.AutomationAttribute): string {
+    if (attribute === "online") return device.online ? "online" : "offline";
+    if (attribute === "battery") return auto.batteryWord(device);
     if (attribute === "state") return device.state;
     if (attribute === "door") return device.doorState;
     if (attribute === "mode") return device.climate?.mode ?? device.air?.mode ?? "";
@@ -249,7 +266,11 @@ export function ValuePicker({
                     : [...(device?.climate?.modes ?? kinds.CLIMATE_MODES)]
                 : attribute === "filter"
                   ? [...kinds.FILTER_STATES]
-                  : [...auto.readingWordsFor(reading)];
+                  : attribute === "online"
+                    ? [...auto.AVAILABILITY_WORDS]
+                    : attribute === "battery"
+                      ? [...auto.BATTERY_WORDS]
+                      : [...auto.readingWordsFor(reading)];
     if (value && !offered.includes(value) && attribute === "reading" && offered.length > 0)
         offered.push(value);
 

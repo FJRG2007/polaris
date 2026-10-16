@@ -491,7 +491,7 @@ describe("an air conditioner in an automation", () => {
     };
 
     it("watches its power and its mode, and can be a threshold's sensor", () => {
-        expect(auto.attributesFor("climate")).toEqual(["state", "mode"]);
+        expect(auto.attributesFor("climate", {})).toEqual(["state", "mode", "online"]);
         expect(auto.measures("climate")).toBe(true);
         expect(
             issues({
@@ -667,7 +667,7 @@ describe("an air purifier", () => {
     };
 
     it("watches its power, its preset and its filters, and offers each figure to compare", () => {
-        expect(auto.attributesFor("air")).toEqual(["state", "mode", "filter"]);
+        expect(auto.attributesFor("air", {})).toEqual(["state", "mode", "filter", "online"]);
         expect(auto.measures("air")).toBe(true);
         expect(auto.measuresFor("air")).toEqual([
             "pm25",

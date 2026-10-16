@@ -24,8 +24,44 @@ import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
  *  lock opened"; a sensor has neither and is its reading. An air conditioner
  *  is on or off, and separately cooling or heating - its mode. A purifier has a
  *  mode too, and filters that wear: `filter` is the most worn one's state. */
-export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading", "mode", "filter"] as const;
+export const AUTOMATION_ATTRIBUTES = [
+    "state",
+    "door",
+    "reading",
+    "mode",
+    "filter",
+    "online",
+    "battery"
+] as const;
 export type AutomationAttribute = (typeof AUTOMATION_ATTRIBUTES)[number];
+
+/** Whether a device is answering. Every device has this, whatever it does. */
+export const AVAILABILITY_WORDS = ["online", "offline"] as const;
+
+/** A battery as a trigger or a condition reads it: running low, or not. */
+export const BATTERY_WORDS = ["low", "ok"] as const;
+
+/** At or under this share a battery reads as low, unless its own maker says
+ *  so first. */
+export const BATTERY_LOW_PERCENT = 20;
+
+/** What a device says about its battery, where it has one. */
+export interface BatteryReport {
+    readonly batteryPercent?: number | null;
+    readonly batteryCritical?: boolean;
+}
+
+/** A battery's word - low or ok - or empty for a device that reports none. */
+export function batteryWord(device: BatteryReport): string {
+    if (device.batteryCritical) return "low";
+    const percent = device.batteryPercent;
+    if (typeof percent !== "number" || !Number.isFinite(percent)) return "";
+    return percent <= BATTERY_LOW_PERCENT ? "low" : "ok";
+}
+
+export function hasBattery(device: BatteryReport): boolean {
+    return batteryWord(device) !== "";
+}
 
 /** The door sensor's words that can be waited for. `unknown` and `none` are not
  *  something a door does. */
@@ -50,14 +86,25 @@ export function watchedStates(kind: string): readonly kinds.DeviceState[] {
     return WATCHED_STATES[kinds.deviceKind(kind)];
 }
 
-/** Which attributes a kind of device has to watch. */
-export function attributesFor(kind: string): readonly AutomationAttribute[] {
+/** What a kind of device does, before whether it answers and its battery. */
+function ownAttributes(kind: string): readonly AutomationAttribute[] {
     const which = kinds.deviceKind(kind);
     if (which === "sensor") return ["reading"];
     if (which === "lock" || which === "opener") return ["state", "door"];
     if (which === "climate") return ["state", "mode"];
     if (which === "air") return ["state", "mode", "filter"];
     return ["state"];
+}
+
+/**
+ * Which attributes a device has to watch: what its kind does, then whether it
+ * is answering, which every device has, then its battery. Given the device, the
+ * battery is there only when it reports one; without it, the battery is allowed,
+ * so a block saved on one is never refused for a reading the screen lacks.
+ */
+export function attributesFor(kind: string, device?: BatteryReport): readonly AutomationAttribute[] {
+    const battery = device === undefined || hasBattery(device);
+    return [...ownAttributes(kind), "online", ...(battery ? (["battery"] as const) : [])];
 }
 
 /**
@@ -617,7 +664,11 @@ function checkWord(
                 ? MODE_WORDS.includes(value)
                 : attribute === "filter"
                   ? (kinds.FILTER_STATES as readonly string[]).includes(value)
-                  : true;
+                  : attribute === "online"
+                    ? (AVAILABILITY_WORDS as readonly string[]).includes(value)
+                    : attribute === "battery"
+                      ? (BATTERY_WORDS as readonly string[]).includes(value)
+                      : true;
     if (!known) context.addIssue({ code: "custom", path, message: "automations.errors.state" });
 }
 

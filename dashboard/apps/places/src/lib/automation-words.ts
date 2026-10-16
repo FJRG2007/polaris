@@ -79,6 +79,14 @@ export function valueText(
         const state = kinds.FILTER_STATES.find((entry) => entry === value);
         return state ? kinds.filterStateText(state, t) : value;
     }
+    if (attribute === "online") {
+        const word = auto.AVAILABILITY_WORDS.find((entry) => entry === value);
+        return word ? t(`automations.availability.${word}`) : value;
+    }
+    if (attribute === "battery") {
+        const word = auto.BATTERY_WORDS.find((entry) => entry === value);
+        return word ? t(`automations.battery.${word}`) : value;
+    }
     return kinds.readingLine({ value, unit: "" }, t);
 }
 

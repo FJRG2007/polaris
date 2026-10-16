@@ -27,6 +27,10 @@ import type {
  *  name, so it can never be taken for one. */
 const FILTER_KEY = "@filter";
 
+/** Where whether it answers and its battery are kept, likewise. */
+const ONLINE_KEY = "@online";
+const BATTERY_KEY = "@battery";
+
 const storedFigure = z.object({ value: z.string().max(200), since: z.string().datetime() });
 
 /** Where the values before each attribute's last change are kept, and since
@@ -56,16 +60,29 @@ function entriesOf<T>(
 }
 
 /** The figures column, read back: each figure with when it changed, the
- *  filter's state, what each attribute was before, and the readings' held
- *  lines. Anything unreadable is left out, so a row written before any of these
- *  reads as one that has none yet. */
-function figuresOf(
+ *  filter's state, whether it answers and its battery, what each attribute was
+ *  before, and the readings' held lines. Anything unreadable is left out, so a
+ *  row written before any of these reads as one that has none yet. */
+export function figuresOf(
     stored: Prisma.JsonValue
-): Pick<Observation, "figures" | "filter" | "filterSince" | "before" | "held"> {
+): Pick<
+    Observation,
+    | "figures"
+    | "filter"
+    | "filterSince"
+    | "before"
+    | "held"
+    | "online"
+    | "onlineSince"
+    | "battery"
+    | "batterySince"
+> {
     const parsed = z.record(z.string(), z.unknown()).safeParse(stored);
     if (!parsed.success) return {};
     const figures: Record<string, Figure> = {};
     let filter: Figure | undefined;
+    let online: Figure | undefined;
+    let battery: Figure | undefined;
     let before: Observation["before"];
     let held: Record<string, Record<string, Held>> | undefined;
     for (const [key, value] of Object.entries(parsed.data)) {
@@ -95,25 +112,44 @@ function figuresOf(
         if (!read.success) continue;
         const figure = { value: read.data.value, since: new Date(read.data.since) };
         if (key === FILTER_KEY) filter = figure;
+        else if (key === ONLINE_KEY) online = figure;
+        else if (key === BATTERY_KEY) battery = figure;
         else figures[key] = figure;
     }
     return {
         ...(Object.keys(figures).length > 0 ? { figures } : {}),
         ...(filter ? { filter: filter.value, filterSince: filter.since } : {}),
+        ...(online ? { online: online.value, onlineSince: online.since } : {}),
+        ...(battery ? { battery: battery.value, batterySince: battery.since } : {}),
         ...(before && Object.keys(before).length > 0 ? { before } : {}),
         ...(held && Object.keys(held).length > 0 ? { held } : {})
     };
 }
 
 /** An observation as the row takes it: its figures folded into one column. */
-function rowOf(observation: Observation) {
-    const { figures, filter, filterSince, before, held, ...rest } = observation;
+export function rowOf(observation: Observation) {
+    const {
+        figures,
+        filter,
+        filterSince,
+        online,
+        onlineSince,
+        battery,
+        batterySince,
+        before,
+        held,
+        ...rest
+    } = observation;
     const stored: Record<string, unknown> = {};
     for (const [key, figure] of Object.entries(figures ?? {})) {
         stored[key] = { value: figure.value, since: figure.since.toISOString() };
     }
     if (filter)
         stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
+    if (online)
+        stored[ONLINE_KEY] = { value: online, since: (onlineSince ?? new Date()).toISOString() };
+    if (battery)
+        stored[BATTERY_KEY] = { value: battery, since: (batterySince ?? new Date()).toISOString() };
     if (before && Object.keys(before).length > 0) stored[BEFORE_KEY] = before;
     if (held && Object.keys(held).length > 0) {
         stored[HELD_KEY] = Object.fromEntries(
