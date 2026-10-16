@@ -58,15 +58,21 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
+import * as move from "./channel-move";
 import {
     Ban,
     CheckCheck,
+    ArrowDownToLine,
+    ArrowUpToLine,
+    Check,
     ChevronDown,
     ChevronsDownUp,
     ChevronsUpDown,
     Copy,
     Fingerprint,
+    FolderInput,
     FolderPlus,
+    FolderTree,
     Hash,
     Link2,
     Lock,
@@ -129,6 +135,88 @@ const CONTEXT_PARTS: MenuParts = {
 /** What an administrator's right-click on a channel asks the rail to open. */
 type ChannelManage = "edit" | "duplicate" | "create" | "delete";
 
+/** What a row's Move to menu needs: where the channel is, and where it can go. */
+interface RowMove {
+    readonly categories: readonly { readonly id: string; readonly name: string }[];
+    readonly categoryId: string | null;
+    /** Already first or last under its heading, so that option would do nothing. */
+    readonly first: boolean;
+    readonly last: boolean;
+    readonly onMove: (to: move.ChannelMove) => void;
+}
+
+/**
+ * Move to: another heading, or the top or bottom of this one.
+ *
+ * The drag, for somebody who would rather not drag - or cannot, on a long rail
+ * where the heading is two screens away. Where the channel already is, the
+ * option is drawn and switched off rather than left out, so the list reads the
+ * same every time and says where it is now.
+ */
+function MoveToOptions({ move: place }: { move: RowMove }) {
+    const t = useTranslations("chat");
+    const headings: { id: string | null; name: string }[] = [
+        { id: null, name: t("channelMenu.noCategory") },
+        ...place.categories
+    ];
+    return (
+        <ContextMenuSub>
+            <ContextMenuSubTrigger>
+                <FolderInput className="size-3.5" />
+                {t("channelMenu.moveTo")}
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+                <ContextMenuSub>
+                    <ContextMenuSubTrigger>
+                        <FolderTree className="size-3.5" />
+                        {t("channelMenu.moveCategory")}
+                    </ContextMenuSubTrigger>
+                    {/* Capped well short of the window, so a space with forty
+                        headings scrolls inside the list instead of filling the
+                        screen with it. */}
+                    <ContextMenuSubContent className="max-h-[min(20rem,var(--radix-context-menu-content-available-height))]">
+                        {headings.map((heading) => {
+                            const here = heading.id === place.categoryId;
+                            return (
+                                <ContextMenuItem
+                                    key={heading.id ?? ""}
+                                    disabled={here}
+                                    onSelect={() =>
+                                        place.onMove({ to: "category", categoryId: heading.id })
+                                    }
+                                >
+                                    {here ? (
+                                        <Check className="size-3.5" />
+                                    ) : (
+                                        <span aria-hidden="true" className="size-3.5 shrink-0" />
+                                    )}
+                                    <span className="min-w-0 truncate" title={heading.name}>
+                                        {heading.name}
+                                    </span>
+                                </ContextMenuItem>
+                            );
+                        })}
+                    </ContextMenuSubContent>
+                </ContextMenuSub>
+                <ContextMenuItem
+                    disabled={place.first}
+                    onSelect={() => place.onMove({ to: "first" })}
+                >
+                    <ArrowUpToLine className="size-3.5" />
+                    {t("channelMenu.moveFirst")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                    disabled={place.last}
+                    onSelect={() => place.onMove({ to: "last" })}
+                >
+                    <ArrowDownToLine className="size-3.5" />
+                    {t("channelMenu.moveLast")}
+                </ContextMenuItem>
+            </ContextMenuSubContent>
+        </ContextMenuSub>
+    );
+}
+
 export function ChatSidebar() {
     const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, refresh, loaded } =
         useChat();
@@ -152,6 +240,14 @@ export function ChatSidebar() {
     const [deleting, setDeleting] = useState<ChatChannelView | null>(null);
     const [deleteError, setDeleteError] = useState("");
     const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+    // A move that has been asked for and is drawn already, ahead of the answer.
+    // `stored` once the server has taken it: it is dropped when the next list
+    // arrives, which is the one that carries it, and at once on a refusal.
+    const [pendingOrder, setPendingOrder] = useState<{
+        order: move.ChannelOrder;
+        stored: boolean;
+    } | null>(null);
+    const toast = useToast();
 
     const space = useMemo(
         () => spaces.find((entry) => entry.id === activeSpaceId) ?? null,
@@ -193,15 +289,17 @@ export function ChatSidebar() {
         [channels]
     );
 
-    const inSpace = useMemo(
-        () =>
-            activeSpaceId
-                ? channels.filter(
-                      (channel) => channel.spaceId === activeSpaceId && !channel.archived
-                  )
-                : [],
-        [channels, activeSpaceId]
-    );
+    const inSpace = useMemo(() => {
+        if (!activeSpaceId) return [];
+        const listed = channels.filter(
+            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+        );
+        return pendingOrder ? move.withChannelOrder(listed, pendingOrder.order) : listed;
+    }, [channels, activeSpaceId, pendingOrder]);
+
+    useEffect(() => {
+        setPendingOrder((current) => (current?.stored ? null : current));
+    }, [channels]);
 
     const voiceIds = useMemo(
         () => inSpace.filter((channel) => channel.kind === "voice").map((channel) => channel.id),
@@ -231,13 +329,48 @@ export function ChatSidebar() {
     );
 
     /**
+     * One heading's channels, stored in a new order.
+     *
+     * The one way the channel order is written, whether it came from a drop or
+     * from the row's Move to menu. Drawn at once and put back if the server
+     * refuses: the refusal is said in a toast, since the rail moving back on its
+     * own would otherwise read as the move never having been made.
+     */
+    const commitChannelOrder = useCallback(
+        (order: move.ChannelOrder) => {
+            if (!space) return;
+            setPendingOrder({ order, stored: false });
+            const refused = (reason: string) => {
+                setPendingOrder((current) => (current?.order === order ? null : current));
+                setError(reason);
+                toast.show({ title: t("channelMenu.moveFailed"), body: reason });
+            };
+            void actions
+                .reorderChannelsAction({
+                    spaceId: space.id,
+                    categoryId: order.categoryId,
+                    channelIds: [...order.channelIds]
+                })
+                .then(
+                    (result) => {
+                        if (result.error) return refused(result.error);
+                        setError("");
+                        setPendingOrder((current) =>
+                            current?.order === order ? { order, stored: true } : current
+                        );
+                        refresh();
+                    },
+                    () => refused(t("errors.channelsNotReordered"))
+                );
+        },
+        [refresh, space, t, toast]
+    );
+
+    /**
      * A drag ended.
      *
      * The rail rebuilds the list it just drew and sends the whole thing, so the
-     * stored order is the order somebody was looking at. Nothing is drawn
-     * optimistically: the write is one small statement and the rail is told
-     * about it, and a rail that moved and then moved back would be worse than
-     * one that moves a moment late.
+     * stored order is the order somebody was looking at.
      */
     const drag = useRailDrag({
         enabled: manages,
@@ -263,27 +396,36 @@ export function ChatSidebar() {
                 const landedIn =
                     target.at === "end"
                         ? target.categoryId
-                        : (channels.find((entry) => entry.id === target.id)?.categoryId ?? null);
-                const ids = channels
-                    .filter(
-                        (entry) =>
-                            entry.spaceId === space.id &&
-                            entry.categoryId === landedIn &&
-                            !entry.archived
-                    )
+                        : (inSpace.find((entry) => entry.id === target.id)?.categoryId ?? null);
+                const ids = inSpace
+                    .filter((entry) => entry.categoryId === landedIn)
                     .map((entry) => entry.id);
-                void actions
-                    .reorderChannelsAction({
-                        spaceId: space.id,
-                        categoryId: landedIn,
-                        channelIds: reordered(ids, source.id, target)
-                    })
-                    .then((result) => setError(result.error ?? ""))
-                    .then(refresh);
+                commitChannelOrder({
+                    categoryId: landedIn,
+                    channelIds: reordered(ids, source.id, target)
+                });
             },
-            [categories, channels, refresh, space]
+            [categories, commitChannelOrder, inSpace, refresh, space]
         )
     });
+
+    // The headings a channel can be moved under from its menu, in rail order.
+    const spaceCategories = useMemo(
+        () => (space ? categories.filter((entry) => entry.spaceId === space.id) : []),
+        [categories, space]
+    );
+    const mover = useCallback(
+        (channel: ChatChannelView): RowMove => ({
+            categories: spaceCategories,
+            categoryId: channel.categoryId,
+            ...move.channelPlace(inSpace, channel.id),
+            onMove: (to) => {
+                const order = move.channelMoveOrder(inSpace, channel.id, to);
+                if (order) commitChannelOrder(order);
+            }
+        }),
+        [commitChannelOrder, inSpace, spaceCategories]
+    );
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -520,6 +662,7 @@ export function ChatSidebar() {
                                 drag={drag}
                                 manages={manages}
                                 onManage={manage}
+                                mover={mover}
                             />
                         </div>
 
@@ -669,6 +812,7 @@ export function ChatSidebar() {
                                         drag={drag}
                                         manages={manages}
                                         onManage={manage}
+                                        mover={mover}
                                         empty="Nothing here yet."
                                     />
                                 </Section>
@@ -822,6 +966,7 @@ function ChannelRows({
     manages,
     onManage,
     onModerated,
+    mover,
     empty
 }: {
     channels: readonly ChatChannelView[];
@@ -834,6 +979,9 @@ function ChannelRows({
     drag?: ReturnType<typeof useRailDrag>;
     manages?: boolean;
     onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
+    /** Where a row can be moved to from its menu, for whoever may arrange
+     *  the space. */
+    mover?: (channel: ChatChannelView) => RowMove;
     empty?: string;
 }) {
     // Dropping into the group rather than between two of its rows is the
@@ -896,6 +1044,7 @@ function ChannelRows({
                                     : null
                             }
                             onManage={manages ? onManage : undefined}
+                            move={manages && mover ? mover(channel) : undefined}
                             icon={
                                 channel.kind === "voice" ? (
                                     <Volume2 className="size-3.5 shrink-0 text-muted-foreground" />
@@ -1084,6 +1233,7 @@ function Row({
     personId,
     channel,
     onManage,
+    move: moveTo,
     occupancy = null,
     roomy = false
 }: {
@@ -1110,6 +1260,8 @@ function Row({
     /** Present for somebody who administers the space, so the menu can offer
      *  what only they may do. */
     onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
+    /** Present for somebody who may arrange the space: the Move to menu. */
+    move?: RowMove;
     /**
      * Drawn large on a phone, the way a messenger lists its conversations: a
      * bigger face, a bigger name, and when the last message was. On a phone the
@@ -1254,7 +1406,7 @@ function Row({
     );
 
     return channel ? (
-        <RowMenu channel={channel} onManage={onManage}>
+        <RowMenu channel={channel} onManage={onManage} move={moveTo}>
             {body}
         </RowMenu>
     ) : (
@@ -1288,10 +1440,12 @@ function PhoneSized({ small, large }: { small: React.ReactNode; large: React.Rea
 function RowMenu({
     channel,
     onManage,
+    move: moveTo,
     children
 }: {
     channel: ChatChannelView;
     onManage?: (channel: ChatChannelView, action: ChannelManage) => void;
+    move?: RowMove;
     children: React.ReactNode;
 }) {
     const baseUrl = useAppUrl();
@@ -1509,6 +1663,13 @@ function RowMenu({
                     {/* Only for somebody who administers the space, and only for a
                     channel in one: a direct message has no settings and a group
                     is managed from its own header. */}
+                    {moveTo && channel.spaceId && (
+                        <>
+                            <ContextMenuSeparator />
+                            <MoveToOptions move={moveTo} />
+                        </>
+                    )}
+
                     {onManage && channel.spaceId && (
                         <>
                             <ContextMenuSeparator />

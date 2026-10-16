@@ -337,7 +337,13 @@
         "expandAll": "Expand all categories",
         "editCategory": "Edit category",
         "categoryName": "Category name",
-        "deleteCategory": "Delete category"
+        "deleteCategory": "Delete category",
+        "moveTo": "Move to",
+        "moveCategory": "Category",
+        "noCategory": "No category",
+        "moveFirst": "First in category",
+        "moveLast": "Last in category",
+        "moveFailed": "Channel not moved"
     },
     "moderation": {
         "notice": {

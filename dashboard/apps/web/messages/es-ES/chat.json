@@ -337,7 +337,13 @@
         "expandAll": "Desplegar todas",
         "editCategory": "Editar categoría",
         "categoryName": "Nombre",
-        "deleteCategory": "Eliminar categoría"
+        "deleteCategory": "Eliminar categoría",
+        "moveTo": "Mover a",
+        "moveCategory": "Categoría",
+        "noCategory": "Sin categoría",
+        "moveFirst": "Subir al inicio",
+        "moveLast": "Bajar al final",
+        "moveFailed": "Canal no movido"
     },
     "moderation": {
         "notice": {
