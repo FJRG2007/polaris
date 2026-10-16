@@ -648,7 +648,10 @@
         "uploadToGoOn": "Sube el archivo de la app Philips Air+ para seguir",
         "fileTooLarge": "Ese archivo es más grande de lo que puede ser una app.",
         "fileEmpty": "No ha llegado nada. Vuelve a elegir el archivo.",
-        "macNotFound": "Nada en esta red responde como {mac}. Comprueba que el dispositivo está encendido y en la misma red que Polaris, o escribe su IP."
+        "macNotFound": "Nada en esta red responde como {mac}. Comprueba que el dispositivo está encendido y en la misma red que Polaris, o escribe su IP.",
+        "brokerQuiet": "El broker local se instaló, pero aún no tiene dirección en esta red",
+        "notNuki": "Solo una cuenta de Nuki se puede vincular en local",
+        "noLocalLink": "Esta cuenta de Nuki no tiene enlace local"
     },
     "connections": {
         "nuki-web": {
@@ -1607,7 +1610,8 @@
         "disconnectBody": "Sus dispositivos se van con ella, y también todo lo que han hecho. Polaris no guarda copia de un edificio del que le han dicho que no es asunto suyo.",
         "disconnect": "Desconectar",
         "filterSoon": "Filtro: cambiar pronto",
-        "filterNow": "Cambiar filtro"
+        "filterNow": "Cambiar filtro",
+        "connectLocally": "Conectar {name} en local"
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",
@@ -2168,5 +2172,26 @@
         "offline": "Sin red",
         "watchOnly": "Solo para vigilar, no para manejar",
         "noControl": "No puedes manejarlo desde aquí"
+    },
+    "nukiLocal": {
+        "title": "Conecta tus cerraduras Nuki en local",
+        "intro": "Las cerraduras que publican por MQTT avisan aquí de cada cambio al instante, sin esperar a que se pregunte a Nuki.",
+        "startHint": "Polaris iniciará un pequeño broker en esta máquina para tus cerraduras. Sirve con Smart Lock 3.0 Pro, 4.ª generación, Pro y Ultra.",
+        "start": "Iniciar el broker local",
+        "starting": "Iniciando el broker...",
+        "steps": {
+            "s0": "En la app de Nuki, abre la cerradura y ve a sus ajustes de MQTT (Funciones y configuración, o Administración en versiones antiguas).",
+            "s1": "Activa MQTT y escribe la dirección, el usuario y la contraseña de abajo. El puerto siempre es 1883.",
+            "s2": "Deja activado Permitir bloqueo, para que Polaris pueda seguir abriendo y cerrando.",
+            "s3": "Guarda y deja esta ventana abierta: cada cerradura aparece abajo en cuanto se conecta."
+        },
+        "host": "Dirección",
+        "port": "Puerto",
+        "username": "Usuario",
+        "password": "Contraseña",
+        "connected": "Conectada - los cambios llegan al instante",
+        "waiting": "Esperando a {id}",
+        "unreachable": "Polaris no llega al broker ahora. Puede que aún esté arrancando; esto se actualiza solo.",
+        "fallback": "Tu cuenta de Nuki sigue funcionando desde cualquier sitio y responde cuando una cerradura no está en esta red."
     }
 }

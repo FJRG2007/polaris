@@ -39,6 +39,7 @@ import { ensureVisionWorker } from "../lib/vision";
 import * as defaults from "../lib/detection-defaults";
 import { LOCAL_TARGET, marksForClip, type ClipMark } from "@polaris/core";
 import * as deviceAccounts from "../lib/device-accounts";
+import * as localBroker from "../lib/local-broker";
 import * as deviceConnections from "../lib/device-connections";
 import { cameraActivity, type CameraActivity } from "../lib/vision-activity";
 import { REACH_TIMEOUT_MS, discoverCameras, portOpen } from "../lib/discovery";
@@ -1574,4 +1575,39 @@ export async function disconnectDeviceAccountAction(accountId: string): Promise<
         targetId: install.id
     });
     return { devices: result.value?.list, accounts: result.value?.connected };
+}
+
+/**
+ * Link a Nuki account to the broker on this machine, starting the broker the
+ * first time. Answers what to type into the Nuki app.
+ */
+export async function linkNukiLocallyAction(accountId: string): Promise<{
+    state?: localBroker.LocalLinkState;
+    error?: string;
+}> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(async () => {
+        const broker = await localBroker.ensureLocalBroker(install.ownerId, user.id);
+        await localBroker.linkNukiAccount(install.id, String(accountId), broker);
+        return localBroker.localLinkState(install.id, String(accountId));
+    });
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.deviceAccount.linkLocal",
+        targetType: "installedApp",
+        targetId: install.id
+    });
+    return { state: result.value };
+}
+
+/** Where a Nuki account's local link stands, for the dialog to watch. */
+export async function nukiLocalStateAction(accountId: string): Promise<{
+    state?: localBroker.LocalLinkState;
+    error?: string;
+}> {
+    const { install } = await requireHome("home.manage");
+    const result = await guard(() => localBroker.localLinkState(install.id, String(accountId)));
+    if (result.error) return { error: result.error };
+    return { state: result.value };
 }

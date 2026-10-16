@@ -35,10 +35,11 @@ export interface BrokerAddress {
  *  there, and a screen waiting on it should be told so rather than left. */
 const CONNECT_MS = 6000;
 
-/** How long to keep listening once the retained messages start arriving, and the
- *  ceiling on the whole read. A broker hands over everything it has held for a
- *  new subscriber at once, so the first quiet moment is the end of it - the
- *  ceiling is only there for a broker that never goes quiet. */
+/** How long to keep listening once the subscription is granted or the retained
+ *  messages start arriving, and the ceiling on the whole read. A broker hands
+ *  over everything it has held for a new subscriber at once, right behind the
+ *  grant, so the first quiet moment is the end of it - an empty broker included.
+ *  The ceiling is only there for a broker that never goes quiet. */
 const QUIET_MS = 400;
 const READ_MS = 5000;
 
@@ -143,7 +144,10 @@ export async function readRetained(
             });
 
             client.subscribe([...filters], { qos: 0 }, (error) => {
-                if (!error) return;
+                if (!error) {
+                    quiet ??= setTimeout(() => finish(), QUIET_MS);
+                    return;
+                }
                 clearTimeout(ceiling);
                 reject(new BrokerError("The broker would not let Polaris read that.", "refused"));
             });

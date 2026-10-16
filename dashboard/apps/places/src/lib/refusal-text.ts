@@ -105,6 +105,12 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Write the address as http://192.168.1.20:8000", "refusals.recognizerAddress"],
     ["Clip not found", "refusals.clipGone"],
     ["The camera relay was installed but is not answering yet", "refusals.relayQuiet"],
+    [
+        "The local broker was installed but has no address on this network yet",
+        "refusals.brokerQuiet"
+    ],
+    ["Only a Nuki account can be linked locally", "refusals.notNuki"],
+    ["This Nuki account has no local link", "refusals.noLocalLink"],
     ["The relay would not accept that camera", "refusals.relayRefused"],
     ["That camera is not shared with you", "refusals.cameraNotShared"],
     ["You cannot operate that from here", "refusals.cannotOperate"],

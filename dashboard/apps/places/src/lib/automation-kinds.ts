@@ -790,6 +790,22 @@ export function readsDevices(definition: AutomationDefinition): boolean {
     );
 }
 
+/**
+ * The devices an automation reads, or "all" when one of its steps waits - a
+ * wait can be on any device, and is answered by reading whatever it names
+ * when it gets there. What decides which accounts are read at the watched pace
+ * with no screen open (`device-watch.ts`).
+ */
+export function devicesReadBy(definition: AutomationDefinition): string[] | "all" {
+    if (definition.actions.some((step) => step.kind === "wait")) return "all";
+    const ids = new Set<string>();
+    for (const trigger of definition.triggers) if ("deviceId" in trigger) ids.add(trigger.deviceId);
+    for (const group of definition.conditions.groups) {
+        for (const item of group.items) if ("deviceId" in item) ids.add(item.deviceId);
+    }
+    return [...ids];
+}
+
 // --- building blocks ---------------------------------------------------------
 
 /** A short random id for a node, unique within one automation. */

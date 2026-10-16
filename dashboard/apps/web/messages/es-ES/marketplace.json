@@ -6,6 +6,7 @@
         "gameManager": "Juegos",
         "gameServer": "Servidor de juegos",
         "cameraHub": "Cámaras",
+        "mqttBroker": "Bróker local",
         "homeHub": "Hogar",
         "mailServer": "Correo",
         "tool": "Herramienta"

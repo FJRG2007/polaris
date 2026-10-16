@@ -29,6 +29,13 @@
  * an account any other path just read (an automation, the button, a press) is
  * not read again until it is due.
  *
+ * An automation is somebody waiting too. An account holding a device that an
+ * enabled automation reads - its trigger, a condition - is read at the watched
+ * pace with no screen open, and so is every account while an automation has a
+ * wait step or a run is waiting (`automationAccounts`). That is the most it
+ * costs: SwitchBot's watched pace is 1,440 calls a day per account, well inside
+ * its 10,000, and a cloud account's is 2,880.
+ *
  * Where a make pushes its changes - Home Assistant, a DIRIGERA hub, a broker -
  * a channel is held open beside the timer (`device-push.ts`), and a change on
  * it reads the account at once instead of at its next turn.
@@ -39,7 +46,10 @@
  * Server-only.
  */
 
+import { prisma } from "@polaris/db";
 import * as push from "./device-push";
+import { devicesReadBy } from "./automation-kinds";
+import { prismaAutomationStore } from "./automation-store";
 import * as accounts from "./device-accounts";
 import { deviceConnection } from "./device-connections";
 
@@ -102,13 +112,21 @@ export function dueAccounts(
     list: readonly Pick<accounts.DeviceAccountView, "id" | "connection" | "lastSyncedAt">[],
     failures: ReadonlyMap<string, { count: number; at: number }>,
     now: number,
-    options: { watched?: boolean; followUps?: ReadonlyMap<string, number> } = {}
+    options: {
+        watched?: boolean;
+        followUps?: ReadonlyMap<string, number>;
+        /** Accounts read at the watched pace whether or not a screen is open:
+         *  the ones an automation is waiting on. */
+        eager?: ReadonlySet<string> | "all";
+    } = {}
 ): { due: string[]; nextInMs: number } {
-    const watched = options.watched ?? true;
+    const anyWatched = options.watched ?? true;
+    const eager = options.eager;
     const due: string[] = [];
     let nextInMs = MAX_BACKOFF_MS;
     for (const account of list) {
         if (!accounts.isConnectable(account.connection)) continue;
+        const watched = anyWatched || eager === "all" || (eager?.has(account.id) ?? false);
         const interval = pollInterval(account.connection, watched);
         const failed = failures.get(account.id);
         const last = Math.max(
@@ -357,7 +375,8 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
         }
         const known = new Set(list.map((account) => account.id));
         for (const id of watch.followUps.keys()) if (!known.has(id)) watch.followUps.delete(id);
-        const options = { watched: watch.viewers > 0, followUps: nextFollowUps(watch) };
+        const eager = await automationAccounts(installedAppId);
+        const options = { watched: watch.viewers > 0, followUps: nextFollowUps(watch), eager };
         const plan = dueAccounts(list, watch.failures, Date.now(), options);
         if (plan.due.length > 0) {
             const since = new Map(
@@ -384,7 +403,8 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
             );
             nextInMs = dueAccounts(after, watch.failures, Date.now(), {
                 watched: watch.viewers > 0,
-                followUps: nextFollowUps(watch)
+                followUps: nextFollowUps(watch),
+                eager
             }).nextInMs;
         } else {
             nextInMs = plan.nextInMs;
@@ -396,6 +416,62 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
         watch.running = false;
     }
     schedule(installedAppId, watch, nextInMs);
+}
+
+/** How long which accounts automations read is trusted before it is asked again. */
+const AUTOMATION_ACCOUNTS_TTL_MS = 60 * SECOND;
+
+const AUTOMATIONS = Symbol.for("polaris.places.devices.automation-accounts");
+
+/**
+ * The accounts an install's automations are waiting on: the ones holding a
+ * device an enabled automation reads, or "all" while one has a wait step or a
+ * run is waiting. Asked once a minute rather than every pass. An answer that
+ * cannot be had is "none", which is the pace there was before this.
+ */
+export async function automationAccounts(
+    installedAppId: string
+): Promise<ReadonlySet<string> | "all"> {
+    const holder = globalThis as unknown as Record<
+        symbol,
+        Map<string, { at: number; value: ReadonlySet<string> | "all" }> | undefined
+    >;
+    const cache = (holder[AUTOMATIONS] ??= new Map());
+    const held = cache.get(installedAppId);
+    if (held && Date.now() - held.at < AUTOMATION_ACCOUNTS_TTL_MS) return held.value;
+    let value: ReadonlySet<string> | "all" = new Set();
+    try {
+        value = await readAutomationAccounts(installedAppId);
+    } catch (error) {
+        console.error("places: which accounts automations read could not be found:", error);
+    }
+    cache.set(installedAppId, { at: Date.now(), value });
+    return value;
+}
+
+async function readAutomationAccounts(
+    installedAppId: string
+): Promise<ReadonlySet<string> | "all"> {
+    const automations = await prismaAutomationStore.enabledAutomations(installedAppId);
+    const deviceIds = new Set<string>();
+    for (const automation of automations) {
+        const read = devicesReadBy(automation.definition);
+        if (read === "all") return "all";
+        for (const id of read) deviceIds.add(id);
+    }
+    const waiting = await prisma.placeAutomationRun.count({
+        where: {
+            status: { in: ["queued", "waiting", "running"] },
+            automation: { installedAppId }
+        }
+    });
+    if (waiting > 0) return "all";
+    if (deviceIds.size === 0) return new Set();
+    const rows = await prisma.placeDevice.findMany({
+        where: { installedAppId, id: { in: [...deviceIds] } },
+        select: { accountId: true }
+    });
+    return new Set(rows.flatMap((row) => (row.accountId ? [row.accountId] : [])));
 }
 
 /** Set the timer, or bring it forward when it would fire later than asked. A
@@ -514,6 +590,9 @@ export function startDeviceCoordinator(): void {
 /** Stop the background reads. Open screens and follow-ups keep their own. */
 export function stopDeviceCoordinator(): void {
     const state = coordinator();
+    (globalThis as unknown as Record<symbol, Map<string, unknown> | undefined>)[
+        AUTOMATIONS
+    ]?.clear();
     if (state.timer) clearInterval(state.timer);
     state.timer = null;
     for (const [installedAppId, watch] of watches()) {

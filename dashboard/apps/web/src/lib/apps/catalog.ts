@@ -25,6 +25,7 @@ import {
     MessagesSquare,
     ScanFace,
     Video,
+    RadioTower,
     Wrench,
     type LucideIcon
 } from "lucide-react";
@@ -40,6 +41,7 @@ export type AppCapability =
     | "game-manager"
     | "game-server"
     | "camera-hub"
+    | "mqtt-broker"
     | "home-hub"
     | "mail-server"
     | "tool";
@@ -1239,6 +1241,41 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             ],
             volumes: [{ name: "config", mountPath: "/config", label: "Relay configuration" }], // i18n-ignore
             ports: [{ container: 1984, protocol: "http", label: "Relay API" }] // i18n-ignore
+        }
+    },
+    {
+        // The broker the locks on this network publish to. Never offered on its
+        // own: Places installs it when somebody links a Nuki account locally,
+        // on this machine, and it is useless without a device pointed at it.
+        // The host port is 1883 because that is the only port a Nuki lock will
+        // dial - its app has no field for another.
+        id: "mqtt-broker",
+        name: "Local device broker",
+        internal: true,
+        ownedBy: "home",
+        category: "Home",
+        icon: RadioTower,
+        summary: "Lets devices on this network report to Polaris the moment they change.",
+        description:
+            "A small message broker on this network. Devices such as Nuki Smart Locks publish every change to it as it happens, so Places hears them at once instead of asking their maker's servers.", // i18n-ignore
+        docsUrl: "https://mosquitto.org/",
+        installMethod: "compose-template",
+        capabilities: ["mqtt-broker"],
+        dashboard: "generic",
+        template: {
+            // Published by CI (.github/workflows/dashboard-publish.yml, `broker`
+            // job) from dashboard/services/mqtt-broker: Mosquitto with one
+            // account, which the stock image has no way to arrive with.
+            image: "ghcr.io/fjrg2007/polaris-mqtt-broker:latest",
+            build: "dashboard/services/mqtt-broker",
+            env: [
+                { key: "BROKER_USERNAME", label: "Device account", default: "polaris" }, // i18n-ignore
+                // Minted at install. Shown on the account screen, because it is
+                // what somebody types into the Nuki app.
+                { key: "BROKER_PASSWORD", label: "Device password", generated: true } // i18n-ignore
+            ],
+            volumes: [{ name: "data", mountPath: "/mosquitto/data", label: "Broker data" }], // i18n-ignore
+            ports: [{ container: 1883, protocol: "tcp", host: 1883, label: "MQTT" }] // i18n-ignore
         }
     },
     {

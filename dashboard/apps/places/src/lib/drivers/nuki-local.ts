@@ -62,7 +62,7 @@ function flag(value: string | undefined): boolean {
 /** One device's topics, as a row. Null for anything on the prefix that is not a
  *  Nuki device with a type - a broker is shared, and something else publishing
  *  under the same prefix is not ours to draw. */
-function toSnapshot(id: string, topics: mqtt.DeviceTopics): DeviceSnapshot | null {
+export function toSnapshot(id: string, topics: mqtt.DeviceTopics): DeviceSnapshot | null {
     const type = whole(topics.deviceType);
     if (type === undefined) return null;
     const kind = nuki.nukiKind(type);

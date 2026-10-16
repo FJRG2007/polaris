@@ -27,12 +27,13 @@
 import * as actions from "../actions";
 import { DeviceDialog } from "./device-dialog";
 import { ConnectDialog, type Connected } from "./connect-dialog";
+import { NukiLocalDialog } from "./nuki-local-dialog";
 import * as kinds from "../../lib/device-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
-import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
+import { BatteryLow, Plus, Radio, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
@@ -111,6 +112,7 @@ export function DevicesView({
     const [editing, setEditing] = useState<DeviceView | null>(null);
     const [opened, setOpened] = useState<DeviceView | null>(null);
     const [disconnecting, setDisconnecting] = useState<DeviceAccountView | null>(null);
+    const [linking, setLinking] = useState<DeviceAccountView | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
@@ -402,6 +404,20 @@ export function DevicesView({
                                   ? t("devicesView.refusing")
                                   : t("devicesView.notAnswering")}
                         </span>
+                        {canManage && account.connection === "nuki-web" && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="size-6 p-0"
+                                aria-label={t("devicesView.connectLocally", {
+                                    name: account.label
+                                })}
+                                title={t("devicesView.connectLocally", { name: account.label })}
+                                onClick={() => setLinking(account)}
+                            >
+                                <Radio className="size-3.5 shrink-0" />
+                            </Button>
+                        )}
                         {canManage && (
                             <Button
                                 size="sm"
@@ -526,6 +542,7 @@ export function DevicesView({
                 }}
             />
 
+            <NukiLocalDialog account={linking} onClose={() => setLinking(null)} />
             <ConfirmDeleteDialog
                 open={disconnecting !== null}
                 onOpenChange={(open) => (open ? undefined : setDisconnecting(null))}
