@@ -31,7 +31,7 @@ import {
     type SortDirection
 } from "@/lib/watch/card-order";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
-import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Skeleton, cn, useToast } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
 import {
     useCallback,
@@ -102,6 +102,7 @@ export function ContainersView({
         (connection) => connection.id === connectionId && connection.local
     );
     const [pending, startTransition] = useTransition();
+    const toast = useToast();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
     // Containers whose removal is in flight. They are already off the table - the
@@ -193,6 +194,7 @@ export function ContainersView({
         startTransition(async () => {
             const result = await containerAction(connectionId!, containerId, action);
             if (result.error) setActionError(result.error);
+            if (result.queued) toast.show({ title: t("queued.title"), body: t("queued.body") });
             refresh();
         });
     }

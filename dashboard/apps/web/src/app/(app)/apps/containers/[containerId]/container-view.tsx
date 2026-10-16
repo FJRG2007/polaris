@@ -43,6 +43,7 @@ import {
     ScrollRow,
     Skeleton,
     TimeSeriesChart,
+    useToast,
     type TimePoint
 } from "@polaris/ui";
 import type {
@@ -126,6 +127,7 @@ export function ContainerView({
     const router = useRouter();
     const [confirm, confirmDialog] = useConfirm();
     const [pending, startTransition] = useTransition();
+    const toast = useToast();
     const [tab, setTab] = useState<ContainerTab>(initialTab);
     const [samples, setSamples] = useState<Sample[]>([]);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -224,6 +226,7 @@ export function ContainerView({
         startTransition(async () => {
             const result = await containerAction(connection.id, containerRef, action);
             if (result.error) setActionError(result.error);
+            if (result.queued) toast.show({ title: t("queued.title"), body: t("queued.body") });
             reloadDetail();
         });
     }

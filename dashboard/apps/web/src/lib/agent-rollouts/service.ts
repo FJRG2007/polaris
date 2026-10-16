@@ -193,6 +193,31 @@ export async function enqueueCommand(input: EnqueueInput, actorId: string | null
     }
 }
 
+/**
+ * Queue a command a sender could not deliver, but only when the server is really
+ * not answering: a server that answers and refuses has said no, and that answer
+ * is the caller's to show. True when it was queued.
+ */
+export async function queueIfOffline(
+    serverId: string,
+    command: queue.CommandSpec,
+    actorId: string
+): Promise<boolean> {
+    const server = await findServer(serverId).catch(() => null);
+    if (!server || (await probe(server)).online) return false;
+    await enqueueCommand({ id: randomUUID(), serverId, expiry: "1d", command }, actorId);
+    return true;
+}
+
+/** The queue's server id for a Containers connection id, or null for a stored
+ *  connection that is not one of Polaris's servers. */
+export function serverOfConnection(connectionId: string): string | null {
+    if (connectionId === LOCAL_SERVER) return LOCAL_SERVER;
+    if (!connectionId.startsWith("host:")) return null;
+    const id = connectionId.slice("host:".length);
+    return queue.serverIdSchema.safeParse(id).success ? id : null;
+}
+
 /** Cancel a command that is still waiting. One already out is not called back. */
 export async function cancelCommand(id: string): Promise<void> {
     const done = await prisma.serverCommand.updateMany({
