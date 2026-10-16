@@ -1854,10 +1854,10 @@
             "time": "A las {time}, {days}",
             "interval": "Cada {every}",
             "manual": "Solo cuando se lanza a mano",
-            "threshold": "{device} pasa {direction, select, above {de} other {por debajo de}} {value}",
+            "threshold": "{device} {direction, select, above {pasa de {value}} below {pasa por debajo de {value}} between {entra en {value} a {upper}} other {sale de {value} a {upper}}}",
             "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {de {from} a {to}} other {pasa a {to}}}} other {{hasFrom, select, yes {deja de estar {from}} other {cambia}}}}",
             "stays": "{device}: {value} durante {span}",
-            "is": "{device} {negate, select, yes {no está} other {está}} {value}",
+            "is": "{device} {negate, select, yes {no está} other {está}} {value}{hasFor, select, yes { durante {span}} other {}}",
             "reading": "{device}: {compare} {value}",
             "between": "Entre las {from} y las {to}",
             "on": "Días: {days}",
@@ -1956,7 +1956,9 @@
             "noControl": "No puedes usar los dispositivos de aquí, así que una automatización que guardes tampoco podría.",
             "noAutoOff": "Ese dispositivo no tiene nada que apagar solo.",
             "setting": "Elige un valor que admita este aparato.",
-            "measure": "Ese dispositivo no informa de eso."
+            "measure": "Ese dispositivo no informa de eso.",
+            "upper": "Indica el tope del rango.",
+            "upperBelow": "Ponlo por encima del inicio."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -2106,7 +2108,11 @@
             "speed": "Velocidad",
             "humidity": "Humedad",
             "worse": "Pasa a peor que",
-            "better": "Pasa a mejor que"
+            "better": "Pasa a mejor que",
+            "between": "Entra en",
+            "outside": "Sale de",
+            "upper": "Hasta",
+            "forMinutes": "Al menos"
         },
         "log": {
             "title": "Qué hizo",
@@ -2152,6 +2158,123 @@
             "lte": "Esta o mejor",
             "eq": "Justo",
             "ne": "No es"
+        },
+        "blocks": {
+            "menu": "Más acciones",
+            "rename": "Renombrar",
+            "addNote": "Añadir nota",
+            "editNote": "Editar nota",
+            "duplicate": "Duplicar",
+            "copy": "Copiar",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "moveUp": "Subir",
+            "moveDown": "Bajar",
+            "disable": "Desactivar",
+            "enable": "Activar",
+            "remove": "Eliminar",
+            "disabled": "Desactivado",
+            "note": "Nota",
+            "closePanel": "Cerrar panel",
+            "resizePanel": "Redimensionar",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "removeNote": "Quitar nota",
+            "undo": "Deshacer",
+            "redo": "Rehacer",
+            "nameLabel": "Nombre que se ve en lugar de la frase",
+            "noteLabel": "Nota sobre este bloque",
+            "noRoom": "Aquí ya no cabe ninguno más.",
+            "renameTitle": {
+                "trigger": "Renombrar disparador",
+                "group": "Renombrar condición",
+                "step": "Renombrar paso"
+            },
+            "noteTitle": {
+                "trigger": "Nota del disparador",
+                "group": "Nota de la condición",
+                "step": "Nota del paso"
+            },
+            "copied": {
+                "trigger": "Disparador copiado",
+                "group": "Condición copiada",
+                "step": "Paso copiado"
+            },
+            "cutDone": {
+                "trigger": "Disparador cortado",
+                "group": "Condición cortada",
+                "step": "Paso cortado"
+            },
+            "pasted": {
+                "trigger": "Disparador pegado",
+                "group": "Condición pegada",
+                "step": "Paso pegado"
+            },
+            "removed": {
+                "trigger": "Disparador borrado",
+                "group": "Condición borrada",
+                "step": "Paso borrado"
+            }
+        },
+        "leave": {
+            "title": "¿Guardar los cambios?",
+            "body": "Has cambiado esta automatización. Guarda los cambios o sal sin ellos.",
+            "newTitle": "¿Guardar la automatización nueva?",
+            "newBody": "Esta automatización aún no está guardada. Guárdala o sal sin crearla.",
+            "save": "Guardar y salir",
+            "discard": "Salir sin guardar",
+            "discardNew": "Salir sin crearla",
+            "stay": "Seguir editando"
+        },
+        "add": {
+            "title": {
+                "trigger": "Añadir disparador",
+                "condition": "Añadir condición",
+                "step": "Nuevo paso"
+            },
+            "search": "Buscar",
+            "byTarget": "Por objetivo",
+            "byType": "Por tipo",
+            "blocks": "Bloques",
+            "back": "Volver",
+            "close": "Cerrar",
+            "noMatch": "Nada coincide con {term}.",
+            "nothingForTarget": "Todavía no se puede añadir nada para este.",
+            "more": "{count} más. Afina la búsqueda para verlos.",
+            "groups": {
+                "devices": "Equipos",
+                "time": "Hora",
+                "other": "Otros"
+            },
+            "paste": {
+                "trigger": "Pegar el disparador copiado",
+                "condition": "Pegar la condición copiada",
+                "step": "Pegar el paso copiado"
+            },
+            "pasteAbout": "El bloque que copiaste o cortaste, añadido al final.",
+            "about": {
+                "trigger": {
+                    "change": "Cuando un dispositivo se enciende, se apaga, se abre, se bloquea o cambia de otra forma.",
+                    "stays": "Cuando un dispositivo lleva un rato en un estado.",
+                    "threshold": "Cuando una lectura cruza una cifra, o entra o sale de un rango.",
+                    "time": "A una hora del día, los días que elijas.",
+                    "interval": "Una y otra vez, cada tantos minutos u horas.",
+                    "manual": "Nunca por sí sola. Solo se ejecuta cuando alguien la inicia."
+                },
+                "condition": {
+                    "device": "Solo mientras un dispositivo está en un estado.",
+                    "reading": "Solo mientras una lectura se compara con una cifra.",
+                    "time": "Solo entre dos horas del día.",
+                    "weekday": "Solo los días de la semana que elijas."
+                },
+                "step": {
+                    "device": "Encender, apagar, bloquear, abrir o ajustar un dispositivo.",
+                    "wait": "Esperar a que un dispositivo esté en un estado, o rendirse tras un rato.",
+                    "delay": "Pausa antes del siguiente paso.",
+                    "notify": "Enviarte una notificación.",
+                    "run": "Iniciar otra automatización de este lugar."
+                }
+            }
         }
     },
     "overview": {

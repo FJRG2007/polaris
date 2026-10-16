@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import * as kinds from "./device-kinds";
-import { automationNodeId, isTimeZone } from "@polaris/core";
+import { automationNodeId, blockBaseShape, isTimeZone } from "@polaris/core";
 import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
@@ -263,11 +263,30 @@ export function settingField(setting: StepSetting): string {
     return "target";
 }
 
+/** A block's own name and note, kept through a save. Places runs every block,
+ *  so the switch that skips one is not taken here yet. */
+const blockBase = { alias: blockBaseShape.alias, note: blockBaseShape.note };
+
+/** How a threshold trigger watches a figure: across a line, or into or out of a range. */
+export const THRESHOLD_DIRECTIONS = ["above", "below", "between", "outside"] as const;
+export type ThresholdDirection = (typeof THRESHOLD_DIRECTIONS)[number];
+
+/** Whether a threshold direction needs a range rather than a line. */
+export function isRange(direction: ThresholdDirection): boolean {
+    return direction === "between" || direction === "outside";
+}
+
 export const triggerSchema = z.discriminatedUnion("kind", [
-    z.object({ id: nodeId, kind: z.literal("time"), at: clock, days }),
-    z.object({ id: nodeId, kind: z.literal("interval"), minutes: count(1, LIMITS.minutes) }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), at: clock, days }),
     z.object({
         id: nodeId,
+        ...blockBase,
+        kind: z.literal("interval"),
+        minutes: count(1, LIMITS.minutes)
+    }),
+    z.object({
+        id: nodeId,
+        ...blockBase,
         kind: z.literal("change"),
         deviceId: deviceRef,
         attribute,
@@ -276,6 +295,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("stays"),
         deviceId: deviceRef,
         attribute,
@@ -286,41 +306,50 @@ export const triggerSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("threshold"),
         deviceId: deviceRef,
-        direction: z.enum(["above", "below"]),
+        /** "between" fires on coming into `value`..`upper`, "outside" on leaving it. */
+        direction: z.enum(THRESHOLD_DIRECTIONS),
         value: amount,
+        /** The top of the range, for "between" and "outside" only. */
+        upper: amount.optional(),
         /** Which of a purifier's figures; absent for a device's one reading. */
         measure: z.enum(READING_MEASURES).optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("manual") })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("manual") })
 ]);
 
 export const conditionSchema = z.discriminatedUnion("kind", [
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
         attribute,
         is: needed,
-        negate: z.boolean()
+        negate: z.boolean(),
+        /** Passes only once the device has been that way for this long. */
+        forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("reading"),
         deviceId: deviceRef,
         op: z.enum(COMPARISONS),
         value: amount,
         measure: z.enum(READING_MEASURES).optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("time"), from: clock, to: clock }),
-    z.object({ id: nodeId, kind: z.literal("weekday"), days })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), from: clock, to: clock }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("weekday"), days })
 ]);
 
 const match = z.enum(["all", "any"]);
 
 export const conditionGroupSchema = z.object({
     id: nodeId,
+    ...blockBase,
     match,
     items: z
         .array(conditionSchema)
@@ -331,6 +360,7 @@ export const conditionGroupSchema = z.object({
 export const actionSchema = z.discriminatedUnion("kind", [
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
         do: z.enum(STEP_DEVICE_ACTIONS, {
@@ -339,9 +369,15 @@ export const actionSchema = z.discriminatedUnion("kind", [
         /** What to set, for the actions that set something. */
         setting: settingSchema.optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("delay"), seconds: count(1, LIMITS.delaySeconds) }),
     z.object({
         id: nodeId,
+        ...blockBase,
+        kind: z.literal("delay"),
+        seconds: count(1, LIMITS.delaySeconds)
+    }),
+    z.object({
+        id: nodeId,
+        ...blockBase,
         kind: z.literal("wait"),
         deviceId: deviceRef,
         attribute,
@@ -351,6 +387,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("notify"),
         message: z
             .string()
@@ -359,6 +396,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         id: nodeId,
+        ...blockBase,
         kind: z.literal("run"),
         automationId: z
             .string({ required_error: "automations.errors.automation" })
@@ -431,7 +469,10 @@ export const definitionSchema = z
             if (trigger.kind === "stays") {
                 checkWord(context, trigger.attribute, trigger.is, [...at, "is"], false);
             }
-            if (trigger.kind === "threshold") checkFigure(context, trigger, at);
+            if (trigger.kind === "threshold") {
+                checkFigure(context, trigger, at);
+                checkRange(context, trigger, at);
+            }
         });
 
         definition.conditions.groups.forEach((group, index) =>
@@ -483,6 +524,32 @@ function checkFigure(
             code: "custom",
             path: [...path, "value"],
             message: "automations.errors.state"
+        });
+    }
+}
+
+/** A range needs its top, above its bottom; a line has none. */
+function checkRange(
+    context: z.RefinementCtx,
+    node: {
+        readonly direction: ThresholdDirection;
+        readonly value: number;
+        readonly upper?: number;
+    },
+    path: (string | number)[]
+): void {
+    if (!isRange(node.direction)) return;
+    if (node.upper === undefined || !Number.isFinite(node.upper)) {
+        context.addIssue({
+            code: "custom",
+            path: [...path, "upper"],
+            message: "automations.errors.upper"
+        });
+    } else if (node.upper <= node.value) {
+        context.addIssue({
+            code: "custom",
+            path: [...path, "upper"],
+            message: "automations.errors.upperBelow"
         });
     }
 }
@@ -914,6 +981,58 @@ export function blankStep(kind: StepKind): Step {
         case "run":
             return { id, kind, automationId: "" };
     }
+}
+
+/** A trigger pointed at `device`, with what it looks at reset to what that device has. */
+export function triggerOn(trigger: Trigger, device: DeviceView): Trigger {
+    if (trigger.kind === "change" || trigger.kind === "stays") {
+        const attribute = attributesFor(device.kind)[0] ?? "state";
+        return trigger.kind === "change"
+            ? { ...trigger, deviceId: device.id, attribute, from: "", to: "" }
+            : { ...trigger, deviceId: device.id, attribute, is: "" };
+    }
+    if (trigger.kind === "threshold") {
+        const { measure: _was, ...rest } = trigger;
+        const measure = measuresFor(device.kind)[0];
+        return { ...rest, deviceId: device.id, ...(measure ? { measure } : {}) };
+    }
+    return trigger;
+}
+
+/** The same for a condition. */
+export function conditionOn(condition: Condition, device: DeviceView): Condition {
+    if (condition.kind === "device") {
+        const attribute = attributesFor(device.kind)[0] ?? "state";
+        return { ...condition, deviceId: device.id, attribute, is: "" };
+    }
+    if (condition.kind === "reading") {
+        const { measure: _was, ...rest } = condition;
+        const measure = measuresFor(device.kind)[0];
+        return { ...rest, deviceId: device.id, ...(measure ? { measure } : {}) };
+    }
+    return condition;
+}
+
+/** The same for a step: an action the device does not offer becomes its first one. */
+export function stepOn(step: Step, device: DeviceView): Step {
+    if (step.kind === "device") {
+        const offered = stepActionsFor(device.kind);
+        const action = offered.includes(step.do) ? step.do : (offered[0] ?? step.do);
+        return {
+            ...step,
+            deviceId: device.id,
+            do: action,
+            setting: blankSetting(action, device.climate, {
+                kind: device.kind,
+                settings: device.air
+            })
+        };
+    }
+    if (step.kind === "wait") {
+        const attribute = attributesFor(device.kind)[0] ?? "state";
+        return { ...step, deviceId: device.id, attribute, is: "" };
+    }
+    return step;
 }
 
 export function blankDefinition(timeZone: string): AutomationDefinition {

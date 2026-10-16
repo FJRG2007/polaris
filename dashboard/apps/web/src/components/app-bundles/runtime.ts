@@ -20,8 +20,12 @@ import * as nextImage from "next/image";
 import * as zoom from "@polaris/ui/zoom";
 import * as automation from "@polaris/ui/automation";
 import * as automationRules from "@polaris/ui/automation-rules";
+import * as automationAdd from "@polaris/ui/automation-add";
 import * as automationGraph from "@polaris/ui/automation-graph";
+import * as automationBlocks from "@polaris/ui/automation-blocks";
+import * as automationHistory from "@polaris/ui/automation-history";
 import * as automationCanvas from "@polaris/ui/automation-canvas";
+import * as automationClipboard from "@polaris/ui/automation-clipboard";
 import * as jsxRuntime from "react/jsx-runtime";
 import * as nextNavigation from "next/navigation";
 import * as hostClient from "@polaris/app-host/client";
@@ -41,6 +45,10 @@ const MODULES: Record<string, object> = {
     "@polaris/ui/automation": automation,
     "@polaris/ui/automation-rules": automationRules,
     "@polaris/ui/automation-graph": automationGraph,
+    "@polaris/ui/automation-blocks": automationBlocks,
+    "@polaris/ui/automation-add": automationAdd,
+    "@polaris/ui/automation-history": automationHistory,
+    "@polaris/ui/automation-clipboard": automationClipboard,
     "@polaris/ui/automation-canvas": automationCanvas,
     "next/image": nextImage,
     "next/link": nextLink,

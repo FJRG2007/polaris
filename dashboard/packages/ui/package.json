@@ -27,6 +27,22 @@
             "types": "./src/automation/graph.ts",
             "import": "./src/automation/graph.ts"
         },
+        "./automation-blocks": {
+            "types": "./src/automation/blocks.tsx",
+            "import": "./src/automation/blocks.tsx"
+        },
+        "./automation-add": {
+            "types": "./src/automation/add-dialog.tsx",
+            "import": "./src/automation/add-dialog.tsx"
+        },
+        "./automation-history": {
+            "types": "./src/automation/history.ts",
+            "import": "./src/automation/history.ts"
+        },
+        "./automation-clipboard": {
+            "types": "./src/automation/clipboard.ts",
+            "import": "./src/automation/clipboard.ts"
+        },
         "./automation-canvas": {
             "types": "./src/automation/canvas.tsx",
             "import": "./src/automation/canvas.tsx"

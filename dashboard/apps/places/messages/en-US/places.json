@@ -1854,10 +1854,10 @@
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
-            "threshold": "{device} goes {direction, select, above {above} other {below}} {value}",
+            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}",
             "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
             "stays": "{device} is {value} for {span}",
-            "is": "{device} {negate, select, yes {is not} other {is}} {value}",
+            "is": "{device} {negate, select, yes {is not} other {is}} {value}{hasFor, select, yes { for {span}} other {}}",
             "reading": "{device}: {compare} {value}",
             "between": "Between {from} and {to}",
             "on": "On {days}",
@@ -1956,7 +1956,9 @@
             "noControl": "You cannot operate the devices here, so an automation you save could not either.",
             "noAutoOff": "That device has nothing to switch off by itself.",
             "setting": "Choose a value this device accepts.",
-            "measure": "That device does not report that."
+            "measure": "That device does not report that.",
+            "upper": "Give the top of the range.",
+            "upperBelow": "Make it higher than the bottom."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -2106,7 +2108,11 @@
             "speed": "Fan speed",
             "humidity": "Humidity",
             "worse": "Gets worse than",
-            "better": "Gets better than"
+            "better": "Gets better than",
+            "between": "Comes into",
+            "outside": "Leaves",
+            "upper": "Up to",
+            "forMinutes": "For at least"
         },
         "log": {
             "title": "What it did",
@@ -2152,6 +2158,123 @@
             "lte": "This or better",
             "eq": "Exactly",
             "ne": "Not"
+        },
+        "blocks": {
+            "menu": "More actions",
+            "rename": "Rename",
+            "addNote": "Add note",
+            "editNote": "Edit note",
+            "duplicate": "Duplicate",
+            "copy": "Copy",
+            "cut": "Cut",
+            "paste": "Paste",
+            "moveUp": "Move up",
+            "moveDown": "Move down",
+            "disable": "Disable",
+            "enable": "Enable",
+            "remove": "Delete",
+            "disabled": "Disabled",
+            "note": "Note",
+            "closePanel": "Close panel",
+            "resizePanel": "Resize panel",
+            "save": "Save",
+            "cancel": "Cancel",
+            "removeNote": "Remove note",
+            "undo": "Undo change",
+            "redo": "Redo change",
+            "nameLabel": "Name shown instead of the sentence",
+            "noteLabel": "Note on this block",
+            "noRoom": "There is no room for another one here.",
+            "renameTitle": {
+                "trigger": "Rename this trigger",
+                "group": "Rename this condition",
+                "step": "Rename this step"
+            },
+            "noteTitle": {
+                "trigger": "Note on the trigger",
+                "group": "Note on the condition",
+                "step": "Note on the step"
+            },
+            "copied": {
+                "trigger": "Trigger copied",
+                "group": "Condition copied",
+                "step": "Step copied"
+            },
+            "cutDone": {
+                "trigger": "Trigger cut out",
+                "group": "Condition cut out",
+                "step": "Step cut out"
+            },
+            "pasted": {
+                "trigger": "Trigger pasted",
+                "group": "Condition pasted",
+                "step": "Step pasted"
+            },
+            "removed": {
+                "trigger": "Trigger deleted",
+                "group": "Condition deleted",
+                "step": "Step deleted"
+            }
+        },
+        "leave": {
+            "title": "Save changes?",
+            "body": "You changed this automation. Save the changes, or leave without them.",
+            "newTitle": "Save the new automation?",
+            "newBody": "This automation is not saved yet. Save it, or leave without making it.",
+            "save": "Save and leave",
+            "discard": "Leave without saving",
+            "discardNew": "Leave without it",
+            "stay": "Keep editing"
+        },
+        "add": {
+            "title": {
+                "trigger": "Add a trigger",
+                "condition": "Add a condition",
+                "step": "Add a step"
+            },
+            "search": "Search",
+            "byTarget": "By target",
+            "byType": "By type",
+            "blocks": "Blocks",
+            "back": "Back",
+            "close": "Close",
+            "noMatch": "Nothing here matches {term}.",
+            "nothingForTarget": "Nothing can be added for this one yet.",
+            "more": "{count} more. Narrow the search to see them.",
+            "groups": {
+                "devices": "Devices",
+                "time": "Time",
+                "other": "Other"
+            },
+            "paste": {
+                "trigger": "Paste the copied trigger",
+                "condition": "Paste the copied condition",
+                "step": "Paste the copied step"
+            },
+            "pasteAbout": "The block you copied or cut, added at the end.",
+            "about": {
+                "trigger": {
+                    "change": "When a device turns on, off, opens, locks or changes in some other way.",
+                    "stays": "When a device has been in a state for a while.",
+                    "threshold": "When a reading crosses a figure, or enters or leaves a range.",
+                    "time": "At a time of day, on the days you choose.",
+                    "interval": "Over and over, every so many minutes or hours.",
+                    "manual": "Never on its own. Runs only when somebody starts it."
+                },
+                "condition": {
+                    "device": "Only while a device is in a given state.",
+                    "reading": "Only while a reading compares to a figure.",
+                    "time": "Only between two times of day.",
+                    "weekday": "Only on the days of the week you choose."
+                },
+                "step": {
+                    "device": "Turn on, off, lock, open or set a device.",
+                    "wait": "Wait until a device is in a state, or give up after a while.",
+                    "delay": "Pause before the next step.",
+                    "notify": "Send a notification to you.",
+                    "run": "Start another automation of this place."
+                }
+            }
         }
     },
     "overview": {

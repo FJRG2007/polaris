@@ -216,7 +216,11 @@ export function describeTrigger(
                 {
                     device: figureOf(device.name, trigger.measure, t),
                     direction: trigger.direction,
-                    value: figureValueText(trigger.measure, trigger.value, t)
+                    value: figureValueText(trigger.measure, trigger.value, t),
+                    upper:
+                        trigger.upper === undefined
+                            ? ""
+                            : figureValueText(trigger.measure, trigger.upper, t)
                 }
             );
         }
@@ -253,7 +257,9 @@ export function describeCondition(
             return t("automations.say.is", {
                 device: device.name,
                 value: valueText(condition.attribute, device.kind, condition.is, t),
-                negate: condition.negate ? "yes" : "no"
+                negate: condition.negate ? "yes" : "no",
+                hasFor: condition.forMinutes ? "yes" : "no",
+                span: condition.forMinutes ? durationText(condition.forMinutes * 60, t) : ""
             });
         }
         case "reading": {
