@@ -17,7 +17,7 @@ import { AppLogo, Badge, cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
-import { AlarmClock, Calculator, Clock, CornerDownLeft, Timer, Watch, X } from "lucide-react";
+import { AlarmClock, Calculator, Clock, Copy, CornerDownLeft, Timer, Watch, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -42,10 +42,14 @@ function Row({
     onHover,
     children,
     label,
-    personId = null
+    personId = null,
+    keepFocus = false
 }: RowProps & {
     children: React.ReactNode;
     label: string;
+    /** The field keeps focus through a press on the row - and a phone keeps its
+     *  keyboard up - when choosing the row means going on typing. */
+    keepFocus?: boolean;
     /** Whose row it is, when the answer is a person. A task, a page or a command
      *  is not somebody and passes nothing. */
     personId?: string | null;
@@ -59,6 +63,7 @@ function Row({
             aria-label={label}
             data-active={selected}
             onMouseMove={onHover}
+            onMouseDown={keepFocus ? (event) => event.preventDefault() : undefined}
             onClick={onSelect}
             className={cn(
                 "flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
@@ -155,15 +160,26 @@ export function clockCommandText(
         : said;
 }
 
-/** The answer to a sum typed into the field; choosing it copies the answer. */
+/** The answer to a sum typed into the field; choosing it puts the answer in the
+ *  field, and its own button copies it. */
 export function CalculationRow({
     expression,
     answer,
     label,
+    copyLabel,
+    copyTitle,
+    onCopy,
     ...row
-}: RowProps & { expression: string; answer: string; label: string }) {
+}: RowProps & {
+    expression: string;
+    answer: string;
+    label: string;
+    copyLabel: string;
+    copyTitle: string;
+    onCopy: () => void;
+}) {
     return (
-        <Row {...row} label={label}>
+        <Row {...row} label={label} keepFocus>
             <Calculator className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold tabular-nums" title={answer}>
@@ -173,6 +189,19 @@ export function CalculationRow({
                     {expression}
                 </span>
             </span>
+            <button
+                type="button"
+                title={copyTitle}
+                aria-label={copyLabel}
+                onClick={(event) => {
+                    // The row's own action is to use the answer, not this.
+                    event.stopPropagation();
+                    onCopy();
+                }}
+                className="-my-2 flex size-10 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+            >
+                <Copy className="size-4" aria-hidden="true" />
+            </button>
             <CornerDownLeft
                 className="size-3.5 shrink-0 text-muted-foreground"
                 aria-hidden="true"

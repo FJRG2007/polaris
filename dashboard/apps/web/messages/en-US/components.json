@@ -176,6 +176,7 @@
         "hintMove": "Up and down to move, Enter to open",
         "hintClear": "Backspace clears the command",
         "hintType": "Type / for commands, @ for people",
+        "hintCalculation": "Enter or Tab to use the result",
         "scopeRow": "Search {scope}",
         "forget": "Remove from recent searches",
         "forgetNamed": "Remove {label} from recent searches",
@@ -259,6 +260,8 @@
         "calculationCopied": "{value} copied to the clipboard",
         "calculationCopyFailed": "The result could not be copied. Try again.",
         "calculationLabel": "Copy {value}",
+        "calculationUse": "Use {value}. Ctrl+C or Cmd+C copies it.",
+        "calculationCopy": "Copy the result",
         "clock": {
             "timer": "Start a {length} timer",
             "alarm": "Set an alarm for {time}",
