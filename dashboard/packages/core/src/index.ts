@@ -174,6 +174,7 @@ export * from "./schemas/account-security.js";
 export * from "./schemas/telemetry.js";
 export * from "./schemas/account-lifecycle.js";
 export * from "./schemas/instance-security.js";
+export * from "./schemas/saml-sso.js";
 export * from "./schemas/mail.js";
 export * from "./schemas/mailbox.js";
 export * from "./schemas/two-factor.js";
