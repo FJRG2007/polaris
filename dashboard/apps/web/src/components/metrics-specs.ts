@@ -128,7 +128,7 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
     // i18n-ignore every label here is said through components.metrics.labels where drawn
     {
         key: "cpu",
-        label: "CPU",
+        label: "CPU", // i18n-ignore
         value: (point) => point.cpuPercent,
         format: percent,
         tone: "primary",
@@ -203,7 +203,7 @@ export const GPU_METRICS: MetricSpec[] = [
     // i18n-ignore every label here is said through components.metrics.labels where drawn
     {
         key: "gpu",
-        label: "GPU",
+        label: "GPU", // i18n-ignore
         value: (point) => point.gpuPercent ?? null,
         format: percent,
         tone: "primary",
