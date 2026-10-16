@@ -716,6 +716,8 @@ export interface DeviceView {
     readonly name: string;
     readonly zone: string;
     readonly placeId: string | null;
+    /** Which of its place's rooms it is in. Null, or absent, for none. */
+    readonly roomId?: string | null;
     readonly model: string;
     readonly firmware: string;
     readonly state: DeviceState;

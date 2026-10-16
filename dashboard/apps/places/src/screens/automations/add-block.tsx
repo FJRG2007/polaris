@@ -10,7 +10,8 @@
 import { Button } from "@polaris/ui";
 import * as fields from "./flow-fields";
 import { usePlacesT } from "../use-places-t";
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { roomsByFloor, type RoomView } from "../../lib/room-kinds";
 import * as kinds from "../../lib/device-kinds";
 import * as auto from "../../lib/automation-kinds";
 import * as purposes from "../../lib/automation-purposes";
@@ -43,6 +44,44 @@ import {
 } from "lucide-react";
 
 export type AddRole = "trigger" | "condition" | "step";
+
+/** The place's rooms, which "By target" groups devices by. The editor provides
+ *  them once rather than through every list a block can be added to. */
+const RoomsContext = createContext<readonly RoomView[]>([]);
+export const RoomsProvider = RoomsContext.Provider;
+
+/**
+ * "By target" groups: a room's devices under the room, floor by floor, then
+ * the devices in no room by what they are. With no rooms, it is only the
+ * second.
+ */
+export function targetGroups<T extends { id: string; kind: string; roomId?: string | null }>(
+    devices: readonly T[],
+    rooms: readonly RoomView[],
+    kindHeading: (device: T) => string,
+    roomHeading: (room: RoomView) => string
+): { id: string; label: string; devices: T[] }[] {
+    const known = new Set(rooms.map((room) => room.id));
+    const inRoom = (device: T) => Boolean(device.roomId && known.has(device.roomId));
+    const byRoom = roomsByFloor(rooms)
+        .flatMap((floor) => floor.rooms)
+        .map((room) => ({
+            id: `room:${room.id}`,
+            label: roomHeading(room),
+            devices: devices.filter((device) => device.roomId === room.id)
+        }))
+        .filter((group) => group.devices.length > 0);
+    const rest = devices.filter((device) => !inRoom(device));
+    const headings = [...new Set(rest.map(kindHeading))];
+    return [
+        ...byRoom,
+        ...headings.map((heading) => ({
+            id: heading,
+            label: heading,
+            devices: rest.filter((device) => kindHeading(device) === heading)
+        }))
+    ];
+}
 
 type GroupId = "devices" | "time" | "other";
 
@@ -167,6 +206,7 @@ export function AddBlockButton({
     onPaste?: () => void;
 }) {
     const t = usePlacesT();
+    const rooms = useContext(RoomsContext);
     const [open, setOpen] = useState(false);
     const vocabulary = VOCABULARY[role];
     const blockItem = (kind: string) => ({
@@ -202,20 +242,26 @@ export function AddBlockButton({
     const reachable = devices.filter(
         (device) => fits(device).length > 0 || purposesFor(device).length > 0
     );
-    const kindGroups = [...new Set(reachable.map((device) => kinds.groupText(device.kind, t)))];
+    const grouped = targetGroups(
+        reachable,
+        rooms,
+        (device) => kinds.groupText(device.kind, t),
+        (room) =>
+            room.floor
+                ? t("automations.add.roomOnFloor", { room: room.name, floor: room.floor })
+                : room.name
+    );
     const targets: AddTargets | undefined =
         reachable.length > 0
             ? {
-                  groups: kindGroups.map((heading) => ({
-                      id: heading,
-                      label: heading,
-                      items: reachable
-                          .filter((device) => kinds.groupText(device.kind, t) === heading)
-                          .map((device) => ({
-                              value: device.id,
-                              label: device.name,
-                              description: device.zone || kinds.kindText(device.kind, t)
-                          }))
+                  groups: grouped.map((group) => ({
+                      id: group.id,
+                      label: group.label,
+                      items: group.devices.map((device) => ({
+                          value: device.id,
+                          label: device.name,
+                          description: device.zone || kinds.kindText(device.kind, t)
+                      }))
                   })),
                   itemsFor: (id) => {
                       const device = reachable.find((each) => each.id === id);

@@ -651,7 +651,9 @@
         "macNotFound": "Nada en esta red responde como {mac}. Comprueba que el dispositivo está encendido y en la misma red que Polaris, o escribe su IP.",
         "brokerQuiet": "El broker local se instaló, pero aún no tiene dirección en esta red",
         "notNuki": "Solo una cuenta de Nuki se puede vincular en local",
-        "noLocalLink": "Esta cuenta de Nuki no tiene enlace local"
+        "noLocalLink": "Esta cuenta de Nuki no tiene enlace local",
+        "roomGone": "Sala inexistente",
+        "roomElsewhere": "Esa sala es de otro sitio"
     },
     "connections": {
         "nuki-web": {
@@ -1695,7 +1697,16 @@
         "noPlace": "Sin decidir",
         "operate": "Manejar desde Polaris",
         "operateHint": "Desactivado conserva el estado y el historial y quita los botones.",
-        "saving": "Guardando"
+        "saving": "Guardando",
+        "room": "Sala",
+        "noRoom": "Sin sala",
+        "newRoom": "Nueva sala",
+        "loadingRooms": "Cargando salas",
+        "roomHint": "Las automatizaciones pueden elegir dispositivos por su sala.",
+        "roomName": "Nombre",
+        "roomNamePlaceholder": "Cocina",
+        "floor": "Planta",
+        "floorPlaceholder": "Planta baja"
     },
     "connect": {
         "reconnectTitle": "Reconectar {name}",
@@ -2301,7 +2312,8 @@
                     "notify": "Enviarte una notificación.",
                     "run": "Iniciar otra automatización de este lugar."
                 }
-            }
+            },
+            "roomOnFloor": "{floor} - {room}"
         },
         "purposes": {
             "trigger": {

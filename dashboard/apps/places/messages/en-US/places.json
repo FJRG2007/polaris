@@ -651,7 +651,9 @@
         "macNotFound": "Nothing on this network answers as {mac}. Check the device is switched on and on the same network as Polaris, or type its IP address instead.",
         "brokerQuiet": "The local broker was installed but has no address on this network yet",
         "notNuki": "Only a Nuki account can be linked locally",
-        "noLocalLink": "This Nuki account has no local link"
+        "noLocalLink": "This Nuki account has no local link",
+        "roomGone": "Room not found",
+        "roomElsewhere": "That room is at another place"
     },
     "connections": {
         "nuki-web": {
@@ -1695,7 +1697,16 @@
         "noPlace": "Not decided yet",
         "operate": "Operate from Polaris",
         "operateHint": "Off leaves the state and the history and takes away the buttons.",
-        "saving": "Saving"
+        "saving": "Saving",
+        "room": "Room",
+        "noRoom": "No room",
+        "newRoom": "New room",
+        "loadingRooms": "Loading rooms",
+        "roomHint": "Automations can pick devices by the room they are in.",
+        "roomName": "Room name",
+        "roomNamePlaceholder": "Kitchen",
+        "floor": "Floor",
+        "floorPlaceholder": "Ground floor"
     },
     "connect": {
         "reconnectTitle": "Reconnect {name}",
@@ -2301,7 +2312,8 @@
                     "notify": "Send a notification to you.",
                     "run": "Start another automation of this place."
                 }
-            }
+            },
+            "roomOnFloor": "{floor} - {room}"
         },
         "purposes": {
             "trigger": {

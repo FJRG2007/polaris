@@ -253,7 +253,14 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
-            devices: id === "auto-set" ? [...DEVICES, device("plug2", "outlet")] : DEVICES,
+            devices:
+                id === "auto-set"
+                    ? [...DEVICES, device("plug2", "outlet", { roomId: "room-1" })]
+                    : DEVICES,
+            rooms:
+                id === "auto-set"
+                    ? [{ id: "room-1", placeId: "place-1", name: "Kitchen", floor: "Ground floor" }]
+                    : [],
             siblings: [{ id: "auto-1", name: "Fixture automation" }]
         }
     }),
@@ -1304,5 +1311,24 @@ describe("a block on a set of devices", () => {
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await painted();
         expect(saved).toHaveLength(0);
+    });
+
+    it("groups the devices of a room under it on By target", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-set"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.click(within(dialog).getByRole("tab", { name: "By target" }));
+        expect(within(dialog).getByText("Ground floor - Kitchen")).toBeDefined();
+        expect(within(dialog).getByRole("button", { name: /^Fixture plug2/ })).toBeDefined();
     });
 });

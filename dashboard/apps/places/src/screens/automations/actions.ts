@@ -18,6 +18,7 @@
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { placesT } from "../../lib/i18n";
+import * as rooms from "../../lib/rooms";
 import * as devices from "../../lib/devices";
 import { requireHome } from "../../lib/access";
 import { guard } from "../../lib/action-guard";
@@ -26,6 +27,7 @@ import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
+import type { RoomView } from "../../lib/room-kinds";
 
 const { recordAudit } = host.auditService;
 const { sessionCan } = host.session;
@@ -66,17 +68,22 @@ export interface EditorContext {
     readonly placeId: string;
     readonly devices: DeviceView[];
     readonly siblings: { readonly id: string; readonly name: string }[];
+    /** The place's rooms, which the add dialog groups devices by. Absent reads
+     *  as none. */
+    readonly rooms?: RoomView[];
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list] = await Promise.all([
+    const [found, list, roomList] = await Promise.all([
         devices.listDevices(installedAppId, placeId),
-        automations.listAutomations(installedAppId, placeId)
+        automations.listAutomations(installedAppId, placeId),
+        rooms.listRooms(installedAppId, placeId)
     ]);
     return {
         placeId,
         devices: found,
-        siblings: list.map((automation) => ({ id: automation.id, name: automation.name }))
+        siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
+        rooms: roomList
     };
 }
 
