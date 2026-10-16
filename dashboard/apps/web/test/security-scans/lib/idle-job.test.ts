@@ -69,7 +69,9 @@ describe("security scans job with nothing configured", () => {
         await tick();
         expect(dialled).toEqual([]);
         expect(writes).toEqual([]);
-        expect(new Set(reads)).toEqual(new Set(["securityScan", "securitySetting", "securityQuarantine"]));
+        expect(new Set(reads)).toEqual(
+            new Set(["securityScan", "securitySetting", "securityQuarantine"])
+        );
     });
 
     it("never lists the servers when no image scan ran on any of them", async () => {

@@ -436,8 +436,7 @@ export async function listInstalledApps(
     const kept = { status: { not: "removed" }, catalogId: { notIn: [...NATIVE_APP_IDS] } };
     const mine = { ownerId, ...kept };
     const rows = await prisma.installedApp.findMany({
-        where:
-            alsoIds.length > 0 ? { OR: [mine, { id: { in: [...alsoIds] }, ...kept }] } : mine,
+        where: alsoIds.length > 0 ? { OR: [mine, { id: { in: [...alsoIds] }, ...kept }] } : mine,
         orderBy: { createdAt: "desc" }
     });
     return rows.map((row) => ({

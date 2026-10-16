@@ -50,7 +50,9 @@ describe("native apps", () => {
     });
 
     it("are not offered, listed or installable in the marketplace", () => {
-        const offered = catalog.appsByCategory().flatMap((group) => group.apps.map((app) => app.id));
+        const offered = catalog
+            .appsByCategory()
+            .flatMap((group) => group.apps.map((app) => app.id));
         const installable = catalog.installableApps().map((app) => app.id);
         for (const id of IDS) {
             const app = catalog.findApp(id);

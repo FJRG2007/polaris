@@ -59,7 +59,8 @@ describe("the Servers sections", () => {
         const pages = {
             "/apps/servers/security":
                 "security-scans/src/routes/apps/servers/security/[[...path]]/page.tsx",
-            "/apps/servers/cloud": "cloud-servers/src/routes/apps/servers/cloud/[[...path]]/page.tsx"
+            "/apps/servers/cloud":
+                "cloud-servers/src/routes/apps/servers/cloud/[[...path]]/page.tsx"
         };
         for (const [href, bundlePage] of Object.entries(pages)) {
             const route = join(process.cwd(), "src/app/(app)", href, "[[...path]]/page.tsx");
