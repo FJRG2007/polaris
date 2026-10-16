@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DeviceView } from "@polaris-app/places/src/lib/device-kinds";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { AutomationView, RunView } from "@polaris-app/places/src/lib/automation-kinds";
+import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 
 const replaced: string[] = [];
 const saved: unknown[] = [];
@@ -219,6 +220,24 @@ async function painted(): Promise<void> {
     });
 }
 
+/** The rows of one stage's list: each row is the button that selects it. */
+function rowsIn(list: string): HTMLElement[] {
+    const found = screen.queryByRole("list", { name: list });
+    if (!found) return [];
+    return within(found)
+        .queryAllByRole("button")
+        .filter((button) => button.hasAttribute("aria-pressed"));
+}
+
+function rowCount(list: string): number {
+    return rowsIn(list).length;
+}
+
+/** Selects a block by its row, which opens its fields in the panel. */
+function openRow(list: string, at = 0): void {
+    fireEvent.click(rowsIn(list)[at]!);
+}
+
 function openMenu(name: string): void {
     fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
 }
@@ -290,6 +309,7 @@ describe("a new automation from the switch-off template", () => {
             />
         );
         await painted();
+        openRow("When");
         fireEvent.change(screen.getByLabelText(/^For/), { target: { value: "0" } });
         expect(
             screen.getByText(
@@ -347,7 +367,7 @@ describe("an empty automation", () => {
         const moves = screen.getAllByRole("button", { name: "Move up" });
         fireEvent.click(moves[moves.length - 1]!);
         // The message is now the first step, so its card carries the number 1.
-        const first = screen.getByLabelText(/Message/).closest("div.rounded-lg") as HTMLElement;
+        const first = screen.getByLabelText(/Message/).closest("aside") as HTMLElement;
         expect(within(first).getByText("1")).toBeDefined();
 
         const removes = screen.getAllByRole("button", { name: "Remove" });
@@ -441,6 +461,7 @@ describe("a step that sets an air conditioner", () => {
             />
         );
         await painted();
+        openRow("Then");
         const target = screen.getByLabelText(/^Temperature/) as HTMLInputElement;
         expect(target.value).toBe("22");
         fireEvent.change(target, { target: { value: "35" } });
@@ -477,13 +498,15 @@ describe("an automation on an air purifier", () => {
             />
         );
         await painted();
+        openRow("When");
         expect(screen.getByRole("combobox", { name: /^Reading/ }).textContent).toContain("PM2.5");
         expect(screen.getByText("µg/m³")).toBeDefined();
+        const value = screen.getByLabelText(/^Value/) as HTMLInputElement;
+        fireEvent.change(value, { target: { value: "50" } });
+        openRow("Then");
         expect(screen.getByRole("combobox", { name: /^Fan speed/ }).textContent).toContain(
             "Speed 2"
         );
-        const value = screen.getByLabelText(/^Value/) as HTMLInputElement;
-        fireEvent.change(value, { target: { value: "50" } });
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await painted();
         const input = saved[0] as { definition: { triggers: unknown[]; actions: unknown[] } };
@@ -501,5 +524,114 @@ describe("an automation on an air purifier", () => {
                 setting: { action: "set-fan", speed: "speed_2" }
             })
         ]);
+    });
+});
+
+describe("the block editor", () => {
+    const editor = (id: string | null, template: string | null = null) => (
+        <AutomationEditor
+            automationId={id}
+            template={template}
+            deviceId={template ? "plug" : null}
+            canManage
+            canControl
+            initialTab="flow"
+        />
+    );
+    const inputOf = (view: AutomationView) => ({
+        name: view.name,
+        enabled: view.enabled,
+        placeId: view.placeId,
+        definition: view.definition
+    });
+
+    it("loads and saves an automation exactly as it was stored, names and notes included", () => {
+        const named = {
+            ...inputOf(SAVED),
+            definition: {
+                ...SAVED.definition,
+                triggers: SAVED.definition.triggers.map((trigger, index) =>
+                    index === 0 ? { ...trigger, alias: "Porch", note: "Only at night" } : trigger
+                ),
+                actions: SAVED.definition.actions.map((step) => ({ ...step, note: "Step note" }))
+            }
+        };
+        for (const input of [inputOf(SAVED), inputOf(CLIMATE_SAVED), inputOf(AIR_SAVED), named])
+            expect(auto.automationInputSchema.parse(auto.normalizeAutomationInput(input))).toEqual(
+                input
+            );
+    });
+
+    it("opens a stored automation with nothing to save", async () => {
+        render(editor("auto-1"));
+        await painted();
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
+        expect(screen.getByRole("button", { name: "Undo" }).hasAttribute("disabled")).toBe(true);
+    });
+
+    it("renames a block from its menu and saves the name with it", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        const menu = within(screen.getByRole("list", { name: "When" })).getAllByRole("button", {
+            name: /^More actions/
+        })[0]!;
+        fireEvent.pointerDown(menu, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Rename" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByLabelText("Name shown instead of the sentence"), {
+            target: { value: "Porch" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+        await painted();
+        expect(rowsIn("When")[0]!.textContent).toContain("Porch");
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as { definition: { triggers: { alias?: string }[] } };
+        expect(input.definition.triggers[0]?.alias).toBe("Porch");
+    });
+
+    it("copies and pastes the selected block, and undoes and redoes with the keyboard", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        const before = rowCount("Then");
+        openRow("Then");
+        fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+        fireEvent.keyDown(window, { key: "v", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(before + 1);
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(before);
+        fireEvent.keyDown(window, { key: "y", ctrlKey: true });
+        await painted();
+        expect(rowCount("Then")).toBe(before + 1);
+    });
+
+    it("deletes a block from its menu, and Undo in the header brings it back", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        const before = rowCount("Then");
+        const menus = within(screen.getByRole("list", { name: "Then" })).getAllByRole("button", {
+            name: /^More actions/
+        });
+        fireEvent.pointerDown(menus[0]!, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /^Delete/ }));
+        await painted();
+        expect(rowCount("Then")).toBe(before - 1);
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        await painted();
+        expect(rowCount("Then")).toBe(before);
+    });
+
+    it("asks before leaving with changes not saved", async () => {
+        render(editor(null, "autoOff"));
+        await painted();
+        fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
+        expect(await screen.findByText("Save the new automation?")).toBeDefined();
+        fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+        await painted();
+        expect(screen.queryByText("Save the new automation?")).toBeNull();
     });
 });

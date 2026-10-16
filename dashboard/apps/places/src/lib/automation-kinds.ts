@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import * as kinds from "./device-kinds";
-import { automationNodeId, isTimeZone } from "@polaris/core";
+import { automationNodeId, blockBaseShape, isTimeZone } from "@polaris/core";
 import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
@@ -263,11 +263,15 @@ export function settingField(setting: StepSetting): string {
     return "target";
 }
 
+/** A block's own name and note, kept through a save. Places runs every block,
+ *  so the switch that skips one is not taken here yet. */
+const blockBase = { alias: blockBaseShape.alias, note: blockBaseShape.note };
+
 export const triggerSchema = z.discriminatedUnion("kind", [
-    z.object({ id: nodeId, kind: z.literal("time"), at: clock, days }),
-    z.object({ id: nodeId, kind: z.literal("interval"), minutes: count(1, LIMITS.minutes) }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), at: clock, days }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("interval"), minutes: count(1, LIMITS.minutes) }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("change"),
         deviceId: deviceRef,
         attribute,
@@ -275,7 +279,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         to: word
     }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("stays"),
         deviceId: deviceRef,
         attribute,
@@ -285,7 +289,7 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         minutes: count(1, LIMITS.minutes, "automations.errors.staysRightAway")
     }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("threshold"),
         deviceId: deviceRef,
         direction: z.enum(["above", "below"]),
@@ -293,12 +297,12 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         /** Which of a purifier's figures; absent for a device's one reading. */
         measure: z.enum(READING_MEASURES).optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("manual") })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("manual") })
 ]);
 
 export const conditionSchema = z.discriminatedUnion("kind", [
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
         attribute,
@@ -306,21 +310,21 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         negate: z.boolean()
     }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("reading"),
         deviceId: deviceRef,
         op: z.enum(COMPARISONS),
         value: amount,
         measure: z.enum(READING_MEASURES).optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("time"), from: clock, to: clock }),
-    z.object({ id: nodeId, kind: z.literal("weekday"), days })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), from: clock, to: clock }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("weekday"), days })
 ]);
 
 const match = z.enum(["all", "any"]);
 
 export const conditionGroupSchema = z.object({
-    id: nodeId,
+    id: nodeId, ...blockBase,
     match,
     items: z
         .array(conditionSchema)
@@ -330,7 +334,7 @@ export const conditionGroupSchema = z.object({
 
 export const actionSchema = z.discriminatedUnion("kind", [
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
         do: z.enum(STEP_DEVICE_ACTIONS, {
@@ -339,9 +343,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         /** What to set, for the actions that set something. */
         setting: settingSchema.optional()
     }),
-    z.object({ id: nodeId, kind: z.literal("delay"), seconds: count(1, LIMITS.delaySeconds) }),
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("delay"), seconds: count(1, LIMITS.delaySeconds) }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("wait"),
         deviceId: deviceRef,
         attribute,
@@ -350,7 +354,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
         onTimeout: z.enum(["stop", "continue"])
     }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("notify"),
         message: z
             .string()
@@ -358,7 +362,7 @@ export const actionSchema = z.discriminatedUnion("kind", [
             .max(LIMITS.message, "automations.errors.tooLong")
     }),
     z.object({
-        id: nodeId,
+        id: nodeId, ...blockBase,
         kind: z.literal("run"),
         automationId: z
             .string({ required_error: "automations.errors.automation" })

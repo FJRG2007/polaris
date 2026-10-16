@@ -16,7 +16,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Filter, Loader2, Play, Zap } from "lucide-react";
+import { ArrowLeft, Filter, Loader2, Play, Redo2, Undo2, Zap } from "lucide-react";
 import {
     Button,
     Input,
@@ -25,8 +25,13 @@ import {
     Skeleton,
     Switch,
     Textarea,
-    cn
+    cn,
+    useToast
 } from "@polaris/ui";
+import * as blocks from "@polaris/ui/automation-blocks";
+import * as clipboard from "@polaris/ui/automation-clipboard";
+import { useDraftHistory } from "@polaris/ui/automation-history";
+import { BLOCK_LIMITS, blockTitle, insertAfter, moveBy, withFreshIds } from "@polaris/core";
 import * as flow from "@polaris/ui/automation";
 import { RunLog } from "./run-log";
 import * as actions from "./actions";
@@ -48,6 +53,78 @@ const { useDisplayFormat } = hostUi.displayFormat;
 export type Draft = auto.AutomationInput;
 
 type Tab = "flow" | "runs";
+
+/** The three lists a block can be in. */
+export type BlockRole = "trigger" | "group" | "step";
+type Block = auto.Trigger | auto.ConditionGroup | auto.Step;
+
+/** Which editor the clipboard is holding a block for. */
+const SURFACE = "places";
+
+/** Where the panel's width is kept, in this browser only. */
+const PANEL_KEY = "polaris.places.automationPanel";
+
+const ROLES: readonly BlockRole[] = ["trigger", "group", "step"];
+
+export function blocksOf(definition: auto.AutomationDefinition, role: BlockRole): readonly Block[] {
+    return role === "trigger"
+        ? definition.triggers
+        : role === "group"
+          ? definition.conditions.groups
+          : definition.actions;
+}
+
+export function withBlocks(
+    definition: auto.AutomationDefinition,
+    role: BlockRole,
+    items: readonly Block[]
+): auto.AutomationDefinition {
+    if (role === "trigger") return { ...definition, triggers: items as auto.Trigger[] };
+    if (role === "group")
+        return {
+            ...definition,
+            conditions: { ...definition.conditions, groups: items as auto.ConditionGroup[] }
+        };
+    return { ...definition, actions: items as auto.Step[] };
+}
+
+const ROOM: Record<BlockRole, number> = {
+    trigger: auto.LIMITS.triggers,
+    group: auto.LIMITS.groups,
+    step: auto.LIMITS.steps
+};
+
+/** Whether something taken off the clipboard is a block of this list at all;
+ *  its fields are then checked like any other edit, under the fields. */
+export function pastable(role: BlockRole, value: unknown): value is Block {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const block = value as { id?: unknown; kind?: unknown; items?: unknown };
+    if (typeof block.id !== "string") return false;
+    if (role === "group") return Array.isArray(block.items);
+    const kinds: readonly string[] = role === "trigger" ? auto.TRIGGER_KINDS : auto.STEP_KINDS;
+    return typeof block.kind === "string" && kinds.includes(block.kind);
+}
+
+/** A block with its name or note set, or taken away when empty - absent rather
+ *  than blank, so a block nobody named saves exactly as it did before. */
+export function withOwnText<B extends Block>(
+    block: B,
+    field: "alias" | "note",
+    value: string | undefined
+): B {
+    const next = { ...block } as B & { alias?: string; note?: string };
+    if (value) next[field] = value;
+    else delete next[field];
+    return next;
+}
+
+function pathOf(role: BlockRole, index: number): (string | number)[] {
+    return role === "trigger"
+        ? ["definition", "triggers", index]
+        : role === "group"
+          ? ["definition", "conditions", "groups", index]
+          : ["definition", "actions", index];
+}
 
 /** Where the reader's choice of layout is kept, in this browser only. */
 const LAYOUT_KEY = "polaris.places.automationLayout";
@@ -146,7 +223,17 @@ export function AutomationEditor({
         runs: auto.RunView[];
         context: actions.EditorContext;
     } | null>(null);
-    const [draft, setDraft] = useState<Draft | null>(null);
+    const history = useDraftHistory<Draft>();
+    const draft = history.value;
+    const toast = useToast();
+    const [selected, setSelected] = useState<{ role: BlockRole; id: string } | null>(null);
+    const [dialog, setDialog] = useState<{
+        kind: "rename" | "note";
+        role: BlockRole;
+        id: string;
+    } | null>(null);
+    // Read again when something is copied, so Paste is offered at once.
+    const [, setClipped] = useState(0);
     const [saved, setSaved] = useState<string>("");
     const [attempted, setAttempted] = useState(false);
     const [serverIssues, setServerIssues] = useState<actions.AutomationFieldIssue[]>([]);
@@ -188,7 +275,7 @@ export function AutomationEditor({
                       t
                   );
             setLoaded({ automation: result.automation ?? null, runs: result.runs ?? [], context });
-            setDraft(next);
+            history.reset(next);
             // A template is a start, not something already saved: it is dirty
             // from the first moment so Save is there to press.
             setSaved(result.automation ? JSON.stringify(auto.normalizeAutomationInput(next)) : "");
@@ -263,26 +350,21 @@ export function AutomationEditor({
         [issues, serverIssues, attempted]
     );
 
-    useEffect(() => {
-        if (!dirty || readOnly) return;
-        const warn = (event: BeforeUnloadEvent) => event.preventDefault();
-        window.addEventListener("beforeunload", warn);
-        return () => window.removeEventListener("beforeunload", warn);
-    }, [dirty, readOnly]);
-
-    const edit = (change: (current: Draft) => Draft) => {
+    const edit = (change: (current: Draft) => Draft, options?: { group?: boolean }) => {
         setServerIssues([]);
         setNotice("");
-        setDraft((current) => (current ? change(current) : current));
+        history.change(change, options);
     };
     const editDefinition = (
-        change: (current: auto.AutomationDefinition) => auto.AutomationDefinition
-    ) => edit((current) => ({ ...current, definition: change(current.definition) }));
+        change: (current: auto.AutomationDefinition) => auto.AutomationDefinition,
+        options?: { group?: boolean }
+    ) => edit((current) => ({ ...current, definition: change(current.definition) }), options);
 
-    const save = async () => {
-        if (!draft || !normalized || readOnly) return;
+    const save = async (): Promise<boolean> => {
+        if (!draft || !normalized || readOnly) return false;
         setAttempted(true);
-        if (issues.length > 0 || !dirty || inFlight.current.save) return;
+        if (!dirty) return issues.length === 0;
+        if (issues.length > 0 || inFlight.current.save) return false;
         inFlight.current.save = true;
         setSaving(true);
         setError("");
@@ -292,11 +374,11 @@ export function AutomationEditor({
         );
         inFlight.current.save = false;
         setSaving(false);
-        if (!result) return;
+        if (!result) return false;
         if (result.issues) setServerIssues(result.issues);
         if (result.error || !result.automation) {
             setError(result.error ?? t("refusals.failed"));
-            return;
+            return false;
         }
         dropAutomationsCache();
         const stored: Draft = {
@@ -305,7 +387,7 @@ export function AutomationEditor({
             placeId: result.automation.placeId,
             definition: result.automation.definition
         };
-        setDraft(stored);
+        history.replace(stored);
         setSaved(JSON.stringify(auto.normalizeAutomationInput(stored)));
         setLoaded((current) =>
             current ? { ...current, automation: result.automation ?? null } : current
@@ -313,6 +395,7 @@ export function AutomationEditor({
         setAttempted(false);
         setNotice(t("automations.editor.saved"));
         if (!automationId) router.replace(`/places/devices/automations/${result.automation.id}`);
+        return true;
     };
 
     const runNow = async () => {
@@ -331,6 +414,155 @@ export function AutomationEditor({
         setTab("runs");
         setRefreshKey((key) => key + 1);
     };
+    const blockStrings: blocks.BlockStrings = {
+        menu: t("automations.blocks.menu"),
+        rename: t("automations.blocks.rename"),
+        addNote: t("automations.blocks.addNote"),
+        editNote: t("automations.blocks.editNote"),
+        duplicate: t("automations.blocks.duplicate"),
+        copy: t("automations.blocks.copy"),
+        cut: t("automations.blocks.cut"),
+        paste: t("automations.blocks.paste"),
+        moveUp: t("automations.blocks.moveUp"),
+        moveDown: t("automations.blocks.moveDown"),
+        disable: t("automations.blocks.disable"),
+        enable: t("automations.blocks.enable"),
+        remove: t("automations.blocks.remove"),
+        disabled: t("automations.blocks.disabled"),
+        note: t("automations.blocks.note"),
+        closePanel: t("automations.blocks.closePanel"),
+        resizePanel: t("automations.blocks.resizePanel"),
+        save: t("automations.blocks.save"),
+        cancel: t("automations.blocks.cancel"),
+        removeNote: t("automations.blocks.removeNote")
+    };
+    const leaveStrings: blocks.LeaveStrings = {
+        title: t("automations.leave.title"),
+        body: t("automations.leave.body"),
+        newTitle: t("automations.leave.newTitle"),
+        newBody: t("automations.leave.newBody"),
+        save: t("automations.leave.save"),
+        discard: t("automations.leave.discard"),
+        discardNew: t("automations.leave.discardNew"),
+        stay: t("automations.leave.stay")
+    };
+
+    /** Change one list of the definition, as a step of its own in the history. */
+    const editBlocks = (role: BlockRole, change: (items: readonly Block[]) => readonly Block[]) =>
+        editDefinition((current) => withBlocks(current, role, change(blocksOf(current, role))), {
+            group: false
+        });
+    const blockAt = (role: BlockRole, index: number): Block | undefined =>
+        draft ? blocksOf(draft.definition, role)[index] : undefined;
+    const roomFor = (role: BlockRole) =>
+        draft !== null && blocksOf(draft.definition, role).length < ROOM[role];
+
+    /** A new block goes at the end of its list and opens, ready to fill in. */
+    const addBlock = (role: BlockRole, block: Block) => {
+        editBlocks(role, (items) => [...items, block]);
+        setSelected({ role, id: block.id });
+    };
+    const duplicateBlock = (role: BlockRole, index: number) => {
+        const block = blockAt(role, index);
+        if (!block || !roomFor(role)) return;
+        const copy = withFreshIds(block, auto.nodeIdOf);
+        editBlocks(role, (items) => insertAfter(items, index, copy));
+        setSelected({ role, id: copy.id });
+    };
+    const removeBlock = (role: BlockRole, index: number, announce = true) => {
+        const block = blockAt(role, index);
+        if (!block) return;
+        editBlocks(role, (items) => items.filter((entry) => entry.id !== block.id));
+        setSelected((current) => (current?.id === block.id ? null : current));
+        if (!announce) return;
+        toast.show({
+            key: "places-automation-removed",
+            title: t(`automations.blocks.removed.${role}`),
+            actions: [
+                {
+                    label: t("automations.blocks.undo"),
+                    run: async () => {
+                        // Put back where it was, unless it is back already.
+                        editBlocks(role, (items) =>
+                            items.some((entry) => entry.id === block.id)
+                                ? items
+                                : insertAfter(items, index - 1, block)
+                        );
+                        return null;
+                    }
+                }
+            ]
+        });
+    };
+    const copyBlock = (role: BlockRole, index: number, cut = false) => {
+        const block = blockAt(role, index);
+        if (!block) return;
+        clipboard.copyBlock({ surface: SURFACE, role, block });
+        setClipped((count) => count + 1);
+        toast.show({
+            key: "places-automation-clipboard",
+            title: t(
+                cut ? `automations.blocks.cutDone.${role}` : `automations.blocks.copied.${role}`
+            )
+        });
+        if (cut) removeBlock(role, index, false);
+    };
+    const pasteBlock = (role: BlockRole, after: number) => {
+        const taken = clipboard.pastedBlock(SURFACE, role);
+        if (!pastable(role, taken)) return;
+        if (!roomFor(role)) {
+            toast.show({
+                key: "places-automation-clipboard",
+                title: t("automations.blocks.noRoom")
+            });
+            return;
+        }
+        const block = withFreshIds(taken, auto.nodeIdOf);
+        editBlocks(role, (items) => insertAfter(items, after, block));
+        setSelected({ role, id: block.id });
+        toast.show({
+            key: "places-automation-clipboard",
+            title: t(`automations.blocks.pasted.${role}`)
+        });
+    };
+    const selectedIndex =
+        selected && draft
+            ? blocksOf(draft.definition, selected.role).findIndex(
+                  (block) => block.id === selected.id
+              )
+            : -1;
+    /** Paste after the selected block when it is the same kind of block, else at
+     *  the end of the list the copied one belongs in. */
+    const pasteHere = () => {
+        if (!draft) return;
+        const role =
+            selected && clipboard.hasBlock(SURFACE, selected.role)
+                ? selected.role
+                : ROLES.find((each) => clipboard.hasBlock(SURFACE, each));
+        if (!role) return;
+        pasteBlock(
+            role,
+            selected?.role === role && selectedIndex >= 0
+                ? selectedIndex
+                : blocksOf(draft.definition, role).length - 1
+        );
+    };
+
+    const leave = blocks.useLeaveGuard(dirty && !readOnly, (href) => router.push(href));
+    const onSelected = (run: (role: BlockRole, index: number) => void) =>
+        selected && selectedIndex >= 0 ? () => run(selected.role, selectedIndex) : undefined;
+    blocks.useEditorKeys(
+        {
+            onSave: () => void save(),
+            onUndo: history.undo,
+            onRedo: history.redo,
+            onCopy: onSelected((role, index) => copyBlock(role, index)),
+            onCut: onSelected((role, index) => copyBlock(role, index, true)),
+            onPaste: pasteHere,
+            onRemove: onSelected((role, index) => removeBlock(role, index))
+        },
+        !readOnly && tab === "flow" && draft !== null && leave.pending === null && dialog === null
+    );
 
     const header = (
         <div className="flex flex-wrap items-center gap-2">
@@ -341,6 +573,32 @@ export function AutomationEditor({
                 </Link>
             </Button>
             <span className="flex-1" />
+            {loaded && tab === "flow" && !readOnly && (
+                <span className="flex items-center">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="size-8 p-0"
+                        aria-label={t("automations.blocks.undo")}
+                        title={t("automations.blocks.undo")}
+                        disabled={!history.canUndo}
+                        onClick={history.undo}
+                    >
+                        <Undo2 className="size-4" />
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="size-8 p-0"
+                        aria-label={t("automations.blocks.redo")}
+                        title={t("automations.blocks.redo")}
+                        disabled={!history.canRedo}
+                        onClick={history.redo}
+                    >
+                        <Redo2 className="size-4" />
+                    </Button>
+                </span>
+            )}
             {loaded && tab === "flow" && (
                 <SegmentedControl<flow.FlowLayout>
                     size="sm"
@@ -400,9 +658,10 @@ export function AutomationEditor({
 
     // One card per node, drawn in the form's column and in the canvas's
     // inspector alike, so both edit with the same fields and the same checks.
-    const triggerCard = (trigger: auto.Trigger, index: number) => (
+    const triggerCard = (trigger: auto.Trigger, index: number, plain = false) => (
         <TriggerCard
             key={trigger.id}
+            plain={plain}
             trigger={trigger}
             path={["definition", "triggers", index]}
             devices={watchedDevices}
@@ -442,9 +701,10 @@ export function AutomationEditor({
         />
     );
 
-    const groupCard = (group: auto.ConditionGroup, groupIndex: number) => (
+    const groupCard = (group: auto.ConditionGroup, groupIndex: number, plain = false) => (
         <ConditionGroupCard
             key={group.id}
+            plain={plain}
             group={group}
             path={["definition", "conditions", "groups", groupIndex]}
             devices={watchedDevices}
@@ -475,9 +735,10 @@ export function AutomationEditor({
         />
     );
 
-    const stepCard = (step: auto.Step, index: number) => (
+    const stepCard = (step: auto.Step, index: number, plain = false) => (
         <StepCard
             key={step.id}
+            plain={plain}
             number={index + 1}
             step={step}
             path={["definition", "actions", index]}
@@ -520,6 +781,188 @@ export function AutomationEditor({
         />
     );
 
+    const ICONS: Record<BlockRole, ReactNode> = {
+        trigger: <Zap />,
+        group: <Filter />,
+        step: <Play />
+    };
+    const sentenceOf = (role: BlockRole, block: Block): string => {
+        if (role === "trigger") return words.describeTrigger(block as auto.Trigger, lookup, t);
+        if (role === "step")
+            return words.describeStep(block as auto.Step, lookup, automationName, t);
+        const first = (block as auto.ConditionGroup).items[0];
+        return first ? words.describeCondition(first, lookup, t) : t("automations.editor.group");
+    };
+    /** A group reads as its first condition, with how the rest join it. */
+    const chipsOf = (role: BlockRole, block: Block): string[] => {
+        if (role !== "group") return [];
+        const group = block as auto.ConditionGroup;
+        if (group.items.length < 2) return [];
+        return [
+            group.match === "all" ? t("automations.editor.allOf") : t("automations.editor.anyOf"),
+            `+${group.items.length - 1}`
+        ];
+    };
+    const actionsFor = (role: BlockRole, index: number): blocks.BlockActions => {
+        const items = blocksOf(definition, role);
+        const block = items[index];
+        const room = items.length < ROOM[role];
+        if (!block) return {};
+        return {
+            onRename: () => setDialog({ kind: "rename", role, id: block.id }),
+            onNote: () => setDialog({ kind: "note", role, id: block.id }),
+            hasNote: Boolean(block.note),
+            onDuplicate: room ? () => duplicateBlock(role, index) : undefined,
+            onCopy: () => copyBlock(role, index),
+            onCut: () => copyBlock(role, index, true),
+            onPaste:
+                room && clipboard.hasBlock(SURFACE, role)
+                    ? () => pasteBlock(role, index)
+                    : undefined,
+            onUp: index > 0 ? () => editBlocks(role, (list) => moveBy(list, index, -1)) : undefined,
+            onDown:
+                index < items.length - 1
+                    ? () => editBlocks(role, (list) => moveBy(list, index, 1))
+                    : undefined,
+            onRemove: () => removeBlock(role, index)
+        };
+    };
+    /** One list as rows that read as sentences; pressing one opens it. */
+    const rowsOf = (role: BlockRole, label: string) => {
+        const items = blocksOf(definition, role);
+        if (items.length === 0) return null;
+        return (
+            <flow.SortableList
+                items={items}
+                label={label}
+                handleLabel={t("automations.canvas.handle")}
+                disabled={readOnly}
+                onMove={(from, to) => editBlocks(role, (list) => flow.moved(list, from, to))}
+            >
+                {(block, index, handle) => {
+                    const title = blockTitle(block, sentenceOf(role, block));
+                    return (
+                        <blocks.BlockRow
+                            handle={handle}
+                            number={role === "step" ? index + 1 : undefined}
+                            icon={ICONS[role]}
+                            title={title}
+                            chips={chipsOf(role, block)}
+                            note={block.note}
+                            selected={selected?.id === block.id}
+                            state={stateOf(pathOf(role, index))}
+                            strings={blockStrings}
+                            menu={
+                                readOnly ? undefined : (
+                                    <blocks.BlockMenu
+                                        strings={blockStrings}
+                                        label={title}
+                                        actions={actionsFor(role, index)}
+                                    />
+                                )
+                            }
+                            onSelect={() =>
+                                setSelected((current) =>
+                                    current?.id === block.id ? null : { role, id: block.id }
+                                )
+                            }
+                            onRemove={readOnly ? undefined : () => removeBlock(role, index)}
+                        />
+                    );
+                }}
+            </flow.SortableList>
+        );
+    };
+
+    const selectedBlock =
+        selected && selectedIndex >= 0
+            ? blocksOf(definition, selected.role)[selectedIndex]
+            : undefined;
+    const selectedTitle =
+        selected && selectedBlock
+            ? blockTitle(selectedBlock, sentenceOf(selected.role, selectedBlock))
+            : "";
+    const panel =
+        selected && selectedBlock ? (
+            <blocks.BlockPanel
+                open
+                title={selectedTitle}
+                icon={ICONS[selected.role]}
+                strings={blockStrings}
+                sizeKey={PANEL_KEY}
+                onClose={() => setSelected(null)}
+                menu={
+                    readOnly ? undefined : (
+                        <blocks.BlockMenu
+                            strings={blockStrings}
+                            label={selectedTitle}
+                            actions={actionsFor(selected.role, selectedIndex)}
+                        />
+                    )
+                }
+            >
+                {selected.role === "trigger"
+                    ? triggerCard(selectedBlock as auto.Trigger, selectedIndex, true)
+                    : selected.role === "group"
+                      ? groupCard(selectedBlock as auto.ConditionGroup, selectedIndex, true)
+                      : stepCard(selectedBlock as auto.Step, selectedIndex, true)}
+                {selectedBlock.note && (
+                    <p className="mt-3 whitespace-pre-wrap break-words border-t border-border pt-3 text-xs text-muted-foreground">
+                        {selectedBlock.note}
+                    </p>
+                )}
+            </blocks.BlockPanel>
+        ) : null;
+
+    const dialogBlock = dialog
+        ? blocksOf(definition, dialog.role).find((block) => block.id === dialog.id)
+        : undefined;
+    const blockDialogs = (
+        <>
+            <blocks.BlockTextDialog
+                open={dialog !== null && dialogBlock !== undefined}
+                title={
+                    dialog
+                        ? t(
+                              dialog.kind === "rename"
+                                  ? `automations.blocks.renameTitle.${dialog.role}`
+                                  : `automations.blocks.noteTitle.${dialog.role}`
+                          )
+                        : ""
+                }
+                label={
+                    dialog?.kind === "note"
+                        ? t("automations.blocks.noteLabel")
+                        : t("automations.blocks.nameLabel")
+                }
+                value={(dialog?.kind === "note" ? dialogBlock?.note : dialogBlock?.alias) ?? ""}
+                maxLength={dialog?.kind === "note" ? BLOCK_LIMITS.note : BLOCK_LIMITS.alias}
+                multiline={dialog?.kind === "note"}
+                strings={blockStrings}
+                onClose={() => setDialog(null)}
+                onSave={(value) => {
+                    if (!dialog) return;
+                    const { role, id, kind } = dialog;
+                    editBlocks(role, (items) =>
+                        items.map((block) =>
+                            block.id === id
+                                ? withOwnText(block, kind === "rename" ? "alias" : "note", value)
+                                : block
+                        )
+                    );
+                }}
+            />
+            <blocks.UnsavedChangesDialog
+                open={leave.pending !== null}
+                isNew={!automationId}
+                strings={leaveStrings}
+                saving={saving}
+                onStay={leave.stay}
+                onDiscard={leave.go}
+                onSave={() => void save().then((ok) => (ok ? leave.go() : leave.stay()))}
+            />
+        </>
+    );
     const groupsMatch = definition.conditions.groups.length > 1 && (
         <flow.MatchPicker
             value={definition.conditions.match}
@@ -688,107 +1131,99 @@ export function AutomationEditor({
                         <p className="text-[0.6875rem] text-foreground-subtle">{footnote}</p>
                     </div>
                 ) : (
-                    <ol className="flex flex-col">
-                        <flow.Stage
-                            icon={<Zap className="size-4" />}
-                            title={t("automations.editor.when")}
-                            hint={t("automations.editor.whenHint")}
-                            issue={attempted ? issueLookup(["definition", "triggers"]) : undefined}
-                        >
-                            {definition.triggers.map(triggerCard)}
-                            {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
-                                <flow.AddMenu
-                                    label={t("automations.editor.addTrigger")}
-                                    options={auto.TRIGGER_KINDS.map((kind) => ({
-                                        value: kind,
-                                        label: words.triggerKindText(kind, t)
-                                    }))}
-                                    onPick={(kind) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            triggers: [
-                                                ...current.triggers,
-                                                auto.blankTrigger(kind as auto.TriggerKind)
-                                            ]
-                                        }))
-                                    }
-                                />
-                            )}
-                        </flow.Stage>
-
-                        <flow.Stage
-                            icon={<Filter className="size-4" />}
-                            title={t("automations.editor.if")}
-                            hint={
-                                definition.conditions.groups.length === 0
-                                    ? t("automations.editor.ifEmpty")
-                                    : t("automations.editor.ifHint")
-                            }
-                        >
-                            {groupsMatch}
-                            {definition.conditions.groups.map(groupCard)}
-                            {!readOnly &&
-                                definition.conditions.groups.length < auto.LIMITS.groups && (
+                    <div className="flex min-w-0 items-start gap-4">
+                        <ol className="flex min-w-0 flex-1 flex-col">
+                            <flow.Stage
+                                icon={<Zap className="size-4" />}
+                                title={t("automations.editor.when")}
+                                hint={t("automations.editor.whenHint")}
+                                issue={
+                                    attempted ? issueLookup(["definition", "triggers"]) : undefined
+                                }
+                            >
+                                {rowsOf("trigger", t("automations.editor.when"))}
+                                {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
                                     <flow.AddMenu
-                                        label={t("automations.editor.addCondition")}
-                                        options={auto.CONDITION_KINDS.map((kind) => ({
+                                        label={t("automations.editor.addTrigger")}
+                                        options={auto.TRIGGER_KINDS.map((kind) => ({
                                             value: kind,
-                                            label: words.conditionKindText(kind, t)
+                                            label: words.triggerKindText(kind, t)
                                         }))}
                                         onPick={(kind) =>
-                                            editDefinition((current) => ({
-                                                ...current,
-                                                conditions: {
-                                                    ...current.conditions,
-                                                    groups: [
-                                                        ...current.conditions.groups,
-                                                        {
-                                                            id: auto.nodeIdOf(),
-                                                            match: "all",
-                                                            items: [
-                                                                auto.blankCondition(
-                                                                    kind as auto.ConditionKind
-                                                                )
-                                                            ]
-                                                        }
-                                                    ]
-                                                }
-                                            }))
+                                            addBlock(
+                                                "trigger",
+                                                auto.blankTrigger(kind as auto.TriggerKind)
+                                            )
                                         }
                                     />
                                 )}
-                        </flow.Stage>
+                            </flow.Stage>
 
-                        <flow.Stage
-                            icon={<Play className="size-4" />}
-                            title={t("automations.editor.then")}
-                            hint={t("automations.editor.thenHint")}
-                            issue={attempted ? issueLookup(["definition", "actions"]) : undefined}
-                            last
-                        >
-                            {definition.actions.map(stepCard)}
-                            {!readOnly && definition.actions.length < auto.LIMITS.steps && (
-                                <flow.AddMenu
-                                    label={t("automations.editor.addStep")}
-                                    options={auto.STEP_KINDS.map((kind) => ({
-                                        value: kind,
-                                        label: words.stepKindText(kind, t)
-                                    }))}
-                                    onPick={(kind) =>
-                                        editDefinition((current) => ({
-                                            ...current,
-                                            actions: [
-                                                ...current.actions,
-                                                auto.blankStep(kind as auto.StepKind)
-                                            ]
-                                        }))
-                                    }
-                                />
-                            )}
-                        </flow.Stage>
-                        <li className="pt-2 text-[0.6875rem] text-foreground-subtle">{footnote}</li>
-                    </ol>
+                            <flow.Stage
+                                icon={<Filter className="size-4" />}
+                                title={t("automations.editor.if")}
+                                hint={
+                                    definition.conditions.groups.length === 0
+                                        ? t("automations.editor.ifEmpty")
+                                        : t("automations.editor.ifHint")
+                                }
+                            >
+                                {groupsMatch}
+                                {rowsOf("group", t("automations.editor.if"))}
+                                {!readOnly &&
+                                    definition.conditions.groups.length < auto.LIMITS.groups && (
+                                        <flow.AddMenu
+                                            label={t("automations.editor.addCondition")}
+                                            options={auto.CONDITION_KINDS.map((kind) => ({
+                                                value: kind,
+                                                label: words.conditionKindText(kind, t)
+                                            }))}
+                                            onPick={(kind) =>
+                                                addBlock("group", {
+                                                    id: auto.nodeIdOf(),
+                                                    match: "all",
+                                                    items: [
+                                                        auto.blankCondition(
+                                                            kind as auto.ConditionKind
+                                                        )
+                                                    ]
+                                                })
+                                            }
+                                        />
+                                    )}
+                            </flow.Stage>
+
+                            <flow.Stage
+                                icon={<Play className="size-4" />}
+                                title={t("automations.editor.then")}
+                                hint={t("automations.editor.thenHint")}
+                                issue={
+                                    attempted ? issueLookup(["definition", "actions"]) : undefined
+                                }
+                                last
+                            >
+                                {rowsOf("step", t("automations.editor.then"))}
+                                {!readOnly && definition.actions.length < auto.LIMITS.steps && (
+                                    <flow.AddMenu
+                                        label={t("automations.editor.addStep")}
+                                        options={auto.STEP_KINDS.map((kind) => ({
+                                            value: kind,
+                                            label: words.stepKindText(kind, t)
+                                        }))}
+                                        onPick={(kind) =>
+                                            addBlock("step", auto.blankStep(kind as auto.StepKind))
+                                        }
+                                    />
+                                )}
+                            </flow.Stage>
+                            <li className="pt-2 text-[0.6875rem] text-foreground-subtle">
+                                {footnote}
+                            </li>
+                        </ol>
+                        {panel}
+                    </div>
                 )}
+                {blockDialogs}
             </div>
         </flow.IssueProvider>
     );
@@ -801,6 +1236,7 @@ function TriggerCard({
     sensors,
     byId,
     disabled,
+    plain,
     onChange,
     onRemove,
     onUp,
@@ -812,6 +1248,7 @@ function TriggerCard({
     sensors: DeviceView[];
     byId: ReadonlyMap<string, DeviceView>;
     disabled: boolean;
+    plain?: boolean;
     onChange: (trigger: auto.Trigger) => void;
     onRemove: () => void;
     onUp?: () => void;
@@ -830,6 +1267,7 @@ function TriggerCard({
     };
     return (
         <flow.NodeCard
+            plain={plain}
             kind={
                 <flow.KindPicker
                     value={trigger.kind}
@@ -1052,6 +1490,7 @@ function ConditionGroupCard({
     sensors,
     byId,
     disabled,
+    plain,
     attempted,
     onChange,
     onRemove
@@ -1062,6 +1501,7 @@ function ConditionGroupCard({
     sensors: DeviceView[];
     byId: ReadonlyMap<string, DeviceView>;
     disabled: boolean;
+    plain?: boolean;
     attempted: boolean;
     onChange: (group: auto.ConditionGroup) => void;
     onRemove: () => void;
@@ -1073,7 +1513,12 @@ function ConditionGroupCard({
             items: group.items.map((entry, at) => (at === index ? item : entry))
         });
     return (
-        <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-2">
+        <div
+            className={cn(
+                "flex flex-col gap-2",
+                !plain && "rounded-lg border border-dashed border-border p-2"
+            )}
+        >
             <div className="flex items-center gap-2">
                 {group.items.length > 1 ? (
                     <flow.MatchPicker
@@ -1345,6 +1790,7 @@ function StepCard({
     byId,
     siblings,
     disabled,
+    plain,
     onChange,
     onRemove,
     onUp,
@@ -1359,6 +1805,7 @@ function StepCard({
     byId: ReadonlyMap<string, DeviceView>;
     siblings: readonly { id: string; name: string }[];
     disabled: boolean;
+    plain?: boolean;
     onChange: (step: auto.Step) => void;
     onRemove: () => void;
     onUp?: () => void;
@@ -1368,6 +1815,7 @@ function StepCard({
     const device = "deviceId" in step ? byId.get(step.deviceId) : undefined;
     return (
         <flow.NodeCard
+            plain={plain}
             number={number}
             kind={
                 <flow.KindPicker

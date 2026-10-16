@@ -2152,6 +2152,73 @@
             "lte": "This or better",
             "eq": "Exactly",
             "ne": "Not"
+        },
+        "blocks": {
+            "menu": "More actions",
+            "rename": "Rename",
+            "addNote": "Add note",
+            "editNote": "Edit note",
+            "duplicate": "Duplicate",
+            "copy": "Copy",
+            "cut": "Cut",
+            "paste": "Paste",
+            "moveUp": "Move up",
+            "moveDown": "Move down",
+            "disable": "Disable",
+            "enable": "Enable",
+            "remove": "Delete",
+            "disabled": "Disabled",
+            "note": "Note",
+            "closePanel": "Close panel",
+            "resizePanel": "Resize panel",
+            "save": "Save",
+            "cancel": "Cancel",
+            "removeNote": "Remove note",
+            "undo": "Undo",
+            "redo": "Redo",
+            "nameLabel": "Name shown instead of the sentence",
+            "noteLabel": "Note on this block",
+            "noRoom": "There is no room for another one here.",
+            "renameTitle": {
+                "trigger": "Rename trigger",
+                "group": "Rename condition",
+                "step": "Rename step"
+            },
+            "noteTitle": {
+                "trigger": "Note on the trigger",
+                "group": "Note on the condition",
+                "step": "Note on the step"
+            },
+            "copied": {
+                "trigger": "Trigger copied",
+                "group": "Condition copied",
+                "step": "Step copied"
+            },
+            "cutDone": {
+                "trigger": "Trigger cut",
+                "group": "Condition cut",
+                "step": "Step cut"
+            },
+            "pasted": {
+                "trigger": "Trigger pasted",
+                "group": "Condition pasted",
+                "step": "Step pasted"
+            },
+            "removed": {
+                "trigger": "Trigger deleted",
+                "group": "Condition deleted",
+                "step": "Step deleted"
+            }
+        },
+        "leave": {
+            "title": "Save changes?",
+            "body": "You changed this automation. Save the changes, or leave without them.",
+            "newTitle": "Save the new automation?",
+            "newBody": "This automation is not saved yet. Save it, or leave without making it.",
+            "save": "Save and leave",
+            "discard": "Leave without saving",
+            "discardNew": "Leave without it",
+            "stay": "Keep editing"
         }
     },
     "overview": {

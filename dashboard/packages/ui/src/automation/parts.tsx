@@ -87,10 +87,13 @@ export function NodeCard({
     upLabel,
     downLabel,
     disabled,
+    plain,
     children
 }: {
     number?: number;
     kind: ReactNode;
+    /** Drawn without its own border, inside a panel that already is one. */
+    plain?: boolean;
     onRemove: () => void;
     onUp?: () => void;
     onDown?: () => void;
@@ -103,7 +106,12 @@ export function NodeCard({
     handle?: ReactNode;
 }) {
     return (
-        <div className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
+        <div
+            className={cn(
+                "relative flex flex-col gap-3",
+                !plain && "rounded-lg border border-border bg-card p-3"
+            )}
+        >
             <div className="flex items-center gap-2">
                 {!disabled && handle}
                 {number !== undefined && (

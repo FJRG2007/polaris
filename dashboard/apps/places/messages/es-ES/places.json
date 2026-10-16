@@ -2152,6 +2152,73 @@
             "lte": "Esta o mejor",
             "eq": "Justo",
             "ne": "No es"
+        },
+        "blocks": {
+            "menu": "Más acciones",
+            "rename": "Renombrar",
+            "addNote": "Añadir nota",
+            "editNote": "Editar nota",
+            "duplicate": "Duplicar",
+            "copy": "Copiar",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "moveUp": "Subir",
+            "moveDown": "Bajar",
+            "disable": "Desactivar",
+            "enable": "Activar",
+            "remove": "Eliminar",
+            "disabled": "Desactivado",
+            "note": "Nota",
+            "closePanel": "Cerrar panel",
+            "resizePanel": "Redimensionar",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "removeNote": "Quitar nota",
+            "undo": "Deshacer",
+            "redo": "Rehacer",
+            "nameLabel": "Nombre que se ve en lugar de la frase",
+            "noteLabel": "Nota sobre este bloque",
+            "noRoom": "Aquí ya no cabe ninguno más.",
+            "renameTitle": {
+                "trigger": "Renombrar disparador",
+                "group": "Renombrar condición",
+                "step": "Renombrar paso"
+            },
+            "noteTitle": {
+                "trigger": "Nota del disparador",
+                "group": "Nota de la condición",
+                "step": "Nota del paso"
+            },
+            "copied": {
+                "trigger": "Disparador copiado",
+                "group": "Condición copiada",
+                "step": "Paso copiado"
+            },
+            "cutDone": {
+                "trigger": "Disparador cortado",
+                "group": "Condición cortada",
+                "step": "Paso cortado"
+            },
+            "pasted": {
+                "trigger": "Disparador pegado",
+                "group": "Condición pegada",
+                "step": "Paso pegado"
+            },
+            "removed": {
+                "trigger": "Disparador eliminado",
+                "group": "Condición eliminada",
+                "step": "Paso eliminado"
+            }
+        },
+        "leave": {
+            "title": "¿Guardar los cambios?",
+            "body": "Has cambiado esta automatización. Guarda los cambios o sal sin ellos.",
+            "newTitle": "¿Guardar la automatización nueva?",
+            "newBody": "Esta automatización aún no está guardada. Guárdala o sal sin crearla.",
+            "save": "Guardar y salir",
+            "discard": "Salir sin guardar",
+            "discardNew": "Salir sin crearla",
+            "stay": "Seguir editando"
         }
     },
     "overview": {
