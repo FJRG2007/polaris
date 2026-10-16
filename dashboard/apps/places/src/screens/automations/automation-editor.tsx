@@ -1444,6 +1444,7 @@ function TriggerCard({
                                 })}
                             </p>
                         )}
+                    <HeldFor node={trigger} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {trigger.kind === "stays" && (
@@ -1565,6 +1566,7 @@ function TriggerCard({
                             onChange={(upper) => onChange({ ...trigger, upper })}
                         />
                     )}
+                    <HeldFor node={trigger} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
         </flow.NodeCard>
@@ -1786,21 +1788,11 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...condition, is })}
                     />
-                    <fields.DurationField
-                        label={t("automations.fields.forMinutes")}
+                    <HeldFor
+                        node={condition}
                         path={path}
-                        field="forMinutes"
-                        stored="minutes"
-                        required={false}
-                        value={condition.forMinutes ?? Number.NaN}
                         disabled={disabled}
-                        onChange={(minutes) => {
-                            const { forMinutes: _was, ...rest } = condition;
-                            // Empty is "as soon as it is so", which is no duration at all.
-                            onChange(
-                                Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes }
-                            );
-                        }}
+                        onChange={onChange}
                     />
                 </>
             )}
@@ -1886,6 +1878,12 @@ function ConditionCard({
                             onChange={(upper) => onChange({ ...condition, upper })}
                         />
                     )}
+                    <HeldFor
+                        node={condition}
+                        path={path}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
                 </>
             )}
             {condition.kind === "time" && (
@@ -2156,5 +2154,36 @@ function StepCard({
                 </flow.Field>
             )}
         </flow.NodeCard>
+    );
+}
+
+/** The optional "for at least" a block can carry: emptied, the block has none
+ *  and happens - or passes - the moment it is so. */
+function HeldFor<T extends { forMinutes?: number }>({
+    node,
+    path,
+    disabled,
+    onChange
+}: {
+    node: T;
+    path: readonly (string | number)[];
+    disabled: boolean;
+    onChange: (node: T) => void;
+}) {
+    const t = usePlacesT();
+    return (
+        <fields.DurationField
+            label={t("automations.fields.forMinutes")}
+            path={path}
+            field="forMinutes"
+            stored="minutes"
+            required={false}
+            value={node.forMinutes ?? Number.NaN}
+            disabled={disabled}
+            onChange={(minutes) => {
+                const { forMinutes: _was, ...rest } = node;
+                onChange((Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes }) as T);
+            }}
+        />
     );
 }

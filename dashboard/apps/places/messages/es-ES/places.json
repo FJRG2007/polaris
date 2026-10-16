@@ -1859,11 +1859,11 @@
             "time": "A las {time}, {days}",
             "interval": "Cada {every}",
             "manual": "Solo cuando se lanza a mano",
-            "threshold": "{device} {direction, select, above {pasa de {value}} below {pasa por debajo de {value}} between {entra en {value} a {upper}} other {sale de {value} a {upper}}}",
-            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {de {from} a {to}} other {pasa a {to}}}} other {{hasFrom, select, yes {deja de estar {from}} other {cambia}}}}",
+            "threshold": "{device} {direction, select, above {pasa de {value}} below {pasa por debajo de {value}} between {entra en {value} a {upper}} other {sale de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {de {from} a {to}} other {pasa a {to}}}} other {{hasFrom, select, yes {deja de estar {from}} other {cambia}}}}{hasFor, select, yes { durante {span}} other {}}",
             "stays": "{device}: {value} durante {span}",
             "is": "{device} {negate, select, yes {no está} other {está}} {value}{hasFor, select, yes { durante {span}} other {}}",
-            "reading": "{device}: {compare} {value}",
+            "reading": "{device}: {compare} {value}{hasFor, select, yes { durante {span}} other {}}",
             "between": "Entre las {from} y las {to}",
             "on": "Días: {days}",
             "act": "{action}: {device}",
@@ -1873,9 +1873,9 @@
             "run": "Lanzar {name}",
             "set": "Poner {device} en {value}",
             "figure": "{measure} de {device}",
-            "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}",
-            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}",
-            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}"
+            "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}{hasFor, select, yes { durante {span}} other {}}",
+            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}{hasFor, select, yes { durante {span}} other {}}",
+            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1883,7 +1883,8 @@
             "time": "A su hora",
             "interval": "En su intervalo",
             "stays": "{device} llevaba {value} {span}",
-            "change": "{device} pasó de {from} a {to}"
+            "change": "{device} pasó de {from} a {to}",
+            "held": "{device} pasó de {from} a {to} y siguió así durante {span}"
         },
         "status": {
             "queued": "En cola",

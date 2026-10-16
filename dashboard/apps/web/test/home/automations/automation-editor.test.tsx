@@ -699,6 +699,22 @@ describe("what a block watches on a device", () => {
         ]);
     });
 
+    it("makes a change wait until it has lasted, and drops the wait when emptied", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "15" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const first = saved[0] as { definition: { triggers: { forMinutes?: number }[] } };
+        expect(first.definition.triggers[0]!.forMinutes).toBe(15);
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const second = saved[1] as { definition: { triggers: object[] } };
+        expect(second.definition.triggers[0]).not.toHaveProperty("forMinutes");
+    });
+
     it("keeps a held-for span typed in hours as whole minutes", async () => {
         render(editor());
         await painted();

@@ -318,7 +318,9 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         deviceId: deviceRef,
         attribute,
         from: word,
-        to: word
+        to: word,
+        /** Fires only once the change has lasted this long, not the moment it happens. */
+        forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({
         id: nodeId,
@@ -342,7 +344,9 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         /** The top of the range, for "between" and "outside" only. */
         upper: amount.optional(),
         /** Which of a purifier's figures; absent for a device's one reading. */
-        measure: z.enum(READING_MEASURES).optional()
+        measure: z.enum(READING_MEASURES).optional(),
+        /** Fires only once the figure has stayed past the line this long. */
+        forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("manual") })
 ]);
@@ -368,7 +372,9 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         value: amount,
         /** The top of the range, for "between" and "outside" only. */
         upper: amount.optional(),
-        measure: z.enum(READING_MEASURES).optional()
+        measure: z.enum(READING_MEASURES).optional(),
+        /** Passes only once the figure has passed the test for this long. */
+        forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), from: clock, to: clock }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("weekday"), days })

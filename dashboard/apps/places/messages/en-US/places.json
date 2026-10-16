@@ -1859,11 +1859,11 @@
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
-            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}",
-            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
+            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}{hasFor, select, yes { for {span}} other {}}",
             "stays": "{device} is {value} for {span}",
             "is": "{device} {negate, select, yes {is not} other {is}} {value}{hasFor, select, yes { for {span}} other {}}",
-            "reading": "{device}: {compare} {value}",
+            "reading": "{device}: {compare} {value}{hasFor, select, yes { for {span}} other {}}",
             "between": "Between {from} and {to}",
             "on": "On {days}",
             "act": "{action}: {device}",
@@ -1873,9 +1873,9 @@
             "run": "Run {name}",
             "set": "Set {device} to {value}",
             "figure": "{measure} of {device}",
-            "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}",
-            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}",
-            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}"
+            "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}{hasFor, select, yes { for {span}} other {}}",
+            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}{hasFor, select, yes { for {span}} other {}}",
+            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1883,7 +1883,8 @@
             "time": "At its time",
             "interval": "On its interval",
             "stays": "{device} was {value} for {span}",
-            "change": "{device} went from {from} to {to}"
+            "change": "{device} went from {from} to {to}",
+            "held": "{device} went from {from} to {to} and stayed so for {span}"
         },
         "status": {
             "queued": "Queued",

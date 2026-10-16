@@ -940,6 +940,30 @@ describe("ranges and held conditions", () => {
         expect(reading({ op: "gt", upper: 2 })).toEqual([]);
     });
 
+    it("takes a change and a crossing that have to last, in whole minutes", () => {
+        const held = (trigger: object) => messages(input({ triggers: [trigger as auto.Trigger] }));
+        const change = {
+            id: "trig01",
+            kind: "change",
+            deviceId: "lock",
+            attribute: "state",
+            from: "",
+            to: "unlocked"
+        };
+        expect(held({ ...change, forMinutes: 10 })).toEqual([]);
+        expect(held({ ...change, forMinutes: 0 }).length).toBeGreaterThan(0);
+        expect(
+            held({
+                id: "trig01",
+                kind: "threshold",
+                deviceId: "temp",
+                direction: "above",
+                value: 25,
+                forMinutes: 5
+            })
+        ).toEqual([]);
+    });
+
     it("takes a held condition in whole minutes", () => {
         const held = (forMinutes: number) =>
             messages(

@@ -101,9 +101,31 @@ export interface Observation {
     /** A purifier's figures by measure - the dust, the humidity, the filter
      *  life - each with when it last changed. Absent for anything else. */
     readonly figures?: Readonly<Record<string, Figure>>;
+    /** What each attribute was before its last change, so a change held for a
+     *  while can still be told apart by where it came from. Absent until the
+     *  first change is seen. */
+    readonly before?: Readonly<Partial<Record<auto.AutomationAttribute, string>>>;
+    /** The values a reading had before its current one, oldest first, by trail
+     *  key (`READING_TRAIL` for the device's one reading, else the measure) -
+     *  what tells how long a figure has been past a line, when the figure moves
+     *  on every sync. At most `TRAIL_POINTS` each. */
+    readonly trails?: Readonly<Record<string, readonly Figure[]>>;
     /** Counts every change, so each one has a name of its own even when two
      *  land in the same millisecond - and so the swap has one field to compare. */
     readonly version: number;
+}
+
+/** The trail key of a device's one reading, beside the measures' own. */
+export const READING_TRAIL = "reading";
+
+/** How many earlier values a trail keeps. A figure that moved more often than
+ *  this inside a "for" is read as held since the oldest one kept - never longer
+ *  than it really was. */
+export const TRAIL_POINTS = 96;
+
+/** A trail with one more point, keeping the newest `TRAIL_POINTS`. */
+function extended(trail: readonly Figure[] | undefined, point: Figure): Figure[] {
+    return [...(trail ?? []), point].slice(-TRAIL_POINTS);
 }
 
 /** One figure as last seen, and since when. */
@@ -404,6 +426,8 @@ export function createEngine(ports: EnginePorts) {
             filter: previous.filter,
             filterSince: previous.filterSince,
             figures: previous.figures ? { ...previous.figures } : undefined,
+            before: { ...(previous.before ?? {}) } as Partial<Record<auto.AutomationAttribute, string>>,
+            trails: { ...(previous.trails ?? {}) } as Record<string, readonly Figure[]>,
             version: previous.version + 1
         };
         const version = next.version;
@@ -416,6 +440,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.state = previous.state;
             next.state = state;
             next.stateSince = now;
         }
@@ -428,6 +453,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.door = previous.door;
             next.door = device.door;
             next.doorSince = now;
         }
@@ -439,6 +465,11 @@ export function createEngine(ports: EnginePorts) {
                 to: device.reading,
                 at: now,
                 version
+            });
+            next.before.reading = previous.reading;
+            next.trails[READING_TRAIL] = extended(previous.trails?.[READING_TRAIL], {
+                value: previous.reading,
+                since: previous.readingSince
             });
             next.reading = device.reading;
             next.readingSince = now;
@@ -454,6 +485,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.mode = previous.mode;
             next.mode = device.mode;
             next.modeSince = now;
         }
@@ -465,6 +497,7 @@ export function createEngine(ports: EnginePorts) {
             if (before && before.value === value) continue;
             next.figures = { ...(next.figures ?? {}), [measure]: { value, since: now } };
             if (!before) continue;
+            next.trails[measure] = extended(previous.trails?.[measure], before);
             changed.push({
                 deviceId: device.id,
                 attribute: "reading",
@@ -486,6 +519,7 @@ export function createEngine(ports: EnginePorts) {
                     version
                 });
             }
+            if (previous.filter) next.before.filter = previous.filter;
             next.filter = device.filter;
             next.filterSince = now;
         }
@@ -533,6 +567,9 @@ export function createEngine(ports: EnginePorts) {
     }
 
     function matchesChange(trigger: auto.Trigger, change: Transition): boolean {
+        // One that has to last is looked at on the clock, once it has.
+        if ((trigger.kind === "change" || trigger.kind === "threshold") && trigger.forMinutes)
+            return false;
         if (trigger.kind === "change") {
             if (trigger.deviceId !== change.deviceId || trigger.attribute !== change.attribute)
                 return false;
@@ -607,6 +644,62 @@ export function createEngine(ports: EnginePorts) {
                 automation,
                 `interval:${trigger.id}:${trigger.minutes}:${slot}`,
                 { kind: "interval", triggerId: trigger.id, minutes: trigger.minutes, at: iso(at) },
+                0
+            );
+            return;
+        }
+        if (trigger.kind === "change" && trigger.forMinutes) {
+            const seen = await store.observation(trigger.deviceId);
+            // No change seen yet is nothing to have lasted.
+            const before = seen?.before?.[trigger.attribute];
+            if (!seen || before === undefined) return;
+            const value = attributeOf(seen, trigger.attribute);
+            if (trigger.from && !same(trigger.from, before)) return;
+            if (trigger.to && !same(trigger.to, value)) return;
+            const since = sinceOf(seen, trigger.attribute);
+            // A change from before it was switched on is not one it saw.
+            if (since.getTime() < armed) return;
+            if (now.getTime() - since.getTime() < trigger.forMinutes * 60 * 1000) return;
+            await fire(
+                automation,
+                `held:${trigger.id}:${trigger.attribute}:${iso(since)}`,
+                {
+                    kind: "change",
+                    triggerId: trigger.id,
+                    deviceId: trigger.deviceId,
+                    attribute: trigger.attribute,
+                    from: before,
+                    to: value,
+                    minutes: trigger.forMinutes,
+                    at: iso(now)
+                },
+                0
+            );
+            return;
+        }
+        if (trigger.kind === "threshold" && trigger.forMinutes) {
+            const seen = await store.observation(trigger.deviceId);
+            if (!seen) return;
+            const points = pointsOf(seen, trigger.measure);
+            const held = heldSince(points, (figure) => beyond(trigger, figure));
+            // Past the line since before anything was seen is no crossing at all.
+            if (!held || !held.crossed || held.since.getTime() < armed) return;
+            if (now.getTime() - held.since.getTime() < trigger.forMinutes * 60 * 1000) return;
+            const from = points[points.length - 1 - held.length];
+            await fire(
+                automation,
+                `held:${trigger.id}:${trigger.measure ?? READING_TRAIL}:${iso(held.since)}`,
+                {
+                    kind: "threshold",
+                    triggerId: trigger.id,
+                    deviceId: trigger.deviceId,
+                    attribute: "reading",
+                    ...(trigger.measure ? { measure: trigger.measure } : {}),
+                    from: from?.value ?? "",
+                    to: points[points.length - 1]?.value ?? "",
+                    minutes: trigger.forMinutes,
+                    at: iso(now)
+                },
                 0
             );
             return;
@@ -974,7 +1067,20 @@ export function createEngine(ports: EnginePorts) {
             const value = numberOf(
                 condition.measure ? (device.figures?.[condition.measure] ?? "") : device.reading
             );
-            return value !== null && compare(value, condition.op, condition.value, condition.upper);
+            const passes =
+                value !== null && compare(value, condition.op, condition.value, condition.upper);
+            if (!passes || !condition.forMinutes) return passes;
+            // Held for long enough: every value since then passed too. A figure
+            // passing since it was first seen counts from then, never before.
+            const seen = await store.observation(condition.deviceId);
+            if (!seen) return false;
+            const held = heldSince(pointsOf(seen, condition.measure), (figure) =>
+                compare(figure, condition.op, condition.value, condition.upper)
+            );
+            return (
+                held !== null &&
+                now.getTime() - held.since.getTime() >= condition.forMinutes * 60 * 1000
+            );
         }
         const clock = wallClock(now, timeZone);
         if (condition.kind === "weekday") {
@@ -1000,6 +1106,50 @@ function sinceOf(seen: Observation, attribute: auto.AutomationAttribute): Date {
     if (attribute === "mode") return seen.modeSince;
     if (attribute === "filter") return seen.filterSince ?? seen.stateSince;
     return seen.stateSince;
+}
+
+/** A reading's values as kept, oldest first, ending with the one it has now. */
+function pointsOf(seen: Observation, measure: auto.ReadingMeasure | undefined): Figure[] {
+    const current = measure
+        ? seen.figures?.[measure]
+        : { value: seen.reading, since: seen.readingSince };
+    if (!current) return [];
+    return [...(seen.trails?.[measure ?? READING_TRAIL] ?? []), current];
+}
+
+/**
+ * Since when every value of a reading has passed `test`, counting back from the
+ * one it has now: null when that one does not. `crossed` is whether a value
+ * that failed was seen before them - the change that made it pass - and
+ * `length` how many kept values passed in a row.
+ */
+export function heldSince(
+    points: readonly Figure[],
+    test: (figure: number) => boolean
+): { since: Date; crossed: boolean; length: number } | null {
+    const passes = (point: Figure) => {
+        const figure = numberOf(point.value);
+        return figure !== null && test(figure);
+    };
+    let index = points.length - 1;
+    if (index < 0 || !passes(points[index]!)) return null;
+    while (index > 0 && passes(points[index - 1]!)) index -= 1;
+    return { since: points[index]!.since, crossed: index > 0, length: points.length - index };
+}
+
+/** Whether a figure is past a threshold's line, or inside ("between") or
+ *  outside ("outside") its range - where a crossing leaves it. */
+export function beyond(
+    threshold: { direction: auto.ThresholdDirection; value: number; upper?: number },
+    figure: number
+): boolean {
+    const { direction, value } = threshold;
+    if (direction === "above") return figure > value;
+    if (direction === "below") return figure < value;
+    const upper = threshold.upper;
+    if (upper === undefined || !(upper > value)) return false;
+    const inside = figure >= value && figure <= upper;
+    return direction === "between" ? inside : !inside;
 }
 
 /**

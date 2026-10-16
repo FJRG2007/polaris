@@ -14,6 +14,7 @@
 import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import * as auto from "./automation-kinds";
+import { TRAIL_POINTS } from "./automation-engine";
 import type {
     AutomationRecord,
     AutomationStore,
@@ -28,16 +29,47 @@ const FILTER_KEY = "@filter";
 
 const storedFigure = z.object({ value: z.string().max(200), since: z.string().datetime() });
 
-/** The figures column, read back: each figure with when it changed, and the
- *  filter's state among them. Anything unreadable is left out. */
+/** Where the values before each attribute's last change are kept, and the
+ *  readings' trails. Not measure names either. */
+const BEFORE_KEY = "@before";
+const TRAIL_KEY = "@trail";
+
+const storedBefore = z.record(z.enum(auto.AUTOMATION_ATTRIBUTES), z.string().max(200));
+const storedTrails = z.record(
+    z.string().max(40),
+    z.array(storedFigure).max(TRAIL_POINTS)
+);
+
+/** The figures column, read back: each figure with when it changed, the
+ *  filter's state, what each attribute was before, and the readings' trails.
+ *  Anything unreadable is left out, so a row written before any of these reads
+ *  as one that has none yet. */
 function figuresOf(
     stored: Prisma.JsonValue
-): Pick<Observation, "figures" | "filter" | "filterSince"> {
+): Pick<Observation, "figures" | "filter" | "filterSince" | "before" | "trails"> {
     const parsed = z.record(z.string(), z.unknown()).safeParse(stored);
     if (!parsed.success) return {};
     const figures: Record<string, Figure> = {};
     let filter: Figure | undefined;
+    let before: Observation["before"];
+    let trails: Record<string, Figure[]> | undefined;
     for (const [key, value] of Object.entries(parsed.data)) {
+        if (key === BEFORE_KEY) {
+            const read = storedBefore.safeParse(value);
+            if (read.success) before = read.data;
+            continue;
+        }
+        if (key === TRAIL_KEY) {
+            const read = storedTrails.safeParse(value);
+            if (read.success)
+                trails = Object.fromEntries(
+                    Object.entries(read.data).map(([name, points]) => [
+                        name,
+                        points.map((point) => ({ value: point.value, since: new Date(point.since) }))
+                    ])
+                );
+            continue;
+        }
         const read = storedFigure.safeParse(value);
         if (!read.success) continue;
         const figure = { value: read.data.value, since: new Date(read.data.since) };
@@ -46,19 +78,30 @@ function figuresOf(
     }
     return {
         ...(Object.keys(figures).length > 0 ? { figures } : {}),
-        ...(filter ? { filter: filter.value, filterSince: filter.since } : {})
+        ...(filter ? { filter: filter.value, filterSince: filter.since } : {}),
+        ...(before && Object.keys(before).length > 0 ? { before } : {}),
+        ...(trails && Object.keys(trails).length > 0 ? { trails } : {})
     };
 }
 
 /** An observation as the row takes it: its figures folded into one column. */
 function rowOf(observation: Observation) {
-    const { figures, filter, filterSince, ...rest } = observation;
-    const stored: Record<string, { value: string; since: string }> = {};
+    const { figures, filter, filterSince, before, trails, ...rest } = observation;
+    const stored: Record<string, unknown> = {};
     for (const [key, figure] of Object.entries(figures ?? {})) {
         stored[key] = { value: figure.value, since: figure.since.toISOString() };
     }
     if (filter)
         stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
+    if (before && Object.keys(before).length > 0) stored[BEFORE_KEY] = before;
+    if (trails && Object.keys(trails).length > 0) {
+        stored[TRAIL_KEY] = Object.fromEntries(
+            Object.entries(trails).map(([name, points]) => [
+                name,
+                points.map((point) => ({ value: point.value, since: point.since.toISOString() }))
+            ])
+        );
+    }
     return { ...rest, figures: stored as Prisma.InputJsonValue };
 }
 
