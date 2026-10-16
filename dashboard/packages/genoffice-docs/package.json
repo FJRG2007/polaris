@@ -30,8 +30,8 @@
         "@polaris/genoffice-ui": "*",
         "@polaris/office-layout": "*",
         "@polaris/project-store": "*",
-        "react": "19.0.0",
-        "react-dom": "19.0.0"
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
     },
     "main": "./dist/App.js",
     "types": "./dist/App.d.ts",
