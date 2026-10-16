@@ -1877,7 +1877,8 @@
             "figure": "{measure} of {device}",
             "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}{hasFor, select, yes { for {span}} other {}}",
             "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}{hasFor, select, yes { for {span}} other {}}",
-            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}"
+            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}",
+            "deviceSet": "{count, plural, one {{first} and one more} other {{first} and # more}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -2122,7 +2123,21 @@
             "outside": "Leaves",
             "upper": "Up to",
             "forMinutes": "For at least",
-            "alreadyThere": "It is {value} now, so this starts it the next time it changes to {value}."
+            "alreadyThere": "It is {value} now, so this starts it the next time it changes to {value}.",
+            "alsoDevice": "And",
+            "addDevice": "Add a device",
+            "removeDevice": "Take this device off",
+            "behaviour": "Fires for",
+            "behaviours": {
+                "each": "Each of them",
+                "first": "The first of them",
+                "all": "All of them together"
+            },
+            "quantifier": "Passes if",
+            "quantifiers": {
+                "any": "Any of them is",
+                "all": "All of them are"
+            }
         },
         "log": {
             "title": "What it did",

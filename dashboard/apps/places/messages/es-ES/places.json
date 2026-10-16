@@ -1877,7 +1877,8 @@
             "figure": "{measure} de {device}",
             "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}{hasFor, select, yes { durante {span}} other {}}",
             "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}{hasFor, select, yes { durante {span}} other {}}",
-            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}"
+            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}",
+            "deviceSet": "{count, plural, one {{first} y uno más} other {{first} y # más}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -2122,7 +2123,21 @@
             "outside": "Sale de",
             "upper": "Hasta",
             "forMinutes": "Al menos",
-            "alreadyThere": "Ahora está en {value}: salta la próxima vez que cambie a {value}."
+            "alreadyThere": "Ahora está en {value}: salta la próxima vez que cambie a {value}.",
+            "alsoDevice": "Y",
+            "addDevice": "Añadir otro",
+            "removeDevice": "Quitar este dispositivo",
+            "behaviour": "Salta con",
+            "behaviours": {
+                "each": "Cada uno",
+                "first": "El primero de ellos",
+                "all": "Todos a la vez"
+            },
+            "quantifier": "Se cumple si",
+            "quantifiers": {
+                "any": "Alguno lo está",
+                "all": "Todos lo están"
+            }
         },
         "log": {
             "title": "Qué hizo",

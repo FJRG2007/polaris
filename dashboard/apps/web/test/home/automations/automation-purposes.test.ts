@@ -134,3 +134,51 @@ describe("purpose blocks", () => {
         expect(auto.attributesFor("outlet")).toContain("battery");
     });
 });
+
+describe("a block's set of devices", () => {
+    it("is its device alone when it has no set, as every stored block is read", () => {
+        expect(auto.deviceTargets({ deviceId: "lamp1" })).toEqual(["lamp1"]);
+    });
+
+    it("keeps its first as its device, once each, and drops the set at one", () => {
+        const trigger = auto.withTargets(
+            { id: "t1", kind: "change", deviceId: "", attribute: "state", from: "", to: "on" },
+            ["lamp2", "lamp1", "lamp2"]
+        );
+        expect(trigger.deviceId).toBe("lamp2");
+        expect(auto.deviceTargets(trigger)).toEqual(["lamp2", "lamp1"]);
+        expect("targets" in auto.withTargets(trigger, ["lamp1"])).toBe(false);
+    });
+
+    it("names a device gone from the set where it is", () => {
+        const issues = auto.deviceIssues(
+            {
+                timeZone: "UTC",
+                triggers: [
+                    {
+                        id: "trigset",
+                        kind: "change",
+                        deviceId: "plug",
+                        targets: [
+                            { kind: "device", id: "plug" },
+                            { kind: "device", id: "gone" }
+                        ],
+                        attribute: "state",
+                        from: "",
+                        to: "on"
+                    }
+                ],
+                conditions: { match: "all", groups: [] },
+                actions: []
+            },
+            [plug],
+            { automationIds: [], selfId: null }
+        );
+        expect(issues).toEqual([
+            {
+                path: ["definition", "triggers", 0, "targets", 1, "id"],
+                message: "automations.errors.deviceGone"
+            }
+        ]);
+    });
+});

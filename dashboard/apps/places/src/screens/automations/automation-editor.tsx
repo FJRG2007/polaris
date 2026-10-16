@@ -186,6 +186,21 @@ function pathKey(path: readonly (string | number)[]): string {
     return path.join(".");
 }
 
+/** A block with its set changed: its devices, and how they count - which goes
+ *  with the set when it is down to one device again. */
+function setOf<T extends auto.Trigger | auto.Condition>(
+    block: T,
+    ids: readonly string[],
+    count: auto.Behaviour | auto.Quantifier | undefined
+): T {
+    if (!("deviceId" in block)) return block;
+    const field = block.kind === "device" || block.kind === "reading" ? "quantifier" : "behaviour";
+    const next = { ...auto.withTargets(block, ids) } as Record<string, unknown>;
+    delete next[field];
+    if (ids.length > 1 && count) next[field] = count;
+    return next as T;
+}
+
 /** A block's own name, note and switch, kept when the Watch picker turns it into
  *  the other kind - picking the temperature is not starting the block over. */
 function baseOf(block: { alias?: string; note?: string; enabled?: boolean }) {
@@ -1388,6 +1403,16 @@ function TriggerCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={pickDevice}
                     />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(trigger)}
+                        devices={devices}
+                        first={device}
+                        role="trigger"
+                        count={trigger.behaviour}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                    />
                     {device && trigger.kind === "change" && (
                         <fields.WatchPicker
                             device={device}
@@ -1502,6 +1527,16 @@ function TriggerCard({
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.triggerOn(trigger, next))}
+                    />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(trigger)}
+                        devices={sensors}
+                        first={device}
+                        role="trigger"
+                        count={trigger.behaviour}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
                     />
                     {device && (
                         <fields.WatchPicker
@@ -1761,6 +1796,16 @@ function ConditionCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(condition)}
+                        devices={devices}
+                        first={device}
+                        role="condition"
+                        count={condition.quantifier}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                    />
                     {device && (
                         <fields.WatchPicker
                             device={device}
@@ -1823,6 +1868,16 @@ function ConditionCard({
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
+                    />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(condition)}
+                        devices={sensors}
+                        first={device}
+                        role="condition"
+                        count={condition.quantifier}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
                     />
                     {device && (
                         <fields.WatchPicker

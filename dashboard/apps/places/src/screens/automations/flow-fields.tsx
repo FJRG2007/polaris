@@ -14,7 +14,8 @@ import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { Field, useIssue } from "@polaris/ui/automation";
-import { Input, Select, cn, type SelectOption } from "@polaris/ui";
+import { Button, Input, Select, cn, type SelectOption } from "@polaris/ui";
+import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
 /** Which device. A device that is no longer at this place stays named as gone
@@ -68,6 +69,156 @@ export function DevicePicker({
                 )
             }
         </Field>
+    );
+}
+
+/** The devices a set can add to `first`: the same kind of device, so every one
+ *  of them answers what the block asks. */
+export function setCandidates(
+    devices: readonly DeviceView[],
+    first: DeviceView | undefined
+): DeviceView[] {
+    if (!first) return [];
+    const kind = kinds.deviceKind(first.kind);
+    return devices.filter((device) => kinds.deviceKind(device.kind) === kind);
+}
+
+/**
+ * The rest of a block's devices, after its first: one picker each with a button
+ * to take it off, a button to add another of the same kind, and - once there
+ * are two or more - how the set counts: each, the first or all of them for a
+ * trigger, any or all of them for a condition.
+ */
+export function TargetSetField({
+    ids,
+    devices,
+    first,
+    role,
+    count,
+    onChange,
+    path,
+    disabled
+}: {
+    /** Every device of the block, its first included. */
+    ids: readonly string[];
+    devices: readonly DeviceView[];
+    first: DeviceView | undefined;
+    role: "trigger" | "condition";
+    /** How the set counts, as stored; absent is each, or any. */
+    count: auto.Behaviour | auto.Quantifier | undefined;
+    onChange: (ids: string[], count: auto.Behaviour | auto.Quantifier | undefined) => void;
+    path: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const candidates = setCandidates(devices, first);
+    if (!first || (candidates.length < 2 && ids.length < 2)) return null;
+    const rest = ids.slice(1);
+    const free = candidates.filter((device) => !ids.includes(device.id));
+    const label = (device: DeviceView) =>
+        device.zone ? `${device.name} - ${device.zone}` : device.name;
+    const counts: SelectOption[] =
+        role === "trigger"
+            ? (["each", "first", "all"] as const).map((value) => ({
+                  value,
+                  label: t(`automations.fields.behaviours.${value}`)
+              }))
+            : (["any", "all"] as const).map((value) => ({
+                  value,
+                  label: t(`automations.fields.quantifiers.${value}`)
+              }));
+    return (
+        <>
+            {rest.map((id, index) => {
+                const options: SelectOption[] = candidates
+                    .filter((device) => device.id === id || !ids.includes(device.id))
+                    .map((device) => ({ value: device.id, label: label(device) }));
+                if (!candidates.some((device) => device.id === id)) {
+                    options.unshift({
+                        value: id,
+                        label: t("automations.missingDevice"),
+                        disabled: true
+                    });
+                }
+                return (
+                    <Field
+                        key={id}
+                        label={t("automations.fields.alsoDevice")}
+                        path={[...path, "targets", index + 1, "id"]}
+                    >
+                        {(fieldId, invalid) => (
+                            <div className="flex min-w-0 items-center gap-1">
+                                <Select
+                                    id={fieldId}
+                                    value={id}
+                                    disabled={disabled}
+                                    options={options}
+                                    className={cn(
+                                        "min-w-0 flex-1",
+                                        invalid && "border-danger-edge"
+                                    )}
+                                    onValueChange={(next) =>
+                                        onChange(
+                                            ids.map((entry) => (entry === id ? next : entry)),
+                                            count
+                                        )
+                                    }
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="size-8 shrink-0 p-0"
+                                    aria-label={t("automations.fields.removeDevice")}
+                                    title={t("automations.fields.removeDevice")}
+                                    disabled={disabled}
+                                    onClick={() => {
+                                        const next = ids.filter((entry) => entry !== id);
+                                        onChange(next, next.length > 1 ? count : undefined);
+                                    }}
+                                >
+                                    <X className="size-4" />
+                                </Button>
+                            </div>
+                        )}
+                    </Field>
+                );
+            })}
+            {ids.length > 1 && (
+                <Field
+                    label={t(
+                        role === "trigger"
+                            ? "automations.fields.behaviour"
+                            : "automations.fields.quantifier"
+                    )}
+                    path={[...path, role === "trigger" ? "behaviour" : "quantifier"]}
+                >
+                    {(fieldId) => (
+                        <Select
+                            id={fieldId}
+                            value={count ?? (role === "trigger" ? "each" : "any")}
+                            disabled={disabled}
+                            options={counts}
+                            onValueChange={(next) =>
+                                onChange([...ids], next as auto.Behaviour | auto.Quantifier)
+                            }
+                        />
+                    )}
+                </Field>
+            )}
+            {free.length > 0 && ids.length < auto.LIMITS.targets && (
+                <div className="flex items-end sm:col-span-2">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={disabled}
+                        onClick={() => onChange([...ids, free[0]!.id], count)}
+                    >
+                        <Plus className="size-4" />
+                        {t("automations.fields.addDevice")}
+                    </Button>
+                </div>
+            )}
+        </>
     );
 }
 

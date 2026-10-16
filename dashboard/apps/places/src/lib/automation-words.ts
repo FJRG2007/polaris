@@ -225,6 +225,21 @@ function deviceName(
         : { name: t("automations.missingDevice"), kind: "" };
 }
 
+/** A block's devices by name: the one it has, or its first and how many more. */
+function setName(
+    lookup: DeviceLookup,
+    block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
+    t: PlacesTranslator
+): { name: string; kind: string } {
+    const first = deviceName(lookup, block.deviceId, t);
+    const more = auto.deviceTargets(block).length - 1;
+    if (more < 1) return first;
+    return {
+        name: t("automations.say.deviceSet", { first: first.name, count: more }),
+        kind: first.kind
+    };
+}
+
 export function describeTrigger(
     trigger: auto.Trigger,
     lookup: DeviceLookup,
@@ -238,7 +253,7 @@ export function describeTrigger(
         case "manual":
             return t("automations.say.manual");
         case "threshold": {
-            const device = deviceName(lookup, trigger.deviceId, t);
+            const device = setName(lookup, trigger, t);
             return t(
                 trigger.measure === "quality"
                     ? "automations.say.qualityThreshold"
@@ -256,7 +271,7 @@ export function describeTrigger(
             );
         }
         case "change": {
-            const device = deviceName(lookup, trigger.deviceId, t);
+            const device = setName(lookup, trigger, t);
             return t("automations.say.change", {
                 device: device.name,
                 what: attributeText(trigger.attribute, t),
@@ -268,7 +283,7 @@ export function describeTrigger(
             });
         }
         case "stays": {
-            const device = deviceName(lookup, trigger.deviceId, t);
+            const device = setName(lookup, trigger, t);
             return t("automations.say.stays", {
                 device: device.name,
                 value: valueText(trigger.attribute, device.kind, trigger.is, t),
@@ -285,7 +300,7 @@ export function describeCondition(
 ): string {
     switch (condition.kind) {
         case "device": {
-            const device = deviceName(lookup, condition.deviceId, t);
+            const device = setName(lookup, condition, t);
             return t("automations.say.is", {
                 device: device.name,
                 value: valueText(condition.attribute, device.kind, condition.is, t),
@@ -295,7 +310,7 @@ export function describeCondition(
             });
         }
         case "reading": {
-            const device = deviceName(lookup, condition.deviceId, t);
+            const device = setName(lookup, condition, t);
             const figure = figureOf(device.name, condition.measure, t);
             const value = figureValueText(condition.measure, condition.value, t);
             const held = heldFor(condition.forMinutes, t);

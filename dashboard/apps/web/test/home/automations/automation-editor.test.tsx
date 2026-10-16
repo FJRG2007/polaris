@@ -194,6 +194,26 @@ const MODE_SAVED: AutomationView = {
     }
 };
 
+/** A plug turning on, beside a second plug it could be a set with. */
+const SET_SAVED: AutomationView = {
+    ...SAVED,
+    id: "auto-set",
+    name: "Plugs",
+    definition: {
+        ...SAVED.definition,
+        triggers: [
+            {
+                id: "trig01",
+                kind: "change",
+                deviceId: "plug",
+                attribute: "state",
+                from: "",
+                to: "on"
+            }
+        ]
+    }
+};
+
 const RUNS: RunView[] = [
     {
         id: "run-1",
@@ -225,13 +245,15 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
                   ? MODE_SAVED
                   : id === "auto-air"
                     ? AIR_SAVED
-                    : id
-                      ? SAVED
-                      : undefined,
+                    : id === "auto-set"
+                      ? SET_SAVED
+                      : id
+                        ? SAVED
+                        : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
-            devices: DEVICES,
+            devices: id === "auto-set" ? [...DEVICES, device("plug2", "outlet")] : DEVICES,
             siblings: [{ id: "auto-1", name: "Fixture automation" }]
         }
     }),
@@ -1209,5 +1231,78 @@ describe("the add dialog", () => {
         } finally {
             window.matchMedia = original;
         }
+    });
+});
+
+describe("a block on a set of devices", () => {
+    beforeEach(() => {
+        Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    it("adds another device of the same kind, counts them as asked, and saves the set", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-set"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        openRow("When");
+        expect(screen.queryByRole("combobox", { name: /^Fires for/ })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Add a device" }));
+        await painted();
+        expect(screen.getByRole("combobox", { name: /^And/ }).textContent).toContain(
+            "Fixture plug2"
+        );
+        expect(screen.queryByRole("button", { name: "Add a device" })).toBeNull();
+        fireEvent.click(screen.getByRole("combobox", { name: /^Fires for/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "All of them together" }));
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as { definition: { triggers: unknown[] } };
+        expect(input.definition.triggers).toEqual([
+            {
+                id: "trig01",
+                kind: "change",
+                deviceId: "plug",
+                targets: [
+                    { kind: "device", id: "plug" },
+                    { kind: "device", id: "plug2" }
+                ],
+                behaviour: "all",
+                attribute: "state",
+                from: "",
+                to: "on"
+            }
+        ]);
+    });
+
+    it("is the block as it was once it is one device again", async () => {
+        render(
+            <AutomationEditor
+                automationId="auto-set"
+                template={null}
+                deviceId={null}
+                canManage
+                canControl
+                initialTab="flow"
+            />
+        );
+        await painted();
+        openRow("When");
+        fireEvent.click(screen.getByRole("button", { name: "Add a device" }));
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Take this device off" }));
+        await painted();
+        expect(screen.queryByRole("combobox", { name: /^Fires for/ })).toBeNull();
+        // Back to the block as it was saved, which is nothing to save.
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        expect(saved).toHaveLength(0);
     });
 });
