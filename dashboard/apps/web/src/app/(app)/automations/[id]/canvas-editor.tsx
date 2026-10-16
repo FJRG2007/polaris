@@ -8,7 +8,7 @@
 
 import * as core from "@polaris/core";
 import { ReferenceScope } from "./references";
-import { Pin, PinOff, Trash2, X } from "lucide-react";
+import { Copy, CopyPlus, PanelRight, Pencil, Pin, PinOff, Power, PowerOff, Trash2, X } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
@@ -16,7 +16,23 @@ import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CanvasBoard, NO_SELECTION, type CanvasSelection } from "./canvas-board";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode, type T } from "./node-fields";
 import { nodeTitle } from "../shared";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Select, Switch, Textarea, useToast } from "@polaris/ui";
+import {
+    Button,
+    ContextMenuGroup,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    Input,
+    MenuShortcut,
+    Select,
+    Switch,
+    Textarea,
+    useToast
+} from "@polaris/ui";
 
 type Change = (update: (graph: core.AutomationGraph) => core.AutomationGraph, options?: { group?: boolean }) => void;
 
@@ -65,6 +81,7 @@ export function CanvasEditor({
     const [selection, setSelection] = useState<CanvasSelection>(NO_SELECTION);
     const [panel, setPanel] = useState<string | null>(null);
     const [palette, setPalette] = useState(false);
+    const [renaming, setRenaming] = useState<string | null>(null);
     const placeAt = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const refuse = (code: core.ConnectRefusal) => toast.show({ title: t(`canvas.refusals.${code}`) });
@@ -111,6 +128,105 @@ export function CanvasEditor({
         setSelection(NO_SELECTION);
     };
 
+    const duplicate = () => {
+        const fragment = core.copyFragment(graph, selection.nodes, selection.notes);
+        if (fragment.nodes.length + fragment.notes.length === 0) return;
+        const pasted = core.pasteFragment(graph, fragment, { x: 32, y: 32 }, core.automationNodeId);
+        if (!pasted) return void toast.show({ title: t("canvas.pasteTooMany") });
+        change(() => pasted.graph, { group: false });
+        setSelection({ nodes: new Set(pasted.nodeIds), notes: new Set(pasted.noteIds), edge: null });
+    };
+
+    /** Switch the chosen steps off, or back on when every one of them is already off. Triggers have no switch. */
+    const toggleEnabled = (ids: ReadonlySet<string>) => {
+        const steps = graph.nodes.filter((node) => ids.has(node.id) && core.nodeRole(node.type) !== "trigger");
+        if (steps.length === 0) return;
+        const on = steps.every((node) => node.enabled === false);
+        const touched = new Set(steps.map((node) => node.id));
+        change((current) => ({ ...current, nodes: current.nodes.map((node) => (touched.has(node.id) ? { ...node, enabled: on ? undefined : false } : node)) }), { group: false });
+    };
+
+    /** Pin the last test output, or unpin. With nothing to pin yet, the panel opens where a sample can be written. */
+    const togglePin = (node: core.GraphNode) => {
+        if (!core.canPin(node.type)) return;
+        const sample = samples[node.id];
+        if (node.pinned === undefined && (sample === undefined || sample === null)) {
+            setPanel(node.id);
+            return void toast.show({ title: t("canvas.noSampleToPin") });
+        }
+        const pinned = node.pinned === undefined ? sample : undefined;
+        change((current) => ({ ...current, nodes: current.nodes.map((entry) => (entry.id === node.id ? { ...entry, pinned } : entry)) }), { group: false });
+        toast.show({ title: pinned === undefined ? t("canvas.unpinned") : t("canvas.pinSaved") });
+    };
+
+    const single = () => (selection.nodes.size === 1 ? graph.nodes.find((node) => selection.nodes.has(node.id)) : undefined);
+
+    const nodeMenu = (node: core.GraphNode) => {
+        const ids = selection.nodes.has(node.id) ? selection.nodes : new Set([node.id]);
+        const steps = graph.nodes.filter((entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger");
+        const turnOn = steps.length > 0 && steps.every((entry) => entry.enabled === false);
+        return (
+            <>
+                <ContextMenuGroup>
+                    <ContextMenuItem onSelect={() => setPanel(node.id)}>
+                        <PanelRight aria-hidden="true" />
+                        {t("canvas.menu.open")}
+                        <MenuShortcut keys="Enter" />
+                    </ContextMenuItem>
+                    {!readOnly ? (
+                        <ContextMenuItem onSelect={() => setRenaming(node.id)}>
+                            <Pencil aria-hidden="true" />
+                            {t("canvas.menu.rename")}
+                            <MenuShortcut>F2</MenuShortcut>
+                        </ContextMenuItem>
+                    ) : null}
+                </ContextMenuGroup>
+                {!readOnly ? (
+                    <>
+                        {core.canPin(node.type) ? (
+                            <>
+                                <ContextMenuSeparator />
+                                <ContextMenuGroup>
+                                    <ContextMenuItem onSelect={() => togglePin(node)}>
+                                        {node.pinned !== undefined ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+                                        {node.pinned !== undefined ? t("canvas.unpin") : t("canvas.menu.pin")}
+                                        <MenuShortcut>P</MenuShortcut>
+                                    </ContextMenuItem>
+                                </ContextMenuGroup>
+                            </>
+                        ) : null}
+                        <ContextMenuSeparator />
+                        <ContextMenuGroup>
+                            <ContextMenuItem onSelect={duplicate}>
+                                <CopyPlus aria-hidden="true" />
+                                {t("canvas.menu.duplicate")}
+                                <MenuShortcut keys="Mod+D" />
+                            </ContextMenuItem>
+                            <ContextMenuItem onSelect={() => void copy(false)}>
+                                <Copy aria-hidden="true" />
+                                {t("canvas.menu.copy")}
+                                <MenuShortcut keys="Mod+C" />
+                            </ContextMenuItem>
+                            {steps.length > 0 ? (
+                                <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
+                                    {turnOn ? <Power aria-hidden="true" /> : <PowerOff aria-hidden="true" />}
+                                    {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
+                                    <MenuShortcut>D</MenuShortcut>
+                                </ContextMenuItem>
+                            ) : null}
+                        </ContextMenuGroup>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem variant="danger" onSelect={remove}>
+                            <Trash2 aria-hidden="true" />
+                            {ids.size > 1 ? t("canvas.menu.deleteMany", { count: ids.size }) : t("canvas.menu.delete")}
+                            <MenuShortcut keys="Delete" />
+                        </ContextMenuItem>
+                    </>
+                ) : null}
+            </>
+        );
+    };
+
     const addNode = (type: string) => {
         if (graph.nodes.length >= core.AUTOMATION_LIMITS.nodes) return void toast.show({ title: t("canvas.pasteTooMany") });
         const node = { ...newNode(type), position: { x: Math.round(placeAt.current.x - core.CANVAS_NODE.width / 2), y: Math.round(placeAt.current.y - core.CANVAS_NODE.height / 2) } };
@@ -135,14 +251,11 @@ export function CanvasEditor({
         else if (mod && key === "c") void copy(false);
         else if (mod && key === "x" && !readOnly) void copy(true);
         else if (mod && key === "v" && !readOnly) void paste(center());
-        else if (mod && key === "d" && !readOnly) {
-            const fragment = core.copyFragment(graph, selection.nodes, selection.notes);
-            const pasted = core.pasteFragment(graph, fragment, { x: 32, y: 32 }, core.automationNodeId);
-            if (pasted) {
-                change(() => pasted.graph, { group: false });
-                setSelection({ nodes: new Set(pasted.nodeIds), notes: new Set(pasted.noteIds), edge: null });
-            }
-        } else if ((key === "delete" || key === "backspace") && !readOnly) remove();
+        else if (mod && key === "d" && !readOnly) duplicate();
+        else if (key === "d" && !mod && !event.shiftKey && !readOnly && selection.nodes.size > 0) toggleEnabled(selection.nodes);
+        else if (key === "p" && !mod && !event.shiftKey && !readOnly && single()) togglePin(single()!);
+        else if (key === "f2" && !readOnly && single()) setRenaming(single()!.id);
+        else if ((key === "delete" || key === "backspace") && !readOnly) remove();
         else if (key === "n" && !mod && !readOnly && !event.shiftKey) {
             placeAt.current = center();
             setPalette(true);
@@ -177,6 +290,7 @@ export function CanvasEditor({
                     subtitle={(node) => nodeSubtitle(t, node)}
                     incomplete={(node) => !configValid(node)}
                     states={states}
+                    menu={nodeMenu}
                 />
             </div>
             {panelNode ? (
@@ -209,11 +323,66 @@ export function CanvasEditor({
                     </div>
                 </aside>
             ) : null}
+            <RenameDialog
+                node={renaming ? graph.nodes.find((node) => node.id === renaming) : undefined}
+                onClose={() => setRenaming(null)}
+                onRename={(nodeId, alias) =>
+                    change((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === nodeId ? { ...node, alias } : node)) }), { group: false })
+                }
+            />
             <Palette open={palette} onOpenChange={setPalette} onPick={(type) => {
                 setPalette(false);
                 addNode(type);
             }} />
         </div>
+    );
+}
+
+function RenameDialog({ node, onClose, onRename }: { node: core.GraphNode | undefined; onClose: () => void; onRename: (nodeId: string, alias: string | undefined) => void }) {
+    const t = useTranslations("automations");
+    const [value, setValue] = useState("");
+    const [shownFor, setShownFor] = useState<string | null>(null);
+    if (node && shownFor !== node.id) {
+        setShownFor(node.id);
+        setValue(node.alias ?? "");
+    }
+    const close = () => {
+        setShownFor(null);
+        onClose();
+    };
+    const save = () => {
+        if (!node) return;
+        const alias = value.trim() || undefined;
+        if (alias !== node.alias) onRename(node.id, alias);
+        close();
+    };
+    return (
+        <Dialog open={Boolean(node)} onOpenChange={(open) => !open && close()}>
+            <DialogContent className="max-w-sm">
+                <DialogTitle>{t("canvas.menu.renameTitle")}</DialogTitle>
+                <DialogDescription>{t("canvas.menu.renameHint")}</DialogDescription>
+                <Input
+                    autoFocus
+                    value={value}
+                    maxLength={80}
+                    aria-label={t("canvas.alias")}
+                    placeholder={node ? nodeTitle(t, node.type) : undefined}
+                    onChange={(event) => setValue(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                            event.preventDefault();
+                            save();
+                        }
+                    }}
+                />
+                <DialogFooter>
+                    <Button variant="ghost" onClick={close}>
+                        {t("canvas.cancel")}
+                    </Button>
+                    <Button onClick={save}>{t("canvas.menu.renameSave")}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

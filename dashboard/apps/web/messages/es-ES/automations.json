@@ -292,7 +292,7 @@
     },
     "canvas": {
         "board": "Lienzo del automatismo",
-        "help": "Arrastra el fondo para moverlo y usa la rueda para el zoom. Arrastra de un puerto a un nodo para unirlos. Tab va a un nodo, Intro lo abre, flechas lo mueven, Supr lo quita. N añade un nodo, Mayús+S una nota, Ctrl+C y Ctrl+V copian y pegan, Ctrl+Z deshace, 1 encuadra.",
+        "help": "Arrastra el fondo para moverlo y usa la rueda para el zoom. Arrastra de un puerto a un nodo para unirlos. Tab va a un nodo, Intro lo abre, flechas lo mueven, Supr lo quita, F2 lo renombra, D lo apaga, P lo fija, clic derecho para más. N añade un nodo, Mayús+S una nota, Ctrl+C y Ctrl+V copian y pegan, Ctrl+Z deshace, 1 encuadra.",
         "helpReadOnly": "Arrastra el fondo para moverlo, la rueda o dos dedos para el zoom. Tab va a un nodo e Intro lo muestra.",
         "view": "Vista",
         "viewCanvas": "Lienzo",
@@ -370,7 +370,23 @@
         },
         "alwaysStarts": "El carril Siempre empieza aquí.",
         "alwaysLeave": "Sacar del carril Siempre",
-        "alwaysStartHere": "Empezar aquí el carril Siempre"
+        "alwaysStartHere": "Empezar aquí el carril Siempre",
+        "menu": {
+            "open": "Abrir ajustes",
+            "rename": "Renombrar",
+            "renameTitle": "Renombrar nodo",
+            "renameHint": "Vacío vuelve al nombre propio del nodo.",
+            "renameSave": "Renombrar",
+            "pin": "Fijar datos",
+            "duplicate": "Duplicar",
+            "copy": "Copiar",
+            "disable": "Apagar",
+            "enable": "Encender",
+            "delete": "Eliminar",
+            "deleteMany": "Eliminar {count} nodos"
+        },
+        "noSampleToPin": "Haz antes una prueba o escribe aquí una muestra.",
+        "unpinned": "Muestra soltada"
     },
     "stepStatus": {
         "ready": "Listo",

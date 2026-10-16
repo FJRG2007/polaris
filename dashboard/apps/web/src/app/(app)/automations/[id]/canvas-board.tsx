@@ -20,8 +20,8 @@
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Map as MapIcon, Maximize, Plus, StickyNote, ZoomIn, ZoomOut } from "lucide-react";
-import { Badge, Button, cn, fitBoard, useBoardGestures, zoomViewAt, type BoardView } from "@polaris/ui";
-import { useCallback, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Badge, Button, ContextMenu, ContextMenuContent, ContextMenuTrigger, cn, fitBoard, useBoardGestures, zoomViewAt, type BoardView } from "@polaris/ui";
+import { useCallback, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 const N = core.CANVAS_NODE;
 const LIMITS = { min: 0.2, max: 2 };
@@ -92,6 +92,8 @@ export interface CanvasBoardProps {
     readonly incomplete: (node: core.GraphNode) => boolean;
     /** Each node's step status in the run being shown. */
     readonly states?: Readonly<Record<string, string>>;
+    /** The items of a node's right-click menu; the node is selected first when it was not already. */
+    readonly menu?: (node: core.GraphNode) => ReactNode;
 }
 
 export function CanvasBoard(props: CanvasBoardProps) {
@@ -411,7 +413,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                     const ports = core.nodePorts(node.type);
                     const trigger = core.nodeRole(node.type) === "trigger";
                     const subtitle = props.subtitle(node);
-                    return (
+                    const card = (
                         <div
                             key={node.id}
                             data-canvas-item
@@ -430,6 +432,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                             )}
                             style={{ left: at.x, top: at.y, width: N.width, height: N.height }}
                             onPointerDown={(event) => pressItem(event, "node", node.id)}
+                            onContextMenu={() => !selected && onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null })}
                             onDoubleClick={() => props.onOpen(node.id)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter" || event.key === " ") {
@@ -495,6 +498,14 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 );
                             })}
                         </div>
+                    );
+                    return props.menu ? (
+                        <ContextMenu key={node.id}>
+                            <ContextMenuTrigger asChild>{card}</ContextMenuTrigger>
+                            <ContextMenuContent>{props.menu(raw)}</ContextMenuContent>
+                        </ContextMenu>
+                    ) : (
+                        card
                     );
                 })}
                 {marquee ? (
