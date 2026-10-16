@@ -19,6 +19,8 @@ import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { placesT } from "../../lib/i18n";
 import * as rooms from "../../lib/rooms";
+import * as places from "../../lib/places";
+import type { Coordinate } from "@polaris/core";
 import * as devices from "../../lib/devices";
 import { requireHome } from "../../lib/access";
 import { guard } from "../../lib/action-guard";
@@ -77,21 +79,25 @@ export interface EditorContext {
     readonly rooms?: RoomView[];
     /** The place's floors, a floor with no room on it among them. */
     readonly floors?: FloorView[];
+    /** Where the place is, for the sun blocks' times. Null until set. */
+    readonly location?: Coordinate | null;
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list, roomList, floorList] = await Promise.all([
+    const [found, list, roomList, floorList, place] = await Promise.all([
         devices.listDevices(installedAppId, placeId),
         automations.listAutomations(installedAppId, placeId),
         rooms.listRooms(installedAppId, placeId),
-        rooms.listFloors(installedAppId, placeId)
+        rooms.listFloors(installedAppId, placeId),
+        places.getPlace(installedAppId, placeId)
     ]);
     return {
         placeId,
         devices: found,
         siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
         rooms: roomList,
-        floors: floorList
+        floors: floorList,
+        location: place?.location ?? null
     };
 }
 

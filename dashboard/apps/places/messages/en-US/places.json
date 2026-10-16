@@ -257,7 +257,16 @@
         "description": "A house, an office, a workshop - anywhere with cameras of its own.",
         "kind": "What it is",
         "name": "Name",
-        "namePlaceholder": "The apartment"
+        "namePlaceholder": "The apartment",
+        "location": "Location",
+        "locationHint": "Optional, for sunrise and sunset. Kept to about 1 km.",
+        "latitude": "Latitude",
+        "longitude": "Longitude",
+        "errors": {
+            "latitude": "Use a latitude from -90 to 90.",
+            "longitude": "Use a longitude from -180 to 180.",
+            "both": "Fill in both, or leave both empty."
+        }
     },
     "placeKinds": {
         "house": "Home",
@@ -656,7 +665,8 @@
         "roomElsewhere": "That room is at another place",
         "floorGone": "Floor not found",
         "floorElsewhere": "That floor is at another place",
-        "floorTaken": "A floor with that name is already here"
+        "floorTaken": "A floor with that name is already here",
+        "notOnEarth": "That is not a place on the Earth"
     },
     "connections": {
         "nuki-web": {
@@ -1114,7 +1124,8 @@
         "areaNotSaved": "That area could not be saved.",
         "personNotAdded": "They could not be added.",
         "photoTooLarge": "That photograph is too large.",
-        "nameNotSaved": "That name could not be saved."
+        "nameNotSaved": "That name could not be saved.",
+        "placeLocation": "That location is not valid."
     },
     "settings": {
         "footageBody": "Recordings and the pictures that go with events are written to <em>{storage}</em>. That is set for the whole instance under Uploads, beside where photos and attachments go - one place for one decision. A camera that wants its own disk says so on its own settings.",
@@ -1872,13 +1883,16 @@
             "threshold": "A reading crosses",
             "time": "At a time",
             "interval": "Every so often",
-            "manual": "Only by hand"
+            "manual": "Only by hand",
+            "sun": "The sun"
         },
         "conditions": {
             "device": "A device's state",
             "reading": "A reading is",
             "time": "Between times",
-            "weekday": "On days"
+            "weekday": "On days",
+            "sun": "The sun is",
+            "triggeredBy": "Triggered by"
         },
         "steps": {
             "device": "Operate a device",
@@ -1925,7 +1939,13 @@
             "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}{hasFor, select, yes { for {span}} other {}}",
             "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}{hasFor, select, yes { for {span}} other {}}",
             "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}",
-            "deviceSet": "{count, plural, one {{first} and one more} other {{first} and # more}}"
+            "deviceSet": "{count, plural, one {{first} and one more} other {{first} and # more}}",
+            "sun": "{hasOffset, select, yes {{offset} {direction, select, before {before} other {after}} } other {At }}{event, select, dawn {dawn} sunrise {sunrise} sunset {sunset} other {dusk}}",
+            "sunEdge": "{hasOffset, select, yes {{offset} {direction, select, before {before} other {after}} } other {}}{event, select, sunrise {sunrise} other {sunset}}",
+            "sunAfter": "After {edge}",
+            "sunBefore": "Before {edge}",
+            "sunBetween": "After {after} and before {before}",
+            "triggeredBy": "Triggered by {count, plural, one {trigger} other {triggers}} {numbers}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1934,7 +1954,8 @@
             "interval": "On its interval",
             "stays": "{device} was {value} for {span}",
             "change": "{device} went from {from} to {to}",
-            "held": "{device} went from {from} to {to} and stayed so for {span}"
+            "held": "{device} went from {from} to {to} and stayed so for {span}",
+            "sun": "At {event, select, dawn {dawn} sunrise {sunrise} sunset {sunset} other {dusk}}"
         },
         "status": {
             "queued": "Queued",
@@ -2017,7 +2038,10 @@
             "setting": "Choose a value this device accepts.",
             "measure": "That device does not report that.",
             "upper": "Give the top of the range.",
-            "upperBelow": "Make it higher than the bottom."
+            "upperBelow": "Make it higher than the bottom.",
+            "sunEdge": "Choose after, before or both.",
+            "noTriggerPicked": "Choose at least one trigger.",
+            "triggerGone": "A trigger it names is gone. Uncheck it."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -2191,7 +2215,37 @@
             "quantifiers": {
                 "any": "Any of them is",
                 "all": "All of them are"
-            }
+            },
+            "sunEvent": "Event",
+            "sunEvents": {
+                "dawn": "Dawn",
+                "sunrise": "Sunrise",
+                "sunset": "Sunset",
+                "dusk": "Civil dusk"
+            },
+            "offset": "Offset",
+            "offsetWay": "Offset way",
+            "offsetWays": {
+                "before": "Before",
+                "after": "After"
+            },
+            "sunPasses": "Passes",
+            "sunModes": {
+                "after": "After",
+                "before": "Before",
+                "between": "After one, before other"
+            },
+            "sunAfter": "After",
+            "sunBefore": "Before",
+            "sunToday": "Today: {time}",
+            "sunNotToday": "It does not happen here today.",
+            "noLocation": "This place has no location yet, so the sun cannot be timed.",
+            "noLocationAsk": "This place has no location yet. Ask a manager to set it.",
+            "triggeredBy": "Which triggers",
+            "noTriggers": "No triggers yet. Add a trigger first.",
+            "triggerNumber": "Trigger {number}",
+            "triggerPosition": "Trigger {number}, as Triggered by names it",
+            "triggerMissing": "Missing trigger. Uncheck it to clear it."
         },
         "log": {
             "title": "What it did",
@@ -2200,7 +2254,8 @@
             "emptyBody": "Each time it fires, what it did and why is written here.",
             "resumes": "Carries on at {time}.",
             "noSteps": "No steps ran.",
-            "stepGone": "A step since removed"
+            "stepGone": "A step since removed",
+            "byTrigger": "Trigger {number}: {name}"
         },
         "shortcut": {
             "offTitle": "Turn off by itself",
@@ -2342,13 +2397,16 @@
                     "threshold": "When a reading crosses a figure, or enters or leaves a range.",
                     "time": "At a time of day, on the days you choose.",
                     "interval": "Over and over, every so many minutes or hours.",
-                    "manual": "Never on its own. Runs only when somebody starts it."
+                    "manual": "Never on its own. Runs only when somebody starts it.",
+                    "sun": "At sunrise, sunset, dawn or dusk, or a while before or after."
                 },
                 "condition": {
                     "device": "Only while a device is in a given state.",
                     "reading": "Only while a reading compares to a figure.",
                     "time": "Only between two times of day.",
-                    "weekday": "Only on the days of the week you choose."
+                    "weekday": "Only on the days of the week you choose.",
+                    "sun": "Only before or after sunrise or sunset, or at night.",
+                    "triggeredBy": "Only when a given trigger started the run."
                 },
                 "step": {
                     "device": "Turn on, off, lock, open or set a device.",
@@ -2452,5 +2510,12 @@
         "waiting": "Waiting for {id}",
         "unreachable": "Polaris cannot reach the broker right now. It may still be starting; this updates on its own.",
         "fallback": "Your Nuki account still works from anywhere, and takes over whenever a lock is off this network."
+    },
+    "location": {
+        "use": "Use my location",
+        "locating": "Finding it...",
+        "denied": "Location was refused. Allow it, or type it in.",
+        "failed": "Could not get the location. Try again.",
+        "unsupported": "This browser cannot share a location."
     }
 }

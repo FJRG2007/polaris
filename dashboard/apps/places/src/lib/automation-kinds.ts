@@ -21,7 +21,10 @@ import {
     behaviourSchema,
     blockBaseShape,
     isTimeZone,
+    offsetSchema,
+    durationSeconds,
     quantifierSchema,
+    SUN_EVENTS,
     targetRefSchema,
     type Behaviour,
     type Quantifier
@@ -221,7 +224,10 @@ export const LIMITS = {
     waitMinutes: 24 * 60,
     word: 60,
     /** Devices one trigger or condition can be about. */
-    targets: 20
+    targets: 20,
+    /** How far before or after a sun event something can be set: half a day,
+     *  past which "before sunset" is the morning. */
+    sunOffsetSeconds: 12 * 60 * 60
 } as const;
 
 export type { Behaviour, Quantifier };
@@ -534,6 +540,25 @@ export function settingField(setting: StepSetting): string {
  *  so the switch that skips one is not taken here yet. */
 const blockBase = { alias: blockBaseShape.alias, note: blockBaseShape.note };
 
+/** The sun events a condition compares with: the sun is up or it is not. */
+export const SUN_EDGES = ["sunrise", "sunset"] as const;
+export type SunEdgeEvent = (typeof SUN_EDGES)[number];
+
+/** How far before or after a sun event: the shared offset, in whole units and
+ *  within half a day. Absent is the moment itself. */
+const sunOffset = offsetSchema
+    .extend({ amount: count(0, 100_000) })
+    .refine(
+        (offset) => durationSeconds(offset) <= LIMITS.sunOffsetSeconds,
+        "automations.errors.tooBig"
+    );
+
+/** One side of a sun condition: after (or before) this event, moved by this. */
+const sunEdge = z.object({
+    event: z.enum(SUN_EDGES, { errorMap: () => ({ message: "automations.errors.state" }) }),
+    offset: sunOffset.optional()
+});
+
 /** How a threshold trigger watches a figure: across a line, or into or out of a range. */
 export const THRESHOLD_DIRECTIONS = ["above", "below", "between", "outside"] as const;
 export type ThresholdDirection = (typeof THRESHOLD_DIRECTIONS)[number];
@@ -595,7 +620,14 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         /** Fires only once the figure has stayed past the line this long. */
         forMinutes: count(1, LIMITS.minutes).optional()
     }),
-    z.object({ id: nodeId, ...blockBase, kind: z.literal("manual") })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("manual") }),
+    z.object({
+        id: nodeId,
+        ...blockBase,
+        kind: z.literal("sun"),
+        event: z.enum(SUN_EVENTS, { errorMap: () => ({ message: "automations.errors.state" }) }),
+        offset: sunOffset.optional()
+    })
 ]);
 
 export const conditionSchema = z.discriminatedUnion("kind", [
@@ -629,7 +661,26 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), from: clock, to: clock }),
-    z.object({ id: nodeId, ...blockBase, kind: z.literal("weekday"), days })
+    z.object({ id: nodeId, ...blockBase, kind: z.literal("weekday"), days }),
+    /** After one sun event, before one, or both. After sunset and before
+     *  sunrise is the night, across midnight; any other pair is one day. */
+    z.object({
+        id: nodeId,
+        ...blockBase,
+        kind: z.literal("sun"),
+        after: sunEdge.optional(),
+        before: sunEdge.optional()
+    }),
+    /** Passes when the run was started by one of these triggers, by id. */
+    z.object({
+        id: nodeId,
+        ...blockBase,
+        kind: z.literal("triggeredBy"),
+        triggerIds: z
+            .array(nodeId)
+            .min(1, "automations.errors.noTriggerPicked")
+            .max(LIMITS.triggers, "automations.errors.tooMany")
+    })
 ]);
 
 const match = z.enum(["all", "any"]);
@@ -777,6 +828,26 @@ export const definitionSchema = z
                     checkFigure(context, condition, at);
                     checkRange(context, isRangeTest(condition.op), condition, at);
                 }
+                if (condition.kind === "sun" && !condition.after && !condition.before) {
+                    context.addIssue({
+                        code: "custom",
+                        path: [...at, "after"],
+                        message: "automations.errors.sunEdge"
+                    });
+                }
+                if (
+                    condition.kind === "triggeredBy" &&
+                    condition.triggerIds.some(
+                        (id) => !definition.triggers.some((trigger) => trigger.id === id)
+                    )
+                ) {
+                    // A trigger since removed: the editor offers to uncheck it.
+                    context.addIssue({
+                        code: "custom",
+                        path: [...at, "triggerIds"],
+                        message: "automations.errors.triggerGone"
+                    });
+                }
                 if (condition.kind === "time" && condition.from === condition.to) {
                     context.addIssue({
                         code: "custom",
@@ -902,10 +973,18 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
     "stays",
     "threshold",
     "time",
+    "sun",
     "interval",
     "manual"
 ];
-export const CONDITION_KINDS: readonly ConditionKind[] = ["device", "reading", "time", "weekday"];
+export const CONDITION_KINDS: readonly ConditionKind[] = [
+    "device",
+    "reading",
+    "time",
+    "weekday",
+    "sun",
+    "triggeredBy"
+];
 export const STEP_KINDS: readonly StepKind[] = ["device", "delay", "wait", "notify", "run"];
 
 // --- normalizing ------------------------------------------------------------
@@ -1259,6 +1338,8 @@ export function blankTrigger(kind: TriggerKind): Trigger {
             return { id, kind, deviceId: "", direction: "above", value: Number.NaN };
         case "manual":
             return { id, kind };
+        case "sun":
+            return { id, kind, event: "sunset" };
     }
 }
 
@@ -1273,6 +1354,11 @@ export function blankCondition(kind: ConditionKind): Condition {
             return { id, kind, from: "22:00", to: "07:00" };
         case "weekday":
             return { id, kind, days: [1, 2, 3, 4, 5] };
+        case "sun":
+            // While it is dark: the pair somebody reaches for first.
+            return { id, kind, after: { event: "sunset" }, before: { event: "sunrise" } };
+        case "triggeredBy":
+            return { id, kind, triggerIds: [] };
     }
 }
 
@@ -1553,6 +1639,8 @@ export interface RunCause {
     readonly byName?: string;
     /** Who pressed Run now. */
     readonly byUser?: string;
+    /** Which sun event, for a sun trigger. */
+    readonly event?: string;
     readonly at: string;
 }
 

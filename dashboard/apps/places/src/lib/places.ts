@@ -16,7 +16,8 @@
 
 import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
-import { PLACE_KINDS, type PlaceView } from "./place-kinds";
+import { PLACE_KINDS, placeLocationSchema, type PlaceView } from "./place-kinds";
+import type { Coordinate } from "@polaris/core";
 
 // Re-exported so server code has one import for "places"; the browser reaches
 // for the pure module directly.
@@ -46,6 +47,8 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
             name: true,
             kind: true,
             address: true,
+            latitude: true,
+            longitude: true,
             _count: { select: { cameras: true } }
         }
     });
@@ -68,6 +71,7 @@ export async function listPlaces(installedAppId: string): Promise<PlaceView[]> {
         name: row.name,
         kind: row.kind,
         address: row.address ?? "",
+        location: locationOf(row),
         cameras: row._count.cameras
     }));
 }
@@ -129,6 +133,8 @@ async function createFirstPlace(installedAppId: string) {
             name: true,
             kind: true,
             address: true,
+            latitude: true,
+            longitude: true,
             _count: { select: { cameras: true } }
         }
     });
@@ -145,6 +151,8 @@ export async function getPlace(installedAppId: string, id: string): Promise<Plac
             name: true,
             kind: true,
             address: true,
+            latitude: true,
+            longitude: true,
             _count: { select: { cameras: true } }
         }
     });
@@ -154,6 +162,7 @@ export async function getPlace(installedAppId: string, id: string): Promise<Plac
               name: row.name,
               kind: row.kind,
               address: row.address ?? "",
+              location: locationOf(row),
               cameras: row._count.cameras
           }
         : null;
@@ -163,6 +172,24 @@ export interface PlaceInput {
     readonly name: string;
     readonly kind: string;
     readonly address: string;
+    /** Absent leaves the coordinate as it is; null clears it. Rounded here
+     *  whatever the caller sent. */
+    readonly location?: Coordinate | null;
+}
+
+function locationOf(row: { latitude: number | null; longitude: number | null }): Coordinate | null {
+    return row.latitude !== null && row.longitude !== null
+        ? { latitude: row.latitude, longitude: row.longitude }
+        : null;
+}
+
+/** The columns a coordinate is written to, rounded to about a kilometre. */
+function locationData(location: Coordinate | null | undefined) {
+    if (location === undefined) return {};
+    if (location === null) return { latitude: null, longitude: null };
+    const parsed = placeLocationSchema.safeParse(location);
+    if (!parsed.success || !parsed.data) throw new HomeError("That is not a place on the Earth");
+    return { latitude: parsed.data.latitude, longitude: parsed.data.longitude };
 }
 
 export async function createPlace(installedAppId: string, input: PlaceInput): Promise<PlaceView> {
@@ -170,9 +197,22 @@ export async function createPlace(installedAppId: string, input: PlaceInput): Pr
     if (!name) throw new HomeError("Give it a name");
     const kind = (PLACE_KINDS as readonly string[]).includes(input.kind) ? input.kind : "other";
     const row = await prisma.place.create({
-        data: { installedAppId, name, kind, address: input.address.trim() || null }
+        data: {
+            installedAppId,
+            name,
+            kind,
+            address: input.address.trim() || null,
+            ...locationData(input.location)
+        }
     });
-    return { id: row.id, name: row.name, kind: row.kind, address: row.address ?? "", cameras: 0 };
+    return {
+        id: row.id,
+        name: row.name,
+        kind: row.kind,
+        address: row.address ?? "",
+        location: locationOf(row),
+        cameras: 0
+    };
 }
 
 export async function updatePlace(
@@ -190,12 +230,14 @@ export async function updatePlace(
     const kind = (PLACE_KINDS as readonly string[]).includes(input.kind) ? input.kind : "other";
     const row = await prisma.place.update({
         where: { id },
-        data: { name, kind, address: input.address.trim() || null },
+        data: { name, kind, address: input.address.trim() || null, ...locationData(input.location) },
         select: {
             id: true,
             name: true,
             kind: true,
             address: true,
+            latitude: true,
+            longitude: true,
             _count: { select: { cameras: true } }
         }
     });
@@ -204,8 +246,28 @@ export async function updatePlace(
         name: row.name,
         kind: row.kind,
         address: row.address ?? "",
+        location: locationOf(row),
         cameras: row._count.cameras
     };
+}
+
+/** Set or clear where a place is, rounded to about a kilometre. */
+export async function setPlaceLocation(
+    installedAppId: string,
+    id: string,
+    location: Coordinate | null
+): Promise<Coordinate | null> {
+    const existing = await prisma.place.findFirst({
+        where: { id, installedAppId },
+        select: { id: true }
+    });
+    if (!existing) throw new HomeError("Place not found");
+    const row = await prisma.place.update({
+        where: { id },
+        data: locationData(location),
+        select: { latitude: true, longitude: true }
+    });
+    return locationOf(row);
 }
 
 /**

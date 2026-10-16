@@ -12,7 +12,7 @@
 
 import * as kinds from "./device-kinds";
 import * as auto from "./automation-kinds";
-import { weekdayNames } from "@polaris/core";
+import { blockTitle, durationSeconds, weekdayNames, type Offset } from "@polaris/core";
 import type { PlacesTranslator } from "./i18n";
 import type { PlacesKey } from "../../messages";
 import { placesRefusalText } from "./refusal-text";
@@ -288,6 +288,8 @@ export function describeTrigger(
             return t("automations.say.interval", { every: durationText(trigger.minutes * 60, t) });
         case "manual":
             return t("automations.say.manual");
+        case "sun":
+            return t("automations.say.sun", { event: trigger.event, ...offsetWords(trigger.offset, t) });
         case "threshold": {
             const device = setName(lookup, trigger, t);
             return t(
@@ -332,9 +334,34 @@ export function describeTrigger(
 export function describeCondition(
     condition: auto.Condition,
     lookup: DeviceLookup,
-    t: PlacesTranslator
+    t: PlacesTranslator,
+    /** The automation's trigger ids in order, which "Triggered by" numbers. */
+    triggerIds: readonly string[] = []
 ): string {
     switch (condition.kind) {
+        case "sun": {
+            const edge = (side: { event: auto.SunEdgeEvent; offset?: Offset }) =>
+                t("automations.say.sunEdge", { event: side.event, ...offsetWords(side.offset, t) });
+            if (condition.after && condition.before)
+                return t("automations.say.sunBetween", {
+                    after: edge(condition.after),
+                    before: edge(condition.before)
+                });
+            if (condition.before) return t("automations.say.sunBefore", { edge: edge(condition.before) });
+            return condition.after
+                ? t("automations.say.sunAfter", { edge: edge(condition.after) })
+                : t("automations.conditions.sun");
+        }
+        case "triggeredBy": {
+            const numbers = condition.triggerIds.map((id) => {
+                const at = triggerIds.indexOf(id);
+                return at < 0 ? "?" : String(at + 1);
+            });
+            return t("automations.say.triggeredBy", {
+                count: numbers.length,
+                numbers: numbers.join(", ")
+            });
+        }
         case "device": {
             const device = setName(lookup, condition, t);
             return t("automations.say.is", {
@@ -434,6 +461,7 @@ export function describeCause(
     if (cause.kind === "manual") return t("automations.cause.manual", { name: cause.byUser ?? "" });
     if (cause.kind === "time") return t("automations.cause.time");
     if (cause.kind === "interval") return t("automations.cause.interval");
+    if (cause.kind === "sun") return t("automations.cause.sun", { event: cause.event ?? "" });
     const device = deviceName(lookup, cause.deviceId ?? "", t);
     const attribute = cause.attribute ?? "state";
     if (cause.kind === "stays") {
@@ -546,4 +574,34 @@ export function autoOffName(
             ? t("automations.templates.autoOff.lockName", { device: device.name, span })
             : t("automations.templates.autoOff.offName", { device: device.name, span });
     return name.slice(0, auto.LIMITS.name);
+}
+
+/** An offset's words for a sun sentence: whether there is one, how long and
+ *  which way. */
+function offsetWords(
+    offset: Offset | undefined,
+    t: PlacesTranslator
+): { hasOffset: "yes" | "no"; offset: string; direction: string } {
+    const seconds = offset ? durationSeconds(offset) : 0;
+    return seconds > 0 && offset
+        ? { hasOffset: "yes", offset: durationText(seconds, t), direction: offset.direction }
+        : { hasOffset: "no", offset: "", direction: "after" };
+}
+
+/** Which of an automation's triggers started a run, as its log shows it: its
+ *  position and its own name or sentence. Undefined when the run had none or
+ *  that trigger has since been removed. */
+export function causeTrigger(
+    cause: auto.RunCause,
+    triggers: readonly auto.Trigger[],
+    lookup: DeviceLookup,
+    t: PlacesTranslator
+): string | undefined {
+    const at = cause.triggerId ? triggers.findIndex((each) => each.id === cause.triggerId) : -1;
+    const trigger = triggers[at];
+    if (!trigger) return undefined;
+    return t("automations.log.byTrigger", {
+        number: at + 1,
+        name: blockTitle(trigger, describeTrigger(trigger, lookup, t))
+    });
 }

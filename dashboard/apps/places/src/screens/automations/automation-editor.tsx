@@ -43,6 +43,8 @@ import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
+import * as sun from "./sun-fields";
+import { savePlaceLocationAction } from "../actions";
 import { AutomationCanvas } from "./automation-canvas";
 import { AddBlockButton, RoomsProvider, blockIcon } from "./add-block";
 import type { RoomView } from "../../lib/room-kinds";
@@ -180,7 +182,8 @@ const UNFINISHED = new Set([
     "automations.errors.noTrigger",
     "automations.errors.noStep",
     "automations.errors.emptyGroup",
-    "automations.errors.days"
+    "automations.errors.days",
+    "automations.errors.noTriggerPicked"
 ]);
 
 function pathKey(path: readonly (string | number)[]): string {
@@ -758,9 +761,26 @@ export function AutomationEditor({
 
     // One card per node, drawn in the form's column and in the canvas's
     // inspector alike, so both edit with the same fields and the same checks.
+    // Numbered only while a "Triggered by" condition reads the numbers.
+    const numbered = sun.numbersTriggers(definition);
+    const triggerIds = definition.triggers.map((trigger) => trigger.id);
+    const setLocation = async (location: { latitude: number; longitude: number }) => {
+        const result = await runAction(
+            () => savePlaceLocationAction(loaded.context.placeId, location),
+            setError
+        );
+        if (!result) return t("location.failed");
+        if (result.error) return result.error;
+        setLoaded((current) =>
+            current
+                ? { ...current, context: { ...current.context, location: result.location ?? null } }
+                : current
+        );
+    };
     const triggerCard = (trigger: auto.Trigger, index: number, plain = false) => (
         <TriggerCard
             key={trigger.id}
+            number={numbered ? index + 1 : undefined}
             plain={plain}
             trigger={trigger}
             path={["definition", "triggers", index]}
@@ -886,7 +906,9 @@ export function AutomationEditor({
         if (role === "step")
             return words.describeStep(block as auto.Step, lookup, automationName, t);
         const first = (block as auto.ConditionGroup).items[0];
-        return first ? words.describeCondition(first, lookup, t) : t("automations.editor.group");
+        return first
+            ? words.describeCondition(first, lookup, t, triggerIds)
+            : t("automations.editor.group");
     };
     /** A group reads as its first condition, with how the rest join it. */
     const chipsOf = (role: BlockRole, block: Block): string[] => {
@@ -1120,6 +1142,15 @@ export function AutomationEditor({
 
     return (
         <RoomsProvider value={loaded?.context.rooms ?? NO_ROOMS}>
+            <sun.AutomationScopeProvider
+                value={{
+                    triggers: definition.triggers,
+                    lookup,
+                    location: loaded.context.location ?? null,
+                    timeZone: definition.timeZone,
+                    setLocation: readOnly ? undefined : setLocation
+                }}
+            >
             <flow.IssueProvider value={issueLookup}>
                 <div className="flex flex-col gap-4">
                     {header}
@@ -1326,12 +1357,14 @@ export function AutomationEditor({
                     {blockDialogs}
                 </div>
             </flow.IssueProvider>
+            </sun.AutomationScopeProvider>
         </RoomsProvider>
     );
 }
 
 function TriggerCard({
     trigger,
+    number,
     path,
     devices,
     sensors,
@@ -1344,6 +1377,8 @@ function TriggerCard({
     onDown
 }: {
     trigger: auto.Trigger;
+    /** Its position, shown while a "Triggered by" condition names triggers. */
+    number?: number;
     path: (string | number)[];
     devices: DeviceView[];
     sensors: DeviceView[];
@@ -1364,6 +1399,12 @@ function TriggerCard({
     return (
         <flow.NodeCard
             plain={plain}
+            number={number}
+            numberLabel={
+                number !== undefined
+                    ? t("automations.fields.triggerPosition", { number })
+                    : undefined
+            }
             kind={
                 <flow.KindPicker
                     value={trigger.kind}
@@ -1409,6 +1450,14 @@ function TriggerCard({
                     value={trigger.minutes}
                     disabled={disabled}
                     onChange={(minutes) => onChange({ ...trigger, minutes })}
+                />
+            )}
+            {trigger.kind === "sun" && (
+                <sun.SunTriggerFields
+                    trigger={trigger}
+                    path={path}
+                    disabled={disabled}
+                    onChange={onChange}
                 />
             )}
             {trigger.kind === "manual" && (
@@ -2032,6 +2081,22 @@ function ConditionCard({
                         onChange={(to) => onChange({ ...condition, to })}
                     />
                 </>
+            )}
+            {condition.kind === "sun" && (
+                <sun.SunConditionFields
+                    condition={condition}
+                    path={path}
+                    disabled={disabled}
+                    onChange={onChange}
+                />
+            )}
+            {condition.kind === "triggeredBy" && (
+                <sun.TriggeredByFields
+                    condition={condition}
+                    path={path}
+                    disabled={disabled}
+                    onChange={onChange}
+                />
             )}
             {condition.kind === "weekday" && (
                 <fields.DaysPicker

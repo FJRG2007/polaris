@@ -406,6 +406,7 @@ describe("the palette", () => {
             "A device stays",
             "A reading crosses",
             "At a time",
+            "The sun",
             "Every so often",
             "Only by hand"
         ]);

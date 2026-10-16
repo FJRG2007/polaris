@@ -257,7 +257,16 @@
         "description": "Una casa, una oficina, un taller: cualquier sitio con sus propias cámaras.",
         "kind": "Qué es",
         "name": "Nombre",
-        "namePlaceholder": "El piso"
+        "namePlaceholder": "El piso",
+        "location": "Ubicación",
+        "locationHint": "Opcional, para amanecer y atardecer. Se guarda a ~1 km.",
+        "latitude": "Latitud",
+        "longitude": "Longitud",
+        "errors": {
+            "latitude": "Usa una latitud entre -90 y 90.",
+            "longitude": "Usa una longitud entre -180 y 180.",
+            "both": "Rellena las dos o deja ambas vacías."
+        }
     },
     "placeKinds": {
         "house": "Casa",
@@ -656,7 +665,8 @@
         "roomElsewhere": "Esa sala es de otro sitio",
         "floorGone": "Planta inexistente",
         "floorElsewhere": "Esa planta es de otro sitio",
-        "floorTaken": "Ya hay una planta con ese nombre"
+        "floorTaken": "Ya hay una planta con ese nombre",
+        "notOnEarth": "Eso no es un lugar de la Tierra."
     },
     "connections": {
         "nuki-web": {
@@ -1114,7 +1124,8 @@
         "areaNotSaved": "No se pudo guardar esa área.",
         "personNotAdded": "No se pudo añadir.",
         "photoTooLarge": "Esa fotografía es demasiado grande.",
-        "nameNotSaved": "No se pudo guardar ese nombre."
+        "nameNotSaved": "No se pudo guardar ese nombre.",
+        "placeLocation": "Esa ubicación no es válida."
     },
     "settings": {
         "footageBody": "Las grabaciones y las imágenes de los eventos se escriben en <em>{storage}</em>. Eso se decide para toda la instancia en Subidas, junto a dónde van las fotos y los adjuntos: un sitio para una decisión. Una cámara que quiera su propio disco lo indica en sus propios ajustes.",
@@ -1872,13 +1883,16 @@
             "threshold": "Una lectura cruza",
             "time": "A una hora",
             "interval": "Cada cierto tiempo",
-            "manual": "Solo a mano"
+            "manual": "Solo a mano",
+            "sun": "El sol"
         },
         "conditions": {
             "device": "Estado de un aparato",
             "reading": "Una lectura es",
             "time": "Entre horas",
-            "weekday": "Qué días"
+            "weekday": "Qué días",
+            "sun": "El sol está",
+            "triggeredBy": "Lanzada por"
         },
         "steps": {
             "device": "Usar un aparato",
@@ -1925,7 +1939,13 @@
             "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}{hasFor, select, yes { durante {span}} other {}}",
             "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}{hasFor, select, yes { durante {span}} other {}}",
             "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}",
-            "deviceSet": "{count, plural, one {{first} y uno más} other {{first} y # más}}"
+            "deviceSet": "{count, plural, one {{first} y uno más} other {{first} y # más}}",
+            "sun": "{hasOffset, select, yes {{offset} {direction, select, before {antes} other {después}} del } other {Al }}{event, select, dawn {alba} sunrise {amanecer} sunset {atardecer} other {anochecer}}",
+            "sunEdge": "{hasOffset, select, yes {{offset} {direction, select, before {antes} other {después}} del } other {el }}{event, select, sunrise {amanecer} other {atardecer}}",
+            "sunAfter": "Tras {edge}",
+            "sunBefore": "Hasta {edge}",
+            "sunBetween": "Tras {after} y hasta {before}",
+            "triggeredBy": "Lanzada por {count, plural, one {el disparador} other {los disparadores}} {numbers}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -1934,7 +1954,8 @@
             "interval": "En su intervalo",
             "stays": "{device} llevaba {value} {span}",
             "change": "{device} pasó de {from} a {to}",
-            "held": "{device} pasó de {from} a {to} y siguió así durante {span}"
+            "held": "{device} pasó de {from} a {to} y siguió así durante {span}",
+            "sun": "{event, select, dawn {Al alba} sunrise {Al amanecer} sunset {Al atardecer} other {Al anochecer}}"
         },
         "status": {
             "queued": "En cola",
@@ -2017,7 +2038,10 @@
             "setting": "Elige un valor que admita este aparato.",
             "measure": "Ese dispositivo no informa de eso.",
             "upper": "Indica el tope del rango.",
-            "upperBelow": "Ponlo por encima del inicio."
+            "upperBelow": "Ponlo por encima del inicio.",
+            "sunEdge": "Elige tras, hasta o ambos.",
+            "noTriggerPicked": "Elige al menos un disparador.",
+            "triggerGone": "Nombra un disparador que ya no está. Desmárcalo."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -2191,7 +2215,37 @@
             "quantifiers": {
                 "any": "Alguno lo está",
                 "all": "Todos lo están"
-            }
+            },
+            "sunEvent": "Momento",
+            "sunEvents": {
+                "dawn": "Alba",
+                "sunrise": "Amanecer",
+                "sunset": "Atardecer",
+                "dusk": "Anochecer"
+            },
+            "offset": "Desfase",
+            "offsetWay": "Sentido",
+            "offsetWays": {
+                "before": "Antes",
+                "after": "Después"
+            },
+            "sunPasses": "Se cumple",
+            "sunModes": {
+                "after": "Tras",
+                "before": "Hasta",
+                "between": "Tras uno, hasta otro"
+            },
+            "sunAfter": "Tras",
+            "sunBefore": "Hasta",
+            "sunToday": "Hoy: {time}",
+            "sunNotToday": "Hoy no ocurre en este sitio.",
+            "noLocation": "Este sitio aún no tiene ubicación; sin ella no se sabe la hora del sol.",
+            "noLocationAsk": "Este sitio aún no tiene ubicación. Pide a un gestor que la fije.",
+            "triggeredBy": "Disparadores",
+            "noTriggers": "Aún no hay disparadores. Añade uno antes.",
+            "triggerNumber": "Disparador {number}",
+            "triggerPosition": "Disparador {number}, como lo nombra Lanzada por",
+            "triggerMissing": "Disparador que falta. Desmárcalo para quitarlo."
         },
         "log": {
             "title": "Qué hizo",
@@ -2200,7 +2254,8 @@
             "emptyBody": "Cada vez que salte, aquí queda qué hizo y por qué.",
             "resumes": "Sigue a las {time}.",
             "noSteps": "No se ejecutó ningún paso.",
-            "stepGone": "Un paso ya quitado"
+            "stepGone": "Un paso ya quitado",
+            "byTrigger": "Disparador {number}: {name}"
         },
         "shortcut": {
             "offTitle": "Apagar solo",
@@ -2342,13 +2397,16 @@
                     "threshold": "Cuando una lectura cruza una cifra, o entra o sale de un rango.",
                     "time": "A una hora del día, los días que elijas.",
                     "interval": "Una y otra vez, cada tantos minutos u horas.",
-                    "manual": "Nunca por sí sola. Solo se ejecuta cuando alguien la inicia."
+                    "manual": "Nunca por sí sola. Solo se ejecuta cuando alguien la inicia.",
+                    "sun": "Al amanecer, atardecer, alba o anochecer, o un rato antes o después."
                 },
                 "condition": {
                     "device": "Solo mientras un dispositivo está en un estado.",
                     "reading": "Solo mientras una lectura se compara con una cifra.",
                     "time": "Solo entre dos horas del día.",
-                    "weekday": "Solo los días de la semana que elijas."
+                    "weekday": "Solo los días de la semana que elijas.",
+                    "sun": "Solo antes o después del amanecer o atardecer, o de noche.",
+                    "triggeredBy": "Solo si la lanzó un disparador concreto."
                 },
                 "step": {
                     "device": "Encender, apagar, bloquear, abrir o ajustar un dispositivo.",
@@ -2452,5 +2510,12 @@
         "waiting": "Esperando a {id}",
         "unreachable": "Polaris no llega al broker ahora. Puede que aún esté arrancando; esto se actualiza solo.",
         "fallback": "Tu cuenta de Nuki sigue funcionando desde cualquier sitio y responde cuando una cerradura no está en esta red."
+    },
+    "location": {
+        "use": "Usar mi ubicación",
+        "locating": "Buscando...",
+        "denied": "Se denegó la ubicación. Permítela o escríbela.",
+        "failed": "No se pudo obtener la ubicación. Reinténtalo.",
+        "unsupported": "Este navegador no puede dar su ubicación."
     }
 }

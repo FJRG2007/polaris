@@ -23,6 +23,8 @@ import { revalidatePath } from "next/cache";
 import * as events from "../lib/events";
 import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
+import type { Coordinate } from "@polaris/core";
+import { normalizePlaceLocation, placeLocationSchema } from "../lib/place-kinds";
 import * as people from "../lib/people";
 import * as rooms from "../lib/rooms";
 import * as automations from "../lib/automations";
@@ -156,13 +158,22 @@ async function reachablePlaces(
 
 export async function savePlaceAction(
     id: string | null,
-    input: { name: string; kind: string; address: string }
+    input: { name: string; kind: string; address: string; location?: unknown }
 ): Promise<{ place?: places.PlaceView; error?: string }> {
     const { install } = await requireHome("home.manage");
+    // Absent leaves the coordinate alone, so a caller from before it existed
+    // cannot clear one by not knowing about it.
+    let location: Coordinate | null | undefined;
+    if (input && "location" in input && input.location !== undefined) {
+        const parsed = placeLocationSchema.safeParse(normalizePlaceLocation(input.location));
+        if (!parsed.success) return { error: await say("actions.placeLocation") };
+        location = parsed.data;
+    }
     const shape = {
         name: String(input?.name ?? ""),
         kind: String(input?.kind ?? "other"),
-        address: String(input?.address ?? "")
+        address: String(input?.address ?? ""),
+        ...(location !== undefined ? { location } : {})
     };
     const result = await guard(() =>
         id ? places.updatePlace(install.id, id, shape) : places.createPlace(install.id, shape)
@@ -171,6 +182,22 @@ export async function savePlaceAction(
         return { error: result.error ?? (await say("actions.placeNotSaved")) };
     revalidatePath(PATH);
     return { place: result.value };
+}
+
+/** Set where a place is, and nothing else about it: the sun block's own
+ *  button, which has a coordinate and no name to send. */
+export async function savePlaceLocationAction(
+    id: string,
+    location: unknown
+): Promise<{ location?: Coordinate | null; error?: string }> {
+    const { install } = await requireHome("home.manage");
+    const parsed = placeLocationSchema.safeParse(normalizePlaceLocation(location));
+    if (!parsed.success) return { error: await say("actions.placeLocation") };
+    const result = await guard(() => places.setPlaceLocation(install.id, String(id), parsed.data));
+    if (result.error || result.value === undefined)
+        return { error: result.error ?? (await say("actions.placeNotSaved")) };
+    revalidatePath(PATH);
+    return { location: result.value };
 }
 
 export async function deletePlaceAction(id: string): Promise<{ error?: string }> {

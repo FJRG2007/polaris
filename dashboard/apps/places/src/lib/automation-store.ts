@@ -196,7 +196,8 @@ const AUTOMATION_FIELDS = {
     name: true,
     enabled: true,
     definition: true,
-    armedAt: true
+    armedAt: true,
+    place: { select: { latitude: true, longitude: true } }
 } as const;
 
 type RunRow = {
@@ -240,13 +241,20 @@ export function toAutomation(row: {
     enabled: boolean;
     definition: unknown;
     armedAt: Date;
+    /** The place's coordinate, for the sun; absent where it was not read. */
+    place?: { latitude: number | null; longitude: number | null } | null;
 }): AutomationRecord | null {
     const parsed = auto.definitionSchema.safeParse(row.definition);
     if (!parsed.success) {
         console.error(`places: automation ${row.id} is stored in a shape this build cannot read`);
         return null;
     }
-    return { ...row, definition: parsed.data };
+    const { place, ...rest } = row;
+    const location =
+        place && place.latitude !== null && place.longitude !== null
+            ? { latitude: place.latitude, longitude: place.longitude }
+            : null;
+    return { ...rest, definition: parsed.data, location };
 }
 
 /** A value already shaped by the schema, as the JSON column takes it. */
