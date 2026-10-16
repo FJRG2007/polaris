@@ -118,7 +118,9 @@ describe("the search panel's calculator", () => {
         expect(screen.getByRole("combobox")).toBe(field);
 
         fireEvent.change(field, { target: { value: "10/4" } });
-        fireEvent.click(screen.getByRole("option", { name: "Use 2.5. Ctrl+C or Cmd+C copies it." }));
+        fireEvent.click(
+            screen.getByRole("option", { name: "Use 2.5. Ctrl+C or Cmd+C copies it." })
+        );
         expect(field.value).toBe("2.5");
         expect(document.activeElement).toBe(field);
         expect(writeText).not.toHaveBeenCalled();

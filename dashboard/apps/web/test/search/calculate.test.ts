@@ -131,7 +131,13 @@ describe("calculate", () => {
     });
 
     it("copies text that reads back as the same number, never an exponent", () => {
-        for (const input of ["12345678901 + 1", "10 ^ 21 * 3", "10 ^ -7 * 4", "2 / 3", "123456789 * 987654321"]) {
+        for (const input of [
+            "12345678901 + 1",
+            "10 ^ 21 * 3",
+            "10 ^ -7 * 4",
+            "2 / 3",
+            "123456789 * 987654321"
+        ]) {
             const value = calculate(input)!;
             const text = calculationText(value);
             expect(text).not.toMatch(/e/i);
