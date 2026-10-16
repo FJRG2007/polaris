@@ -246,6 +246,43 @@ export function removeFromGraph(graph: graphs.AutomationGraph, nodeIds: Iterable
     };
 }
 
+/**
+ * The graph with `node` put on a connection: what led into the connection's
+ * end now leads into the new node, and the new node's first output leads on to
+ * it. Nodes downstream move right when there is no room. Null when the
+ * connection is gone, the node is a trigger, or the node limit is reached.
+ */
+export function insertOnEdge(graph: graphs.AutomationGraph, key: string, node: graphs.GraphNode): graphs.AutomationGraph | null {
+    if (graph.nodes.length >= graphs.AUTOMATION_LIMITS.nodes || graphs.nodeRole(node.type) === "trigger") return null;
+    const lane = key === `${FINALLY_SOURCE}>${graph.finally.entry}`;
+    const edge = lane ? null : graph.edges.find((entry) => edgeKey(entry) === key);
+    const toId = lane ? graph.finally.entry : edge?.to.node;
+    const target = graph.nodes.find((entry) => entry.id === toId);
+    if (!target || (!lane && !edge)) return null;
+    if (graph.edges.length + 1 > graphs.AUTOMATION_LIMITS.edges) return null;
+    const source = edge ? graph.nodes.find((entry) => entry.id === edge.from.node) : undefined;
+    const to = target.position ?? { x: 0, y: 0 };
+    const from = source?.position ?? { x: to.x - CANVAS_NODE.width - CANVAS_GAP.x, y: to.y };
+    const step = CANVAS_NODE.width + CANVAS_GAP.x;
+    const at = { x: Math.round(from.x + step), y: Math.round(lane ? to.y : from.y) };
+    const room = to.x - at.x - step;
+    const shift = room < 0 ? -room : 0;
+    const moving = shift ? graphs.reachableFrom(graph, target.id) : new Set<string>();
+    const port = graphs.nodePorts(node.type)[0]!;
+    const placed: graphs.GraphNode = { ...node, position: at };
+    const nodes = [...graph.nodes.map((entry) => (moving.has(entry.id) && entry.position ? { ...entry, position: { x: entry.position.x + shift, y: entry.position.y } } : entry)), placed];
+    if (lane) return { ...graph, nodes, edges: [...graph.edges, { from: { node: node.id, port }, to: { node: target.id } }], finally: { ...graph.finally, entry: node.id } };
+    return {
+        ...graph,
+        nodes,
+        edges: [
+            ...graph.edges.filter((entry) => entry !== edge),
+            { from: { ...edge!.from }, to: { node: node.id } },
+            { from: { node: node.id, port }, to: { node: target.id } }
+        ]
+    };
+}
+
 /** Move nodes and notes by the same distance, as a drag of a selection does. */
 export function moveInGraph(graph: graphs.AutomationGraph, nodeIds: ReadonlySet<string>, noteIds: ReadonlySet<string>, dx: number, dy: number): graphs.AutomationGraph {
     const snap = (value: number) => Math.round(value);

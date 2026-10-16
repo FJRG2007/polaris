@@ -19,7 +19,7 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Map as MapIcon, Maximize, Plus, StickyNote, ZoomIn, ZoomOut } from "lucide-react";
+import { LayoutGrid, Map as MapIcon, Maximize, Plus, StickyNote, ZoomIn, ZoomOut } from "lucide-react";
 import { Badge, Button, ContextMenu, ContextMenuContent, ContextMenuTrigger, cn, fitBoard, useBoardGestures, zoomViewAt, type BoardView } from "@polaris/ui";
 import { useCallback, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
@@ -76,6 +76,12 @@ export function wirePath(from: Point, to: Point): string {
     return `M${from.x},${from.y} C${from.x + reach},${from.y} ${to.x - reach},${to.y} ${to.x},${to.y}`;
 }
 
+/** The middle of the curve `wirePath` draws, where its insert button sits. */
+export function wireMiddle(from: Point, to: Point): Point {
+    const reach = Math.max(40, Math.abs(to.x - from.x) * 0.5);
+    return { x: (from.x + 3 * (from.x + reach) + 3 * (to.x - reach) + to.x) / 8, y: (from.y + to.y) / 2 };
+}
+
 export interface CanvasBoardProps {
     readonly graph: core.AutomationGraph;
     readonly readOnly: boolean;
@@ -84,6 +90,10 @@ export interface CanvasBoardProps {
     readonly onChange: (update: (graph: core.AutomationGraph) => core.AutomationGraph, options?: { group?: boolean }) => void;
     readonly onOpen: (nodeId: string) => void;
     readonly onPalette: () => void;
+    /** Add a node on a connection, between its two ends. */
+    readonly onInsert?: (edgeKey: string) => void;
+    /** Lay every node out again. */
+    readonly onTidy?: () => void;
     readonly onAddNote: (at: Point) => void;
     readonly onRefused: (code: core.ConnectRefusal) => void;
     readonly onKey?: (event: KeyboardEvent<HTMLDivElement>, center: () => Point) => boolean;
@@ -94,6 +104,8 @@ export interface CanvasBoardProps {
     readonly states?: Readonly<Record<string, string>>;
     /** The items of a node's right-click menu; the node is selected first when it was not already. */
     readonly menu?: (node: core.GraphNode) => ReactNode;
+    /** Bumped by the editor to frame the whole graph again (after a tidy). */
+    readonly refit?: number;
 }
 
 export function CanvasBoard(props: CanvasBoardProps) {
@@ -108,6 +120,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const [marquee, setMarquee] = useState<{ a: Point; b: Point } | null>(null);
     const [editingNote, setEditingNote] = useState<string | null>(null);
     const [overview, setOverview] = useState(graph.nodes.length >= 8);
+    const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
     const shift = useRef(false);
     const help = useId();
 
@@ -137,6 +150,13 @@ export function CanvasBoard(props: CanvasBoardProps) {
         framed.current = true;
         fit();
     }, [fit]);
+
+    const refit = useRef(props.refit);
+    useLayoutEffect(() => {
+        if (refit.current === props.refit) return;
+        refit.current = props.refit;
+        fit();
+    }, [props.refit, fit]);
 
     useBoardGestures(frame, {
         onZoom: (factor, at) => setView((current) => zoomViewAt(current, factor, at, LIMITS)),
@@ -279,10 +299,17 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const edges = graph.edges.map((edge) => {
         const from = byId.get(edge.from.node);
         const to = byId.get(edge.to.node);
-        return from && to ? { key: core.edgeKey(edge), d: wirePath(portAnchor(shifted(from), edge.from.port), portAnchor(shifted(to), null)) } : null;
+        if (!from || !to) return null;
+        const a = portAnchor(shifted(from), edge.from.port);
+        const b = portAnchor(shifted(to), null);
+        return { key: core.edgeKey(edge), d: wirePath(a, b), middle: wireMiddle(a, b) };
     });
     const entry = graph.finally.entry ? byId.get(graph.finally.entry) : undefined;
-    if (entry) edges.push({ key: `${core.FINALLY_SOURCE}>${entry.id}`, d: wirePath(finallySource, portAnchor(shifted(entry), null)) });
+    if (entry) {
+        const b = portAnchor(shifted(entry), null);
+        edges.push({ key: `${core.FINALLY_SOURCE}>${entry.id}`, d: wirePath(finallySource, b), middle: wireMiddle(finallySource, b) });
+    }
+    const insertAt = !readOnly && props.onInsert && !drag && !wire ? edges.find((edge) => edge && (edge.key === hoveredEdge || edge.key === selection.edge)) : undefined;
 
     const frameRect = frame.current?.getBoundingClientRect();
 
@@ -330,6 +357,8 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     stroke="transparent"
                                     strokeWidth={14}
                                     style={{ pointerEvents: readOnly ? "none" : "stroke", cursor: "pointer" }}
+                                    onPointerEnter={() => setHoveredEdge(edge.key)}
+                                    onPointerLeave={() => setHoveredEdge((current) => (current === edge.key ? null : current))}
                                     onClick={(event) => {
                                         event.stopPropagation();
                                         onSelect({ nodes: new Set(), notes: new Set(), edge: edge.key });
@@ -357,6 +386,24 @@ export function CanvasBoard(props: CanvasBoardProps) {
                         />
                     ) : null}
                 </svg>
+                {insertAt ? (
+                    <button
+                        type="button"
+                        aria-label={t("canvas.insertHere")}
+                        title={t("canvas.insertHere")}
+                        className="absolute flex size-6 items-center justify-center rounded-full border border-border-strong bg-elevated text-muted-foreground shadow-popover hover:border-primary hover:text-primary focus-visible:border-primary"
+                        style={{ left: insertAt.middle.x - 12, top: insertAt.middle.y - 12 }}
+                        onPointerEnter={() => setHoveredEdge(insertAt.key)}
+                        onPointerLeave={() => setHoveredEdge(null)}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            setHoveredEdge(null);
+                            props.onInsert?.(insertAt.key);
+                        }}
+                    >
+                        <Plus className="size-3.5" aria-hidden="true" />
+                    </button>
+                ) : null}
                 {!readOnly ? (
                     <span
                         data-port
@@ -535,6 +582,11 @@ export function CanvasBoard(props: CanvasBoardProps) {
                         <ToolButton label={t("canvas.addNote")} onClick={() => props.onAddNote(center())}>
                             <StickyNote aria-hidden="true" />
                         </ToolButton>
+                        {props.onTidy && graph.nodes.length > 1 ? (
+                            <ToolButton label={t("canvas.tidy")} onClick={props.onTidy}>
+                                <LayoutGrid aria-hidden="true" />
+                            </ToolButton>
+                        ) : null}
                     </>
                 ) : null}
                 <ToolButton label={t("canvas.zoomIn")} onClick={() => zoomCentre(STEP)}>

@@ -82,6 +82,8 @@ export function CanvasEditor({
     const [panel, setPanel] = useState<string | null>(null);
     const [palette, setPalette] = useState(false);
     const [renaming, setRenaming] = useState<string | null>(null);
+    const [insertOn, setInsertOn] = useState<string | null>(null);
+    const [refit, setRefit] = useState(0);
     const placeAt = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const refuse = (code: core.ConnectRefusal) => toast.show({ title: t(`canvas.refusals.${code}`) });
@@ -227,8 +229,24 @@ export function CanvasEditor({
         );
     };
 
+    const tidy = () => {
+        change((current) => core.layoutGraph(current, { tidy: true }), { group: false });
+        setRefit((count) => count + 1);
+        toast.show({ title: t("canvas.tidied") });
+    };
+
     const addNode = (type: string) => {
         if (graph.nodes.length >= core.AUTOMATION_LIMITS.nodes) return void toast.show({ title: t("canvas.pasteTooMany") });
+        if (insertOn) {
+            const node = newNode(type);
+            const inserted = core.insertOnEdge(graph, insertOn, node);
+            setInsertOn(null);
+            if (!inserted) return void toast.show({ title: t("canvas.insertGone") });
+            change(() => inserted, { group: false });
+            setSelection({ nodes: new Set([node.id]), notes: new Set(), edge: null });
+            setPanel(node.id);
+            return;
+        }
         const node = { ...newNode(type), position: { x: Math.round(placeAt.current.x - core.CANVAS_NODE.width / 2), y: Math.round(placeAt.current.y - core.CANVAS_NODE.height / 2) } };
         change((current) => ({ ...current, nodes: [...current.nodes, node] }), { group: false });
         setSelection({ nodes: new Set([node.id]), notes: new Set(), edge: null });
@@ -258,8 +276,10 @@ export function CanvasEditor({
         else if ((key === "delete" || key === "backspace") && !readOnly) remove();
         else if (key === "n" && !mod && !readOnly && !event.shiftKey) {
             placeAt.current = center();
+            setInsertOn(null);
             setPalette(true);
         } else if (key === "s" && event.shiftKey && !mod && !readOnly) addNote(center());
+        else if (key === "t" && event.shiftKey && event.altKey && !mod && !readOnly) tidy();
         else if (key === "enter" && selection.nodes.size === 1) setPanel([...selection.nodes][0]!);
         else return false;
         event.preventDefault();
@@ -279,7 +299,14 @@ export function CanvasEditor({
                     }}
                     onChange={change}
                     onOpen={setPanel}
+                    onInsert={(edgeKey) => {
+                        setInsertOn(edgeKey);
+                        setPalette(true);
+                    }}
+                    onTidy={tidy}
+                    refit={refit}
                     onPalette={() => {
+                        setInsertOn(null);
                         placeAt.current = { x: (core.graphBounds(graph)?.x ?? 0) + (core.graphBounds(graph)?.width ?? 0) + 120, y: core.graphBounds(graph)?.y ?? 0 };
                         setPalette(true);
                     }}
@@ -330,7 +357,10 @@ export function CanvasEditor({
                     change((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === nodeId ? { ...node, alias } : node)) }), { group: false })
                 }
             />
-            <Palette open={palette} onOpenChange={setPalette} onPick={(type) => {
+            <Palette open={palette} stepsOnly={insertOn !== null} onOpenChange={(open) => {
+                setPalette(open);
+                if (!open) setInsertOn(null);
+            }} onPick={(type) => {
                 setPalette(false);
                 addNode(type);
             }} />
@@ -386,11 +416,11 @@ function RenameDialog({ node, onClose, onRename }: { node: core.GraphNode | unde
     );
 }
 
-function Palette({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (open: boolean) => void; onPick: (type: string) => void }) {
+function Palette({ open, stepsOnly, onOpenChange, onPick }: { open: boolean; stepsOnly: boolean; onOpenChange: (open: boolean) => void; onPick: (type: string) => void }) {
     const t = useTranslations("automations");
     const [query, setQuery] = useState("");
     const groups = [
-        { label: t("canvas.groupTriggers"), types: TRIGGER_TYPES as readonly string[] },
+        ...(stepsOnly ? [] : [{ label: t("canvas.groupTriggers"), types: TRIGGER_TYPES as readonly string[] }]),
         { label: t("canvas.groupSteps"), types: STEP_TYPES as readonly string[] }
     ];
     const needle = query.trim().toLowerCase();
@@ -407,7 +437,7 @@ function Palette({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: 
             }}
         >
             <DialogContent className="max-w-md">
-                <DialogTitle>{t("canvas.paletteTitle")}</DialogTitle>
+                <DialogTitle>{stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}</DialogTitle>
                 <DialogDescription>{t("canvas.paletteHint")}</DialogDescription>
                 <Input
                     autoFocus

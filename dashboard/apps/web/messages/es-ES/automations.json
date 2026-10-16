@@ -292,7 +292,7 @@
     },
     "canvas": {
         "board": "Lienzo del automatismo",
-        "help": "Arrastra el fondo para moverlo y usa la rueda para el zoom. Arrastra de un puerto a un nodo para unirlos. Tab va a un nodo, Intro lo abre, flechas lo mueven, Supr lo quita, F2 lo renombra, D lo apaga, P lo fija, clic derecho para más. N añade un nodo, Mayús+S una nota, Ctrl+C y Ctrl+V copian y pegan, Ctrl+Z deshace, 1 encuadra.",
+        "help": "Arrastra el fondo para moverlo y usa la rueda para el zoom. Arrastra de un puerto a un nodo para unirlos. Tab va a un nodo, Intro lo abre, flechas lo mueven, Supr lo quita, F2 lo renombra, D lo apaga, P lo fija, clic derecho para más. N añade un nodo, Mayús+S una nota, Ctrl+C y Ctrl+V copian y pegan, Ctrl+Z deshace, 1 encuadra, Mayús+Alt+T ordena.",
         "helpReadOnly": "Arrastra el fondo para moverlo, la rueda o dos dedos para el zoom. Tab va a un nodo e Intro lo muestra.",
         "view": "Vista",
         "viewCanvas": "Lienzo",
@@ -386,7 +386,12 @@
             "deleteMany": "Eliminar {count} nodos"
         },
         "noSampleToPin": "Haz antes una prueba o escribe aquí una muestra.",
-        "unpinned": "Muestra soltada"
+        "unpinned": "Muestra soltada",
+        "insertHere": "Añadir un nodo aquí",
+        "insertTitle": "Añadir un nodo en medio",
+        "insertGone": "Esa conexión ya no existe.",
+        "tidy": "Ordenar",
+        "tidied": "Ordenado. Ctrl+Z lo deshace."
     },
     "stepStatus": {
         "ready": "Listo",

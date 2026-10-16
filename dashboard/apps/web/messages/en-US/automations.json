@@ -292,7 +292,7 @@
     },
     "canvas": {
         "board": "Automation canvas",
-        "help": "Drag the board to move it, the wheel to zoom. Drag from a port onto a node to connect. Tab to a node, Enter to open it, arrows to move it, Delete to remove it, F2 to rename it, D to switch it off, P to pin it, right-click for more. N adds a node, Shift+S a note, Ctrl+C and Ctrl+V copy and paste, Ctrl+Z undoes, 1 fits the view.",
+        "help": "Drag the board to move it, the wheel to zoom. Drag from a port onto a node to connect. Tab to a node, Enter to open it, arrows to move it, Delete to remove it, F2 to rename it, D to switch it off, P to pin it, right-click for more. N adds a node, Shift+S a note, Ctrl+C and Ctrl+V copy and paste, Ctrl+Z undoes, 1 fits the view, Shift+Alt+T tidies up.",
         "helpReadOnly": "Drag the board to move it, the wheel or two fingers to zoom. Tab to a node and press Enter to see it.",
         "view": "View",
         "viewCanvas": "Canvas",
@@ -386,7 +386,12 @@
             "deleteMany": "Delete {count} nodes"
         },
         "noSampleToPin": "Run a test first, or write a sample here.",
-        "unpinned": "Sample unpinned"
+        "unpinned": "Sample unpinned",
+        "insertHere": "Add a node here",
+        "insertTitle": "Add a node in between",
+        "insertGone": "That connection is gone.",
+        "tidy": "Tidy up",
+        "tidied": "Tidied up. Ctrl+Z undoes it."
     },
     "stepStatus": {
         "ready": "Ready",

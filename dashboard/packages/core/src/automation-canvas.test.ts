@@ -211,3 +211,41 @@ describe("placing nodes added in the list view", () => {
         expect(canvas.placeNew(sample())).toEqual(canvas.layoutGraph(sample()));
     });
 });
+
+describe("inserting on a connection", () => {
+    it("puts the node between the two ends, keeps the port, and makes room downstream", () => {
+        const laid = canvas.layoutGraph(sample());
+        const key = canvas.edgeKey(laid.edges.find((entry) => entry.to.node === "a")!);
+        const before = laid.nodes.find((entry) => entry.id === "a")!.position!;
+        const inserted = canvas.insertOnEdge(laid, key, node("mid", "core.notify", { title: "M", body: "" }))!;
+        expect(inserted.edges).toContainEqual(edge("if1", "mid", "then"));
+        expect(inserted.edges).toContainEqual(edge("mid", "a"));
+        expect(inserted.edges.some((entry) => canvas.edgeKey(entry) === key)).toBe(false);
+        const mid = inserted.nodes.find((entry) => entry.id === "mid")!.position!;
+        const after = inserted.nodes.find((entry) => entry.id === "a")!.position!;
+        expect(mid.x).toBeGreaterThan(laid.nodes.find((entry) => entry.id === "if1")!.position!.x);
+        expect(after.x).toBeGreaterThanOrEqual(mid.x + canvas.CANVAS_NODE.width + canvas.CANVAS_GAP.x);
+        expect(after.x).toBeGreaterThan(before.x);
+        expect(graph.graphProblems(inserted)).toEqual(graph.graphProblems(laid));
+    });
+
+    it("inserts at the start of the Always lane, and refuses a trigger or a connection that is gone", () => {
+        const laid = canvas.layoutGraph(sample());
+        const inserted = canvas.insertOnEdge(laid, `${canvas.FINALLY_SOURCE}>z`, node("first", "core.notify", { title: "F", body: "" }))!;
+        expect(inserted.finally.entry).toBe("first");
+        expect(inserted.edges).toContainEqual(edge("first", "z"));
+        expect(canvas.lanesOf(inserted).get("z")).toBe("finally");
+        expect(canvas.insertOnEdge(laid, "nope", node("x", "core.notify"))).toBeNull();
+        expect(canvas.insertOnEdge(laid, canvas.edgeKey(laid.edges[0]!), node("x", "core.manual"))).toBeNull();
+    });
+});
+
+describe("tidy up", () => {
+    it("lays out every node again, stored positions or not, without touching notes", () => {
+        const laid = canvas.layoutGraph(sample());
+        const messy = { ...laid, nodes: laid.nodes.map((entry, index) => ({ ...entry, position: { x: index * 7, y: 3 } })), notes: [{ id: "note", text: "", position: { x: 5, y: 5 }, size: { width: 100, height: 80 } }] };
+        const tidy = canvas.layoutGraph(messy, { tidy: true });
+        expect(tidy.nodes.map((entry) => entry.position)).toEqual(laid.nodes.map((entry) => entry.position));
+        expect(tidy.notes).toEqual(messy.notes);
+    });
+});
