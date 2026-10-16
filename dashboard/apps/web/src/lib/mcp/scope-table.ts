@@ -69,6 +69,8 @@ export const PERMISSION_CATEGORIES: Readonly<Record<Permission, McpCategory>> = 
     "mailserver.manage": "mail",
     "calendar.use": "calendar",
     "crm.use": "productivity",
+    "automations.use": "productivity",
+    "automations.secrets": "productivity",
     "status.manage": "development",
     "chat.use": "chat",
     "chat.spaces": "chat",
