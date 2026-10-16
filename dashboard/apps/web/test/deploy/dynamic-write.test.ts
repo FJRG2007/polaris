@@ -142,6 +142,26 @@ describe("writing a file the edge watches", () => {
         expect(await leftovers()).toEqual([]);
     });
 
+    it("leaves a file that already holds the same content untouched", async () => {
+        // During an update two dashboards republish the same routes; the edge must
+        // not be handed a reload for a file that did not change.
+        const write = await writer();
+        const file = "polaris-same.yml";
+        await write(file, "http: same\n");
+        control.renames = 0;
+        control.written = [];
+
+        await write(file, "http: same\n");
+
+        expect(control.written).toEqual([]);
+        expect(control.renames).toBe(0);
+        expect(await readFile(join(dynamic, file), "utf8")).toBe("http: same\n");
+
+        await write(file, "http: changed\n");
+        expect(control.renames).toBe(1);
+        expect(await readFile(join(dynamic, file), "utf8")).toBe("http: changed\n");
+    });
+
     it("writes a restricted file through the same path", async () => {
         const write = await writer();
         await write("polaris-secret.key", "PRIVATE", { mode: 0o600 });
