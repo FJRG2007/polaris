@@ -43,6 +43,7 @@ on:
       - "dashboard/services/edge-guard/**"
       - "dashboard/services/hytale/**"
       - "dashboard/services/camera-relay/**"
+      - "dashboard/services/mqtt-broker/**"
       - "dashboard/services/vision/**"
       - "dashboard/services/face/**"
       - "dashboard/package.json"
@@ -110,6 +111,7 @@ jobs:
       guard: ${{ steps.filter.outputs.guard }}
       hytale: ${{ steps.filter.outputs.hytale }}
       relay: ${{ steps.filter.outputs.relay }}
+      broker: ${{ steps.filter.outputs.broker }}
       vision: ${{ steps.filter.outputs.vision }}
       face: ${{ steps.filter.outputs.face }}
     steps:
@@ -126,7 +128,7 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out vision true; out face true; }
+          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out bridge true; out guard true; out hytale true; out relay true; out broker true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -208,6 +210,8 @@ jobs:
           has '^dashboard/services/hytale/' && out hytale true || out hytale false
           # The relay is go2rtc plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
+          # The broker is Mosquitto plus an entrypoint; nothing else feeds it.
+          has '^dashboard/services/mqtt-broker/' && out broker true || out broker false
           # The worker bundles part of @polaris/core - the zone geometry, the
           # detector's decoder and the tracker - so a change to those is a change
           # to the worker. The whole of core was the pattern here, and core is
@@ -614,6 +618,37 @@ jobs:
           provenance: false
           sbom: false
 
+  # The local device broker: Mosquitto with one account, which the stock image
+  # has no way to arrive with. Published so a house does not build a broker the
+  # first time somebody links a lock.
+  broker:
+    needs: changes
+    if: ${{ needs.changes.outputs.broker == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: dashboard
+          file: dashboard/services/mqtt-broker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-mqtt-broker,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          # No attestation manifests, for the reason given on the relay job.
+          provenance: false
+          sbom: false
+
   # The vision worker: ffmpeg and one bundled file. Published so a house does not
   # build a video pipeline the first time somebody asks a camera to watch for
   # people.
@@ -708,7 +743,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [dashboard-ci, web, bridge, guard, hytale, relay, vision, face]
+    needs: [dashboard-ci, web, bridge, guard, hytale, relay, broker, vision, face]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
@@ -760,6 +795,11 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-camera-relay:latest \
             ghcr.io/fjrg2007/polaris-camera-relay@${{ needs.relay.outputs.digest }}
+      - name: Tag the local device broker
+        if: ${{ env.PUBLISH == 'true' && needs.broker.result == 'success' }}
+        run: |
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-mqtt-broker:latest \
+            ghcr.io/fjrg2007/polaris-mqtt-broker@${{ needs.broker.outputs.digest }}
       - name: Tag the vision worker
         if: ${{ env.PUBLISH == 'true' && needs.vision.result == 'success' }}
         run: |
