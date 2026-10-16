@@ -59,6 +59,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
 import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-rail-drag";
 import * as move from "./channel-move";
+import { joinMenuGroups } from "./menu-groups";
 import {
     Ban,
     CheckCheck,
@@ -1482,222 +1483,228 @@ function RowMenu({
         <>
             <ContextMenu>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-                <ContextMenuContent className="w-48">
-                    {/* Back to the empty screen, as Escape does. Nothing is left
-                        or deleted: the conversation is only no longer open. */}
-                    {showing && (
-                        <>
-                            <ContextMenuItem onSelect={() => router.push("/chat")}>
-                                <X className="size-3.5" />
-                                {t("sidebar.closeChat")}
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-                    {/* Kept for this reader and nobody else, which is why it sits
-                    beside muting rather than in the channel's settings. */}
-                    <ContextMenuItem
-                        onSelect={async () => {
-                            await actions.setPinnedAction(channel.id, !channel.pinned);
-                            refresh();
-                        }}
-                    >
-                        {channel.pinned ? (
-                            <PinOff className="size-3.5" />
-                        ) : (
-                            <Pin className="size-3.5" />
-                        )}
-                        {channel.pinned ? t("sidebar.unpin") : t("sidebar.pinToTheTop")}
-                    </ContextMenuItem>
-                    {/* Only where there is something to put back. A conversation
-                    already carrying a badge has nothing to mark, and an item
-                    that does nothing is worse than one that is not drawn. */}
-                    {channel.unread === 0 ? (
-                        <ContextMenuItem
-                            onSelect={async () => {
-                                await actions.markUnreadAction({ channelId: channel.id });
-                                refresh();
-                            }}
-                        >
-                            <Mail className="size-3.5" />
-                            {t("sidebar.markAsUnread")}
-                        </ContextMenuItem>
-                    ) : (
-                        <ContextMenuItem
-                            onSelect={async () => {
-                                await actions.markChannelsReadAction({ channelIds: [channel.id] });
-                                refresh();
-                            }}
-                        >
-                            <CheckCheck className="size-3.5" />
-                            {t("channelMenu.markRead")}
-                        </ContextMenuItem>
-                    )}
-                    {/* An invitation into the space the channel is in: a
-                        channel has no door of its own, and the person arriving
-                        sees what any member of the space sees. */}
-                    {mayInvite && (
-                        <ContextMenuItem onSelect={() => setInviting(true)}>
-                            <UserPlus className="size-3.5" />
-                            {t("channelMenu.invite")}
-                        </ContextMenuItem>
-                    )}
-                    <ContextMenuItem
-                        onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
-                    >
-                        <Link2 className="size-3.5" />
-                        {t("sidebar.copyLink")}
-                    </ContextMenuItem>
-                    {/* What a bot, an integration or an API call names it by. */}
-                    <ContextMenuItem onSelect={() => void copyText(channel.id)}>
-                        <Fingerprint className="size-3.5" />
-                        {t("channelMenu.copyId")}
-                    </ContextMenuItem>
-                    <MuteOptions
-                        channel={channel}
-                        parts={CONTEXT_PARTS}
-                        onChoose={async (minutes) => {
-                            await actions.setMutedAction(channel.id, minutes);
-                            refresh();
-                        }}
-                    />
-                    {/* Not in a one-to-one conversation: every message in one is
-                        addressed to you, so "only mentions" would mean nothing
-                        and the mute is the whole of the question. */}
-                    {channel.kind !== "dm" && (
-                        <NotifyOptions
-                            level={channel.notifyLevel}
-                            parts={CONTEXT_PARTS}
-                            inheritable={channel.spaceId !== null}
-                            onChoose={async (level) => {
-                                await actions.setChannelNotifyAction(channel.id, level);
-                                refresh();
-                            }}
-                        />
-                    )}
-
-                    {/* Ring them from the row. The address is the whole
-                        mechanism - arriving with `answer` on it is what starts
-                        the call, which is the same path answering a missed one
-                        takes - so there is no second copy of "start a call"
-                        here to fall out of step with the one in the room. */}
-                    {channel.kind !== "text" && (
-                        <ContextMenuItem
-                            onSelect={() => router.push(`/chat/c/${channel.id}?answer=1`)}
-                        >
-                            <Phone className="size-3.5" />
-                            {t("sidebar.startACall")}
-                        </ContextMenuItem>
-                    )}
-
-                    {/* What you call them, offered from the row as well as from
-                    the open conversation: it is a note about a person, and the
-                    place somebody reaches for it is wherever their name is
-                    written. Nothing is announced and nobody else sees it. */}
-                    {person && (
-                        <ContextMenuItem onSelect={() => setNaming(true)}>
-                            <Pencil className="size-3.5" />
-                            {t("sidebar.nickname")}
-                        </ContextMenuItem>
-                    )}
-
-                    {/* The heavy one, and the reason it is here: somebody
-                        deciding they are done with a person decides it looking
-                        at the row with their name on, not after opening the
-                        conversation and finding their way to their profile.
-                        Below the rest and marked, so it is not next to Pin. */}
-                    {person && (
-                        <>
-                            <ContextMenuSeparator />
-                            {/* Lighter than blocking, and above it: only for a
-                                friend, and asked first. */}
-                            {friends.has(person.id) && (
-                                <ContextMenuItem
-                                    onSelect={() =>
-                                        void removeFriend({ id: person.id, name: person.name })
-                                    }
-                                >
-                                    <UserMinus className="size-3.5" />
-                                    {t("removeFriend.menu")}
-                                </ContextMenuItem>
-                            )}
-                            <ContextMenuItem
-                                variant={blocked.has(person.id) ? undefined : "danger"}
-                                onSelect={async () => {
-                                    const result = await runAction(
-                                        () =>
-                                            blocked.has(person.id)
-                                                ? unblockPersonAction({ userId: person.id })
-                                                : blockPersonAction({ userId: person.id }),
-                                        setError
-                                    );
-                                    if (!result?.error) refresh();
-                                }}
-                            >
-                                {blocked.has(person.id) ? (
-                                    <ShieldOff className="size-3.5" />
+                <ContextMenuContent className="w-52">
+                    {/* Grouped, a line between each group and never one at an
+                        edge or two together - see `joinMenuGroups`, which is
+                        what makes a group with nothing in it for this reader
+                        simply not there. */}
+                    {joinMenuGroups(
+                        [
+                            // The conversation itself: leave it, or ring it.
+                            [
+                                // Back to the empty screen, as Escape does.
+                                // Nothing is left or deleted: the
+                                // conversation is only no longer open.
+                                showing && (
+                                    <ContextMenuItem onSelect={() => router.push("/chat")}>
+                                        <X className="size-3.5" />
+                                        {t("sidebar.closeChat")}
+                                    </ContextMenuItem>
+                                ),
+                                // Ring them from the row. The address is the
+                                // whole mechanism - arriving with `answer` on
+                                // it starts the call, the same path answering
+                                // a missed one takes.
+                                channel.kind !== "text" && (
+                                    <ContextMenuItem
+                                        onSelect={() =>
+                                            router.push(`/chat/c/${channel.id}?answer=1`)
+                                        }
+                                    >
+                                        <Phone className="size-3.5" />
+                                        {t("sidebar.startACall")}
+                                    </ContextMenuItem>
+                                )
+                            ],
+                            // Read state. A conversation already carrying a
+                            // badge has nothing to mark unread, so the item
+                            // is whichever of the two would do something.
+                            [
+                                channel.unread === 0 ? (
+                                    <ContextMenuItem
+                                        onSelect={async () => {
+                                            await actions.markUnreadAction({
+                                                channelId: channel.id
+                                            });
+                                            refresh();
+                                        }}
+                                    >
+                                        <Mail className="size-3.5" />
+                                        {t("sidebar.markAsUnread")}
+                                    </ContextMenuItem>
                                 ) : (
-                                    <Ban className="size-3.5" />
-                                )}
-                                {blocked.has(person.id) ? t("sidebar.unblock") : t("sidebar.block")}
-                            </ContextMenuItem>
-                        </>
-                    )}
-
-                    {/* The same item the open conversation offers, offered from
-                    the row as well. Leaving is a decision about a conversation
-                    rather than something done inside it, and the place somebody
-                    reaches for it is the list - which is where they are when
-                    they decide they are done with it, and is the one place they
-                    do not have to open it first. */}
-                    {group && (
-                        <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem variant="danger" onSelect={() => setLeaving(true)}>
-                                <LogOut className="size-3.5" />
-                                {t("sidebar.leaveThisGroup")}
-                            </ContextMenuItem>
-                        </>
-                    )}
-
-                    {/* Only for somebody who administers the space, and only for a
-                    channel in one: a direct message has no settings and a group
-                    is managed from its own header. */}
-                    {moveTo && channel.spaceId && (
-                        <>
-                            <ContextMenuSeparator />
-                            <MoveToOptions move={moveTo} />
-                        </>
-                    )}
-
-                    {onManage && channel.spaceId && (
-                        <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem onSelect={() => onManage(channel, "edit")}>
-                                <Settings2 className="size-3.5" />
-                                {t("sidebar.editChannel")}
-                            </ContextMenuItem>
-                            {/* The settings, people and access rules, under a
-                                new name. Never the messages. */}
-                            <ContextMenuItem onSelect={() => onManage(channel, "duplicate")}>
-                                <Copy className="size-3.5" />
-                                {t("channelMenu.duplicate")}
-                            </ContextMenuItem>
-                            {/* Under the same heading as this one, which is
-                                what reaching for it from this row means. */}
-                            <ContextMenuItem onSelect={() => onManage(channel, "create")}>
-                                <Plus className="size-3.5" />
-                                {t("channelMenu.create")}
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                                variant="danger"
-                                onSelect={() => onManage(channel, "delete")}
-                            >
-                                <Trash2 className="size-3.5" />
-                                {t("channelMenu.delete")}
-                            </ContextMenuItem>
-                        </>
+                                    <ContextMenuItem
+                                        onSelect={async () => {
+                                            await actions.markChannelsReadAction({
+                                                channelIds: [channel.id]
+                                            });
+                                            refresh();
+                                        }}
+                                    >
+                                        <CheckCheck className="size-3.5" />
+                                        {t("channelMenu.markRead")}
+                                    </ContextMenuItem>
+                                )
+                            ],
+                            // Sharing it and where it sits for this reader.
+                            [
+                                // An invitation into the space the channel is
+                                // in: a channel has no door of its own.
+                                mayInvite && (
+                                    <ContextMenuItem onSelect={() => setInviting(true)}>
+                                        <UserPlus className="size-3.5" />
+                                        {t("channelMenu.invite")}
+                                    </ContextMenuItem>
+                                ),
+                                // Kept for this reader and nobody else.
+                                <ContextMenuItem
+                                    onSelect={async () => {
+                                        await actions.setPinnedAction(channel.id, !channel.pinned);
+                                        refresh();
+                                    }}
+                                >
+                                    {channel.pinned ? (
+                                        <PinOff className="size-3.5" />
+                                    ) : (
+                                        <Pin className="size-3.5" />
+                                    )}
+                                    {channel.pinned ? t("sidebar.unpin") : t("sidebar.pinToTheTop")}
+                                </ContextMenuItem>,
+                                <ContextMenuItem
+                                    onSelect={() => void copyText(channelLink(baseUrl, channel.id))}
+                                >
+                                    <Link2 className="size-3.5" />
+                                    {t("sidebar.copyLink")}
+                                </ContextMenuItem>
+                            ],
+                            // How loud it is.
+                            [
+                                <MuteOptions
+                                    channel={channel}
+                                    parts={CONTEXT_PARTS}
+                                    onChoose={async (minutes) => {
+                                        await actions.setMutedAction(channel.id, minutes);
+                                        refresh();
+                                    }}
+                                />,
+                                // Not in a one-to-one conversation: every
+                                // message in one is addressed to you, so "only
+                                // mentions" would mean nothing.
+                                channel.kind !== "dm" && (
+                                    <NotifyOptions
+                                        level={channel.notifyLevel}
+                                        parts={CONTEXT_PARTS}
+                                        inheritable={channel.spaceId !== null}
+                                        onChoose={async (level) => {
+                                            await actions.setChannelNotifyAction(channel.id, level);
+                                            refresh();
+                                        }}
+                                    />
+                                )
+                            ],
+                            // The person on the other end, for a one-to-one
+                            // conversation: what you call them, and - below
+                            // that and marked - being done with them, decided
+                            // looking at the row with their name on.
+                            [
+                                person && (
+                                    <ContextMenuItem onSelect={() => setNaming(true)}>
+                                        <Pencil className="size-3.5" />
+                                        {t("sidebar.nickname")}
+                                    </ContextMenuItem>
+                                ),
+                                person && friends.has(person.id) && (
+                                    <ContextMenuItem
+                                        onSelect={() =>
+                                            void removeFriend({ id: person.id, name: person.name })
+                                        }
+                                    >
+                                        <UserMinus className="size-3.5" />
+                                        {t("removeFriend.menu")}
+                                    </ContextMenuItem>
+                                ),
+                                person && (
+                                    <ContextMenuItem
+                                        variant={blocked.has(person.id) ? undefined : "danger"}
+                                        onSelect={async () => {
+                                            const result = await runAction(
+                                                () =>
+                                                    blocked.has(person.id)
+                                                        ? unblockPersonAction({ userId: person.id })
+                                                        : blockPersonAction({ userId: person.id }),
+                                                setError
+                                            );
+                                            if (!result?.error) refresh();
+                                        }}
+                                    >
+                                        {blocked.has(person.id) ? (
+                                            <ShieldOff className="size-3.5" />
+                                        ) : (
+                                            <Ban className="size-3.5" />
+                                        )}
+                                        {blocked.has(person.id)
+                                            ? t("sidebar.unblock")
+                                            : t("sidebar.block")}
+                                    </ContextMenuItem>
+                                )
+                            ],
+                            // Where it sits in the space, for whoever may
+                            // arrange it.
+                            [moveTo && channel.spaceId && <MoveToOptions move={moveTo} />],
+                            // The channel itself, for somebody who administers
+                            // the space. Deleting last, and asked first.
+                            onManage && channel.spaceId
+                                ? [
+                                      <ContextMenuItem onSelect={() => onManage(channel, "edit")}>
+                                          <Settings2 className="size-3.5" />
+                                          {t("sidebar.editChannel")}
+                                      </ContextMenuItem>,
+                                      // The settings, people and access rules,
+                                      // under a new name. Never the messages.
+                                      <ContextMenuItem
+                                          onSelect={() => onManage(channel, "duplicate")}
+                                      >
+                                          <Copy className="size-3.5" />
+                                          {t("channelMenu.duplicate")}
+                                      </ContextMenuItem>,
+                                      // Under the same heading as this one.
+                                      <ContextMenuItem onSelect={() => onManage(channel, "create")}>
+                                          <Plus className="size-3.5" />
+                                          {t("channelMenu.create")}
+                                      </ContextMenuItem>,
+                                      <ContextMenuItem
+                                          variant="danger"
+                                          onSelect={() => onManage(channel, "delete")}
+                                      >
+                                          <Trash2 className="size-3.5" />
+                                          {t("channelMenu.delete")}
+                                      </ContextMenuItem>
+                                  ]
+                                : [],
+                            // Leaving a group is a decision about the
+                            // conversation, made from the list where somebody
+                            // is when they decide they are done with it.
+                            [
+                                group && (
+                                    <ContextMenuItem
+                                        variant="danger"
+                                        onSelect={() => setLeaving(true)}
+                                    >
+                                        <LogOut className="size-3.5" />
+                                        {t("sidebar.leaveThisGroup")}
+                                    </ContextMenuItem>
+                                )
+                            ],
+                            // What a bot, an integration or an API call names
+                            // it by.
+                            [
+                                <ContextMenuItem onSelect={() => void copyText(channel.id)}>
+                                    <Fingerprint className="size-3.5" />
+                                    {t("channelMenu.copyId")}
+                                </ContextMenuItem>
+                            ]
+                        ],
+                        ContextMenuSeparator
                     )}
                 </ContextMenuContent>
             </ContextMenu>
@@ -1777,41 +1784,48 @@ function CategoryMenuItems({
     const t = useTranslations("chat");
     return (
         <>
-            {unread && (
-                <ContextMenuItem onSelect={onMarkRead}>
-                    <CheckCheck className="size-3.5" />
-                    {t("channelMenu.markRead")}
-                </ContextMenuItem>
-            )}
-            <ContextMenuItem onSelect={onToggle}>
-                <ChevronDown className={cn("size-3.5", folded && "-rotate-90")} />
-                {folded ? t("channelMenu.expand") : t("channelMenu.collapse")}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => onFoldAll(true)}>
-                <ChevronsDownUp className="size-3.5" />
-                {t("channelMenu.collapseAll")}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => onFoldAll(false)}>
-                <ChevronsUpDown className="size-3.5" />
-                {t("channelMenu.expandAll")}
-            </ContextMenuItem>
-            {manage && (
-                <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onSelect={manage.onCreate}>
-                        <Plus className="size-3.5" />
-                        {t("channelMenu.create")}
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={manage.onRename}>
-                        <Pencil className="size-3.5" />
-                        {t("channelMenu.editCategory")}
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem variant="danger" onSelect={manage.onDelete}>
-                        <Trash2 className="size-3.5" />
-                        {t("channelMenu.deleteCategory")}
-                    </ContextMenuItem>
-                </>
+            {joinMenuGroups(
+                [
+                    [
+                        unread && (
+                            <ContextMenuItem onSelect={onMarkRead}>
+                                <CheckCheck className="size-3.5" />
+                                {t("channelMenu.markRead")}
+                            </ContextMenuItem>
+                        )
+                    ],
+                    [
+                        <ContextMenuItem onSelect={onToggle}>
+                            <ChevronDown className={cn("size-3.5", folded && "-rotate-90")} />
+                            {folded ? t("channelMenu.expand") : t("channelMenu.collapse")}
+                        </ContextMenuItem>,
+                        <ContextMenuItem onSelect={() => onFoldAll(true)}>
+                            <ChevronsDownUp className="size-3.5" />
+                            {t("channelMenu.collapseAll")}
+                        </ContextMenuItem>,
+                        <ContextMenuItem onSelect={() => onFoldAll(false)}>
+                            <ChevronsUpDown className="size-3.5" />
+                            {t("channelMenu.expandAll")}
+                        </ContextMenuItem>
+                    ],
+                    manage
+                        ? [
+                              <ContextMenuItem onSelect={manage.onCreate}>
+                                  <Plus className="size-3.5" />
+                                  {t("channelMenu.create")}
+                              </ContextMenuItem>,
+                              <ContextMenuItem onSelect={manage.onRename}>
+                                  <Pencil className="size-3.5" />
+                                  {t("channelMenu.editCategory")}
+                              </ContextMenuItem>,
+                              <ContextMenuItem variant="danger" onSelect={manage.onDelete}>
+                                  <Trash2 className="size-3.5" />
+                                  {t("channelMenu.deleteCategory")}
+                              </ContextMenuItem>
+                          ]
+                        : []
+                ],
+                ContextMenuSeparator
             )}
         </>
     );

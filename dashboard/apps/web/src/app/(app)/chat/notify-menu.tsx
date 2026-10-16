@@ -20,6 +20,15 @@ import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Bell, Check } from "lucide-react";
 import type { MenuParts } from "./mute-menu";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** Each level's name, in the reader's language. */
+const LEVEL_KEYS: Readonly<Record<core.ChatChannelNotifyLevel, NamespaceKey<"chat">>> = {
+    [core.CHAT_NOTIFY_INHERIT]: "notifyMenu.levels.inherit",
+    all: "notifyMenu.levels.all",
+    mentions: "notifyMenu.levels.mentions",
+    none: "notifyMenu.levels.none"
+};
 
 export function NotifyOptions({
     level,
@@ -49,7 +58,17 @@ export function NotifyOptions({
         <Sub>
             <SubTrigger>
                 <Bell className="size-3.5" />
-                {t("notifyMenu.notifications")}
+                {/* What it is set to now, under the name, so the answer to
+                    "why did this not ping me" is on the row without opening it. */}
+                <span className="flex min-w-0 flex-col leading-tight">
+                    <span className="truncate">{t("notifyMenu.notifications")}</span>
+                    <span
+                        className="truncate text-[0.6875rem] text-foreground-subtle"
+                        title={t(LEVEL_KEYS[current])}
+                    >
+                        {t(LEVEL_KEYS[current])}
+                    </span>
+                </span>
             </SubTrigger>
             <SubContent>
                 {offered.map((option) => (
@@ -61,7 +80,7 @@ export function NotifyOptions({
                         ) : (
                             <span aria-hidden="true" className="size-3.5" />
                         )}
-                        {core.CHAT_NOTIFY_LABEL[option]}
+                        {t(LEVEL_KEYS[option])}
                     </Item>
                 ))}
             </SubContent>

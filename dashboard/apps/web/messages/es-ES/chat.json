@@ -1536,7 +1536,13 @@
         "about": "Sobre mí"
     },
     "notifyMenu": {
-        "notifications": "Avisos"
+        "notifications": "Avisos",
+        "levels": {
+            "inherit": "Como el servidor",
+            "all": "Cada mensaje",
+            "mentions": "Solo menciones",
+            "none": "Nada"
+        }
     },
     "elsewhereLabel": {
         "somewhereElse": "En otro sitio"

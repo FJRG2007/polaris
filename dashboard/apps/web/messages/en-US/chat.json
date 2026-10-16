@@ -1536,7 +1536,13 @@
         "about": "About"
     },
     "notifyMenu": {
-        "notifications": "Notifications"
+        "notifications": "Notifications",
+        "levels": {
+            "inherit": "Follow the server",
+            "all": "Every message",
+            "mentions": "Only mentions",
+            "none": "Nothing"
+        }
     },
     "elsewhereLabel": {
         "somewhereElse": "Somewhere else"
