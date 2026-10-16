@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AutomationPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     return (
-        <div className="mx-auto w-full max-w-4xl">
+        <div className="mx-auto w-full max-w-[96rem]">
             <AutomationEditor id={id} />
         </div>
     );
