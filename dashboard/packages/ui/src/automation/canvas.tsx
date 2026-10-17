@@ -672,7 +672,8 @@ export function FlowCanvas<D extends graphs.FlowDefinition>({
             <div
                 className={cn(
                     "grid min-w-0 gap-4",
-                    inspectorPlacement === "beside" && "xl:grid-cols-[minmax(0,1fr)_24rem]"
+                    inspectorPlacement === "beside" &&
+                        "xl:grid-cols-[minmax(0,1fr)_clamp(360px,32vw,560px)]"
                 )}
             >
                 <div

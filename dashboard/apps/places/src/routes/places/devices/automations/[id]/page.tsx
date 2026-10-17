@@ -36,7 +36,7 @@ export default async function AutomationPage({
     if (!automationId && !canManage) redirect("/places/devices/automations");
 
     return (
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4">
             <h1 className="sr-only">{t("pages.automations.title")}</h1>
             <AutomationEditor
                 key={automationId ?? "new"}

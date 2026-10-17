@@ -356,15 +356,28 @@ export function useWide(query = "(min-width: 1024px)"): boolean {
     return wide;
 }
 
-const PANEL_WIDTH = { initial: 380, min: 300, max: 640 };
+const PANEL_WIDTH = { initial: 380, min: 300, max: 720 };
+/** The width a panel nobody has resized takes: a third of the window, within
+ *  what a form of two columns reads well at. */
+const PANEL_FLUID = "clamp(360px, 32vw, 560px)";
 const SHEET_HEIGHT = { min: 220 };
 
-function readSize(key: string, fallback: number, min: number, max: number): number {
+/** The size kept in this browser, or null where there is none to trust. */
+function readStoredSize(key: string, min: number, max: number): number | null {
     try {
-        const stored = Number(window.localStorage.getItem(key));
-        return Number.isFinite(stored) && stored >= min && stored <= max ? stored : fallback;
+        const raw = window.localStorage.getItem(key);
+        const stored = raw === null ? Number.NaN : Number(raw);
+        return Number.isFinite(stored) && stored >= min && stored <= max ? stored : null;
     } catch {
-        return fallback;
+        return null;
+    }
+}
+
+function forgetSize(key: string): void {
+    try {
+        window.localStorage.removeItem(key);
+    } catch {
+        // No storage here: there is nothing kept to forget.
     }
 }
 
@@ -404,11 +417,23 @@ export function BlockPanel({
     children: ReactNode;
 }) {
     const wide = useWide();
-    const [width, setWidth] = useState(PANEL_WIDTH.initial);
+    // Null until somebody drags the edge: the panel follows the window then.
+    const [width, setWidth] = useState<number | null>(null);
     const [height, setHeight] = useState(0);
+    const [measured, setMeasured] = useState<number | null>(null);
+    const aside = useRef<HTMLElement>(null);
     useEffect(() => {
-        setWidth(readSize(sizeKey, PANEL_WIDTH.initial, PANEL_WIDTH.min, PANEL_WIDTH.max));
+        setWidth(readStoredSize(sizeKey, PANEL_WIDTH.min, PANEL_WIDTH.max));
     }, [sizeKey]);
+    useEffect(() => {
+        const node = aside.current;
+        if (!open || !wide || !node) return;
+        setMeasured(node.offsetWidth);
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(() => setMeasured(node.offsetWidth));
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [open, wide]);
     const titleId = useId();
     if (!open) return null;
 
@@ -439,14 +464,15 @@ export function BlockPanel({
     if (wide)
         return (
             <aside
+                ref={aside}
                 aria-labelledby={titleId}
                 className="relative flex max-h-[calc(100dvh-8rem-var(--notice-height))] min-w-0 shrink-0 flex-col self-start overflow-hidden rounded-lg border border-border bg-card lg:sticky lg:top-4"
-                style={{ width }}
+                style={{ width: width ?? PANEL_FLUID }}
             >
                 <ResizeHandle
                     axis="x"
                     side="end"
-                    size={width}
+                    size={width ?? measured ?? PANEL_WIDTH.initial}
                     min={PANEL_WIDTH.min}
                     max={PANEL_WIDTH.max}
                     label={strings.resizePanel}
@@ -455,8 +481,8 @@ export function BlockPanel({
                         writeSize(sizeKey, next);
                     }}
                     onReset={() => {
-                        setWidth(PANEL_WIDTH.initial);
-                        writeSize(sizeKey, PANEL_WIDTH.initial);
+                        setWidth(null);
+                        forgetSize(sizeKey);
                     }}
                     className="absolute inset-y-0 left-0 z-10"
                 />
