@@ -37,6 +37,12 @@ export interface CallSession {
      * conversation, which is every call started from one.
      */
     readonly href?: string;
+    /**
+     * When this browser placed the call and rang somebody with it, for the tone
+     * it plays while they are rung. Absent for a call that was joined, answered,
+     * or brought back after a reload - none of those is waiting on anybody.
+     */
+    readonly placedAt?: number;
 }
 
 export interface CallHold {

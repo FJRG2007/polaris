@@ -415,9 +415,11 @@ describe("sharing a window that stopped sending pictures", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByText(/stopped sending new pictures/).getAttribute("role")).toBe(
-            "status"
-        );
+        // One line of the call's notices now: its words, and the whole sentence
+        // read with them, announced politely.
+        const line = screen.getByText(/stopped sending new pictures/).closest("[role]");
+        expect(line?.getAttribute("role")).toBe("status");
+        expect(line?.textContent).toContain("Your share stopped updating");
         rerender(
             <CallRoom
                 meetingId="m1"

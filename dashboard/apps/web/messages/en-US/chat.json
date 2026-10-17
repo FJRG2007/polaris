@@ -1546,6 +1546,30 @@
         "yourMicrophoneHasNotPicked": "Your microphone has not picked anything up for a while. Check that it is not muted on the machine itself, and that the right one is chosen under Account > Devices.",
         "dismiss": "Dismiss"
     },
+    "callNotices": {
+        "region": "Call notices",
+        "more": "+{count}",
+        "showMore": "Show {count} more call notices",
+        "showLess": "Show fewer call notices",
+        "details": "Details",
+        "rejoin": "Rejoin call",
+        "followsFrom": "Caused by the first notice",
+        "serverLost": "This call lost the call server. Nothing more will be heard until it is back.",
+        "short": {
+            "serverLost": "Disconnected from the call",
+            "reconnecting": "Reconnecting to the call",
+            "noMicrophone": "No microphone is open",
+            "micStopped": "Your microphone stopped",
+            "micSilent": "Your mic hears nothing",
+            "micNotSent": "Your mic is not being sent",
+            "othersSilent": "Others cannot be heard",
+            "theirs": "Others are not sending sound",
+            "turnedDown": "Everybody is turned down",
+            "quietMic": "You sound quieter than others",
+            "slowLine": "Slow connection",
+            "shareStill": "Your share stopped updating"
+        }
+    },
     "openDirect": {
         "noConversationToOpen": "No conversation to open.",
         "backToConversations": "Back to conversations"
@@ -1599,8 +1623,6 @@
         }
     },
     "diagnosis": {
-        "whatIsHappeningAtThe": "What is happening at the other end",
-        "whyThisCallHasNo": "Why this call has no sound",
         "whatWasChecked": "What was checked"
     },
     "linkCard": {

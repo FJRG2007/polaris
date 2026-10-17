@@ -52,11 +52,9 @@ import { ChatPeoplePicker } from "./chat-people-picker";
 import { CameraLookMenu } from "./camera-look-menu";
 import type { CameraLook } from "./camera-look";
 import { cameraProblemText, type CameraProblem } from "./camera-problem";
-import { NoAudioNotice } from "./no-audio-notice";
-import { QuietMicNotice } from "./quiet-mic-notice";
-import { SlowConnectionNotice } from "@/components/connection-banner";
+import { CallNoticeStrip, useCallNotices } from "./call-notice-strip";
 import { playCallSound } from "@/lib/call-sounds";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { FACE_MAX, fillsTile, useFaceSize, useTileFit } from "./call-grid";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
@@ -77,7 +75,6 @@ import { PersonMenu, StreamMenu, type SeatHosting } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
 import { useStreamFormat } from "./call-stream-format";
-import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { ControlHint, type ControlHintText } from "./control-hint";
 import { useMutedSpeech } from "./muted-speech";
 import type { SeatModeration } from "./call-moderation-menu";
@@ -242,6 +239,9 @@ export function CallRoom({
     const micHint: ControlHintText | null = talkingMuted
         ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
         : null;
+    // Everything the call has to say, weighed once: the strip draws it, and the
+    // microphone button carries whichever of it is about the microphone.
+    const notices = useCallNotices(call);
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
     /** Whether this browser can share a screen. Asked after mounting, as the
@@ -808,55 +808,11 @@ export function CallRoom({
                 )}
             </div>
 
-            {call.error && (
-                <p
-                    role="alert"
-                    className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
-                >
-                    {call.error}
-                </p>
-            )}
-
-            {/* What the call says about itself, in a strip of its own that
-                shrinks and scrolls before anything else gives way. On a square
-                or short screen these notices used to take their full height
-                out of a band that had none to give, and the rows below them -
-                the pictures, and the controls somebody needs to leave the call
-                - were pushed out over the conversation. */}
-            <div className="flex min-h-12 shrink flex-col gap-3 overflow-y-auto overscroll-contain empty:hidden">
-                {/* Why the call is silent, when it is. Everything else on this
-                screen is true before any sound has moved, so a call carrying
-                nothing looked exactly like one that worked. See
-                `call-diagnosis`. */}
-                <CallDiagnosisPanel audio={call.audio} />
-
-                {call.shareStill && (
-                    <p
-                        role="status"
-                        className="shrink-0 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground"
-                    >
-                        {t("callRoom.whatYouAreSharingHas")}
-                    </p>
-                )}
-
-                {/* A microphone that opened but is picking nothing up looks exactly
-                like somebody who is not talking, and the person it is happening
-                to has no way of telling. See `no-audio-notice`.
-
-                Watching what is published rather than the device behind it: with
-                a noise filter running they are two different tracks, and a graph
-                that has stopped producing anything leaves the device reading
-                perfectly while the call carries silence. */}
-                {/* A thin line is felt in a call before anywhere else. */}
-                <SlowConnectionNotice />
-
-                <NoAudioNotice
-                    track={call.outgoing}
-                    device={call.localStream?.getAudioTracks()[0] ?? null}
-                    micOn={call.micOn}
-                />
-                <QuietMicNotice micOn={call.micOn} />
-            </div>
+            {/* What the call says about itself, as one line. These used to be a
+                stack of banners, and when the call server went four of them took
+                the height the pictures and the controls needed - three of them
+                that same fault seen from the microphone. See `call-notice-strip`. */}
+            <CallNoticeStrip order={notices} />
 
             <CombineStrip call={call} />
 
@@ -1282,6 +1238,11 @@ export function CallRoom({
                     }
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
                     hint={micHint}
+                    alert={
+                        notices.mic
+                            ? { reason: notices.mic.short, tone: notices.mic.severity }
+                            : null
+                    }
                     variant={call.micOn ? "secondary" : "danger"}
                     pressed={!call.micOn}
                     onClick={call.toggleMic}
@@ -1517,9 +1478,14 @@ function Split({
     look,
     onLook,
     title,
-    hint
+    hint,
+    alert
 }: {
     label: string;
+    /** Something wrong with what this control sends, marked on it as a dot and
+     *  said in its name - the microphone not being sent, picking nothing up,
+     *  arriving too quiet. The sentence itself is in the call notices. */
+    alert?: { reason: string; tone: "error" | "warning" | "info" } | null;
     /** A word drawn over the control while its state needs saying - "Muted",
      *  "Deafened" - or a warning that has to be seen now. */
     hint?: ControlHintText | null;
@@ -1603,9 +1569,10 @@ function Split({
         onMirror !== undefined;
     const showing = ladder && level ? ladder.rungs[level] : null;
     const anchor = useRef<HTMLSpanElement>(null);
+    const alertId = useId();
 
     return (
-        <span ref={anchor} className="flex items-center">
+        <span ref={anchor} className="relative flex items-center">
             <ControlHint anchor={anchor} hint={hint ?? null} />
             {/* The icon alone. What it does is in the title and in the
                 accessible name, which is where a person who needs the words
@@ -1618,11 +1585,26 @@ function Split({
                 onClick={onClick}
                 aria-pressed={pressed}
                 aria-label={label}
-                title={title ?? label}
+                aria-describedby={alert ? alertId : undefined}
+                title={alert ? `${title ?? label}\n${alert.reason}` : (title ?? label)}
                 className={hasMenu ? "rounded-r-none" : undefined}
             >
                 {icon}
             </Button>
+            {alert && (
+                <>
+                    <span id={alertId} className="sr-only">
+                        {alert.reason}
+                    </span>
+                    <span
+                        aria-hidden
+                        className={cn(
+                            "pointer-events-none absolute -left-0.5 -top-0.5 size-2.5 rounded-full ring-2 ring-background",
+                            alert.tone === "error" ? "bg-danger" : "bg-warning"
+                        )}
+                    />
+                </>
+            )}
             {hasMenu && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

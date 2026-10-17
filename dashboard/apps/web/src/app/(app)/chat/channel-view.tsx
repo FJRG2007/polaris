@@ -94,6 +94,7 @@ import {
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
+import { placed } from "./ring-back";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -844,7 +845,10 @@ export function ChannelView({
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
             if (result?.error) setError(result.error);
             if (result?.meetingId) {
-                enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
+                enter(
+                    { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                    false
+                );
             }
             checkCall();
         });
@@ -1197,7 +1201,10 @@ export function ChannelView({
             }
             // Without a camera, whoever they are: a voice channel is voice, and
             // the camera is one press away inside it.
-            enter({ meetingId: result.meetingId, channelId, title: callTitle }, false);
+            enter(
+                { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                false
+            );
             checkCall();
         });
     }, [callTitle, callsOff, channel, channelId, checkCall, enter, pressed, router, session]);
@@ -2278,7 +2285,10 @@ export function ChannelView({
             return;
         }
         if (result.meetingId) {
-            enter({ meetingId: result.meetingId, channelId, title: callTitle }, withVideo);
+            enter(
+                { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                withVideo
+            );
         } else setError("That call could not be joined. Try again.");
         checkCall();
     }
@@ -2392,7 +2402,8 @@ export function ChannelView({
                                             {
                                                 meetingId: result.meetingId,
                                                 channelId,
-                                                title: callTitle
+                                                title: callTitle,
+                                                ...placed(result)
                                             },
                                             video
                                         );

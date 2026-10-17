@@ -25,8 +25,10 @@ vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
     playSoundAction: async () => ({})
 }));
 // The panels around the room, which are not what this is about.
-vi.mock("@/app/(app)/chat/call-diagnosis-panel", () => ({ CallDiagnosisPanel: () => null }));
-vi.mock("@/app/(app)/chat/no-audio-notice", () => ({ NoAudioNotice: () => null }));
+vi.mock("@/app/(app)/chat/call-notice-strip", () => ({
+    CallNoticeStrip: () => null,
+    useCallNotices: () => ({ top: null, rest: [], consequences: [], mic: null })
+}));
 vi.mock("@/app/(app)/chat/call-hands-panel", () => ({ HandStrip: () => null }));
 vi.mock("@/app/(app)/chat/call-combine-panel", () => ({
     CombineRequestDialog: () => null,

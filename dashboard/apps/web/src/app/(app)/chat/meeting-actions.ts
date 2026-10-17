@@ -72,7 +72,7 @@ export async function callsUnavailableAction(): Promise<string | null> {
  */
 export async function startCallAction(
     channelId: string
-): Promise<{ meetingId?: string; error?: string }> {
+): Promise<{ meetingId?: string; rang?: boolean; error?: string }> {
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const off = await calls.callsUnavailable();
@@ -96,7 +96,9 @@ export async function startCallAction(
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );
-    return result.error ? { error: result.error } : { meetingId: result.value!.meetingId };
+    return result.error
+        ? { error: result.error }
+        : { meetingId: result.value!.meetingId, rang: result.value!.rang ?? false };
 }
 
 /**

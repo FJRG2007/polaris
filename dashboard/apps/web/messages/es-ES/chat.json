@@ -1546,6 +1546,30 @@
         "yourMicrophoneHasNotPicked": "Tu micrófono lleva un rato sin captar nada. Comprueba que no esté silenciado en el propio equipo y que esté elegido el correcto en Cuenta > Dispositivos.",
         "dismiss": "Cerrar"
     },
+    "callNotices": {
+        "region": "Avisos",
+        "more": "+{count}",
+        "showMore": "Ver {count} avisos más",
+        "showLess": "Ver menos avisos",
+        "details": "Detalles",
+        "rejoin": "Reconectar",
+        "followsFrom": "Causado por el primer aviso",
+        "serverLost": "Esta llamada perdió el servidor de llamadas. No se oirá nada más hasta que vuelva.",
+        "short": {
+            "serverLost": "Desconectado de la llamada",
+            "reconnecting": "Reconectando la llamada",
+            "noMicrophone": "No hay micrófono abierto",
+            "micStopped": "Tu micrófono se detuvo",
+            "micSilent": "Tu micro no capta nada",
+            "micNotSent": "Tu micrófono no se envía",
+            "othersSilent": "No se oye a los demás",
+            "theirs": "Los demás no envían sonido",
+            "turnedDown": "Todos están sin volumen",
+            "quietMic": "Suenas más bajo que el resto",
+            "slowLine": "Conexión lenta",
+            "shareStill": "Lo compartido no se actualiza"
+        }
+    },
     "openDirect": {
         "noConversationToOpen": "No hay conversación que abrir.",
         "backToConversations": "Volver a conversaciones"
@@ -1599,8 +1623,6 @@
         }
     },
     "diagnosis": {
-        "whatIsHappeningAtThe": "Qué pasa en el otro extremo",
-        "whyThisCallHasNo": "Por qué la llamada no suena",
         "whatWasChecked": "Qué se ha comprobado"
     },
     "linkCard": {

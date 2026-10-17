@@ -227,3 +227,20 @@ describe("a call in a channel", () => {
         expect(state.bodies).toEqual([]);
     });
 });
+
+describe("whether placing a call rang somebody", () => {
+    it("rings from whoever starts a direct message call, not from whoever answers", async () => {
+        expect((await meetings.startOrJoin(ana, "c1")).rang).toBe(true);
+        expect((await meetings.startOrJoin(ben, "c1")).rang).toBe(false);
+    });
+
+    it("rings in a group", async () => {
+        state.kind = "group";
+        expect((await meetings.startOrJoin(ana, "c1")).rang).toBe(true);
+    });
+
+    it("rings nobody in a channel's room", async () => {
+        state.kind = "voice";
+        expect((await meetings.startOrJoin(ana, "c1")).rang).toBe(false);
+    });
+});

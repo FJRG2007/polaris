@@ -412,9 +412,13 @@ export const RING_FOR_MS = 45_000;
  * at, which is every tab a call arrives in. The ring rang once and then stopped
  * for the rest of its forty-five seconds, and the code looked correct - the
  * timer was simply not being run. The audio thread is not throttled.
+ *
+ * Only the passes that finish inside the span: each is shorter than its
+ * interval, so a pass that starts a whole interval before the end is heard to its
+ * end and none is still sounding after the ring has given up.
  */
-export function ringPasses(name: "ring" | "ringBack"): number {
-    return Math.max(1, Math.ceil(RING_FOR_MS / RING_EVERY_MS[name]));
+export function ringPasses(name: "ring" | "ringBack", forMs: number = RING_FOR_MS): number {
+    return Math.max(1, Math.floor(forMs / RING_EVERY_MS[name]));
 }
 
 /** How loud a tone is by default. Low: these play over whatever the reader is
@@ -598,16 +602,20 @@ function sound(
  * Ring until the returned function is called, or until it gives up.
  *
  * The first pass is immediate: a ring that waits for its own interval before the
- * first sound is a ring that is missed.
+ * first sound is a ring that is missed. `forMs` shortens the span for a ring
+ * that started part of the way through it - the caller's tone, resumed.
  */
-export function startRinging(name: "ring" | "ringBack" = "ring"): () => void {
+export function startRinging(
+    name: "ring" | "ringBack" = "ring",
+    forMs: number = RING_FOR_MS
+): () => void {
     const level = soundGain();
     const ctx = level > 0 ? audio() : null;
     if (!ctx) return () => undefined;
 
     const every = RING_EVERY_MS[name] / 1000;
     const made: OscillatorNode[] = [];
-    for (let pass = 0; pass < ringPasses(name); pass += 1) {
+    for (let pass = 0; pass < ringPasses(name, forMs); pass += 1) {
         made.push(...schedule(ctx, name, ctx.currentTime + pass * every, level));
     }
     return () => {
