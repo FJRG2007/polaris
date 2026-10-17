@@ -495,7 +495,11 @@ function Loaded({
                     </p>
                     <Section
                         title={t("editor.when")}
-                        hint={flow.when && flow.when.kind !== "any" ? t("flow.whenCombined") : t("editor.whenHint")}
+                        hint={
+                            flow.when && flow.when.kind !== "any"
+                                ? t("flow.whenCombined")
+                                : t("editor.whenHint")
+                        }
                     >
                         <WhenFields
                             when={flow.when ?? { kind: "any" }}
@@ -1171,7 +1175,9 @@ function NodeCard({
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{nodeTitle(t, step.node.type)}</p>
                     {open ? null : (
-                        <p className="truncate text-xs text-muted-foreground">{nodeHint(t, step.node.type)}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                            {nodeHint(t, step.node.type)}
+                        </p>
                     )}
                     {!valid ? (
                         <p className="text-xs text-warning-ink">{t("runErrors.badConfig")}</p>
@@ -1231,11 +1237,7 @@ function NodeCard({
                             onChanged={onChanged}
                         />
                     </ReferenceScope>
-                    <FailureFields
-                        node={step.node}
-                        onChange={setNode}
-                        allowPort={false}
-                    />
+                    <FailureFields node={step.node} onChange={setNode} allowPort={false} />
                 </fieldset>
             ) : null}
             {step.branches ? (
@@ -1252,7 +1254,11 @@ function NodeCard({
                                         ...step,
                                         branches: core
                                             .nodePorts(step.node.type, step.node)
-                                            .map((_, index) => (index === at ? branch : (step.branches?.[index] ?? [])))
+                                            .map((_, index) =>
+                                                index === at
+                                                    ? branch
+                                                    : (step.branches?.[index] ?? [])
+                                            )
                                     })
                                 }
                                 types={STEP_TYPES}

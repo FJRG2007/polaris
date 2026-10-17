@@ -33,8 +33,12 @@ afterEach(cleanup);
 
 const draft = (nodes: core.GraphNode[]): core.AutomationGraph =>
     core.automationGraphSchema.parse({ nodes, edges: [] });
-const node = (id: string, type: string, config: unknown = {}, extra: Partial<core.GraphNode> = {}) =>
-    ({ id, type, typeVersion: 1, config, ...extra }) as core.GraphNode;
+const node = (
+    id: string,
+    type: string,
+    config: unknown = {},
+    extra: Partial<core.GraphNode> = {}
+) => ({ id, type, typeVersion: 1, config, ...extra }) as core.GraphNode;
 
 describe("the condition editor", () => {
     it("adds a nested group and turns a group into NOT", () => {
@@ -184,7 +188,9 @@ describe("ports and passes in the reader's words", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByText("Paid|Case 2|Otherwise|Path 2|On error|Timed out|Each|Done")).toBeTruthy();
+        expect(
+            screen.getByText("Paid|Case 2|Otherwise|Path 2|On error|Timed out|Each|Done")
+        ).toBeTruthy();
     });
 
     it("reads loop passes from the iteration path, counted from one", () => {

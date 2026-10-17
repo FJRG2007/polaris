@@ -710,7 +710,8 @@ async function buildContext(run: RunRow, iteration: string): Promise<RunContext>
     const visible = done.sort((a, b) => b.iteration.length - a.iteration.length);
     const steps: Record<string, unknown> = {};
     for (const step of visible)
-        if (step.output !== null && !Object.hasOwn(steps, step.nodeId)) steps[step.nodeId] = step.output;
+        if (step.output !== null && !Object.hasOwn(steps, step.nodeId))
+            steps[step.nodeId] = step.output;
     const cause = (run.cause ?? {}) as Record<string, unknown>;
     const pass = innermostPass(iteration);
     let item: unknown;
@@ -735,7 +736,9 @@ async function buildContext(run: RunRow, iteration: string): Promise<RunContext>
         automation: { id: run.automation.id, name: run.automation.name },
         now: new Date().toISOString(),
         ...(pass ? { item, index: pass.pass } : {}),
-        ...(inputs && typeof inputs === "object" ? { inputs: inputs as Record<string, unknown> } : {})
+        ...(inputs && typeof inputs === "object"
+            ? { inputs: inputs as Record<string, unknown> }
+            : {})
     };
 }
 
@@ -763,7 +766,15 @@ const CONTROL_TYPES = new Set([
 /** What a control node asks of the engine besides an ordinary result. */
 type ControlResult =
     | NodeResult
-    | { readonly hold: { readonly waitKey: string; readonly until?: Date; readonly input?: unknown; readonly output?: unknown }; readonly start?: { readonly iteration: string; readonly nodes: string[] } }
+    | {
+          readonly hold: {
+              readonly waitKey: string;
+              readonly until?: Date;
+              readonly input?: unknown;
+              readonly output?: unknown;
+          };
+          readonly start?: { readonly iteration: string; readonly nodes: string[] };
+      }
     | { readonly stop: { readonly as: "succeeded" | "failed"; readonly reason: string } };
 
 async function executeStep(
@@ -886,7 +897,9 @@ async function executeStep(
                     waitKey: result.hold.waitKey,
                     waitUntil: until ?? null,
                     input: store(result.hold.input ?? input),
-                    ...(result.hold.output !== undefined ? { output: store(result.hold.output) } : {})
+                    ...(result.hold.output !== undefined
+                        ? { output: store(result.hold.output) }
+                        : {})
                 }
             });
             if (result.start) await enqueue(run.id, result.start.nodes, result.start.iteration);
@@ -971,7 +984,13 @@ async function handleFailure(
         retryable(code)
     ) {
         const next = step.attempt + 1;
-        const done = await finishStep(step.id, { status: "retried", error: code, output, input, from });
+        const done = await finishStep(step.id, {
+            status: "retried",
+            error: code,
+            output,
+            input,
+            from
+        });
         if (!done) return;
         await prisma.automationStep.createMany({
             data: [
@@ -990,14 +1009,13 @@ async function handleFailure(
         return;
     }
     const detail = { error: code, ...(output ? { detail: output } : {}) };
-    const port =
-        refused
-            ? null
-            : node.onError === "continue"
-              ? core.passPort(node.type, node)
-              : node.onError === "port" && core.canTakeErrorPort(node.type)
-                ? "error"
-                : null;
+    const port = refused
+        ? null
+        : node.onError === "continue"
+          ? core.passPort(node.type, node)
+          : node.onError === "port" && core.canTakeErrorPort(node.type)
+            ? "error"
+            : null;
     if (port !== null) {
         const done = await finishStep(step.id, {
             status: failure.status === "interrupted" ? "interrupted" : "failed",
@@ -1058,7 +1076,10 @@ type RunConfig = ReturnType<(typeof core.CORE_NODE_CONFIGS)["core.run"]["parse"]
 type StopConfig = ReturnType<(typeof core.CORE_NODE_CONFIGS)["core.stop"]["parse"]>;
 
 /** The key a Wait for an event waits under: the shelf and the event's name. */
-export function eventWaitKey(shelf: { orgId: string | null; userId: string | null }, name: string): string {
+export function eventWaitKey(
+    shelf: { orgId: string | null; userId: string | null },
+    name: string
+): string {
     return `event:${shelf.orgId ? `org:${shelf.orgId}` : `user:${shelf.userId ?? ""}`}:${name}`;
 }
 
@@ -1085,18 +1106,29 @@ async function control(
                 batches.push(loop.batch === 1 ? value[at] : value.slice(at, at + loop.batch));
             if (core.byteLength(JSON.stringify(batches)) > L.stepDataBytes)
                 throw new StepError("listTooLarge");
-            return startLoop(graph, node, step, { count: value.length, passes: batches.length }, batches);
+            return startLoop(
+                graph,
+                node,
+                step,
+                { count: value.length, passes: batches.length },
+                batches
+            );
         }
         case "core.repeat": {
             const repeat = config as core.RepeatConfig;
             const passes = repeat.kind === "times" ? repeat.count : repeat.max;
-            if (repeat.kind === "until" && core.checkCondition(repeat.condition, { ...context, index: 0 }))
+            if (
+                repeat.kind === "until" &&
+                core.checkCondition(repeat.condition, { ...context, index: 0 })
+            )
                 return { output: { passes: 0 }, port: "done" };
             return startLoop(graph, node, step, { passes }, null);
         }
         case "core.stop": {
             const stop = config as StopConfig;
-            return { stop: { as: stop.as, reason: core.interpolate(stop.reason, context).slice(0, 200) } };
+            return {
+                stop: { as: stop.as, reason: core.interpolate(stop.reason, context).slice(0, 200) }
+            };
         }
         case "core.waitEvent": {
             const wait = config as WaitEventConfig;
@@ -1200,7 +1232,8 @@ async function settleLoops(
                     run,
                     passIteration(loop.iteration, loop.nodeId, seen)
                 );
-                if (core.checkCondition(repeat.data.condition, { ...context, index: next })) next = passes + 1;
+                if (core.checkCondition(repeat.data.condition, { ...context, index: next }))
+                    next = passes + 1;
             }
         }
         if (next < passes) {
@@ -1216,7 +1249,12 @@ async function settleLoops(
             ...(state.count !== undefined ? { count: state.count } : {}),
             passes: Math.min(seen + 1, passes)
         };
-        const done = await finishStep(loop.id, { status: "ok", port: "done", output, from: "waiting" });
+        const done = await finishStep(loop.id, {
+            status: "ok",
+            port: "done",
+            output,
+            from: "waiting"
+        });
         if (done) {
             await count(run.id, output);
             await enqueue(run.id, core.successors(graph, loop.nodeId, "done"), loop.iteration);
@@ -1246,7 +1284,9 @@ async function callAutomation(
     if (run.depth + 1 > L.depth) throw new StepRefusal("loop");
     if (!target.enabled || !target.publishedVersionId) throw new StepError("callOff");
     const graph = await loadGraph(target.publishedVersionId);
-    const called = graph?.nodes.find((entry) => entry.type === "core.called" && entry.enabled !== false);
+    const called = graph?.nodes.find(
+        (entry) => entry.type === "core.called" && entry.enabled !== false
+    );
     if (!called) throw new StepError("callNoTrigger");
     const declared = core.calledConfigSchema.parse(called.config ?? {}).inputs;
     const inputs = callInputs(declared, config.inputs, context);
@@ -1255,7 +1295,13 @@ async function callAutomation(
         versionId: target.publishedVersionId,
         triggerNodeId: called.id,
         firingKey: `call:${step.id}`,
-        cause: { id: called.id, at: new Date().toISOString(), kind: "call", inputs, callerRunId: run.id },
+        cause: {
+            id: called.id,
+            at: new Date().toISOString(),
+            kind: "call",
+            inputs,
+            callerRunId: run.id
+        },
         depth: run.depth + 1,
         parentRunId: run.id,
         parentStepId: step.id
@@ -1267,7 +1313,9 @@ async function callAutomation(
         if (answer.failed) throw new StepError("callFailed", answer.output);
         return { output: answer.output };
     }
-    return { hold: { waitKey: `${CALL_WAIT}${child.id}`, input: { automationId: target.id, inputs } } };
+    return {
+        hold: { waitKey: `${CALL_WAIT}${child.id}`, input: { automationId: target.id, inputs } }
+    };
 }
 
 /** A call's inputs, typed by what the called automation declares. Undeclared names are dropped. */
@@ -1287,7 +1335,8 @@ export function callInputs(
         }
         if (input.kind === "number") {
             const value = typeof raw === "number" ? raw : Number(raw);
-            if (!Number.isFinite(value)) throw new StepError("callInputInvalid", { input: input.name });
+            if (!Number.isFinite(value))
+                throw new StepError("callInputInvalid", { input: input.name });
             out[input.name] = value;
         } else if (input.kind === "boolean") {
             out[input.name] = raw === true || raw === "true";
@@ -1301,7 +1350,8 @@ export function callInputs(
                 }
         } else out[input.name] = typeof raw === "string" ? raw : JSON.stringify(raw);
     }
-    if (core.byteLength(JSON.stringify(out)) > L.eventPayloadBytes) throw new StepError("callInputInvalid");
+    if (core.byteLength(JSON.stringify(out)) > L.eventPayloadBytes)
+        throw new StepError("callInputInvalid");
     return out;
 }
 
@@ -1316,7 +1366,9 @@ async function childAnswer(
     });
     const graph = child ? await loadGraph(child.versionId) : null;
     const answers = new Set(
-        (graph?.nodes ?? []).filter((entry) => entry.type === "core.answer").map((entry) => entry.id)
+        (graph?.nodes ?? [])
+            .filter((entry) => entry.type === "core.answer")
+            .map((entry) => entry.id)
     );
     const rows = answers.size
         ? await prisma.automationStep.findMany({
@@ -1413,7 +1465,12 @@ async function resumeParent(childId: string): Promise<boolean> {
         });
         return true;
     }
-    const done = await finishStep(waitingStep.id, { status: "ok", port: "next", output, from: "waiting" });
+    const done = await finishStep(waitingStep.id, {
+        status: "ok",
+        port: "next",
+        output,
+        from: "waiting"
+    });
     if (!done) return false;
     await count(parent.id, output);
     await enqueue(parent.id, core.successors(graph, node.id, "next"), waitingStep.iteration);
@@ -1667,14 +1724,26 @@ export async function resumeEventWaits(
             const node = graph?.nodes.find((entry) => entry.id === step.nodeId);
             if (!run || !graph || !node || core.runFinished(run.status)) continue;
             const config = core.CORE_NODE_CONFIGS["core.waitEvent"].safeParse(node.config);
-            if (config.success && config.data.filter && !core.checkCondition(config.data.filter, { event: payload }))
+            if (
+                config.success &&
+                config.data.filter &&
+                !core.checkCondition(config.data.filter, { event: payload })
+            )
                 continue;
             await prisma.automationRun.updateMany({
                 where: { id: step.runId, status: "waiting" },
                 data: { status: "running", dueAt: null }
             });
-            const output = core.capStored({ name, payload, timedOut: false }, L.stepDataBytes) as object;
-            const done = await finishStep(step.id, { status: "ok", port: "next", output, from: "waiting" });
+            const output = core.capStored(
+                { name, payload, timedOut: false },
+                L.stepDataBytes
+            ) as object;
+            const done = await finishStep(step.id, {
+                status: "ok",
+                port: "next",
+                output,
+                from: "waiting"
+            });
             if (!done) continue;
             await enqueue(step.runId, core.successors(graph, step.nodeId, "next"), step.iteration);
             runs.add(step.runId);

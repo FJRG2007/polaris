@@ -84,7 +84,6 @@ export function triggerChoices(t: T, graph: core.AutomationGraph): { id: string;
     }));
 }
 
-
 /** An AND/OR group with an optional NOT, nested up to the schema's depth. */
 export function ConditionEditor({
     value,

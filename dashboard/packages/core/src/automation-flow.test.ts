@@ -46,10 +46,18 @@ describe("flow ports", () => {
     it("refuses an edge from a port the config does not have", () => {
         const config = { kind: "value", value: "{{trigger.x}}", cases: [{ equals: "a" }] };
         const flow = build(
-            [node("t", "core.manual"), node("s", "core.switch", config), node("a", "core.notify", { title: "a" })],
+            [
+                node("t", "core.manual"),
+                node("s", "core.switch", config),
+                node("a", "core.notify", { title: "a" })
+            ],
             [edge("t", "next", "s"), edge("s", "case2", "a")]
         );
-        expect(ag.graphProblems(flow)).toContainEqual({ code: "unknownPort", node: "s", port: "case2" });
+        expect(ag.graphProblems(flow)).toContainEqual({
+            code: "unknownPort",
+            node: "s",
+            port: "case2"
+        });
     });
 });
 
@@ -62,7 +70,12 @@ describe("loops", () => {
                 node("a", "core.notify", { title: "a" }),
                 node("b", "core.notify", { title: "b" })
             ],
-            [edge("t", "next", "l"), edge("l", "each", "a"), edge("l", "done", "b"), edge("b", "next", "a")]
+            [
+                edge("t", "next", "l"),
+                edge("l", "each", "a"),
+                edge("l", "done", "b"),
+                edge("b", "next", "a")
+            ]
         );
         expect(ag.graphProblems(flow)).toContainEqual({ code: "loopBodyLeaks", node: "a" });
     });
@@ -161,7 +174,10 @@ describe("the list view of flow control", () => {
                 },
                 {
                     node: n("par", "core.parallel", { lanes: 2 }),
-                    branches: [[{ node: n("b", "core.notify", { title: "b" }) }], [{ node: n("c", "core.notify", { title: "c" }) }]]
+                    branches: [
+                        [{ node: n("b", "core.notify", { title: "b" }) }],
+                        [{ node: n("c", "core.notify", { title: "c" }) }]
+                    ]
                 },
                 { node: n("join", "core.join", {}) },
                 {
@@ -202,7 +218,11 @@ describe("ports that follow a change of settings", () => {
     it("keeps wires by position when a case is only edited, and drops Otherwise when it goes", () => {
         const edited = { ...second, label: "renamed" };
         const moves = ag.portMoves(choose([first, second]), choose([first, edited], false));
-        expect(Object.fromEntries(moves)).toEqual({ case1: "case1", case2: "case2", otherwise: null });
+        expect(Object.fromEntries(moves)).toEqual({
+            case1: "case1",
+            case2: "case2",
+            otherwise: null
+        });
     });
 
     it("drops the lanes a parallel no longer has and the error port once it is off", () => {

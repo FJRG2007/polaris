@@ -254,7 +254,9 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                                 step={step}
                                 label={nodeLabel(t, byId.get(step.nodeId))}
                                 node={byId.get(step.nodeId)}
-                                finallyLane={step.iteration.split("/")[0] === core.FINALLY_ITERATION}
+                                finallyLane={
+                                    step.iteration.split("/")[0] === core.FINALLY_ITERATION
+                                }
                                 pass={passOf(step.iteration)}
                                 showData={run.canSeeData}
                             />
@@ -321,7 +323,9 @@ function StepItem({
                         {step.finishedAt ? took(step.startedAt, step.finishedAt) : ""}
                         {step.error ? ` - ${words(step.error)}` : ""}
                         {pass !== null ? ` - ${t("runView.pass", { number: pass })}` : ""}
-                        {step.attempt > 1 ? ` - ${t("runView.attempt", { number: step.attempt })}` : ""}
+                        {step.attempt > 1
+                            ? ` - ${t("runView.attempt", { number: step.attempt })}`
+                            : ""}
                         {went ? ` - ${t("runView.went", { port: went })}` : ""}
                     </p>
                 </div>

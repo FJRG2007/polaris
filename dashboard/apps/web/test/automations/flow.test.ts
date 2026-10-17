@@ -53,7 +53,12 @@ const calls = await import("@/lib/automations/calls");
 
 const fake = () => db.current!;
 type Extra = Partial<core.GraphNode>;
-const node = (id: string, type: string, config: unknown = {}, extra: Extra = {}): core.GraphNode => ({
+const node = (
+    id: string,
+    type: string,
+    config: unknown = {},
+    extra: Extra = {}
+): core.GraphNode => ({
     id,
     type,
     typeVersion: 1,
@@ -81,7 +86,12 @@ type Wire = [string, string, string];
 async function seed(
     nodes: core.GraphNode[],
     wires: Wire[],
-    options: { finally?: string; onCancel?: boolean; trigger?: core.GraphNode; userId?: string } = {}
+    options: {
+        finally?: string;
+        onCancel?: boolean;
+        trigger?: core.GraphNode;
+        userId?: string;
+    } = {}
 ) {
     const trigger = options.trigger ?? node("t1", "core.manual");
     const graph = core.automationGraphSchema.parse({
@@ -193,7 +203,10 @@ describe("Choose", () => {
         const both = await fire(every, "k2", { n: 50 });
         await engine.advanceRun(both.id);
         expect(titles()).toEqual(["step a", "step b"]);
-        expect(step(both.id, "sw")).toMatchObject({ port: "case1,case2", output: { matched: [1, 2] } });
+        expect(step(both.id, "sw")).toMatchObject({
+            port: "case1,case2",
+            output: { matched: [1, 2] }
+        });
         notify.mockClear();
         await engine.advanceRun((await fire(first, "k3", { n: -1 })).id);
         expect(titles()).toEqual(["step c"]);
@@ -275,7 +288,10 @@ describe("At the same time and Join", () => {
         await drain();
         expect(titles()).toEqual(["step a", "step z", "step b"]);
         expect(stepsOf(started.id, "z")).toHaveLength(1);
-        expect(step(started.id, "join")!.output).toMatchObject({ items: [{ sent: true }], missing: ["b"] });
+        expect(step(started.id, "join")!.output).toMatchObject({
+            items: [{ sent: true }],
+            missing: ["b"]
+        });
     });
 
     it("goes on once N have arrived", async () => {
@@ -345,7 +361,11 @@ describe("At the same time and Join", () => {
 describe("loops", () => {
     it("walks every item, one pass at a time, then leaves by done", async () => {
         const seeded = await seed(
-            [node("each", "core.forEach", { items: "{{trigger.items}}" }), say("x", "item {{item}} at {{index}}"), say("end")],
+            [
+                node("each", "core.forEach", { items: "{{trigger.items}}" }),
+                say("x", "item {{item}} at {{index}}"),
+                say("end")
+            ],
             [
                 ["t1", "next", "each"],
                 ["each", "each", "x"],
@@ -355,17 +375,25 @@ describe("loops", () => {
         const started = await fire(seeded, "k1", { items: ["a", "b", "c"] });
         await engine.advanceRun(started.id);
         expect(titles()).toEqual(["item a at 0", "item b at 1", "item c at 2", "step end"]);
-        expect(step(started.id, "each")).toMatchObject({ status: "ok", port: "done", output: { count: 3, passes: 3 } });
-        expect(steps(started.id).filter((row) => row.nodeId === "x").map((row) => row.iteration)).toEqual([
-            "0/each:0",
-            "0/each:1",
-            "0/each:2"
-        ]);
+        expect(step(started.id, "each")).toMatchObject({
+            status: "ok",
+            port: "done",
+            output: { count: 3, passes: 3 }
+        });
+        expect(
+            steps(started.id)
+                .filter((row) => row.nodeId === "x")
+                .map((row) => row.iteration)
+        ).toEqual(["0/each:0", "0/each:1", "0/each:2"]);
     });
 
     it("hands batches, waits inside a pass, and refuses an unbounded list", async () => {
         const seeded = await seed(
-            [node("each", "core.forEach", { items: "{{trigger.items}}", batch: 2 }), pause("w"), say("x", "{{item}}")],
+            [
+                node("each", "core.forEach", { items: "{{trigger.items}}", batch: 2 }),
+                pause("w"),
+                say("x", "{{item}}")
+            ],
             [
                 ["t1", "next", "each"],
                 ["each", "each", "w"],
@@ -398,7 +426,14 @@ describe("loops", () => {
         expect(titles()).toEqual(["pass 0", "pass 1", "pass 2"]);
         notify.mockClear();
         const until = await seed(
-            [node("rep", "core.repeat", { kind: "until", max: 10, condition: compare("{{index}}", "gte", "2") }), say("x", "pass {{index}}")],
+            [
+                node("rep", "core.repeat", {
+                    kind: "until",
+                    max: 10,
+                    condition: compare("{{index}}", "gte", "2")
+                }),
+                say("x", "pass {{index}}")
+            ],
             [
                 ["t1", "next", "rep"],
                 ["rep", "each", "x"]
@@ -413,7 +448,14 @@ describe("loops", () => {
     it("checks the until condition against what the pass just did", async () => {
         sent.statuses = [202, 202, 200, 200];
         const polling = await seed(
-            [node("rep", "core.repeat", { kind: "until", max: 10, condition: compare("{{steps.h.status}}", "eq", "200") }), http("h")],
+            [
+                node("rep", "core.repeat", {
+                    kind: "until",
+                    max: 10,
+                    condition: compare("{{steps.h.status}}", "eq", "200")
+                }),
+                http("h")
+            ],
             [
                 ["t1", "next", "rep"],
                 ["rep", "each", "h"]
@@ -429,15 +471,21 @@ describe("loops", () => {
 describe("Stop, retries and the error port", () => {
     it("stops as failed and still runs the Finally lane once", async () => {
         const seeded = await seed(
-            [node("stop", "core.stop", { as: "failed", reason: "no stock" }), say("after"), say("z")],
             [
-                ["t1", "next", "stop"]
+                node("stop", "core.stop", { as: "failed", reason: "no stock" }),
+                say("after"),
+                say("z")
             ],
+            [["t1", "next", "stop"]],
             { finally: "z" }
         );
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started.id);
-        expect(runRow(started.id)).toMatchObject({ status: "failed", finally: "done", error: "stoppedAsFailed" });
+        expect(runRow(started.id)).toMatchObject({
+            status: "failed",
+            finally: "done",
+            error: "stoppedAsFailed"
+        });
         expect(titles()).toEqual(["step z"]);
         const ok = await seed([node("stop", "core.stop", {})], [["t1", "next", "stop"]]);
         const stopped = await fire(ok, "k2");
@@ -448,14 +496,23 @@ describe("Stop, retries and the error port", () => {
     it("tries again after a wait, and a restart during the wait loses nothing and sends nothing twice", async () => {
         sent.statuses = [503, 200];
         const seeded = await seed(
-            [http("h", { retry: { tries: 3, waitSeconds: 30, backoff: "fixed" } }), say("after"), say("z")],
-            [["t1", "next", "h"], ["h", "next", "after"]],
+            [
+                http("h", { retry: { tries: 3, waitSeconds: 30, backoff: "fixed" } }),
+                say("after"),
+                say("z")
+            ],
+            [
+                ["t1", "next", "h"],
+                ["h", "next", "after"]
+            ],
             { finally: "z" }
         );
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started.id);
         expect(runRow(started.id).status).toBe("waiting");
-        expect(stepsOf(started.id, "h").map((row) => [row.attempt, row.status, row.waitKey ?? null])).toEqual([
+        expect(
+            stepsOf(started.id, "h").map((row) => [row.attempt, row.status, row.waitKey ?? null])
+        ).toEqual([
             [1, "retried", null],
             [2, "waiting", "retry"]
         ]);
@@ -494,8 +551,20 @@ describe("Stop, retries and the error port", () => {
     it("leaves by the error port after the last try, and the Finally lane runs once", async () => {
         sent.statuses = [500, 500];
         const seeded = await seed(
-            [http("h", { onError: "port", retry: { tries: 2, waitSeconds: 1, backoff: "fixed" } }), say("ok"), say("bad", "failed with {{steps.h.error}}"), say("z")],
-            [["t1", "next", "h"], ["h", "next", "ok"], ["h", "error", "bad"]],
+            [
+                http("h", {
+                    onError: "port",
+                    retry: { tries: 2, waitSeconds: 1, backoff: "fixed" }
+                }),
+                say("ok"),
+                say("bad", "failed with {{steps.h.error}}"),
+                say("z")
+            ],
+            [
+                ["t1", "next", "h"],
+                ["h", "next", "ok"],
+                ["h", "error", "bad"]
+            ],
             { finally: "z" }
         );
         const started = await fire(seeded, "k1");
@@ -508,7 +577,10 @@ describe("Stop, retries and the error port", () => {
 });
 
 describe("events between automations", () => {
-    async function listener(name: string, extra: core.GraphNode[] = [say("heard", "heard {{trigger.payload.door}}")]) {
+    async function listener(
+        name: string,
+        extra: core.GraphNode[] = [say("heard", "heard {{trigger.payload.door}}")]
+    ) {
         const seeded = await seed(extra, [["on", "next", extra[0]!.id]], {
             trigger: node("on", "core.onEvent", { name })
         });
@@ -519,13 +591,19 @@ describe("events between automations", () => {
     it("starts the automations on the shelf that listen, but never the announcer itself", async () => {
         await listener("door.closed");
         const speaker = await seed(
-            [node("say", "core.announce", { name: "door.closed", payload: [{ name: "door", value: "{{trigger.door}}" }] })],
+            [
+                node("say", "core.announce", {
+                    name: "door.closed",
+                    payload: [{ name: "door", value: "{{trigger.door}}" }]
+                })
+            ],
             [["on", "next", "say"]],
             { trigger: node("on", "core.onEvent", { name: "door.closed" }) }
         );
         await triggers.armVersion(speaker.automationId, speaker.versionId, speaker.graph);
         const other = await listener("door.closed");
-        fake().tables.automation!.find((row) => row.id === other.automationId)!.userId = "someone-else";
+        fake().tables.automation!.find((row) => row.id === other.automationId)!.userId =
+            "someone-else";
         const started = await engine.startRun({
             automationId: speaker.automationId,
             versionId: speaker.versionId,
@@ -539,7 +617,9 @@ describe("events between automations", () => {
         expect(titles()).toEqual(["heard front"]);
         const runs = fake().tables.automationRun!;
         expect(runs.filter((row) => row.automationId === speaker.automationId)).toHaveLength(1);
-        expect(runs.find((row) => row.automationId !== speaker.automationId && row.depth === 1)).toBeTruthy();
+        expect(
+            runs.find((row) => row.automationId !== speaker.automationId && row.depth === 1)
+        ).toBeTruthy();
     });
 
     it("refuses a chain deeper than the limit", async () => {
@@ -551,7 +631,9 @@ describe("events between automations", () => {
             depth: core.AUTOMATION_LIMITS.depth + 1
         });
         await drain();
-        expect(fake().tables.automationRun!.find((row) => row.automationId === seeded.automationId)).toMatchObject({
+        expect(
+            fake().tables.automationRun!.find((row) => row.automationId === seeded.automationId)
+        ).toMatchObject({
             status: "refused",
             error: "loop"
         });
@@ -569,15 +651,27 @@ describe("events between automations", () => {
                 say("closed", "closed {{steps.wait.payload.door}}"),
                 say("late")
             ],
-            [["t1", "next", "wait"], ["wait", "next", "closed"], ["wait", "timeout", "late"]]
+            [
+                ["t1", "next", "wait"],
+                ["wait", "next", "closed"],
+                ["wait", "timeout", "late"]
+            ]
         );
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started.id);
         expect(runRow(started.id).status).toBe("waiting");
-        await outbox.emitAutomationEvent("core.event", { userId: "u1", subjectKey: "door.closed", payload: { name: "door.closed", payload: { door: "front" } } });
+        await outbox.emitAutomationEvent("core.event", {
+            userId: "u1",
+            subjectKey: "door.closed",
+            payload: { name: "door.closed", payload: { door: "front" } }
+        });
         await drain();
         expect(runRow(started.id).status).toBe("waiting");
-        const id = await outbox.emitAutomationEvent("core.event", { userId: "u1", subjectKey: "door.closed", payload: { name: "door.closed", payload: { door: "back" } } });
+        const id = await outbox.emitAutomationEvent("core.event", {
+            userId: "u1",
+            subjectKey: "door.closed",
+            payload: { name: "door.closed", payload: { door: "back" } }
+        });
         await outbox.processAutomationEvents();
         // The process died before it marked the event processed: it is matched again.
         fake().tables.automationEvent!.find((row) => row.id === id)!.processedAt = null;
@@ -589,8 +683,17 @@ describe("events between automations", () => {
 
     it("wakes every waiter under the name, past one page", async () => {
         const seeded = await seed(
-            [node("wait", "core.waitEvent", { name: "bell", timeout: { amount: 1, unit: "hours" } }), say("rang")],
-            [["t1", "next", "wait"], ["wait", "next", "rang"]]
+            [
+                node("wait", "core.waitEvent", {
+                    name: "bell",
+                    timeout: { amount: 1, unit: "hours" }
+                }),
+                say("rang")
+            ],
+            [
+                ["t1", "next", "wait"],
+                ["wait", "next", "rang"]
+            ]
         );
         const runs = [];
         for (let at = 0; at < 5; at++) runs.push(await fire(seeded, `k${at}`));
@@ -601,42 +704,80 @@ describe("events between automations", () => {
 
     it("takes the timeout path when nothing comes", async () => {
         const seeded = await seed(
-            [node("wait", "core.waitEvent", { name: "door.closed", timeout: { amount: 5, unit: "minutes" } }), say("late")],
-            [["t1", "next", "wait"], ["wait", "timeout", "late"]]
+            [
+                node("wait", "core.waitEvent", {
+                    name: "door.closed",
+                    timeout: { amount: 5, unit: "minutes" }
+                }),
+                say("late")
+            ],
+            [
+                ["t1", "next", "wait"],
+                ["wait", "timeout", "late"]
+            ]
         );
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started.id);
         timePasses();
         await drain();
         expect(titles()).toEqual(["step late"]);
-        expect(step(started.id, "wait")).toMatchObject({ port: "timeout", output: { timedOut: true } });
+        expect(step(started.id, "wait")).toMatchObject({
+            port: "timeout",
+            output: { timedOut: true }
+        });
     });
 
-    it("starts \"An automation failed\" for another automation's failure only", async () => {
+    it('starts "An automation failed" for another automation\'s failure only', async () => {
         sent.statuses = [500];
-        const watcher = await seed([say("alarm", "{{trigger.automationName}} {{trigger.status}}")], [["f", "next", "alarm"]], {
-            trigger: node("f", "core.failed", {})
-        });
+        const watcher = await seed(
+            [say("alarm", "{{trigger.automationName}} {{trigger.status}}")],
+            [["f", "next", "alarm"]],
+            {
+                trigger: node("f", "core.failed", {})
+            }
+        );
         await triggers.armVersion(watcher.automationId, watcher.versionId, watcher.graph);
         const failing = await seed([http("h")], [["t1", "next", "h"]]);
         const started = await fire(failing, "k1");
         await engine.advanceRun(started.id);
         await drain();
         expect(titles()).toEqual(["Test failed"]);
-        expect(fake().tables.automationRun!.filter((row) => row.automationId === watcher.automationId)).toHaveLength(1);
+        expect(
+            fake().tables.automationRun!.filter((row) => row.automationId === watcher.automationId)
+        ).toHaveLength(1);
     });
 });
 
 describe("Run another automation", () => {
-    async function callee(nodes: core.GraphNode[] = [node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })], wires: Wire[] = [["c", "next", "ans"]]) {
+    async function callee(
+        nodes: core.GraphNode[] = [
+            node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })
+        ],
+        wires: Wire[] = [["c", "next", "ans"]]
+    ) {
         return seed(nodes, wires, {
-            trigger: node("c", "core.called", { inputs: [{ name: "n", kind: "number", required: true }] })
+            trigger: node("c", "core.called", {
+                inputs: [{ name: "n", kind: "number", required: true }]
+            })
         });
     }
     const caller = (target: string, wait = true, extra: Extra = {}) =>
         seed(
-            [node("call", "core.run", { automationId: target, inputs: [{ name: "n", value: "{{trigger.n}}" }], wait }, extra), say("after", "got {{steps.call.outputs.got}}"), say("bad", "call failed")],
-            [["t1", "next", "call"], ["call", "next", "after"], ...(extra.onError === "port" ? ([["call", "error", "bad"]] as Wire[]) : [])]
+            [
+                node(
+                    "call",
+                    "core.run",
+                    { automationId: target, inputs: [{ name: "n", value: "{{trigger.n}}" }], wait },
+                    extra
+                ),
+                say("after", "got {{steps.call.outputs.got}}"),
+                say("bad", "call failed")
+            ],
+            [
+                ["t1", "next", "call"],
+                ["call", "next", "after"],
+                ...(extra.onError === "port" ? ([["call", "error", "bad"]] as Wire[]) : [])
+            ]
         );
 
     it("passes typed inputs, waits, and takes the answer", async () => {
@@ -647,13 +788,27 @@ describe("Run another automation", () => {
         expect(runRow(started.id).status).toBe("waiting");
         await drain();
         expect(titles()).toEqual(["got 7"]);
-        const childRun = fake().tables.automationRun!.find((row) => row.automationId === child.automationId)!;
+        const childRun = fake().tables.automationRun!.find(
+            (row) => row.automationId === child.automationId
+        )!;
         expect(childRun).toMatchObject({ parentRunId: started.id, depth: 1, status: "succeeded" });
-        expect(step(started.id, "call")!.output).toMatchObject({ status: "succeeded", outputs: { got: 7 } });
+        expect(step(started.id, "call")!.output).toMatchObject({
+            status: "succeeded",
+            outputs: { got: 7 }
+        });
     });
 
     it("survives a restart mid sub-run: one child run, one answer", async () => {
-        const child = await callee([pause("w"), node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })], [["c", "next", "w"], ["w", "next", "ans"]]);
+        const child = await callee(
+            [
+                pause("w"),
+                node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })
+            ],
+            [
+                ["c", "next", "w"],
+                ["w", "next", "ans"]
+            ]
+        );
         const parent = await caller(child.automationId);
         const started = await fire(parent, "k1", { n: 3 });
         await drain();
@@ -662,18 +817,31 @@ describe("Run another automation", () => {
         await drain();
         timePasses();
         await drain();
-        expect(fake().tables.automationRun!.filter((row) => row.automationId === child.automationId)).toHaveLength(1);
+        expect(
+            fake().tables.automationRun!.filter((row) => row.automationId === child.automationId)
+        ).toHaveLength(1);
         expect(titles()).toEqual(["got 3"]);
         expect(stepsOf(started.id, "after")).toHaveLength(1);
     });
 
     it("goes on when the child ended before the wait was written, or its end never reached the caller", async () => {
-        const child = await callee([pause("w"), node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })], [["c", "next", "w"], ["w", "next", "ans"]]);
+        const child = await callee(
+            [
+                pause("w"),
+                node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })
+            ],
+            [
+                ["c", "next", "w"],
+                ["w", "next", "ans"]
+            ]
+        );
         const parent = await caller(child.automationId);
         const started = await fire(parent, "k1", { n: 4 });
         await drain();
         expect(runRow(started.id).status).toBe("waiting");
-        const childRun = fake().tables.automationRun!.find((row) => row.automationId === child.automationId)!;
+        const childRun = fake().tables.automationRun!.find(
+            (row) => row.automationId === child.automationId
+        )!;
         // The child ends but the process dies before it tells the caller.
         const waiting = step(started.id, "call")!;
         waiting.waitKey = null;
@@ -720,7 +888,10 @@ describe("Run another automation", () => {
         const started = await fire(waiting, "k3", { n: 1 });
         await drain();
         await engine.cancelRun(started.id);
-        expect(fake().tables.automationRun!.find((row) => row.automationId === slow.automationId)!.status).toBe("cancelled");
+        expect(
+            fake().tables.automationRun!.find((row) => row.automationId === slow.automationId)!
+                .status
+        ).toBe("cancelled");
     });
 
     it("starts and carries on without waiting, and refuses another shelf's automation", async () => {
@@ -730,7 +901,8 @@ describe("Run another automation", () => {
         await drain();
         expect(runRow(started.id).status).toBe("succeeded");
         const foreign = await callee();
-        fake().tables.automation!.find((row) => row.id === foreign.automationId)!.userId = "someone-else";
+        fake().tables.automation!.find((row) => row.id === foreign.automationId)!.userId =
+            "someone-else";
         const refused = await fire(await caller(foreign.automationId), "k2", { n: 1 });
         await drain();
         expect(runRow(refused.id)).toMatchObject({ status: "refused", error: "callForbidden" });
@@ -739,11 +911,19 @@ describe("Run another automation", () => {
     it("finds a cycle of calls before it is published", async () => {
         const graphs = new Map<string, core.AutomationGraph>();
         const call = (target: string) =>
-            core.automationGraphSchema.parse({ nodes: [node("t1", "core.manual"), node(`call-${target}`, "core.run", { automationId: target })], edges: [] });
+            core.automationGraphSchema.parse({
+                nodes: [
+                    node("t1", "core.manual"),
+                    node(`call-${target}`, "core.run", { automationId: target })
+                ],
+                edges: []
+            });
         const a = "00000000-0000-7000-8000-00000000000a";
         const b = "00000000-0000-7000-8000-00000000000b";
         graphs.set(b, call(a));
-        expect(await calls.callCycle(a, call(b), async (id) => graphs.get(id) ?? null)).toEqual({ node: `call-${b}` });
+        expect(await calls.callCycle(a, call(b), async (id) => graphs.get(id) ?? null)).toEqual({
+            node: `call-${b}`
+        });
         graphs.set(b, call("00000000-0000-7000-8000-00000000000c"));
         expect(await calls.callCycle(a, call(b), async (id) => graphs.get(id) ?? null)).toBeNull();
     });
@@ -751,23 +931,45 @@ describe("Run another automation", () => {
 
 describe("trigger combinators", () => {
     async function together(when: unknown, names: string[]) {
-        const triggersOf = names.map((name, index) => node(`on${index + 1}`, "core.onEvent", { name }));
+        const triggersOf = names.map((name, index) =>
+            node(`on${index + 1}`, "core.onEvent", { name })
+        );
         const graph = core.automationGraphSchema.parse({
             nodes: [...triggersOf, say("go", "go {{trigger.members.on1.payload.v}}")],
-            edges: triggersOf.map((entry) => ({ from: { node: entry.id, port: "next" }, to: { node: "go" } })),
+            edges: triggersOf.map((entry) => ({
+                from: { node: entry.id, port: "next" },
+                to: { node: "go" }
+            })),
             when
         });
         const row = await fake().prisma.automation.create({
-            data: { name: "Both", draft: graph, enabled: true, runAsId: "u1", userId: "u1", mode: "parallel" }
+            data: {
+                name: "Both",
+                draft: graph,
+                enabled: true,
+                runAsId: "u1",
+                userId: "u1",
+                mode: "parallel"
+            }
         });
-        const version = await fake().prisma.automationVersion.create({ data: { automationId: row.id, number: 1, graph } });
-        await fake().prisma.automation.update({ where: { id: row.id }, data: { publishedVersionId: version.id } });
+        const version = await fake().prisma.automationVersion.create({
+            data: { automationId: row.id, number: 1, graph }
+        });
+        await fake().prisma.automation.update({
+            where: { id: row.id },
+            data: { publishedVersionId: version.id }
+        });
         await triggers.armVersion(row.id as string, version.id as string, graph);
         return row.id as string;
     }
     const announce = (name: string, v = 1) =>
-        outbox.emitAutomationEvent("core.event", { userId: "u1", subjectKey: name, payload: { name, payload: { v } } });
-    const runsOf = (id: string) => fake().tables.automationRun!.filter((row) => row.automationId === id);
+        outbox.emitAutomationEvent("core.event", {
+            userId: "u1",
+            subjectKey: name,
+            payload: { name, payload: { v } }
+        });
+    const runsOf = (id: string) =>
+        fake().tables.automationRun!.filter((row) => row.automationId === id);
 
     it("starts once every member has fired inside the window, with each member's data", async () => {
         const id = await together({ kind: "all", windowSeconds: 300 }, ["a", "b"]);
@@ -792,7 +994,9 @@ describe("trigger combinators", () => {
         const id = await together({ kind: "all", windowSeconds: 60 }, ["a", "b"]);
         await announce("a");
         await drain();
-        const memory = fake().tables.automationTrigger!.find((row) => row.automationId === id && row.nodeId === "__when")!;
+        const memory = fake().tables.automationTrigger!.find(
+            (row) => row.automationId === id && row.nodeId === "__when"
+        )!;
         const members = (memory.state as { members: Record<string, { at: string }> }).members;
         members.on1!.at = new Date(Date.now() - 120_000).toISOString();
         await announce("b");

@@ -272,10 +272,7 @@ export type CompareLeaf = z.infer<typeof compareLeafSchema>;
 /** Holds when the run was started by one of these trigger nodes. */
 export const triggeredByLeafSchema = z.object({
     kind: z.literal("triggeredBy"),
-    triggers: z
-        .array(z.string().min(1).max(64))
-        .max(20)
-        .default([])
+    triggers: z.array(z.string().min(1).max(64)).max(20).default([])
 });
 export type TriggeredByLeaf = z.infer<typeof triggeredByLeafSchema>;
 
@@ -1154,8 +1151,10 @@ function chain(
             });
         } else if (isLoopNode(step.node.type)) {
             const start = chain(step.body ?? [], null, nodes, edges);
-            if (start) edges.push({ from: { node: step.node.id, port: "each" }, to: { node: start } });
-            if (next) edges.push({ from: { node: step.node.id, port: "done" }, to: { node: next } });
+            if (start)
+                edges.push({ from: { node: step.node.id, port: "each" }, to: { node: start } });
+            if (next)
+                edges.push({ from: { node: step.node.id, port: "done" }, to: { node: next } });
         } else if (step.node.type === "core.stop") {
             // A Stop ends the run: nothing follows it.
         } else if (next) {
@@ -1276,7 +1275,9 @@ function walk(
             at = join ?? undefined;
             if (at === stop) break;
         } else if (BRANCHING.has(node.type)) {
-            const starts = nodePorts(node.type, node).map((port) => successors(graph, at!, port)[0]);
+            const starts = nodePorts(node.type, node).map(
+                (port) => successors(graph, at!, port)[0]
+            );
             const join = meetingOf(graph, starts) ?? stop;
             const branches: ListStep[][] = [];
             for (const start of starts) {

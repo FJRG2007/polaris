@@ -273,7 +273,9 @@ const NODE_ICONS: Record<string, LucideIcon> = {
 /** A node type's icon; an app's node without one gets the generic piece. */
 export function NodeIcon({ type, className }: { type: string; className?: string }) {
     const Icon = NODE_ICONS[type] ?? Puzzle;
-    return <Icon aria-hidden="true" className={className ?? "size-4 shrink-0 text-muted-foreground"} />;
+    return (
+        <Icon aria-hidden="true" className={className ?? "size-4 shrink-0 text-muted-foreground"} />
+    );
 }
 
 /** A node type's one-line description, or null for an app's node. */
