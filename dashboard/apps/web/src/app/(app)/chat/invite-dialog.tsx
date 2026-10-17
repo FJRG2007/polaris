@@ -273,7 +273,7 @@ export function InviteDialog({
                             />
                         </div>
 
-                        <ul className="-mx-1 flex min-h-24 flex-1 flex-col overflow-y-auto px-1">
+                        <ul className="-mx-1 flex min-h-24 flex-1 flex-col overflow-y-auto overscroll-contain px-1">
                             {people === null ? (
                                 [0, 1, 2].map((at) => (
                                     <li
