@@ -52,6 +52,8 @@ export interface AutomationRow {
     readonly lastRunAt: string | null;
     readonly lastStatus: string | null;
     readonly updatedAt: string;
+    readonly folderId: string | null;
+    readonly tags: readonly string[];
 }
 
 export async function listAutomations(
@@ -72,7 +74,9 @@ export async function listAutomations(
             mode: true,
             lastRunAt: true,
             lastStatus: true,
-            updatedAt: true
+            updatedAt: true,
+            folderId: true,
+            tags: true
         }
     });
     return {
@@ -86,7 +90,9 @@ export async function listAutomations(
             mode: row.mode,
             lastRunAt: row.lastRunAt?.toISOString() ?? null,
             lastStatus: row.lastStatus,
-            updatedAt: row.updatedAt.toISOString()
+            updatedAt: row.updatedAt.toISOString(),
+            folderId: row.folderId,
+            tags: row.tags ?? []
         }))
     };
 }

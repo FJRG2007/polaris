@@ -637,3 +637,28 @@ export function compareGraphs(base: graphs.AutomationGraph, next: graphs.Automat
         rewired: wiring(base) !== wiring(next)
     };
 }
+
+// ---------------------------------------------------------------------------
+// Folders and tags
+// ---------------------------------------------------------------------------
+
+export const AUTOMATION_ORGANIZE_LIMITS = { foldersPerShelf: 100, folderNameLength: 60, tagsPerAutomation: 10, tagLength: 32 } as const;
+
+/** A folder name as stored: trimmed, inner spaces collapsed, never empty. */
+export const automationFolderNameSchema = z
+    .string()
+    .transform((value) => value.trim().replace(/\s+/g, " "))
+    .pipe(z.string().min(1).max(AUTOMATION_ORGANIZE_LIMITS.folderNameLength));
+
+/** One tag as stored: trimmed, lower case, inner spaces collapsed, so "Billing " and "billing" are one tag. */
+export function normalizeAutomationTag(value: string): string {
+    return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+export const automationTagSchema = z.string().transform(normalizeAutomationTag).pipe(z.string().min(1).max(AUTOMATION_ORGANIZE_LIMITS.tagLength));
+
+/** An automation's tags: each normalized, duplicates dropped, at most ten. */
+export const automationTagsSchema = z
+    .array(automationTagSchema)
+    .transform((tags) => [...new Set(tags)])
+    .pipe(z.array(z.string()).max(AUTOMATION_ORGANIZE_LIMITS.tagsPerAutomation));

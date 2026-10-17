@@ -14,6 +14,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import * as service from "@/lib/automations/service";
 import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
+import * as organize from "@/lib/automations/organize";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { RunActor } from "@/lib/automations/types";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
@@ -53,12 +54,12 @@ function refresh(automationId?: string): void {
     if (automationId) revalidatePath(`/automations/${automationId}`);
 }
 
-export async function listAutomationsAction(): Promise<
-    Result<{ rows: service.AutomationRow[]; canEdit: boolean }>
-> {
+export async function listAutomationsAction(): Promise<Result<{ rows: service.AutomationRow[]; canEdit: boolean; folders: organize.FolderRow[] }>> {
     try {
         const who = await actor();
-        return { ok: true, ...(await service.listAutomations(who, await openShelf(who))) };
+        const shelf = await openShelf(who);
+        const [list, folders] = await Promise.all([service.listAutomations(who, shelf), organize.listFolders(who, shelf)]);
+        return { ok: true, ...list, folders };
     } catch (caught) {
         return failure(caught);
     }
@@ -447,6 +448,75 @@ export async function deleteSecretAction(secretId: unknown): Promise<Result> {
             throw new service.AutomationAccessError("notFound");
         revalidatePath("/automations/secrets");
         return { ok: true };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const folderInput = z.object({ name: core.automationFolderNameSchema });
+
+export async function createFolderAction(input: unknown): Promise<Result<{ folder: organize.FolderRow }>> {
+    const parsed = folderInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        const who = await actor();
+        const folder = await organize.createFolder(who, await openShelf(who), parsed.data.name);
+        refresh();
+        return { ok: true, folder };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const renameFolderInput = z.object({ folderId: id, name: core.automationFolderNameSchema });
+
+export async function renameFolderAction(input: unknown): Promise<Result> {
+    const parsed = renameFolderInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        await organize.renameFolder(await actor(), parsed.data.folderId, parsed.data.name);
+        refresh();
+        return { ok: true };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function deleteFolderAction(folderId: unknown): Promise<Result> {
+    const parsed = id.safeParse(folderId);
+    if (!parsed.success) return invalid();
+    try {
+        await organize.deleteFolder(await actor(), parsed.data);
+        refresh();
+        return { ok: true };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const moveInput = z.object({ automationId: id, folderId: id.nullable() });
+
+export async function moveToFolderAction(input: unknown): Promise<Result> {
+    const parsed = moveInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        await organize.moveToFolder(await actor(), parsed.data.automationId, parsed.data.folderId);
+        refresh(parsed.data.automationId);
+        return { ok: true };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const tagsInput = z.object({ automationId: id, tags: core.automationTagsSchema });
+
+export async function setTagsAction(input: unknown): Promise<Result<{ tags: string[] }>> {
+    const parsed = tagsInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        await organize.setTags(await actor(), parsed.data.automationId, parsed.data.tags);
+        refresh(parsed.data.automationId);
+        return { ok: true, tags: parsed.data.tags };
     } catch (caught) {
         return failure(caught);
     }

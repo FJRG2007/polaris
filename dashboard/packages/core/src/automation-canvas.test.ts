@@ -338,3 +338,17 @@ describe("comparing versions", () => {
         expect(canvas.versionNameSchema.safeParse("x".repeat(81)).success).toBe(false);
     });
 });
+
+describe("folders and tags", () => {
+    it("normalizes a folder name and refuses an empty or long one", () => {
+        expect(canvas.automationFolderNameSchema.parse("  Billing   jobs ")).toBe("Billing jobs");
+        expect(canvas.automationFolderNameSchema.safeParse("   ").success).toBe(false);
+        expect(canvas.automationFolderNameSchema.safeParse("x".repeat(61)).success).toBe(false);
+    });
+
+    it("makes tags one form, drops duplicates and caps the count", () => {
+        expect(canvas.automationTagsSchema.parse([" Billing ", "billing", "Night  shift"])).toEqual(["billing", "night shift"]);
+        expect(canvas.automationTagsSchema.safeParse([""]).success).toBe(false);
+        expect(canvas.automationTagsSchema.safeParse(Array.from({ length: 11 }, (_, index) => `t${index}`)).success).toBe(false);
+    });
+});
