@@ -256,7 +256,8 @@ export type ConnectRefusal =
     | "crossesLane"
     | "intoLaneStart"
     | "laneTaken"
-    | "intoLoopBody";
+    | "intoLoopBody"
+    | "intoTryBody";
 
 /** Why a connection from `from` to `to` may not be made, or null when it may. */
 export function connectRefusal(
@@ -292,6 +293,8 @@ export function connectRefusal(
     const wired = { ...graph, edges: [...graph.edges, { from: { ...from }, to: { node: to } }] };
     const leaking = new Set(graphs.loopBodyLeaks(graph));
     if (graphs.loopBodyLeaks(wired).some((node) => !leaking.has(node))) return "intoLoopBody";
+    const tryLeaking = new Set(graphs.tryBodyLeaks(graph));
+    if (graphs.tryBodyLeaks(wired).some((node) => !tryLeaking.has(node))) return "intoTryBody";
     return null;
 }
 
@@ -630,7 +633,9 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.waitEvent": ["name", "payload", "timedOut"],
     "core.run": ["runId", "status", "outputs"],
     "core.answer": ["outputs"],
-    "core.announce": ["name", "eventId"]
+    "core.announce": ["name", "eventId"],
+    "core.try": ["failed", "error", "node", "recovered"],
+    "core.waitCondition": ["matched", "checks", "timedOut"]
 };
 
 export interface ReferenceOption {

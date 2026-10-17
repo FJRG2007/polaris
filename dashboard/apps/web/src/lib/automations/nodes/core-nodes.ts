@@ -23,7 +23,9 @@ type Declared =
     | "core.repeat"
     | "core.stop"
     | "core.waitEvent"
-    | "core.run";
+    | "core.run"
+    | "core.try"
+    | "core.waitCondition";
 
 /** A node with no work of its own here: a trigger (its step is written when the run starts) or one the engine runs. */
 function declared(type: Declared): ServerNode {
@@ -207,6 +209,8 @@ export const CORE_SERVER_NODES: readonly ServerNode[] = [
     waitNode as ServerNode,
     declared("core.waitEvent"),
     declared("core.run"),
+    declared("core.try"),
+    declared("core.waitCondition"),
     notifyNode as ServerNode,
     answerNode as ServerNode,
     announceNode as ServerNode

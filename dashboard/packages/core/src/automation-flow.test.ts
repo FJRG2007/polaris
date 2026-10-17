@@ -265,3 +265,116 @@ describe("node height on the canvas", () => {
         );
     });
 });
+
+describe("Try and Wait for a condition", () => {
+    it("gives a Try its four ports and passes a switched-off one by Then and Always", () => {
+        expect(ag.nodePorts("core.try")).toEqual(["body", "then", "catch", "always"]);
+        expect(ag.passPort("core.try")).toBe("then,always");
+        expect(ag.nodePorts("core.waitCondition")).toEqual(["next", "timeout"]);
+        expect(ag.isScopeNode("core.try")).toBe(true);
+        expect(ag.bodyPort("core.try")).toBe("body");
+    });
+
+    it("refuses a Try body reached from outside it, and from its own Then", () => {
+        const nodes = [
+            node("t1", "core.manual"),
+            node("try", "core.try"),
+            node("a", "core.notify", { title: "a" }),
+            node("b", "core.notify", { title: "b" })
+        ];
+        const closed = build(nodes, [
+            edge("t1", "next", "try"),
+            edge("try", "body", "a"),
+            edge("try", "then", "b")
+        ]);
+        expect(ag.graphProblems(closed)).toEqual([]);
+        const leaky = build(nodes, [
+            edge("t1", "next", "try"),
+            edge("try", "body", "a"),
+            edge("try", "then", "a")
+        ]);
+        expect(ag.graphProblems(leaky)).toContainEqual({ code: "tryBodyLeaks", node: "a" });
+        expect(ag.tryBodyLeaks(leaky)).toEqual(["a"]);
+    });
+
+    it("bounds how deep Try blocks and loops nest", () => {
+        const depth = ag.AUTOMATION_LIMITS.scopeDepth + 1;
+        const nodes = [node("t1", "core.manual")];
+        const edges = [edge("t1", "next", "s0")];
+        for (let at = 0; at < depth; at++) {
+            nodes.push(node(`s${at}`, "core.try"));
+            if (at > 0) edges.push(edge(`s${at - 1}`, "body", `s${at}`));
+        }
+        const problems = ag.graphProblems(build(nodes, edges));
+        expect(problems).toContainEqual({ code: "scopeTooDeep", node: "s0" });
+        expect(problems.filter((problem) => problem.code === "scopeTooDeep")).toHaveLength(1);
+        const fits = build(nodes.slice(0, -1), edges.slice(0, -1));
+        expect(ag.graphProblems(fits)).toEqual([]);
+    });
+
+    it("validates a Try and a Wait for a condition", () => {
+        const C = ag.CORE_NODE_CONFIGS;
+        expect(C["core.try"].parse({})).toEqual({ recover: false });
+        expect(C["core.try"].safeParse({ recover: "yes" }).success).toBe(false);
+        const condition = { kind: "group", join: "all", items: [] };
+        const wait = C["core.waitCondition"].parse({
+            condition,
+            timeout: { amount: 1, unit: "hours" }
+        });
+        expect(wait.every).toEqual({ amount: 5, unit: "minutes" });
+        expect(
+            C["core.waitCondition"].safeParse({
+                condition,
+                timeout: { amount: 1, unit: "hours" },
+                every: { amount: 10, unit: "seconds" }
+            }).success
+        ).toBe(false);
+        expect(
+            C["core.waitCondition"].safeParse({
+                condition,
+                timeout: { amount: 31, unit: "days" }
+            }).success
+        ).toBe(false);
+    });
+
+    it("keeps the names Polaris sends for itself out of Announce", () => {
+        const announce = ag.CORE_NODE_CONFIGS["core.announce"];
+        expect(announce.safeParse({ name: ag.AUTOMATION_FINISHED_EVENT }).success).toBe(false);
+        expect(announce.safeParse({ name: "automation.anything" }).success).toBe(false);
+        expect(announce.safeParse({ name: "automations-done" }).success).toBe(true);
+        expect(
+            ag.CORE_NODE_CONFIGS["core.onEvent"].safeParse({ name: ag.AUTOMATION_FINISHED_EVENT })
+                .success
+        ).toBe(true);
+    });
+
+    it("round-trips a Try in the list view", () => {
+        const flow: ag.ListFlow = {
+            timeZone: "UTC",
+            triggers: [node("t1", "core.manual")],
+            steps: [
+                {
+                    node: node("try", "core.try", { recover: true }),
+                    body: [{ node: node("a", "core.notify", { title: "a" }) }],
+                    onError: [{ node: node("b", "core.notify", { title: "b" }) }],
+                    always: [{ node: node("c", "core.notify", { title: "c" }) }]
+                },
+                { node: node("d", "core.notify", { title: "d" }) }
+            ],
+            finally: [],
+            finallyOnCancel: false
+        };
+        const graph = ag.graphFromList(flow);
+        expect(graph.edges).toContainEqual(edge("try", "then", "d"));
+        expect(graph.edges).toContainEqual(edge("try", "catch", "b"));
+        expect(ag.graphProblems(graph, { forPublish: true })).toEqual([]);
+        const back = ag.listFromGraph(graph);
+        expect(back).not.toBeNull();
+        expect(ag.graphFromList(back!)).toEqual(graph);
+        expect(ag.listStepFor(node("x", "core.try"))).toMatchObject({
+            body: [],
+            onError: [],
+            always: []
+        });
+    });
+});

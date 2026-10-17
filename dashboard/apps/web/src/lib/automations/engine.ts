@@ -351,6 +351,7 @@ export async function cancelRun(runId: string, reason = "cancelled"): Promise<bo
     });
     await cancelChildren(runId);
     await resumeParent(runId);
+    await announceFinished(runId, "cancelled", reason);
     await promoteQueued(run.automationId);
     return true;
 }
@@ -375,6 +376,52 @@ export function laneOf(iteration: string): string {
 
 function passIteration(iteration: string, loopId: string, pass: number): string {
     return `${iteration}${SEPARATOR}${loopId}:${pass}`;
+}
+
+/** The wait key of a Try waiting for its body. */
+const TRY_WAIT = "try";
+/** Set on a failed Try once its failure has gone on to the scope around it. */
+const RETHROWN = "rethrown";
+
+/** The rows of one scope: the iteration itself and everything nested under it. */
+function inScope(iteration: string, prefix: string): boolean {
+    return iteration === prefix || iteration.startsWith(`${prefix}${SEPARATOR}`);
+}
+
+/**
+ * The innermost Try an iteration runs inside, with the iteration the Try's own
+ * step has and the prefix of its body, or null when no Try encloses it.
+ */
+function enclosingTry(
+    graph: core.AutomationGraph,
+    iteration: string
+): { tryId: string; parent: string; prefix: string } | null {
+    const segments = iteration.split(SEPARATOR);
+    for (let at = segments.length - 1; at >= 1; at--) {
+        const segment = segments[at]!;
+        const id = segment.slice(0, segment.lastIndexOf(":"));
+        if (graph.nodes.find((entry) => entry.id === id)?.type === "core.try")
+            return {
+                tryId: id,
+                parent: segments.slice(0, at).join(SEPARATOR),
+                prefix: segments.slice(0, at + 1).join(SEPARATOR)
+            };
+    }
+    return null;
+}
+
+/** The innermost loop pass an iteration runs in, skipping Try bodies, given the graph. */
+function innermostLoopPass(
+    graph: core.AutomationGraph,
+    iteration: string
+): { parent: string; loopId: string; pass: number } | null {
+    const segments = iteration.split(SEPARATOR);
+    for (let at = segments.length - 1; at >= 1; at--) {
+        const found = innermostPass(segments.slice(0, at + 1).join(SEPARATOR));
+        const type = graph.nodes.find((entry) => entry.id === found?.loopId)?.type;
+        if (found && type && core.isLoopNode(type)) return found;
+    }
+    return null;
 }
 
 /** The innermost loop pass an iteration runs in, or null at the top of a lane. */
@@ -518,6 +565,8 @@ async function stepLoop(runId: string, token: string): Promise<void> {
             (step) => step.status === "ready" && !joinHeld(graph, steps, step)
         );
         if (!ready) {
+            if (await rethrowUnrecovered(run, graph, steps)) continue;
+            if (await settleTries(run, graph, steps)) continue;
             if (await settleLoops(run, graph, steps)) continue;
             if (await settleCalls(steps)) continue;
             const waiting = steps.filter((step) => step.status === "waiting");
@@ -689,7 +738,11 @@ async function recoverInterrupted(
 }
 
 /** The context a node reads, from the rows: the trigger, and the finished steps it can see. */
-async function buildContext(run: RunRow, iteration: string): Promise<RunContext> {
+async function buildContext(
+    run: RunRow,
+    iteration: string,
+    graph: core.AutomationGraph
+): Promise<RunContext> {
     const lane = laneOf(iteration);
     // A step sees its own pass and the passes it runs inside; the Finally lane
     // also sees the top of the main flow. Nearer passes win, then newer rows.
@@ -713,7 +766,7 @@ async function buildContext(run: RunRow, iteration: string): Promise<RunContext>
         if (step.output !== null && !Object.hasOwn(steps, step.nodeId))
             steps[step.nodeId] = step.output;
     const cause = (run.cause ?? {}) as Record<string, unknown>;
-    const pass = innermostPass(iteration);
+    const pass = innermostLoopPass(graph, iteration);
     let item: unknown;
     if (pass) {
         const loop = await prisma.automationStep.findFirst({
@@ -760,7 +813,9 @@ const CONTROL_TYPES = new Set([
     "core.repeat",
     "core.stop",
     "core.waitEvent",
-    "core.run"
+    "core.run",
+    "core.try",
+    "core.waitCondition"
 ]);
 
 /** What a control node asks of the engine besides an ordinary result. */
@@ -834,7 +889,7 @@ async function executeStep(
         await failLane(run, graph, lane, "failed", "badConfig");
         return;
     }
-    const context = await buildContext(run, step.iteration);
+    const context = await buildContext(run, step.iteration, graph);
     const started = await prisma.automationStep.updateMany({
         where: { id: step.id, status: "ready" },
         data: { status: "running", startedAt: new Date() }
@@ -1029,7 +1084,160 @@ async function handleFailure(
         return;
     }
     await finishStep(step.id, { status: failure.status, error: code, output, input, from });
-    await failLane(run, graph, lane, refused ? "refused" : "failed", code);
+    // A refusal is about the run, not the step: no Try catches it.
+    if (refused) await failLane(run, graph, lane, "refused", code);
+    else await failScope(run, graph, step.iteration, code, node.id);
+}
+
+/**
+ * A step failed for good: the innermost Try around it leaves by On error and
+ * Always, and what was still to do in its body is skipped. With no Try around
+ * it, the lane ends as before.
+ */
+async function failScope(
+    run: RunRow,
+    graph: core.AutomationGraph,
+    iteration: string,
+    error: string,
+    nodeId: string
+): Promise<void> {
+    const scope = enclosingTry(graph, iteration);
+    if (!scope) {
+        await failLane(run, graph, laneOf(iteration), "failed", error);
+        return;
+    }
+    const held = await prisma.automationStep.findFirst({
+        where: {
+            runId: run.id,
+            nodeId: scope.tryId,
+            iteration: scope.parent,
+            status: "waiting",
+            waitKey: TRY_WAIT
+        },
+        select: { id: true }
+    });
+    // Already settled: a crash part-way through this, or a second failure in the same body.
+    if (!held) return;
+    const node = graph.nodes.find((entry) => entry.id === scope.tryId)!;
+    const config = core.CORE_NODE_CONFIGS["core.try"].safeParse(node.config);
+    const recovered = config.success && config.data.recover;
+    const output = { failed: true, error, node: nodeId, recovered };
+    // The Try first: once it has left, the stepper skips whatever its body still holds.
+    const done = await finishStep(held.id, {
+        status: recovered ? "ok" : "failed",
+        port: "catch,always",
+        error,
+        output,
+        from: "waiting"
+    });
+    if (!done) return;
+    await skipScope(run.id, scope.prefix);
+    await count(run.id, output);
+    await enqueue(run.id, leaving(graph, scope.tryId, "catch,always"), scope.parent);
+}
+
+/** Skip what is still to do inside one scope, and cancel the runs it was waiting for. */
+async function skipScope(runId: string, prefix: string): Promise<void> {
+    const where = {
+        runId,
+        status: { in: ["ready", "waiting"] },
+        OR: [{ iteration: prefix }, { iteration: { startsWith: `${prefix}${SEPARATOR}` } }]
+    };
+    const calls = await prisma.automationStep.findMany({
+        where: { ...where, waitKey: { startsWith: CALL_WAIT } },
+        select: { waitKey: true },
+        take: L.stepsPerRun
+    });
+    await prisma.automationStep.updateMany({
+        where,
+        data: { status: "skipped", finishedAt: new Date() }
+    });
+    for (const call of calls) await cancelRun(call.waitKey!.slice(CALL_WAIT.length), "callerEnded");
+}
+
+/**
+ * A Try whose body failed and that does not mark it recovered passes the
+ * failure on once everything after it (On error, Always, Then) is done: to the
+ * Try around it, or to the lane. Passed on first and marked after, so a crash
+ * in between passes it on again, which finds the outer scope already settled.
+ */
+async function rethrowUnrecovered(
+    run: RunRow,
+    graph: core.AutomationGraph,
+    steps: readonly StepRow[]
+): Promise<boolean> {
+    const failed = steps.filter(
+        (step) =>
+            step.status === "failed" &&
+            step.waitKey === TRY_WAIT &&
+            (step.port ?? "").split(",").includes("catch")
+    );
+    for (const step of failed) {
+        const after = core.reachableFrom(graph, step.nodeId);
+        const busy = steps.some(
+            (other) =>
+                other.id !== step.id &&
+                ACTIVE.includes(other.status) &&
+                other.iteration === step.iteration &&
+                after.has(other.nodeId)
+        );
+        if (busy) continue;
+        const row = await prisma.automationStep.findUnique({
+            where: { id: step.id },
+            select: { error: true }
+        });
+        await failScope(run, graph, step.iteration, row?.error ?? "failed", step.nodeId);
+        await prisma.automationStep.updateMany({
+            where: { id: step.id, waitKey: TRY_WAIT },
+            data: { waitKey: RETHROWN }
+        });
+        return true;
+    }
+    return false;
+}
+
+/**
+ * A Try whose body has nothing left to do and did not fail leaves by Then and
+ * Always. A Try that already left (a crash between leaving and skipping its
+ * body) has the rest of its body skipped here.
+ */
+async function settleTries(
+    run: RunRow,
+    graph: core.AutomationGraph,
+    steps: readonly StepRow[]
+): Promise<boolean> {
+    const tries = steps
+        .filter((step) => step.waitKey === TRY_WAIT || step.waitKey === RETHROWN)
+        .sort((a, b) => b.iteration.length - a.iteration.length);
+    for (const held of tries) {
+        const prefix = passIteration(held.iteration, held.nodeId, 0);
+        const inside = steps.filter((step) => inScope(step.iteration, prefix));
+        const busy = inside.some((step) => ACTIVE.includes(step.status));
+        if (held.status !== "waiting") {
+            if (!busy) continue;
+            await skipScope(run.id, prefix);
+            return true;
+        }
+        if (busy) continue;
+        if (inside.length === 0) {
+            // Held, but its body was never written: a crash between the two.
+            await enqueue(run.id, core.successors(graph, held.nodeId, "body"), prefix);
+            return true;
+        }
+        const output = { failed: false, recovered: false };
+        const done = await finishStep(held.id, {
+            status: "ok",
+            port: "then,always",
+            output,
+            from: "waiting"
+        });
+        if (done) {
+            await count(run.id, output);
+            await enqueue(run.id, leaving(graph, held.nodeId, "then,always"), held.iteration);
+        }
+        return true;
+    }
+    return false;
 }
 
 async function count(runId: string, output: unknown): Promise<void> {
@@ -1143,6 +1351,32 @@ async function control(
         }
         case "core.run":
             return callAutomation(run, config as RunConfig, context, step);
+        case "core.try": {
+            const body = core.successors(graph, node.id, "body");
+            if (body.length === 0)
+                return { output: { failed: false, recovered: false }, port: "then,always" };
+            return {
+                hold: { waitKey: TRY_WAIT, input: {} },
+                start: { iteration: passIteration(step.iteration, node.id, 0), nodes: body }
+            };
+        }
+        case "core.waitCondition": {
+            const wait = config as core.WaitConditionConfig;
+            if (core.checkCondition(wait.condition, context))
+                return { output: { matched: true, checks: 1, timedOut: false } };
+            const now = Date.now();
+            const timeout = core.durationSeconds(wait.timeout) * 1000;
+            const every = core.durationSeconds(wait.every) * 1000;
+            const deadline = new Date(now + timeout);
+            return {
+                hold: {
+                    waitKey: conditionWaitKey(io.shelf),
+                    until: new Date(Math.min(now + every, deadline.getTime())),
+                    input: { deadline: deadline.toISOString(), everySeconds: every / 1000 },
+                    output: { matched: false, checks: 1, timedOut: false }
+                }
+            };
+        }
         default:
             throw new StepError("appMissing");
     }
@@ -1230,7 +1464,8 @@ async function settleLoops(
             if (repeat.success && repeat.data.kind === "until") {
                 const context = await buildContext(
                     run,
-                    passIteration(loop.iteration, loop.nodeId, seen)
+                    passIteration(loop.iteration, loop.nodeId, seen),
+                    graph
                 );
                 if (core.checkCondition(repeat.data.condition, { ...context, index: next }))
                     next = passes + 1;
@@ -1535,12 +1770,15 @@ async function endLane(
     run: RunRow,
     graph: core.AutomationGraph,
     lane: string,
-    steps: readonly { status: string; port: string | null }[]
+    steps: readonly { status: string; port: string | null; iteration: string }[]
 ): Promise<void> {
     if (lane === FINALLY) {
+        // A failure inside a Try was caught there; one it did not recover was passed on.
         const failed = steps.some(
             (step) =>
-                ["failed", "refused", "timedOut", "interrupted"].includes(step.status) && !step.port
+                ["failed", "refused", "timedOut", "interrupted"].includes(step.status) &&
+                !step.port &&
+                !enclosingTry(graph, step.iteration)
         );
         await finalize(
             run,
@@ -1607,6 +1845,7 @@ async function afterEnd(
     error: string | null
 ): Promise<void> {
     await resumeParent(run.id);
+    await announceFinished(run.id, status, error);
     if (run.test || (status !== "failed" && status !== "timedOut")) return;
     const { emitAutomationEvent } = await import("./outbox");
     await emitAutomationEvent("core.failed", {
@@ -1620,6 +1859,54 @@ async function afterEnd(
             error
         },
         dedupeKey: run.id,
+        depth: run.depth + 1,
+        originRunId: run.id
+    });
+}
+
+/**
+ * "automation.finished" on the run's shelf, for every live run however it
+ * ended: one level deeper, never starting the same automation again (the
+ * outbox skips the automation a run's own event came from), and held to the
+ * shelf's announce rate so a chain of them cannot flood it.
+ */
+async function announceFinished(runId: string, status: string, error: string | null) {
+    const run = await prisma.automationRun.findUnique({
+        where: { id: runId },
+        select: {
+            id: true,
+            test: true,
+            depth: true,
+            automation: { select: { id: true, name: true, orgId: true, userId: true } }
+        }
+    });
+    if (!run || run.test || run.depth + 1 > L.depth) return;
+    const shelf = { orgId: run.automation.orgId, userId: run.automation.userId };
+    const recent = await prisma.automationEvent.count({
+        where: {
+            type: "core.event",
+            orgId: shelf.orgId,
+            ...(shelf.orgId ? {} : { userId: shelf.userId }),
+            createdAt: { gte: new Date(Date.now() - core.RATE_WINDOW_MS) }
+        }
+    });
+    if (recent >= L.announceRate) return;
+    const { emitAutomationEvent } = await import("./outbox");
+    const name = core.AUTOMATION_FINISHED_EVENT;
+    await emitAutomationEvent("core.event", {
+        ...shelf,
+        subjectKey: name,
+        payload: {
+            name,
+            payload: {
+                automationId: run.automation.id,
+                automationName: run.automation.name,
+                runId: run.id,
+                outcome: status,
+                error
+            }
+        },
+        dedupeKey: `finished:${run.id}`,
         depth: run.depth + 1,
         originRunId: run.id
     });
@@ -1661,6 +1948,10 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
             select: { versionId: true }
         });
         const graph = run ? await loadGraph(run.versionId) : null;
+        if (step.waitKey?.startsWith(CONDITION_WAIT)) {
+            if (await recheckCondition(step.id, null)) runs.add(step.runId);
+            continue;
+        }
         // Running first: a crash after this leaves a run the job steps, and the
         // stepper re-enqueues a successor a crash kept from being written.
         await prisma.automationRun.updateMany({
@@ -1749,6 +2040,100 @@ export async function resumeEventWaits(
             runs.add(step.runId);
         }
     } while (cursor);
+    return [...runs];
+}
+
+/** The wait key of a Wait for a condition: rechecked by every automation event on its shelf. */
+const CONDITION_WAIT = "condition:";
+
+export function conditionWaitKey(shelf: { orgId: string | null; userId: string | null }): string {
+    return `${CONDITION_WAIT}${shelf.orgId ? `org:${shelf.orgId}` : `user:${shelf.userId ?? ""}`}`;
+}
+
+/**
+ * Check a Wait for a condition again, on the clock (`event` null) or because
+ * an automation event reached its shelf. It goes on by "next" once the
+ * condition holds, by "timeout" once its time is up, and otherwise waits for
+ * the next check. Returns the run to step, or null.
+ */
+async function recheckCondition(
+    stepId: string,
+    event: { name: string; payload: Record<string, unknown> } | null
+): Promise<string | null> {
+    const step = await prisma.automationStep.findUnique({
+        where: { id: stepId },
+        select: {
+            id: true,
+            runId: true,
+            nodeId: true,
+            iteration: true,
+            status: true,
+            input: true,
+            output: true
+        }
+    });
+    if (!step || step.status !== "waiting") return null;
+    const run = await readRun(step.runId);
+    const graph = run ? await loadGraph(run.versionId) : null;
+    const node = graph?.nodes.find((entry) => entry.id === step.nodeId);
+    if (!run || !graph || !node || core.runFinished(run.status)) return null;
+    const config = core.waitConditionConfigSchema.safeParse(node.config);
+    const input = (step.input ?? {}) as { deadline?: string; everySeconds?: number };
+    const checks = ((step.output as { checks?: number } | null)?.checks ?? 0) + 1;
+    const context = await buildContext(run, step.iteration, graph);
+    const matched =
+        config.success &&
+        core.checkCondition(config.data.condition, event ? { ...context, event } : context);
+    const now = Date.now();
+    const deadline = input.deadline ? Date.parse(input.deadline) : now;
+    if (!matched && now < deadline) {
+        // Still waiting: an event leaves the clock alone, a clock check sets the next one.
+        const every = Math.max(L.conditionRecheckMinSeconds, input.everySeconds ?? 0) * 1000;
+        await prisma.automationStep.updateMany({
+            where: { id: step.id, status: "waiting" },
+            data: {
+                output: { matched: false, checks, timedOut: false },
+                ...(event ? {} : { waitUntil: new Date(Math.min(now + every, deadline)) })
+            }
+        });
+        return null;
+    }
+    // Running first: a crash after this leaves a run the job steps, never one stuck waiting.
+    await prisma.automationRun.updateMany({
+        where: { id: run.id, status: "waiting" },
+        data: { status: "running", dueAt: null }
+    });
+    const port = matched ? "next" : "timeout";
+    const done = await finishStep(step.id, {
+        status: "ok",
+        port,
+        output: { matched, checks, timedOut: !matched },
+        from: "waiting"
+    });
+    if (!done) return null;
+    await enqueue(run.id, core.successors(graph, node.id, port), step.iteration);
+    return run.id;
+}
+
+/**
+ * An automation event reached a shelf: every Wait for a condition on it is
+ * checked again, with the event as `event`, bounded per event. Returns the runs to step.
+ */
+export async function resumeConditionWaits(
+    shelf: { orgId: string | null; userId: string | null },
+    event: { name: string; payload: Record<string, unknown> }
+): Promise<string[]> {
+    const waiting = await prisma.automationStep.findMany({
+        where: { status: "waiting", waitKey: conditionWaitKey(shelf) },
+        orderBy: { id: "asc" },
+        take: L.conditionWaitsPerEvent,
+        select: { id: true }
+    });
+    const runs = new Set<string>();
+    for (const step of waiting) {
+        const run = await recheckCondition(step.id, event);
+        if (run) runs.add(run);
+    }
     return [...runs];
 }
 
