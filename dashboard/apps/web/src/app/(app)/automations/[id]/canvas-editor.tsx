@@ -185,6 +185,7 @@ export function CanvasEditor({
                         <ContextMenuItem onSelect={() => setRenaming(node.id)}>
                             <Pencil aria-hidden="true" />
                             {t("canvas.menu.rename")}
+                            {/* i18n-ignore: a key on the keyboard */}
                             <MenuShortcut>F2</MenuShortcut>
                         </ContextMenuItem>
                     ) : null}
@@ -204,6 +205,7 @@ export function CanvasEditor({
                                     {core.canPin(node.type) ? <ContextMenuItem onSelect={() => togglePin(node)}>
                                         {node.pinned !== undefined ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
                                         {node.pinned !== undefined ? t("canvas.unpin") : t("canvas.menu.pin")}
+                                        {/* i18n-ignore: a key on the keyboard */}
                                         <MenuShortcut>P</MenuShortcut>
                                     </ContextMenuItem> : null}
                                 </ContextMenuGroup>
@@ -225,6 +227,7 @@ export function CanvasEditor({
                                 <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
                                     {turnOn ? <Power aria-hidden="true" /> : <PowerOff aria-hidden="true" />}
                                     {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
+                                    {/* i18n-ignore: a key on the keyboard */}
                                     <MenuShortcut>D</MenuShortcut>
                                 </ContextMenuItem>
                             ) : null}
