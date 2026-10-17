@@ -71,7 +71,9 @@ describe("an app's node in the central editor", () => {
             <NodeFields
                 node={node("home.action.device", { placeId: "p" })}
                 setConfig={setConfig}
-                detail={detail({ home: { app: "home", kind: "automation-node", props: null, bundle } })}
+                detail={detail({
+                    home: { app: "home", kind: "automation-node", props: null, bundle }
+                })}
                 secrets={[]}
                 onChanged={vi.fn()}
             />,

@@ -145,9 +145,7 @@ export async function fireAppTrigger(input: z.input<typeof fireInput>): Promise<
     if (!automation?.enabled || !automation.publishedVersionId) return false;
     const graph = await loadGraph(automation.publishedVersionId);
     const triggers = graph ? core.triggerNodes(graph).filter((node) => node.enabled !== false) : [];
-    const node = firing.nodeId
-        ? triggers.find((entry) => entry.id === firing.nodeId)
-        : triggers[0];
+    const node = firing.nodeId ? triggers.find((entry) => entry.id === firing.nodeId) : triggers[0];
     if (!node) return false;
     const run = await fireTrigger({
         automationId: firing.automationId,

@@ -1428,7 +1428,14 @@ describe("a Places node in the central editor", () => {
                 node={{
                     id: "trig01",
                     type: "home.trigger.change",
-                    config: { placeId: PLACE, kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }
+                    config: {
+                        placeId: PLACE,
+                        kind: "change",
+                        deviceId: "plug",
+                        attribute: "state",
+                        from: "",
+                        to: "on"
+                    }
                 }}
                 setConfig={setConfig}
             />

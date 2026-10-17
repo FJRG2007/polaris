@@ -45,7 +45,10 @@ vi.mock("@polaris/db", () => ({
         },
         placeAutomation: {
             findMany: async (args: {
-                where: { movedToId: null; OR?: [{ createdAt: { gt: Date } }, { createdAt: Date; id: { gt: string } }] };
+                where: {
+                    movedToId: null;
+                    OR?: [{ createdAt: { gt: Date } }, { createdAt: Date; id: { gt: string } }];
+                };
                 take: number;
             }) => {
                 const after = args.where.OR?.[1];
@@ -55,14 +58,24 @@ vi.mock("@polaris/db", () => ({
                         (row) =>
                             !after ||
                             row.createdAt > after.createdAt ||
-                            (row.createdAt.getTime() === after.createdAt.getTime() && row.id > after.id.gt)
+                            (row.createdAt.getTime() === after.createdAt.getTime() &&
+                                row.id > after.id.gt)
                     )
-                    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
+                    .sort(
+                        (a, b) =>
+                            a.createdAt.getTime() - b.createdAt.getTime() ||
+                            a.id.localeCompare(b.id)
+                    )
                     .slice(0, args.take)
                     .map(({ movedToId: _moved, ...row }) => ({ ...row }));
             },
-            updateMany: async (args: { where: { id: string; movedToId: null }; data: { movedToId: string } }) => {
-                const row = state.rows.find((each) => each.id === args.where.id && each.movedToId === null);
+            updateMany: async (args: {
+                where: { id: string; movedToId: null };
+                data: { movedToId: string };
+            }) => {
+                const row = state.rows.find(
+                    (each) => each.id === args.where.id && each.movedToId === null
+                );
                 if (row) row.movedToId = args.data.movedToId;
                 return { count: row ? 1 : 0 };
             },
@@ -97,7 +110,9 @@ vi.mock("@polaris/app-host", async (original) => {
         ...real,
         host: new Proxy(real.host, {
             get: (target, key) =>
-                key === "automations" ? automations : (target as Record<string | symbol, unknown>)[key]
+                key === "automations"
+                    ? automations
+                    : (target as Record<string | symbol, unknown>)[key]
         })
     };
 });
@@ -107,7 +122,16 @@ const move = await import("@polaris-app/places/src/lib/automation-move");
 function definition(extra: Record<string, unknown> = {}) {
     return {
         timeZone: "Europe/Madrid",
-        triggers: [{ id: "trig01", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }],
+        triggers: [
+            {
+                id: "trig01",
+                kind: "change",
+                deviceId: "plug",
+                attribute: "state",
+                from: "",
+                to: "on"
+            }
+        ],
         conditions: { match: "all", groups: [] },
         actions: [{ id: "step01", kind: "device", deviceId: "plug", do: "turn-off" }],
         ...extra
@@ -143,7 +167,11 @@ describe("moveAutomationNow", () => {
         expect(id).toBe("00000000-0000-4000-8000-000000000001");
         expect(state.rows.map((each) => each.movedToId)).toEqual([null, id]);
         expect(state.imports).toHaveLength(1);
-        expect(state.imports[0]).toMatchObject({ legacyRef: "place:a2", origin: "home", originRef: PLACE });
+        expect(state.imports[0]).toMatchObject({
+            legacyRef: "place:a2",
+            origin: "home",
+            originRef: PLACE
+        });
     });
 
     it("answers the twin of a row already moved, importing nothing", async () => {
@@ -183,7 +211,10 @@ describe("movePlaceAutomations", () => {
             }),
             expect.objectContaining({ legacyRef: "place:a2", enabled: false })
         ]);
-        expect(state.rows.map((each) => each.movedToId)).toEqual([state.central.get("place:a1"), state.central.get("place:a2")]);
+        expect(state.rows.map((each) => each.movedToId)).toEqual([
+            state.central.get("place:a1"),
+            state.central.get("place:a2")
+        ]);
         expect(await move.movedTo("a1")).toBe(state.central.get("place:a1"));
     });
 
@@ -218,7 +249,11 @@ describe("movePlaceAutomations", () => {
         expect(await move.movePlaceAutomations()).toBe(1);
         await move.movePlaceAutomations();
         expect(state.rows[0]!.movedToId).toBeNull();
-        expect((console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter((call) => String(call[0]).includes("bad"))).toHaveLength(1);
+        expect(
+            (console.error as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(
+                (call) => String(call[0]).includes("bad")
+            )
+        ).toHaveLength(1);
     });
 
     it("moves a row written by an older build: no sets, a group of conditions, a delay", async () => {
@@ -227,7 +262,13 @@ describe("movePlaceAutomations", () => {
                 definition: definition({
                     conditions: {
                         match: "all",
-                        groups: [{ id: "grp001", match: "all", items: [{ id: "cond01", kind: "weekday", days: [1] }] }]
+                        groups: [
+                            {
+                                id: "grp001",
+                                match: "all",
+                                items: [{ id: "cond01", kind: "weekday", days: [1] }]
+                            }
+                        ]
                     },
                     actions: [
                         { id: "step01", kind: "delay", seconds: 60 },
@@ -237,8 +278,15 @@ describe("movePlaceAutomations", () => {
             })
         ];
         expect(await move.movePlaceAutomations()).toBe(1);
-        const graph = state.imports[0]!.graph as { nodes: { id: string; type: string; config: Record<string, unknown> }[] };
-        expect(graph.nodes.map((node) => node.type)).toEqual(["home.trigger.change", "home.condition.check", "core.wait", "home.action.run"]);
+        const graph = state.imports[0]!.graph as {
+            nodes: { id: string; type: string; config: Record<string, unknown> }[];
+        };
+        expect(graph.nodes.map((node) => node.type)).toEqual([
+            "home.trigger.change",
+            "home.condition.check",
+            "core.wait",
+            "home.action.run"
+        ]);
         // "Run another" keeps the old id: the node finds its twin when it runs, whatever order they moved in.
         expect(graph.nodes[3]!.config.automationId).toBe("a2");
     });
@@ -246,7 +294,9 @@ describe("movePlaceAutomations", () => {
     it("takes a batch at a time, oldest first", async () => {
         state.rows = Array.from({ length: 30 }, (_, index) => row(`r${index}`, 59 - index));
         expect(await move.movePlaceAutomations()).toBe(25);
-        expect(state.rows.filter((each) => each.movedToId === null).map((each) => each.id)).toEqual(["r0", "r1", "r2", "r3", "r4"]);
+        expect(state.rows.filter((each) => each.movedToId === null).map((each) => each.id)).toEqual(
+            ["r0", "r1", "r2", "r3", "r4"]
+        );
         expect(await move.movePlaceAutomations()).toBe(5);
     });
 
@@ -273,7 +323,12 @@ describe("movePlaceAutomations", () => {
 
     it("reads a moved automation's old runs, and nothing for a ref that is not Places'", async () => {
         expect(await move.legacyRuns("place:a1")).toEqual([
-            { id: "run-2", status: "skipped", startedAt: "2026-01-02T00:00:00.000Z", finishedAt: null }
+            {
+                id: "run-2",
+                status: "skipped",
+                startedAt: "2026-01-02T00:00:00.000Z",
+                finishedAt: null
+            }
         ]);
         expect(await move.legacyRuns("place:other")).toEqual([]);
         expect(await move.legacyRuns("crm:a1")).toEqual([]);
@@ -289,6 +344,8 @@ describe("automationHref", () => {
             `/automations/runs?automation=${central}`
         );
         expect(automationHref({ id: "a1", movedTo: null })).toBe("/places/devices/automations/a1");
-        expect(automationHref({ id: "a1" }, "runs")).toBe("/places/devices/automations/a1?tab=runs");
+        expect(automationHref({ id: "a1" }, "runs")).toBe(
+            "/places/devices/automations/a1?tab=runs"
+        );
     });
 });

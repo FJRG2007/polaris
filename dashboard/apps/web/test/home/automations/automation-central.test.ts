@@ -24,7 +24,8 @@ vi.mock("@polaris/db", () => ({
         placeAutomation: {
             findFirst: async (args: { where: { id: string; installedAppId: string } }) =>
                 state.legacy.find(
-                    (row) => row.id === args.where.id && row.installedAppId === args.where.installedAppId
+                    (row) =>
+                        row.id === args.where.id && row.installedAppId === args.where.installedAppId
                 ) ?? null
         }
     }
@@ -51,7 +52,9 @@ vi.mock("@polaris/app-host", async (original) => {
         ...real,
         host: new Proxy(real.host, {
             get: (target, key) =>
-                key === "automations" ? automations : (target as Record<string | symbol, unknown>)[key]
+                key === "automations"
+                    ? automations
+                    : (target as Record<string | symbol, unknown>)[key]
         })
     };
 });

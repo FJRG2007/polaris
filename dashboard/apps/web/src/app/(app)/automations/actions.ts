@@ -313,7 +313,10 @@ export async function listLegacyRunsAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        return { ok: true, rows: await history.listLegacyRuns(who, await openShelf(who), parsed.data) };
+        return {
+            ok: true,
+            rows: await history.listLegacyRuns(who, await openShelf(who), parsed.data)
+        };
     } catch (caught) {
         return failure(caught);
     }

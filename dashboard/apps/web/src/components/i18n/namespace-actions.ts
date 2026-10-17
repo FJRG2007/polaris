@@ -10,7 +10,10 @@ import { z } from "zod";
 import { getLocale } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 
-const askable = z.array(z.enum(["automations"])).min(1).max(4);
+const askable = z
+    .array(z.enum(["automations"]))
+    .min(1)
+    .max(4);
 
 export async function namespaceMessagesAction(names: unknown) {
     const parsed = askable.safeParse(names);

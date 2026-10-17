@@ -27,7 +27,14 @@ import { randomBytes } from "node:crypto";
 import { automationRunner, mayAllowLocalNetwork } from "./runner";
 import { serverNode } from "./node-registry";
 import { readSecretForRun } from "./secrets";
-import { StepError, StepRefusal, type NodeIo, type NodeResult, type RunContext, type StopAs } from "./types";
+import {
+    StepError,
+    StepRefusal,
+    type NodeIo,
+    type NodeResult,
+    type RunContext,
+    type StopAs
+} from "./types";
 
 const L = core.AUTOMATION_LIMITS;
 const MAIN = core.MAIN_ITERATION;

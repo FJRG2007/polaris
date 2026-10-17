@@ -48,7 +48,8 @@ export async function centralRecords(installedAppId: string): Promise<Automation
     const rows = await host.automations.appTriggers(nodes.NODE_APP);
     if (rows.length === 0) return [];
     const byAutomation = new Map<string, typeof rows>();
-    for (const row of rows) byAutomation.set(row.automationId, [...(byAutomation.get(row.automationId) ?? []), row]);
+    for (const row of rows)
+        byAutomation.set(row.automationId, [...(byAutomation.get(row.automationId) ?? []), row]);
     const placeIds = new Set(
         rows.flatMap((row) => {
             const id = (row.config as { placeId?: unknown } | null)?.placeId;
@@ -240,7 +241,11 @@ const deviceNode: ServerNode<DeviceConfig> = {
 async function placeScope(record: AutomationRecord): Promise<auto.TargetScope> {
     const [devices, rooms] = await Promise.all([
         prisma.placeDevice.findMany({
-            where: { installedAppId: record.installedAppId, placeId: record.placeId, roomId: { not: null } },
+            where: {
+                installedAppId: record.installedAppId,
+                placeId: record.placeId,
+                roomId: { not: null }
+            },
             select: { id: true, kind: true, controllable: true, roomId: true },
             take: 1000
         }),
@@ -272,7 +277,10 @@ const waitNode: ServerNode<WaitConfig> = {
         if (reached) return { output: { reached: true, timedOut: false } };
         if (now < deadline)
             return {
-                wait: { until: new Date(Math.min(deadline, now + RECHECK_MS)), recheck: RECHECK_KEY }
+                wait: {
+                    until: new Date(Math.min(deadline, now + RECHECK_MS)),
+                    recheck: RECHECK_KEY
+                }
             };
         // Stop: the run ends stopped there, as a Places run did; nothing after it is done.
         return step.onTimeout === "stop"

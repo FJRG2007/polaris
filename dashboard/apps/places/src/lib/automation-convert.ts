@@ -42,7 +42,13 @@ function without<T extends { id: string; alias?: string; note?: string }>(block:
 
 function triggerNode(trigger: auto.Trigger, placeId: string): GraphNode {
     if (trigger.kind === "manual")
-        return { id: trigger.id, type: "core.manual", typeVersion: 1, config: {}, ...base(trigger) };
+        return {
+            id: trigger.id,
+            type: "core.manual",
+            typeVersion: 1,
+            config: {},
+            ...base(trigger)
+        };
     return {
         id: trigger.id,
         type: nodes.triggerNodeType(trigger.kind),

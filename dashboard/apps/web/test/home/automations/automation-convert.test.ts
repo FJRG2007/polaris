@@ -23,7 +23,9 @@ function definition(parts: Parts) {
         timeZone: "Europe/Madrid",
         triggers: parts.triggers ?? [{ id: "trig01", kind: "manual" }],
         conditions: { match: parts.match ?? "all", groups: parts.groups ?? [] },
-        actions: parts.actions ?? [{ id: "step01", kind: "device", deviceId: "plug", do: "turn-off" }]
+        actions: parts.actions ?? [
+            { id: "step01", kind: "device", deviceId: "plug", do: "turn-off" }
+        ]
     };
 }
 
@@ -49,11 +51,25 @@ const TRIGGERS: { name: string; trigger: Record<string, unknown> }[] = [
     { name: "interval", trigger: { id: "trig01", kind: "interval", minutes: 15 } },
     {
         name: "change",
-        trigger: { id: "trig01", kind: "change", deviceId: "plug", attribute: "state", from: "off", to: "on" }
+        trigger: {
+            id: "trig01",
+            kind: "change",
+            deviceId: "plug",
+            attribute: "state",
+            from: "off",
+            to: "on"
+        }
     },
     {
         name: "change any to any",
-        trigger: { id: "trig01", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "" }
+        trigger: {
+            id: "trig01",
+            kind: "change",
+            deviceId: "plug",
+            attribute: "state",
+            from: "",
+            to: ""
+        }
     },
     {
         name: "change held for, on rooms and floors, first",
@@ -101,7 +117,14 @@ const TRIGGERS: { name: string; trigger: Record<string, unknown> }[] = [
     })),
     {
         name: "threshold with a measure",
-        trigger: { id: "trig01", kind: "threshold", deviceId: "air", direction: "above", value: 50, measure: "pm25" }
+        trigger: {
+            id: "trig01",
+            kind: "threshold",
+            deviceId: "air",
+            direction: "above",
+            value: 50,
+            measure: "pm25"
+        }
     },
     { name: "sun", trigger: { id: "trig01", kind: "sun", event: "sunset" } },
     {
@@ -135,7 +158,9 @@ describe("convertPlaceAutomation: triggers", () => {
 
     it("keeps an alias and a note on the node, not in its config", () => {
         const graph = converted({
-            triggers: [{ id: "trig01", kind: "interval", minutes: 5, alias: "Every five", note: "Why" }]
+            triggers: [
+                { id: "trig01", kind: "interval", minutes: 5, alias: "Every five", note: "Why" }
+            ]
         });
         expect(graph.nodes[0]).toMatchObject({ alias: "Every five", note: "Why" });
         expect(graph.nodes[0]!.config).toEqual({ kind: "interval", minutes: 5, placeId: PLACE });
@@ -148,7 +173,9 @@ describe("convertPlaceAutomation: triggers", () => {
                 { id: "trig02", kind: "interval", minutes: 5 }
             ]
         });
-        const into = graph.edges.filter((edge) => edge.to.node === "step01").map((edge) => edge.from.node);
+        const into = graph.edges
+            .filter((edge) => edge.to.node === "step01")
+            .map((edge) => edge.from.node);
         expect(into.sort()).toEqual(["trig01", "trig02"]);
     });
 });
@@ -202,15 +229,23 @@ describe("convertPlaceAutomation: conditions", () => {
         expect(node.config).toEqual({ placeId: PLACE, match: "any", groups });
         expect(nodes.conditionNodeConfig.safeParse(node.config).success).toBe(true);
         expect(core.nodeRole(node.type)).toBe("condition");
-        expect(graph.edges).toContainEqual({ from: { node: "trig01", port: "next" }, to: { node: "grp001" } });
-        expect(graph.edges).toContainEqual({ from: { node: "grp001", port: "then" }, to: { node: "step01" } });
+        expect(graph.edges).toContainEqual({
+            from: { node: "trig01", port: "next" },
+            to: { node: "grp001" }
+        });
+        expect(graph.edges).toContainEqual({
+            from: { node: "grp001", port: "then" },
+            to: { node: "step01" }
+        });
         expect(graph.edges.some((edge) => edge.from.port === "else")).toBe(false);
     });
 
     it("a definition with no conditions goes straight to the steps", () => {
         const graph = converted({});
         expect(graph.nodes.some((each) => each.type === nodes.CONDITION_NODE_TYPE)).toBe(false);
-        expect(graph.edges).toEqual([{ from: { node: "trig01", port: "next" }, to: { node: "step01" } }]);
+        expect(graph.edges).toEqual([
+            { from: { node: "trig01", port: "next" }, to: { node: "step01" } }
+        ]);
     });
 });
 
@@ -225,7 +260,13 @@ const STEPS: { name: string; step: Record<string, unknown> }[] = [
     },
     {
         name: "set the mode",
-        step: { id: "step01", kind: "device", deviceId: "ac", do: "set-mode", setting: { action: "set-mode", mode: "cool" } }
+        step: {
+            id: "step01",
+            kind: "device",
+            deviceId: "ac",
+            do: "set-mode",
+            setting: { action: "set-mode", mode: "cool" }
+        }
     },
     {
         name: "set the temperature",
@@ -239,7 +280,13 @@ const STEPS: { name: string; step: Record<string, unknown> }[] = [
     },
     {
         name: "set the fan",
-        step: { id: "step01", kind: "device", deviceId: "ac", do: "set-fan", setting: { action: "set-fan", fan: "auto" } }
+        step: {
+            id: "step01",
+            kind: "device",
+            deviceId: "ac",
+            do: "set-fan",
+            setting: { action: "set-fan", fan: "auto" }
+        }
     },
     {
         name: "set an option",
@@ -349,17 +396,34 @@ describe("convertPlaceAutomation: steps", () => {
 describe("convertPlaceAutomation: refusals and older shapes", () => {
     it("reads a block stored before sets existed (no targets)", () => {
         const graph = converted({
-            triggers: [{ id: "trig01", kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }]
+            triggers: [
+                {
+                    id: "trig01",
+                    kind: "change",
+                    deviceId: "plug",
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                }
+            ]
         });
         expect(graph.nodes[0]!.config).not.toHaveProperty("targets");
     });
 
     it("refuses a definition the Places engine could not have run", () => {
-        expect(convert.convertPlaceAutomation({ id: "x", placeId: PLACE, definition: { triggers: [] } })).toEqual({
+        expect(
+            convert.convertPlaceAutomation({
+                id: "x",
+                placeId: PLACE,
+                definition: { triggers: [] }
+            })
+        ).toEqual({
             ok: false,
             reason: "unreadable"
         });
-        expect(convert.convertPlaceAutomation({ id: "x", placeId: PLACE, definition: null })).toEqual({
+        expect(
+            convert.convertPlaceAutomation({ id: "x", placeId: PLACE, definition: null })
+        ).toEqual({
             ok: false,
             reason: "unreadable"
         });

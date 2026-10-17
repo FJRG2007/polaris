@@ -2613,7 +2613,15 @@ describe("an automation that moved to the central engine", () => {
             "moved",
             {
                 triggers: [
-                    { id: "trigdoor", kind: "change", deviceId: "door", attribute: "door", from: "closed", to: "open", forMinutes: 5 }
+                    {
+                        id: "trigdoor",
+                        kind: "change",
+                        deviceId: "door",
+                        attribute: "door",
+                        from: "closed",
+                        to: "open",
+                        forMinutes: 5
+                    }
                 ],
                 actions: []
             },
@@ -2641,7 +2649,15 @@ describe("an automation that moved to the central engine", () => {
             "moved",
             {
                 triggers: [
-                    { id: "trigdoor", kind: "change", deviceId: "door", attribute: "door", from: "closed", to: "open", forMinutes: 5 }
+                    {
+                        id: "trigdoor",
+                        kind: "change",
+                        deviceId: "door",
+                        attribute: "door",
+                        from: "closed",
+                        to: "open",
+                        forMinutes: 5
+                    }
                 ],
                 actions: []
             },
@@ -2683,10 +2699,18 @@ describe("an automation that moved to the central engine", () => {
     });
 
     it("Run now on a moved automation starts its central twin", async () => {
-        const record = automation("moved", {}, { central: { automationId: "central-1", legacyId: "moved" } });
+        const record = automation(
+            "moved",
+            {},
+            { central: { automationId: "central-1", legacyId: "moved" } }
+        );
         expect(await engine.runNow(record, "owner-1", "k1")).toBe(true);
         expect(centralFired).toEqual([
-            expect.objectContaining({ automationId: "central-1", key: "manual:k1", triggerId: "trigmanual" })
+            expect.objectContaining({
+                automationId: "central-1",
+                key: "manual:k1",
+                triggerId: "trigmanual"
+            })
         ]);
         expect(store.runsOf("moved")).toEqual([]);
     });
@@ -2703,7 +2727,10 @@ describe("an automation that moved to the central engine", () => {
         await engine.drain();
         expect(store.runsOf("old")[0]?.status).toBe("waiting");
         // The move: the row now answers as its central twin.
-        store.automations.set("old", { ...record, central: { automationId: "central-1", legacyId: "old" } });
+        store.automations.set("old", {
+            ...record,
+            central: { automationId: "central-1", legacyId: "old" }
+        });
         later(61_000);
         await engine.drain();
         expect(store.runsOf("old")[0]?.status).toBe("succeeded");

@@ -81,7 +81,9 @@ export function AutomationsList({
         [origin, originRef]
     );
     const { data, error, refresh, replace } = useCachedAction(
-        origin ? `polaris.automations.list.${origin}.${originRef ?? ""}` : "polaris.automations.list",
+        origin
+            ? `polaris.automations.list.${origin}.${originRef ?? ""}`
+            : "polaris.automations.list",
         load
     );
     const mayCreate = Boolean(data?.canEdit) && !origin;

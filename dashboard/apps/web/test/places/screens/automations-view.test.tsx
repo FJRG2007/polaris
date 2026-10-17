@@ -38,9 +38,11 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
 
 // The central list is the dashboard's own screen, tested there; here only what it is handed.
 vi.mock("@/app/(app)/automations/embedded-list", () => ({
-    EmbeddedAutomationsList: ({ from }: { from?: { origin: string; originRef?: string | null } }) => (
-        <div data-testid="central-list">{`${from?.origin}:${from?.originRef}`}</div>
-    )
+    EmbeddedAutomationsList: ({
+        from
+    }: {
+        from?: { origin: string; originRef?: string | null };
+    }) => <div data-testid="central-list">{`${from?.origin}:${from?.originRef}`}</div>
 }));
 
 import { AutomationsView } from "@polaris-app/places/src/screens/automations/automations-view";
@@ -149,7 +151,9 @@ describe("the places automation list, on the shared rule pieces", () => {
     });
 
     it("draws no leftover section once everything moved", async () => {
-        state.rows = [{ ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" }];
+        state.rows = [
+            { ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" }
+        ];
         open();
         await screen.findByTestId("central-list");
         await waitFor(() => expect(screen.queryByText("Not moved yet")).toBeNull());

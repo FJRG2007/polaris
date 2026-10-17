@@ -107,7 +107,10 @@ export async function appAutomationNodeSlots(): Promise<Record<string, AppSlot>>
 }
 
 /** The runs a moved automation had in its app, before the move; none while the app is away. */
-export async function appAutomationHistory(app: string, legacyRef: string): Promise<LegacyRunRow[]> {
+export async function appAutomationHistory(
+    app: string,
+    legacyRef: string
+): Promise<LegacyRunRow[]> {
     const extension = extensions().find((entry) => entry.id === app);
     if (!extension?.automationHistory || !(await isAppInstalled(app))) return [];
     return [...(await extension.automationHistory(legacyRef))];
