@@ -72,6 +72,26 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (node.type === "core.onEvent") {
+            const config = core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(node.config);
+            if (!config.success) continue;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.event",
+                subjectKey: config.data.name,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
+        } else if (node.type === "core.failed") {
+            out.push({
+                nodeId: node.id,
+                eventType: "core.failed",
+                subjectKey: null,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.schedule") {
             const config = core.scheduleConfigSchema.parse(node.config);
             const before = existing.find((row) => row.nodeId === node.id);

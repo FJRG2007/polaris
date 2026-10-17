@@ -134,7 +134,9 @@ export const STEP_STATUSES = [
     "skipped",
     "refused",
     "timedOut",
-    "interrupted"
+    "interrupted",
+    /** A failed try that was tried again. */
+    "retried"
 ] as const;
 export type StepStatus = (typeof STEP_STATUSES)[number];
 
@@ -918,6 +920,7 @@ export type GraphProblem =
     | { code: "pinTooLarge"; node: string }
     | { code: "pinNotAllowed"; node: string }
     | { code: "loopBodyLeaks"; node: string }
+    | { code: "callCycle"; node: string }
     | { code: "noTrigger" };
 
 /** Nodes reachable from `start` along edges, `start` included. */

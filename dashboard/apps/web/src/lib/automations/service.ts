@@ -7,13 +7,14 @@
  */
 
 import { prisma } from "@polaris/db";
-import { cancelRun } from "./engine";
+import { cancelRun, loadGraph } from "./engine";
 import * as core from "@polaris/core";
 import type { RunActor } from "./types";
 import { randomUUID } from "node:crypto";
 import { recordAudit } from "@/lib/audit-service";
 import { emitAutomationEvent, kickIntake } from "./outbox";
 import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
+import { callCycle } from "./calls";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 
 const L = core.AUTOMATION_LIMITS;
@@ -289,6 +290,14 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
     if (!parsed.success) throw new AutomationAccessError("invalid");
     const problems = core.graphProblems(parsed.data, { forPublish: true });
     if (problems.length > 0) return problems;
+    const cycle = await callCycle(id, parsed.data, async (target) => {
+        const other = await prisma.automation.findUnique({
+            where: { id: target },
+            select: { publishedVersionId: true }
+        });
+        return other?.publishedVersionId ? loadGraph(other.publishedVersionId) : null;
+    });
+    if (cycle) return [{ code: "callCycle", node: cycle.node }];
     await checkSecrets(row, parsed.data);
     const last = await prisma.automationVersion.findFirst({
         where: { automationId: id },

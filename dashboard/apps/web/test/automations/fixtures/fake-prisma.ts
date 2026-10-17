@@ -118,6 +118,11 @@ function matches(row: Row, where: Row | undefined): boolean {
             if ("notIn" in ops && (ops.notIn as unknown[]).some((item) => same(item, value)))
                 return false;
             if ("not" in ops && same(ops.not ?? null, value)) return false;
+            if (
+                "startsWith" in ops &&
+                (typeof value !== "string" || !value.startsWith(ops.startsWith as string))
+            )
+                return false;
             if ("lt" in ops && (value === null || cmp(value, ops.lt) >= 0)) return false;
             if ("lte" in ops && (value === null || cmp(value, ops.lte) > 0)) return false;
             if ("gt" in ops && (value === null || cmp(value, ops.gt) <= 0)) return false;

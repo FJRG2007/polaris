@@ -39,6 +39,8 @@ const io = {
     runId: "r1",
     automationId: "a1",
     idempotencyKey: "r1:h:0",
+    depth: 0,
+    shelf: { orgId: null, userId: "u1" },
     timeZone: "UTC",
     signal: new AbortController().signal,
     allowLocalNetwork: false,
