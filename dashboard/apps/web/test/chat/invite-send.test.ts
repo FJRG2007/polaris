@@ -23,18 +23,33 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatSpaceInvite: { findUnique: async () => invite },
         chatInviteSend: {
-            findUnique: async ({ where }: { where: { inviteId_recipientId: { recipientId: string } } }) =>
-                claims.get(where.inviteId_recipientId.recipientId) ?? null,
-            create: async ({ data }: { data: { recipientId: string } }) => {
-                if (claims.has(data.recipientId)) {
+            findUnique: async ({
+                where
+            }: {
+                where: { inviteId_senderId_recipientId: { senderId: string; recipientId: string } };
+            }) => {
+                const key = where.inviteId_senderId_recipientId;
+                return claims.get(`${key.senderId}:${key.recipientId}`) ?? null;
+            },
+            create: async ({ data }: { data: { senderId: string; recipientId: string } }) => {
+                const key = `${data.senderId}:${data.recipientId}`;
+                if (claims.has(key)) {
                     throw Object.assign(new Error("unique"), { code: "P2002" });
                 }
-                const row = { id: `claim-${data.recipientId}`, channelId: null };
-                claims.set(data.recipientId, row);
+                const row = { id: `claim-${key}`, channelId: null };
+                claims.set(key, row);
                 return { id: row.id };
             },
-            update: async ({ data }: { data: { channelId: string } }) => {
-                for (const row of claims.values()) row.channelId = data.channelId;
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: { channelId: string };
+            }) => {
+                for (const row of claims.values()) {
+                    if (row.id === where.id) row.channelId = data.channelId;
+                }
                 return {};
             },
             delete: async ({ where }: { where: { id: string } }) => {
@@ -75,6 +90,7 @@ vi.mock("@/lib/chat/notices", () => ({ postSpaceNotice: async () => undefined })
 const { sendInvite } = await import("@/lib/chat/invites");
 
 const ada = { id: "ada" };
+const bob = { id: "bob" };
 
 beforeEach(() => {
     invite = {
@@ -119,6 +135,13 @@ describe("sending an invite to a friend", () => {
         // And again later: still the one message.
         expect((await sendInvite(ada, { code: "AbCdEf1234", userId: GRACE })).already).toBe(true);
         expect(posted).toHaveLength(1);
+    });
+
+    it("posts for a second sender of the same link to the same person", async () => {
+        await sendInvite(ada, { code: "AbCdEf1234", userId: GRACE });
+        const result = await sendInvite(bob, { code: "AbCdEf1234", userId: GRACE });
+        expect(result.already).toBe(false);
+        expect(posted.map((one) => one.authorId)).toEqual(["ada", "bob"]);
     });
 
     it("is refused for a plain member of a private space, as the menu hides it", async () => {

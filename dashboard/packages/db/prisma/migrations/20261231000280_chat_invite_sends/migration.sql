@@ -1,5 +1,5 @@
--- Invitations sent to one person from the invite dialog, so sending the same
--- link to the same person twice posts one message. Additive only.
+-- Invitations sent to one person from the invite dialog, so one sender sending
+-- the same link to the same person twice posts one message. Additive only.
 --
 -- Every statement is written so that running it a second time is a no-op.
 
@@ -7,6 +7,7 @@
 CREATE TABLE IF NOT EXISTS "ChatInviteSend" (
     "id" UUID NOT NULL,
     "inviteId" UUID NOT NULL,
+    "senderId" UUID NOT NULL,
     "recipientId" UUID NOT NULL,
     "channelId" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS "ChatInviteSend" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "ChatInviteSend_inviteId_recipientId_key" ON "ChatInviteSend"("inviteId", "recipientId");
+CREATE UNIQUE INDEX IF NOT EXISTS "ChatInviteSend_inviteId_senderId_recipientId_key" ON "ChatInviteSend"("inviteId", "senderId", "recipientId");
 
 -- AddForeignKey
 ALTER TABLE "ChatInviteSend" DROP CONSTRAINT IF EXISTS "ChatInviteSend_inviteId_fkey";

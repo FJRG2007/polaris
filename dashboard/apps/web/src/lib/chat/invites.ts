@@ -39,6 +39,7 @@ import {
     ChatAccessError,
     ChatRuleError,
     searchForConversation,
+    directReachable,
     spaceAccess,
     type ChatActor
 } from "./access";
@@ -332,10 +333,8 @@ export async function inviteLink(
             createdById: actor.id,
             revokedAt: null,
             maxUses: null,
-            OR: [
-                { expiresAt: null },
-                { expiresAt: { gt: new Date(Date.now() + REUSE_MARGIN_MS) } }
-            ]
+            ...(channelId ? { channel: { private: false, archived: false } } : {}),
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date(Date.now() + REUSE_MARGIN_MS) } }]
         },
         orderBy: { createdAt: "desc" },
         select: { ...SELECT, space: { select: { visibility: true, archived: true } } }
@@ -357,6 +356,9 @@ export async function inviteLink(
     });
 }
 
+/** How many people the invite dialog lists at once; typing narrows past it. */
+const CANDIDATE_LIMIT = 100;
+
 /** Somebody the invite dialog lists. */
 export interface ChatInviteCandidate {
     readonly id: string;
@@ -369,7 +371,8 @@ export interface ChatInviteCandidate {
 /**
  * Who the invite dialog offers.
  *
- * With nothing typed, the inviter's friends. With a search, the same reach the
+ * With nothing typed, the inviter's friends a direct message reaches, those
+ * still outside the space first. With a search, the same reach the
  * new-conversation picker has (`searchForConversation`): a friend by any part of
  * their name, anybody else by their whole username, and nobody privacy, a block
  * or a missing chat permission keeps out of a direct message.
@@ -391,23 +394,7 @@ export async function inviteCandidates(
             : [...(await friendIds(actor.id))].filter((id) => id !== actor.id);
     if (ids.length === 0) return [];
 
-    const [people, members, space] = await Promise.all([
-        prisma.user.findMany({
-            where: {
-                id: { in: ids },
-                ...(query && query.length < SHORTEST_SEARCH
-                    ? {
-                          OR: [
-                              { name: { contains: query, mode: "insensitive" as const } },
-                              { username: { startsWith: query, mode: "insensitive" as const } }
-                          ]
-                      }
-                    : {})
-            },
-            orderBy: { name: "asc" },
-            take: 100,
-            select: { id: true, name: true, username: true }
-        }),
+    const [members, space] = await Promise.all([
         prisma.chatSpaceMember.findMany({
             where: { spaceId, userId: { in: ids } },
             select: { userId: true }
@@ -416,14 +403,54 @@ export async function inviteCandidates(
     ]);
     const inside = new Set(members.map((row) => row.userId));
     if (space) inside.add(space.ownerId);
-    return people
-        .map((person) => ({
-            id: person.id,
-            name: person.name,
-            username: person.username,
-            member: inside.has(person.id)
-        }))
-        .sort((one, other) => Number(one.member) - Number(other.member));
+
+    const named =
+        query && query.length < SHORTEST_SEARCH
+            ? {
+                  OR: [
+                      { name: { contains: query, mode: "insensitive" as const } },
+                      { username: { startsWith: query, mode: "insensitive" as const } }
+                  ]
+              }
+            : {};
+    const select = { id: true, name: true, username: true } as const;
+
+    // Whoever can still be invited fills the list first, and people already in
+    // the space take what room is left - otherwise a long friends list spent on
+    // members hides the friends there is something to send to.
+    const outside = await prisma.user.findMany({
+        where: { id: { in: ids.filter((id) => !inside.has(id)) }, ...named },
+        orderBy: { name: "asc" },
+        take: CANDIDATE_LIMIT * 2,
+        select
+    });
+    // The search already asked this; a friend has not been, and one a direct
+    // message cannot reach would offer a button that only fails.
+    const reach =
+        query.length >= SHORTEST_SEARCH
+            ? null
+            : await directReachable(
+                  actor,
+                  outside.map((person) => person.id)
+              );
+    const invitable = (reach ? outside.filter((person) => reach.has(person.id)) : outside).slice(
+        0,
+        CANDIDATE_LIMIT
+    );
+    const already =
+        invitable.length < CANDIDATE_LIMIT
+            ? await prisma.user.findMany({
+                  where: { id: { in: ids.filter((id) => inside.has(id)) }, ...named },
+                  orderBy: { name: "asc" },
+                  take: CANDIDATE_LIMIT - invitable.length,
+                  select
+              })
+            : [];
+
+    return [
+        ...invitable.map((person) => ({ ...person, member: false })),
+        ...already.map((person) => ({ ...person, member: true }))
+    ];
 }
 
 /**
@@ -431,9 +458,11 @@ export async function inviteCandidates(
  * conversation between them - opened through the ordinary path, so every rule
  * that decides whether these two may message applies here too.
  *
- * Idempotent per (invite, person): the pair is claimed in a unique row before
- * anything is posted, so a double click or two tabs post one message. A claim
- * whose message never went out is released, so a retry can send it.
+ * Idempotent per (invite, sender, person): the three are claimed in a unique
+ * row before anything is posted, so a double click or two tabs post one
+ * message, and somebody else having sent the same link never stands in for
+ * this sender's. A claim whose message never went out is released, so a retry
+ * can send it.
  */
 export async function sendInvite(
     actor: ChatActor,
@@ -463,7 +492,13 @@ export async function sendInvite(
     if (input.userId === actor.id) throw new ChatAccessError({ key: "errors.inviteNotSent" });
 
     const earlier = await prisma.chatInviteSend.findUnique({
-        where: { inviteId_recipientId: { inviteId: invite.id, recipientId: input.userId } },
+        where: {
+            inviteId_senderId_recipientId: {
+                inviteId: invite.id,
+                senderId: actor.id,
+                recipientId: input.userId
+            }
+        },
         select: { channelId: true }
     });
     if (earlier) return { channelId: earlier.channelId ?? "", already: true };
@@ -483,7 +518,7 @@ export async function sendInvite(
     let claim: { id: string };
     try {
         claim = await prisma.chatInviteSend.create({
-            data: { inviteId: invite.id, recipientId: input.userId },
+            data: { inviteId: invite.id, senderId: actor.id, recipientId: input.userId },
             select: { id: true }
         });
     } catch (error) {

@@ -12,7 +12,8 @@ import type { ChatActor } from "./access";
 /** What a card under a message says about one invitation, for this reader. */
 export interface ChatInviteCard {
     readonly code: string;
-    /** Null when the code names nothing: the card says the invite is invalid. */
+    /** Null when the code names nothing or no longer opens: the card says the
+     *  invite is invalid, and nothing about the space. */
     readonly spaceId: string | null;
     readonly spaceName: string;
     readonly spaceColor: string;
@@ -53,7 +54,8 @@ export async function inviteCards(
             }
         }
     });
-    const spaceIds = [...new Set(rows.map((row) => row.space.id))];
+    const usable = rows.filter((row) => !row.space.archived && core.inviteUsable(row));
+    const spaceIds = [...new Set(usable.map((row) => row.space.id))];
     const since = new Date(Date.now() - ONLINE_MS);
     const [mine, counts, online] = spaceIds.length
         ? await Promise.all([
@@ -81,10 +83,11 @@ export async function inviteCards(
         : [[], [], []];
     const joined = new Set(mine.map((row) => row.spaceId));
     const total = new Map(counts.map((row) => [row.spaceId, row._count._all]));
-    const live = new Map(online.map((row) => [row.spaceId, row._count._all]));
+    const around = new Map(online.map((row) => [row.spaceId, row._count._all]));
 
     for (const code of wanted) {
-        const row = rows.find((entry) => entry.code === code);
+        const row = usable.find((entry) => entry.code === code);
+        // A link that no longer opens says nothing about the space it named.
         if (!row) {
             cards.set(code, {
                 code,
@@ -105,11 +108,11 @@ export async function inviteCards(
             spaceName: row.space.name,
             spaceColor: row.space.color,
             channelId: row.channelId && row.channel && !row.channel.private ? row.channelId : null,
-            usable: !row.space.archived && core.inviteUsable(row),
+            usable: true,
             member: joined.has(row.space.id) || row.space.ownerId === actor.id,
             // The owner holds no membership row.
             members: (total.get(row.space.id) ?? 0) + 1,
-            online: live.get(row.space.id) ?? 0
+            online: around.get(row.space.id) ?? 0
         });
     }
     return cards;
