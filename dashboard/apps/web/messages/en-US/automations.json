@@ -317,6 +317,8 @@
         "notReady": "It is not ready to publish. Check the steps.",
         "noTrigger": "Add a trigger to test it.",
         "triggerGone": "That trigger is no longer in this version.",
+        "loopBodyLeaks": "Only the loop leads into the steps it repeats. Remove the other connection.",
+        "callCycle": "It calls an automation that calls this one back. Change the Run another automation step.",
         "partial": {
             "notFound": "That node is not in the saved draft.",
             "notMainFlow": "Run from here works on steps a trigger reaches.",
@@ -408,7 +410,8 @@
             "cycle": "That would make a loop.",
             "crossesLane": "The main flow and the Always lane stay apart.",
             "intoLaneStart": "The Always lane starts on its own.",
-            "laneTaken": "The Always lane already has a start."
+            "laneTaken": "The Always lane already has a start.",
+            "intoLoopBody": "A loop step is reached only from its loop."
         },
         "alwaysStarts": "The Always lane starts here.",
         "alwaysLeave": "Take out of the Always lane",

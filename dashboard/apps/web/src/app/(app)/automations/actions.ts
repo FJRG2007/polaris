@@ -140,6 +140,18 @@ export async function setEnabledAction(automationId: unknown, enabled: unknown):
     }
 }
 
+/** The sentence for a draft that cannot be saved or published: the problem's own when it has one. */
+async function problemError(
+    problems: readonly core.GraphProblem[],
+    fallback: "invalid" | "notReady"
+): Promise<string> {
+    const t = await getTranslations("automations");
+    const named = problems.find(
+        (problem) => problem.code === "loopBodyLeaks" || problem.code === "callCycle"
+    );
+    return t(`errors.${named?.code ?? fallback}`);
+}
+
 export async function saveDraftAction(automationId: unknown, graph: unknown): Promise<Result> {
     const parsedId = id.safeParse(automationId);
     const parsed = core.automationGraphSchema.safeParse(graph);
@@ -147,11 +159,7 @@ export async function saveDraftAction(automationId: unknown, graph: unknown): Pr
     try {
         const problems = await service.saveDraft(await actor(), parsedId.data, parsed.data);
         if (problems.some((problem) => problem.code !== "badConfig"))
-            return {
-                ok: false,
-                error: (await getTranslations("automations"))("errors.invalid"),
-                problems
-            };
+            return { ok: false, error: await problemError(problems, "invalid"), problems };
         refresh(parsedId.data);
         return { ok: true };
     } catch (caught) {
@@ -165,11 +173,7 @@ export async function publishAction(automationId: unknown): Promise<Result> {
     try {
         const problems = await service.publishAutomation(await actor(), parsed.data);
         if (problems.length > 0)
-            return {
-                ok: false,
-                error: (await getTranslations("automations"))("errors.notReady"),
-                problems
-            };
+            return { ok: false, error: await problemError(problems, "notReady"), problems };
         refresh(parsed.data);
         return { ok: true };
     } catch (caught) {

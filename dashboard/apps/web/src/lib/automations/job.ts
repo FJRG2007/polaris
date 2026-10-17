@@ -13,7 +13,7 @@ import { withLease } from "@/lib/cron/lease";
 import { fireDueSchedules } from "./triggers";
 import { noteEngineBoot } from "./legacy-retirement";
 import { INTAKE_LEASE, processAutomationEvents } from "./outbox";
-import { advanceRun, resumeDueWaits, runnableRuns, stopClaiming } from "./engine";
+import { advanceRun, resumeDueWaits, resumeEndedCalls, runnableRuns, stopClaiming } from "./engine";
 
 const L = core.AUTOMATION_LIMITS;
 const PARALLEL_RUNS = 8;
@@ -35,7 +35,7 @@ export async function runAutomationsPass(): Promise<Record<string, number>> {
         const matched = await processAutomationEvents();
         return scheduled.length + matched.length;
     });
-    const resumed = await resumeDueWaits();
+    const resumed = [...(await resumeDueWaits()), ...(await resumeEndedCalls())];
     const runs = [...new Set([...resumed, ...(await runnableRuns(PARALLEL_RUNS))])].slice(
         0,
         PARALLEL_RUNS

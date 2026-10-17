@@ -255,7 +255,8 @@ export type ConnectRefusal =
     | "cycle"
     | "crossesLane"
     | "intoLaneStart"
-    | "laneTaken";
+    | "laneTaken"
+    | "intoLoopBody";
 
 /** Why a connection from `from` to `to` may not be made, or null when it may. */
 export function connectRefusal(
@@ -288,6 +289,9 @@ export function connectRefusal(
     const a = lanes.get(from.node);
     const b = lanes.get(to);
     if (a !== "loose" && b !== "loose" && a !== b) return "crossesLane";
+    const wired = { ...graph, edges: [...graph.edges, { from: { ...from }, to: { node: to } }] };
+    const leaking = new Set(graphs.loopBodyLeaks(graph));
+    if (graphs.loopBodyLeaks(wired).some((node) => !leaking.has(node))) return "intoLoopBody";
     return null;
 }
 

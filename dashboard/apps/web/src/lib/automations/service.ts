@@ -10,6 +10,7 @@ import { prisma } from "@polaris/db";
 import { cancelRun, loadGraph } from "./engine";
 import * as core from "@polaris/core";
 import type { RunActor } from "./types";
+import { isUuid } from "@/lib/uuid";
 import { randomUUID } from "node:crypto";
 import { recordAudit } from "@/lib/audit-service";
 import { emitAutomationEvent, kickIntake } from "./outbox";
@@ -18,6 +19,7 @@ import { callCycle } from "./calls";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 
 const L = core.AUTOMATION_LIMITS;
+const OTHERS_LISTED = 1000;
 
 /** A refusal the screens put into words by its code. */
 export class AutomationAccessError extends Error {
@@ -170,7 +172,9 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
                 );
             }
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
-    const [live, lastTest, others] = await Promise.all([
+    const named = namedAutomations(draft).filter((other) => other !== row.id);
+    const shelf = row.orgId ? { orgId: row.orgId } : { orgId: null, userId: row.userId };
+    const [live, lastTest, listed, kept] = await Promise.all([
         row.publishedVersionId
             ? prisma.automationVersion.findUnique({
                   where: { id: row.publishedVersionId },
@@ -185,15 +189,22 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
               })
             : null,
         prisma.automation.findMany({
-            where: {
-                ...(row.orgId ? { orgId: row.orgId } : { orgId: null, userId: row.userId }),
-                id: { not: row.id }
-            },
+            where: { ...shelf, id: { not: row.id } },
             orderBy: { name: "asc" },
-            take: 200,
+            take: OTHERS_LISTED,
             select: { id: true, name: true }
-        })
+        }),
+        named.length
+            ? prisma.automation.findMany({
+                  where: { ...shelf, id: { in: named } },
+                  select: { id: true, name: true }
+              })
+            : []
     ]);
+    const others = [
+        ...listed,
+        ...kept.filter((one) => !listed.some((other) => other.id === one.id))
+    ].sort((a, b) => a.name.localeCompare(b.name));
     const liveGraph = live ? core.automationGraphSchema.safeParse(live.graph) : null;
     return {
         id: row.id,
@@ -219,6 +230,19 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         lastTestRunId: lastTest?.id ?? null,
         others
     };
+}
+
+/** The other automations a graph's Run another automation and An automation failed steps name. */
+function namedAutomations(graph: core.AutomationGraph): string[] {
+    const ids = new Set<string>();
+    for (const node of graph.nodes) {
+        const config = (node.config ?? {}) as { automationId?: unknown; automations?: unknown };
+        if (node.type === "core.run" && typeof config.automationId === "string")
+            ids.add(config.automationId);
+        if (node.type === "core.failed" && Array.isArray(config.automations))
+            for (const id of config.automations) if (typeof id === "string") ids.add(id);
+    }
+    return [...ids].filter(isUuid);
 }
 
 export async function shelfOf(id: string): Promise<Shelf> {

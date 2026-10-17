@@ -409,6 +409,21 @@ describe("loops", () => {
         expect(titles()).toEqual(["pass 0", "pass 1"]);
         expect(step(started.id, "rep")!.output).toMatchObject({ passes: 2 });
     });
+
+    it("checks the until condition against what the pass just did", async () => {
+        sent.statuses = [202, 202, 200, 200];
+        const polling = await seed(
+            [node("rep", "core.repeat", { kind: "until", max: 10, condition: compare("{{steps.h.status}}", "eq", "200") }), http("h")],
+            [
+                ["t1", "next", "rep"],
+                ["rep", "each", "h"]
+            ]
+        );
+        const started = await fire(polling, "k1");
+        await engine.advanceRun(started.id);
+        expect(sent.requests).toHaveLength(3);
+        expect(step(started.id, "rep")!.output).toMatchObject({ passes: 3 });
+    });
 });
 
 describe("Stop, retries and the error port", () => {
@@ -572,6 +587,18 @@ describe("events between automations", () => {
         expect(runRow(started.id).status).toBe("succeeded");
     });
 
+    it("wakes every waiter under the name, past one page", async () => {
+        const seeded = await seed(
+            [node("wait", "core.waitEvent", { name: "bell", timeout: { amount: 1, unit: "hours" } }), say("rang")],
+            [["t1", "next", "wait"], ["wait", "next", "rang"]]
+        );
+        const runs = [];
+        for (let at = 0; at < 5; at++) runs.push(await fire(seeded, `k${at}`));
+        for (const run of runs) await engine.advanceRun(run.id);
+        const resumed = await engine.resumeEventWaits({ orgId: null, userId: "u1" }, "bell", {}, 2);
+        expect(resumed.sort()).toEqual(runs.map((run) => run.id).sort());
+    });
+
     it("takes the timeout path when nothing comes", async () => {
         const seeded = await seed(
             [node("wait", "core.waitEvent", { name: "door.closed", timeout: { amount: 5, unit: "minutes" } }), say("late")],
@@ -638,6 +665,44 @@ describe("Run another automation", () => {
         expect(fake().tables.automationRun!.filter((row) => row.automationId === child.automationId)).toHaveLength(1);
         expect(titles()).toEqual(["got 3"]);
         expect(stepsOf(started.id, "after")).toHaveLength(1);
+    });
+
+    it("goes on when the child ended before the wait was written, or its end never reached the caller", async () => {
+        const child = await callee([pause("w"), node("ans", "core.answer", { outputs: [{ name: "got", value: "{{inputs.n}}" }] })], [["c", "next", "w"], ["w", "next", "ans"]]);
+        const parent = await caller(child.automationId);
+        const started = await fire(parent, "k1", { n: 4 });
+        await drain();
+        expect(runRow(started.id).status).toBe("waiting");
+        const childRun = fake().tables.automationRun!.find((row) => row.automationId === child.automationId)!;
+        // The child ends but the process dies before it tells the caller.
+        const waiting = step(started.id, "call")!;
+        waiting.waitKey = null;
+        timePasses();
+        await engine.resumeDueWaits();
+        await engine.advanceRun(childRun.id);
+        expect(childRun.status).toBe("succeeded");
+        waiting.waitKey = `run:${childRun.id}`;
+        expect(runRow(started.id).status).toBe("waiting");
+        expect(await engine.resumeEndedCalls()).toEqual([started.id]);
+        await drain();
+        expect(titles()).toEqual(["got 4"]);
+        expect(runRow(started.id).status).toBe("succeeded");
+
+        // The child ends before the caller's wait is written: the stepper finds it.
+        notify.mockClear();
+        const again = await fire(parent, "k2", { n: 5 });
+        await drain();
+        const second = fake().tables.automationRun!.find((row) => row.parentRunId === again.id)!;
+        const held = step(again.id, "call")!;
+        held.waitKey = null;
+        timePasses();
+        await drain();
+        expect(second.status).toBe("succeeded");
+        held.waitKey = `run:${second.id}`;
+        runRow(again.id).status = "running";
+        await engine.advanceRun(again.id);
+        expect(titles()).toEqual(["got 5"]);
+        expect(runRow(again.id).status).toBe("succeeded");
     });
 
     it("leaves by the error port when the child fails, refuses a missing input, and cancels the child with the caller", async () => {

@@ -965,6 +965,23 @@ export function reachableFrom(graph: AutomationGraph, start: string): Set<string
     return seen;
 }
 
+/** The nodes of a loop body that something outside the body leads into, besides the loop's "each". */
+export function loopBodyLeaks(graph: AutomationGraph): string[] {
+    const leaks: string[] = [];
+    for (const loop of graph.nodes) {
+        if (!isLoopNode(loop.type)) continue;
+        const body = loopBody(graph, loop.id);
+        for (const edge of graph.edges)
+            if (
+                body.has(edge.to.node) &&
+                !body.has(edge.from.node) &&
+                !(edge.from.node === loop.id && edge.from.port === "each")
+            )
+                leaks.push(edge.to.node);
+    }
+    return leaks;
+}
+
 /** The nodes a loop's "each" port reaches: what runs once per item. */
 export function loopBody(graph: AutomationGraph, loopId: string): Set<string> {
     const body = new Set<string>();
@@ -1067,17 +1084,7 @@ export function graphProblems(
         }
     }
     if (!cyclic)
-        for (const loop of graph.nodes) {
-            if (!isLoopNode(loop.type)) continue;
-            const body = loopBody(graph, loop.id);
-            for (const edge of graph.edges)
-                if (
-                    body.has(edge.to.node) &&
-                    !body.has(edge.from.node) &&
-                    !(edge.from.node === loop.id && edge.from.port === "each")
-                )
-                    problems.push({ code: "loopBodyLeaks", node: edge.to.node });
-        }
+        for (const node of loopBodyLeaks(graph)) problems.push({ code: "loopBodyLeaks", node });
     if (options.forPublish && triggerNodes(graph).length === 0)
         problems.push({ code: "noTrigger" });
     return problems;

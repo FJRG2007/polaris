@@ -317,6 +317,8 @@
         "notReady": "Aún no se puede publicar. Revisa los pasos.",
         "noTrigger": "Añade un disparador para probar.",
         "triggerGone": "Ese disparador ya no está aquí.",
+        "loopBodyLeaks": "Solo el bucle lleva a los pasos que repite. Quita la otra conexión.",
+        "callCycle": "Llama a una automatización que vuelve a llamar a esta. Cambia el paso Ejecutar otra automatización.",
         "partial": {
             "notFound": "Ese nodo no está en el borrador guardado.",
             "notMainFlow": "Ejecutar desde aquí sirve en pasos que alcanza un disparador.",
@@ -408,7 +410,8 @@
             "cycle": "Eso haría un bucle.",
             "crossesLane": "El flujo y el carril Siempre van aparte.",
             "intoLaneStart": "El carril Siempre empieza solo.",
-            "laneTaken": "El carril Siempre ya tiene inicio."
+            "laneTaken": "El carril Siempre ya tiene inicio.",
+            "intoLoopBody": "A un paso del bucle solo se llega desde el bucle."
         },
         "alwaysStarts": "El carril Siempre empieza aquí.",
         "alwaysLeave": "Sacar del carril Siempre",
