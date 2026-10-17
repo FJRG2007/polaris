@@ -26,6 +26,15 @@ function writeCache(key: string, value: unknown): void {
     }
 }
 
+/** Forget a cached answer, for a screen about to open on data that just changed on the server. */
+export function dropCache(key: string): void {
+    try {
+        sessionStorage.removeItem(key);
+    } catch {
+        // Nothing was kept.
+    }
+}
+
 export type Loaded<T> = { ok: true } & T;
 type Answer<T> = Loaded<T> | { ok: false; error: string };
 

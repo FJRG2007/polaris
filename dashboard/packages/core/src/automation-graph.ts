@@ -55,7 +55,14 @@ export const AUTOMATION_LIMITS = {
     eventKeepDays: 7,
     secretsPerShelf: 200,
     secretLength: 4096,
-    textLength: 4000
+    textLength: 4000,
+    notes: 100,
+    noteLength: 2000,
+    /** A pinned sample, the same ceiling as a stored step output. */
+    pinBytes: 64 * KB,
+    /** Versions listed in the history; every one is kept. */
+    versionsListed: 50,
+    runsPage: 50
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -571,9 +578,24 @@ export const graphNodeSchema = z.object({
     note: z.string().trim().max(250).optional(),
     enabled: z.boolean().optional(),
     position: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
-    onError: z.enum(["stop", "continue"]).optional()
+    onError: z.enum(["stop", "continue"]).optional(),
+    /** A sample output used instead of running the node, in test runs of the draft only. Never published. */
+    pinned: z.unknown().optional()
 });
 export type GraphNode = z.infer<typeof graphNodeSchema>;
+
+export const graphNoteSchema = z.object({
+    id: nodeId,
+    text: z.string().max(AUTOMATION_LIMITS.noteLength).default(""),
+    position: z.object({ x: z.number().finite(), y: z.number().finite() }),
+    size: z
+        .object({
+            width: z.number().finite().min(120).max(1200),
+            height: z.number().finite().min(60).max(1200)
+        })
+        .default({ width: 220, height: 120 })
+});
+export type GraphNote = z.infer<typeof graphNoteSchema>;
 
 export const graphEdgeSchema = z.object({
     from: z.object({ node: nodeId, port: z.string().min(1).max(40) }),
@@ -592,12 +614,21 @@ export const automationGraphSchema = z.object({
             /** Also run the lane when somebody cancels the run. Off: a cancel is a decision to stop. */
             onCancel: z.boolean().default(false)
         })
-        .default({ entry: null, onCancel: false })
+        .default({ entry: null, onCancel: false }),
+    /** Sticky notes on the canvas: words for the reader, never run. */
+    notes: z.array(graphNoteSchema).max(AUTOMATION_LIMITS.notes).default([])
 });
 export type AutomationGraph = z.infer<typeof automationGraphSchema>;
 
 export function emptyGraph(timeZone = "UTC"): AutomationGraph {
-    return { schema: 1, timeZone, nodes: [], edges: [], finally: { entry: null, onCancel: false } };
+    return {
+        schema: 1,
+        timeZone,
+        nodes: [],
+        edges: [],
+        finally: { entry: null, onCancel: false },
+        notes: []
+    };
 }
 
 export type GraphProblem =
@@ -609,6 +640,8 @@ export type GraphProblem =
     | { code: "finallyEntry"; node: string }
     | { code: "finallyShared"; node: string }
     | { code: "badConfig"; node: string; issue: string }
+    | { code: "pinTooLarge"; node: string }
+    | { code: "pinNotAllowed"; node: string }
     | { code: "noTrigger" };
 
 /** Nodes reachable from `start` along edges, `start` included. */
@@ -664,6 +697,12 @@ export function graphProblems(
                     node: node.id,
                     issue: parsed.error.issues[0]?.message ?? "invalid"
                 });
+        }
+        if (node.pinned !== undefined) {
+            if (nodeRole(node.type) === "condition")
+                problems.push({ code: "pinNotAllowed", node: node.id });
+            else if (byteLength(JSON.stringify(node.pinned) ?? "null") > AUTOMATION_LIMITS.pinBytes)
+                problems.push({ code: "pinTooLarge", node: node.id });
         }
     }
     for (const edge of graph.edges) {
@@ -776,7 +815,8 @@ export function graphFromList(flow: ListFlow): AutomationGraph {
         timeZone: flow.timeZone,
         nodes,
         edges,
-        finally: { entry, onCancel: flow.finallyOnCancel }
+        finally: { entry, onCancel: flow.finallyOnCancel },
+        notes: []
     };
 }
 
