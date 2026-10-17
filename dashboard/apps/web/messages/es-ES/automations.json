@@ -230,7 +230,9 @@
         "showData": "Datos",
         "hideData": "Ocultar",
         "input": "Enviado",
-        "output": "Recibido"
+        "output": "Recibido",
+        "beforeMove": "Antes del traslado",
+        "beforeMoveHint": "Ejecuciones de donde vivía antes este automatismo. Solo lectura."
     },
     "runErrors": {
         "alreadyRunning": "Ya en curso",

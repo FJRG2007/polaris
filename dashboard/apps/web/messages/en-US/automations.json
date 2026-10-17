@@ -230,7 +230,9 @@
         "showData": "Data",
         "hideData": "Hide data",
         "input": "Sent",
-        "output": "Received"
+        "output": "Received",
+        "beforeMove": "Before the move",
+        "beforeMoveHint": "Runs from where this automation used to live. Read-only."
     },
     "runErrors": {
         "alreadyRunning": "Already running",

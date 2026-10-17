@@ -30,6 +30,19 @@ const state = vi.hoisted(() => ({
 vi.mock("@polaris/db", () => ({
     Prisma: {},
     prisma: {
+        placeAutomationRun: {
+            findMany: async (args: { where: { automationId: string }; take: number }) =>
+                args.where.automationId === "a1"
+                    ? [
+                          {
+                              id: "run-2",
+                              status: "skipped",
+                              startedAt: new Date("2026-01-02T00:00:00.000Z"),
+                              finishedAt: null
+                          }
+                      ].slice(0, args.take)
+                    : []
+        },
         placeAutomation: {
             findMany: async (args: { where: { movedToId: null }; take: number }) =>
                 state.rows
@@ -198,5 +211,13 @@ describe("movePlaceAutomations", () => {
         state.central.set("place:a1", "00000000-0000-4000-8000-000000000042");
         expect(await move.movedTo("a1")).toBe("00000000-0000-4000-8000-000000000042");
         expect(await move.movedTo("gone")).toBeNull();
+    });
+
+    it("reads a moved automation's old runs, and nothing for a ref that is not Places'", async () => {
+        expect(await move.legacyRuns("place:a1")).toEqual([
+            { id: "run-2", status: "skipped", startedAt: "2026-01-02T00:00:00.000Z", finishedAt: null }
+        ]);
+        expect(await move.legacyRuns("place:other")).toEqual([]);
+        expect(await move.legacyRuns("crm:a1")).toEqual([]);
     });
 });

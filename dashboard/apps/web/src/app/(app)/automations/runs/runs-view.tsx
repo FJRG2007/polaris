@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { History, RefreshCw, X } from "lucide-react";
-import { cancelRunAction, listRunsAction } from "../actions";
+import { cancelRunAction, listLegacyRunsAction, listRunsAction } from "../actions";
 import type { RunFilter, RunRow } from "@/lib/automations/history";
 import { Button, EmptyState, SegmentedControl, useToast } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -172,6 +172,40 @@ export function RunsView({ automationId }: { automationId: string | null }) {
                     ) : null}
                 </>
             )}
+            {automationId ? <BeforeTheMove automationId={automationId} /> : null}
         </div>
+    );
+}
+
+/** What an automation an app moved here ran before the move: read-only, and absent when there was none. */
+function BeforeTheMove({ automationId }: { automationId: string }) {
+    const t = useTranslations("automations");
+    const locale = useLocale();
+    const { data } = useCachedAction(`polaris.automations.legacyRuns.${automationId}`, () =>
+        listLegacyRunsAction(automationId)
+    );
+    if (!data || data.rows.length === 0) return null;
+    return (
+        <section className="space-y-2" aria-labelledby="runs-before-move">
+            <div>
+                <h2 id="runs-before-move" className="text-sm font-medium">
+                    {t("runs.beforeMove")}
+                </h2>
+                <p className="text-xs text-muted-foreground">{t("runs.beforeMoveHint")}</p>
+            </div>
+            <ul className="divide-y divide-border rounded-lg border border-border">
+                {data.rows.map((row) => (
+                    <li key={row.id} className="flex items-center gap-3 p-3">
+                        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                            {when(row.startedAt, locale)}
+                            {row.finishedAt
+                                ? ` - ${t("runView.took", { time: took(row.startedAt, row.finishedAt) })}`
+                                : ""}
+                        </p>
+                        <StatusChip status={row.status} />
+                    </li>
+                ))}
+            </ul>
+        </section>
     );
 }
