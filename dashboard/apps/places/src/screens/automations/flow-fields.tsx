@@ -678,6 +678,10 @@ export function DaysPicker({
     );
 }
 
+/** A typed number never narrows below about five digits: the row it sits in
+ *  wraps its unit or suffix onto the next line before it squeezes the value. */
+const NUMBER_INPUT = "min-w-[5rem] flex-[1_1_5rem]";
+
 /** A number typed into a field, where an empty field is a missing number rather
  *  than zero. */
 export function NumberField({
@@ -704,11 +708,12 @@ export function NumberField({
     return (
         <Field label={label} path={[...path, field]} required>
             {(id, invalid) => (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     <Input
                         id={id}
                         type="number"
                         inputMode="decimal"
+                        className={NUMBER_INPUT}
                         min={min}
                         step={step}
                         disabled={disabled}
@@ -886,7 +891,7 @@ export function DurationField({
     return (
         <Field label={label} path={[...path, field]} required={required}>
             {(id, invalid) => (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     <Input
                         id={id}
                         type="number"
@@ -894,7 +899,7 @@ export function DurationField({
                         min={0}
                         step="any"
                         disabled={disabled}
-                        className="min-w-0 flex-1"
+                        className={NUMBER_INPUT}
                         value={Number.isFinite(amount) ? String(amount) : ""}
                         aria-invalid={invalid || undefined}
                         onChange={(event) =>
@@ -907,7 +912,7 @@ export function DurationField({
                     <Select
                         value={unit}
                         disabled={disabled}
-                        className="w-28 shrink-0"
+                        className="min-w-[7rem] flex-1 basis-28"
                         aria-label={t("automations.fields.unit")}
                         options={offered.map((entry) => ({
                             value: entry,
