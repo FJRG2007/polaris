@@ -20,6 +20,7 @@ import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 const replaced: string[] = [];
 const pushed: string[] = [];
 const saved: unknown[] = [];
+const contextAsked: (string | null)[] = [];
 let toggleAnswer: { error?: string; automation?: AutomationView } = {};
 
 vi.mock("next/navigation", async (original) => ({
@@ -321,6 +322,17 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
         devices: DEVICES,
         placeId: "place-1"
     }),
+    nodeContextAction: async (placeId: string | null) => {
+        contextAsked.push(placeId);
+        return {
+            context: {
+                placeId: placeId ?? "place-1",
+                devices: DEVICES,
+                rooms: [],
+                siblings: [{ id: "auto-1", name: "Fixture automation" }]
+            }
+        };
+    },
     setAutomationEnabledAction: async () => toggleAnswer,
     deleteAutomationAction: async () => ({}),
     addAutoOffAction: async () => ({})
@@ -1423,6 +1435,7 @@ describe("a Places node in the central editor", () => {
         );
         expect((await screen.findAllByText(/Fixture plug/)).length).toBeGreaterThan(0);
         expect(setConfig).not.toHaveBeenCalled();
+        expect(contextAsked.at(-1)).toBe(PLACE);
     });
 
     it("edits a step node with the Places step card, and a conditions node group by group", async () => {

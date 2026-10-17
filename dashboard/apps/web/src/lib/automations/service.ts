@@ -17,6 +17,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { emitAutomationEvent, kickIntake } from "./outbox";
 import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
 import { callCycle } from "./calls";
+import { graphProblems } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 
 const L = core.AUTOMATION_LIMITS;
@@ -324,7 +325,7 @@ export async function saveDraft(
     graph: core.AutomationGraph
 ): Promise<core.GraphProblem[]> {
     const row = await load(actor, id, true);
-    const problems = core.graphProblems(graph);
+    const problems = await graphProblems(graph);
     if (problems.some((problem) => problem.code !== "badConfig")) return problems;
     await checkSecrets(row, graph);
     await prisma.automation.update({
@@ -339,7 +340,7 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
-    const problems = core.graphProblems(parsed.data, { forPublish: true });
+    const problems = await graphProblems(parsed.data, { forPublish: true });
     if (problems.length > 0) return problems;
     const cycle = await callCycle(id, parsed.data, async (target) => {
         const other = await prisma.automation.findUnique({

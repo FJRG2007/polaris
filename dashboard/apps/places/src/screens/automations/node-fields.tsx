@@ -35,6 +35,7 @@ export interface HomeNodeFieldsProps {
 }
 
 interface Listing {
+    readonly placeId: string;
     readonly devices: DeviceView[];
     readonly rooms: RoomView[];
     readonly siblings: { id: string; name: string }[];
@@ -53,33 +54,33 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
     const [listing, setListing] = useState<Listing | null>(null);
     const [error, setError] = useState("");
 
+    const config = (node.config ?? {}) as Record<string, unknown>;
+    const named = typeof config.placeId === "string" ? config.placeId : null;
+
     useEffect(() => {
         let cancelled = false;
         void (async () => {
-            const result = await runAction(() => actions.listAutomationsAction(), setError);
+            const result = await runAction(() => actions.nodeContextAction(named), setError);
             if (cancelled || !result) return;
             if (result.error) {
                 setError(result.error);
                 return;
             }
+            if (!result.context) return;
             setListing({
-                devices: result.devices ?? [],
-                rooms: result.rooms ?? [],
-                siblings: (result.automations ?? []).map((each) => ({
-                    id: each.id,
-                    name: each.name
-                }))
+                placeId: result.context.placeId,
+                devices: result.context.devices,
+                rooms: result.context.rooms ?? NO_ROOMS,
+                siblings: result.context.siblings
             });
         })();
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [named]);
 
     const devices = listing?.devices ?? [];
     const byId = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
-    const config = (node.config ?? {}) as Record<string, unknown>;
-    const placeId = config.placeId;
 
     if (error && !listing) {
         return (
@@ -90,6 +91,7 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
     }
     if (!listing) return <Skeleton className="h-24 w-full" />;
 
+    const placeId = named ?? listing.placeId;
     const watched = devices.filter(fields.watchable);
     const sensors = devices.filter((device) => auto.measures(device.kind));
     const operable = devices.filter(fields.operable);
@@ -116,7 +118,8 @@ export function HomeNodeFields({ node, setConfig, disabled = false }: HomeNodeFi
     } else if (node.type === nodes.CONDITION_NODE_TYPE) {
         const groups = (Array.isArray(config.groups) ? config.groups : []) as auto.ConditionGroup[];
         const match = config.match === "any" ? "any" : "all";
-        const setGroups = (next: auto.ConditionGroup[]) => setConfig({ ...config, groups: next });
+        const setGroups = (next: auto.ConditionGroup[]) =>
+            setConfig({ ...config, placeId, groups: next });
         body = (
             <div className="flex flex-col gap-3">
                 {groups.length > 1 && (

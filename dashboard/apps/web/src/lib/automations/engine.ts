@@ -1961,10 +1961,10 @@ async function cancelChildren(runId: string): Promise<void> {
 // Waits
 // ---------------------------------------------------------------------------
 
-/** Finish every wait that is due and put its run back to work. Returns the runs to step. */
 /** A step that waits to be run again (an app's "wait until a device is ..."): its wait key starts with this. */
 export const RECHECK_PREFIX = "recheck:";
 
+/** Finish every wait that is due and put its run back to work. Returns the runs to step. */
 export async function resumeDueWaits(limit = 100): Promise<string[]> {
     const due = await prisma.automationStep.findMany({
         where: { status: "waiting", waitUntil: { lte: new Date() } },

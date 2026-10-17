@@ -320,12 +320,6 @@ const causeContext = new AsyncLocalStorage<{ readonly depth: number }>();
 /** Central firings remembered as handed over; the oldest is forgotten first. */
 const DELIVERED_KEPT = 5000;
 
-/** Do `work` on behalf of a run this deep in a chain - a central run's device
- *  step - so whatever a device it moves fires carries the depth on. */
-export function withCauseDepth<T>(depth: number, work: () => Promise<T>): Promise<T> {
-    return causeContext.run({ depth }, work);
-}
-
 function iso(date: Date): string {
     return date.toISOString();
 }

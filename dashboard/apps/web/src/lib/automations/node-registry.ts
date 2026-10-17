@@ -5,6 +5,7 @@
  * nodes is refused with "appMissing" rather than failing.
  */
 
+import * as core from "@polaris/core";
 import type { ServerNode } from "./types";
 import { HTTP_SERVER_NODES } from "./nodes/http-node";
 import { CORE_SERVER_NODES } from "./nodes/core-nodes";
@@ -23,4 +24,30 @@ export async function serverNode(type: string): Promise<ServerNode | null> {
 
 export function coreServerNodeTypes(): string[] {
     return [...CORE.keys()];
+}
+
+/**
+ * `core.graphProblems`, with every app node's config checked by its app's own
+ * schema as core's are. An app that is not installed checks nothing: its node
+ * is refused with "appMissing" when a run reaches it.
+ */
+export async function graphProblems(
+    graph: core.AutomationGraph,
+    options: { forPublish?: boolean } = {}
+): Promise<core.GraphProblem[]> {
+    const problems = core.graphProblems(graph, options);
+    const apps = graph.nodes.filter((node) => !core.isCoreNodeType(node.type));
+    if (apps.length === 0) return problems;
+    const contributed = await appAutomationNodes().catch(() => []);
+    const byType = new Map(contributed.map((node) => [node.type, node]));
+    for (const node of apps) {
+        const parsed = byType.get(node.type)?.config.safeParse(node.config);
+        if (parsed && !parsed.success)
+            problems.push({
+                code: "badConfig",
+                node: node.id,
+                issue: parsed.error.issues[0]?.message ?? "invalid"
+            });
+    }
+    return problems;
 }

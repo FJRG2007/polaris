@@ -148,6 +148,31 @@ describe("importLegacyAutomation", () => {
         await expect(imported({ nope: true } as never)).rejects.toThrow();
         expect(fake().tables.automation ?? []).toHaveLength(0);
     });
+
+    it("refuses a graph whose app node the app's own schema refuses", async () => {
+        const half = graphOf([node("t1", "fixture.trigger.ping", { every: "soon" }), ...CHECKED.nodes.slice(1)], [
+            ["t1", "next", "c1"],
+            ["c1", "then", "s1"]
+        ]);
+        await expect(imported(half)).rejects.toThrow();
+        expect(fake().tables.automation ?? []).toHaveLength(0);
+    });
+});
+
+describe("graphProblems", () => {
+    it("checks an app node's config with the app's schema, and none of an app that is away", async () => {
+        const registry = await import("@/lib/automations/node-registry");
+        const half = graphOf([node("t1", "fixture.trigger.ping", {}), ...CHECKED.nodes.slice(1)], [
+            ["t1", "next", "c1"],
+            ["c1", "then", "s1"]
+        ]);
+        expect(await registry.graphProblems(CHECKED, { forPublish: true })).toEqual([]);
+        expect(await registry.graphProblems(half)).toEqual([
+            expect.objectContaining({ code: "badConfig", node: "t1" })
+        ]);
+        app.installed = false;
+        expect(await registry.graphProblems(half)).toEqual([]);
+    });
 });
 
 describe("appTriggers and fireAppTrigger", () => {

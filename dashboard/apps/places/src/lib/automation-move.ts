@@ -24,6 +24,10 @@ const BATCH = 25;
 /** Rows that could not be converted, said once per process rather than every minute. */
 const reported = new Set<string>();
 
+/** Where the next pass reads from: past the rows that stayed, so they never hold
+ *  back newer ones. Back to the start once a pass reaches the end. */
+let after: { readonly createdAt: Date; readonly id: string } | null = null;
+
 interface MovableRow {
     readonly id: string;
     readonly placeId: string;
@@ -79,12 +83,25 @@ async function moveRow(row: MovableRow): Promise<string | null> {
 
 /** Move the next few. Returns how many moved. */
 export async function movePlaceAutomations(): Promise<number> {
+    const from = after;
     const rows = await prisma.placeAutomation.findMany({
-        where: { movedToId: null },
-        orderBy: { createdAt: "asc" },
+        where: {
+            movedToId: null,
+            ...(from
+                ? {
+                      OR: [
+                          { createdAt: { gt: from.createdAt } },
+                          { createdAt: from.createdAt, id: { gt: from.id } }
+                      ]
+                  }
+                : {})
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         take: BATCH,
-        select: MOVABLE
+        select: { ...MOVABLE, createdAt: true }
     });
+    const last = rows.at(-1);
+    after = rows.length === BATCH && last ? { createdAt: last.createdAt, id: last.id } : null;
     let moved = 0;
     for (const row of rows) if (await moveRow(row)) moved += 1;
     return moved;

@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { fireTrigger } from "./combine";
 import { armVersion } from "./triggers";
+import { graphProblems } from "./node-registry";
 import { advanceRun, loadGraph, resumeDueWaits, RECHECK_PREFIX } from "./engine";
 
 const L = core.AUTOMATION_LIMITS;
@@ -37,32 +38,65 @@ export interface AppTriggerRow {
     readonly legacyRef: string | null;
 }
 
-/** Every armed trigger of one app's node types. */
+/** One stored trigger of an app's node type, as a page reads it. */
+interface StoredTrigger {
+    readonly id: string;
+    readonly nodeId: string;
+    readonly versionId: string;
+    readonly eventType: string;
+    readonly automation: {
+        readonly id: string;
+        readonly name: string;
+        readonly enabled: boolean;
+        readonly publishedVersionId: string | null;
+        readonly runAsId: string | null;
+        readonly legacyRef: string | null;
+    };
+}
+
+/** Every armed trigger of one app's node types, read a page at a time. */
 export async function appTriggers(app: string): Promise<AppTriggerRow[]> {
     const prefix = `${appId.parse(app)}.trigger.`;
-    const rows = await prisma.automationTrigger.findMany({
-        where: { eventType: { startsWith: prefix } },
-        take: L.perShelf * 4,
-        select: {
-            nodeId: true,
-            versionId: true,
-            eventType: true,
-            state: true,
-            automation: {
-                select: {
-                    id: true,
-                    name: true,
-                    enabled: true,
-                    publishedVersionId: true,
-                    runAsId: true,
-                    legacyRef: true
+    const out: AppTriggerRow[] = [];
+    let after: string | null = null;
+    for (;;) {
+        const rows: StoredTrigger[] = await prisma.automationTrigger.findMany({
+            where: {
+                eventType: { startsWith: prefix },
+                automation: { enabled: true, publishedVersionId: { not: null } },
+                ...(after ? { id: { gt: after } } : {})
+            },
+            orderBy: { id: "asc" },
+            take: L.perShelf,
+            select: {
+                id: true,
+                nodeId: true,
+                versionId: true,
+                eventType: true,
+                automation: {
+                    select: {
+                        id: true,
+                        name: true,
+                        enabled: true,
+                        publishedVersionId: true,
+                        runAsId: true,
+                        legacyRef: true
+                    }
                 }
             }
-        }
-    });
+        });
+        out.push(...(await armedOf(rows)));
+        if (rows.length < L.perShelf) return out;
+        after = rows[rows.length - 1]!.id;
+    }
+}
+
+/** The rows of one page that the published version armed, with their node's config. */
+async function armedOf(rows: readonly StoredTrigger[]): Promise<AppTriggerRow[]> {
     const live = rows.filter(
         (row) => row.automation.enabled && row.automation.publishedVersionId === row.versionId
     );
+    if (live.length === 0) return [];
     const versions = await prisma.automationVersion.findMany({
         where: { id: { in: [...new Set(live.map((row) => row.versionId))] } },
         select: { id: true, createdAt: true, graph: true }
@@ -168,7 +202,7 @@ export async function importLegacyAutomation(input: z.input<typeof importInput>)
     });
     if (existing) return existing.id;
     const graph = core.automationGraphSchema.parse(given.graph);
-    if (core.graphProblems(graph, { forPublish: true }).length > 0)
+    if ((await graphProblems(graph, { forPublish: true })).length > 0)
         throw new Error("an imported automation must be one that can be published");
     let id: string;
     try {

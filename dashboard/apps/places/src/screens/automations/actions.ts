@@ -15,6 +15,7 @@
  * under the field rather than above the form.
  */
 
+import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { placesT } from "../../lib/i18n";
@@ -100,6 +101,20 @@ async function editorContext(installedAppId: string, placeId: string): Promise<E
         floors: floorList,
         location: place?.location ?? null
     };
+}
+
+/** What a Places node in the central editor picks from: the place its config
+ *  names, or the one being looked at for a node that names none yet. */
+export async function nodeContextAction(
+    placeId: string | null
+): Promise<{ context?: EditorContext; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const given = z.string().uuid().nullable().catch(null).parse(placeId);
+    const result = await guard(async () =>
+        editorContext(install.id, given ?? (await currentPlace(install.id)).current.id)
+    );
+    if (result.error) return { error: result.error };
+    return { context: result.value };
 }
 
 /** One automation with what its editor needs: its log, the devices its pickers

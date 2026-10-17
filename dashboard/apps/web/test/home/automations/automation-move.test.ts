@@ -44,12 +44,23 @@ vi.mock("@polaris/db", () => ({
                     : []
         },
         placeAutomation: {
-            findMany: async (args: { where: { movedToId: null }; take: number }) =>
-                state.rows
+            findMany: async (args: {
+                where: { movedToId: null; OR?: [{ createdAt: { gt: Date } }, { createdAt: Date; id: { gt: string } }] };
+                take: number;
+            }) => {
+                const after = args.where.OR?.[1];
+                return state.rows
                     .filter((row) => row.movedToId === null)
-                    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+                    .filter(
+                        (row) =>
+                            !after ||
+                            row.createdAt > after.createdAt ||
+                            (row.createdAt.getTime() === after.createdAt.getTime() && row.id > after.id.gt)
+                    )
+                    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
                     .slice(0, args.take)
-                    .map(({ movedToId: _moved, createdAt: _at, ...row }) => ({ ...row })),
+                    .map(({ movedToId: _moved, ...row }) => ({ ...row }));
+            },
             updateMany: async (args: { where: { id: string; movedToId: null }; data: { movedToId: string } }) => {
                 const row = state.rows.find((each) => each.id === args.where.id && each.movedToId === null);
                 if (row) row.movedToId = args.data.movedToId;
@@ -237,6 +248,20 @@ describe("movePlaceAutomations", () => {
         expect(await move.movePlaceAutomations()).toBe(25);
         expect(state.rows.filter((each) => each.movedToId === null).map((each) => each.id)).toEqual(["r0", "r1", "r2", "r3", "r4"]);
         expect(await move.movePlaceAutomations()).toBe(5);
+    });
+
+    it("reads past rows that stay, so they never hold back newer ones", async () => {
+        const stuck = Array.from({ length: 25 }, (_, index) =>
+            row(`bad${String(index).padStart(2, "0")}`, 1, { definition: { triggers: "nope" } })
+        );
+        state.rows = [...stuck, row("late", 2)];
+        expect(await move.movePlaceAutomations()).toBe(0);
+        expect(await move.movePlaceAutomations()).toBe(1);
+        expect(state.rows.find((each) => each.id === "late")!.movedToId).not.toBeNull();
+        // Back at the start: the rows that stayed are tried again.
+        expect(await move.movePlaceAutomations()).toBe(0);
+        expect(state.rows.filter((each) => each.movedToId === null)).toHaveLength(25);
+        expect(await move.movePlaceAutomations()).toBe(0);
     });
 
     it("finds a twin by its legacy ref for a row whose mark is missing", async () => {

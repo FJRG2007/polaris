@@ -309,10 +309,16 @@ const runNode: ServerNode<RunConfig> = {
         if (io.depth + 1 > MAX_DEPTH) throw new StepRefusal("loop");
         // A moved step still names the Places automation it ran; that one's
         // central twin is the one meant.
-        const target =
-            (await host.automations.automationForLegacy(
-                `${LEGACY_PREFIX}${config.automationId}`
-            )) ?? config.automationId;
+        const install = await homeInstall();
+        const named = install
+            ? await prisma.placeAutomation.findFirst({
+                  where: { id: config.automationId, installedAppId: install.id },
+                  select: { id: true }
+              })
+            : null;
+        if (!named) throw new StepRefusal("callForbidden");
+        const target = await host.automations.automationForLegacy(`${LEGACY_PREFIX}${named.id}`);
+        if (!target) return { output: { started: false } };
         const started = await host.automations.fireAppTrigger({
             automationId: target,
             firingKey: `chain:${io.idempotencyKey}`,

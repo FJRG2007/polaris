@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { RunActor } from "./types";
 import { randomUUID } from "node:crypto";
+import { graphProblems } from "./node-registry";
 import { advanceRun, loadGraph, startRun } from "./engine";
 import { mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 import { AutomationAccessError, checkSecrets, load, shelfWhere } from "./service";
@@ -155,7 +156,6 @@ export interface RunDetail {
     readonly canRerun: boolean;
 }
 
-/** One run with every step, for the run view and the canvas. */
 /**
  * What an automation an app moved here ran before the move, read-only and from
  * the app's own tables: the newest few, and none once the app is away.
@@ -177,6 +177,7 @@ export async function listLegacyRuns(
     });
 }
 
+/** One run with every step, for the run view and the canvas. */
 export async function getRun(actor: RunActor, runId: string): Promise<RunDetail> {
     const run = await prisma.automationRun.findUnique({
         where: { id: runId },
@@ -327,7 +328,7 @@ export async function startTestRun(
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
-    const problems = core.graphProblems(parsed.data, { forPublish: true });
+    const problems = await graphProblems(parsed.data, { forPublish: true });
     if (problems.length > 0) return { problems };
     await checkSecrets(row, parsed.data);
     const triggers = core.triggerNodes(parsed.data);
@@ -384,7 +385,7 @@ export async function startPartialRun(
     if (core.nodeRole(node.type) === "trigger") return startTestRun(actor, id, nodeId);
     const partial = core.partialRunGraph(parsed.data, nodeId, await lastTestOutputs(id));
     if ("refusal" in partial) return partial;
-    const problems = core.graphProblems(partial.graph, { forPublish: true });
+    const problems = await graphProblems(partial.graph, { forPublish: true });
     if (problems.length > 0) return { problems };
     await checkSecrets(row, partial.graph);
     return {
