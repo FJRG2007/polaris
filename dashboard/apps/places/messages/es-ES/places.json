@@ -1861,6 +1861,9 @@
         "other": "{kind, select, vehicle {Un vehículo} animal {Un animal} package {Un paquete} other {Algo}} en {camera}"
     },
     "automations": {
+        "nodeFields": {
+            "groupsMatch": "Cómo se unen los grupos"
+        },
         "anyValue": "Cualquiera",
         "missingDevice": "Un dispositivo que ya no está",
         "missingAutomation": "Una automatización que ya no está",

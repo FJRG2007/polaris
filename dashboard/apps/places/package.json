@@ -6,7 +6,8 @@
     "description": "Places: cameras, devices, people and alerts for the places somebody looks after. An installable Polaris app.",
     "polaris": {
         "id": "home",
-        "extension": "src/lib/places-extension.ts#placesExtension"
+        "extension": "src/lib/places-extension.ts#placesExtension",
+        "slot": "src/screens/extension-slot.tsx#PlacesSlot"
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",

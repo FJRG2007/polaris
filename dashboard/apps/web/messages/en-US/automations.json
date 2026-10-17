@@ -684,5 +684,20 @@
         "useFinished": "Use it",
         "outcomes": "Only when it ends as",
         "outcomesAny": "None ticked takes any ending. Read it as {example}."
+    },
+    "appNodes": {
+        "homeTime": "Places: at a time",
+        "homeInterval": "Places: every so often",
+        "homeChange": "Places: a device changes",
+        "homeStays": "Places: a device stays",
+        "homeThreshold": "Places: a reading crosses",
+        "homeSun": "Places: sunrise or sunset",
+        "homeCheck": "Places: check the house",
+        "homeDevice": "Places: operate a device",
+        "homeWait": "Places: wait for a device",
+        "homeNotify": "Places: tell somebody",
+        "homeRun": "Places: run another",
+        "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
+        "install": "Install the app"
     }
 }

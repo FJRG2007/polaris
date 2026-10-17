@@ -1374,7 +1374,7 @@ export function AutomationEditor({
     );
 }
 
-function TriggerCard({
+export function TriggerCard({
     trigger,
     number,
     path,
@@ -1733,7 +1733,7 @@ function TriggerCard({
     );
 }
 
-function ConditionGroupCard({
+export function ConditionGroupCard({
     group,
     path,
     devices,
@@ -2122,7 +2122,7 @@ function ConditionCard({
     );
 }
 
-function StepCard({
+export function StepCard({
     number,
     step,
     path,

@@ -90,6 +90,22 @@ export async function appAutomationNodes(): Promise<AutomationServerNode[]> {
     return lists.flat();
 }
 
+/**
+ * Where each installed app that brings automation nodes draws their settings:
+ * its slot of kind `automation-node`, by app id. An app that is not installed is
+ * absent, which the editor shows as a node that needs it.
+ */
+export async function appAutomationNodeSlots(): Promise<Record<string, AppSlot>> {
+    const found = await Promise.all(
+        extensions().map(async (extension) => {
+            if (!extension.automationNodes || !(await isAppInstalled(extension.id))) return null;
+            const slot: AppSlot = { app: extension.id, kind: "automation-node", props: null };
+            return [extension.id, withBundleSlot(slot)] as const;
+        })
+    );
+    return Object.fromEntries(found.filter((entry) => entry !== null));
+}
+
 /** The runs a moved automation had in its app, before the move; none while the app is away. */
 export async function appAutomationHistory(app: string, legacyRef: string): Promise<LegacyRunRow[]> {
     const extension = extensions().find((entry) => entry.id === app);

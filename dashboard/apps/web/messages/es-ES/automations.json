@@ -684,5 +684,20 @@
         "useFinished": "Usarlo",
         "outcomes": "Solo si termina como",
         "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}."
+    },
+    "appNodes": {
+        "homeTime": "Lugares: a una hora",
+        "homeInterval": "Lugares: cada cierto tiempo",
+        "homeChange": "Lugares: cambia un equipo",
+        "homeStays": "Lugares: equipo sin cambio",
+        "homeThreshold": "Lugares: una lectura cruza",
+        "homeSun": "Lugares: amanecer o anochecer",
+        "homeCheck": "Lugares: comprobar la casa",
+        "homeDevice": "Lugares: manejar un equipo",
+        "homeWait": "Lugares: esperar a un equipo",
+        "homeNotify": "Lugares: avisar a alguien",
+        "homeRun": "Lugares: ejecutar otro",
+        "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
+        "install": "Instalar la app"
     }
 }

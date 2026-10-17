@@ -224,6 +224,8 @@
         "places/src/screens/alerts/alert-dialog.tsx",
         "places/src/screens/alerts/alerts-view.tsx",
         "places/src/screens/automations/actions.ts",
+        "places/src/screens/automations/node-fields.tsx",
+        "places/src/screens/extension-slot.tsx",
         "places/src/screens/automations/add-block.tsx",
         "places/src/screens/automations/auto-off-shortcut.tsx",
         "places/src/screens/automations/automation-canvas.tsx",

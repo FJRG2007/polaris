@@ -6,6 +6,7 @@
  * what they would refuse, and every read is bounded.
  */
 
+import type { AppSlot } from "@/lib/app-extensions/types";
 import { prisma } from "@polaris/db";
 import { cancelRun, loadGraph } from "./engine";
 import * as core from "@polaris/core";
@@ -138,6 +139,8 @@ export async function load(actor: RunActor, id: string, write: boolean) {
 }
 
 export interface AutomationDetail {
+    /** Where installed apps draw their nodes' settings, by app id; filled in by the screen's action. */
+    readonly appNodes?: Readonly<Record<string, AppSlot>>;
     readonly id: string;
     readonly name: string;
     readonly description: string;

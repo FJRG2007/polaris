@@ -6,6 +6,7 @@
  * anything unexpected is logged here and answered with a generic sentence.
  */
 
+import { appAutomationNodeSlots } from "@/lib/app-extensions/registry";
 import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
@@ -90,7 +91,11 @@ export async function getAutomationAction(
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        const automation = await service.getAutomation(who, parsed.data);
+        const [found, appNodes] = await Promise.all([
+            service.getAutomation(who, parsed.data),
+            appAutomationNodeSlots().catch(() => ({}))
+        ]);
+        const automation = { ...found, appNodes };
         const shelf = await service.shelfOf(parsed.data);
         return {
             ok: true,

@@ -23,6 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { rotateHookAction } from "../actions";
 import { RefInput, RefTextarea } from "./references";
+import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
     ConditionEditor,
     FLOW_FIELD_TYPES,
@@ -140,9 +141,46 @@ export function newNode(type: string): core.GraphNode {
 }
 
 export function configValid(node: core.GraphNode): boolean {
-    return core.isCoreNodeType(node.type)
-        ? core.CORE_NODE_CONFIGS[node.type].safeParse(node.config).success
-        : false;
+    if (core.isCoreNodeType(node.type))
+        return core.CORE_NODE_CONFIGS[node.type].safeParse(node.config).success;
+    // An app's node is checked by the app, on save and on publish.
+    return core.nodeTypeApp(node.type) !== null;
+}
+
+/** An app's node: drawn by the app where it is installed, and said to need it where it is not. */
+function AppNodeFields({
+    node,
+    setConfig,
+    detail
+}: {
+    node: core.GraphNode;
+    setConfig: (config: unknown) => void;
+    detail: AutomationDetail;
+}) {
+    const t = useTranslations("automations");
+    const app = core.nodeTypeApp(node.type);
+    const slot = app ? detail.appNodes?.[app] : undefined;
+    if (slot?.bundle) {
+        return (
+            <AppSlotView
+                slot={{ ...slot, props: { node, setConfig, disabled: !detail.canEdit } }}
+            />
+        );
+    }
+    if (slot) return <p className="text-sm text-muted-foreground">{t("nodes.unknown")}</p>;
+    return (
+        <div
+            role="note"
+            className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground"
+        >
+            <span className="min-w-0 flex-1">{t("appNodes.missing")}</span>
+            {app ? (
+                <Button asChild size="sm" variant="outline">
+                    <Link href={`/apps/marketplace/${app}`}>{t("appNodes.install")}</Link>
+                </Button>
+            ) : null}
+        </div>
+    );
 }
 
 type Config = Record<string, any>;
@@ -678,6 +716,8 @@ export function NodeFields({
             );
         }
         default:
+            if (core.nodeTypeApp(node.type))
+                return <AppNodeFields node={node} setConfig={setConfig} detail={detail} />;
             return <p className="text-sm text-muted-foreground">{t("nodes.unknown")}</p>;
     }
 }

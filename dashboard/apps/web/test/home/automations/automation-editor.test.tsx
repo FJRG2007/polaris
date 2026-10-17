@@ -1402,3 +1402,62 @@ describe("a block on a set of devices", () => {
         expect(within(dialog).getByRole("button", { name: /^Fixture plug2/ })).toBeDefined();
     });
 });
+
+describe("a Places node in the central editor", () => {
+    const PLACE = "11111111-1111-4111-8111-111111111111";
+
+    it("edits a trigger node with the Places trigger card, keeping its place and leaving out its id", async () => {
+        const { HomeNodeFields } = await import(
+            "@polaris-app/places/src/screens/automations/node-fields"
+        );
+        const setConfig = vi.fn();
+        render(
+            <HomeNodeFields
+                node={{
+                    id: "trig01",
+                    type: "home.trigger.change",
+                    config: { placeId: PLACE, kind: "change", deviceId: "plug", attribute: "state", from: "", to: "on" }
+                }}
+                setConfig={setConfig}
+            />
+        );
+        expect((await screen.findAllByText(/Fixture plug/)).length).toBeGreaterThan(0);
+        expect(setConfig).not.toHaveBeenCalled();
+    });
+
+    it("edits a step node with the Places step card, and a conditions node group by group", async () => {
+        const { HomeNodeFields } = await import(
+            "@polaris-app/places/src/screens/automations/node-fields"
+        );
+        render(
+            <HomeNodeFields
+                node={{
+                    id: "step01",
+                    type: "home.action.device",
+                    config: { placeId: PLACE, kind: "device", deviceId: "plug", do: "turn-off" }
+                }}
+                setConfig={vi.fn()}
+            />
+        );
+        expect((await screen.findAllByText(/Fixture plug/)).length).toBeGreaterThan(0);
+        cleanup();
+        render(
+            <HomeNodeFields
+                node={{
+                    id: "cond01",
+                    type: "home.condition.check",
+                    config: {
+                        placeId: PLACE,
+                        match: "any",
+                        groups: [
+                            { id: "grp01", match: "all", items: [{ kind: "weekday", days: [1] }] },
+                            { id: "grp02", match: "all", items: [{ kind: "weekday", days: [2] }] }
+                        ]
+                    }
+                }}
+                setConfig={vi.fn()}
+            />
+        );
+        expect(await screen.findByLabelText("How the groups join")).toBeTruthy();
+    });
+});
