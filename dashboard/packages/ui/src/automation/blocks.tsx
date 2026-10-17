@@ -420,10 +420,20 @@ export function BlockPanel({
     // Null until somebody drags the edge: the panel follows the window then.
     const [width, setWidth] = useState<number | null>(null);
     const [height, setHeight] = useState(0);
+    const [measured, setMeasured] = useState<number | null>(null);
     const aside = useRef<HTMLElement>(null);
     useEffect(() => {
         setWidth(readStoredSize(sizeKey, PANEL_WIDTH.min, PANEL_WIDTH.max));
     }, [sizeKey]);
+    useEffect(() => {
+        const node = aside.current;
+        if (!open || !wide || !node) return;
+        setMeasured(node.offsetWidth);
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(() => setMeasured(node.offsetWidth));
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [open, wide]);
     const titleId = useId();
     if (!open) return null;
 
@@ -462,7 +472,7 @@ export function BlockPanel({
                 <ResizeHandle
                     axis="x"
                     side="end"
-                    size={width ?? aside.current?.offsetWidth ?? PANEL_WIDTH.initial}
+                    size={width ?? measured ?? PANEL_WIDTH.initial}
                     min={PANEL_WIDTH.min}
                     max={PANEL_WIDTH.max}
                     label={strings.resizePanel}
