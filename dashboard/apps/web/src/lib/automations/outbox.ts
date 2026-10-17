@@ -14,7 +14,8 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { withLease } from "@/lib/cron/lease";
-import { advanceRun, resumeEventWaits, startRun, type StartedRun } from "./engine";
+import { advanceRun, resumeEventWaits, type StartedRun } from "./engine";
+import { fireTrigger } from "./combine";
 
 const L = core.AUTOMATION_LIMITS;
 const CLAIM_MS = 60_000;
@@ -154,7 +155,7 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             if (!event.orgId && event.userId && automation.userId !== event.userId) continue;
             if (origin && origin.automationId === automation.id) continue;
             if (!acceptsEvent(event.type, trigger.state, payload, automation.id)) continue;
-            const run = await startRun({
+            const run = await fireTrigger({
                 automationId: automation.id,
                 versionId: trigger.versionId,
                 triggerNodeId: trigger.nodeId,

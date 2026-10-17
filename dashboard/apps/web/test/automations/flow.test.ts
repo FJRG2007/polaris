@@ -683,3 +683,66 @@ describe("Run another automation", () => {
         expect(await calls.callCycle(a, call(b), async (id) => graphs.get(id) ?? null)).toBeNull();
     });
 });
+
+describe("trigger combinators", () => {
+    async function together(when: unknown, names: string[]) {
+        const triggersOf = names.map((name, index) => node(`on${index + 1}`, "core.onEvent", { name }));
+        const graph = core.automationGraphSchema.parse({
+            nodes: [...triggersOf, say("go", "go {{trigger.members.on1.payload.v}}")],
+            edges: triggersOf.map((entry) => ({ from: { node: entry.id, port: "next" }, to: { node: "go" } })),
+            when
+        });
+        const row = await fake().prisma.automation.create({
+            data: { name: "Both", draft: graph, enabled: true, runAsId: "u1", userId: "u1", mode: "parallel" }
+        });
+        const version = await fake().prisma.automationVersion.create({ data: { automationId: row.id, number: 1, graph } });
+        await fake().prisma.automation.update({ where: { id: row.id }, data: { publishedVersionId: version.id } });
+        await triggers.armVersion(row.id as string, version.id as string, graph);
+        return row.id as string;
+    }
+    const announce = (name: string, v = 1) =>
+        outbox.emitAutomationEvent("core.event", { userId: "u1", subjectKey: name, payload: { name, payload: { v } } });
+    const runsOf = (id: string) => fake().tables.automationRun!.filter((row) => row.automationId === id);
+
+    it("starts once every member has fired inside the window, with each member's data", async () => {
+        const id = await together({ kind: "all", windowSeconds: 300 }, ["a", "b"]);
+        await announce("a", 7);
+        await drain();
+        expect(runsOf(id)).toHaveLength(0);
+        const second = await announce("b");
+        await outbox.processAutomationEvents();
+        // Matched again after a crash: the same combination starts nothing more.
+        const row = fake().tables.automationEvent!.find((entry) => entry.id === second)!;
+        row.processedAt = null;
+        row.claimedUntil = null;
+        await drain();
+        expect(runsOf(id)).toHaveLength(1);
+        expect(titles()).toEqual(["go 7"]);
+        await announce("b");
+        await drain();
+        expect(runsOf(id)).toHaveLength(1);
+    });
+
+    it("forgets a member that fired before the window", async () => {
+        const id = await together({ kind: "all", windowSeconds: 60 }, ["a", "b"]);
+        await announce("a");
+        await drain();
+        const memory = fake().tables.automationTrigger!.find((row) => row.automationId === id && row.nodeId === "__when")!;
+        const members = (memory.state as { members: Record<string, { at: string }> }).members;
+        members.on1!.at = new Date(Date.now() - 120_000).toISOString();
+        await announce("b");
+        await drain();
+        expect(runsOf(id)).toHaveLength(0);
+    });
+
+    it("starts at N of M", async () => {
+        const id = await together({ kind: "count", count: 2, windowSeconds: 300 }, ["a", "b", "c"]);
+        await announce("c");
+        await drain();
+        expect(runsOf(id)).toHaveLength(0);
+        await announce("a", 3);
+        await drain();
+        expect(runsOf(id)).toHaveLength(1);
+        expect(titles()).toEqual(["go 3"]);
+    });
+});
