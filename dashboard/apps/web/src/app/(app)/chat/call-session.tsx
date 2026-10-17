@@ -33,6 +33,7 @@ import { usePresenceRefresh } from "@/components/presence-store";
 import { rememberCall, takeRememberedCall } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { ControlHint } from "./control-hint";
+import { useRingBack } from "./ring-back";
 import { useMutedSpeech } from "./muted-speech";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
@@ -54,6 +55,8 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      *  without being rebuilt every time it counts a second. */
     const recorder = useRef(recording);
     recorder.current = recording;
+    // What the caller hears while the other side is rung.
+    useRingBack(call, session, viewerId);
 
     const enter = useCallback((next: CallSession, video: boolean) => {
         setWithVideo(video);
@@ -106,7 +109,9 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      */
     useEffect(() => {
         const back = takeRememberedCall(viewerId);
-        if (back) enter(back.session, back.video);
+        // Brought back, never rung again: whoever was being rung may have
+        // answered while this page was loading.
+        if (back) enter({ ...back.session, placedAt: undefined }, back.video);
     }, [enter, viewerId]);
 
     /**

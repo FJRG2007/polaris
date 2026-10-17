@@ -145,6 +145,9 @@ export interface MeetingSeat {
     /** Set only for a guest, and only on the join that minted it. */
     readonly guestKey?: string;
     readonly admission: "admitted" | "waiting" | "denied";
+    /** Whether taking this seat rang somebody: a one-to-one or a group whose
+     *  call it started. Drives the tone the caller hears while it rings. */
+    readonly rang?: boolean;
 }
 
 /**
@@ -219,7 +222,7 @@ export async function startOrJoin(
     if (created && announcesCalls(access.kind)) {
         await postNotice(channelId, "callStarted", { subjectId: actor.id });
     }
-    return seat;
+    return { ...seat, rang: wasEmpty && announcesCalls(access.kind) };
 }
 
 /**
