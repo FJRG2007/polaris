@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowDown, ArrowLeft, ArrowUp, Check, FlaskConical, GitCompare, History, Pencil, Play, Trash2, X } from "lucide-react";
 import {
     Button,
@@ -62,7 +62,7 @@ import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode } from "./n
 
 export function AutomationEditor({ id }: { id: string }) {
     const t = useTranslations("automations");
-    const { data, error, refresh } = useCachedAction(`polaris.automations.one.${id}`, () => getAutomationAction(id));
+    const { data, error, refresh, replace } = useCachedAction(`polaris.automations.one.${id}`, () => getAutomationAction(id));
 
     return (
         <div className="space-y-6">
@@ -78,7 +78,13 @@ export function AutomationEditor({ id }: { id: string }) {
                     <RowsSkeleton rows={5} />
                 </>
             ) : (
-                <Loaded key={data.automation.id} detail={data.automation} secrets={data.secrets} onChanged={() => void refresh()} />
+                <Loaded
+                    key={data.automation.id}
+                    detail={data.automation}
+                    secrets={data.secrets}
+                    onChanged={() => void refresh()}
+                    onStored={(graph) => replace((current) => ({ ...current, automation: { ...current.automation, draft: graph } }))}
+                />
             )}
         </div>
     );
@@ -123,7 +129,17 @@ function useTestRun(runId: string | null): RunDetail | null {
     return run;
 }
 
-function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secrets: SecretSummary[]; onChanged: () => void }) {
+function Loaded({
+    detail,
+    secrets,
+    onChanged,
+    onStored
+}: {
+    detail: AutomationDetail;
+    secrets: SecretSummary[];
+    onChanged: () => void;
+    onStored: (graph: core.AutomationGraph) => void;
+}) {
     const t = useTranslations("automations");
     const toast = useToast();
     const router = useRouter();
@@ -132,7 +148,15 @@ function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secr
     const draft = useDraftHistory<core.AutomationGraph>(initial);
     const graph = draft.value ?? initial;
     const [saved, setSaved] = useState(() => JSON.stringify(initial));
-    useEffect(() => setSaved(JSON.stringify(initial)), [initial]);
+    const shown = useRef(initial);
+    useEffect(() => {
+        if (shown.current === initial) return;
+        shown.current = initial;
+        const next = JSON.stringify(initial);
+        const current = JSON.stringify(graph);
+        if (current === saved && current !== next) draft.reset(initial);
+        setSaved(next);
+    }, [initial]);
     const [pending, start] = useTransition();
     const [deleting, setDeleting] = useState(false);
     const [versionsOpen, setVersionsOpen] = useState(false);
@@ -181,8 +205,9 @@ function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secr
             return false;
         }
         setSaved(JSON.stringify(graph));
+        onStored(graph);
         return true;
-    }, [detail.id, graph, toast]);
+    }, [detail.id, graph, onStored, toast]);
 
     const act = (work: () => Promise<void>) => start(work);
 
@@ -398,6 +423,7 @@ function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secr
                     const laid = core.layoutGraph(restored);
                     draft.change(() => laid, { group: false });
                     setSaved(JSON.stringify(laid));
+                    onStored(restored);
                     toast.show({ title: t("versions.restored") });
                 }}
             />

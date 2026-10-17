@@ -149,7 +149,8 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
     const row = await load(actor, id, false);
     const canEdit = await mayEditShelf(actor, row);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
-    const draft = parsed.success ? parsed.data : core.emptyGraph();
+    const graph = parsed.success ? parsed.data : core.emptyGraph();
+    const draft = canEdit ? graph : core.withoutPins(graph);
     const hooks: Record<string, string> = {};
     if (canEdit)
         for (const node of draft.nodes)
