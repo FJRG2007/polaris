@@ -103,9 +103,7 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
                 <div className="flex min-w-0 flex-1 flex-col">
                     <span
                         className={
-                            valid
-                                ? "truncate font-semibold"
-                                : "truncate font-semibold text-danger"
+                            valid ? "truncate font-semibold" : "truncate font-semibold text-danger"
                         }
                         title={valid ? card.spaceName : undefined}
                     >

@@ -76,8 +76,11 @@ describe("the invite dialog", () => {
         // The link is there on open, with no button to make it.
         await waitFor(() =>
             expect(
-                (screen.getByDisplayValue("https://polaris.example/chat/i/AbCdEf1234") as HTMLInputElement)
-                    .value
+                (
+                    screen.getByDisplayValue(
+                        "https://polaris.example/chat/i/AbCdEf1234"
+                    ) as HTMLInputElement
+                ).value
             ).toBe("https://polaris.example/chat/i/AbCdEf1234")
         );
         expect(screen.getByText(/expires in 7 days/)).toBeTruthy();

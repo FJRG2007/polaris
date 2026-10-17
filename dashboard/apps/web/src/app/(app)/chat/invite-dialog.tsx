@@ -127,8 +127,7 @@ export function InviteDialog({
     }, [copied]);
 
     const link = invite ? `${baseUrl}/chat/i/${invite.code}` : "";
-    const landing =
-        channels.find((entry) => entry.id === (invite?.channelId ?? channelId)) ?? null;
+    const landing = channels.find((entry) => entry.id === (invite?.channelId ?? channelId)) ?? null;
 
     const send = async (person: ChatInviteCandidate) => {
         if (!invite || (rows.get(person.id) ?? "idle") !== "idle") return;

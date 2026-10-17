@@ -68,11 +68,7 @@ import type {
     ChatMemberView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
-import {
-    reachableChannelIds,
-    requirePostable,
-    searchForConversation
-} from "@/lib/chat/access";
+import { reachableChannelIds, requirePostable, searchForConversation } from "@/lib/chat/access";
 
 const CHAT_PATH = "/chat";
 
