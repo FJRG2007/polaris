@@ -129,13 +129,11 @@ describe("the deploy-hook gateway", () => {
 
     it("refuses a timestamp more than five minutes off, either way", async () => {
         const now = Math.floor(Date.now() / 1000);
-        expect((await receiveInbound(signed("{}", { ts: now - 301 }))).status).toBe(401);
-        expect(
-            (await receiveInbound(signed("{}", { ts: now + 301, delivery: "d-2" }))).status
-        ).toBe(401);
-        expect(
-            (await receiveInbound(signed("{}", { ts: now - 299, delivery: "d-3" }))).status
-        ).toBe(202);
+        const at = (request: ReturnType<typeof signed>) =>
+            receiveInbound({ ...request, now: new Date(now * 1000) });
+        expect((await at(signed("{}", { ts: now - 301 }))).status).toBe(401);
+        expect((await at(signed("{}", { ts: now + 301, delivery: "d-2" }))).status).toBe(401);
+        expect((await at(signed("{}", { ts: now - 299, delivery: "d-3" }))).status).toBe(202);
     });
 
     it("refuses the same request twice", async () => {
