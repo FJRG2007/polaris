@@ -317,6 +317,9 @@ export interface EnginePorts {
  *  it moves passes its depth on to whatever that change fires. */
 const causeContext = new AsyncLocalStorage<{ readonly depth: number }>();
 
+/** Central firings remembered as handed over; the oldest is forgotten first. */
+const DELIVERED_KEPT = 5000;
+
 /** Do `work` on behalf of a run this deep in a chain - a central run's device
  *  step - so whatever a device it moves fires carries the depth on. */
 export function withCauseDepth<T>(depth: number, work: () => Promise<T>): Promise<T> {
@@ -499,6 +502,35 @@ export function createEngine(ports: EnginePorts) {
     let draining: Promise<void> | null = null;
     let again = false;
 
+    /**
+     * Central firings already handed over, by automation, arming and key. A
+     * trigger that has to last is true on every pass for as long as it holds,
+     * and a clock trigger for its whole catch-up window; the central engine
+     * dedupes them by key, but each pass would still cost it a round trip. A
+     * firing it answered - started, or already had - is not handed again. Kept
+     * in memory and bounded: after a restart, or once evicted, the next pass
+     * hands it once more and the central side dedupes it as before.
+     */
+    const delivered = new Set<string>();
+
+    async function fireCentral(
+        automation: AutomationRecord,
+        firingKey: string,
+        cause: auto.RunCause,
+        depth: number
+    ): Promise<boolean> {
+        if (!ports.central) return false;
+        const key = `${automation.id}|${automation.armedAt.getTime()}|${firingKey}`;
+        if (delivered.has(key)) return false;
+        const started = await ports.central(automation, firingKey, cause, depth);
+        if (delivered.size >= DELIVERED_KEPT) {
+            const oldest = delivered.values().next();
+            if (!oldest.done) delivered.delete(oldest.value);
+        }
+        delivered.add(key);
+        return started;
+    }
+
     const fault = (message: string, error: unknown) =>
         (ports.log ?? ((said, caught) => console.error(`places: ${said}`, caught)))(message, error);
 
@@ -512,7 +544,7 @@ export function createEngine(ports: EnginePorts) {
         cause: auto.RunCause,
         depth: number
     ): Promise<boolean> {
-        if (automation.central) return ports.central ? ports.central(automation, firingKey, cause, depth) : false;
+        if (automation.central) return fireCentral(automation, firingKey, cause, depth);
         const now = ports.now();
         if (depth > MAX_DEPTH) {
             // Written once per firing, so the log says why a chain stopped rather
