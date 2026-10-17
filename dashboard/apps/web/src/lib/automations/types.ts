@@ -41,6 +41,8 @@ export interface NodeIo {
     readonly idempotencyKey: string;
     /** How many automations in a chain led to this run (0 for a direct start). */
     readonly depth: number;
+    /** When the run first reached this step; a step that is run again after a recheck keeps it. */
+    readonly since: Date;
     /** The automation's shelf: an org, or a person. */
     readonly shelf: { readonly orgId: string | null; readonly userId: string | null };
     readonly timeZone: string;
@@ -56,7 +58,14 @@ export interface NodeIo {
 /** `port` may list several ports joined by commas: every one of them is taken. */
 export type NodeResult =
     | { readonly output: unknown; readonly port?: string }
-    | { readonly wait: { readonly until: Date } };
+    | {
+          readonly wait: {
+              readonly until: Date;
+              /** Run the node again at `until` (or sooner, when its app wakes the key)
+               *  instead of carrying on: `recheck:<app>`. */
+              readonly recheck?: string;
+          };
+      };
 
 export interface ServerNode<Config = unknown> {
     readonly type: string;

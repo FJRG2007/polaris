@@ -933,6 +933,7 @@ async function executeStep(
         automationId: run.automation.id,
         idempotencyKey: `${run.id}:${node.id}:${step.iteration}`,
         depth: run.depth,
+        since: step.createdAt,
         shelf: { orgId: run.automation.orgId, userId: run.automation.userId },
         timeZone: graph.timeZone,
         signal: controller.signal,
@@ -993,7 +994,12 @@ async function executeStep(
             if (until.getTime() - Date.now() > L.longestWaitMs) throw new StepError("waitTooLong");
             await prisma.automationStep.updateMany({
                 where: { id: step.id, status: "running" },
-                data: { status: "waiting", waitUntil: until, input: store(input) }
+                data: {
+                    status: "waiting",
+                    waitUntil: until,
+                    waitKey: result.wait.recheck ?? null,
+                    input: store(input)
+                }
             });
             return;
         }
@@ -1955,6 +1961,9 @@ async function cancelChildren(runId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /** Finish every wait that is due and put its run back to work. Returns the runs to step. */
+/** A step that waits to be run again (an app's "wait until a device is ..."): its wait key starts with this. */
+export const RECHECK_PREFIX = "recheck:";
+
 export async function resumeDueWaits(limit = 100): Promise<string[]> {
     const due = await prisma.automationStep.findMany({
         where: { status: "waiting", waitUntil: { lte: new Date() } },
@@ -1986,7 +1995,7 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
             where: { id: step.runId, status: "waiting" },
             data: { status: "running", dueAt: null }
         });
-        if (step.waitKey === "retry") {
+        if (step.waitKey === "retry" || step.waitKey?.startsWith(RECHECK_PREFIX)) {
             await prisma.automationStep.updateMany({
                 where: { id: step.id, status: "waiting" },
                 data: { status: "ready", waitUntil: null }

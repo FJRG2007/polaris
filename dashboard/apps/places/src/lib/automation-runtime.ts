@@ -106,7 +106,28 @@ let engine: AutomationEngine | null = null;
 export function automationEngine(): AutomationEngine {
     engine ??= createEngine({
         now: () => new Date(),
-        store: prismaAutomationStore,
+        // The automations that moved to the central engine still have their
+        // triggers decided here, by the same rules; a firing starts a central run.
+        store: {
+            ...prismaAutomationStore,
+            async enabledAutomations(installedAppId) {
+                const [own, central] = await Promise.all([
+                    prismaAutomationStore.enabledAutomations(installedAppId),
+                    import("./automation-central").then((module) =>
+                        module.centralRecords(installedAppId)
+                    )
+                ]);
+                return [...own, ...central];
+            },
+            async wakeWaiting(deviceId, now) {
+                await prismaAutomationStore.wakeWaiting(deviceId, now);
+                await host.automations.wakeAppWaits("home").catch((error: unknown) => {
+                    console.error("places: central automations could not look again:", error);
+                });
+            }
+        },
+        central: async (automation, firingKey, cause, depth) =>
+            (await import("./automation-central")).fireCentral(automation, firingKey, cause, depth),
         async places(installedAppId, placeId) {
             const [devices, rooms] = await Promise.all([
                 prisma.placeDevice.findMany({
@@ -189,7 +210,9 @@ export function automationEngine(): AutomationEngine {
                 event: "places.automation",
                 title: t("automations.notice.title", { name: automation.name }),
                 body: message,
-                href: automationHref(automation.id),
+                href: automation.central
+                    ? `/automations/${automation.central.automationId}`
+                    : automationHref(automation.id),
                 metadata: { automationId: automation.id, runId }
             });
         },
@@ -214,7 +237,7 @@ export function automationEngine(): AutomationEngine {
  * than from a session. An account that is banned, switched off or on its way
  * out operates nothing, whatever its roles still say.
  */
-async function mayOperate(ownerId: string, right: "run" | "control"): Promise<boolean> {
+export async function mayOperate(ownerId: string, right: "run" | "control"): Promise<boolean> {
     const user = await prisma.user.findUnique({
         where: { id: ownerId },
         select: {
@@ -266,13 +289,24 @@ export async function observeDevices(
 export async function tickAutomations(): Promise<void> {
     const install = await homeInstall();
     if (!install) return;
+    // Bring what is still on the Places engine over to the central one; a row
+    // that cannot move keeps running here.
+    await import("./automation-move")
+        .then((module) => module.movePlaceAutomations())
+        .catch((error) => console.error("places: automations could not be moved yet:", error));
     const running = automationEngine();
     const automations = await prismaAutomationStore.enabledAutomations(install.id);
+    // Central runs waiting on a device read it from its row, which the sync keeps current.
+    const centralWaiting = automations.some((automation) => automation.central);
     const pending = await prisma.placeAutomationRun.count({
         where: { status: { in: ["queued", "waiting", "running"] } }
     });
     if (automations.length === 0 && pending === 0) return;
-    if (automations.some((automation) => readsDevices(automation.definition)) || pending > 0) {
+    if (
+        automations.some((automation) => readsDevices(automation.definition)) ||
+        pending > 0 ||
+        centralWaiting
+    ) {
         const devices = await import("./devices");
         await devices.syncDevices(install.id).catch((error) => {
             console.error("places: automations could not read the devices:", error);

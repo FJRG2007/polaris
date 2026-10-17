@@ -81,6 +81,10 @@ export const placesExtension: AppExtension = {
         }
     ],
 
+    // Its triggers, conditions and steps in the central automations engine. The
+    // triggers fire through the Places engine's own rules (automation-central).
+    automationNodes: async () => (await import("./automation-central")).placesAutomationNodes(),
+
     // The Overview's cards: the devices somebody picks, at a glance, and the
     // controls they reach for. Loaded when a card is drawn or pressed; see
     // `overview-widgets`.
