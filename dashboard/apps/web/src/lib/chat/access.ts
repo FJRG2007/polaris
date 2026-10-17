@@ -34,6 +34,7 @@ import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
 import { findPeople, type FoundPeople } from "@/lib/people-search";
+import { blockedBetween } from "@/lib/blocks";
 import { spokenWait } from "./durations";
 import { chatText, type ChatText } from "./text";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -539,15 +540,39 @@ export async function searchForConversation(
     query: string,
     limit = 8
 ): Promise<FoundPeople> {
+    const reachable = await conversationReach(actor);
+    return findPeople(actor, query, { reachableOnly: true, reachable, limit });
+}
+
+/**
+ * Which of these accounts this one could open a direct message with, for a
+ * list that is not a search: the same reach `searchForConversation` applies,
+ * and no block in either direction - what `findPeople` leaves out of a search.
+ */
+export async function directReachable(
+    actor: ChatActor,
+    userIds: readonly string[]
+): Promise<Set<string>> {
+    const [reachable, blocked] = await Promise.all([
+        conversationReach(actor),
+        blockedBetween(actor.id, userIds)
+    ]);
+    return reachable(userIds.filter((id) => id !== actor.id && !blocked.has(id)));
+}
+
+/** `chat.use`, narrowed to the organization's own people while its chat is the
+ *  one in use. */
+async function conversationReach(
+    actor: ChatActor
+): Promise<(userIds: readonly string[]) => Promise<Set<string>>> {
     const orgId = await currentChatOrgId(actor.id);
     const roster = orgId ? await orgChatPeople(orgId) : null;
-    const reachable = roster
+    return roster
         ? async (userIds: readonly string[]) => {
               const allowed = await messageable(userIds);
               return new Set([...allowed].filter((id) => roster.has(id)));
           }
         : messageable;
-    return findPeople(actor, query, { reachableOnly: true, reachable, limit });
 }
 
 /**

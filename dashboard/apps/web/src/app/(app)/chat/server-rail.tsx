@@ -452,7 +452,7 @@ function SpaceMenu({
 }) {
     const t = useTranslations("chat");
     const administers = space.access !== "member";
-    const mayInvite = administers || space.visibility !== "private";
+    const mayInvite = core.spaceInviteAllowed(space.access, space.visibility);
     // Leaving is only real where the roster is what lets somebody in. An
     // internal space is reachable by everybody who can see its owner, so
     // deleting a membership row there would take nothing away and the space

@@ -19,6 +19,7 @@
 import { storageRefusal } from "@/lib/storage-refusal";
 import { prisma } from "@polaris/db";
 import { apiUser } from "@/lib/api-session";
+import { inviteShowsSpace } from "@/lib/chat/invite-cards";
 
 import { channelAccess, picturesAllowed, spaceAccess } from "@/lib/chat/access";
 import { BLANK_AVATAR_ETAG, blankAvatarResponse } from "@/lib/avatar-blank";
@@ -59,7 +60,14 @@ export async function GET(
     const { kind, subjectId } = await params;
     const what = kindOf(kind);
     if (!what) return blankAvatarResponse(NO_CACHE);
-    if (!(await mayRead(user.id, what, subjectId))) return blankAvatarResponse(NO_CACHE);
+    // An invite card shows the picture of a space the reader is not in yet,
+    // on the strength of a live invitation into it - the same thing the card
+    // already shows them the name of.
+    const invite = new URL(request.url).searchParams.get("invite");
+    const shown =
+        (await mayRead(user.id, what, subjectId)) ||
+        (what === "space" && invite !== null && (await inviteShowsSpace(invite, subjectId)));
+    if (!shown) return blankAvatarResponse(NO_CACHE);
 
     const picture = await resolveChatAvatar(what, subjectId);
     if (!picture) {

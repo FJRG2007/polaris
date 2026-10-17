@@ -48,7 +48,8 @@ export function ChatAvatar({
     color,
     size = 24,
     square = false,
-    className
+    className,
+    invite
 }: {
     kind: "space" | "channel";
     id: string;
@@ -63,6 +64,9 @@ export function ChatAvatar({
      *  person are told apart before either name is read. */
     square?: boolean;
     className?: string;
+    /** An invitation code into this space, for a reader who is not in it yet:
+     *  it is what lets an invite card show the space's picture. */
+    invite?: string;
 }) {
     // A transparent pixel is the answer when there is no picture and when the
     // reader is not in the thing, so a successful load is not proof of one -
@@ -125,7 +129,7 @@ export function ChatAvatar({
             {!failed && (
                 // eslint-disable-next-line @next/next/no-img-element -- one small image, no loader wanted
                 <img
-                    src={chatAvatarUrl(kind, id)}
+                    src={`${chatAvatarUrl(kind, id)}${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`}
                     alt=""
                     onError={() => setFailed(true)}
                     className={cn("absolute inset-0 size-full object-cover", shape)}

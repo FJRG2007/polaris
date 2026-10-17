@@ -1167,3 +1167,78 @@ export function inviteUsable(
     }
     return invite.maxUses === null || invite.uses < invite.maxUses;
 }
+
+/**
+ * What a fresh link carries when nobody has chosen otherwise: a week, and
+ * anybody who has it. The invite dialog makes one of these the moment it
+ * opens, so the common case - "send this to a friend" - takes no settings.
+ */
+export const INVITE_DEFAULT_MINUTES = 60 * 24 * 7;
+export const INVITE_DEFAULT_USES = INVITE_UNLIMITED;
+
+/**
+ * Whether somebody with this standing may bring people into a space.
+ *
+ * The one rule the server enforces and every screen asks before offering the
+ * Invite item: anybody in an open space, and only those who run a private one,
+ * since a private space is one whose roster is chosen.
+ */
+export function spaceInviteAllowed(
+    standing: "owner" | "admin" | "member" | null,
+    visibility: string
+): boolean {
+    if (!standing) return false;
+    return standing !== "member" || visibility !== "private";
+}
+
+/** The link the invite dialog shows: made, or an existing one reused. */
+export const chatInviteLinkSchema = z.object({
+    spaceId: z.string().uuid(),
+    /** The room it was opened from. Absent: the space's first open room. */
+    channelId: z.string().uuid().nullable().optional()
+});
+
+export type ChatInviteLinkInput = z.infer<typeof chatInviteLinkSchema>;
+
+/** Sending a link to one person, into the direct conversation with them. */
+export const chatInviteSendSchema = z.object({
+    code: inviteCodeSchema,
+    userId: z.string().uuid()
+});
+
+export type ChatInviteSendInput = z.infer<typeof chatInviteSendSchema>;
+
+/** Who the invite dialog lists, narrowed by what is typed in its search. */
+export const chatInviteCandidatesSchema = z.object({
+    spaceId: z.string().uuid(),
+    query: z.string().trim().max(64).default("")
+});
+
+/** How many invite cards one message may carry. */
+export const MAX_INVITE_CARDS = 3;
+
+/**
+ * The invitation codes in a message, in the order they appear.
+ *
+ * Only addresses on this deployment's own origin count: a link to another site
+ * that happens to end in `/chat/i/<code>` is somebody else's page, and drawing
+ * one of our cards under it would vouch for a link that does not go here.
+ * Relative addresses (`/chat/i/<code>`) are ours by definition.
+ */
+export function inviteCodesIn(body: string, origin: string | null): string[] {
+    if (!body.includes("/chat/i/")) return [];
+    const base = origin ? origin.replace(/\/+$/, "") : null;
+    const found: string[] = [];
+    const pattern = /(https?:\/\/[^\s/()<>\]]+)?\/chat\/i\/([A-Za-z0-9_-]{6,32})(?![A-Za-z0-9_-])/g;
+    for (const match of body.matchAll(pattern)) {
+        const host = match[1];
+        const start = match.index ?? 0;
+        // A path glued to something else ("foo/chat/i/x") is not an address.
+        if (!host && start > 0 && !/[\s(<[]/.test(body[start - 1]!)) continue;
+        if (host && (!base || host.toLowerCase() !== base.toLowerCase())) continue;
+        const code = match[2]!;
+        if (!found.includes(code)) found.push(code);
+        if (found.length >= MAX_INVITE_CARDS) break;
+    }
+    return found;
+}
