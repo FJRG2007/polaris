@@ -388,7 +388,17 @@ const RETHROWN = "rethrown";
  * loop pass (an item, an index, a pass shown on the run).
  */
 function tryIteration(iteration: string, tryId: string): string {
-    return `${iteration}${SEPARATOR}${tryId}:try`;
+    return `${iteration}${SEPARATOR}${tryId}${TRY_SEGMENT}`;
+}
+
+const TRY_SEGMENT = ":try";
+
+/** The scope an iteration reads as once the Try bodies it ends in are seen through. */
+function outsideTries(iteration: string): string {
+    let scope = iteration;
+    while (scope.endsWith(TRY_SEGMENT) && scope.includes(SEPARATOR))
+        scope = scope.slice(0, scope.lastIndexOf(SEPARATOR));
+    return scope;
 }
 
 /** The rows of one scope: the iteration itself and everything nested under it. */
@@ -753,14 +763,21 @@ async function buildContext(
 ): Promise<RunContext> {
     const lane = laneOf(iteration);
     // A step sees its own pass and the passes it runs inside; the Finally lane
-    // also sees the top of the main flow. Nearer passes win, then newer rows.
+    // also sees the top of the main flow. A Try body runs once, so its rows
+    // read as part of the scope around it. Nearer passes win, then newer rows.
     const segments = iteration.split(SEPARATOR);
     const enclosing = segments.map((_, at) => segments.slice(0, at + 1).join(SEPARATOR));
     if (lane === FINALLY) enclosing.unshift(MAIN);
+    const lanes = [...new Set(enclosing.map(laneOf))];
     const done = await prisma.automationStep.findMany({
         where: {
             runId: run.id,
-            iteration: { in: enclosing },
+            OR: [
+                { iteration: { in: enclosing } },
+                ...lanes.map((root) => ({
+                    iteration: { startsWith: `${root}${SEPARATOR}`, endsWith: TRY_SEGMENT }
+                }))
+            ],
             status: { in: ["ok", "failed", "skipped"] },
             port: { not: null }
         },
@@ -768,7 +785,10 @@ async function buildContext(
         take: L.stepsPerRun * 2,
         select: { nodeId: true, output: true, iteration: true }
     });
-    const visible = done.sort((a, b) => b.iteration.length - a.iteration.length);
+    const scopes = new Set(enclosing);
+    const visible = done
+        .filter((step) => scopes.has(outsideTries(step.iteration)))
+        .sort((a, b) => b.iteration.length - a.iteration.length);
     const steps: Record<string, unknown> = {};
     for (const step of visible)
         if (step.output !== null && !Object.hasOwn(steps, step.nodeId))
@@ -1951,15 +1971,15 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
     });
     const runs = new Set<string>();
     for (const step of due) {
+        if (step.waitKey?.startsWith(CONDITION_WAIT)) {
+            if (await recheckCondition(step.id, null)) runs.add(step.runId);
+            continue;
+        }
         const run = await prisma.automationRun.findUnique({
             where: { id: step.runId },
             select: { versionId: true }
         });
         const graph = run ? await loadGraph(run.versionId) : null;
-        if (step.waitKey?.startsWith(CONDITION_WAIT)) {
-            if (await recheckCondition(step.id, null)) runs.add(step.runId);
-            continue;
-        }
         // Running first: a crash after this leaves a run the job steps, and the
         // stepper re-enqueues a successor a crash kept from being written.
         await prisma.automationRun.updateMany({
@@ -2124,6 +2144,10 @@ async function recheckCondition(
     return run.id;
 }
 
+/** Where the last event's recheck stopped, per shelf with more waits than one event checks. */
+const conditionCursors = new Map<string, string>();
+const CONDITION_CURSORS = 1000;
+
 /**
  * An automation event reached a shelf: every Wait for a condition on it is
  * checked again, with the event as `event`, bounded per event. Returns the runs to step.
@@ -2132,12 +2156,26 @@ export async function resumeConditionWaits(
     shelf: { orgId: string | null; userId: string | null },
     event: { name: string; payload: Record<string, unknown> }
 ): Promise<string[]> {
-    const waiting = await prisma.automationStep.findMany({
-        where: { status: "waiting", waitKey: conditionWaitKey(shelf) },
-        orderBy: { id: "asc" },
-        take: L.conditionWaitsPerEvent,
-        select: { id: true }
-    });
+    // Each event starts where the last one stopped, so past the bound every
+    // wait still gets its turn instead of the oldest ones every time.
+    const key = conditionWaitKey(shelf);
+    const after = conditionCursors.get(key);
+    const page = (id: object | undefined, take: number) =>
+        prisma.automationStep.findMany({
+            where: { status: "waiting", waitKey: key, ...(id ? { id } : {}) },
+            orderBy: { id: "asc" },
+            take,
+            select: { id: true }
+        });
+    const waiting = await page(after ? { gt: after } : undefined, L.conditionWaitsPerEvent);
+    if (after && waiting.length < L.conditionWaitsPerEvent)
+        waiting.push(...(await page({ lte: after }, L.conditionWaitsPerEvent - waiting.length)));
+    conditionCursors.delete(key);
+    if (waiting.length === L.conditionWaitsPerEvent) {
+        if (conditionCursors.size >= CONDITION_CURSORS)
+            conditionCursors.delete(conditionCursors.keys().next().value!);
+        conditionCursors.set(key, waiting.at(-1)!.id);
+    }
     const runs = new Set<string>();
     for (const step of waiting) {
         const run = await recheckCondition(step.id, event);

@@ -123,6 +123,11 @@ function matches(row: Row, where: Row | undefined): boolean {
                 (typeof value !== "string" || !value.startsWith(ops.startsWith as string))
             )
                 return false;
+            if (
+                "endsWith" in ops &&
+                (typeof value !== "string" || !value.endsWith(ops.endsWith as string))
+            )
+                return false;
             if ("lt" in ops && (value === null || cmp(value, ops.lt) >= 0)) return false;
             if ("lte" in ops && (value === null || cmp(value, ops.lte) > 0)) return false;
             if ("gt" in ops && (value === null || cmp(value, ops.gt) <= 0)) return false;

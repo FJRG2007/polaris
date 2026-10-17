@@ -1040,6 +1040,30 @@ describe("Try", () => {
         expect(runRow(started.id).status).toBe("succeeded");
     });
 
+    it("lets the steps after a Try read what its body did", async () => {
+        const seeded = await seed(
+            [
+                attempt(),
+                node("inner", "core.try", {}),
+                http("h"),
+                say("ok", "then {{steps.h.status}}"),
+                say("end", "always {{steps.h.status}}"),
+                say("after", "after {{steps.h.status}}")
+            ],
+            [
+                ["t1", "next", "try"],
+                ["try", "body", "inner"],
+                ["inner", "body", "h"],
+                ["try", "then", "ok"],
+                ["try", "always", "end"],
+                ["end", "next", "after"]
+            ]
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(titles().sort()).toEqual(["after 200", "always 200", "then 200"]);
+    });
+
     it("leaves by On error and Always when the body fails, skips the rest, and the run still fails", async () => {
         sent.statuses = [500];
         const seeded = await seed([attempt(), ...parts()], wires);
@@ -1246,6 +1270,36 @@ describe("Wait for a condition", () => {
         await drain();
         expect(titles()).toEqual(["step yes"]);
         expect(step(started.id, "wait")).toMatchObject({ port: "next", output: { matched: true } });
+    });
+
+    it("past the bound per event, the next event checks the waits the last one left", async () => {
+        const seeded = await seed(
+            [waiter(compare("{{event.payload.door}}", "eq", "open")), say("yes"), say("late")],
+            wires
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        for (let at = 0; at < core.AUTOMATION_LIMITS.conditionWaitsPerEvent; at++)
+            fake().tables.automationStep!.push({
+                id: `00000000-0000-0000-0000-${String(at).padStart(12, "0")}`,
+                runId: "gone",
+                nodeId: "wait",
+                iteration: "0",
+                status: "waiting",
+                waitKey: "condition:user:u1"
+            });
+        const shout = () =>
+            outbox.emitAutomationEvent("core.event", {
+                userId: "u1",
+                subjectKey: "door",
+                payload: { name: "door", payload: { door: "shut" } }
+            });
+        await shout();
+        await drain();
+        expect(step(started.id, "wait")!.output).toMatchObject({ checks: 1 });
+        await shout();
+        await drain();
+        expect(step(started.id, "wait")!.output).toMatchObject({ checks: 2 });
     });
 
     it("checks again on the clock, then times out", async () => {
