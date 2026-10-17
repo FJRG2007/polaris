@@ -35,7 +35,9 @@ export const FLOW_FIELD_TYPES = new Set([
     "core.waitEvent",
     "core.run",
     "core.answer",
-    "core.announce"
+    "core.announce",
+    "core.try",
+    "core.waitCondition"
 ]);
 
 const emptyCompare = (): core.CompareLeaf => ({ kind: "compare", left: "", op: "eq", right: "" });
@@ -376,6 +378,59 @@ function EventName({ value, onChange }: { value: string; onChange: (name: string
     );
 }
 
+/**
+ * The built-in "automation.finished" event: a button that picks it, and once
+ * picked, which endings of the other automation count.
+ */
+function FinishedEvent({
+    config,
+    set,
+    example
+}: {
+    config: Config;
+    set: (change: Config) => void;
+    /** Where the steps after it read the ending. */
+    example: string;
+}) {
+    const t = useTranslations("automations");
+    const name = core.AUTOMATION_FINISHED_EVENT;
+    if (config.name !== name)
+        return (
+            <div className="flex min-w-0 items-center justify-between gap-2">
+                <p className="min-w-0 text-xs text-muted-foreground">
+                    {t("flow.builtInEvent", { name })}
+                </p>
+                <Button size="sm" variant="outline" onClick={() => set({ name, outcomes: [] })}>
+                    {t("flow.useFinished")}
+                </Button>
+            </div>
+        );
+    const picked = (config.outcomes ?? []) as string[];
+    return (
+        <fieldset className="space-y-1">
+            <legend className="text-sm font-medium">{t("flow.outcomes")}</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {core.FINISHED_EVENT_OUTCOMES.map((outcome) => (
+                    <label key={outcome} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                            checked={picked.includes(outcome)}
+                            onChange={(event) =>
+                                set({
+                                    outcomes: event.target.checked
+                                        ? [...picked, outcome]
+                                        : picked.filter((entry) => entry !== outcome)
+                                })
+                            }
+                        />
+                        {t(`status.${outcome}`)}
+                    </label>
+                ))}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("flow.outcomesAny", { example })}</p>
+        </fieldset>
+    );
+}
+
 export function FlowNodeFields({
     node,
     setConfig,
@@ -484,6 +539,11 @@ export function FlowNodeFields({
                 <div className="space-y-2">
                     <EventName value={config.name ?? ""} onChange={(name) => set({ name })} />
                     {hint(t("nodeHints.onEvent"))}
+                    <FinishedEvent
+                        config={config}
+                        set={set}
+                        example="{{trigger.payload.outcome}}"
+                    />
                 </div>
             );
         case "core.failed": {
@@ -827,6 +887,11 @@ export function FlowNodeFields({
                 <div className="space-y-3">
                     {hint(t("nodeHints.waitEvent"))}
                     <EventName value={config.name ?? ""} onChange={(name) => set({ name })} />
+                    <FinishedEvent
+                        config={config}
+                        set={set}
+                        example={`{{steps.${node.id}.payload.outcome}}`}
+                    />
                     <Duration
                         label={t("flow.timeout")}
                         value={config.timeout ?? { amount: 1, unit: "hours" }}
@@ -850,6 +915,52 @@ export function FlowNodeFields({
                                 triggers={[]}
                             />
                         </>
+                    ) : null}
+                </div>
+            );
+        case "core.try":
+            return (
+                <div className="space-y-3">
+                    {hint(t("nodeHints.try"))}
+                    <label className="flex items-center justify-between gap-2 text-sm">
+                        <span className="min-w-0">{t("flow.recover")}</span>
+                        <Switch
+                            checked={config.recover === true}
+                            aria-label={t("flow.recover")}
+                            onChange={(on: boolean) => set({ recover: on })}
+                        />
+                    </label>
+                    {hint(t(config.recover === true ? "flow.recoverOn" : "flow.recoverOff"))}
+                    {hint(t("flow.tryErrorHint", { example: `{{steps.${node.id}.error}}` }))}
+                </div>
+            );
+        case "core.waitCondition":
+            return (
+                <div className="space-y-3">
+                    {hint(t("nodeHints.waitCondition"))}
+                    <ConditionEditor
+                        value={(config.condition as core.ConditionGroup) ?? emptyCondition()}
+                        onChange={(condition) => set({ condition })}
+                        triggers={triggers}
+                    />
+                    {hint(t("flow.conditionWaitHint", { example: "{{event.payload.status}}" }))}
+                    <Duration
+                        label={t("flow.timeout")}
+                        value={config.timeout ?? { amount: 1, unit: "hours" }}
+                        onChange={(timeout) => set({ timeout })}
+                    />
+                    <Duration
+                        label={t("flow.recheckEvery")}
+                        value={config.every ?? { amount: 5, unit: "minutes" }}
+                        onChange={(every) => set({ every })}
+                    />
+                    {core.durationSeconds(config.every ?? { amount: 5, unit: "minutes" }) <
+                        L.conditionRecheckMinSeconds ||
+                    core.durationSeconds(config.every ?? { amount: 5, unit: "minutes" }) >
+                        L.conditionRecheckMaxSeconds ? (
+                        <p role="alert" className="text-xs text-danger">
+                            {t("flow.recheckRange")}
+                        </p>
                     ) : null}
                 </div>
             );
@@ -906,6 +1017,11 @@ export function FlowNodeFields({
                 <div className="space-y-3">
                     {hint(t("nodeHints.announce"))}
                     <EventName value={config.name ?? ""} onChange={(name) => set({ name })} />
+                    {String(config.name ?? "").startsWith(core.RESERVED_EVENT_PREFIX) ? (
+                        <p role="alert" className="text-xs text-danger">
+                            {t("flow.eventNameReserved", { prefix: core.RESERVED_EVENT_PREFIX })}
+                        </p>
+                    ) : null}
                     <Pairs
                         label={t("flow.payload")}
                         value={config.payload ?? []}

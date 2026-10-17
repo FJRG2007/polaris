@@ -383,6 +383,14 @@ const TRY_WAIT = "try";
 /** Set on a failed Try once its failure has gone on to the scope around it. */
 const RETHROWN = "rethrown";
 
+/**
+ * A Try body's iteration: a segment with no pass number, so it never reads as a
+ * loop pass (an item, an index, a pass shown on the run).
+ */
+function tryIteration(iteration: string, tryId: string): string {
+    return `${iteration}${SEPARATOR}${tryId}:try`;
+}
+
 /** The rows of one scope: the iteration itself and everything nested under it. */
 function inScope(iteration: string, prefix: string): boolean {
     return iteration === prefix || iteration.startsWith(`${prefix}${SEPARATOR}`);
@@ -1210,7 +1218,7 @@ async function settleTries(
         .filter((step) => step.waitKey === TRY_WAIT || step.waitKey === RETHROWN)
         .sort((a, b) => b.iteration.length - a.iteration.length);
     for (const held of tries) {
-        const prefix = passIteration(held.iteration, held.nodeId, 0);
+        const prefix = tryIteration(held.iteration, held.nodeId);
         const inside = steps.filter((step) => inScope(step.iteration, prefix));
         const busy = inside.some((step) => ACTIVE.includes(step.status));
         if (held.status !== "waiting") {
@@ -1357,7 +1365,7 @@ async function control(
                 return { output: { failed: false, recovered: false }, port: "then,always" };
             return {
                 hold: { waitKey: TRY_WAIT, input: {} },
-                start: { iteration: passIteration(step.iteration, node.id, 0), nodes: body }
+                start: { iteration: tryIteration(step.iteration, node.id), nodes: body }
             };
         }
         case "core.waitCondition": {
@@ -2017,8 +2025,9 @@ export async function resumeEventWaits(
             const config = core.CORE_NODE_CONFIGS["core.waitEvent"].safeParse(node.config);
             if (
                 config.success &&
-                config.data.filter &&
-                !core.checkCondition(config.data.filter, { event: payload })
+                ((config.data.filter &&
+                    !core.checkCondition(config.data.filter, { event: payload })) ||
+                    !core.takesOutcome(config.data.name, config.data.outcomes, payload))
             )
                 continue;
             await prisma.automationRun.updateMany({

@@ -640,6 +640,24 @@ export function CanvasBoard(props: CanvasBoardProps) {
                         }
                     />
                 ) : null}
+                {core.tryFrames({ ...graph, nodes: graph.nodes.map(shifted) }).map((frame) => (
+                    <div
+                        key={`try-${frame.id}`}
+                        data-try-frame={frame.id}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute rounded-lg border border-dashed border-border-strong bg-muted/30"
+                        style={{
+                            left: frame.x,
+                            top: frame.y,
+                            width: frame.width,
+                            height: frame.height
+                        }}
+                    >
+                        <p className="truncate px-2 pt-1 text-xs font-medium text-muted-foreground">
+                            {`${props.title(byId.get(frame.id)!)} - ${portLabel(t, byId.get(frame.id)!, "body")}`}
+                        </p>
+                    </div>
+                ))}
                 {graph.notes.map((note) => {
                     const at =
                         drag && selection.notes.has(note.id)

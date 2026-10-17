@@ -1374,4 +1374,46 @@ describe("automation.finished", () => {
         await drain();
         expect(titles()).toEqual(["step a", "succeeded"]);
     });
+
+    it("takes only the endings ticked, on a trigger and on a wait", async () => {
+        const seeded = await seed(
+            [say("heard", "{{trigger.payload.outcome}}")],
+            [["on", "next", "heard"]],
+            {
+                trigger: node("on", "core.onEvent", {
+                    name: core.AUTOMATION_FINISHED_EVENT,
+                    outcomes: ["failed"]
+                })
+            }
+        );
+        await triggers.armVersion(seeded.automationId, seeded.versionId, seeded.graph);
+        const waiter = await seed(
+            [
+                node("wait", "core.waitEvent", {
+                    name: core.AUTOMATION_FINISHED_EVENT,
+                    outcomes: ["failed"],
+                    timeout: { amount: 1, unit: "hours" }
+                }),
+                say("woke", "{{steps.wait.payload.outcome}}")
+            ],
+            [
+                ["t1", "next", "wait"],
+                ["wait", "next", "woke"]
+            ]
+        );
+        await engine.advanceRun((await fire(waiter, "w1")).id);
+        sent.statuses = [500];
+        const ok = await seed([say("a")], [["t1", "next", "a"]]);
+        await engine.advanceRun((await fire(ok, "k1")).id);
+        await drain();
+        expect(titles()).toEqual(["step a"]);
+        const failing = await seed([http("h")], [["t1", "next", "h"]]);
+        await engine.advanceRun((await fire(failing, "k2")).id);
+        await drain();
+        expect(
+            titles()
+                .filter((title) => title !== "step a")
+                .sort()
+        ).toEqual(["failed", "failed"]);
+    });
 });

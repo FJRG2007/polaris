@@ -327,6 +327,10 @@ function StepItem({
                             ? ` - ${t("runView.attempt", { number: step.attempt })}`
                             : ""}
                         {went ? ` - ${t("runView.went", { port: went })}` : ""}
+                        {node?.type === "core.try" &&
+                        (step.output as { recovered?: unknown } | null)?.recovered === true
+                            ? ` - ${t("runView.recovered")}`
+                            : ""}
                     </p>
                 </div>
                 <Badge

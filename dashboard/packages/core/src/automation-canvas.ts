@@ -222,6 +222,49 @@ export function graphBounds(graph: graphs.AutomationGraph): CanvasBox | null {
     return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+/** Room a Try's frame leaves around the steps inside it, and above them for its label. */
+export const TRY_FRAME_PAD = { side: 16, top: 28 } as const;
+
+/**
+ * The frame drawn around each Try's body: the box of the steps its body port
+ * reaches, padded. A Try with nothing inside has no frame. Nested Tries come
+ * after the ones around them, so they are drawn on top.
+ */
+export function tryFrames(graph: graphs.AutomationGraph): Array<CanvasBox & { id: string }> {
+    const frames: Array<CanvasBox & { id: string; depth: number }> = [];
+    const tries = graph.nodes.filter((node) => node.type === "core.try");
+    const bodies = new Map(tries.map((node) => [node.id, graphs.loopBody(graph, node.id)]));
+    for (const node of tries) {
+        const body = bodies.get(node.id)!;
+        const boxes = graph.nodes
+            .filter((entry) => body.has(entry.id))
+            .map((entry) => nodeBox(entry, entry.position ?? { x: 0, y: 0 }));
+        if (boxes.length === 0) continue;
+        const left = Math.min(...boxes.map((box) => box.x)) - TRY_FRAME_PAD.side;
+        const top = Math.min(...boxes.map((box) => box.y)) - TRY_FRAME_PAD.top;
+        const right = Math.max(...boxes.map((box) => box.x + box.width)) + TRY_FRAME_PAD.side;
+        const bottom = Math.max(...boxes.map((box) => box.y + box.height)) + TRY_FRAME_PAD.side;
+        const depth = [...bodies.values()].filter((other) => other.has(node.id)).length;
+        frames.push({
+            id: node.id,
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+            depth
+        });
+    }
+    return frames
+        .sort((a, b) => a.depth - b.depth)
+        .map((frame) => ({
+            id: frame.id,
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height
+        }));
+}
+
 /** The vertical band the Always lane is drawn in, from its nodes, or a band under the main flow when it is empty. */
 export function finallyBand(graph: graphs.AutomationGraph): { top: number; bottom: number } {
     const lanes = lanesOf(graph);

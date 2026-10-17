@@ -348,6 +348,17 @@ describe("Try and Wait for a condition", () => {
         ).toBe(true);
     });
 
+    it("filters automation.finished by its ending, and nothing else", () => {
+        const onEvent = ag.CORE_NODE_CONFIGS["core.onEvent"];
+        expect(onEvent.parse({ name: "order.paid" })).toEqual({ name: "order.paid", outcomes: [] });
+        expect(onEvent.safeParse({ name: "x", outcomes: ["refused"] }).success).toBe(false);
+        const name = ag.AUTOMATION_FINISHED_EVENT;
+        expect(ag.takesOutcome(name, [], { outcome: "failed" })).toBe(true);
+        expect(ag.takesOutcome(name, ["failed"], { outcome: "failed" })).toBe(true);
+        expect(ag.takesOutcome(name, ["failed"], { outcome: "succeeded" })).toBe(false);
+        expect(ag.takesOutcome("order.paid", ["failed"], { outcome: "succeeded" })).toBe(true);
+    });
+
     it("round-trips a Try in the list view", () => {
         const flow: ag.ListFlow = {
             timeZone: "UTC",

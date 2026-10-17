@@ -16,6 +16,7 @@ import {
     Globe,
     Hand,
     Hourglass,
+    LifeBuoy,
     ListOrdered,
     Megaphone,
     Merge,
@@ -26,6 +27,7 @@ import {
     Repeat,
     Reply,
     Split,
+    Timer,
     TriangleAlert,
     Webhook,
     Workflow,
@@ -243,7 +245,9 @@ const NODE_KEYS = {
     "core.waitEvent": "waitEvent",
     "core.run": "run",
     "core.answer": "answer",
-    "core.announce": "announce"
+    "core.announce": "announce",
+    "core.try": "try",
+    "core.waitCondition": "waitCondition"
 } as const;
 
 const NODE_ICONS: Record<string, LucideIcon> = {
@@ -267,7 +271,9 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "core.waitEvent": Ear,
     "core.run": Workflow,
     "core.answer": Reply,
-    "core.announce": Megaphone
+    "core.announce": Megaphone,
+    "core.try": LifeBuoy,
+    "core.waitCondition": Timer
 };
 
 /** A node type's icon; an app's node without one gets the generic piece. */
@@ -302,7 +308,18 @@ export function portLabel(
         ]?.label;
         return label?.trim() || t("canvas.ports.case", { number: choice[1]! });
     }
-    const known = ["then", "else", "otherwise", "each", "done", "error", "timeout"] as const;
+    const known = [
+        "then",
+        "else",
+        "otherwise",
+        "each",
+        "done",
+        "error",
+        "timeout",
+        "body",
+        "catch",
+        "always"
+    ] as const;
     return (known as readonly string[]).includes(port)
         ? t(`canvas.ports.${port as (typeof known)[number]}`)
         : t("canvas.ports.next");

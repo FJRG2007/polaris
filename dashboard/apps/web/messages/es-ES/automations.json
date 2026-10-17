@@ -100,7 +100,8 @@
         "onErrorStop": "Parar",
         "onErrorContinue": "Seguir",
         "references": "Usa {example} para insertar un valor del disparo o de un paso anterior.",
-        "onErrorPort": "Camino de error"
+        "onErrorPort": "Camino de error",
+        "tryThen": "Los pasos tras el Intentar siguen cuando los de dentro salen bien."
     },
     "nodes": {
         "manual": "A mano",
@@ -124,7 +125,9 @@
         "waitEvent": "Esperar un anuncio",
         "run": "Ejecutar otra automatización",
         "answer": "Responder",
-        "announce": "Anunciar"
+        "announce": "Anunciar",
+        "try": "Intentar",
+        "waitCondition": "Esperar una condición"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -325,7 +328,9 @@
             "noTriggerData": "Haz una prueba o fija una muestra en el disparador antes.",
             "missingData": "Haz una prueba o fija datos en los pasos anteriores:"
         },
-        "tooLarge": "Demasiado grande para fijarlo (64 KB como mucho)."
+        "tooLarge": "Demasiado grande para fijarlo (64 KB como mucho).",
+        "tryBodyLeaks": "Solo el Intentar lleva a los pasos de dentro. Quita la otra conexión.",
+        "scopeTooDeep": "Los Intentar y bucles anidan {max} niveles como mucho. Saca un paso."
     },
     "canvas": {
         "board": "Lienzo del automatismo",
@@ -400,7 +405,10 @@
             "each": "Cada",
             "done": "Hecho",
             "error": "Si falla",
-            "timeout": "Sin tiempo"
+            "timeout": "Sin tiempo",
+            "body": "Pasos",
+            "catch": "Si falla",
+            "always": "Siempre"
         },
         "refusals": {
             "self": "Un nodo no puede ir a sí mismo.",
@@ -411,7 +419,8 @@
             "crossesLane": "El flujo y el carril Siempre van aparte.",
             "intoLaneStart": "El carril Siempre empieza solo.",
             "laneTaken": "El carril Siempre ya tiene inicio.",
-            "intoLoopBody": "A un paso del bucle solo se llega desde el bucle."
+            "intoLoopBody": "A un paso del bucle solo se llega desde el bucle.",
+            "intoTryBody": "A un paso de un Intentar solo se llega desde su Intentar."
         },
         "alwaysStarts": "El carril Siempre empieza aquí.",
         "alwaysLeave": "Sacar del carril Siempre",
@@ -511,7 +520,8 @@
         "dataPinned": "Datos del disparador fijados",
         "pass": "Vuelta {number}",
         "attempt": "Intento {number}",
-        "went": "Salió: {port}"
+        "went": "Salió: {port}",
+        "recovered": "Recuperado"
     },
     "folders": {
         "all": "Todas",
@@ -574,7 +584,9 @@
         "waitEvent": "Pausa hasta que se anuncie un nombre o se agote el tiempo.",
         "run": "Inicia otra automatización con los valores que le das.",
         "answer": "Devuelve valores a la automatización que llamó.",
-        "announce": "Avisa a otras automatizaciones de que pasó algo."
+        "announce": "Avisa a otras automatizaciones de que pasó algo.",
+        "try": "Ejecuta los pasos de dentro y elige qué sigue a un fallo.",
+        "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -656,6 +668,18 @@
         "combineCount": "Si saltan varios",
         "combineHowMany": "Cuántos",
         "windowMinutes": "En minutos",
-        "whenCombined": "Estos inician juntos, dentro del plazo."
+        "whenCombined": "Estos inician juntos, dentro del plazo.",
+        "recover": "Marcar como recuperado",
+        "recoverOn": "Cuando acaban los pasos Si falla, la ejecución no termina como fallida.",
+        "recoverOff": "La ejecución acaba como fallida tras los pasos Si falla y Siempre.",
+        "tryErrorHint": "Si falla y Siempre leen lo que falló como {example}.",
+        "conditionWaitHint": "Se comprueba con cada anuncio de aquí y con el reloj. Lee un anuncio como {example}.",
+        "recheckEvery": "Comprobar cada",
+        "recheckRange": "Comprueba entre cada minuto y una vez al día.",
+        "builtInEvent": "Polaris también anuncia {name} cuando termina una automatización.",
+        "eventNameReserved": "Los nombres que empiezan por {prefix} son de Polaris.",
+        "useFinished": "Usarlo",
+        "outcomes": "Solo si termina como",
+        "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}."
     }
 }

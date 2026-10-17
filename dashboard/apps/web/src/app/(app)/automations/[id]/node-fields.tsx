@@ -55,8 +55,10 @@ export const STEP_TYPES = [
     "core.join",
     "core.forEach",
     "core.repeat",
+    "core.try",
     "core.wait",
     "core.waitEvent",
+    "core.waitCondition",
     "core.notify",
     "core.http",
     "core.chat",
@@ -105,6 +107,16 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.repeat": () => ({ kind: "times", count: 3 }),
     "core.stop": () => ({ as: "succeeded", reason: "" }),
     "core.waitEvent": () => ({ name: "", timeout: { amount: 1, unit: "hours" } }),
+    "core.try": () => ({ recover: false }),
+    "core.waitCondition": () => ({
+        condition: {
+            kind: "group",
+            join: "all",
+            items: [{ kind: "compare", left: "", op: "eq", right: "" }]
+        },
+        timeout: { amount: 1, unit: "hours" },
+        every: { amount: 5, unit: "minutes" }
+    }),
     "core.run": () => ({ automationId: "", inputs: [], wait: true }),
     "core.answer": () => ({ outputs: [] }),
     "core.announce": () => ({ name: "", payload: [] }),

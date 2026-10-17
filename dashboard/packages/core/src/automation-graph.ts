@@ -133,6 +133,34 @@ export const FINISHED_RUN_STATUSES = [
     "timedOut"
 ] as const satisfies readonly RunStatus[];
 
+/** How a run that had started can end: what "automation.finished" carries as its outcome. */
+export const FINISHED_EVENT_OUTCOMES = [
+    "succeeded",
+    "failed",
+    "stopped",
+    "cancelled",
+    "timedOut"
+] as const satisfies readonly RunStatus[];
+
+/**
+ * Which endings of another automation an "automation.finished" trigger or wait
+ * takes; empty takes every one. Ignored for any other event name.
+ */
+const finishedOutcomes = z
+    .array(z.enum(FINISHED_EVENT_OUTCOMES))
+    .max(FINISHED_EVENT_OUTCOMES.length)
+    .default([]);
+
+/** Whether an event, by name and payload, is one a trigger or wait with these outcomes takes. */
+export function takesOutcome(
+    name: string,
+    outcomes: readonly string[] | undefined,
+    payload: Record<string, unknown>
+): boolean {
+    if (name !== AUTOMATION_FINISHED_EVENT || !outcomes?.length) return true;
+    return outcomes.includes(String(payload.outcome));
+}
+
 export function runFinished(status: string): boolean {
     return (FINISHED_RUN_STATUSES as readonly string[]).includes(status);
 }
@@ -646,7 +674,7 @@ export const CORE_NODE_CONFIGS = {
     "core.http": httpConfigSchema,
     "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) }),
     "core.called": calledConfigSchema,
-    "core.onEvent": z.object({ name: eventName }),
+    "core.onEvent": z.object({ name: eventName, outcomes: finishedOutcomes }),
     "core.failed": z.object({
         /** Empty: any other automation on this shelf. */
         automations: z.array(z.string().uuid()).max(50).default([])
@@ -671,7 +699,8 @@ export const CORE_NODE_CONFIGS = {
         name: eventName,
         timeout: waitTimeout,
         /** Checked against the event as `event.*`; the wait goes on when it does not hold. */
-        filter: conditionTreeSchema.optional()
+        filter: conditionTreeSchema.optional(),
+        outcomes: finishedOutcomes
     }),
     "core.run": z.object({
         automationId: z.string().uuid(),

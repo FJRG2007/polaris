@@ -62,21 +62,30 @@ export async function emitAutomationEvent(type: string, input: EmitInput): Promi
     }
 }
 
-/** A trigger's own filter on top of its event type: which automations "An automation failed" watches. */
+/**
+ * A trigger's own filter on top of its event type: which automations "An
+ * automation failed" watches, and which endings an "automation.finished" one takes.
+ */
 export function acceptsEvent(
     type: string,
     state: unknown,
     payload: Record<string, unknown>,
     automationId: string
 ): boolean {
-    if (type !== "core.failed") return true;
-    if (payload.automationId === automationId) return false;
+    if (type !== "core.failed" && type !== "core.event") return true;
     let config: unknown = {};
     try {
         config = JSON.parse((state as { config?: string } | null)?.config ?? "{}");
     } catch {
-        return false;
+        return type === "core.event";
     }
+    if (type === "core.event") {
+        const parsed = core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(config);
+        if (!parsed.success) return true;
+        const inner = (payload.payload ?? {}) as Record<string, unknown>;
+        return core.takesOutcome(parsed.data.name, parsed.data.outcomes, inner);
+    }
+    if (payload.automationId === automationId) return false;
     const parsed = core.CORE_NODE_CONFIGS["core.failed"].safeParse(config);
     if (!parsed.success) return false;
     const watched = parsed.data.automations;

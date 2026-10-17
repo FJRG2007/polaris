@@ -600,3 +600,41 @@ describe("folders and tags", () => {
         ).toBe(false);
     });
 });
+
+describe("Try frames", () => {
+    it("frames the steps inside each Try, nested ones after the Try around them", () => {
+        const at = (entry: graph.GraphNode, x: number, y: number) => ({
+            ...entry,
+            position: { x, y }
+        });
+        const shaped: graph.AutomationGraph = {
+            ...graph.emptyGraph(),
+            nodes: [
+                at(node("t1", "core.manual"), 0, 0),
+                at(node("outer", "core.try"), 300, 0),
+                at(node("inner", "core.try"), 600, 0),
+                at(node("a", "core.notify", { title: "A", body: "" }), 900, 0),
+                at(node("b", "core.notify", { title: "B", body: "" }), 900, 200),
+                at(node("empty", "core.try"), 300, 400)
+            ],
+            edges: [
+                edge("t1", "outer"),
+                edge("outer", "inner", "body"),
+                edge("inner", "a", "body"),
+                edge("inner", "b", "then")
+            ]
+        };
+        const frames = canvas.tryFrames(shaped);
+        const pad = canvas.TRY_FRAME_PAD;
+        const height = canvas.canvasNodeHeight(node("b", "core.notify"));
+        expect(frames.map((frame) => frame.id)).toEqual(["outer", "inner"]);
+        expect(frames[0]).toEqual({
+            id: "outer",
+            x: 600 - pad.side,
+            y: 0 - pad.top,
+            width: 300 + canvas.CANVAS_NODE.width + pad.side * 2,
+            height: 200 + height + pad.top + pad.side
+        });
+        expect(frames[1]).toMatchObject({ x: 900 - pad.side, y: -pad.top });
+    });
+});
