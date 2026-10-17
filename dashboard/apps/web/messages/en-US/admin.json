@@ -2310,6 +2310,7 @@
             "inbox": "Inbox",
             "management": "Management",
             "crm": "CRM",
+            "automations": "Automations",
             "statusPages": "Status pages"
         },
         "permissions": {
@@ -2404,6 +2405,10 @@
             },
             "crm": {
                 "use": "Keep companies, people and deals"
+            },
+            "automations": {
+                "use": "Make automations that act for you",
+                "secrets": "Store secrets automations send"
             }
         }
     },

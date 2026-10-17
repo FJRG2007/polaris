@@ -84,6 +84,7 @@ secrets/
 # The directory itself has to be re-included - a rule inside one that is excluded
 # is never even looked at.
 !dashboard/apps/web/src/app/(app)/apps/runners/secrets/
+!dashboard/apps/web/src/app/(app)/automations/secrets/
 id_ed25519
 id_ed25519.pub
 known_hosts

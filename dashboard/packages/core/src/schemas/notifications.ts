@@ -751,6 +751,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "automations.message",
+        group: "system",
+        label: "Message from an automation",
+        description: "A Notify step in one of your automations sent you a message.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "system.update",
         group: "system",
         label: "Update available",

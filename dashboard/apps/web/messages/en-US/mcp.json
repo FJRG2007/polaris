@@ -59,6 +59,8 @@
         "mailserver_manage": "Run mail servers",
         "calendar_use": "See upcoming calendar events",
         "crm_use": "Read and change CRM records",
+        "automations_use": "Read and change automations",
+        "automations_secrets": "Store automation secrets",
         "status_manage": "Run status pages and their checks",
         "calendar_read": "See your calendars and events",
         "calendar_manage": "Create, change and delete events",

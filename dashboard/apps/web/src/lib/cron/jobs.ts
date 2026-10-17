@@ -792,6 +792,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
     },
     {
+        key: "automations",
+        // Every five seconds: a schedule, a webhook or a finished wait should not
+        // sit for a minute before its run starts. Free when nothing is due.
+        everyMs: 5_000,
+        // Unleased: admission takes the automations intake lease itself, and
+        // every run and step is claimed on its own row, so two passes at once
+        // only share the work.
+        leaseMs: null,
+        run: async () => (await import("@/lib/automations/job")).runAutomationsPass()
+    },
+    {
         key: "outbound-webhooks",
         // Every minute: the first retry of a signed webhook is due a minute after
         // the try that failed. Also drops log rows past their thirty days, and

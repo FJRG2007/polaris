@@ -11,6 +11,7 @@
  * about. Everything here is a type, so this module is shared by core and apps.
  */
 
+import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { McpSearchProvider } from "@/lib/mcp/search";
 import type { Locale, PendingAppLink } from "@polaris/core";
@@ -76,6 +77,13 @@ export interface AppExtension {
 
     /** The scheduled jobs it runs. They only run while it is installed. */
     readonly jobs?: () => readonly AppJob[];
+
+    /**
+     * The automation node types it contributes (triggers, conditions, actions).
+     * Import the implementations lazily inside: the registry loads every
+     * extension module on boot.
+     */
+    readonly automationNodes?: () => Promise<readonly AutomationServerNode[]>;
 
     /** The backup sources it provides, by resource kind. */
     readonly backupSources?: () => Readonly<Partial<Record<BackupSource["kind"], BackupSource>>>;

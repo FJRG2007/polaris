@@ -460,6 +460,10 @@
             "label": "Almacenamiento con nueva dirección",
             "description": "Un NAS tomó otra dirección en la red local y Polaris lo encontró y lo sigue. Solo llega a administradores."
         },
+        "automationsMessage": {
+            "label": "Mensaje de un automatismo",
+            "description": "Un paso Avisar de uno de tus automatismos te envió un mensaje."
+        },
         "webhookDisabled": {
             "label": "Se desactivó un webhook",
             "description": "Uno de tus webhooks falló cinco entregas seguidas, así que Polaris dejó de enviarle."

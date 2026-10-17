@@ -25,6 +25,8 @@ export const PERMISSIONS = [
     "mailserver.manage",
     "calendar.use",
     "crm.use",
+    "automations.use",
+    "automations.secrets",
     "status.manage",
     "chat.use",
     "chat.spaces",
@@ -104,6 +106,8 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "mail.use",
         "calendar.use",
         "crm.use",
+        "automations.use",
+        "automations.secrets",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -157,6 +161,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // What an organization's CRM lets somebody do is the organization's
         // roles, never this.
         "crm.use",
+        "automations.use",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -219,6 +224,10 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // Opening the CRM at all. A personal CRM is reached by this alone; an
     // organization's records are governed by that organization's roles.
     "crm.use": { area: "CRM", label: "Keep companies, people and deals" },
+    // An automation acts as whoever published it and is re-checked on every run,
+    // so this grants nothing the account could not already do by hand.
+    "automations.use": { area: "Automations", label: "Make automations that act for you" },
+    "automations.secrets": { area: "Automations", label: "Store secrets automations send" },
     // Status pages make Polaris dial addresses somebody typed, from inside the
     // network, and publish what it finds. Admin only, like adding a camera.
     "status.manage": { area: "Status pages", label: "Run status pages and their checks" },

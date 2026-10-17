@@ -9,6 +9,7 @@
  * Server-only.
  */
 
+import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import { withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
 import type { Locale } from "@polaris/core";
@@ -74,6 +75,20 @@ export function whileInstalled(
 }
 
 /** Every app's scheduled jobs, each running only while its app is installed. */
+/**
+ * The automation node types the installed apps contribute. An app that is not
+ * installed contributes none, so a run that reaches one of its nodes is refused.
+ */
+export async function appAutomationNodes(): Promise<AutomationServerNode[]> {
+    const lists = await Promise.all(
+        extensions().map(async (extension) => {
+            if (!extension.automationNodes || !(await isAppInstalled(extension.id))) return [];
+            return extension.automationNodes().catch(() => []);
+        })
+    );
+    return lists.flat();
+}
+
 export function appJobs(): AppJob[] {
     return extensions().flatMap((extension) =>
         (extension.jobs?.() ?? []).map((job) => ({

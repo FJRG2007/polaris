@@ -32,6 +32,9 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
+    automations       Automation[]       @relation("AutomationShelf")
+    automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
+    automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
     id            String   @id @default(uuid(7)) @db.Uuid
     // What this account is called wherever it appears. better-auth owns this
     // column, so it keeps its name - but it is a chosen label rather than a
@@ -6221,6 +6224,9 @@ model ConnectivityOutageMonth {
 // large they may get are administrator settings rather than schema (see
 // ORGANIZATION_POLICY in @polaris/core).
 model Organization {
+    automations       Automation[]
+    automationSecrets AutomationSecret[]
+    automationFolders AutomationFolder[]
     id          String   @id @default(uuid(7)) @db.Uuid
     // The handle in URLs. Unique across the instance and refused when it collides
     // with an account username, so /o/acme can never be ambiguous with a person.
@@ -14437,4 +14443,217 @@ model WireguardTunnel {
     @@unique([ownerId, slot])
     @@unique([hostname])
     @@index([applicationId])
+}
+// ---------------------------------------------------------------------------
+// Central automations (apps/web/src/lib/automations). One engine for every app:
+// a graph of typed nodes, published as immutable versions, run durably - every
+// step is a row, every wait is a row with a due time - so an Update never loses
+// or doubles a step.
+// ---------------------------------------------------------------------------
+
+// One automation on a shelf: an organization's (orgId) or one account's (userId), never both.
+model Automation {
+    id                 String    @id @default(uuid(7)) @db.Uuid
+    orgId              String?   @db.Uuid
+    userId             String?   @db.Uuid
+    name               String
+    description        String    @default("")
+    folderId           String?   @db.Uuid
+    tags               String[]  @default([])
+    enabled            Boolean   @default(false)
+    // The graph being edited (automationGraphSchema). Never run by a live trigger.
+    draft              Json
+    draftUpdatedAt     DateTime  @default(now())
+    publishedVersionId String?   @db.Uuid
+    // Whoever last published it: it runs as them, re-checked on every run. No FK,
+    // it outlives them and stops running then.
+    runAsId            String?   @db.Uuid
+    // single | restart | queued | parallel
+    mode               String    @default("single")
+    maxRuns            Int       @default(10)
+    // Runs per ten minutes.
+    rateLimit          Int       @default(20)
+    // Whether its HTTP steps may reach private LAN ranges. Off unless an administrator turns it on.
+    allowLocalNetwork  Boolean   @default(false)
+    // The app that made it (null for core) and what in that app it belongs to.
+    origin             String?
+    originRef          String?
+    // "place:<id>", "crm:<id>", ... for a row moved from an app's own engine.
+    legacyRef          String?   @unique
+    lastRunAt          DateTime?
+    lastStatus         String?
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
+
+    org      Organization?       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user     User?               @relation("AutomationShelf", fields: [userId], references: [id], onDelete: Cascade)
+    versions AutomationVersion[]
+    triggers AutomationTrigger[]
+    runs     AutomationRun[]
+
+    @@index([orgId, updatedAt])
+    @@index([userId, updatedAt])
+    @@index([origin, originRef])
+}
+
+// A published graph. Immutable.
+model AutomationVersion {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    automationId String   @db.Uuid
+    number       Int
+    graph        Json
+    name         String?
+    savedById    String?  @db.Uuid
+    createdAt    DateTime @default(now())
+
+    automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@unique([automationId, number])
+}
+
+// One armed trigger of the published version, derived on publish so an event
+// finds the automations it starts by index instead of by reading every graph.
+model AutomationTrigger {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    automationId String    @db.Uuid
+    versionId    String    @db.Uuid
+    nodeId       String
+    eventType    String
+    subjectKey   String?
+    nextDueAt    DateTime?
+    state        Json?
+    // SHA-256 of a webhook trigger's address token.
+    hookHash     String?   @unique
+    createdAt    DateTime  @default(now())
+
+    automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@unique([automationId, nodeId])
+    @@index([eventType, subjectKey])
+    @@index([nextDueAt])
+}
+
+// The outbox: an event something in Polaris said happened, kept until the engine
+// has matched it, so a restart between the write and the match loses nothing.
+model AutomationEvent {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    type         String
+    orgId        String?   @db.Uuid
+    userId       String?   @db.Uuid
+    subjectKey   String?
+    payload      Json
+    dedupeKey    String?
+    depth        Int       @default(0)
+    originRunId  String?   @db.Uuid
+    createdAt    DateTime  @default(now())
+    claimedUntil DateTime?
+    processedAt  DateTime?
+
+    @@unique([type, dedupeKey])
+    @@index([processedAt, createdAt])
+}
+
+model AutomationRun {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    automationId  String    @db.Uuid
+    versionId     String    @db.Uuid
+    // queued | running | waiting | succeeded | failed | stopped | cancelled | refused | limited | skipped | timedOut
+    status        String
+    triggerNodeId String
+    cause         Json
+    // Unique per automation, so an event or a due time processed twice starts one run.
+    firingKey     String
+    depth         Int       @default(0)
+    parentRunId   String?   @db.Uuid
+    parentStepId  String?   @db.Uuid
+    test          Boolean   @default(false)
+    // none | pending | done | failed: the Finally lane.
+    finally       String    @default("none")
+    // How the main flow ended, kept while the Finally lane runs.
+    outcome       String?
+    lockedUntil   DateTime?
+    lockToken     String?
+    dueAt         DateTime?
+    stepCount     Int       @default(0)
+    bytes         Int       @default(0)
+    error         String?
+    queuedAt      DateTime  @default(now())
+    startedAt     DateTime?
+    finishedAt    DateTime?
+
+    automation Automation       @relation(fields: [automationId], references: [id], onDelete: Cascade)
+    steps      AutomationStep[]
+
+    @@unique([automationId, firingKey])
+    @@index([automationId, queuedAt])
+    @@index([status, dueAt])
+    @@index([parentRunId])
+}
+
+model AutomationStep {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    runId       String    @db.Uuid
+    nodeId      String
+    // "0" in the main flow, "f" in the Finally lane; container paths later.
+    iteration   String    @default("0")
+    attempt     Int       @default(1)
+    // ready | running | waiting | ok | failed | skipped | refused | timedOut | interrupted
+    status      String
+    // The port the step left by, once it has.
+    port        String?
+    input       Json?
+    output      Json?
+    error       String?
+    waitUntil   DateTime?
+    waitKey     String?
+    lockedUntil DateTime?
+    createdAt   DateTime  @default(now())
+    startedAt   DateTime?
+    finishedAt  DateTime?
+
+    run AutomationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+    @@unique([runId, nodeId, iteration, attempt])
+    @@index([runId, status])
+    @@index([status, waitUntil])
+    @@index([waitKey])
+}
+
+// A credential an automation uses: write-only, envelope encrypted; the hint is
+// all any screen shows.
+model AutomationSecret {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    orgId       String?   @db.Uuid
+    userId      String?   @db.Uuid
+    name        String
+    // url | token | basic | header
+    kind        String
+    hint        String
+    encrypted   Bytes
+    nonce       Bytes
+    keyId       String?
+    createdById String?   @db.Uuid
+    lastUsedAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("AutomationSecretShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([orgId])
+    @@index([userId])
+}
+
+model AutomationFolder {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String?  @db.Uuid
+    userId    String?  @db.Uuid
+    name      String
+    parentId  String?  @db.Uuid
+    createdAt DateTime @default(now())
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("AutomationFolderShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([orgId])
+    @@index([userId])
 }
