@@ -201,6 +201,11 @@ export interface CallAudioReport {
      *  which is better than inventing a step. */
     readonly fix: string;
     readonly lines: readonly CallAudioLine[];
+    /** What the verdict was reached from, so a screen that says other things
+     *  about the call can tell which of them this one explains. Absent before
+     *  anything was checked. */
+    readonly link?: CallLink;
+    readonly mic?: MicSending;
 }
 
 /**
@@ -228,6 +233,15 @@ export function settlingFor(everHeard: boolean, farEnd: boolean): number {
     if (!farEnd) return 10_000;
     return everHeard ? 10_000 : 45_000;
 }
+
+/**
+ * What the call says once the client has given up on the call server.
+ *
+ * Kept here, beside the verdicts, because the call screen has to recognise it:
+ * every other line about the microphone or the far end is a consequence of it.
+ */
+export const SERVER_LOST =
+    "This call lost the call server. Nothing more will be heard until it is back.";
 
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
@@ -379,7 +393,9 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         farEnd,
         headline,
         fix,
-        lines
+        lines,
+        link: facts.link,
+        mic: facts.mic
     });
     /** The same, for something that is happening at the other end. Nothing here
      *  is wrong, so it is drawn as a note rather than as an alarm. */
@@ -389,7 +405,9 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         farEnd: true,
         headline,
         fix,
-        lines
+        lines,
+        link: facts.link,
+        mic: facts.mic
     });
 
     if (facts.link === "lost") {
@@ -520,5 +538,14 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         );
     }
 
-    return { ok: true, blame: "fault", farEnd: false, headline: "", fix: "", lines };
+    return {
+        ok: true,
+        blame: "fault",
+        farEnd: false,
+        headline: "",
+        fix: "",
+        lines,
+        link: facts.link,
+        mic: facts.mic
+    };
 }

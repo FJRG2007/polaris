@@ -116,6 +116,7 @@ import {
 import {
     carriedSound,
     diagnoseCall,
+    SERVER_LOST,
     settlingFor,
     UNKNOWN_AUDIO,
     type CallAudioFacts,
@@ -240,6 +241,7 @@ const CONNECTED = "connected" as Room["state"];
 const CONNECTING = "connecting" as Room["state"];
 const RECONNECTING = "reconnecting" as Room["state"];
 const SIGNAL_RECONNECTING = "signalReconnecting" as Room["state"];
+const DISCONNECTED = "disconnected" as Room["state"];
 
 /**
  * How often the call is asked whether sound is actually flowing.
@@ -1805,9 +1807,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     }
                     setRemote(new Map());
                     setScreens(new Map());
-                    report(
-                        "This call lost the call server. Nothing more will be heard until it is back."
-                    );
+                    report(SERVER_LOST);
                 });
 
             /**
@@ -3832,6 +3832,15 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
     }, [meeting, participantId, repairMic, say, setVoiceEnabled]);
 
+    const rejoinCall = useCallback(() => {
+        const held = room.current;
+        // A room that is connected, or still being retried by the client, is
+        // left to it: a second join under the same identity closes the first.
+        if (held && held.state !== DISCONNECTED) return;
+        room.current = null;
+        rejoin.current?.();
+    }, []);
+
     return {
         meeting,
         participantId,
@@ -3882,6 +3891,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         screenLevel,
         setCameraQuality,
         setScreenQuality,
+        rejoin: rejoinCall,
         toggleMic,
         toggleCamera,
         toggleShare,

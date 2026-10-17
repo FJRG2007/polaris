@@ -17,18 +17,15 @@
 import { AlertTriangle, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { measureVoice } from "./voice-level";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useVoiceSettings } from "./voice-settings";
 import { dismissNoAudio, NO_AUDIO_START, watchNoAudio, type NoAudioWatch } from "./no-audio";
 
 /** How often the level is read. */
 const SAMPLE_MS = 500;
 
-export function NoAudioNotice({
-    track,
-    device,
-    micOn
-}: {
+/** What the microphone is doing, as the watch below needs it. */
+export interface NoAudioSource {
     /** What is actually going out, or null when there is no microphone. */
     track: MediaStreamTrack | null;
     /** The microphone itself. The same object as `track` unless a noise filter
@@ -36,8 +33,20 @@ export function NoAudioNotice({
     device: MediaStreamTrack | null;
     /** Whether the reader wants to be heard. Muted is not a fault. */
     micOn: boolean;
-}) {
-    const t = useTranslations("chat");
+}
+
+/**
+ * Whether the microphone has been picking nothing up for long enough to say so,
+ * and the way to close the warning.
+ *
+ * A hook of its own so the call screen can weigh it against everything else the
+ * call has to say - see `call-notices` - rather than drawing it as one more
+ * banner.
+ */
+export function useNoAudioWarning({ track, device, micOn }: NoAudioSource): {
+    readonly warning: boolean;
+    readonly dismiss: () => void;
+} {
     const [voice] = useVoiceSettings();
     const [watch, setWatch] = useState<NoAudioWatch>(NO_AUDIO_START);
     const source = device ?? track;
@@ -97,19 +106,25 @@ export function NoAudioNotice({
         };
     }, [voice.noAudioWarning, micOn, track, source]);
 
-    if (!watch.warning) return null;
+    const dismiss = useCallback(() => setWatch(dismissNoAudio), []);
+    return { warning: watch.warning, dismiss };
+}
+
+/** The same warning drawn on its own, for a screen that has nothing else to say. */
+export function NoAudioNotice(source: NoAudioSource) {
+    const t = useTranslations("chat");
+    const { warning, dismiss } = useNoAudioWarning(source);
+    if (!warning) return null;
     return (
         <p
             role="status"
             className="flex shrink-0 items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-ink"
         >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1">
-                {t("noAudio.yourMicrophoneHasNotPicked")}
-            </span>
+            <span className="min-w-0 flex-1">{t("noAudio.yourMicrophoneHasNotPicked")}</span>
             <button
                 type="button"
-                onClick={() => setWatch(dismissNoAudio)}
+                onClick={dismiss}
                 aria-label={t("noAudio.dismiss")}
                 title={t("noAudio.dismiss")}
                 className="-m-1 shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"

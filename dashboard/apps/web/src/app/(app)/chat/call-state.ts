@@ -158,6 +158,15 @@ export interface CallState {
     /** The camera's light, colour and framing - see `camera-look`. */
     readonly look: CameraLook;
     setLook: (patch: Partial<CameraLook>) => void;
+    /**
+     * Join the call server again, after the client has given up on it.
+     *
+     * The room it gave up on is kept, and a kept room is what stops every later
+     * attempt from starting - so without this, "nothing more will be heard" was
+     * true until the reader left the call. Does nothing while a room is still
+     * connected or trying to be.
+     */
+    rejoin: () => void;
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;
