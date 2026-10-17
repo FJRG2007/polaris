@@ -55,14 +55,26 @@ function refresh(automationId?: string): void {
     if (automationId) revalidatePath(`/automations/${automationId}`);
 }
 
-export async function listAutomationsAction(): Promise<
+/** Narrows the list to what one app made, and optionally to one thing of it. */
+const originFilter = z
+    .object({
+        origin: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+        originRef: z.string().min(1).max(120).nullish()
+    })
+    .strict();
+
+export async function listAutomationsAction(
+    from?: unknown
+): Promise<
     Result<{ rows: service.AutomationRow[]; canEdit: boolean; folders: organize.FolderRow[] }>
 > {
+    const filter = originFilter.optional().safeParse(from ?? undefined);
+    if (!filter.success) return invalid();
     try {
         const who = await actor();
         const shelf = await openShelf(who);
         const [list, folders] = await Promise.all([
-            service.listAutomations(who, shelf),
+            service.listAutomations(who, shelf, filter.data),
             organize.listFolders(who, shelf)
         ]);
         return { ok: true, ...list, folders };

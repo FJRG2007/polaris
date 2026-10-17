@@ -6,6 +6,7 @@
         "emptyTitle": "No automations yet",
         "emptyDescription": "Start one with a trigger, then add what it should do.",
         "emptyReadOnly": "Nothing here yet. An organization admin can add one.",
+        "emptyFromApp": "None here yet. Start one from a template above.",
         "loadFailed": "The automations could not be loaded.",
         "retry": "Try again",
         "draft": "Draft",

@@ -57,7 +57,9 @@ vi.mock("@polaris/db", () => ({
             },
             findUnique: async (args: { where: { id: string } }) => {
                 const row = state.rows.find((each) => each.id === args.where.id);
-                return row ? { movedToId: row.movedToId } : null;
+                if (!row) return null;
+                const { createdAt: _at, ...rest } = row;
+                return { ...rest };
             }
         }
     }
@@ -121,6 +123,37 @@ beforeEach(() => {
     state.imports = [];
     state.failNext = false;
     vi.spyOn(console, "error").mockImplementation(() => undefined);
+});
+
+describe("moveAutomationNow", () => {
+    it("moves one row at once and answers its central id", async () => {
+        state.rows = [row("a1", 1), row("a2", 2)];
+        const id = await move.moveAutomationNow("a2");
+        expect(id).toBe("00000000-0000-4000-8000-000000000001");
+        expect(state.rows.map((each) => each.movedToId)).toEqual([null, id]);
+        expect(state.imports).toHaveLength(1);
+        expect(state.imports[0]).toMatchObject({ legacyRef: "place:a2", origin: "home", originRef: PLACE });
+    });
+
+    it("answers the twin of a row already moved, importing nothing", async () => {
+        state.rows = [row("a1", 1, { movedToId: "00000000-0000-4000-8000-000000000042" })];
+        expect(await move.moveAutomationNow("a1")).toBe("00000000-0000-4000-8000-000000000042");
+        expect(state.imports).toEqual([]);
+    });
+
+    it("answers null for a row it cannot convert or cannot find, and leaves it here", async () => {
+        state.rows = [row("bad", 1, { definition: { triggers: "nope" } })];
+        expect(await move.moveAutomationNow("bad")).toBeNull();
+        expect(await move.moveAutomationNow("missing")).toBeNull();
+        expect(state.rows[0]!.movedToId).toBeNull();
+    });
+
+    it("answers null when the import fails, for the tick to retry", async () => {
+        state.rows = [row("a1", 1)];
+        state.failNext = true;
+        expect(await move.moveAutomationNow("a1")).toBeNull();
+        expect(state.rows[0]!.movedToId).toBeNull();
+    });
 });
 
 describe("movePlaceAutomations", () => {
@@ -219,5 +252,18 @@ describe("movePlaceAutomations", () => {
         ]);
         expect(await move.legacyRuns("place:other")).toEqual([]);
         expect(await move.legacyRuns("crm:a1")).toEqual([]);
+    });
+});
+
+describe("automationHref", () => {
+    it("opens a moved automation where it now runs, and an unmoved one here", async () => {
+        const { automationHref } = await import("@polaris-app/places/src/lib/automation-kinds");
+        const central = "00000000-0000-4000-8000-000000000007";
+        expect(automationHref({ id: "a1", movedTo: central })).toBe(`/automations/${central}`);
+        expect(automationHref({ id: "a1", movedTo: central }, "runs")).toBe(
+            `/automations/runs?automation=${central}`
+        );
+        expect(automationHref({ id: "a1", movedTo: null })).toBe("/places/devices/automations/a1");
+        expect(automationHref({ id: "a1" }, "runs")).toBe("/places/devices/automations/a1?tab=runs");
     });
 });

@@ -2048,6 +2048,8 @@
         },
         "list": {
             "intro": "Lo que este sitio hace solo. Cada una actúa como quien la guardó por última vez.",
+            "unmovedTitle": "Sin mover todavía",
+            "unmovedHint": "Siguen funcionando aquí. Pasarán a la lista de arriba cuando puedan.",
             "new": "Crear nueva",
             "blank": "Empezar vacía",
             "emptyTitle": "Sin automatizaciones",

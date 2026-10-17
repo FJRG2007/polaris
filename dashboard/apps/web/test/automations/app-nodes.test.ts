@@ -138,6 +138,10 @@ describe("importLegacyAutomation", () => {
         expect(fake().tables.automationVersion).toHaveLength(1);
         expect(await bridge.automationForLegacy("fixture:one")).toBe(id);
         expect(await bridge.automationsForLegacy(["fixture:one", "fixture:none"])).toEqual({ "fixture:one": id });
+        expect(await bridge.legacySummaries(["fixture:one", "fixture:none"])).toEqual({
+            "fixture:one": { id, name: "Moved", enabled: true, lastRunAt: null, lastStatus: null }
+        });
+        expect(await bridge.legacySummaries([])).toEqual({});
     });
 
     it("refuses a graph that is not one", async () => {

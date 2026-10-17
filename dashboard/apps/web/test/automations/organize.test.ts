@@ -113,3 +113,20 @@ describe("tags", () => {
         ]);
     });
 });
+
+describe("listAutomations, narrowed to what an app made", () => {
+    it("lists only that app's automations, and only of the one thing named", async () => {
+        const plain = await seed();
+        const ours = await seed();
+        const other = await seed();
+        const rows = fake().tables.automation!;
+        Object.assign(rows.find((row) => row.id === ours)!, { origin: "home", originRef: "p1" });
+        Object.assign(rows.find((row) => row.id === other)!, { origin: "home", originRef: "p2" });
+        const ids = async (from?: { origin: string; originRef?: string | null }) =>
+            (await service.listAutomations(actor, mine, from)).rows.map((row) => row.id).sort();
+        expect(await ids()).toEqual([plain, ours, other].sort());
+        expect(await ids({ origin: "home", originRef: "p1" })).toEqual([ours]);
+        expect(await ids({ origin: "home" })).toEqual([ours, other].sort());
+        expect(await ids({ origin: "crm" })).toEqual([]);
+    });
+});

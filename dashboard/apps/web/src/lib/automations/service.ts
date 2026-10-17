@@ -59,13 +59,25 @@ export interface AutomationRow {
     readonly tags: readonly string[];
 }
 
+/** The app an automation came from, and the thing of that app it belongs to - a place. */
+export interface OriginFilter {
+    readonly origin: string;
+    readonly originRef?: string | null;
+}
+
 export async function listAutomations(
     actor: RunActor,
-    shelf: Shelf
+    shelf: Shelf,
+    from?: OriginFilter
 ): Promise<{ rows: AutomationRow[]; canEdit: boolean }> {
     if (!(await mayReadShelf(actor, shelf))) return { rows: [], canEdit: false };
     const rows = await prisma.automation.findMany({
-        where: shelfWhere(shelf),
+        where: {
+            ...shelfWhere(shelf),
+            ...(from
+                ? { origin: from.origin, ...(from.originRef ? { originRef: from.originRef } : {}) }
+                : {})
+        },
         orderBy: { updatedAt: "desc" },
         take: L.perShelf,
         select: {

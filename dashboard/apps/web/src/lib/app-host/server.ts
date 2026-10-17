@@ -514,6 +514,7 @@ export const serverHost = {
         automationsForLegacy: later(load.automations, "automationsForLegacy"),
         fireAppTrigger: later(load.automations, "fireAppTrigger"),
         importLegacyAutomation: later(load.automations, "importLegacyAutomation"),
+        legacySummaries: later(load.automations, "legacySummaries"),
         StepError,
         StepRefusal,
         wakeAppWaits: later(load.automations, "wakeAppWaits")

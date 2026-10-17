@@ -481,7 +481,9 @@ export function AutomationEditor({
         );
         setAttempted(false);
         setNotice(t("automations.editor.saved"));
-        if (!automationId) router.replace(`/places/devices/automations/${result.automation.id}`);
+        // Moved on save: from here on it is edited where it now runs.
+        if (result.automation.movedTo) router.replace(auto.automationHref(result.automation));
+        else if (!automationId) router.replace(auto.automationHref(result.automation));
         return true;
     };
 

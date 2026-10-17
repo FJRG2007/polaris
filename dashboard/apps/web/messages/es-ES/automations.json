@@ -6,6 +6,7 @@
         "emptyTitle": "Aún no hay automatismos",
         "emptyDescription": "Empieza con un disparador y añade lo que debe hacer.",
         "emptyReadOnly": "Nada aún. Un admin de la organización puede crear uno.",
+        "emptyFromApp": "Aún no hay ninguno. Empieza con una plantilla.",
         "loadFailed": "No se pudieron cargar los automatismos.",
         "retry": "Reintentar",
         "draft": "Borrador",

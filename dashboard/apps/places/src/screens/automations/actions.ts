@@ -27,6 +27,7 @@ import { guard } from "../../lib/action-guard";
 import * as auto from "../../lib/automation-kinds";
 import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
+import { moveAutomationNow } from "../../lib/automation-move";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import type { FloorView, RoomView } from "../../lib/room-kinds";
@@ -193,7 +194,12 @@ export async function saveAutomationAction(
         targetId: result.value?.id ?? "",
         metadata: { name: parsed.data.name }
     });
-    return { automation: result.value };
+    // Saved here, then moved at once: what was just made runs on the central
+    // engine, and its screen is there. One that cannot move stays here.
+    const saved = result.value;
+    if (!saved) return { automation: saved };
+    const movedTo = await moveAutomationNow(saved.id).catch(() => null);
+    return { automation: movedTo ? { ...saved, movedTo } : saved };
 }
 
 export async function setAutomationEnabledAction(

@@ -24,48 +24,84 @@ const BATCH = 25;
 /** Rows that could not be converted, said once per process rather than every minute. */
 const reported = new Set<string>();
 
+interface MovableRow {
+    readonly id: string;
+    readonly placeId: string;
+    readonly ownerId: string;
+    readonly name: string;
+    readonly enabled: boolean;
+    readonly definition: unknown;
+}
+
+const MOVABLE = {
+    id: true,
+    placeId: true,
+    ownerId: true,
+    name: true,
+    enabled: true,
+    definition: true
+} as const;
+
+/** Move one row; the central id, or null when it stays here (said in the log). */
+async function moveRow(row: MovableRow): Promise<string | null> {
+    const converted = convertPlaceAutomation(row);
+    if (!converted.ok) {
+        if (!reported.has(row.id)) {
+            reported.add(row.id);
+            console.error(
+                `places: automation ${row.id} stays on the Places engine: it could not be converted (${converted.reason})`
+            );
+        }
+        return null;
+    }
+    try {
+        const centralId = await host.automations.importLegacyAutomation({
+            legacyRef: `${LEGACY_PREFIX}${row.id}`,
+            name: row.name,
+            enabled: row.enabled,
+            ownerId: row.ownerId,
+            origin: "home",
+            originRef: row.placeId,
+            // What Places always did: a firing while a run is going starts beside it.
+            mode: "parallel",
+            graph: converted.graph
+        });
+        await prisma.placeAutomation.updateMany({
+            where: { id: row.id, movedToId: null },
+            data: { movedToId: centralId }
+        });
+        return centralId;
+    } catch (error) {
+        console.error(`places: automation ${row.id} could not be moved yet:`, error);
+        return null;
+    }
+}
+
 /** Move the next few. Returns how many moved. */
 export async function movePlaceAutomations(): Promise<number> {
     const rows = await prisma.placeAutomation.findMany({
         where: { movedToId: null },
         orderBy: { createdAt: "asc" },
         take: BATCH,
-        select: { id: true, placeId: true, ownerId: true, name: true, enabled: true, definition: true }
+        select: MOVABLE
     });
     let moved = 0;
-    for (const row of rows) {
-        const converted = convertPlaceAutomation(row);
-        if (!converted.ok) {
-            if (!reported.has(row.id)) {
-                reported.add(row.id);
-                console.error(
-                    `places: automation ${row.id} stays on the Places engine: it could not be converted (${converted.reason})`
-                );
-            }
-            continue;
-        }
-        try {
-            const centralId = await host.automations.importLegacyAutomation({
-                legacyRef: `${LEGACY_PREFIX}${row.id}`,
-                name: row.name,
-                enabled: row.enabled,
-                ownerId: row.ownerId,
-                origin: "home",
-                originRef: row.placeId,
-                // What Places always did: a firing while a run is going starts beside it.
-                mode: "parallel",
-                graph: converted.graph
-            });
-            const marked = await prisma.placeAutomation.updateMany({
-                where: { id: row.id, movedToId: null },
-                data: { movedToId: centralId }
-            });
-            moved += marked.count;
-        } catch (error) {
-            console.error(`places: automation ${row.id} could not be moved yet:`, error);
-        }
-    }
+    for (const row of rows) if (await moveRow(row)) moved += 1;
     return moved;
+}
+
+/**
+ * Move one row now - one just written from this app's screen, so the person who
+ * made it lands on the automation it is, rather than on one the next tick moves.
+ * The central id, or null when it stays here (the tick tries again).
+ */
+export async function moveAutomationNow(id: string): Promise<string | null> {
+    const row = await prisma.placeAutomation.findUnique({
+        where: { id },
+        select: { ...MOVABLE, movedToId: true }
+    });
+    if (!row) return null;
+    return row.movedToId ?? moveRow(row);
 }
 
 /** Where an old automation's screen went: its central twin, or null while it has none. */

@@ -1990,6 +1990,8 @@
         "web/src/lib/orgs/quotas.ts",
         "web/src/app/(app)/automations/[id]/automation-editor.tsx",
         "web/src/app/(app)/automations/[id]/page.tsx",
+        "web/src/app/(app)/automations/embedded-list.tsx",
+        "web/src/components/i18n/client-namespaces.tsx",
         "web/src/app/(app)/automations/actions.ts",
         "web/src/app/(app)/automations/automations-list.tsx",
         "web/src/app/(app)/automations/layout.tsx",

@@ -243,3 +243,43 @@ export async function automationsForLegacy(
     });
     return Object.fromEntries(rows.map((row) => [row.legacyRef!, row.id]));
 }
+
+/** What an app's own list shows of a moved automation, read where it now lives. */
+export interface LegacySummary {
+    readonly id: string;
+    readonly name: string;
+    readonly enabled: boolean;
+    readonly lastRunAt: string | null;
+    readonly lastStatus: string | null;
+}
+
+/** The central side of many moved rows at once, by `legacyRef`. */
+export async function legacySummaries(
+    legacyRefs: readonly string[]
+): Promise<Record<string, LegacySummary>> {
+    const refs = z.array(z.string().min(3).max(120)).max(1000).parse(legacyRefs);
+    if (refs.length === 0) return {};
+    const rows = await prisma.automation.findMany({
+        where: { legacyRef: { in: refs } },
+        select: {
+            id: true,
+            legacyRef: true,
+            name: true,
+            enabled: true,
+            lastRunAt: true,
+            lastStatus: true
+        }
+    });
+    return Object.fromEntries(
+        rows.map((row) => [
+            row.legacyRef!,
+            {
+                id: row.id,
+                name: row.name,
+                enabled: row.enabled,
+                lastRunAt: row.lastRunAt?.toISOString() ?? null,
+                lastStatus: row.lastStatus
+            }
+        ])
+    );
+}

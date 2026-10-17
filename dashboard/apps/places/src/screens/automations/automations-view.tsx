@@ -13,16 +13,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { History, Loader2, Play, Plus, Trash2, Workflow } from "lucide-react";
+import { History, Loader2, Play, Plus, Trash2 } from "lucide-react";
 import {
     Button,
     ConfirmDeleteDialog,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger,
-    EmptyState,
-    Skeleton
+    DropdownMenuTrigger
 } from "@polaris/ui";
 import * as rules from "@polaris/ui/automation-rules";
 import { automationsCacheKey, dropAutomationsCache } from "./cache";
@@ -37,6 +35,7 @@ import type { RoomView } from "../../lib/room-kinds";
 const { runAction } = hostUi.runAction;
 const { RelativeTime } = hostUi.relativeTime;
 const { readSnapshot, writeSnapshot } = hostUi.snapshotCache;
+const { AutomationsList } = hostUi.automationsList;
 
 /** How long a copy of the list is good for painting from. */
 const CACHE_MS = 30_000;
@@ -88,7 +87,12 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
 
     const shown = useMemo(
         () =>
-            listing ? listing.automations.filter((automation) => !hidden.has(automation.id)) : [],
+            // A moved one is in the central list above, where it now runs.
+            listing
+                ? listing.automations.filter(
+                      (automation) => !automation.movedTo && !hidden.has(automation.id)
+                  )
+                : [],
         [listing, hidden]
     );
 
@@ -231,24 +235,16 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                 </p>
             )}
 
-            {listing === null ? (
-                <div className="flex flex-col gap-2" aria-busy="true">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                </div>
-            ) : shown.length === 0 ? (
-                <EmptyState
-                    icon={<Workflow className="size-5" />}
-                    title={t("automations.list.emptyTitle")}
-                    description={
-                        canManage
-                            ? t("automations.list.emptyManage")
-                            : t("automations.list.emptyView")
-                    }
-                    action={newMenu ?? undefined}
-                />
-            ) : (
+            <AutomationsList from={{ origin: "home", originRef: placeId }} />
+
+            {shown.length > 0 && (
+                <section className="flex flex-col gap-2" aria-labelledby="places-unmoved">
+                    <h2 id="places-unmoved" className="text-sm font-medium">
+                        {t("automations.list.unmovedTitle")}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                        {t("automations.list.unmovedHint")}
+                    </p>
                 <rules.RuleList>
                     {shown.map((automation) => {
                         const busy = pending[automation.id];
@@ -271,7 +267,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                 }
                                 open={({ className, children }) => (
                                     <Link
-                                        href={`/places/devices/automations/${automation.id}`}
+                                        href={auto.automationHref(automation)}
                                         className={className}
                                     >
                                         {children}
@@ -318,7 +314,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                                             title={t("automations.list.log")}
                                         >
                                             <Link
-                                                href={`/places/devices/automations/${automation.id}?tab=runs`}
+                                                href={auto.automationHref(automation, "runs")}
                                             >
                                                 <History className="size-4" />
                                             </Link>
@@ -360,6 +356,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                         );
                     })}
                 </rules.RuleList>
+                </section>
             )}
 
             <ConfirmDeleteDialog

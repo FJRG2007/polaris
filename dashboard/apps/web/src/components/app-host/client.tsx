@@ -115,6 +115,16 @@ const QRCodeSVG = dynamic(() => import("qrcode.react").then((module) => module.Q
     ssr: false
 });
 
+/** The automations list, for an app's screen that shows the automations it made.
+ *  Carries the automation actions and core's graph helpers, so loaded there. */
+const AutomationsList = dynamic(
+    () =>
+        import("@/app/(app)/automations/embedded-list").then(
+            (module) => module.EmbeddedAutomationsList
+        ),
+    { ssr: false }
+);
+
 /** Server actions, loaded when first called rather than bundled with every page. */
 type AccessActions = typeof import("@/app/(app)/apps/installed/[id]/access-actions");
 const accessActions = () => import("@/app/(app)/apps/installed/[id]/access-actions");
@@ -143,6 +153,7 @@ export const clientHost = {
     },
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
     appFavorites: { refreshAppFavorites },
+    automationsList: { AutomationsList },
     avatar: { Avatar },
     brandIcons: { TpLinkMark },
     confirmDialog: { useConfirm },
