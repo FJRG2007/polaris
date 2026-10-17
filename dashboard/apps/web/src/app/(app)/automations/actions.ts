@@ -147,10 +147,14 @@ async function problemError(
     fallback: "invalid" | "notReady"
 ): Promise<string> {
     const t = await getTranslations("automations");
-    const named = problems.find(
-        (problem) => problem.code === "loopBodyLeaks" || problem.code === "callCycle"
+    const named = problems.find((problem) =>
+        ["loopBodyLeaks", "tryBodyLeaks", "scopeTooDeep", "callCycle"].includes(problem.code)
     );
-    return t(`errors.${named?.code ?? fallback}`);
+    if (named?.code === "scopeTooDeep")
+        return t("errors.scopeTooDeep", { max: core.AUTOMATION_LIMITS.scopeDepth });
+    return t(
+        `errors.${(named?.code ?? fallback) as "loopBodyLeaks" | "tryBodyLeaks" | "callCycle" | typeof fallback}`
+    );
 }
 
 export async function saveDraftAction(automationId: unknown, graph: unknown): Promise<Result> {

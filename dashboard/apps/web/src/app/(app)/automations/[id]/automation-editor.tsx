@@ -1275,7 +1275,7 @@ function NodeCard({
             {step.body ? (
                 <div className="space-y-2 border-t border-border p-3 pl-4 sm:pl-6">
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        {portLabel(t, step.node, "each")}
+                        {portLabel(t, step.node, core.bodyPort(step.node.type) ?? "each")}
                     </p>
                     <NodeList
                         nodes={step.body}
@@ -1287,6 +1287,37 @@ function NodeCard({
                         readOnly={readOnly}
                         onChanged={onChanged}
                     />
+                </div>
+            ) : null}
+            {step.node.type === "core.try" ? (
+                <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        {portLabel(t, step.node, "catch")}
+                    </p>
+                    <NodeList
+                        nodes={step.onError ?? []}
+                        onChange={(onError) => onChange({ ...step, onError })}
+                        types={STEP_TYPES}
+                        addLabel={t("editor.addStep")}
+                        detail={detail}
+                        secrets={secrets}
+                        readOnly={readOnly}
+                        onChanged={onChanged}
+                    />
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        {portLabel(t, step.node, "always")}
+                    </p>
+                    <NodeList
+                        nodes={step.always ?? []}
+                        onChange={(always) => onChange({ ...step, always })}
+                        types={STEP_TYPES}
+                        addLabel={t("editor.addStep")}
+                        detail={detail}
+                        secrets={secrets}
+                        readOnly={readOnly}
+                        onChanged={onChanged}
+                    />
+                    <p className="text-xs text-muted-foreground">{t("editor.tryThen")}</p>
                 </div>
             ) : null}
             {step.node.type === "core.if" ? (

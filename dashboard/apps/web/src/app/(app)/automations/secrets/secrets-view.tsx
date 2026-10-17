@@ -219,11 +219,11 @@ function CreateDialog({
                             aria-invalid={valueIssue ? true : undefined}
                         />
                         {valueIssue ? (
-                            <span className="block text-xs text-destructive">{valueIssue}</span>
+                            <span className="block text-xs text-danger">{valueIssue}</span>
                         ) : null}
                     </label>
                     {error ? (
-                        <p role="alert" className="text-sm text-destructive">
+                        <p role="alert" className="text-sm text-danger">
                             {error}
                         </p>
                     ) : null}

@@ -79,8 +79,20 @@ export const AUTOMATION_LIMITS = {
     /** Trigger combinators: how far apart the members may fire. */
     combineWindowSeconds: 30 * 24 * 60 * 60,
     /** Automation events one shelf may announce in ten minutes. */
-    announceRate: 200
+    announceRate: 200,
+    /** Try blocks and loops inside one another. */
+    scopeDepth: 8,
+    /** Wait for a condition: the shortest and longest gap between two checks on the clock. */
+    conditionRecheckMinSeconds: 60,
+    conditionRecheckMaxSeconds: 24 * 60 * 60,
+    /** Waiting conditions one automation event checks again. */
+    conditionWaitsPerEvent: 200
 } as const;
+
+/** The event every live run sends when it ends, whatever the outcome. */
+export const AUTOMATION_FINISHED_EVENT = "automation.finished";
+/** Event names under this prefix are sent by Polaris itself; Announce may not use them. */
+export const RESERVED_EVENT_PREFIX = "automation.";
 
 // ---------------------------------------------------------------------------
 // Statuses and modes
@@ -120,6 +132,34 @@ export const FINISHED_RUN_STATUSES = [
     "skipped",
     "timedOut"
 ] as const satisfies readonly RunStatus[];
+
+/** How a run that had started can end: what "automation.finished" carries as its outcome. */
+export const FINISHED_EVENT_OUTCOMES = [
+    "succeeded",
+    "failed",
+    "stopped",
+    "cancelled",
+    "timedOut"
+] as const satisfies readonly RunStatus[];
+
+/**
+ * Which endings of another automation an "automation.finished" trigger or wait
+ * takes; empty takes every one. Ignored for any other event name.
+ */
+const finishedOutcomes = z
+    .array(z.enum(FINISHED_EVENT_OUTCOMES))
+    .max(FINISHED_EVENT_OUTCOMES.length)
+    .default([]);
+
+/** Whether an event, by name and payload, is one a trigger or wait with these outcomes takes. */
+export function takesOutcome(
+    name: string,
+    outcomes: readonly string[] | undefined,
+    payload: Record<string, unknown>
+): boolean {
+    if (name !== AUTOMATION_FINISHED_EVENT || !outcomes?.length) return true;
+    return outcomes.includes(String(payload.outcome));
+}
 
 export function runFinished(status: string): boolean {
     return (FINISHED_RUN_STATUSES as readonly string[]).includes(status);
@@ -579,6 +619,29 @@ export const joinConfigSchema = z.object({
 });
 export type JoinConfig = z.infer<typeof joinConfigSchema>;
 
+/** A wait no shorter than a second and no longer than the longest wait. */
+const waitTimeout = durationSchema.refine(
+    (value) =>
+        durationSeconds(value) >= 1 &&
+        durationSeconds(value) * 1000 <= AUTOMATION_LIMITS.longestWaitMs,
+    "waitTooLong"
+);
+
+export const waitConditionConfigSchema = z.object({
+    condition: conditionTreeSchema,
+    timeout: waitTimeout,
+    /** How often the clock checks it again, besides every automation event on the shelf. */
+    every: durationSchema
+        .refine(
+            (value) =>
+                durationSeconds(value) >= AUTOMATION_LIMITS.conditionRecheckMinSeconds &&
+                durationSeconds(value) <= AUTOMATION_LIMITS.conditionRecheckMaxSeconds,
+            "recheckOutOfRange"
+        )
+        .default({ amount: 5, unit: "minutes" })
+});
+export type WaitConditionConfig = z.infer<typeof waitConditionConfigSchema>;
+
 export const repeatConfigSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("times"),
@@ -611,7 +674,7 @@ export const CORE_NODE_CONFIGS = {
     "core.http": httpConfigSchema,
     "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) }),
     "core.called": calledConfigSchema,
-    "core.onEvent": z.object({ name: eventName }),
+    "core.onEvent": z.object({ name: eventName, outcomes: finishedOutcomes }),
     "core.failed": z.object({
         /** Empty: any other automation on this shelf. */
         automations: z.array(z.string().uuid()).max(50).default([])
@@ -634,14 +697,10 @@ export const CORE_NODE_CONFIGS = {
     }),
     "core.waitEvent": z.object({
         name: eventName,
-        timeout: durationSchema.refine(
-            (value) =>
-                durationSeconds(value) >= 1 &&
-                durationSeconds(value) * 1000 <= AUTOMATION_LIMITS.longestWaitMs,
-            "waitTooLong"
-        ),
+        timeout: waitTimeout,
         /** Checked against the event as `event.*`; the wait goes on when it does not hold. */
-        filter: conditionTreeSchema.optional()
+        filter: conditionTreeSchema.optional(),
+        outcomes: finishedOutcomes
     }),
     "core.run": z.object({
         automationId: z.string().uuid(),
@@ -650,7 +709,18 @@ export const CORE_NODE_CONFIGS = {
         wait: z.boolean().default(true)
     }),
     "core.answer": z.object({ outputs: valuePairs }),
-    "core.announce": z.object({ name: eventName, payload: valuePairs })
+    "core.announce": z.object({
+        name: eventName.refine(
+            (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
+            "eventNameReserved"
+        ),
+        payload: valuePairs
+    }),
+    "core.try": z.object({
+        /** A run whose On error path completes does not end as failed. */
+        recover: z.boolean().default(false)
+    }),
+    "core.waitCondition": waitConditionConfigSchema
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -692,13 +762,30 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.run": { role: "action", ports: [], idempotent: true },
     "core.answer": { role: "action", ports: [], idempotent: true },
     // The event's dedupe key is the step's idempotency key.
-    "core.announce": { role: "action", ports: [], idempotent: true }
+    "core.announce": { role: "action", ports: [], idempotent: true },
+    "core.try": {
+        role: "flow",
+        ports: ["body", "then", "catch", "always"],
+        own: true,
+        idempotent: true
+    },
+    "core.waitCondition": { role: "action", ports: ["timeout"], idempotent: true }
 };
 
 /** Loop nodes: their "each" port starts a body that runs once per item or pass. */
 export const LOOP_NODE_TYPES = ["core.forEach", "core.repeat"] as const;
 export function isLoopNode(type: string): boolean {
     return (LOOP_NODE_TYPES as readonly string[]).includes(type);
+}
+
+/** Scope nodes: a loop or a Try, whose body port starts steps that run inside it. */
+export function isScopeNode(type: string): boolean {
+    return isLoopNode(type) || type === "core.try";
+}
+
+/** The port a scope node's body starts from: "each" for a loop, "body" for a Try. */
+export function bodyPort(type: string): string | null {
+    return isLoopNode(type) ? "each" : type === "core.try" ? "body" : null;
 }
 
 /** Node types that may take the "error" port: everything that can fail on its own. */
@@ -773,6 +860,8 @@ export function nodePorts(
 export function passPort(type: string, node?: { readonly config?: unknown }): string | null {
     if (type === "core.stop") return null;
     if (isLoopNode(type)) return "done";
+    // A switched-off Try skips its body: nothing failed.
+    if (type === "core.try") return "then,always";
     return nodePorts(type, { config: node?.config })[0] ?? null;
 }
 
@@ -943,6 +1032,8 @@ export type GraphProblem =
     | { code: "pinTooLarge"; node: string }
     | { code: "pinNotAllowed"; node: string }
     | { code: "loopBodyLeaks"; node: string }
+    | { code: "tryBodyLeaks"; node: string }
+    | { code: "scopeTooDeep"; node: string }
     | { code: "callCycle"; node: string }
     | { code: "noTrigger" };
 
@@ -962,29 +1053,63 @@ export function reachableFrom(graph: AutomationGraph, start: string): Set<string
     return seen;
 }
 
-/** The nodes of a loop body that something outside the body leads into, besides the loop's "each". */
-export function loopBodyLeaks(graph: AutomationGraph): string[] {
+function bodyLeaks(graph: AutomationGraph, scopes: (type: string) => boolean): string[] {
     const leaks: string[] = [];
-    for (const loop of graph.nodes) {
-        if (!isLoopNode(loop.type)) continue;
-        const body = loopBody(graph, loop.id);
+    for (const scope of graph.nodes) {
+        if (!scopes(scope.type)) continue;
+        const port = bodyPort(scope.type);
+        const body = loopBody(graph, scope.id);
         for (const edge of graph.edges)
             if (
                 body.has(edge.to.node) &&
                 !body.has(edge.from.node) &&
-                !(edge.from.node === loop.id && edge.from.port === "each")
+                !(edge.from.node === scope.id && edge.from.port === port)
             )
                 leaks.push(edge.to.node);
     }
     return leaks;
 }
 
-/** The nodes a loop's "each" port reaches: what runs once per item. */
+/** The nodes of a loop body that something outside the body leads into, besides the loop's "each". */
+export function loopBodyLeaks(graph: AutomationGraph): string[] {
+    return bodyLeaks(graph, isLoopNode);
+}
+
+/** The same for a Try: its body is entered only by its "body" port. */
+export function tryBodyLeaks(graph: AutomationGraph): string[] {
+    return bodyLeaks(graph, (type) => type === "core.try");
+}
+
+/** The nodes a scope's body port reaches: what runs once per item, or inside the Try. */
 export function loopBody(graph: AutomationGraph, loopId: string): Set<string> {
+    const node = graph.nodes.find((entry) => entry.id === loopId);
+    const port = (node && bodyPort(node.type)) ?? "each";
     const body = new Set<string>();
-    for (const start of successors(graph, loopId, "each"))
+    for (const start of successors(graph, loopId, port))
         for (const id of reachableFrom(graph, start)) body.add(id);
     return body;
+}
+
+/**
+ * Scope nodes nested deeper than the limit: a Try or loop inside the body of
+ * another counts one level more. Call on an acyclic graph.
+ */
+export function scopesTooDeep(graph: AutomationGraph): string[] {
+    const scopes = graph.nodes.filter((node) => isScopeNode(node.type));
+    const bodies = new Map(scopes.map((scope) => [scope.id, loopBody(graph, scope.id)]));
+    const depth = new Map<string, number>();
+    const measure = (id: string): number => {
+        const known = depth.get(id);
+        if (known !== undefined) return known;
+        let deepest = 0;
+        for (const inner of bodies.get(id) ?? [])
+            if (inner !== id && bodies.has(inner)) deepest = Math.max(deepest, measure(inner));
+        depth.set(id, deepest + 1);
+        return deepest + 1;
+    };
+    return scopes
+        .filter((scope) => measure(scope.id) > AUTOMATION_LIMITS.scopeDepth)
+        .map((scope) => scope.id);
 }
 
 export function triggerNodes(graph: AutomationGraph): GraphNode[] {
@@ -1080,8 +1205,11 @@ export function graphProblems(
                 if (edge.to.node === entry) problems.push({ code: "finallyShared", node: entry });
         }
     }
-    if (!cyclic)
+    if (!cyclic) {
         for (const node of loopBodyLeaks(graph)) problems.push({ code: "loopBodyLeaks", node });
+        for (const node of tryBodyLeaks(graph)) problems.push({ code: "tryBodyLeaks", node });
+        for (const node of scopesTooDeep(graph)) problems.push({ code: "scopeTooDeep", node });
+    }
     if (options.forPublish && triggerNodes(graph).length === 0)
         problems.push({ code: "noTrigger" });
     return problems;
@@ -1101,6 +1229,9 @@ export interface ListStep {
     else?: ListStep[];
     branches?: ListStep[][];
     body?: ListStep[];
+    /** A Try's On error and Always paths; its Then path is what follows it in the list. */
+    onError?: ListStep[];
+    always?: ListStep[];
 }
 
 /** Node types the list view draws with one nested list per output port. */
@@ -1112,6 +1243,7 @@ export function listStepFor(node: GraphNode): ListStep {
     if (BRANCHING.has(node.type))
         return { node, branches: nodePorts(node.type, node).map(() => []) };
     if (isLoopNode(node.type)) return { node, body: [] };
+    if (node.type === "core.try") return { node, body: [], onError: [], always: [] };
     return { node };
 }
 
@@ -1155,6 +1287,18 @@ function chain(
                 edges.push({ from: { node: step.node.id, port: "each" }, to: { node: start } });
             if (next)
                 edges.push({ from: { node: step.node.id, port: "done" }, to: { node: next } });
+        } else if (step.node.type === "core.try") {
+            const lists = [
+                ["body", step.body],
+                ["catch", step.onError],
+                ["always", step.always]
+            ] as const;
+            for (const [port, list] of lists) {
+                const start = chain(list ?? [], null, nodes, edges);
+                if (start) edges.push({ from: { node: step.node.id, port }, to: { node: start } });
+            }
+            if (next)
+                edges.push({ from: { node: step.node.id, port: "then" }, to: { node: next } });
         } else if (step.node.type === "core.stop") {
             // A Stop ends the run: nothing follows it.
         } else if (next) {
@@ -1293,6 +1437,13 @@ function walk(
             if (!body) return null;
             steps.push({ node, body });
             at = successors(graph, at, "done")[0];
+        } else if (node.type === "core.try") {
+            const body = walk(graph, successors(graph, at, "body")[0], null, budget);
+            const onError = walk(graph, successors(graph, at, "catch")[0], null, budget);
+            const always = walk(graph, successors(graph, at, "always")[0], null, budget);
+            if (!body || !onError || !always) return null;
+            steps.push({ node, body, onError, always });
+            at = successors(graph, at, "then")[0];
         } else {
             steps.push({ node });
             at = successors(graph, at, "next")[0];

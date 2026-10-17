@@ -100,7 +100,8 @@
         "onErrorStop": "Stop the run",
         "onErrorContinue": "Carry on",
         "references": "Use {example} to insert a value from the trigger or an earlier step.",
-        "onErrorPort": "Take the error path"
+        "onErrorPort": "Take the error path",
+        "tryThen": "The steps after the Try run when the steps inside it succeed."
     },
     "nodes": {
         "manual": "Run by hand",
@@ -124,7 +125,9 @@
         "waitEvent": "Wait for an announcement",
         "run": "Run another automation",
         "answer": "Answer",
-        "announce": "Announce"
+        "announce": "Announce",
+        "try": "Try block",
+        "waitCondition": "Wait for a condition"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -325,7 +328,9 @@
             "noTriggerData": "Run a test or pin a sample on the trigger first.",
             "missingData": "Run a test or pin data on the steps before:"
         },
-        "tooLarge": "Too large to pin (64 KB at most)."
+        "tooLarge": "Too large to pin (64 KB at most).",
+        "tryBodyLeaks": "Only the Try leads into the steps inside it. Remove the other connection.",
+        "scopeTooDeep": "Try blocks and loops go {max} deep at most. Move a step out."
     },
     "canvas": {
         "board": "Automation canvas",
@@ -400,7 +405,10 @@
             "each": "Each",
             "done": "Done",
             "error": "On error",
-            "timeout": "Timed out"
+            "timeout": "Timed out",
+            "body": "Steps",
+            "catch": "On error",
+            "always": "Always"
         },
         "refusals": {
             "self": "A node cannot lead into itself.",
@@ -411,7 +419,8 @@
             "crossesLane": "The main flow and the Always lane stay apart.",
             "intoLaneStart": "The Always lane starts on its own.",
             "laneTaken": "The Always lane already has a start.",
-            "intoLoopBody": "A loop step is reached only from its loop."
+            "intoLoopBody": "A loop step is reached only from its loop.",
+            "intoTryBody": "A step inside a Try is reached only from its Try."
         },
         "alwaysStarts": "The Always lane starts here.",
         "alwaysLeave": "Take out of the Always lane",
@@ -511,7 +520,8 @@
         "dataPinned": "Trigger data pinned in the draft",
         "pass": "Pass {number}",
         "attempt": "Try {number}",
-        "went": "Went: {port}"
+        "went": "Went: {port}",
+        "recovered": "Recovered"
     },
     "folders": {
         "all": "All folders",
@@ -574,7 +584,9 @@
         "waitEvent": "Pause until a name is announced, or time runs out.",
         "run": "Start another automation with values you give it.",
         "answer": "Send values back to the automation that called.",
-        "announce": "Tell other automations that something happened."
+        "announce": "Tell other automations that something happened.",
+        "try": "Run the steps inside, and choose what follows a failure.",
+        "waitCondition": "Pause until a condition is true, or time runs out."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -656,6 +668,18 @@
         "combineCount": "When some fire",
         "combineHowMany": "How many",
         "windowMinutes": "Within minutes",
-        "whenCombined": "These start a run together, within the window."
+        "whenCombined": "These start a run together, within the window.",
+        "recover": "Mark as recovered",
+        "recoverOn": "When the On error steps finish, the run does not end as failed.",
+        "recoverOff": "The run still ends as failed once the On error and Always steps finish.",
+        "tryErrorHint": "On error and Always read what failed as {example}.",
+        "conditionWaitHint": "Checked on every announcement here and on the clock. Read an announcement as {example}.",
+        "recheckEvery": "Check again every",
+        "recheckRange": "Check again between every minute and once a day.",
+        "builtInEvent": "Polaris also announces {name} whenever an automation here ends.",
+        "eventNameReserved": "Names starting with {prefix} are kept for Polaris.",
+        "useFinished": "Use it",
+        "outcomes": "Only when it ends as",
+        "outcomesAny": "None ticked takes any ending. Read it as {example}."
     }
 }

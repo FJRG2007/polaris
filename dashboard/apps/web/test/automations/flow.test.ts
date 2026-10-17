@@ -1015,3 +1015,459 @@ describe("trigger combinators", () => {
         expect(titles()).toEqual(["go 3"]);
     });
 });
+describe("Try", () => {
+    const attempt = (recover = false) => node("try", "core.try", { recover });
+    const wires: Wire[] = [
+        ["t1", "next", "try"],
+        ["try", "body", "h"],
+        ["h", "next", "b2"],
+        ["try", "then", "ok"],
+        ["try", "catch", "oops"],
+        ["try", "always", "end"]
+    ];
+    const parts = () => [http("h"), say("b2"), say("ok"), say("oops"), say("end")];
+
+    it("leaves by Then and Always when the body succeeds", async () => {
+        const seeded = await seed([attempt(), ...parts()], wires);
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(titles().sort()).toEqual(["step b2", "step end", "step ok"]);
+        expect(step(started.id, "try")).toMatchObject({
+            status: "ok",
+            port: "then,always",
+            output: { failed: false }
+        });
+        expect(runRow(started.id).status).toBe("succeeded");
+    });
+
+    it("lets the steps after a Try read what its body did", async () => {
+        const seeded = await seed(
+            [
+                attempt(),
+                node("inner", "core.try", {}),
+                http("h"),
+                say("ok", "then {{steps.h.status}}"),
+                say("end", "always {{steps.h.status}}"),
+                say("after", "after {{steps.h.status}}")
+            ],
+            [
+                ["t1", "next", "try"],
+                ["try", "body", "inner"],
+                ["inner", "body", "h"],
+                ["try", "then", "ok"],
+                ["try", "always", "end"],
+                ["end", "next", "after"]
+            ]
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(titles().sort()).toEqual(["after 200", "always 200", "then 200"]);
+    });
+
+    it("leaves by On error and Always when the body fails, skips the rest, and the run still fails", async () => {
+        sent.statuses = [500];
+        const seeded = await seed([attempt(), ...parts()], wires);
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(titles().sort()).toEqual(["step end", "step oops"]);
+        expect(step(started.id, "try")).toMatchObject({
+            status: "failed",
+            port: "catch,always",
+            output: { failed: true, error: "httpStatus:500", node: "h", recovered: false }
+        });
+        expect(runRow(started.id)).toMatchObject({ status: "failed", error: "httpStatus:500" });
+    });
+
+    it("marks the run recovered when asked, unless the On error path itself fails", async () => {
+        sent.statuses = [500];
+        const seeded = await seed([attempt(true), ...parts()], wires);
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(runRow(started.id).status).toBe("succeeded");
+        expect(step(started.id, "try")).toMatchObject({
+            status: "ok",
+            output: { recovered: true }
+        });
+
+        sent.statuses = [500, 500];
+        const broken = await seed(
+            [attempt(true), http("h"), http("fix"), say("end")],
+            [
+                ["t1", "next", "try"],
+                ["try", "body", "h"],
+                ["try", "catch", "fix"],
+                ["try", "always", "end"]
+            ]
+        );
+        const again = await fire(broken, "k2");
+        await engine.advanceRun(again.id);
+        expect(runRow(again.id)).toMatchObject({ status: "failed", error: "httpStatus:500" });
+    });
+
+    it("passes an unrecovered failure to the Try around it, like nested try and catch", async () => {
+        sent.statuses = [500];
+        const seeded = await seed(
+            [
+                node("outer", "core.try", { recover: true }),
+                node("inner", "core.try", {}),
+                http("h"),
+                say("innerCatch"),
+                say("innerAlways"),
+                say("afterInner"),
+                say("outerCatch")
+            ],
+            [
+                ["t1", "next", "outer"],
+                ["outer", "body", "inner"],
+                ["inner", "body", "h"],
+                ["inner", "catch", "innerCatch"],
+                ["inner", "always", "innerAlways"],
+                ["inner", "then", "afterInner"],
+                ["outer", "catch", "outerCatch"]
+            ]
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(titles()).toEqual(["step innerCatch", "step innerAlways", "step outerCatch"]);
+        expect(step(started.id, "outer")).toMatchObject({
+            port: "catch,always",
+            output: { error: "httpStatus:500", node: "inner", recovered: true }
+        });
+        expect(runRow(started.id).status).toBe("succeeded");
+    });
+
+    it("survives a restart mid-body: the failure after the wait is caught once", async () => {
+        sent.statuses = [500];
+        const seeded = await seed(
+            [attempt(), pause("p"), http("h"), say("oops"), say("end")],
+            [
+                ["t1", "next", "try"],
+                ["try", "body", "p"],
+                ["p", "next", "h"],
+                ["try", "catch", "oops"],
+                ["try", "always", "end"]
+            ]
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(runRow(started.id).status).toBe("waiting");
+        expect(step(started.id, "try")).toMatchObject({ status: "waiting", waitKey: "try" });
+        engine.stopClaiming();
+        engine.resumeClaiming();
+        await drain();
+        expect(titles()).toEqual([]);
+        timePasses();
+        await drain();
+        await drain();
+        expect(titles().sort()).toEqual(["step end", "step oops"]);
+        expect(sent.requests).toHaveLength(1);
+        expect(runRow(started.id).status).toBe("failed");
+    });
+
+    it("skips what its body still holds after a crash between leaving and skipping", async () => {
+        const seeded = await seed(
+            [attempt(true), pause("p"), say("never"), say("oops")],
+            [
+                ["t1", "next", "try"],
+                ["try", "body", "p"],
+                ["p", "next", "never"],
+                ["try", "catch", "oops"]
+            ]
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        // The Try left by On error, then the process died before skipping the wait in its body.
+        Object.assign(step(started.id, "try")!, {
+            status: "ok",
+            port: "catch,always",
+            output: { failed: true, error: "failed", node: "p", recovered: true }
+        });
+        runRow(started.id).status = "running";
+        await drain();
+        timePasses();
+        await drain();
+        expect(step(started.id, "p")!.status).toBe("skipped");
+        expect(titles()).toEqual(["step oops"]);
+        expect(runRow(started.id).status).toBe("succeeded");
+    });
+
+    it("keeps the loop item visible inside a Try within a For each, and catches in the Finally lane", async () => {
+        const seeded = await seed(
+            [
+                node("each", "core.forEach", { items: "{{trigger.items}}" }),
+                attempt(),
+                say("x", "item {{item}}"),
+                node("fin", "core.try", { recover: true }),
+                http("h"),
+                say("z")
+            ],
+            [
+                ["t1", "next", "each"],
+                ["each", "each", "try"],
+                ["try", "body", "x"],
+                ["fin", "body", "h"],
+                ["fin", "always", "z"]
+            ],
+            { finally: "fin" }
+        );
+        sent.statuses = [500];
+        const started = await fire(seeded, "k1", { items: ["a", "b"] });
+        await engine.advanceRun(started.id);
+        expect(titles()).toEqual(["item a", "item b", "step z"]);
+        expect(runRow(started.id)).toMatchObject({ status: "succeeded", finally: "done" });
+    });
+});
+
+describe("Wait for a condition", () => {
+    const waiter = (condition: unknown) =>
+        node("wait", "core.waitCondition", {
+            condition,
+            timeout: { amount: 1, unit: "hours" },
+            every: { amount: 5, unit: "minutes" }
+        });
+    const wires: Wire[] = [
+        ["t1", "next", "wait"],
+        ["wait", "next", "yes"],
+        ["wait", "timeout", "late"]
+    ];
+
+    it("goes on at once when the condition already holds", async () => {
+        const seeded = await seed(
+            [waiter(compare("{{trigger.door}}", "eq", "open")), say("yes"), say("late")],
+            wires
+        );
+        const started = await fire(seeded, "k1", { door: "open" });
+        await engine.advanceRun(started.id);
+        expect(titles()).toEqual(["step yes"]);
+        expect(step(started.id, "wait")).toMatchObject({ output: { matched: true, checks: 1 } });
+    });
+
+    it("checks again on every event on the shelf, and a restart mid-wait loses nothing", async () => {
+        const seeded = await seed(
+            [waiter(compare("{{event.payload.door}}", "eq", "open")), say("yes"), say("late")],
+            wires
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        expect(step(started.id, "wait")).toMatchObject({
+            status: "waiting",
+            waitKey: "condition:user:u1"
+        });
+        engine.stopClaiming();
+        engine.resumeClaiming();
+        const shout = (door: string, userId = "u1") =>
+            outbox.emitAutomationEvent("core.event", {
+                userId,
+                subjectKey: "door",
+                payload: { name: "door", payload: { door } }
+            });
+        await shout("shut");
+        await shout("open", "someone-else");
+        await drain();
+        expect(runRow(started.id).status).toBe("waiting");
+        expect(step(started.id, "wait")!.output).toMatchObject({ checks: 2 });
+        await shout("open");
+        await drain();
+        expect(titles()).toEqual(["step yes"]);
+        expect(step(started.id, "wait")).toMatchObject({ port: "next", output: { matched: true } });
+    });
+
+    it("past the bound per event, the next event checks the waits the last one left", async () => {
+        const seeded = await seed(
+            [waiter(compare("{{event.payload.door}}", "eq", "open")), say("yes"), say("late")],
+            wires
+        );
+        const started = await fire(seeded, "k1");
+        await engine.advanceRun(started.id);
+        for (let at = 0; at < core.AUTOMATION_LIMITS.conditionWaitsPerEvent; at++)
+            fake().tables.automationStep!.push({
+                id: `00000000-0000-0000-0000-${String(at).padStart(12, "0")}`,
+                runId: "gone",
+                nodeId: "wait",
+                iteration: "0",
+                status: "waiting",
+                waitKey: "condition:user:u1"
+            });
+        const shout = () =>
+            outbox.emitAutomationEvent("core.event", {
+                userId: "u1",
+                subjectKey: "door",
+                payload: { name: "door", payload: { door: "shut" } }
+            });
+        await shout();
+        await drain();
+        expect(step(started.id, "wait")!.output).toMatchObject({ checks: 1 });
+        await shout();
+        await drain();
+        expect(step(started.id, "wait")!.output).toMatchObject({ checks: 2 });
+    });
+
+    it("checks again on the clock, then times out", async () => {
+        const seeded = await seed(
+            [waiter(compare("{{trigger.door}}", "eq", "open")), say("yes"), say("late")],
+            wires
+        );
+        const started = await fire(seeded, "k1", { door: "shut" });
+        await engine.advanceRun(started.id);
+        const first = step(started.id, "wait")!.waitUntil as Date;
+        expect(first.getTime() - Date.now()).toBeLessThanOrEqual(5 * 60_000);
+        timePasses();
+        await drain();
+        expect(step(started.id, "wait")).toMatchObject({
+            status: "waiting",
+            output: { checks: 2 }
+        });
+        expect((step(started.id, "wait")!.waitUntil as Date).getTime()).toBeGreaterThan(Date.now());
+        (step(started.id, "wait")!.input as { deadline: string }).deadline = new Date(
+            Date.now() - 1000
+        ).toISOString();
+        timePasses();
+        await drain();
+        expect(titles()).toEqual(["step late"]);
+        expect(step(started.id, "wait")).toMatchObject({
+            port: "timeout",
+            output: { matched: false, timedOut: true, checks: 3 }
+        });
+    });
+});
+
+describe("automation.finished", () => {
+    async function watcher() {
+        const seeded = await seed(
+            [say("heard", "{{trigger.payload.automationName}} {{trigger.payload.outcome}}")],
+            [["on", "next", "heard"]],
+            { trigger: node("on", "core.onEvent", { name: core.AUTOMATION_FINISHED_EVENT }) }
+        );
+        await triggers.armVersion(seeded.automationId, seeded.versionId, seeded.graph);
+        return seeded;
+    }
+
+    it("is sent for every live run's end, and never starts the automation it came from", async () => {
+        const seen = await watcher();
+        sent.statuses = [500];
+        const ok = await seed([say("a")], [["t1", "next", "a"]]);
+        const failing = await seed([http("h")], [["t1", "next", "h"]]);
+        await engine.advanceRun((await fire(ok, "k1")).id);
+        await engine.advanceRun((await fire(failing, "k2")).id);
+        await drain();
+        expect(titles().filter((title) => title.startsWith("Test"))).toEqual([
+            "Test succeeded",
+            "Test failed"
+        ]);
+        // The watcher's own runs announced their end too, and started nothing more.
+        const own = fake().tables.automationRun!.filter(
+            (row) => row.automationId === seen.automationId
+        );
+        expect(own).toHaveLength(2);
+        expect(own.every((row) => row.depth === 1)).toBe(true);
+        const events = fake().tables.automationEvent!.filter(
+            (row) => row.subjectKey === core.AUTOMATION_FINISHED_EVENT
+        );
+        expect(events).toHaveLength(4);
+        expect(events[0]).toMatchObject({
+            type: "core.event",
+            userId: "u1",
+            depth: 1,
+            payload: { name: "automation.finished", payload: { outcome: "succeeded" } }
+        });
+    });
+
+    it("is not sent for a test run, a cancelled run says so, and the shelf's rate holds it", async () => {
+        const seeded = await seed([pause("p")], [["t1", "next", "p"]]);
+        const test = await engine.startRun({
+            automationId: seeded.automationId,
+            versionId: seeded.versionId,
+            triggerNodeId: "t1",
+            firingKey: "test",
+            cause: { id: "t1" },
+            depth: 0,
+            test: true
+        });
+        await engine.advanceRun(test!.id);
+        await engine.cancelRun(test!.id);
+        const live = await fire(seeded, "k1");
+        await engine.advanceRun(live.id);
+        await engine.cancelRun(live.id);
+        const finished = () =>
+            fake().tables.automationEvent!.filter(
+                (row) => row.subjectKey === core.AUTOMATION_FINISHED_EVENT
+            );
+        expect(finished()).toHaveLength(1);
+        expect(finished()[0]!.payload).toMatchObject({ payload: { outcome: "cancelled" } });
+        for (let at = 0; at < core.AUTOMATION_LIMITS.announceRate; at++)
+            await outbox.emitAutomationEvent("core.event", {
+                userId: "u1",
+                subjectKey: "noise",
+                payload: { name: "noise", payload: {} },
+                dedupeKey: `noise${at}`
+            });
+        const more = await fire(seeded, "k2");
+        await engine.advanceRun(more.id);
+        await engine.cancelRun(more.id);
+        expect(finished()).toHaveLength(1);
+    });
+
+    it("wakes a Wait for an event under its name", async () => {
+        const seeded = await seed(
+            [
+                node("wait", "core.waitEvent", {
+                    name: core.AUTOMATION_FINISHED_EVENT,
+                    timeout: { amount: 1, unit: "hours" }
+                }),
+                say("done", "{{steps.wait.payload.outcome}}")
+            ],
+            [
+                ["t1", "next", "wait"],
+                ["wait", "next", "done"]
+            ]
+        );
+        const waiting = await fire(seeded, "k1");
+        await engine.advanceRun(waiting.id);
+        const other = await seed([say("a")], [["t1", "next", "a"]]);
+        await engine.advanceRun((await fire(other, "k2")).id);
+        await drain();
+        expect(titles()).toEqual(["step a", "succeeded"]);
+    });
+
+    it("takes only the endings ticked, on a trigger and on a wait", async () => {
+        const seeded = await seed(
+            [say("heard", "{{trigger.payload.outcome}}")],
+            [["on", "next", "heard"]],
+            {
+                trigger: node("on", "core.onEvent", {
+                    name: core.AUTOMATION_FINISHED_EVENT,
+                    outcomes: ["failed"]
+                })
+            }
+        );
+        await triggers.armVersion(seeded.automationId, seeded.versionId, seeded.graph);
+        const waiter = await seed(
+            [
+                node("wait", "core.waitEvent", {
+                    name: core.AUTOMATION_FINISHED_EVENT,
+                    outcomes: ["failed"],
+                    timeout: { amount: 1, unit: "hours" }
+                }),
+                say("woke", "{{steps.wait.payload.outcome}}")
+            ],
+            [
+                ["t1", "next", "wait"],
+                ["wait", "next", "woke"]
+            ]
+        );
+        await engine.advanceRun((await fire(waiter, "w1")).id);
+        sent.statuses = [500];
+        const ok = await seed([say("a")], [["t1", "next", "a"]]);
+        await engine.advanceRun((await fire(ok, "k1")).id);
+        await drain();
+        expect(titles()).toEqual(["step a"]);
+        const failing = await seed([http("h")], [["t1", "next", "h"]]);
+        await engine.advanceRun((await fire(failing, "k2")).id);
+        await drain();
+        expect(
+            titles()
+                .filter((title) => title !== "step a")
+                .sort()
+        ).toEqual(["failed", "failed"]);
+    });
+});

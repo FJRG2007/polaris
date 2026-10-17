@@ -200,3 +200,111 @@ describe("ports and passes in the reader's words", () => {
         expect(passOf("0/each1:2/rep:4")).toBe("3.5");
     });
 });
+
+describe("Try, Wait for a condition, and the finished event", () => {
+    const fields = (shown: core.GraphNode, setConfig = vi.fn()) => {
+        const detail = { draft: draft([node("t", "core.manual"), shown]), others: [] };
+        render(
+            <FlowNodeFields
+                node={shown}
+                setConfig={setConfig}
+                detail={detail as unknown as AutomationDetail}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        return setConfig;
+    };
+
+    it("switches a Try to mark the run as recovered and says what that means", () => {
+        const setConfig = fields(node("try1", "core.try", { recover: false }));
+        expect(
+            screen.getByText(
+                "The run still ends as failed once the On error and Always steps finish."
+            )
+        ).toBeTruthy();
+        expect(
+            screen.getByText("On error and Always read what failed as {{steps.try1.error}}.")
+        ).toBeTruthy();
+        fireEvent.click(screen.getByRole("switch", { name: "Mark as recovered" }));
+        expect(setConfig).toHaveBeenLastCalledWith({ recover: true });
+    });
+
+    it("waits on a condition with its own editor and refuses a recheck under a minute", () => {
+        fields(
+            node("wc", "core.waitCondition", {
+                condition: emptyCondition(),
+                timeout: { amount: 1, unit: "hours" },
+                every: { amount: 30, unit: "seconds" }
+            })
+        );
+        expect(screen.getAllByRole("group", { name: "Conditions" })).toHaveLength(1);
+        expect(screen.getByLabelText("Check again every")).toBeTruthy();
+        expect(screen.getByRole("alert").textContent).toBe(
+            "Check again between every minute and once a day."
+        );
+    });
+
+    it("picks automation.finished on On event and filters it by ending", () => {
+        const setConfig = fields(node("ev", "core.onEvent", { name: "" }));
+        fireEvent.click(screen.getByRole("button", { name: "Use it" }));
+        expect(setConfig).toHaveBeenLastCalledWith({
+            name: core.AUTOMATION_FINISHED_EVENT,
+            outcomes: []
+        });
+        cleanup();
+        const next = fields(
+            node("ev", "core.onEvent", { name: core.AUTOMATION_FINISHED_EVENT, outcomes: [] })
+        );
+        expect(screen.queryByRole("button", { name: "Use it" })).toBeNull();
+        fireEvent.click(screen.getByRole("checkbox", { name: "Failed" }));
+        expect(next).toHaveBeenLastCalledWith({
+            name: core.AUTOMATION_FINISHED_EVENT,
+            outcomes: ["failed"]
+        });
+        expect(
+            core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(next.mock.calls.at(-1)![0]).success
+        ).toBe(true);
+    });
+
+    it("offers the same ending filter on a wait for an announcement", () => {
+        fields(
+            node("we", "core.waitEvent", {
+                name: core.AUTOMATION_FINISHED_EVENT,
+                outcomes: ["succeeded"],
+                timeout: { amount: 1, unit: "hours" }
+            })
+        );
+        const ticked = screen.getByRole("checkbox", { name: "Succeeded" }) as HTMLInputElement;
+        expect(ticked.checked).toBe(true);
+        expect(
+            screen.getByText(
+                "None ticked takes any ending. Read it as {{steps.we.payload.outcome}}."
+            )
+        ).toBeTruthy();
+    });
+
+    it("warns when Announce uses a name kept for Polaris", () => {
+        fields(node("an", "core.announce", { name: "automation.finished", payload: [] }));
+        expect(screen.getByRole("alert").textContent).toBe(
+            "Names starting with automation. are kept for Polaris."
+        );
+    });
+
+    it("names a Try's ports and keeps its body out of the loop passes", () => {
+        function Labels() {
+            const t = useTranslations("automations");
+            const shown = node("try1", "core.try");
+            return (
+                <p>
+                    {["body", "then", "catch", "always"]
+                        .map((port) => portLabel(t, shown, port))
+                        .join("|")}
+                </p>
+            );
+        }
+        render(<Labels />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("Steps|Then|On error|Always")).toBeTruthy();
+        expect(passOf("0/try1:try")).toBeNull();
+        expect(passOf("0/each1:1/try1:try")).toBe("2");
+    });
+});

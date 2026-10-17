@@ -14,7 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { withLease } from "@/lib/cron/lease";
-import { advanceRun, resumeEventWaits, type StartedRun } from "./engine";
+import { advanceRun, resumeConditionWaits, resumeEventWaits, type StartedRun } from "./engine";
 import { fireTrigger } from "./combine";
 
 const L = core.AUTOMATION_LIMITS;
@@ -62,21 +62,30 @@ export async function emitAutomationEvent(type: string, input: EmitInput): Promi
     }
 }
 
-/** A trigger's own filter on top of its event type: which automations "An automation failed" watches. */
+/**
+ * A trigger's own filter on top of its event type: which automations "An
+ * automation failed" watches, and which endings an "automation.finished" one takes.
+ */
 export function acceptsEvent(
     type: string,
     state: unknown,
     payload: Record<string, unknown>,
     automationId: string
 ): boolean {
-    if (type !== "core.failed") return true;
-    if (payload.automationId === automationId) return false;
+    if (type !== "core.failed" && type !== "core.event") return true;
     let config: unknown = {};
     try {
         config = JSON.parse((state as { config?: string } | null)?.config ?? "{}");
     } catch {
-        return false;
+        return type === "core.event";
     }
+    if (type === "core.event") {
+        const parsed = core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(config);
+        if (!parsed.success) return true;
+        const inner = (payload.payload ?? {}) as Record<string, unknown>;
+        return core.takesOutcome(parsed.data.name, parsed.data.outcomes, inner);
+    }
+    if (payload.automationId === automationId) return false;
     const parsed = core.CORE_NODE_CONFIGS["core.failed"].safeParse(config);
     if (!parsed.success) return false;
     const watched = parsed.data.automations;
@@ -120,6 +129,23 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
                 (payload.payload ?? {}) as Record<string, unknown>
             );
             for (const id of resumed) started.push({ id, status: "running" });
+        }
+        // Every automation event on a shelf checks its waiting conditions again.
+        if (
+            (event.type === "core.event" || event.type === "core.failed") &&
+            (event.orgId || event.userId)
+        ) {
+            const rechecked = await resumeConditionWaits(
+                { orgId: event.orgId, userId: event.userId },
+                {
+                    name: event.type === "core.event" ? (event.subjectKey ?? "") : "core.failed",
+                    payload: (event.type === "core.event"
+                        ? (payload.payload ?? {})
+                        : payload) as Record<string, unknown>
+                }
+            );
+            for (const id of rechecked)
+                if (!started.some((run) => run.id === id)) started.push({ id, status: "running" });
         }
         // A run never starts its own automation through what it announced.
         const origin = event.originRunId
