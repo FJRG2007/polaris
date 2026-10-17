@@ -232,8 +232,8 @@ export function NodeFields({
                             value={config.method ?? "POST"}
                             onValueChange={(method) => set({ method })}
                             options={[
-                                { value: "POST", label: "POST" },
-                                { value: "GET", label: "GET" },
+                                { value: "POST", label: "POST" }, // i18n-ignore
+                                { value: "GET", label: "GET" }, // i18n-ignore
                                 { value: "any", label: t("fields.anyMethod") }
                             ]}
                             aria-label={t("fields.method")}

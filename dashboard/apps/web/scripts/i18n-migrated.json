@@ -2011,6 +2011,13 @@
         "web/src/lib/automations/secrets.ts",
         "web/src/lib/automations/service.ts",
         "web/src/lib/automations/triggers.ts",
-        "web/src/lib/automations/types.ts"
+        "web/src/lib/automations/types.ts",
+        "web/src/app/(app)/automations/[id]/canvas-board.tsx",
+        "web/src/app/(app)/automations/[id]/canvas-editor.tsx",
+        "web/src/app/(app)/automations/[id]/flow-fields.tsx",
+        "web/src/app/(app)/automations/[id]/node-fields.tsx",
+        "web/src/app/(app)/automations/[id]/references.tsx",
+        "web/src/app/(app)/automations/runs/[runId]/page.tsx",
+        "web/src/app/(app)/automations/runs/[runId]/run-detail.tsx"
     ]
 }
