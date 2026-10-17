@@ -11,7 +11,8 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { createHash, createHmac } from "node:crypto";
-import { startRun, type StartedRun } from "./engine";
+import type { StartedRun } from "./engine";
+import { fireTrigger } from "./combine";
 
 /** The secret part of a webhook trigger's address. Derived, never stored; only its hash is. */
 export function hookToken(automationId: string, nodeId: string, rotation: number): string {
@@ -69,6 +70,26 @@ export function armedTriggers(
                 eventType: "core.webhook",
                 subjectKey: hash,
                 hookHash: hash,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
+        } else if (node.type === "core.onEvent") {
+            const config = core.CORE_NODE_CONFIGS["core.onEvent"].safeParse(node.config);
+            if (!config.success) continue;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.event",
+                subjectKey: config.data.name,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
+        } else if (node.type === "core.failed") {
+            out.push({
+                nodeId: node.id,
+                eventType: "core.failed",
+                subjectKey: null,
+                hookHash: null,
                 nextDueAt: null,
                 state: { config: configKey }
             });
@@ -170,7 +191,7 @@ export async function fireDueSchedules(limit = 100): Promise<StartedRun[]> {
         });
         if (moved.count !== 1) continue;
         if (now.getTime() - dueAt.getTime() > core.AUTOMATION_LIMITS.catchUpMs) continue;
-        const run = await startRun({
+        const run = await fireTrigger({
             automationId: row.automationId,
             versionId: row.versionId,
             triggerNodeId: row.nodeId,

@@ -27,6 +27,7 @@ import type { AutomationDetail } from "@/lib/automations/service";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CanvasBoard, NO_SELECTION, type CanvasSelection } from "./canvas-board";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode, type T } from "./node-fields";
+import { FailureFields, WhenFields } from "./flow-fields";
 import { nodeTitle } from "../shared";
 import {
     Button,
@@ -681,15 +682,24 @@ function NodePanel({
     const t = useTranslations("automations");
     const toast = useToast();
     const [pinText, setPinText] = useState<string | null>(null);
+    // A change that adds or removes outputs (a Choose case, a lane, the error
+    // port) moves the wires on them with it, and drops the ones left on nothing.
     const set = (update: Partial<core.GraphNode>) =>
-        change((current) => ({
-            ...current,
-            nodes: current.nodes.map((entry) =>
-                entry.id === node.id ? { ...entry, ...update } : entry
-            )
-        }));
+        change((current) => {
+            const next = { ...node, ...update };
+            const moves = core.portMoves(node, next);
+            return {
+                ...current,
+                nodes: current.nodes.map((entry) => (entry.id === node.id ? next : entry)),
+                edges: current.edges.flatMap((edge) => {
+                    if (edge.from.node !== node.id || !moves.has(edge.from.port)) return [edge];
+                    const port = moves.get(edge.from.port);
+                    return port ? [{ ...edge, from: { ...edge.from, port } }] : [];
+                })
+            };
+        });
     const role = core.nodeRole(node.type);
-    const ports = core.nodePorts(node.type);
+    const ports = core.nodePorts(node.type, node);
     const byId = useMemo(
         () => new Map(graph.nodes.map((entry) => [entry.id, entry])),
         [graph.nodes]
@@ -726,21 +736,14 @@ function NodePanel({
                         onChanged={onChanged}
                     />
                 </ReferenceScope>
-                {role === "action" ? (
-                    <label className="block space-y-1 text-sm">
-                        <span>{t("editor.ifFails")}</span>
-                        <Select
-                            value={node.onError ?? "stop"}
-                            onValueChange={(value) =>
-                                set({ onError: value as "stop" | "continue" })
-                            }
-                            options={[
-                                { value: "stop", label: t("editor.onErrorStop") },
-                                { value: "continue", label: t("editor.onErrorContinue") }
-                            ]}
-                            aria-label={t("editor.ifFails")}
-                        />
-                    </label>
+                <FailureFields node={node} onChange={set} allowPort />
+                {role === "trigger" ? (
+                    <WhenFields
+                        when={graph.when}
+                        triggers={core.triggerNodes(graph).length}
+                        readOnly={readOnly}
+                        onChange={(when) => change((current) => ({ ...current, when }))}
+                    />
                 ) : null}
                 {role !== "trigger" ? (
                     <label className="flex items-center justify-between gap-2 text-sm">

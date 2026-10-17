@@ -14,7 +14,8 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { withLease } from "@/lib/cron/lease";
-import { advanceRun, startRun, type StartedRun } from "./engine";
+import { advanceRun, resumeEventWaits, type StartedRun } from "./engine";
+import { fireTrigger } from "./combine";
 
 const L = core.AUTOMATION_LIMITS;
 const CLAIM_MS = 60_000;
@@ -61,6 +62,27 @@ export async function emitAutomationEvent(type: string, input: EmitInput): Promi
     }
 }
 
+/** A trigger's own filter on top of its event type: which automations "An automation failed" watches. */
+export function acceptsEvent(
+    type: string,
+    state: unknown,
+    payload: Record<string, unknown>,
+    automationId: string
+): boolean {
+    if (type !== "core.failed") return true;
+    if (payload.automationId === automationId) return false;
+    let config: unknown = {};
+    try {
+        config = JSON.parse((state as { config?: string } | null)?.config ?? "{}");
+    } catch {
+        return false;
+    }
+    const parsed = core.CORE_NODE_CONFIGS["core.failed"].safeParse(config);
+    if (!parsed.success) return false;
+    const watched = parsed.data.automations;
+    return watched.length === 0 || watched.includes(String(payload.automationId));
+}
+
 /** Match a batch of unprocessed events. Call under the intake lease. */
 export async function processAutomationEvents(limit = 50): Promise<StartedRun[]> {
     const now = new Date();
@@ -75,7 +97,8 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             userId: true,
             subjectKey: true,
             payload: true,
-            depth: true
+            depth: true,
+            originRunId: true
         }
     });
     const started: StartedRun[] = [];
@@ -89,12 +112,29 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             data: { claimedUntil: new Date(Date.now() + CLAIM_MS) }
         });
         if (claimed.count !== 1) continue;
+        const payload = (event.payload ?? {}) as Record<string, unknown>;
+        if (event.type === "core.event" && event.subjectKey) {
+            const resumed = await resumeEventWaits(
+                { orgId: event.orgId, userId: event.userId },
+                event.subjectKey,
+                (payload.payload ?? {}) as Record<string, unknown>
+            );
+            for (const id of resumed) started.push({ id, status: "running" });
+        }
+        // A run never starts its own automation through what it announced.
+        const origin = event.originRunId
+            ? await prisma.automationRun.findUnique({
+                  where: { id: event.originRunId },
+                  select: { automationId: true }
+              })
+            : null;
         const triggers = await prisma.automationTrigger.findMany({
             where: { eventType: event.type, subjectKey: event.subjectKey },
             take: L.perShelf,
             select: {
                 nodeId: true,
                 versionId: true,
+                state: true,
                 automation: {
                     select: {
                         id: true,
@@ -113,7 +153,9 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             // An event that names a shelf only starts that shelf's automations.
             if (event.orgId && automation.orgId !== event.orgId) continue;
             if (!event.orgId && event.userId && automation.userId !== event.userId) continue;
-            const run = await startRun({
+            if (origin && origin.automationId === automation.id) continue;
+            if (!acceptsEvent(event.type, trigger.state, payload, automation.id)) continue;
+            const run = await fireTrigger({
                 automationId: automation.id,
                 versionId: trigger.versionId,
                 triggerNodeId: trigger.nodeId,

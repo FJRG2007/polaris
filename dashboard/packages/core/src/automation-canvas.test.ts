@@ -106,6 +106,35 @@ describe("connections", () => {
         expect(canvas.connectRefusal(g, { node: "a", port: "next" }, "b")).toBeNull();
     });
 
+    it("leads into a loop body only from its loop", () => {
+        const g: graph.AutomationGraph = {
+            ...graph.emptyGraph(),
+            nodes: [
+                node("t1", "core.manual"),
+                node("l", "core.repeat", { kind: "times", count: 3 }),
+                node("a", "core.notify", { title: "A", body: "" }),
+                node("b", "core.notify", { title: "B", body: "" }),
+                node("c", "core.notify", { title: "C", body: "" })
+            ],
+            edges: [
+                edge("t1", "l"),
+                edge("l", "a", "each"),
+                edge("l", "b", "done"),
+                edge("t1", "c")
+            ]
+        };
+        expect(canvas.connectRefusal(g, { node: "b", port: "next" }, "a")).toBe("intoLoopBody");
+        expect(canvas.connectRefusal(g, { node: "a", port: "next" }, "c")).toBe("intoLoopBody");
+        expect(canvas.connectRefusal(g, { node: "l", port: "each" }, "b")).toBe("intoLoopBody");
+        const closed = canvas.connect(g, { node: "a", port: "next" }, "b");
+        expect(closed).toBe(g);
+        const extended = {
+            ...g,
+            nodes: [...g.nodes, node("d", "core.notify", { title: "D", body: "" })]
+        };
+        expect(canvas.connectRefusal(extended, { node: "a", port: "next" }, "d")).toBeNull();
+    });
+
     it("never wires the main flow into the Always lane", () => {
         const g = {
             ...sample(),

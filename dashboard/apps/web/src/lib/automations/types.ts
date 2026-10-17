@@ -26,6 +26,11 @@ export interface RunContext {
     };
     readonly automation: { readonly id: string; readonly name: string };
     readonly now: string;
+    /** Inside a For each: the item (or batch) of this pass; inside a Repeat: the pass number. */
+    readonly item?: unknown;
+    readonly index?: number;
+    /** A called automation's typed inputs. */
+    readonly inputs?: Record<string, unknown>;
 }
 
 export interface NodeIo {
@@ -34,6 +39,10 @@ export interface NodeIo {
     readonly automationId: string;
     /** Sent to receivers that can recognise a repeat: `<runId>:<nodeId>:<iteration>`. */
     readonly idempotencyKey: string;
+    /** How many automations in a chain led to this run (0 for a direct start). */
+    readonly depth: number;
+    /** The automation's shelf: an org, or a person. */
+    readonly shelf: { readonly orgId: string | null; readonly userId: string | null };
     readonly timeZone: string;
     readonly signal: AbortSignal;
     /** Whether this automation was allowed onto the local network by an administrator. */
@@ -44,6 +53,7 @@ export interface NodeIo {
     recordInput(input: unknown): void;
 }
 
+/** `port` may list several ports joined by commas: every one of them is taken. */
 export type NodeResult =
     | { readonly output: unknown; readonly port?: string }
     | { readonly wait: { readonly until: Date } };
