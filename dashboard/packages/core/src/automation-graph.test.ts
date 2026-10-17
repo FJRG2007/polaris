@@ -241,3 +241,28 @@ describe("stored data", () => {
         ).toBe(true);
     });
 });
+
+describe("app node types", () => {
+    it("read their role and app from the type alone", () => {
+        expect(graph.appNodeRole("home.trigger.change")).toBe("trigger");
+        expect(graph.appNodeRole("home.condition.check")).toBe("condition");
+        expect(graph.appNodeRole("home.action.device")).toBe("action");
+        expect(graph.appNodeRole("home.widget.x")).toBeNull();
+        expect(graph.appNodeRole("core.trigger.x")).toBeNull();
+        expect(graph.appNodeRole("deploy.redeploy")).toBeNull();
+        expect(graph.nodeTypeApp("home.action.device")).toBe("home");
+        expect(graph.nodeTypeApp("core.notify")).toBeNull();
+    });
+    it("give an app condition then and else, and anything else next", () => {
+        expect(graph.nodePorts("home.condition.check")).toEqual(["then", "else"]);
+        expect(graph.nodePorts("home.action.device")).toEqual(["next"]);
+        expect(graph.nodeRole("home.trigger.sun")).toBe("trigger");
+    });
+    it("count as triggers in a graph even with the app away", () => {
+        const flow = graph.emptyGraph("UTC");
+        flow.nodes = [node("t1", "home.trigger.time", { at: "07:00" }), notify("n1")];
+        flow.edges = [{ from: { node: "t1", port: "next" }, to: { node: "n1" } }];
+        expect(graph.triggerNodes(flow).map((each) => each.id)).toEqual(["t1"]);
+        expect(graph.graphProblems(flow, { forPublish: true })).toEqual([]);
+    });
+});

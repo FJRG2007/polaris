@@ -77,3 +77,25 @@ export async function movedTo(id: string): Promise<string | null> {
     if (row?.movedToId) return row.movedToId;
     return host.automations.automationForLegacy(`${LEGACY_PREFIX}${id}`);
 }
+
+/** Old runs shown, newest first: the history screen is a glance, not an archive. */
+const HISTORY = 50;
+
+/** The runs a moved automation had here before the move, read-only. */
+export async function legacyRuns(legacyRef: string): Promise<
+    { id: string; status: string; startedAt: string; finishedAt: string | null }[]
+> {
+    if (!legacyRef.startsWith(LEGACY_PREFIX)) return [];
+    const rows = await prisma.placeAutomationRun.findMany({
+        where: { automationId: legacyRef.slice(LEGACY_PREFIX.length) },
+        orderBy: { startedAt: "desc" },
+        take: HISTORY,
+        select: { id: true, status: true, startedAt: true, finishedAt: true }
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        status: row.status,
+        startedAt: row.startedAt.toISOString(),
+        finishedAt: row.finishedAt?.toISOString() ?? null
+    }));
+}

@@ -16,6 +16,7 @@ import * as history from "@/lib/automations/history";
 import * as secrets from "@/lib/automations/secrets";
 import * as organize from "@/lib/automations/organize";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
@@ -283,6 +284,19 @@ export async function listRunsAction(
             ok: true,
             ...(await history.listRuns(who, await openShelf(who), one, { cursor, filter }))
         };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function listLegacyRunsAction(
+    automationId: unknown
+): Promise<Result<{ rows: LegacyRunRow[] }>> {
+    const parsed = id.safeParse(automationId);
+    if (!parsed.success) return invalid();
+    try {
+        const who = await actor();
+        return { ok: true, rows: await history.listLegacyRuns(who, await openShelf(who), parsed.data) };
     } catch (caught) {
         return failure(caught);
     }

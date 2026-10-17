@@ -203,6 +203,8 @@ const conditionNode: ServerNode<nodes.ConditionNodeConfig> = {
             causeOf(context.trigger)
         );
         io.recordInput({ placeId: config.placeId, groups: config.groups.length });
+        // Nothing wired to "else": the run ends skipped, as a Places run whose conditions failed.
+        if (!holds && !io.leads("else")) return { stop: { as: "skipped", reason: "conditions" } };
         return { output: { holds }, port: holds ? "then" : "else" };
     }
 };
@@ -272,9 +274,9 @@ const waitNode: ServerNode<WaitConfig> = {
             return {
                 wait: { until: new Date(Math.min(deadline, now + RECHECK_MS)), recheck: RECHECK_KEY }
             };
-        // Stop: the rest of the run is not done, as a Places run stopped there.
+        // Stop: the run ends stopped there, as a Places run did; nothing after it is done.
         return step.onTimeout === "stop"
-            ? { output: { reached: false, timedOut: true }, port: "" }
+            ? { stop: { as: "succeeded", reason: "timedOut" } }
             : { output: { reached: false, timedOut: true } };
     }
 };

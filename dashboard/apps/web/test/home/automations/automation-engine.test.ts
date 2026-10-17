@@ -142,6 +142,8 @@ let acted: { deviceId: string; action: DeviceAction; setting?: unknown }[];
 let notified: string[];
 let faults: string[];
 let woken: number[];
+/** Firings handed to the central engine. */
+let centralFired: { automationId: string; key: string; triggerId?: string; depth: number }[];
 let mayOperate: boolean;
 let refuse: Map<string, Error>;
 let engine: AutomationEngine;
@@ -188,7 +190,16 @@ function boot(): AutomationEngine {
             notified.push(message);
         },
         wake: (ms) => woken.push(ms),
-        log: (message) => faults.push(message)
+        log: (message) => faults.push(message),
+        central: async (record, key, cause, depth) => {
+            centralFired.push({
+                automationId: record.central!.automationId,
+                key,
+                ...(cause.triggerId ? { triggerId: cause.triggerId } : {}),
+                depth
+            });
+            return true;
+        }
     });
     return made;
 }
@@ -260,6 +271,7 @@ beforeEach(() => {
     notified = [];
     faults = [];
     woken = [];
+    centralFired = [];
     mayOperate = true;
     refuse = new Map();
     scope = { devices: [], rooms: [] };
@@ -2582,5 +2594,77 @@ describe("triggered by", () => {
         await engine.evaluateSchedules(INSTALL);
         await engine.drain();
         expect(acted).toEqual([{ deviceId: "plug", action: "turn-on" }]);
+    });
+});
+
+describe("an automation that moved to the central engine", () => {
+    const CENTRAL = { automationId: "central-1", legacyId: null };
+
+    it("has its held-for trigger decided here, and starts a central run instead of its own", async () => {
+        await reads(readout("door", "contact", "off", { door: "closed" }));
+        automation(
+            "moved",
+            {
+                triggers: [
+                    { id: "trigdoor", kind: "change", deviceId: "door", attribute: "door", from: "closed", to: "open", forMinutes: 5 }
+                ],
+                actions: []
+            },
+            { central: CENTRAL }
+        );
+        await reads(readout("door", "contact", "off", { door: "open" }));
+        await engine.evaluateSchedules(INSTALL);
+        expect(centralFired).toEqual([]);
+        later(5 * MINUTE + 1000);
+        await engine.evaluateSchedules(INSTALL);
+        expect(centralFired).toEqual([
+            expect.objectContaining({ automationId: "central-1", triggerId: "trigdoor", depth: 0 })
+        ]);
+        await engine.evaluateSchedules(INSTALL);
+        // Asked again, it hands over the same firing key: the central engine starts one run per key.
+        expect(new Set(centralFired.map((each) => each.key)).size).toBe(1);
+        expect(store.runsOf("moved")).toEqual([]);
+    });
+
+    it("fires its time of day once, as the central automation", async () => {
+        automation(
+            "moved",
+            { triggers: [{ id: "trigtime", kind: "time", at: "07:00", days: [3] }], actions: [] },
+            { central: CENTRAL }
+        );
+        at("2026-09-30T07:00:20.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        await boot().evaluateSchedules(INSTALL);
+        expect(new Set(centralFired.map((each) => `${each.triggerId}:${each.key}`)).size).toBe(1);
+        expect(store.runsOf("moved")).toEqual([]);
+    });
+
+    it("Run now on a moved automation starts its central twin", async () => {
+        const record = automation("moved", {}, { central: { automationId: "central-1", legacyId: "moved" } });
+        expect(await engine.runNow(record, "owner-1", "k1")).toBe(true);
+        expect(centralFired).toEqual([
+            expect.objectContaining({ automationId: "central-1", key: "manual:k1", triggerId: "trigmanual" })
+        ]);
+        expect(store.runsOf("moved")).toEqual([]);
+    });
+
+    it("a run that was already waiting before the move still finishes here", async () => {
+        devices.set("plug", readout("plug", "outlet", "off"));
+        const record = automation("old", {
+            actions: [
+                { id: "stepwait", kind: "delay", seconds: 60 },
+                { id: "stepon", kind: "device", deviceId: "plug", do: "turn-on" }
+            ]
+        });
+        await engine.runNow(record, "owner-1", "k1");
+        await engine.drain();
+        expect(store.runsOf("old")[0]?.status).toBe("waiting");
+        // The move: the row now answers as its central twin.
+        store.automations.set("old", { ...record, central: { automationId: "central-1", legacyId: "old" } });
+        later(61_000);
+        await engine.drain();
+        expect(store.runsOf("old")[0]?.status).toBe("succeeded");
+        expect(acted).toEqual([{ deviceId: "plug", action: "turn-on" }]);
+        expect(centralFired).toEqual([]);
     });
 });

@@ -168,6 +168,8 @@ export async function importLegacyAutomation(input: z.input<typeof importInput>)
     });
     if (existing) return existing.id;
     const graph = core.automationGraphSchema.parse(given.graph);
+    if (core.graphProblems(graph, { forPublish: true }).length > 0)
+        throw new Error("an imported automation must be one that can be published");
     let id: string;
     try {
         id = await prisma.$transaction(async (tx) => {

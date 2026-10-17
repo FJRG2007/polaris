@@ -288,9 +288,16 @@ export const prismaAutomationStore: AutomationStore = {
     async automation(id) {
         const row = await prisma.placeAutomation.findUnique({
             where: { id },
-            select: AUTOMATION_FIELDS
+            select: { ...AUTOMATION_FIELDS, movedToId: true }
         });
-        return row ? toAutomation(row) : null;
+        if (!row) return null;
+        const { movedToId, ...own } = row;
+        const record = toAutomation(own);
+        // Moved: a run already waiting still finishes here, but anything new -
+        // Run now, another automation's "run" step - starts its central twin.
+        return record && movedToId
+            ? { ...record, central: { automationId: movedToId, legacyId: id } }
+            : record;
     },
 
     async createRun(input) {

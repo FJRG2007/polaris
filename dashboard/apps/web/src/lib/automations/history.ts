@@ -15,6 +15,8 @@ import { randomUUID } from "node:crypto";
 import { advanceRun, loadGraph, startRun } from "./engine";
 import { mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 import { AutomationAccessError, checkSecrets, load, shelfWhere } from "./service";
+import { appAutomationHistory } from "@/lib/app-extensions/registry";
+import type { LegacyRunRow } from "@/lib/app-extensions/types";
 
 const L = core.AUTOMATION_LIMITS;
 
@@ -154,6 +156,27 @@ export interface RunDetail {
 }
 
 /** One run with every step, for the run view and the canvas. */
+/**
+ * What an automation an app moved here ran before the move, read-only and from
+ * the app's own tables: the newest few, and none once the app is away.
+ */
+export async function listLegacyRuns(
+    actor: RunActor,
+    shelf: Shelf,
+    automationId: string
+): Promise<LegacyRunRow[]> {
+    if (!(await mayReadShelf(actor, shelf))) return [];
+    const row = await prisma.automation.findFirst({
+        where: { id: automationId, ...shelfWhere(shelf) },
+        select: { origin: true, legacyRef: true }
+    });
+    if (!row?.legacyRef || !row.origin) return [];
+    return appAutomationHistory(row.origin, row.legacyRef).catch((caught) => {
+        console.error("polaris: an app's run history could not be read:", caught);
+        return [];
+    });
+}
+
 export async function getRun(actor: RunActor, runId: string): Promise<RunDetail> {
     const run = await prisma.automationRun.findUnique({
         where: { id: runId },

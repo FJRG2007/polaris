@@ -28,6 +28,7 @@ import type {
     ChatCommandSpec,
     ChatGameLink,
     ExtensionInstall,
+    LegacyRunRow,
     GameSanction,
     GameServerSummary,
     PlayingNow,
@@ -87,6 +88,13 @@ export async function appAutomationNodes(): Promise<AutomationServerNode[]> {
         })
     );
     return lists.flat();
+}
+
+/** The runs a moved automation had in its app, before the move; none while the app is away. */
+export async function appAutomationHistory(app: string, legacyRef: string): Promise<LegacyRunRow[]> {
+    const extension = extensions().find((entry) => entry.id === app);
+    if (!extension?.automationHistory || !(await isAppInstalled(app))) return [];
+    return [...(await extension.automationHistory(legacyRef))];
 }
 
 export function appJobs(): AppJob[] {

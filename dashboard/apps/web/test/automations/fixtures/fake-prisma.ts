@@ -9,6 +9,7 @@
 type Row = Record<string, unknown>;
 
 const UNIQUE: Record<string, string[][]> = {
+    automation: [["legacyRef"]],
     automationRun: [["automationId", "firingKey"]],
     automationStep: [["runId", "nodeId", "iteration", "attempt"]],
     automationEvent: [["type", "dedupeKey"]],
@@ -313,8 +314,13 @@ export function createFakeDb(): FakeDb {
         }
     });
 
-    const prisma = new Proxy({} as FakeDb["prisma"], {
-        get: (cache, name: string) => ((cache as Record<string, unknown>)[name] ??= model(name))
+    const prisma: FakeDb["prisma"] = new Proxy({} as FakeDb["prisma"], {
+        get: (cache, name: string) =>
+            ((cache as Record<string, unknown>)[name] ??=
+                // An interactive transaction runs against the same tables: no rollback.
+                name === "$transaction"
+                    ? async (work: (tx: unknown) => Promise<unknown>) => work(prisma)
+                    : model(name))
     });
     return {
         tables,
