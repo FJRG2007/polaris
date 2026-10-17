@@ -342,6 +342,30 @@ export async function listVersionsAction(automationId: unknown): Promise<Result<
 }
 
 const restoreInput = z.object({ automationId: id, versionId: id });
+const renameVersionInput = z.object({ automationId: id, versionId: id, name: core.versionNameSchema });
+
+export async function renameVersionAction(input: unknown): Promise<Result<{ name: string | null }>> {
+    const parsed = renameVersionInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        await history.renameVersion(await actor(), parsed.data.automationId, parsed.data.versionId, parsed.data.name);
+        return { ok: true, name: parsed.data.name };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+const compareInput = z.object({ automationId: id, versionId: id, against: z.union([id, z.literal("draft")]) });
+
+export async function compareVersionsAction(input: unknown): Promise<Result<{ comparison: history.VersionComparison }>> {
+    const parsed = compareInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, comparison: await history.compareVersions(await actor(), parsed.data.automationId, parsed.data.versionId, parsed.data.against) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
 
 export async function restoreVersionAction(input: unknown): Promise<Result<{ graph: core.AutomationGraph }>> {
     const parsed = restoreInput.safeParse(input);

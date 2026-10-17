@@ -425,7 +425,22 @@
         "restored": "Restaurada en el borrador. Deshaz para volver.",
         "notPublished": "Sin publicar",
         "draftDiffers": "El borrador difiere de v{number}",
-        "draftSame": "El borrador es la v{number}"
+        "draftSame": "El borrador es la v{number}",
+        "named": "{name} - v{number}",
+        "name": "Nombre",
+        "rename": "Nombrar versión",
+        "saveName": "Guardar",
+        "compare": "Comparar",
+        "compareWith": "Comparar con",
+        "theDraft": "El borrador actual",
+        "comparing": "{from} frente a {to}",
+        "closeCompare": "Cerrar comparación",
+        "added": "Añadidos",
+        "removed": "Quitados",
+        "changed": "Cambiados",
+        "rewired": "También cambiaron las conexiones.",
+        "onlyRewired": "Mismos nodos, otras conexiones.",
+        "noDifference": "Ninguna diferencia que note una ejecución."
     },
     "runView": {
         "back": "Historial",

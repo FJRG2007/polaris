@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, FlaskConical, History, Pencil, Play, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, FlaskConical, GitCompare, History, Pencil, Play, Trash2, X } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -39,7 +39,9 @@ import type { AutomationDetail } from "@/lib/automations/service";
 import {
     deleteAutomationAction,
     getAutomationAction,
+    compareVersionsAction,
     getRunAction,
+    renameVersionAction,
     listVersionsAction,
     publishAction,
     restoreVersionAction,
@@ -52,7 +54,7 @@ import {
 } from "../actions";
 import { useWide } from "@polaris/ui/automation-blocks";
 import { useDraftHistory } from "@polaris/ui/automation-history";
-import type { RunDetail, VersionRow } from "@/lib/automations/history";
+import type { ComparedNode, RunDetail, VersionComparison, VersionRow } from "@/lib/automations/history";
 import { CanvasEditor, nodeLabel } from "./canvas-editor";
 import { EditorGraphProvider, ReferenceScope } from "./references";
 import { LoadFailed, RowsSkeleton, Section, StatusChip, nodeTitle, useCachedAction, when } from "../shared";
@@ -439,6 +441,35 @@ function VersionsDialog({
     const [rows, setRows] = useState<VersionRow[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
+    const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+    const [against, setAgainst] = useState<string>("draft");
+    const [comparing, setComparing] = useState<{ versionId: string; result: VersionComparison | null } | null>(null);
+    const nameCheck = renaming ? core.versionNameSchema.safeParse(renaming.value) : null;
+
+    const rename = async (row: VersionRow, value: string) => {
+        const parsed = core.versionNameSchema.safeParse(value);
+        setRenaming(null);
+        if (!parsed.success || parsed.data === row.name) return;
+        const name = parsed.data;
+        // Shown at once, put back if the server refuses.
+        setRows((current) => current?.map((entry) => (entry.id === row.id ? { ...entry, name } : entry)) ?? current);
+        const answer = await renameVersionAction({ automationId, versionId: row.id, name }).catch(() => null);
+        if (!answer?.ok) {
+            setRows((current) => current?.map((entry) => (entry.id === row.id ? { ...entry, name: row.name } : entry)) ?? current);
+            toast.show({ title: answer?.error ?? t("errors.generic") });
+        }
+    };
+
+    const compare = async (versionId: string, base: string) => {
+        setComparing({ versionId, result: null });
+        const answer = await compareVersionsAction({ automationId, versionId, against: base }).catch(() => null);
+        if (!answer?.ok) {
+            setComparing(null);
+            return void toast.show({ title: answer?.error ?? t("errors.generic") });
+        }
+        setComparing((current) => (current?.versionId === versionId ? { versionId, result: answer.comparison } : current));
+    };
+
     const load = useCallback(async () => {
         setError(null);
         const answer = await listVersionsAction(automationId).catch(() => null);
@@ -460,17 +491,96 @@ function VersionsDialog({
                 ) : rows.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("versions.empty")}</p>
                 ) : (
+                    <>
+                    <label className="flex min-w-0 items-center gap-2 text-sm">
+                        <span className="shrink-0 text-muted-foreground">{t("versions.compareWith")}</span>
+                        <Select
+                            className="min-w-0 flex-1"
+                            value={against}
+                            aria-label={t("versions.compareWith")}
+                            onValueChange={(value) => {
+                                setAgainst(value);
+                                if (comparing) void compare(comparing.versionId, value);
+                            }}
+                            options={[
+                                { value: "draft", label: t("versions.theDraft") },
+                                ...rows.map((row) => ({ value: row.id, label: row.name ? t("versions.named", { name: row.name, number: row.number }) : t("versions.number", { number: row.number }) }))
+                            ]}
+                        />
+                    </label>
+                    {comparing ? (
+                        <section className="space-y-2 rounded-lg border border-border p-3" aria-live="polite">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <h3 className="min-w-0 flex-1 truncate text-sm font-medium">
+                                    {t("versions.comparing", {
+                                        from: t("versions.number", { number: rows.find((row) => row.id === comparing.versionId)?.number ?? 0 }),
+                                        to: against === "draft" ? t("versions.theDraft") : t("versions.number", { number: rows.find((row) => row.id === against)?.number ?? 0 })
+                                    })}
+                                </h3>
+                                <Button variant="ghost" size="icon-sm" aria-label={t("versions.closeCompare")} title={t("versions.closeCompare")} onClick={() => setComparing(null)}>
+                                    <X aria-hidden="true" />
+                                </Button>
+                            </div>
+                            {!comparing.result ? <RowsSkeleton rows={2} /> : <ComparisonList comparison={comparing.result} />}
+                        </section>
+                    ) : null}
                     <ul className="max-h-96 divide-y divide-border overflow-y-auto rounded-lg border border-border">
                         {rows.map((row) => (
-                            <li key={row.id} className="flex min-w-0 items-center gap-3 p-3">
+                            <li key={row.id} className="flex min-w-0 flex-wrap items-center gap-2 p-3">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium">{row.name || t("versions.number", { number: row.number })}</p>
+                                    {renaming?.id === row.id ? (
+                                        <Input
+                                            autoFocus
+                                            value={renaming.value}
+                                            maxLength={core.VERSION_NAME_LENGTH}
+                                            placeholder={t("versions.number", { number: row.number })}
+                                            aria-label={t("versions.name")}
+                                            aria-invalid={nameCheck && !nameCheck.success ? true : undefined}
+                                            onChange={(event) => setRenaming({ id: row.id, value: event.target.value })}
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    void rename(row, renaming.value);
+                                                } else if (event.key === "Escape") {
+                                                    event.preventDefault();
+                                                    event.stopPropagation();
+                                                    setRenaming(null);
+                                                }
+                                            }}
+                                        />
+                                    ) : (
+                                        <p className="truncate text-sm font-medium" title={row.name ?? undefined}>
+                                            {row.name ? t("versions.named", { name: row.name, number: row.number }) : t("versions.number", { number: row.number })}
+                                        </p>
+                                    )}
                                     <p className="truncate text-xs text-muted-foreground">
                                         {when(row.createdAt, locale)}
                                         {row.savedBy ? ` - ${t("versions.by", { name: row.savedBy })}` : ""}
                                     </p>
                                 </div>
                                 {row.live ? <Badge variant="success">{t("versions.live")}</Badge> : null}
+                                {canRestore ? (
+                                    renaming?.id === row.id ? (
+                                        <Button variant="ghost" size="icon-sm" aria-label={t("versions.saveName")} title={t("versions.saveName")} disabled={nameCheck !== null && !nameCheck.success} onClick={() => void rename(row, renaming.value)}>
+                                            <Check aria-hidden="true" />
+                                        </Button>
+                                    ) : (
+                                        <Button variant="ghost" size="icon-sm" aria-label={t("versions.rename")} title={t("versions.rename")} onClick={() => setRenaming({ id: row.id, value: row.name ?? "" })}>
+                                            <Pencil aria-hidden="true" />
+                                        </Button>
+                                    )
+                                ) : null}
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("versions.compare")}
+                                    title={t("versions.compare")}
+                                    disabled={against === row.id}
+                                    aria-pressed={comparing?.versionId === row.id}
+                                    onClick={() => void compare(row.id, against)}
+                                >
+                                    <GitCompare aria-hidden="true" />
+                                </Button>
                                 {canRestore ? (
                                     <Button
                                         variant="outline"
@@ -491,9 +601,42 @@ function VersionsDialog({
                             </li>
                         ))}
                     </ul>
+                    </>
                 )}
             </DialogContent>
         </Dialog>
+    );
+}
+
+function ComparisonList({ comparison }: { comparison: VersionComparison }) {
+    const t = useTranslations("automations");
+    const name = (node: ComparedNode) => node.alias || nodeTitle(t, node.type);
+    const groups = [
+        { label: t("versions.added"), nodes: comparison.added, variant: "success" as const },
+        { label: t("versions.removed"), nodes: comparison.removed, variant: "danger" as const },
+        { label: t("versions.changed"), nodes: comparison.changed, variant: "warning" as const }
+    ].filter((group) => group.nodes.length > 0);
+    if (groups.length === 0) return <p className="text-xs text-muted-foreground">{comparison.rewired ? t("versions.onlyRewired") : t("versions.noDifference")}</p>;
+    return (
+        <div className="space-y-2">
+            {groups.map((group) => (
+                <div key={group.label} className="space-y-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
+                        {group.label} ({group.nodes.length})
+                    </p>
+                    <ul className="flex flex-wrap gap-1">
+                        {group.nodes.map((node) => (
+                            <li key={node.id} className="min-w-0 max-w-full">
+                                <Badge variant={group.variant} className="max-w-full truncate" title={name(node)}>
+                                    {name(node)}
+                                </Badge>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+            {comparison.rewired ? <p className="text-xs text-muted-foreground">{t("versions.rewired")}</p> : null}
+        </div>
     );
 }
 

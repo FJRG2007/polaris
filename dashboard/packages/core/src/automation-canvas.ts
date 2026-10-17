@@ -599,3 +599,41 @@ export function canPin(type: string): boolean {
 export function paletteTypes(): { type: graphs.CoreNodeType; role: "trigger" | "condition" | "action" }[] {
     return (Object.keys(graphs.CORE_NODE_META) as graphs.CoreNodeType[]).map((type) => ({ type, role: graphs.CORE_NODE_META[type].role }));
 }
+
+// ---------------------------------------------------------------------------
+// Comparing versions
+// ---------------------------------------------------------------------------
+
+/** The longest name a published version may be given. */
+export const VERSION_NAME_LENGTH = 80;
+
+export const versionNameSchema = z
+    .string()
+    .transform((value) => value.trim())
+    .pipe(z.string().max(VERSION_NAME_LENGTH))
+    .transform((value) => (value === "" ? null : value));
+
+export interface GraphComparison {
+    /** In `next`, not in `base`. */
+    readonly added: readonly string[];
+    /** In `base`, not in `next`. */
+    readonly removed: readonly string[];
+    /** In both, set up differently (settings, name, switch, retry, note). Moving one does not count. */
+    readonly changed: readonly string[];
+    /** Whether the connections or the Always lane differ. */
+    readonly rewired: boolean;
+}
+
+/** What changed from `base` to `next`, node by node. Positions and pinned samples are not part of a version's meaning. */
+export function compareGraphs(base: graphs.AutomationGraph, next: graphs.AutomationGraph): GraphComparison {
+    const shape = ({ position: _position, pinned: _pinned, ...node }: graphs.GraphNode) => JSON.stringify(node);
+    const before = new Map(base.nodes.map((node) => [node.id, node]));
+    const after = new Map(next.nodes.map((node) => [node.id, node]));
+    const wiring = (graph: graphs.AutomationGraph) => JSON.stringify({ edges: graph.edges.map(edgeKey).sort(), finally: graph.finally });
+    return {
+        added: next.nodes.filter((node) => !before.has(node.id)).map((node) => node.id),
+        removed: base.nodes.filter((node) => !after.has(node.id)).map((node) => node.id),
+        changed: next.nodes.filter((node) => before.has(node.id) && shape(before.get(node.id)!) !== shape(node)).map((node) => node.id),
+        rewired: wiring(base) !== wiring(next)
+    };
+}

@@ -449,3 +449,51 @@ export async function pinRunData(actor: RunActor, runId: string): Promise<{ auto
     await prisma.automation.update({ where: { id: run.automationId }, data: { draft: draft as object, draftUpdatedAt: new Date() } });
     return { automationId: run.automationId, triggerNodeId: trigger.id };
 }
+
+/** Give a published version a name, or take it away (null). Editors only. */
+export async function renameVersion(actor: RunActor, id: string, versionId: string, name: string | null): Promise<void> {
+    await load(actor, id, true);
+    const version = await prisma.automationVersion.findUnique({ where: { id: versionId }, select: { automationId: true, number: true } });
+    if (!version || version.automationId !== id || version.number <= 0) throw new AutomationAccessError("notFound");
+    await prisma.automationVersion.update({ where: { id: versionId }, data: { name } });
+}
+
+export interface ComparedNode {
+    readonly id: string;
+    readonly type: string;
+    readonly alias: string | null;
+}
+
+export interface VersionComparison {
+    readonly added: readonly ComparedNode[];
+    readonly removed: readonly ComparedNode[];
+    readonly changed: readonly ComparedNode[];
+    readonly rewired: boolean;
+}
+
+/** What changed from a published version to another one, or to the draft (`against` "draft"). */
+export async function compareVersions(actor: RunActor, id: string, versionId: string, against: string): Promise<VersionComparison> {
+    const row = await load(actor, id, false);
+    const ids = against === "draft" ? [versionId] : [versionId, against];
+    const versions = await prisma.automationVersion.findMany({
+        where: { id: { in: ids }, automationId: id, number: { gt: 0 } },
+        take: 2,
+        select: { id: true, graph: true }
+    });
+    const read = (value: unknown) => {
+        const parsed = core.automationGraphSchema.safeParse(value);
+        if (!parsed.success) throw new AutomationAccessError("invalid");
+        return parsed.data;
+    };
+    const base = versions.find((version) => version.id === versionId);
+    const next = against === "draft" ? { graph: row.draft } : versions.find((version) => version.id === against);
+    if (!base || !next) throw new AutomationAccessError("notFound");
+    const from = read(base.graph);
+    const to = read(next.graph);
+    const diff = core.compareGraphs(from, to);
+    const describe = (graph: core.AutomationGraph) => (nodeId: string): ComparedNode => {
+        const node = graph.nodes.find((entry) => entry.id === nodeId)!;
+        return { id: node.id, type: node.type, alias: node.alias ?? null };
+    };
+    return { added: diff.added.map(describe(to)), removed: diff.removed.map(describe(from)), changed: diff.changed.map(describe(to)), rewired: diff.rewired };
+}

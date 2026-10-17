@@ -314,3 +314,27 @@ describe("resizing a note", () => {
         expect(canvas.resizeNote(g, "gone", { width: 400, height: 400 })).toBe(g);
     });
 });
+
+describe("comparing versions", () => {
+    it("lists added, removed and changed nodes, and ignores moves and pins", () => {
+        const base = canvas.layoutGraph(sample());
+        const next = {
+            ...base,
+            nodes: [
+                ...base.nodes
+                    .filter((entry) => entry.id !== "b")
+                    .map((entry) => (entry.id === "a" ? { ...entry, config: { title: "A2", body: "" } } : entry.id === "t1" ? { ...entry, position: { x: 999, y: 9 }, pinned: { x: 1 } } : entry)),
+                node("c", "core.notify", { title: "C", body: "" })
+            ],
+            edges: base.edges.filter((entry) => entry.to.node !== "b")
+        };
+        expect(canvas.compareGraphs(base, next)).toEqual({ added: ["c"], removed: ["b"], changed: ["a"], rewired: true });
+        expect(canvas.compareGraphs(base, base)).toEqual({ added: [], removed: [], changed: [], rewired: false });
+    });
+
+    it("trims a version name and keeps an empty one as no name", () => {
+        expect(canvas.versionNameSchema.parse("  Before the move  ")).toBe("Before the move");
+        expect(canvas.versionNameSchema.parse("   ")).toBeNull();
+        expect(canvas.versionNameSchema.safeParse("x".repeat(81)).success).toBe(false);
+    });
+});

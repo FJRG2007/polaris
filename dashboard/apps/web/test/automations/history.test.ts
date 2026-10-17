@@ -321,3 +321,36 @@ describe("open in editor with this data", () => {
         await expect(history.pinRunData(actor, runId)).rejects.toThrow();
     });
 });
+
+describe("naming and comparing versions", () => {
+    it("names a version, takes the name away, and compares it with the draft and another version", async () => {
+        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        await service.publishAutomation(actor, id);
+        const draft = graphOf([node("t1", "core.manual"), say("m")], [["t1", "m"]]);
+        await service.saveDraft(actor, id, draft);
+        await service.publishAutomation(actor, id);
+        const [second, first] = await history.listVersions(actor, id);
+        await history.renameVersion(actor, id, first!.id, "Before the move");
+        expect((await history.listVersions(actor, id))[1]!.name).toBe("Before the move");
+        await history.renameVersion(actor, id, first!.id, null);
+        expect((await history.listVersions(actor, id))[1]!.name).toBeNull();
+
+        const diff = await history.compareVersions(actor, id, first!.id, second!.id);
+        expect(diff.added.map((entry) => entry.id)).toEqual(["m"]);
+        expect(diff.removed.map((entry) => entry.id)).toEqual(["n"]);
+        expect(diff.rewired).toBe(true);
+        const same = await history.compareVersions(actor, id, second!.id, "draft");
+        expect(same).toEqual({ added: [], removed: [], changed: [], rewired: false });
+    });
+
+    it("refuses a reader renaming, and a version of another automation", async () => {
+        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        const other = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        await service.publishAutomation(actor, other);
+        const [version] = await history.listVersions(actor, other);
+        await expect(history.renameVersion(actor, id, version!.id, "x")).rejects.toMatchObject({ code: "notFound" });
+        await expect(history.compareVersions(actor, id, version!.id, "draft")).rejects.toMatchObject({ code: "notFound" });
+        access.edit = false;
+        await expect(history.renameVersion(actor, other, version!.id, "x")).rejects.toThrow();
+    });
+});

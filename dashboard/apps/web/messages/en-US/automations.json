@@ -425,7 +425,22 @@
         "restored": "Restored into the draft. Undo to go back.",
         "notPublished": "Not published",
         "draftDiffers": "Draft differs from live v{number}",
-        "draftSame": "Draft is live v{number}"
+        "draftSame": "Draft is live v{number}",
+        "named": "{name} - v{number}",
+        "name": "Version name",
+        "rename": "Name this version",
+        "saveName": "Save name",
+        "compare": "Compare",
+        "compareWith": "Compare with",
+        "theDraft": "The current draft",
+        "comparing": "{from} against {to}",
+        "closeCompare": "Close comparison",
+        "added": "Added",
+        "removed": "Removed",
+        "changed": "Changed",
+        "rewired": "Connections changed too.",
+        "onlyRewired": "Same nodes, different connections.",
+        "noDifference": "No difference a run would notice."
     },
     "runView": {
         "back": "All runs",
