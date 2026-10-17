@@ -109,7 +109,12 @@ describe("how long the tone has left", () => {
     it("schedules only the passes the time left needs", () => {
         expect(ringPasses("ringBack", RING_EVERY_MS.ringBack * 2)).toBe(2);
         expect(ringPasses("ringBack", 1)).toBe(1);
-        expect(ringPasses("ringBack")).toBe(Math.ceil(RING_FOR_MS / RING_EVERY_MS.ringBack));
+        expect(ringPasses("ringBack")).toBe(Math.floor(RING_FOR_MS / RING_EVERY_MS.ringBack));
+    });
+
+    it("never sounds past the deadline when it resumes part of the way through", () => {
+        expect(ringPasses("ringBack", RING_EVERY_MS.ringBack * 2 + 1)).toBe(2);
+        expect(ringPasses("ringBack", RING_EVERY_MS.ringBack * 3 - 1)).toBe(2);
     });
 });
 

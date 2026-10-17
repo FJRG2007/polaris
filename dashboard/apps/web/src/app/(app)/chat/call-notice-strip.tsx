@@ -70,6 +70,10 @@ export interface ShownNotice extends CallNotice {
 
 type ChatT = NamespaceTranslator<"chat">;
 
+/** A control's reach, grown past what it draws so a finger finds it without the
+ *  line getting any taller. */
+const REACH = "relative after:absolute after:-inset-x-1 after:-inset-y-3 after:content-['']";
+
 /** What the diagnosis said, as a notice the strip can weigh. */
 function diagnosisNotice(audio: CallAudioReport, t: ChatT, rejoin: () => void): ShownNotice | null {
     if (audio.ok || !audio.headline) return null;
@@ -234,6 +238,7 @@ export function useCallNotices(call: CallState): NoticeOrder<ShownNotice> {
 /** How a notice of each weight is coloured. Status tokens only - see
  *  `test/design/status-tokens`. */
 const TONE: Readonly<Record<CallNotice["severity"], string>> = {
+    // i18n-ignore: class names
     error: "border-danger-edge bg-danger-soft text-danger-ink",
     warning: "border-warning-edge bg-warning-soft text-warning-ink",
     info: "border-border bg-muted text-foreground"
@@ -270,7 +275,10 @@ function NoticeRow({
                 <button
                     type="button"
                     onClick={notice.action.run}
-                    className="shrink-0 rounded px-1.5 py-0.5 font-medium underline decoration-dotted underline-offset-2 hover:no-underline"
+                    className={cn(
+                        REACH,
+                        "shrink-0 rounded px-1.5 py-0.5 font-medium underline decoration-dotted underline-offset-2 hover:no-underline"
+                    )}
                 >
                     {notice.action.label}
                 </button>
@@ -281,7 +289,10 @@ function NoticeRow({
                         type="button"
                         aria-label={t("callNotices.details")}
                         title={t("callNotices.details")}
-                        className="-my-0.5 shrink-0 rounded p-1 opacity-80 transition-opacity hover:opacity-100"
+                        className={cn(
+                            REACH,
+                            "-my-0.5 shrink-0 rounded p-1 opacity-80 transition-opacity hover:opacity-100"
+                        )}
                     >
                         <Info className="size-3.5" />
                     </button>
@@ -324,7 +335,10 @@ function NoticeRow({
                     onClick={notice.dismiss}
                     aria-label={t("noAudio.dismiss")}
                     title={t("noAudio.dismiss")}
-                    className="-my-0.5 shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
+                    className={cn(
+                        REACH,
+                        "-my-0.5 shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
+                    )}
                 >
                     <X className="size-3.5" />
                 </button>
@@ -369,7 +383,10 @@ export function CallNoticeStrip({ order }: { order: NoticeOrder<ShownNotice> }) 
                                 ? t("callNotices.showLess")
                                 : t("callNotices.showMore", { count: hidden })
                         }
-                        className="shrink-0 rounded px-1.5 py-0.5 font-medium tabular-nums hover:bg-background/40"
+                        className={cn(
+                            REACH,
+                            "shrink-0 rounded px-1.5 py-0.5 font-medium tabular-nums hover:bg-background/40"
+                        )}
                     >
                         {t("callNotices.more", { count: hidden })}
                     </button>

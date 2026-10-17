@@ -1623,8 +1623,6 @@
         }
     },
     "diagnosis": {
-        "whatIsHappeningAtThe": "What is happening at the other end",
-        "whyThisCallHasNo": "Why this call has no sound",
         "whatWasChecked": "What was checked"
     },
     "linkCard": {

@@ -11,8 +11,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { QuietMicNotice } from "@/app/(app)/chat/quiet-mic-notice";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { useQuietMic } from "@/app/(app)/chat/quiet-mic-notice";
 import { micGain } from "@/app/(app)/chat/mic-gain";
 import { ENOUGH_SPEECH_MS, SELF, setLoudness, type Loudness } from "@/app/(app)/chat/call-loudness";
 
@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe("the quiet hint", () => {
     it("waits until both sides have been heard for long enough", () => {
-        render(<QuietMicNotice micOn />);
+        const { result } = renderHook(() => useQuietMic(true));
         act(() =>
             setLoudness(
                 new Map([
@@ -50,11 +50,11 @@ describe("the quiet hint", () => {
                 ])
             )
         );
-        expect(screen.queryByRole("status")).toBeNull();
+        expect(result.current.quiet).toBe(false);
     });
 
     it("appears when you sit well below the room, and turns you up", () => {
-        render(<QuietMicNotice micOn />);
+        const { result } = renderHook(() => useQuietMic(true));
         act(() =>
             setLoudness(
                 new Map([
@@ -64,14 +64,14 @@ describe("the quiet hint", () => {
                 ])
             )
         );
-        expect(screen.getByRole("status")).toBeTruthy();
+        expect(result.current.quiet).toBe(true);
         expect(micGain()).toBe(1);
-        fireEvent.click(screen.getByRole("button", { name: /turn ?up/i }));
+        act(() => result.current.turnUp());
         expect(micGain()).toBe(1.25);
     });
 
     it("says nothing for a voice that is merely a little quieter", () => {
-        render(<QuietMicNotice micOn />);
+        const { result } = renderHook(() => useQuietMic(true));
         act(() =>
             setLoudness(
                 new Map([
@@ -80,11 +80,11 @@ describe("the quiet hint", () => {
                 ])
             )
         );
-        expect(screen.queryByRole("status")).toBeNull();
+        expect(result.current.quiet).toBe(false);
     });
 
     it("says nothing while the microphone is off", () => {
-        render(<QuietMicNotice micOn={false} />);
+        const { result } = renderHook(() => useQuietMic(false));
         act(() =>
             setLoudness(
                 new Map([
@@ -93,6 +93,6 @@ describe("the quiet hint", () => {
                 ])
             )
         );
-        expect(screen.queryByRole("status")).toBeNull();
+        expect(result.current.quiet).toBe(false);
     });
 });

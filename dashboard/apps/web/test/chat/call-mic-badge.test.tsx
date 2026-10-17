@@ -23,7 +23,6 @@ vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
     playSoundAction: async () => ({})
 }));
 // The panels around the room, which are not what this is about.
-vi.mock("@/app/(app)/chat/call-diagnosis-panel", () => ({ CallDiagnosisPanel: () => null }));
 const notices: { mic: { short: string; severity: "error" | "warning" } | null } = { mic: null };
 vi.mock("@/app/(app)/chat/call-notice-strip", () => ({
     CallNoticeStrip: () => null,

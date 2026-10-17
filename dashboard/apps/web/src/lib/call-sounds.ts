@@ -412,9 +412,13 @@ export const RING_FOR_MS = 45_000;
  * at, which is every tab a call arrives in. The ring rang once and then stopped
  * for the rest of its forty-five seconds, and the code looked correct - the
  * timer was simply not being run. The audio thread is not throttled.
+ *
+ * Only the passes that finish inside the span: each is shorter than its
+ * interval, so a pass that starts a whole interval before the end is heard to its
+ * end and none is still sounding after the ring has given up.
  */
 export function ringPasses(name: "ring" | "ringBack", forMs: number = RING_FOR_MS): number {
-    return Math.max(1, Math.ceil(forMs / RING_EVERY_MS[name]));
+    return Math.max(1, Math.floor(forMs / RING_EVERY_MS[name]));
 }
 
 /** How loud a tone is by default. Low: these play over whatever the reader is

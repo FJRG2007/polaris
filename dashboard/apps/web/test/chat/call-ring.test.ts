@@ -79,8 +79,12 @@ describe("the incoming ring", () => {
         // minute in a tab nobody is looking at - so the ring sounded once and
         // then stopped for the remaining forty seconds of its life, in the one
         // case it exists for.
-        expect(ringPasses("ring") * RING_EVERY_MS.ring).toBeGreaterThanOrEqual(RING_FOR_MS);
-        expect(ringPasses("ring")).toBeGreaterThan(1);
+        const passes = ringPasses("ring");
+        expect(passes).toBeGreaterThan(1);
+        expect((passes + 1) * RING_EVERY_MS.ring).toBeGreaterThan(RING_FOR_MS);
+        expect((passes - 1) * RING_EVERY_MS.ring + passSeconds("ring") * 1000).toBeLessThanOrEqual(
+            RING_FOR_MS
+        );
     });
 
     it("does not ask the speakers for more than they have", () => {

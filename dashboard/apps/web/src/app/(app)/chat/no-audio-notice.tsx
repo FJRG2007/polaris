@@ -14,8 +14,6 @@
  * simply quiet. It can be closed, and it waits longer each time it comes back.
  */
 
-import { AlertTriangle, X } from "lucide-react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import { measureVoice } from "./voice-level";
 import { useCallback, useEffect, useState } from "react";
 import { useVoiceSettings } from "./voice-settings";
@@ -108,29 +106,4 @@ export function useNoAudioWarning({ track, device, micOn }: NoAudioSource): {
 
     const dismiss = useCallback(() => setWatch(dismissNoAudio), []);
     return { warning: watch.warning, dismiss };
-}
-
-/** The same warning drawn on its own, for a screen that has nothing else to say. */
-export function NoAudioNotice(source: NoAudioSource) {
-    const t = useTranslations("chat");
-    const { warning, dismiss } = useNoAudioWarning(source);
-    if (!warning) return null;
-    return (
-        <p
-            role="status"
-            className="flex shrink-0 items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-ink"
-        >
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1">{t("noAudio.yourMicrophoneHasNotPicked")}</span>
-            <button
-                type="button"
-                onClick={dismiss}
-                aria-label={t("noAudio.dismiss")}
-                title={t("noAudio.dismiss")}
-                className="-m-1 shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
-            >
-                <X className="size-3.5" />
-            </button>
-        </p>
-    );
 }
