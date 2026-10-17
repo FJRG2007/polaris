@@ -3,7 +3,8 @@
 /**
  * The options of the newer events played on a map built in the sky: a TNT
  * run's floors, an ice track's laps, a dropper's shaft, a nether maze, a flag game, hide and
- * seek, a hot potato, SkyWars, an impostor game, a glass bridge and a tug of war.
+ * seek, a hot potato, SkyWars, an impostor game, a glass bridge, a tug of war and
+ * pillars.
  */
 
 import { useGameText } from "../game-text";
@@ -80,6 +81,13 @@ const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameK
     {
         normal: "editor.labels.skyWarsLoot.normal",
         rich: "editor.labels.skyWarsLoot.rich"
+    };
+
+const POOL_LABELS: Readonly<Record<(typeof catalog.PILLAR_POOLS)[number], GameKey<"minecraft">>> =
+    {
+        balanced: "editor.labels.pillarPool.balanced",
+        blocks: "editor.labels.pillarPool.blocks",
+        chaos: "editor.labels.pillarPool.chaos"
     };
 
 /** A whole number from `min` to `max`, with the schema's complaint about it. */
@@ -911,6 +919,87 @@ export function GlassBridgeFields({
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}
                 what={t("editor.place.arena")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+        </>
+    );
+}
+
+export function PillarsFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"pillars">;
+    onChange: (options: catalog.EventOptions<"pillars">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label={t("editor.itemPool")}>
+                    <Select
+                        value={value.pool}
+                        onValueChange={(pool) =>
+                            onChange({ ...value, pool: pool as typeof value.pool })
+                        }
+                        options={options(t, POOL_LABELS)}
+                        aria-label={t("editor.itemPool")}
+                    />
+                </Field>
+                <NumberField
+                    label={t("editor.itemInterval")}
+                    hint={t("editor.itemIntervalHint")}
+                    min={3}
+                    max={20}
+                    value={value.interval}
+                    onChange={(interval) => onChange({ ...value, interval })}
+                    issues={issues}
+                    field="interval"
+                />
+                <NumberField
+                    label={t("editor.pillarHeight")}
+                    hint={t("editor.pillarHeightHint")}
+                    min={40}
+                    max={60}
+                    value={value.height}
+                    onChange={(height) => onChange({ ...value, height })}
+                    issues={issues}
+                    field="height"
+                />
+                <NumberField
+                    label={t("editor.voidAfter")}
+                    hint={t("editor.voidAfterHint")}
+                    min={0}
+                    max={15}
+                    value={value.voidAfter}
+                    onChange={(voidAfter) => onChange({ ...value, voidAfter })}
+                    issues={issues}
+                    field="voidAfter"
+                />
+            </div>
+            <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 font-medium">{t("editor.pillarMiddle")}</span>
+                <Switch
+                    checked={value.middle}
+                    onChange={(middle) => onChange({ ...value, middle })}
+                    aria-label={t("editor.pillarMiddle")}
+                />
+            </label>
+            <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 font-medium">{t("editor.pillarTwists")}</span>
+                <Switch
+                    checked={value.twists}
+                    onChange={(twists) => onChange({ ...value, twists })}
+                    aria-label={t("editor.pillarTwists")}
+                />
+            </label>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.pillars")}
                 issues={issues}
                 path={["options", "place"]}
             />

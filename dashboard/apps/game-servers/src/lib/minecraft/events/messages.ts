@@ -198,6 +198,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "tug-of-war": {
         en: "Two teams on a rope. Right-click with your rod to pull; drag the marker over your line and the other team drops into the water.",
         es: "Dos equipos y una cuerda. Haz clic derecho con la caña para tirar; arrastra la marca hasta tu línea y el otro equipo cae al agua."
+    },
+    pillars: {
+        en: "A pillar each, an item every few seconds. Bridge, fight and be the last one left. Nothing of yours is lost.",
+        es: "Un pilar cada uno, un objeto cada pocos segundos. Tiende puentes, lucha y sé el último en pie. No pierdes nada tuyo."
     }
 };
 

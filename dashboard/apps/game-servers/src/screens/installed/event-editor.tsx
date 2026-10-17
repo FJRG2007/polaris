@@ -46,6 +46,7 @@ import {
     HotPotatoFields,
     ImpostorFields,
     NetherMazeFields,
+    PillarsFields,
     SkyWarsFields,
     TntRunFields,
     TugOfWarFields
@@ -1218,6 +1219,14 @@ function OptionsFields({
             return (
                 <SkyWarsFields
                     value={preset.options as catalog.EventOptions<"sky-wars">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "pillars":
+            return (
+                <PillarsFields
+                    value={preset.options as catalog.EventOptions<"pillars">}
                     onChange={onChange}
                     issues={issues}
                 />

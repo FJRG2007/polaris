@@ -2165,6 +2165,7 @@ async function play(
         case "hide-and-seek":
         case "hot-potato":
         case "sky-wars":
+        case "pillars":
         case "impostor":
         case "glass-bridge":
         case "tug-of-war":

@@ -13301,6 +13301,186 @@ describe("SkyWars", () => {
     });
 });
 
+describe("Pillars", () => {
+    const pillarsOf = (minutes = 10) => ({ ...newPreset("pillars", "pil"), minutes });
+    const kind = () => import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/pillars");
+    const names = ["Ana", "Ben", "Cy"];
+    /** Where the ring stands for a run, as the arena worked it out. */
+    const placedOf = async (run: { place: { x: number; y: number; z: number } | null }, count = 3) => {
+        const pi = await kind();
+        const layout = pi.layoutFor(count, true);
+        return {
+            layout,
+            at: { x: run.place!.x, y: pi.topOver(run.place!.y, 40), z: run.place!.z }
+        };
+    };
+    const packed = (path: string) =>
+        world.files.get(`/data/world/datapacks/${snowballPack.PACK_DIR}/${path}`);
+
+    it("builds the ring into air, puts everybody's things away, has the server hand out the items, and the last one left wins", async () => {
+        const pi = await kind();
+        world.online = [...names];
+        world.board = { pe_swt: { Ana: 0, Ben: 0, Cy: 0 }, pe_swb: { Ana: 0, Ben: 0, Cy: 0 } };
+        world.dealt = { Ana: 0, Ben: 0, Cy: 0 };
+        world.inv = { Ana: stuffed(), Ben: new Map([[4, { id: "minecraft:bread", count: 5 }]]) };
+        const ana = copyOf(world.inv.Ana!);
+        const ben = copyOf(world.inv.Ben!);
+        setUp([pillarsOf()]);
+        await joinAndStart("pil", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const { layout, at } = await placedOf(run);
+        expect(run.arena!.box).toEqual(pi.arenaBox(layout, at));
+        // Everything they brought put away whole before they play.
+        expect(ownStacks(world.inv.Ana!)).toBe(0);
+        expect(ownStacks(world.inv.Ben!)).toBe(0);
+        expect([...stashRows.values()].map((row) => row.player).sort()).toEqual(["Ana", "Ben"]);
+        // Built only into air: a pillar of bedrock for each, the barrier floor
+        // under the whole box, the platform in the middle.
+        expect(
+            fills().filter(
+                (line) =>
+                    !line.endsWith(" keep") &&
+                    !line.endsWith(" minecraft:air replace minecraft:barrier")
+            )
+        ).toEqual([]);
+        expect(fills().filter((line) => line.endsWith(" minecraft:bedrock keep"))).toHaveLength(
+            names.length
+        );
+        expect(fills().some((line) => line.endsWith(" minecraft:barrier keep"))).toBe(true);
+        expect(fills().some((line) => line.endsWith(" minecraft:smooth_stone keep"))).toBe(true);
+        // Each on top of their own pillar, in survival from "Go!".
+        for (const [index, name] of names.entries()) {
+            const spot = pi.startSpot(layout, at, index);
+            expect(
+                world.sent.some((line) =>
+                    line.includes(` tp ${name} ${spot.x + 0.5} ${spot.y} ${spot.z + 0.5}`)
+                )
+            ).toBe(true);
+            expect(world.sent).toContain(`tag ${name} add ${pi.IN_TAG}`);
+            expect(world.sent.indexOf(`gamemode survival ${name}`)).toBeGreaterThan(
+                world.sent.indexOf(`gamemode adventure ${name}`)
+            );
+        }
+        // The items come from the events pack, in the server: its loot tables
+        // written, its drops armed for this server's item data, nothing given
+        // over the console.
+        expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
+        expect(
+            JSON.parse(packed("data/polaris/loot_table/pillars/balanced_components.json")!)
+        ).toEqual(pi.lootTable("balanced", "components"));
+        for (const line of pi.armLines(7, "balanced", "components"))
+            expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
+        await play(2_100);
+
+        // Cy falls off: out, up to the gallery, the kit taken and only the kit.
+        const play0 = pi.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        const game = pi.stateOf(state().run!.game);
+        expect(game.out.map((one) => [one.name, one.why])).toEqual([["Cy", "fell"]]);
+        expect(world.sent).toContain(`tag Cy add ${pi.OUT_TAG}`);
+        expect(world.sent).toContain(
+            "clear Cy minecraft:oak_planks[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.at.Cy![1]).toBe(pi.galleryFloor(layout, at).y1 + 1);
+        expect(world.sent.lastIndexOf("gamemode adventure Cy")).toBeGreaterThan(
+            world.sent.indexOf("gamemode survival Cy")
+        );
+        expect(saidToAll("Cy fell into the void")).toBe(true);
+
+        // Ana strikes Ben beside her, and Ben dies: Ana's elimination, and the end.
+        const anaAt = world.at.Ana!;
+        world.at.Ben = [anaAt[0] + 1.5, anaAt[1], anaAt[2]];
+        world.dealt.Ana = 30;
+        world.board.pe_swt!.Ben = 30;
+        world.attackers.Ben = "Ana";
+        world.died = { Ben: 1 };
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Only one player was left",
+            podium: [
+                { place: 1, name: "Ana" },
+                { place: 2, name: "Ben" },
+                { place: 3, name: "Cy" }
+            ]
+        });
+        expect(saidToAll("Ben is out (Ana).")).toBe(true);
+        expect(saidToAll("Ana is the last one standing and wins.")).toBe(true);
+        // The drops off, the ring down by kind, everybody's own things back
+        // byte for byte, and nothing kept.
+        for (const line of pi.STOP_LINES) expect(world.sent).toContain(line);
+        for (const block of ["minecraft:bedrock", "minecraft:barrier", "minecraft:smooth_stone"])
+            expect(fills().some((line) => line.endsWith(` minecraft:air replace ${block}`))).toBe(
+                true
+            );
+        expect(world.inv.Ana).toEqual(ana);
+        expect(world.inv.Ben).toEqual(ben);
+        expect(stashRows.size).toBe(0);
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("where the pack cannot be put on, gives everybody's items in one batch and takes them back when called off", async () => {
+        const pi = await kind();
+        world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([pillarsOf()]);
+        await joinAndStart("pil");
+        const run = state().run!;
+        expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(false);
+        expect(world.sent).not.toContain(`scoreboard players set #on ${pi.OBJECTIVE} 1`);
+        await play(2_100);
+        // The first drop at once, the same draw the pure function makes, and
+        // every item given marked as the kit.
+        for (const line of pi.dropLines(run.id, 0, ["Ana", "Ben"], "balanced", "components"))
+            expect(world.sent).toContain(line);
+        await play(7_100);
+        for (const line of pi.dropLines(run.id, 1, ["Ana", "Ben"], "balanced", "components"))
+            expect(world.sent).toContain(line);
+        const given = world.sent.filter((line) => /^give (Ana|Ben) /.test(line));
+        expect(given.length).toBeGreaterThanOrEqual(4);
+        expect(
+            given.every((line) => line.includes("[minecraft:custom_data={polaris_event:1b}"))
+        ).toBe(true);
+        expect(pi.stateOf(state().run!.game).drops).toBeGreaterThanOrEqual(2);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:ender_pearl[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.inv.Ana).toEqual(ana);
+        expect(stashRows.size).toBe(0);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("refuses a server older than 1.17, where the items would sit beside what players brought", async () => {
+        world.version = "1.16.5";
+        setUp([pillarsOf()]);
+        const why = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "pil",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        expect(why).toMatch(
+            /needs Minecraft 1\.17 or later, where what players carry is put away before they play/
+        );
+        expect(fills()).toEqual([]);
+    });
+});
 /**
  * The pace of an event between its steps, against a server that takes as long
  * to reach as a real one does from the dashboard: every trip into it - a

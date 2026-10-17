@@ -1847,6 +1847,11 @@
                 "label": "Tira y afloja",
                 "summary": "Los jugadores que se apuntan se reparten en dos equipos iguales, cada uno en un corral a un extremo de una plataforma en el cielo, con una cuerda entre ambos y una marca en el centro. Cada clic derecho con la caña que se entrega es un tirón, contado por el servidor y limitado a lo que hace una mano rápida, y los tirones de cada equipo se promedian entre sus jugadores para que un equipo más pequeño no salga perdiendo. La marca se mueve hacia el equipo que tira más fuerte; arrástrala hasta tu línea para ganar, o ve por delante cuando acabe el tiempo. El suelo de los perdedores se abre y caen al agua. Nadie sufre daño y nadie pierde nada suyo.",
                 "unit": "points"
+            },
+            "pillars": {
+                "label": "Pilares",
+                "summary": "Cada jugador que se une empieza solo en lo alto de un pilar de roca madre, en un anillo sobre una gran caída. Cada pocos segundos todos reciben un objeto al azar: bloques, armas, perlas, pociones y más. Tiende puentes, tira a los demás y sé el último en pie. Caer o morir solo te deja fuera: las cosas de cada uno se guardan y se devuelven.",
+                "unit": "puntos"
             }
         },
         "triggers": {
@@ -2451,6 +2456,11 @@
             "downhillSteepness": {
                 "gentle": "Suave",
                 "steep": "Fuerte"
+            },
+            "pillarPool": {
+                "balanced": "Equilibrado",
+                "blocks": "Solo bloques",
+                "chaos": "Caos: lava, TNT y más"
             }
         },
         "place": {
@@ -2470,7 +2480,8 @@
             "maze": "El laberinto se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "acid": "La arena se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "elytra": "El circuito se cuelga a 50 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
-            "downhill": "La meta se construye a 30 bloques de altura y la salida más arriba, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
+            "downhill": "La meta se construye a 30 bloques de altura y la salida más arriba, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "pillars": "Los pilares se construyen 40 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
         },
         "floorSizeHint": "De 5 a 15: este mide {size} por {size}.",
         "range": "De {min} a {max}",
@@ -2581,7 +2592,16 @@
         "glassSteps": "Filas de cristal",
         "glassStepsHint": "De 6 a 20.",
         "turnSeconds": "Tiempo por fila (segundos)",
-        "turnSecondsHint": "De 10 a 60 que tiene cada jugador por turnos para llegar a la siguiente fila antes de quedar fuera."
+        "turnSecondsHint": "De 10 a 60 que tiene cada jugador por turnos para llegar a la siguiente fila antes de quedar fuera.",
+        "itemPool": "Objetos",
+        "itemInterval": "Segundos entre objetos",
+        "itemIntervalHint": "De 3 a 20; todos reciben uno cada vez",
+        "pillarHeight": "Altura (bloques)",
+        "pillarHeightHint": "De 40 a 60 sobre el suelo",
+        "voidAfter": "El vacío sube tras (min)",
+        "voidAfterHint": "De 0 a 15; 0 nunca, puede durar todo",
+        "pillarMiddle": "Plataforma en el centro",
+        "pillarTwists": "Giros al azar en la partida"
     },
     "moderation": {
         "announcements": {
