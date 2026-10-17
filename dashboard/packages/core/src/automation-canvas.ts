@@ -254,7 +254,7 @@ export function connectRefusal(
     }
     if (from.node === to) return "self";
     const source = graph.nodes.find((node) => node.id === from.node);
-    if (!source || !graphs.nodePorts(source.type).includes(from.port)) return "unknownPort";
+    if (!source || !graphs.nodePorts(source.type, source).includes(from.port)) return "unknownPort";
     if (
         graph.edges.some(
             (edge) =>
@@ -346,7 +346,7 @@ export function insertOnEdge(
     const room = to.x - at.x - step;
     const shift = room < 0 ? -room : 0;
     const moving = shift ? graphs.reachableFrom(graph, target.id) : new Set<string>();
-    const port = graphs.nodePorts(node.type)[0]!;
+    const port = graphs.nodePorts(node.type, node)[0]!;
     const placed: graphs.GraphNode = { ...node, position: at };
     const nodes = [
         ...graph.nodes.map((entry) =>
@@ -592,7 +592,20 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.wait": ["waitedUntil"],
     "core.notify": ["sent"],
     "core.http": ["status", "ok", "headers", "body"],
-    "core.chat": ["status", "ok"]
+    "core.chat": ["status", "ok"],
+    "core.called": ["id", "at", "inputs"],
+    "core.onEvent": ["id", "at", "name", "payload"],
+    "core.failed": ["id", "at", "automationId", "automationName", "runId", "status", "error"],
+    "core.switch": ["matched"],
+    "core.parallel": ["lanes"],
+    "core.join": ["inputs", "items", "arrived", "missing"],
+    "core.forEach": ["count", "passes"],
+    "core.repeat": ["passes"],
+    "core.stop": ["as", "reason"],
+    "core.waitEvent": ["name", "payload", "timedOut"],
+    "core.run": ["runId", "status", "outputs"],
+    "core.answer": ["outputs"],
+    "core.announce": ["name", "eventId"]
 };
 
 export interface ReferenceOption {
@@ -799,7 +812,7 @@ export function canPin(type: string): boolean {
 /** The node types the palette offers, by role, in a stable order. */
 export function paletteTypes(): {
     type: graphs.CoreNodeType;
-    role: "trigger" | "condition" | "action";
+    role: graphs.NodeRole;
 }[] {
     return (Object.keys(graphs.CORE_NODE_META) as graphs.CoreNodeType[]).map((type) => ({
         type,

@@ -62,7 +62,24 @@ export const AUTOMATION_LIMITS = {
     pinBytes: 64 * KB,
     /** Versions listed in the history; every one is kept. */
     versionsListed: 50,
-    runsPage: 50
+    runsPage: 50,
+    /** Items one For each walks, and passes one Repeat makes. */
+    loopItems: 1000,
+    repeatPasses: 100,
+    loopBatch: 100,
+    /** Outputs a Choose may have, and lanes an At the same time. */
+    switchCases: 10,
+    parallelLanes: 8,
+    joinInputs: 20,
+    /** Retry on fail: tries counted with the first, and the longest wait between two. */
+    retryTries: 5,
+    retryWaitSeconds: 3600,
+    /** Inputs a called automation declares, and values an Answer or Announce carries. */
+    callInputs: 20,
+    /** Trigger combinators: how far apart the members may fire. */
+    combineWindowSeconds: 30 * 24 * 60 * 60,
+    /** Automation events one shelf may announce in ten minutes. */
+    announceRate: 200
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -250,25 +267,37 @@ export const compareLeafSchema = z.object({
 });
 export type CompareLeaf = z.infer<typeof compareLeafSchema>;
 
+/** Holds when the run was started by one of these trigger nodes. */
+export const triggeredByLeafSchema = z.object({
+    kind: z.literal("triggeredBy"),
+    triggers: z
+        .array(z.string().min(1).max(64))
+        .max(20)
+        .default([])
+});
+export type TriggeredByLeaf = z.infer<typeof triggeredByLeafSchema>;
+
 export interface ConditionGroup {
     kind: "group";
     join: "all" | "any";
     negate?: boolean;
     items: ConditionNode[];
 }
-export type ConditionNode = CompareLeaf | ConditionGroup;
+export type ConditionNode = CompareLeaf | TriggeredByLeaf | ConditionGroup;
 
 export const conditionGroupSchema: z.ZodType<ConditionGroup, z.ZodTypeDef, unknown> = z.lazy(() =>
     z.object({
         kind: z.literal("group"),
         join: z.enum(["all", "any"]),
         negate: z.boolean().optional(),
-        items: z.array(z.union([compareLeafSchema, conditionGroupSchema])).max(20)
+        items: z
+            .array(z.union([compareLeafSchema, triggeredByLeafSchema, conditionGroupSchema]))
+            .max(20)
     })
 ) as z.ZodType<ConditionGroup, z.ZodTypeDef, unknown>;
 
 function conditionDepth(node: ConditionNode): number {
-    if (node.kind === "compare") return 0;
+    if (node.kind !== "group") return 0;
     return 1 + Math.max(0, ...node.items.map(conditionDepth));
 }
 
@@ -329,6 +358,10 @@ export function checkCompare(leaf: CompareLeaf, context: unknown): boolean {
 /** An empty group holds: "only if nothing" is no gate at all. */
 export function checkCondition(node: ConditionNode, context: unknown): boolean {
     if (node.kind === "compare") return checkCompare(node, context);
+    if (node.kind === "triggeredBy") {
+        const id = resolvePath(context, "trigger.id");
+        return typeof id === "string" && node.triggers.includes(id);
+    }
     const results = node.items.map((item) => checkCondition(item, context));
     const held =
         node.join === "all"
@@ -465,6 +498,102 @@ export const waitConfigSchema = z.discriminatedUnion("kind", [
     })
 ]);
 
+/** A name an automation event goes by: lowercase words joined by dots, dashes or underscores. */
+export const eventName = z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9._-]*$/, "eventNameInvalid");
+
+/** Named values with references, for Answer, Announce and a call's inputs. */
+const valuePairs = z
+    .array(
+        z.object({
+            name: z
+                .string()
+                .trim()
+                .min(1)
+                .max(64)
+                .regex(/^[A-Za-z_][\w-]*$/, "valueNameInvalid"),
+            value: text(2000).default("")
+        })
+    )
+    .max(AUTOMATION_LIMITS.callInputs)
+    .default([]);
+
+export const CALL_INPUT_KINDS = ["text", "number", "boolean", "json"] as const;
+
+export const calledConfigSchema = z.object({
+    inputs: z
+        .array(
+            z.object({
+                name: z
+                    .string()
+                    .trim()
+                    .min(1)
+                    .max(64)
+                    .regex(/^[A-Za-z_][\w-]*$/, "valueNameInvalid"),
+                kind: z.enum(CALL_INPUT_KINDS).default("text"),
+                required: z.boolean().default(false)
+            })
+        )
+        .max(AUTOMATION_LIMITS.callInputs)
+        .default([])
+});
+export type CalledConfig = z.infer<typeof calledConfigSchema>;
+
+export const switchConfigSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("rules"),
+        cases: z
+            .array(z.object({ label: text(60).default(""), condition: conditionTreeSchema }))
+            .min(1)
+            .max(AUTOMATION_LIMITS.switchCases),
+        /** Leave by every case that holds, rather than the first. */
+        every: z.boolean().default(false),
+        fallback: z.boolean().default(true)
+    }),
+    z.object({
+        kind: z.literal("value"),
+        value: text(500).min(1),
+        cases: z
+            .array(z.object({ label: text(60).default(""), equals: text(500) }))
+            .min(1)
+            .max(AUTOMATION_LIMITS.switchCases),
+        ignoreCase: z.boolean().default(true),
+        fallback: z.boolean().default(true)
+    })
+]);
+export type SwitchConfig = z.infer<typeof switchConfigSchema>;
+
+export const JOIN_WAITS = ["all", "any", "count"] as const;
+export const JOIN_OUTPUTS = ["byInput", "append", "keep"] as const;
+
+export const joinConfigSchema = z.object({
+    /** All inputs that can still arrive, the first one, or at least `count` of them. */
+    wait: z.enum(JOIN_WAITS).default("all"),
+    count: z.number().int().min(1).max(AUTOMATION_LIMITS.joinInputs).default(2),
+    /** Each input under its node id, every input in a list, or one input's data only. */
+    output: z.enum(JOIN_OUTPUTS).default("byInput"),
+    keep: z.string().max(64).nullable().default(null)
+});
+export type JoinConfig = z.infer<typeof joinConfigSchema>;
+
+export const repeatConfigSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("times"),
+        count: z.number().int().min(1).max(AUTOMATION_LIMITS.repeatPasses)
+    }),
+    /** Checked before each pass; stops when it holds, or after `max` passes. */
+    z.object({
+        kind: z.literal("until"),
+        condition: conditionTreeSchema,
+        max: z.number().int().min(1).max(AUTOMATION_LIMITS.repeatPasses).default(10)
+    })
+]);
+export type RepeatConfig = z.infer<typeof repeatConfigSchema>;
+
 /** Every node type core contributes, with the config each one takes. */
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
@@ -481,17 +610,61 @@ export const CORE_NODE_CONFIGS = {
         body: text(AUTOMATION_LIMITS.textLength).default("")
     }),
     "core.http": httpConfigSchema,
-    "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) })
+    "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) }),
+    "core.called": calledConfigSchema,
+    "core.onEvent": z.object({ name: eventName }),
+    "core.failed": z.object({
+        /** Empty: any other automation on this shelf. */
+        automations: z.array(z.string().uuid()).max(50).default([])
+    }),
+    "core.switch": switchConfigSchema,
+    "core.parallel": z.object({
+        lanes: z.number().int().min(2).max(AUTOMATION_LIMITS.parallelLanes).default(2)
+    }),
+    "core.join": joinConfigSchema,
+    "core.forEach": z.object({
+        /** A whole reference to a list, such as {{steps.http1.body.items}}. */
+        items: text(500).min(1),
+        /** Items handed to one pass of the loop; 1 walks them one by one. */
+        batch: z.number().int().min(1).max(AUTOMATION_LIMITS.loopBatch).default(1)
+    }),
+    "core.repeat": repeatConfigSchema,
+    "core.stop": z.object({
+        as: z.enum(["succeeded", "failed"]).default("succeeded"),
+        reason: text(200).default("")
+    }),
+    "core.waitEvent": z.object({
+        name: eventName,
+        timeout: durationSchema.refine(
+            (value) =>
+                durationSeconds(value) >= 1 &&
+                durationSeconds(value) * 1000 <= AUTOMATION_LIMITS.longestWaitMs,
+            "waitTooLong"
+        ),
+        /** Checked against the event as `event.*`; the wait goes on when it does not hold. */
+        filter: conditionTreeSchema.optional()
+    }),
+    "core.run": z.object({
+        automationId: z.string().uuid(),
+        inputs: valuePairs,
+        /** Wait for it to finish and take its answer; off: start it and carry on. */
+        wait: z.boolean().default(true)
+    }),
+    "core.answer": z.object({ outputs: valuePairs }),
+    "core.announce": z.object({ name: eventName, payload: valuePairs })
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
 
-export type NodeRole = "trigger" | "condition" | "action";
+/** "flow" nodes steer tokens (Choose, At the same time, Join, loops, Stop) and do nothing outside the run. */
+export type NodeRole = "trigger" | "condition" | "action" | "flow";
 
 export interface CoreNodeMeta {
     readonly role: NodeRole;
-    /** Output ports besides "next". */
+    /** Output ports besides "next"; for a condition or a flow node with `own`, all of them. */
     readonly ports: readonly string[];
+    /** The node leaves only by its own ports, never by "next". */
+    readonly own?: boolean;
     /** Safe to run again after a crash part-way through it. */
     readonly idempotent: boolean;
 }
@@ -504,18 +677,78 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.wait": { role: "action", ports: [], idempotent: true },
     "core.notify": { role: "action", ports: [], idempotent: false },
     "core.http": { role: "action", ports: [], idempotent: false },
-    "core.chat": { role: "action", ports: [], idempotent: false }
+    "core.chat": { role: "action", ports: [], idempotent: false },
+    "core.called": { role: "trigger", ports: [], idempotent: true },
+    "core.onEvent": { role: "trigger", ports: [], idempotent: true },
+    "core.failed": { role: "trigger", ports: [], idempotent: true },
+    // Ports of Choose and At the same time follow their config: see nodePorts.
+    "core.switch": { role: "flow", ports: [], own: true, idempotent: true },
+    "core.parallel": { role: "flow", ports: [], own: true, idempotent: true },
+    "core.join": { role: "flow", ports: [], idempotent: true },
+    "core.forEach": { role: "flow", ports: ["each", "done"], own: true, idempotent: true },
+    "core.repeat": { role: "flow", ports: ["each", "done"], own: true, idempotent: true },
+    "core.stop": { role: "flow", ports: [], own: true, idempotent: true },
+    "core.waitEvent": { role: "action", ports: ["timeout"], idempotent: true },
+    // The child run's firing key is unique per step, so starting it again finds the same run.
+    "core.run": { role: "action", ports: [], idempotent: true },
+    "core.answer": { role: "action", ports: [], idempotent: true },
+    // The event's dedupe key is the step's idempotency key.
+    "core.announce": { role: "action", ports: [], idempotent: true }
 };
+
+/** Loop nodes: their "each" port starts a body that runs once per item or pass. */
+export const LOOP_NODE_TYPES = ["core.forEach", "core.repeat"] as const;
+export function isLoopNode(type: string): boolean {
+    return (LOOP_NODE_TYPES as readonly string[]).includes(type);
+}
+
+/** Node types that may take the "error" port: everything that can fail on its own. */
+export function canTakeErrorPort(type: string): boolean {
+    const role = nodeRole(type);
+    return role === "action" || (role === null && type.length > 0);
+}
+
+/** The ports of a Choose, from its config: one per case, then "otherwise" when it has one. */
+export function switchPorts(config: unknown): string[] {
+    const parsed = switchConfigSchema.safeParse(config);
+    if (!parsed.success) return ["otherwise"];
+    const cases = parsed.data.cases.map((_, index) => `case${index + 1}`);
+    return parsed.data.fallback ? [...cases, "otherwise"] : cases;
+}
+
+export function parallelPorts(config: unknown): string[] {
+    const parsed = CORE_NODE_CONFIGS["core.parallel"].safeParse(config);
+    const lanes = parsed.success ? parsed.data.lanes : 2;
+    return Array.from({ length: lanes }, (_, index) => `lane${index + 1}`);
+}
 
 export function isCoreNodeType(type: string): type is CoreNodeType {
     return Object.prototype.hasOwnProperty.call(CORE_NODE_CONFIGS, type);
 }
 
-/** The ports a node may be wired from. A condition has only its own; everything else has "next". */
-export function nodePorts(type: string): readonly string[] {
-    if (!isCoreNodeType(type)) return ["next"];
+/**
+ * The ports a node may be wired from. A condition and an `own` flow node have
+ * only their own; everything else has "next". Given the node, the ports its
+ * config adds (Choose cases, parallel lanes) and its error port are included.
+ */
+export function nodePorts(
+    type: string,
+    node?: { readonly config?: unknown; readonly onError?: string }
+): readonly string[] {
+    const errorPort = node?.onError === "port" && canTakeErrorPort(type) ? ["error"] : [];
+    if (!isCoreNodeType(type)) return ["next", ...errorPort];
     const meta = CORE_NODE_META[type];
-    return meta.role === "condition" ? meta.ports : ["next", ...meta.ports];
+    if (type === "core.switch") return switchPorts(node?.config);
+    if (type === "core.parallel") return parallelPorts(node?.config);
+    const own = meta.role === "condition" || meta.own ? meta.ports : ["next", ...meta.ports];
+    return [...own, ...errorPort];
+}
+
+/** The port a node leaves by when it is switched off or carries on after a failure. */
+export function passPort(type: string, node?: { readonly config?: unknown }): string | null {
+    if (type === "core.stop") return null;
+    if (isLoopNode(type)) return "done";
+    return nodePorts(type, { config: node?.config })[0] ?? null;
 }
 
 export function nodeRole(type: string): NodeRole | null {
@@ -578,7 +811,16 @@ export const graphNodeSchema = z.object({
     note: z.string().trim().max(250).optional(),
     enabled: z.boolean().optional(),
     position: z.object({ x: z.number().finite(), y: z.number().finite() }).optional(),
-    onError: z.enum(["stop", "continue"]).optional(),
+    /** Stop the run, carry on by the first port, or leave by the "error" port. */
+    onError: z.enum(["stop", "continue", "port"]).optional(),
+    /** Try again on a failure, `tries` times in all, waiting between tries. */
+    retry: z
+        .object({
+            tries: z.number().int().min(2).max(AUTOMATION_LIMITS.retryTries),
+            waitSeconds: z.number().int().min(1).max(AUTOMATION_LIMITS.retryWaitSeconds),
+            backoff: z.enum(["fixed", "double"]).default("fixed")
+        })
+        .optional(),
     /** A sample output used instead of running the node, in test runs of the draft only. Never published. */
     pinned: z.unknown().optional()
 });
@@ -603,6 +845,36 @@ export const graphEdgeSchema = z.object({
 });
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 
+const windowSeconds = z
+    .number()
+    .int()
+    .min(1)
+    .max(AUTOMATION_LIMITS.combineWindowSeconds)
+    .default(300);
+
+export const whenSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("any") }),
+    z.object({ kind: z.literal("all"), windowSeconds }),
+    z.object({ kind: z.literal("count"), count: z.number().int().min(1).max(20), windowSeconds })
+]);
+export type WhenConfig = z.infer<typeof whenSchema>;
+
+/** How many members must fire inside the window for a combined start, or 1 for "any". */
+export function combineNeeds(when: WhenConfig, members: number): number {
+    if (when.kind === "any") return 1;
+    if (when.kind === "all") return Math.max(1, members);
+    return Math.max(1, Math.min(when.count, members));
+}
+
+/** Retry wait before try number `next` (2 = the first retry), in milliseconds. */
+export function retryDelayMs(
+    retry: { readonly waitSeconds: number; readonly backoff: "fixed" | "double" },
+    next: number
+): number {
+    const factor = retry.backoff === "double" ? 2 ** Math.max(0, next - 2) : 1;
+    return Math.min(retry.waitSeconds * factor, AUTOMATION_LIMITS.retryWaitSeconds) * 1000;
+}
+
 export const automationGraphSchema = z.object({
     schema: z.literal(1).default(1),
     timeZone: z.string().min(1).max(64).default("UTC"),
@@ -616,7 +888,9 @@ export const automationGraphSchema = z.object({
         })
         .default({ entry: null, onCancel: false }),
     /** Sticky notes on the canvas: words for the reader, never run. */
-    notes: z.array(graphNoteSchema).max(AUTOMATION_LIMITS.notes).default([])
+    notes: z.array(graphNoteSchema).max(AUTOMATION_LIMITS.notes).default([]),
+    /** How the triggers combine: any one starts a run, or all / at least N within a window. */
+    when: whenSchema.default({ kind: "any" })
 });
 export type AutomationGraph = z.infer<typeof automationGraphSchema>;
 
@@ -627,7 +901,8 @@ export function emptyGraph(timeZone = "UTC"): AutomationGraph {
         nodes: [],
         edges: [],
         finally: { entry: null, onCancel: false },
-        notes: []
+        notes: [],
+        when: { kind: "any" }
     };
 }
 
@@ -642,6 +917,7 @@ export type GraphProblem =
     | { code: "badConfig"; node: string; issue: string }
     | { code: "pinTooLarge"; node: string }
     | { code: "pinNotAllowed"; node: string }
+    | { code: "loopBodyLeaks"; node: string }
     | { code: "noTrigger" };
 
 /** Nodes reachable from `start` along edges, `start` included. */
@@ -658,6 +934,14 @@ export function reachableFrom(graph: AutomationGraph, start: string): Set<string
         stack.push(...(out.get(at) ?? []));
     }
     return seen;
+}
+
+/** The nodes a loop's "each" port reaches: what runs once per item. */
+export function loopBody(graph: AutomationGraph, loopId: string): Set<string> {
+    const body = new Set<string>();
+    for (const start of successors(graph, loopId, "each"))
+        for (const id of reachableFrom(graph, start)) body.add(id);
+    return body;
 }
 
 export function triggerNodes(graph: AutomationGraph): GraphNode[] {
@@ -701,6 +985,8 @@ export function graphProblems(
         if (node.pinned !== undefined) {
             if (nodeRole(node.type) === "condition")
                 problems.push({ code: "pinNotAllowed", node: node.id });
+            else if (nodeRole(node.type) === "flow")
+                problems.push({ code: "pinNotAllowed", node: node.id });
             else if (byteLength(JSON.stringify(node.pinned) ?? "null") > AUTOMATION_LIMITS.pinBytes)
                 problems.push({ code: "pinTooLarge", node: node.id });
         }
@@ -710,7 +996,7 @@ export function graphProblems(
         const to = byId.get(edge.to.node);
         if (!from) problems.push({ code: "unknownEdgeNode", node: edge.from.node });
         if (!to) problems.push({ code: "unknownEdgeNode", node: edge.to.node });
-        if (from && !nodePorts(from.type).includes(edge.from.port))
+        if (from && !nodePorts(from.type, from).includes(edge.from.port))
             problems.push({ code: "unknownPort", node: from.id, port: edge.from.port });
         if (to && nodeRole(to.type) === "trigger")
             problems.push({ code: "intoTrigger", node: to.id });
@@ -751,6 +1037,18 @@ export function graphProblems(
                 if (edge.to.node === entry) problems.push({ code: "finallyShared", node: entry });
         }
     }
+    if (!cyclic)
+        for (const loop of graph.nodes) {
+            if (!isLoopNode(loop.type)) continue;
+            const body = loopBody(graph, loop.id);
+            for (const edge of graph.edges)
+                if (
+                    body.has(edge.to.node) &&
+                    !body.has(edge.from.node) &&
+                    !(edge.from.node === loop.id && edge.from.port === "each")
+                )
+                    problems.push({ code: "loopBodyLeaks", node: edge.to.node });
+        }
     if (options.forPublish && triggerNodes(graph).length === 0)
         problems.push({ code: "noTrigger" });
     return problems;
@@ -816,7 +1114,8 @@ export function graphFromList(flow: ListFlow): AutomationGraph {
         nodes,
         edges,
         finally: { entry, onCancel: flow.finallyOnCancel },
-        notes: []
+        notes: [],
+        when: { kind: "any" }
     };
 }
 
