@@ -7,6 +7,7 @@
 
 import { redirect } from "next/navigation";
 import { placesT } from "../../../../../lib/i18n";
+import { movedTo } from "../../../../../lib/automation-move";
 import { TEMPLATES } from "../../../../../lib/automation-kinds";
 import { requireHomeUser } from "../../../../../lib/access";
 import { AutomationEditor } from "../../../../../screens/automations/automation-editor";
@@ -32,6 +33,9 @@ export default async function AutomationPage({
     const raw = one(id);
     const automationId = raw === "new" ? null : raw;
     const template = one(query.template);
+    // Moved to the central engine: its screen is there now, under its new id.
+    const moved = automationId ? await movedTo(automationId) : null;
+    if (moved) redirect(`/automations/${moved}`);
     // Somebody who cannot write automations has nothing to start here.
     if (!automationId && !canManage) redirect("/places/devices/automations");
 
