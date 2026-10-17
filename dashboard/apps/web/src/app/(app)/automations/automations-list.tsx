@@ -363,7 +363,7 @@ function FoldersDialog({
                 {folders.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("folders.empty")}</p>
                 ) : (
-                    <ul className="max-h-80 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                    <ul className="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain rounded-lg border border-border">
                         {folders.map((folder) => (
                             <li key={folder.id} className="flex min-w-0 items-center gap-2 p-2">
                                 {editing?.id === folder.id ? (

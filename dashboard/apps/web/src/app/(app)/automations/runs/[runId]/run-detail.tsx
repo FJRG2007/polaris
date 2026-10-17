@@ -231,7 +231,7 @@ function DataBlock({ title, value }: { title: string; value: unknown }) {
             {value === null || value === undefined ? (
                 <p className="text-xs text-muted-foreground">{t("runView.noData")}</p>
             ) : (
-                <pre className="max-h-64 overflow-auto rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>
+                <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>
             )}
         </div>
     );

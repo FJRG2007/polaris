@@ -55,7 +55,7 @@ function ReferenceMenu({ disabled, onPick }: { disabled?: boolean; onPick: (path
                     <Braces aria-hidden="true" />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto">
+            <DropdownMenuContent align="end" className="max-h-80 w-72 overflow-y-auto overscroll-contain">
                 {groups.length === 0 ? (
                     <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("canvas.noReferences")}</p>
                 ) : (

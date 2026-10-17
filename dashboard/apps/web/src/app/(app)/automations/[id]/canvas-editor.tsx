@@ -345,7 +345,7 @@ export function CanvasEditor({
                             <X aria-hidden="true" />
                         </Button>
                     </header>
-                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
                         <NodePanel
                             key={panelNode.id}
                             node={panelNode}
@@ -468,7 +468,7 @@ function Palette({ open, stepsOnly, onOpenChange, onPick }: { open: boolean; ste
                         }
                     }}
                 />
-                <div className="max-h-80 space-y-3 overflow-y-auto">
+                <div className="max-h-80 space-y-3 overflow-y-auto overscroll-contain">
                     {shown.length === 0 ? <p className="text-sm text-muted-foreground">{t("canvas.noMatches")}</p> : null}
                     {shown.map((group) => (
                         <div key={group.label} className="space-y-1">
@@ -633,7 +633,7 @@ function NodePanel({
                             </div>
                         </>
                     ) : shownSample !== undefined && shownSample !== null ? (
-                        <pre className="max-h-64 overflow-auto rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(shownSample, null, 2)}</pre>
+                        <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(shownSample, null, 2)}</pre>
                     ) : (
                         <p className="text-xs text-muted-foreground">{t("canvas.noOutput")}</p>
                     )}

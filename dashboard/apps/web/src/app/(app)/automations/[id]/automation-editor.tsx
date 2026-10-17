@@ -524,7 +524,7 @@ function VersionsDialog({
                             {!comparing.result ? <RowsSkeleton rows={2} /> : <ComparisonList comparison={comparing.result} />}
                         </section>
                     ) : null}
-                    <ul className="max-h-96 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                    <ul className="max-h-96 divide-y divide-border overflow-y-auto overscroll-contain rounded-lg border border-border">
                         {rows.map((row) => (
                             <li key={row.id} className="flex min-w-0 flex-wrap items-center gap-2 p-3">
                                 <div className="min-w-0 flex-1">
