@@ -44,6 +44,13 @@ import { LoadFailed, nodeTitle, RowsSkeleton, Section, useCachedAction } from ".
 const TRIGGER_TYPES = ["core.manual", "core.schedule", "core.webhook"] as const;
 const STEP_TYPES = ["core.if", "core.wait", "core.notify", "core.http", "core.chat"] as const;
 
+/** A service's own name, the same in every language. */
+const PRESET_NAMES: Record<core.ChatPreset, string> = {
+    slack: "Slack", // i18n-ignore
+    discord: "Discord", // i18n-ignore
+    teams: "Teams" // i18n-ignore
+};
+
 const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.manual": () => ({}),
     "core.schedule": () => ({ kind: "every", amount: 15, unit: "minutes" }),
@@ -787,8 +794,8 @@ function NodeFields({
                             value={config.method ?? "POST"}
                             onValueChange={(method) => set({ method })}
                             options={[
-                                { value: "POST", label: "POST" },
-                                { value: "GET", label: "GET" },
+                                { value: "POST", label: "POST" }, // i18n-ignore
+                                { value: "GET", label: "GET" }, // i18n-ignore
                                 { value: "any", label: t("fields.anyMethod") }
                             ]}
                             aria-label={t("fields.method")}
@@ -1097,18 +1104,12 @@ function NodeFields({
                 <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Field label={t("fields.preset")}>
-                            {/* i18n-ignore: a service's own name */}
                             <Select
                                 value={config.preset}
                                 onValueChange={(preset) => set({ preset })}
                                 options={core.CHAT_PRESETS.map((preset) => ({
                                     value: preset,
-                                    label:
-                                        preset === "slack"
-                                            ? "Slack"
-                                            : preset === "discord"
-                                              ? "Discord"
-                                              : "Teams"
+                                    label: PRESET_NAMES[preset]
                                 }))}
                                 aria-label={t("fields.preset")}
                             />

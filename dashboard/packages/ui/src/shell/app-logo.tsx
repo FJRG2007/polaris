@@ -256,10 +256,9 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
-    // A sticky note with a turned-up corner and two lines.
     // A trigger wired to the step it starts.
     automations: {
-        palette: ["#99F6E4", "#14B8A6", "#0F766E"],
+        palette: ["#5EEAD4", "#0D9488", "#115E59"],
         draw: ({ base, face }) => (
             <>
                 <rect x="4" y="5" width="11" height="9" rx="3" fill={base} />
@@ -268,6 +267,7 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // A sticky note with a turned-up corner and two lines.
     notes: {
         palette: ["#FDE68A", "#EAB308", "#B45309"],
         draw: ({ base, face }) => (

@@ -299,7 +299,7 @@ function StepData({ label, value }: { label: string; value: unknown }) {
     return (
         <div className="min-w-0 space-y-1">
             <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 text-xs">
+            <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-background p-2 text-xs">
                 {text || "-"}
             </pre>
         </div>

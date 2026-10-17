@@ -26,14 +26,14 @@ const KEPT_HEADERS = [
 ];
 
 async function handle(request: Request, token: string): Promise<Response> {
-    // i18n-ignore: a reply to a machine caller, not read on screen
     if (!/^[\w-]{20,100}$/.test(token))
+        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json({ error: "not found" }, { status: 404 });
     const hash = hookHash(token);
     const limited = await rateLimit(`automation-hook:${hash}`, PER_MINUTE, 60_000);
     if (!limited.ok)
-        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json(
+            // i18n-ignore: a reply to a machine caller, not read on screen
             { error: "rate limited" },
             {
                 status: 429,
@@ -69,13 +69,13 @@ async function handle(request: Request, token: string): Promise<Response> {
         : undefined;
     const config = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node?.config);
     const method = config.success ? config.data.method : "POST";
-    // i18n-ignore: a reply to a machine caller, not read on screen
     if (method !== "any" && request.method !== method)
+        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json({ error: "method not allowed" }, { status: 405 });
 
     const declared = Number(request.headers.get("content-length") ?? "0");
-    // i18n-ignore: a reply to a machine caller, not read on screen
     if (declared > core.AUTOMATION_LIMITS.eventPayloadBytes)
+        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json({ error: "too large" }, { status: 413 });
     const bytes =
         request.method === "GET"
