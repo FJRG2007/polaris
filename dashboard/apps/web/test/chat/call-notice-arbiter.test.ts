@@ -26,11 +26,7 @@ const ids = (list: readonly CallNotice[]) => list.map((item) => item.id);
 /** Every notice handed in comes back exactly once, in one of the three places. */
 function expectNothingLost(active: readonly CallNotice[]) {
     const order = arbitrateNotices(active);
-    const out = [
-        ...(order.top ? [order.top] : []),
-        ...order.rest,
-        ...order.consequences
-    ];
+    const out = [...(order.top ? [order.top] : []), ...order.rest, ...order.consequences];
     expect(ids(out).sort()).toEqual(ids(active).sort());
 }
 
@@ -50,7 +46,12 @@ describe("the call notice arbiter", () => {
         const order = arbitrateNotices(active);
         expect(order.top?.id).toBe("server");
         expect(order.rest).toEqual([]);
-        expect(ids(order.consequences).sort()).toEqual(["mic-not-sent", "no-audio", "quiet", "slow"]);
+        expect(ids(order.consequences).sort()).toEqual([
+            "mic-not-sent",
+            "no-audio",
+            "quiet",
+            "slow"
+        ]);
         // A microphone cannot be faulted through a connection that is not there.
         expect(order.mic).toBeNull();
         expectNothingLost(active);
@@ -59,14 +60,20 @@ describe("the call notice arbiter", () => {
     it.each<NoticeCause>(["line", "mic-fault", "mic-silent", "mic-quiet", "sound", "far-end"])(
         "the call server explains %s",
         (cause) => {
-            const order = arbitrateNotices([notice("x", cause, "error"), notice("s", "server", "warning")]);
+            const order = arbitrateNotices([
+                notice("x", cause, "error"),
+                notice("s", "server", "warning")
+            ]);
             expect(order.top?.id).toBe("s");
             expect(ids(order.consequences)).toEqual(["x"]);
         }
     );
 
     it.each<NoticeCause>(["share", "other"])("the call server never explains %s", (cause) => {
-        const order = arbitrateNotices([notice("x", cause, "info"), notice("s", "server", "error")]);
+        const order = arbitrateNotices([
+            notice("x", cause, "info"),
+            notice("s", "server", "error")
+        ]);
         expect(order.top?.id).toBe("s");
         expect(ids(order.rest)).toEqual(["x"]);
         expect(order.consequences).toEqual([]);
@@ -84,7 +91,10 @@ describe("the call notice arbiter", () => {
     });
 
     it("a silent microphone explains it being quiet", () => {
-        const order = arbitrateNotices([notice("quiet", "mic-quiet"), notice("silent", "mic-silent")]);
+        const order = arbitrateNotices([
+            notice("quiet", "mic-quiet"),
+            notice("silent", "mic-silent")
+        ]);
         expect(order.top?.id).toBe("silent");
         expect(ids(order.consequences)).toEqual(["quiet"]);
         expect(order.mic?.id).toBe("silent");
@@ -137,7 +147,10 @@ describe("the call notice arbiter", () => {
     });
 
     it("an error about the microphone goes before a warning about the line", () => {
-        const order = arbitrateNotices([notice("line", "line"), notice("mic", "mic-fault", "error")]);
+        const order = arbitrateNotices([
+            notice("line", "line"),
+            notice("mic", "mic-fault", "error")
+        ]);
         expect(ids([order.top!, ...order.rest])).toEqual(["mic", "line"]);
     });
 

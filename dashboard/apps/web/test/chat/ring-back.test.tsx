@@ -124,9 +124,21 @@ describe("who answers", () => {
         expect(somebodyElseIn([me, ben], "p-ana", "ana")).toBe(true);
         expect(somebodyElseIn([me, { ...ben, admission: "waiting" }], "p-ana", "ana")).toBe(false);
         // The caller's own second tab is not somebody answering.
-        expect(somebodyElseIn([me, { id: "p-ana-2", userId: "ana", admission: "admitted" }], "p-ana", "ana")).toBe(false);
+        expect(
+            somebodyElseIn(
+                [me, { id: "p-ana-2", userId: "ana", admission: "admitted" }],
+                "p-ana",
+                "ana"
+            )
+        ).toBe(false);
         // A guest has no account and still answers.
-        expect(somebodyElseIn([me, { id: "p-guest", userId: null, admission: "admitted" }], "p-ana", "ana")).toBe(true);
+        expect(
+            somebodyElseIn(
+                [me, { id: "p-guest", userId: null, admission: "admitted" }],
+                "p-ana",
+                "ana"
+            )
+        ).toBe(true);
     });
 });
 
@@ -165,7 +177,10 @@ describe("the caller's tone", () => {
     it("stops when somebody answers, and never comes back through a reconnect", async () => {
         const hook = mount(callWith(), session(NOW));
         await settle();
-        hook.rerender({ call: callWith({ meeting: { participants: [me, ben] } }), held: session(NOW) });
+        hook.rerender({
+            call: callWith({ meeting: { participants: [me, ben] } }),
+            held: session(NOW)
+        });
         await settle();
         expect(sounds.stopped).toBe(1);
         // The connection dropped and came back: for a moment nobody is listed.

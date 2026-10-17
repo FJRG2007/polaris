@@ -86,7 +86,13 @@ afterEach(() => {
 function room() {
     HTMLMediaElement.prototype.play = () => Promise.resolve();
     return render(
-        <CallRoom meetingId="m1" place="channel" call={callWith()} onLeave={() => undefined} viewerId="alan" />
+        <CallRoom
+            meetingId="m1"
+            place="channel"
+            call={callWith()}
+            onLeave={() => undefined}
+            viewerId="alan"
+        />
     );
 }
 

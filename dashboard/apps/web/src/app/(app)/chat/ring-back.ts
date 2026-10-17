@@ -78,7 +78,11 @@ export interface RingBackCall {
  * chosen speaker the way every ring does, and says nothing where this tab cannot
  * be heard.
  */
-export function useRingBack(call: RingBackCall, session: CallSession | null, viewerId: string): void {
+export function useRingBack(
+    call: RingBackCall,
+    session: CallSession | null,
+    viewerId: string
+): void {
     const meetingId = session?.meetingId ?? null;
     const placedAt = session?.placedAt;
     /** The call somebody answered, which never rings back again. */

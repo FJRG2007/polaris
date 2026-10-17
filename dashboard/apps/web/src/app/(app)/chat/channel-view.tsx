@@ -845,7 +845,10 @@ export function ChannelView({
         void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
             if (result?.error) setError(result.error);
             if (result?.meetingId) {
-                enter({ meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) }, false);
+                enter(
+                    { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                    false
+                );
             }
             checkCall();
         });
@@ -1198,7 +1201,10 @@ export function ChannelView({
             }
             // Without a camera, whoever they are: a voice channel is voice, and
             // the camera is one press away inside it.
-            enter({ meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) }, false);
+            enter(
+                { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                false
+            );
             checkCall();
         });
     }, [callTitle, callsOff, channel, channelId, checkCall, enter, pressed, router, session]);
@@ -2279,7 +2285,10 @@ export function ChannelView({
             return;
         }
         if (result.meetingId) {
-            enter({ meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) }, withVideo);
+            enter(
+                { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
+                withVideo
+            );
         } else setError("That call could not be joined. Try again.");
         checkCall();
     }

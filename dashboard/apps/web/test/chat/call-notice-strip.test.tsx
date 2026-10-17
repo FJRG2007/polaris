@@ -16,7 +16,15 @@ import { Wifi, WifiOff, MicOff, Volume1 } from "lucide-react";
 import { arbitrateNotices } from "@/app/(app)/chat/call-notices";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SERVER_LOST, UNKNOWN_AUDIO } from "@/app/(app)/chat/call-diagnosis";
-import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    renderHook,
+    screen,
+    within
+} from "@testing-library/react";
 
 const network = { online: true, slow: false };
 const noAudio = { warning: false, dismiss: vi.fn() };
@@ -75,11 +83,14 @@ const quietMic: Shown = {
 };
 
 function strip(...notices: Shown[]) {
-    return render(<CallNoticeStrip order={arbitrateNotices(notices)} />, { wrapper: MessagesWrapper });
+    return render(<CallNoticeStrip order={arbitrateNotices(notices)} />, {
+        wrapper: MessagesWrapper
+    });
 }
 
 /** The rows drawn, each one notice. */
-const rows = () => screen.getByRole("region", { name: "Call notices" }).querySelectorAll(":scope div.rounded-md");
+const rows = () =>
+    screen.getByRole("region", { name: "Call notices" }).querySelectorAll(":scope div.rounded-md");
 
 describe("the call notice strip", () => {
     it("draws nothing when the call has nothing to say", () => {
@@ -237,7 +248,11 @@ describe("the notices a call has", () => {
 
     it("an error said in a sentence of its own is drawn as it is", () => {
         const order = noticesOf(callWith({ error: "The camera was refused." }));
-        expect(order.top).toMatchObject({ cause: "other", severity: "error", short: "The camera was refused." });
+        expect(order.top).toMatchObject({
+            cause: "other",
+            severity: "error",
+            short: "The camera was refused."
+        });
     });
 
     it("a slow line is only said while there is a line", () => {
