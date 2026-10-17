@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { FolderInput, FolderPlus, Folders, MoreHorizontal, Pencil, Plus, Tags, Trash2, Workflow, X } from "lucide-react";
+import {
+    FolderInput,
+    FolderPlus,
+    Folders,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Tags,
+    Trash2,
+    Workflow,
+    X
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -64,32 +75,65 @@ export function AutomationsList() {
     const [tagging, setTagging] = useState<AutomationRow | null>(null);
 
     const folders = data?.folders ?? [];
-    const folderName = useMemo(() => new Map(folders.map((entry) => [entry.id, entry.name])), [folders]);
+    const folderName = useMemo(
+        () => new Map(folders.map((entry) => [entry.id, entry.name])),
+        [folders]
+    );
     // A list cached before folders and tags existed has rows without them.
-    const rows = useMemo(() => (data?.rows ?? []).map((row) => ({ ...row, folderId: row.folderId ?? null, tags: row.tags ?? [] })), [data?.rows]);
+    const rows = useMemo(
+        () =>
+            (data?.rows ?? []).map((row) => ({
+                ...row,
+                folderId: row.folderId ?? null,
+                tags: row.tags ?? []
+            })),
+        [data?.rows]
+    );
     const allTags = useMemo(() => [...new Set(rows.flatMap((row) => row.tags))].sort(), [rows]);
     // A filter on a folder or tag that no longer exists shows everything rather than nothing.
     const folderFilter = folder === ALL || folder === NONE || folderName.has(folder) ? folder : ALL;
     const tagFilter = tag && allTags.includes(tag) ? tag : null;
     const shown = rows.filter(
-        (row) => (folderFilter === ALL || (folderFilter === NONE ? !row.folderId : row.folderId === folderFilter)) && (!tagFilter || row.tags.includes(tagFilter))
+        (row) =>
+            (folderFilter === ALL ||
+                (folderFilter === NONE ? !row.folderId : row.folderId === folderFilter)) &&
+            (!tagFilter || row.tags.includes(tagFilter))
     );
 
     /** Change one row now, and put it back when the server says no. */
-    const patchRow = async (row: AutomationRow, patch: Partial<AutomationRow>, send: () => Promise<{ ok: boolean; error?: string }>) => {
-        const before: Partial<AutomationRow> = Object.fromEntries(Object.keys(patch).map((key) => [key, row[key as keyof AutomationRow]]));
-        replace((current) => ({ ...current, rows: current.rows.map((entry) => (entry.id === row.id ? { ...entry, ...patch } : entry)) }));
+    const patchRow = async (
+        row: AutomationRow,
+        patch: Partial<AutomationRow>,
+        send: () => Promise<{ ok: boolean; error?: string }>
+    ) => {
+        const before: Partial<AutomationRow> = Object.fromEntries(
+            Object.keys(patch).map((key) => [key, row[key as keyof AutomationRow]])
+        );
+        replace((current) => ({
+            ...current,
+            rows: current.rows.map((entry) =>
+                entry.id === row.id ? { ...entry, ...patch } : entry
+            )
+        }));
         const answer = await send().catch(() => ({ ok: false, error: t("errors.generic") }));
         if (!answer.ok) {
-            replace((current) => ({ ...current, rows: current.rows.map((entry) => (entry.id === row.id ? { ...entry, ...before } : entry)) }));
+            replace((current) => ({
+                ...current,
+                rows: current.rows.map((entry) =>
+                    entry.id === row.id ? { ...entry, ...before } : entry
+                )
+            }));
             toast.show({ title: answer.error ?? t("errors.generic") });
         }
     };
 
-    const toggle = (row: AutomationRow, enabled: boolean) => void patchRow(row, { enabled }, () => setEnabledAction(row.id, enabled));
+    const toggle = (row: AutomationRow, enabled: boolean) =>
+        void patchRow(row, { enabled }, () => setEnabledAction(row.id, enabled));
     const move = (row: AutomationRow, folderId: string | null) => {
         if (row.folderId === folderId) return;
-        void patchRow(row, { folderId }, () => moveToFolderAction({ automationId: row.id, folderId }));
+        void patchRow(row, { folderId }, () =>
+            moveToFolderAction({ automationId: row.id, folderId })
+        );
     };
 
     const filterOptions = [
@@ -102,7 +146,13 @@ export function AutomationsList() {
         <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
                 {data && (folders.length > 0 || data.canEdit) ? (
-                    <Select className="w-full min-w-0 sm:w-56" value={folderFilter} onValueChange={setFolder} options={filterOptions} aria-label={t("folders.filter")} />
+                    <Select
+                        className="w-full min-w-0 sm:w-56"
+                        value={folderFilter}
+                        onValueChange={setFolder}
+                        options={filterOptions}
+                        aria-label={t("folders.filter")}
+                    />
                 ) : null}
                 {data?.canEdit ? (
                     <Button variant="ghost" size="sm" onClick={() => setManaging(true)}>
@@ -120,9 +170,21 @@ export function AutomationsList() {
                 </div>
             </div>
             {allTags.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("tags.filter")}>
+                <div
+                    className="flex flex-wrap items-center gap-1"
+                    role="group"
+                    aria-label={t("tags.filter")}
+                >
                     {allTags.map((entry) => (
-                        <Button key={entry} size="sm" variant={tagFilter === entry ? "secondary" : "ghost"} className="h-7 max-w-[12rem] px-2" aria-pressed={tagFilter === entry} title={entry} onClick={() => setTag(tagFilter === entry ? null : entry)}>
+                        <Button
+                            key={entry}
+                            size="sm"
+                            variant={tagFilter === entry ? "secondary" : "ghost"}
+                            className="h-7 max-w-[12rem] px-2"
+                            aria-pressed={tagFilter === entry}
+                            title={entry}
+                            onClick={() => setTag(tagFilter === entry ? null : entry)}
+                        >
                             <span className="truncate">#{entry}</span>
                         </Button>
                     ))}
@@ -186,18 +248,38 @@ export function AutomationsList() {
                                         ? t("list.lastRun", { when: when(row.lastRunAt, locale) })
                                         : t("list.never")}
                                 </p>
-                                {(row.folderId && folderName.has(row.folderId)) || row.tags.length > 0 ? (
+                                {(row.folderId && folderName.has(row.folderId)) ||
+                                row.tags.length > 0 ? (
                                     <div className="mt-1 flex min-w-0 flex-wrap gap-1">
                                         {row.folderId && folderName.has(row.folderId) ? (
-                                            <button type="button" className="min-w-0 max-w-[12rem]" title={t("folders.showFolder", { name: folderName.get(row.folderId)! })} onClick={() => setFolder(row.folderId!)}>
-                                                <Badge variant="neutral" className="max-w-full truncate">
+                                            <button
+                                                type="button"
+                                                className="min-w-0 max-w-[12rem]"
+                                                title={t("folders.showFolder", {
+                                                    name: folderName.get(row.folderId)!
+                                                })}
+                                                onClick={() => setFolder(row.folderId!)}
+                                            >
+                                                <Badge
+                                                    variant="neutral"
+                                                    className="max-w-full truncate"
+                                                >
                                                     {folderName.get(row.folderId)}
                                                 </Badge>
                                             </button>
                                         ) : null}
                                         {row.tags.map((entry) => (
-                                            <button key={entry} type="button" className="min-w-0 max-w-[10rem]" title={t("tags.showTag", { tag: entry })} onClick={() => setTag(entry)}>
-                                                <Badge variant="primary" className="max-w-full truncate">
+                                            <button
+                                                key={entry}
+                                                type="button"
+                                                className="min-w-0 max-w-[10rem]"
+                                                title={t("tags.showTag", { tag: entry })}
+                                                onClick={() => setTag(entry)}
+                                            >
+                                                <Badge
+                                                    variant="primary"
+                                                    className="max-w-full truncate"
+                                                >
                                                     #{entry}
                                                 </Badge>
                                             </button>
@@ -222,7 +304,12 @@ export function AutomationsList() {
                             {data.canEdit ? (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon-sm" aria-label={t("folders.rowMenu", { name: row.name })} title={t("folders.rowMenuShort")}>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("folders.rowMenu", { name: row.name })}
+                                            title={t("folders.rowMenuShort")}
+                                        >
                                             <MoreHorizontal aria-hidden="true" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -233,16 +320,27 @@ export function AutomationsList() {
                                                 {t("folders.moveTo")}
                                             </DropdownMenuSubTrigger>
                                             <DropdownMenuSubContent>
-                                                <DropdownMenuItem disabled={!row.folderId} onSelect={() => move(row, null)}>
+                                                <DropdownMenuItem
+                                                    disabled={!row.folderId}
+                                                    onSelect={() => move(row, null)}
+                                                >
                                                     {t("folders.none")}
                                                 </DropdownMenuItem>
                                                 {folders.map((entry) => (
-                                                    <DropdownMenuItem key={entry.id} disabled={row.folderId === entry.id} onSelect={() => move(row, entry.id)}>
-                                                        <span className="truncate">{entry.name}</span>
+                                                    <DropdownMenuItem
+                                                        key={entry.id}
+                                                        disabled={row.folderId === entry.id}
+                                                        onSelect={() => move(row, entry.id)}
+                                                    >
+                                                        <span className="truncate">
+                                                            {entry.name}
+                                                        </span>
                                                     </DropdownMenuItem>
                                                 ))}
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem onSelect={() => setManaging(true)}>
+                                                <DropdownMenuItem
+                                                    onSelect={() => setManaging(true)}
+                                                >
                                                     <FolderPlus aria-hidden="true" />
                                                     {t("folders.newFolder")}
                                                 </DropdownMenuItem>
@@ -265,7 +363,17 @@ export function AutomationsList() {
                     folders={folders}
                     counts={(id) => data.rows.filter((row) => row.folderId === id).length}
                     onClose={() => setManaging(false)}
-                    onChange={(next, rowsOut) => replace((current) => ({ ...current, folders: next, rows: rowsOut ? current.rows.map((row) => (row.folderId === rowsOut ? { ...row, folderId: null } : row)) : current.rows }))}
+                    onChange={(next, rowsOut) =>
+                        replace((current) => ({
+                            ...current,
+                            folders: next,
+                            rows: rowsOut
+                                ? current.rows.map((row) =>
+                                      row.folderId === rowsOut ? { ...row, folderId: null } : row
+                                  )
+                                : current.rows
+                        }))
+                    }
                 />
             ) : null}
             {tagging ? (
@@ -277,7 +385,9 @@ export function AutomationsList() {
                         const row = tagging;
                         setTagging(null);
                         if (JSON.stringify(tags) === JSON.stringify(row.tags)) return;
-                        void patchRow(row, { tags }, () => setTagsAction({ automationId: row.id, tags }));
+                        void patchRow(row, { tags }, () =>
+                            setTagsAction({ automationId: row.id, tags })
+                        );
                     }}
                 />
             ) : null}
@@ -304,7 +414,10 @@ function FoldersDialog({
     const [deleting, setDeleting] = useState<FolderRow | null>(null);
     const [pending, start] = useTransition();
     const fresh = core.automationFolderNameSchema.safeParse(name);
-    const taken = (value: string, except?: string) => folders.some((entry) => entry.id !== except && entry.name.toLowerCase() === value.toLowerCase());
+    const taken = (value: string, except?: string) =>
+        folders.some(
+            (entry) => entry.id !== except && entry.name.toLowerCase() === value.toLowerCase()
+        );
     const editCheck = editing ? core.automationFolderNameSchema.safeParse(editing.value) : null;
     const atLimit = folders.length >= core.AUTOMATION_ORGANIZE_LIMITS.foldersPerShelf;
 
@@ -312,7 +425,8 @@ function FoldersDialog({
         if (!fresh.success || taken(fresh.data) || atLimit) return;
         start(async () => {
             const answer = await createFolderAction({ name: fresh.data }).catch(() => null);
-            if (!answer?.ok) return void toast.show({ title: answer?.error ?? t("errors.generic") });
+            if (!answer?.ok)
+                return void toast.show({ title: answer?.error ?? t("errors.generic") });
             onChange([...folders, answer.folder].sort((a, b) => a.name.localeCompare(b.name)));
             setName("");
         });
@@ -323,8 +437,14 @@ function FoldersDialog({
         const parsed = core.automationFolderNameSchema.safeParse(value);
         if (!parsed.success || parsed.data === folder.name || taken(parsed.data, folder.id)) return;
         const before = [...folders];
-        onChange(folders.map((entry) => (entry.id === folder.id ? { ...entry, name: parsed.data } : entry)));
-        const answer = await renameFolderAction({ folderId: folder.id, name: parsed.data }).catch(() => null);
+        onChange(
+            folders.map((entry) =>
+                entry.id === folder.id ? { ...entry, name: parsed.data } : entry
+            )
+        );
+        const answer = await renameFolderAction({ folderId: folder.id, name: parsed.data }).catch(
+            () => null
+        );
         if (!answer?.ok) {
             onChange(before);
             toast.show({ title: answer?.error ?? t("errors.generic") });
@@ -354,12 +474,20 @@ function FoldersDialog({
                         aria-invalid={fresh.success && taken(fresh.data) ? true : undefined}
                         onChange={(event) => setName(event.target.value)}
                     />
-                    <Button type="submit" disabled={!fresh.success || taken(fresh.data) || atLimit || pending} aria-disabled={!fresh.success}>
+                    <Button
+                        type="submit"
+                        disabled={!fresh.success || taken(fresh.data) || atLimit || pending}
+                        aria-disabled={!fresh.success}
+                    >
                         <FolderPlus aria-hidden="true" />
                         {t("folders.add")}
                     </Button>
                 </form>
-                {fresh.success && taken(fresh.data) ? <p className="text-xs text-danger">{t("folders.taken")}</p> : atLimit ? <p className="text-xs text-muted-foreground">{t("folders.atLimit")}</p> : null}
+                {fresh.success && taken(fresh.data) ? (
+                    <p className="text-xs text-danger">{t("folders.taken")}</p>
+                ) : atLimit ? (
+                    <p className="text-xs text-muted-foreground">{t("folders.atLimit")}</p>
+                ) : null}
                 {folders.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("folders.empty")}</p>
                 ) : (
@@ -373,8 +501,15 @@ function FoldersDialog({
                                         value={editing.value}
                                         maxLength={core.AUTOMATION_ORGANIZE_LIMITS.folderNameLength}
                                         aria-label={t("folders.name")}
-                                        aria-invalid={editCheck && (!editCheck.success || taken(editCheck.data, folder.id)) ? true : undefined}
-                                        onChange={(event) => setEditing({ id: folder.id, value: event.target.value })}
+                                        aria-invalid={
+                                            editCheck &&
+                                            (!editCheck.success || taken(editCheck.data, folder.id))
+                                                ? true
+                                                : undefined
+                                        }
+                                        onChange={(event) =>
+                                            setEditing({ id: folder.id, value: event.target.value })
+                                        }
                                         onBlur={() => void rename(folder, editing.value)}
                                         onKeyDown={(event) => {
                                             if (event.key === "Enter") {
@@ -388,15 +523,34 @@ function FoldersDialog({
                                         }}
                                     />
                                 ) : (
-                                    <span className="min-w-0 flex-1 truncate text-sm" title={folder.name}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-sm"
+                                        title={folder.name}
+                                    >
                                         {folder.name}
-                                        <span className="ml-2 text-xs text-muted-foreground">{t("folders.count", { count: counts(folder.id) })}</span>
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                            {t("folders.count", { count: counts(folder.id) })}
+                                        </span>
                                     </span>
                                 )}
-                                <Button variant="ghost" size="icon-sm" aria-label={t("folders.rename")} title={t("folders.rename")} onClick={() => setEditing({ id: folder.id, value: folder.name })}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("folders.rename")}
+                                    title={t("folders.rename")}
+                                    onClick={() =>
+                                        setEditing({ id: folder.id, value: folder.name })
+                                    }
+                                >
                                     <Pencil aria-hidden="true" />
                                 </Button>
-                                <Button variant="ghost" size="icon-sm" aria-label={t("folders.delete")} title={t("folders.delete")} onClick={() => setDeleting(folder)}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("folders.delete")}
+                                    title={t("folders.delete")}
+                                    onClick={() => setDeleting(folder)}
+                                >
                                     <Trash2 aria-hidden="true" />
                                 </Button>
                             </li>
@@ -421,9 +575,14 @@ function FoldersDialog({
                         onConfirm={() =>
                             start(async () => {
                                 const folder = deleting;
-                                const answer = await deleteFolderAction(folder.id).catch(() => null);
+                                const answer = await deleteFolderAction(folder.id).catch(
+                                    () => null
+                                );
                                 setDeleting(null);
-                                if (!answer?.ok) return void toast.show({ title: answer?.error ?? t("errors.generic") });
+                                if (!answer?.ok)
+                                    return void toast.show({
+                                        title: answer?.error ?? t("errors.generic")
+                                    });
                                 onChange(
                                     folders.filter((entry) => entry.id !== folder.id),
                                     folder.id
@@ -437,7 +596,17 @@ function FoldersDialog({
     );
 }
 
-function TagsDialog({ row, known, onClose, onSave }: { row: AutomationRow; known: readonly string[]; onClose: () => void; onSave: (tags: string[]) => void }) {
+function TagsDialog({
+    row,
+    known,
+    onClose,
+    onSave
+}: {
+    row: AutomationRow;
+    known: readonly string[];
+    onClose: () => void;
+    onSave: (tags: string[]) => void;
+}) {
     const t = useTranslations("automations");
     const [tags, setTags] = useState<string[]>([...row.tags]);
     const [draft, setDraft] = useState("");
@@ -449,7 +618,9 @@ function TagsDialog({ row, known, onClose, onSave }: { row: AutomationRow; known
         setTags([...tags, parsed.data]);
         setDraft("");
     };
-    const suggestions = known.filter((entry) => !tags.includes(entry) && (!typed.success || entry.includes(typed.data))).slice(0, 8);
+    const suggestions = known
+        .filter((entry) => !tags.includes(entry) && (!typed.success || entry.includes(typed.data)))
+        .slice(0, 8);
     return (
         <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
             <DialogContent className="max-w-md">
@@ -460,11 +631,22 @@ function TagsDialog({ row, known, onClose, onSave }: { row: AutomationRow; known
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex min-h-8 flex-wrap gap-1">
-                    {tags.length === 0 ? <p className="text-sm text-muted-foreground">{t("tags.none")}</p> : null}
+                    {tags.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("tags.none")}</p>
+                    ) : null}
                     {tags.map((entry) => (
-                        <span key={entry} className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+                        <span
+                            key={entry}
+                            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground"
+                        >
                             <span className="truncate">#{entry}</span>
-                            <button type="button" className="shrink-0 rounded hover:text-foreground" aria-label={t("tags.remove", { tag: entry })} title={t("tags.remove", { tag: entry })} onClick={() => setTags(tags.filter((other) => other !== entry))}>
+                            <button
+                                type="button"
+                                className="shrink-0 rounded hover:text-foreground"
+                                aria-label={t("tags.remove", { tag: entry })}
+                                title={t("tags.remove", { tag: entry })}
+                                onClick={() => setTags(tags.filter((other) => other !== entry))}
+                            >
                                 <X className="size-3" aria-hidden="true" />
                             </button>
                         </span>
@@ -487,15 +669,32 @@ function TagsDialog({ row, known, onClose, onSave }: { row: AutomationRow; known
                         disabled={full}
                         onChange={(event) => setDraft(event.target.value)}
                     />
-                    <Button type="submit" variant="outline" disabled={!typed.success || tags.includes(typed.data) || full} aria-disabled={!typed.success}>
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        disabled={!typed.success || tags.includes(typed.data) || full}
+                        aria-disabled={!typed.success}
+                    >
                         {t("tags.add")}
                     </Button>
                 </form>
-                {full ? <p className="text-xs text-muted-foreground">{t("tags.full")}</p> : draft.trim() !== "" && !typed.success ? <p className="text-xs text-danger">{t("tags.tooLong")}</p> : null}
+                {full ? (
+                    <p className="text-xs text-muted-foreground">{t("tags.full")}</p>
+                ) : draft.trim() !== "" && !typed.success ? (
+                    <p className="text-xs text-danger">{t("tags.tooLong")}</p>
+                ) : null}
                 {suggestions.length > 0 && !full ? (
                     <div className="flex flex-wrap gap-1">
                         {suggestions.map((entry) => (
-                            <Button key={entry} type="button" variant="ghost" size="sm" className="h-7 max-w-[10rem] px-2" title={entry} onClick={() => add(entry)}>
+                            <Button
+                                key={entry}
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 max-w-[10rem] px-2"
+                                title={entry}
+                                onClick={() => add(entry)}
+                            >
                                 <span className="truncate">#{entry}</span>
                             </Button>
                         ))}

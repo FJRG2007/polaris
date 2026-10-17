@@ -52,7 +52,9 @@ export function readCursor(cursor: string | undefined): { at: Date; id: string }
     if (!cursor) return null;
     const [at, id] = cursor.split("|");
     const date = new Date(at ?? "");
-    return id && /^[0-9a-f-]{36}$/i.test(id) && !Number.isNaN(date.getTime()) ? { at: date, id } : null;
+    return id && /^[0-9a-f-]{36}$/i.test(id) && !Number.isNaN(date.getTime())
+        ? { at: date, id }
+        : null;
 }
 
 /** Live runs on a shelf (or of one automation), newest first, one page at a time. */
@@ -72,7 +74,14 @@ export async function listRuns(
             automation: shelfWhere(shelf),
             ...(automationId ? { automationId } : {}),
             ...statusWhere(page.filter ?? "all"),
-            ...(after ? { OR: [{ queuedAt: { lt: after.at } }, { queuedAt: after.at, id: { lt: after.id } }] } : {})
+            ...(after
+                ? {
+                      OR: [
+                          { queuedAt: { lt: after.at } },
+                          { queuedAt: after.at, id: { lt: after.id } }
+                      ]
+                  }
+                : {})
         },
         orderBy: [{ queuedAt: "desc" }, { id: "desc" }],
         take: size + 1,
@@ -186,7 +195,10 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
                 finishedAt: true
             }
         }),
-        prisma.automationVersion.findUnique({ where: { id: run.versionId }, select: { number: true } }),
+        prisma.automationVersion.findUnique({
+            where: { id: run.versionId },
+            select: { number: true }
+        }),
         loadGraph(run.versionId)
     ]);
     return {
@@ -226,7 +238,9 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
 }
 
 function kick(runId: string): void {
-    void advanceRun(runId).catch((caught) => console.error("polaris: an automation run failed to step:", caught));
+    void advanceRun(runId).catch((caught) =>
+        console.error("polaris: an automation run failed to step:", caught)
+    );
 }
 
 /**
@@ -234,17 +248,28 @@ function kick(runId: string): void {
  * ("same") or on the one live now ("published"). It is a new run, admitted by
  * the automation's mode and rate limit like any other.
  */
-export async function rerun(actor: RunActor, runId: string, which: "same" | "published"): Promise<string> {
+export async function rerun(
+    actor: RunActor,
+    runId: string,
+    which: "same" | "published"
+): Promise<string> {
     const run = await prisma.automationRun.findUnique({
         where: { id: runId },
-        select: { automationId: true, versionId: true, triggerNodeId: true, cause: true, test: true }
+        select: {
+            automationId: true,
+            versionId: true,
+            triggerNodeId: true,
+            cause: true,
+            test: true
+        }
     });
     if (!run || run.test) throw new AutomationAccessError("notFound");
     const row = await load(actor, run.automationId, true);
     if (!row.enabled || !row.publishedVersionId) throw new AutomationAccessError("notPublished");
     const versionId = which === "same" ? run.versionId : row.publishedVersionId;
     const graph = await loadGraph(versionId);
-    if (!graph?.nodes.some((node) => node.id === run.triggerNodeId)) throw new AutomationAccessError("triggerGone");
+    if (!graph?.nodes.some((node) => node.id === run.triggerNodeId))
+        throw new AutomationAccessError("triggerGone");
     const started = await startRun({
         automationId: run.automationId,
         versionId,
@@ -260,7 +285,9 @@ export async function rerun(actor: RunActor, runId: string, which: "same" | "pub
 
 /** A pinned sample as trigger data: an object as it is, anything else under `value`. */
 export function pinnedCause(pinned: unknown): Record<string, unknown> {
-    return pinned && typeof pinned === "object" && !Array.isArray(pinned) ? { ...(pinned as Record<string, unknown>) } : { value: pinned };
+    return pinned && typeof pinned === "object" && !Array.isArray(pinned)
+        ? { ...(pinned as Record<string, unknown>) }
+        : { value: pinned };
 }
 
 /**
@@ -281,15 +308,22 @@ export async function startTestRun(
     if (problems.length > 0) return { problems };
     await checkSecrets(row, parsed.data);
     const triggers = core.triggerNodes(parsed.data);
-    const trigger = triggerNodeId ? triggers.find((node) => node.id === triggerNodeId) : triggers[0];
+    const trigger = triggerNodeId
+        ? triggers.find((node) => node.id === triggerNodeId)
+        : triggers[0];
     if (!trigger) throw new AutomationAccessError("noTrigger");
-    const cause = trigger.pinned !== undefined ? pinnedCause(trigger.pinned) : { kind: "test", by: actor.id };
+    const cause =
+        trigger.pinned !== undefined ? pinnedCause(trigger.pinned) : { kind: "test", by: actor.id };
     return { runId: await startSnapshot(actor, id, parsed.data, trigger.id, cause) };
 }
 
 /** What each node gave in the newest test run of the draft: the data "Run from here" stands in with. */
 async function lastTestOutputs(automationId: string): Promise<Record<string, unknown>> {
-    const last = await prisma.automationRun.findFirst({ where: { automationId, test: true }, orderBy: { queuedAt: "desc" }, select: { id: true } });
+    const last = await prisma.automationRun.findFirst({
+        where: { automationId, test: true },
+        orderBy: { queuedAt: "desc" },
+        select: { id: true }
+    });
     if (!last) return {};
     const steps = await prisma.automationStep.findMany({
         where: { runId: last.id, status: "ok", port: { not: null } },
@@ -298,11 +332,15 @@ async function lastTestOutputs(automationId: string): Promise<Record<string, unk
         select: { nodeId: true, output: true }
     });
     const out: Record<string, unknown> = {};
-    for (const step of steps) if (step.output !== null && step.output !== undefined) out[step.nodeId] = step.output;
+    for (const step of steps)
+        if (step.output !== null && step.output !== undefined) out[step.nodeId] = step.output;
     return out;
 }
 
-export type PartialRunAnswer = { runId: string } | { problems: core.GraphProblem[] } | { refusal: core.PartialRunRefusal; nodes: readonly string[] };
+export type PartialRunAnswer =
+    | { runId: string }
+    | { problems: core.GraphProblem[] }
+    | { refusal: core.PartialRunRefusal; nodes: readonly string[] };
 
 /**
  * "Run from here": a test run of the saved draft that really runs `nodeId` and
@@ -310,7 +348,11 @@ export type PartialRunAnswer = { runId: string } | { problems: core.GraphProblem
  * or its output in the last test run (`core.partialRunGraph`). A trigger runs
  * an ordinary test from it.
  */
-export async function startPartialRun(actor: RunActor, id: string, nodeId: string): Promise<PartialRunAnswer> {
+export async function startPartialRun(
+    actor: RunActor,
+    id: string,
+    nodeId: string
+): Promise<PartialRunAnswer> {
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
@@ -322,11 +364,25 @@ export async function startPartialRun(actor: RunActor, id: string, nodeId: strin
     const problems = core.graphProblems(partial.graph, { forPublish: true });
     if (problems.length > 0) return { problems };
     await checkSecrets(row, partial.graph);
-    return { runId: await startSnapshot(actor, id, partial.graph, partial.triggerId, pinnedCause(partial.cause)) };
+    return {
+        runId: await startSnapshot(
+            actor,
+            id,
+            partial.graph,
+            partial.triggerId,
+            pinnedCause(partial.cause)
+        )
+    };
 }
 
 /** Store `graph` as a test snapshot and start a test run of it from `triggerId`. */
-async function startSnapshot(actor: RunActor, id: string, graph: core.AutomationGraph, triggerId: string, cause: Record<string, unknown>): Promise<string> {
+async function startSnapshot(
+    actor: RunActor,
+    id: string,
+    graph: core.AutomationGraph,
+    triggerId: string,
+    cause: Record<string, unknown>
+): Promise<string> {
     // The snapshot a test runs is an immutable version too, numbered below zero
     // so the history (1, 2, ...) and the next publish never see it.
     let versionId: string | null = null;
@@ -338,7 +394,12 @@ async function startSnapshot(actor: RunActor, id: string, graph: core.Automation
         });
         try {
             const created = await prisma.automationVersion.create({
-                data: { automationId: id, number: (lowest?.number ?? 0) - 1, graph: graph as object, savedById: actor.id },
+                data: {
+                    automationId: id,
+                    number: (lowest?.number ?? 0) - 1,
+                    graph: graph as object,
+                    savedById: actor.id
+                },
                 select: { id: true }
             });
             versionId = created.id;
@@ -371,7 +432,8 @@ async function pruneTestRuns(automationId: string): Promise<void> {
         take: 50,
         select: { id: true }
     });
-    if (old.length > 0) await prisma.automationRun.deleteMany({ where: { id: { in: old.map((run) => run.id) } } });
+    if (old.length > 0)
+        await prisma.automationRun.deleteMany({ where: { id: { in: old.map((run) => run.id) } } });
     const kept = await prisma.automationRun.findMany({
         where: { automationId, test: true },
         take: L.keepTestRuns + 50,
@@ -400,9 +462,19 @@ export async function listVersions(actor: RunActor, id: string): Promise<Version
         take: L.versionsListed,
         select: { id: true, number: true, name: true, createdAt: true, savedById: true }
     });
-    const people = [...new Set(versions.map((version) => version.savedById).filter((value): value is string => Boolean(value)))];
+    const people = [
+        ...new Set(
+            versions
+                .map((version) => version.savedById)
+                .filter((value): value is string => Boolean(value))
+        )
+    ];
     const names = people.length
-        ? await prisma.user.findMany({ where: { id: { in: people } }, select: { id: true, name: true }, take: people.length })
+        ? await prisma.user.findMany({
+              where: { id: { in: people } },
+              select: { id: true, name: true },
+              take: people.length
+          })
         : [];
     const byId = new Map(names.map((person) => [person.id, person.name]));
     return versions.map((version) => ({
@@ -416,16 +488,24 @@ export async function listVersions(actor: RunActor, id: string): Promise<Version
 }
 
 /** Put a published version back into the draft. The live version stays as it is until the next publish. */
-export async function restoreVersion(actor: RunActor, id: string, versionId: string): Promise<core.AutomationGraph> {
+export async function restoreVersion(
+    actor: RunActor,
+    id: string,
+    versionId: string
+): Promise<core.AutomationGraph> {
     await load(actor, id, true);
     const version = await prisma.automationVersion.findUnique({
         where: { id: versionId },
         select: { automationId: true, number: true, graph: true }
     });
-    if (!version || version.automationId !== id || version.number <= 0) throw new AutomationAccessError("notFound");
+    if (!version || version.automationId !== id || version.number <= 0)
+        throw new AutomationAccessError("notFound");
     const parsed = core.automationGraphSchema.safeParse(version.graph);
     if (!parsed.success) throw new AutomationAccessError("invalid");
-    await prisma.automation.update({ where: { id }, data: { draft: parsed.data as object, draftUpdatedAt: new Date() } });
+    await prisma.automation.update({
+        where: { id },
+        data: { draft: parsed.data as object, draftUpdatedAt: new Date() }
+    });
     return parsed.data;
 }
 
@@ -435,26 +515,51 @@ export async function restoreVersion(actor: RunActor, id: string, versionId: str
  * otherwise as it was. Refused when the trigger is no longer in the draft or
  * the data is too large to pin.
  */
-export async function pinRunData(actor: RunActor, runId: string): Promise<{ automationId: string; triggerNodeId: string }> {
-    const run = await prisma.automationRun.findUnique({ where: { id: runId }, select: { automationId: true, triggerNodeId: true, cause: true } });
+export async function pinRunData(
+    actor: RunActor,
+    runId: string
+): Promise<{ automationId: string; triggerNodeId: string }> {
+    const run = await prisma.automationRun.findUnique({
+        where: { id: runId },
+        select: { automationId: true, triggerNodeId: true, cause: true }
+    });
     if (!run) throw new AutomationAccessError("notFound");
     const row = await load(actor, run.automationId, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
     const trigger = parsed.data.nodes.find((node) => node.id === run.triggerNodeId);
-    if (!trigger || core.nodeRole(trigger.type) !== "trigger") throw new AutomationAccessError("triggerGone");
+    if (!trigger || core.nodeRole(trigger.type) !== "trigger")
+        throw new AutomationAccessError("triggerGone");
     const { id: _id, at: _at, ...data } = (run.cause ?? {}) as Record<string, unknown>;
-    if (core.byteLength(JSON.stringify(data)) > L.pinBytes) throw new AutomationAccessError("tooLarge");
-    const draft = { ...parsed.data, nodes: parsed.data.nodes.map((node) => (node.id === trigger.id ? { ...node, pinned: data } : node)) };
-    await prisma.automation.update({ where: { id: run.automationId }, data: { draft: draft as object, draftUpdatedAt: new Date() } });
+    if (core.byteLength(JSON.stringify(data)) > L.pinBytes)
+        throw new AutomationAccessError("tooLarge");
+    const draft = {
+        ...parsed.data,
+        nodes: parsed.data.nodes.map((node) =>
+            node.id === trigger.id ? { ...node, pinned: data } : node
+        )
+    };
+    await prisma.automation.update({
+        where: { id: run.automationId },
+        data: { draft: draft as object, draftUpdatedAt: new Date() }
+    });
     return { automationId: run.automationId, triggerNodeId: trigger.id };
 }
 
 /** Give a published version a name, or take it away (null). Editors only. */
-export async function renameVersion(actor: RunActor, id: string, versionId: string, name: string | null): Promise<void> {
+export async function renameVersion(
+    actor: RunActor,
+    id: string,
+    versionId: string,
+    name: string | null
+): Promise<void> {
     await load(actor, id, true);
-    const version = await prisma.automationVersion.findUnique({ where: { id: versionId }, select: { automationId: true, number: true } });
-    if (!version || version.automationId !== id || version.number <= 0) throw new AutomationAccessError("notFound");
+    const version = await prisma.automationVersion.findUnique({
+        where: { id: versionId },
+        select: { automationId: true, number: true }
+    });
+    if (!version || version.automationId !== id || version.number <= 0)
+        throw new AutomationAccessError("notFound");
     await prisma.automationVersion.update({ where: { id: versionId }, data: { name } });
 }
 
@@ -472,7 +577,12 @@ export interface VersionComparison {
 }
 
 /** What changed from a published version to another one, or to the draft (`against` "draft"). */
-export async function compareVersions(actor: RunActor, id: string, versionId: string, against: string): Promise<VersionComparison> {
+export async function compareVersions(
+    actor: RunActor,
+    id: string,
+    versionId: string,
+    against: string
+): Promise<VersionComparison> {
     const row = await load(actor, id, false);
     const ids = against === "draft" ? [versionId] : [versionId, against];
     const versions = await prisma.automationVersion.findMany({
@@ -486,14 +596,24 @@ export async function compareVersions(actor: RunActor, id: string, versionId: st
         return parsed.data;
     };
     const base = versions.find((version) => version.id === versionId);
-    const next = against === "draft" ? { graph: row.draft } : versions.find((version) => version.id === against);
+    const next =
+        against === "draft"
+            ? { graph: row.draft }
+            : versions.find((version) => version.id === against);
     if (!base || !next) throw new AutomationAccessError("notFound");
     const from = read(base.graph);
     const to = read(next.graph);
     const diff = core.compareGraphs(from, to);
-    const describe = (graph: core.AutomationGraph) => (nodeId: string): ComparedNode => {
-        const node = graph.nodes.find((entry) => entry.id === nodeId)!;
-        return { id: node.id, type: node.type, alias: node.alias ?? null };
+    const describe =
+        (graph: core.AutomationGraph) =>
+        (nodeId: string): ComparedNode => {
+            const node = graph.nodes.find((entry) => entry.id === nodeId)!;
+            return { id: node.id, type: node.type, alias: node.alias ?? null };
+        };
+    return {
+        added: diff.added.map(describe(to)),
+        removed: diff.removed.map(describe(from)),
+        changed: diff.changed.map(describe(to)),
+        rewired: diff.rewired
     };
-    return { added: diff.added.map(describe(to)), removed: diff.removed.map(describe(from)), changed: diff.changed.map(describe(to)), rewired: diff.rewired };
 }

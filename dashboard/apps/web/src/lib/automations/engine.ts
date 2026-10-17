@@ -116,9 +116,15 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
         : core.DEFAULT_AUTOMATION_MODE;
     const [active, queued, recent] = await Promise.all([
         prisma.automationRun.count({
-            where: { automationId: automation.id, test: false, status: { in: [...core.ACTIVE_RUN_STATUSES] } }
+            where: {
+                automationId: automation.id,
+                test: false,
+                status: { in: [...core.ACTIVE_RUN_STATUSES] }
+            }
         }),
-        prisma.automationRun.count({ where: { automationId: automation.id, test: false, status: "queued" } }),
+        prisma.automationRun.count({
+            where: { automationId: automation.id, test: false, status: "queued" }
+        }),
         prisma.automationRun.count({
             where: {
                 automationId: automation.id,
@@ -132,7 +138,14 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
         ? "start"
         : firing.depth > L.depth
           ? "skip"
-          : core.admitRun({ mode, maxRuns: automation.maxRuns, rateLimit: automation.rateLimit, active, queued, recent });
+          : core.admitRun({
+                mode,
+                maxRuns: automation.maxRuns,
+                rateLimit: automation.rateLimit,
+                active,
+                queued,
+                recent
+            });
 
     const status =
         firing.depth > L.depth
@@ -554,7 +567,12 @@ async function executeStep(
     if (run.test && node.pinned !== undefined && core.canPin(node.type)) {
         // A pinned sample stands in for the node in a test run: nothing is sent.
         const output = core.capStored(node.pinned, L.stepDataBytes) as object;
-        const done = await finishStep(step.id, { status: "ok", port: ports[0]!, output, from: "ready" });
+        const done = await finishStep(step.id, {
+            status: "ok",
+            port: ports[0]!,
+            output,
+            from: "ready"
+        });
         if (done) {
             await count(run.id, output);
             await enqueue(run.id, core.successors(graph, node.id, ports[0]!), lane);

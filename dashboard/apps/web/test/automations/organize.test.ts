@@ -7,7 +7,11 @@
 import * as core from "@polaris/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const db = vi.hoisted(() => ({ current: null as Awaited<ReturnType<typeof import("./fixtures/fake-prisma")["createFakeDb"]>> | null }));
+const db = vi.hoisted(() => ({
+    current: null as Awaited<
+        ReturnType<(typeof import("./fixtures/fake-prisma"))["createFakeDb"]>
+    > | null
+}));
 const access = vi.hoisted(() => ({ edit: true }));
 
 vi.mock("@polaris/db", async () => {
@@ -34,7 +38,16 @@ const mine = { orgId: null, userId: "u1" };
 const theirs = { orgId: null, userId: "u2" };
 
 async function seed(userId = "u1") {
-    const row = await fake().prisma.automation.create({ data: { name: "Test", draft: core.emptyGraph("UTC"), enabled: false, userId, mode: "single", updatedAt: new Date() } });
+    const row = await fake().prisma.automation.create({
+        data: {
+            name: "Test",
+            draft: core.emptyGraph("UTC"),
+            enabled: false,
+            userId,
+            mode: "single",
+            updatedAt: new Date()
+        }
+    });
     return row.id as string;
 }
 
@@ -62,24 +75,41 @@ describe("folders", () => {
         await organize.moveToFolder(actor, id, folder.id);
         await organize.deleteFolder(actor, folder.id);
         expect(await organize.listFolders(actor, mine)).toEqual([]);
-        expect((await service.listAutomations(actor, mine)).rows.map((row) => row.folderId)).toEqual([null]);
+        expect(
+            (await service.listAutomations(actor, mine)).rows.map((row) => row.folderId)
+        ).toEqual([null]);
     });
 
     it("never puts an automation in another shelf's folder, and refuses a reader", async () => {
         const other = await organize.createFolder(actor, theirs, "Theirs");
         const id = await seed();
-        await expect(organize.moveToFolder(actor, id, other.id)).rejects.toMatchObject({ code: "notFound" });
+        await expect(organize.moveToFolder(actor, id, other.id)).rejects.toMatchObject({
+            code: "notFound"
+        });
         access.edit = false;
-        await expect(organize.createFolder(actor, mine, "Nope")).rejects.toMatchObject({ code: "forbidden" });
-        await expect(organize.renameFolder(actor, other.id, "x")).rejects.toMatchObject({ code: "forbidden" });
-        await expect(organize.setTags(actor, id, ["a"])).rejects.toMatchObject({ code: "forbidden" });
+        await expect(organize.createFolder(actor, mine, "Nope")).rejects.toMatchObject({
+            code: "forbidden"
+        });
+        await expect(organize.renameFolder(actor, other.id, "x")).rejects.toMatchObject({
+            code: "forbidden"
+        });
+        await expect(organize.setTags(actor, id, ["a"])).rejects.toMatchObject({
+            code: "forbidden"
+        });
     });
 });
 
 describe("tags", () => {
     it("stores the tags the list shows", async () => {
         const id = await seed();
-        await organize.setTags(actor, id, core.automationTagsSchema.parse(["Billing", " billing ", "night"]));
-        expect((await service.listAutomations(actor, mine)).rows[0]!.tags).toEqual(["billing", "night"]);
+        await organize.setTags(
+            actor,
+            id,
+            core.automationTagsSchema.parse(["Billing", " billing ", "night"])
+        );
+        expect((await service.listAutomations(actor, mine)).rows[0]!.tags).toEqual([
+            "billing",
+            "night"
+        ]);
     });
 });

@@ -14,15 +14,46 @@ import { useEffect, useMemo, useState } from "react";
 import { nodeLabel } from "@/app/(app)/automations/[id]/canvas-editor";
 import { ArrowLeft, ChevronDown, FlaskConical, RotateCcw, X } from "lucide-react";
 import type { RunDetail, StepView } from "@/lib/automations/history";
-import { cancelRunAction, getRunAction, pinRunDataAction, rerunAction } from "@/app/(app)/automations/actions";
+import {
+    cancelRunAction,
+    getRunAction,
+    pinRunDataAction,
+    rerunAction
+} from "@/app/(app)/automations/actions";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { CanvasBoard, NO_SELECTION, stepKey, type CanvasSelection } from "@/app/(app)/automations/[id]/canvas-board";
-import { LoadFailed, RowsSkeleton, StatusChip, dropCache, useCachedAction, useRunError, when } from "@/app/(app)/automations/shared";
-import { Badge, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, PageHeader, Skeleton, cn, useToast } from "@polaris/ui";
+import {
+    CanvasBoard,
+    NO_SELECTION,
+    stepKey,
+    type CanvasSelection
+} from "@/app/(app)/automations/[id]/canvas-board";
+import {
+    LoadFailed,
+    RowsSkeleton,
+    StatusChip,
+    dropCache,
+    useCachedAction,
+    useRunError,
+    when
+} from "@/app/(app)/automations/shared";
+import {
+    Badge,
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    PageHeader,
+    Skeleton,
+    cn,
+    useToast
+} from "@polaris/ui";
 
 export function RunDetailView({ runId }: { runId: string }) {
     const t = useTranslations("automations");
-    const { data, error, refresh } = useCachedAction(`polaris.automations.run.${runId}`, () => getRunAction(runId));
+    const { data, error, refresh } = useCachedAction(`polaris.automations.run.${runId}`, () =>
+        getRunAction(runId)
+    );
     const run = data?.run;
 
     // A run still going is refetched until it ends.
@@ -34,12 +65,18 @@ export function RunDetailView({ runId }: { runId: string }) {
 
     return (
         <div className="space-y-4">
-            <Link href="/automations/runs" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <Link
+                href="/automations/runs"
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            >
                 <ArrowLeft className="size-4" aria-hidden="true" />
                 {t("runView.back")}
             </Link>
             {error !== null && !run ? (
-                <LoadFailed message={error || t("runView.notFound")} onRetry={() => void refresh()} />
+                <LoadFailed
+                    message={error || t("runView.notFound")}
+                    onRetry={() => void refresh()}
+                />
             ) : !run ? (
                 <>
                     <Skeleton className="h-7 w-64" />
@@ -68,7 +105,10 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
         for (const step of run.steps) out[step.nodeId] = step.status;
         return out;
     }, [run.steps]);
-    const byId = useMemo(() => new Map((graph?.nodes ?? []).map((node) => [node.id, node])), [graph]);
+    const byId = useMemo(
+        () => new Map((graph?.nodes ?? []).map((node) => [node.id, node])),
+        [graph]
+    );
     const picked = selection.nodes.size === 1 ? [...selection.nodes][0] : null;
     const steps = picked ? run.steps.filter((step) => step.nodeId === picked) : run.steps;
 
@@ -98,8 +138,16 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                 title={run.automationName}
                 description={[
                     when(run.startedAt ?? run.queuedAt, locale),
-                    run.finishedAt ? t("runView.took", { time: took(run.startedAt ?? run.queuedAt, run.finishedAt) }) : null,
-                    run.test ? t("runView.testVersion") : run.versionNumber ? t("runView.version", { number: run.versionNumber }) : null
+                    run.finishedAt
+                        ? t("runView.took", {
+                              time: took(run.startedAt ?? run.queuedAt, run.finishedAt)
+                          })
+                        : null,
+                    run.test
+                        ? t("runView.testVersion")
+                        : run.versionNumber
+                          ? t("runView.version", { number: run.versionNumber })
+                          : null
                 ]
                     .filter(Boolean)
                     .join(" - ")}
@@ -108,10 +156,18 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                         {run.test ? <Badge variant="neutral">{t("runView.test")}</Badge> : null}
                         <StatusChip status={run.status} />
                         <Button variant="outline" size="sm" asChild>
-                            <Link href={`/automations/${run.automationId}`}>{t("runView.openAutomation")}</Link>
+                            <Link href={`/automations/${run.automationId}`}>
+                                {t("runView.openAutomation")}
+                            </Link>
                         </Button>
                         {run.canSeeData ? (
-                            <Button variant="outline" size="sm" disabled={opening} title={t("runView.openWithDataHint")} onClick={() => void openWithData()}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={opening}
+                                title={t("runView.openWithDataHint")}
+                                onClick={() => void openWithData()}
+                            >
                                 <FlaskConical aria-hidden="true" />
                                 {t("runView.openWithData")}
                             </Button>
@@ -126,8 +182,12 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onSelect={() => void again("same")}>{t("runView.rerunSame")}</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => void again("published")}>{t("runView.rerunLive")}</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => void again("same")}>
+                                        {t("runView.rerunSame")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => void again("published")}>
+                                        {t("runView.rerunLive")}
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : null}
@@ -137,7 +197,9 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                                 size="sm"
                                 onClick={async () => {
                                     const answer = await cancelRunAction(run.id);
-                                    toast.show({ title: answer.ok ? t("runs.cancelled") : answer.error });
+                                    toast.show({
+                                        title: answer.ok ? t("runs.cancelled") : answer.error
+                                    });
                                     if (answer.ok) onChanged();
                                 }}
                             >
@@ -158,7 +220,9 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                             selection={selection}
                             onSelect={setSelection}
                             onChange={() => undefined}
-                            onOpen={(id) => setSelection({ nodes: new Set([id]), notes: new Set(), edge: null })}
+                            onOpen={(id) =>
+                                setSelection({ nodes: new Set([id]), notes: new Set(), edge: null })
+                            }
                             onPalette={() => undefined}
                             onAddNote={() => undefined}
                             onRefused={() => undefined}
@@ -168,15 +232,25 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                             states={states}
                         />
                     ) : (
-                        <p className="text-sm text-muted-foreground">{t("runErrors.graphUnreadable")}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {t("runErrors.graphUnreadable")}
+                        </p>
                     )}
                 </div>
                 <section className="min-w-0 space-y-2" aria-label={t("runView.steps")}>
                     <h2 className="text-sm font-semibold">{t("runView.steps")}</h2>
-                    {!run.canSeeData ? <p className="text-xs text-muted-foreground">{t("runView.hiddenData")}</p> : null}
+                    {!run.canSeeData ? (
+                        <p className="text-xs text-muted-foreground">{t("runView.hiddenData")}</p>
+                    ) : null}
                     <ol className="space-y-2">
                         {steps.map((step) => (
-                            <StepItem key={step.id} step={step} label={nodeLabel(t, byId.get(step.nodeId))} finallyLane={step.iteration === core.FINALLY_ITERATION} showData={run.canSeeData} />
+                            <StepItem
+                                key={step.id}
+                                step={step}
+                                label={nodeLabel(t, byId.get(step.nodeId))}
+                                finallyLane={step.iteration === core.FINALLY_ITERATION}
+                                showData={run.canSeeData}
+                            />
                         ))}
                     </ol>
                 </section>
@@ -185,14 +259,34 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
     );
 }
 
-function StepItem({ step, label, finallyLane, showData }: { step: StepView; label: string; finallyLane: boolean; showData: boolean }) {
+function StepItem({
+    step,
+    label,
+    finallyLane,
+    showData
+}: {
+    step: StepView;
+    label: string;
+    finallyLane: boolean;
+    showData: boolean;
+}) {
     const t = useTranslations("automations");
     const words = useRunError();
     const [open, setOpen] = useState(step.status === "failed");
     const failed = ["failed", "refused", "timedOut", "interrupted"].includes(step.status);
     return (
-        <li className={cn("rounded-lg border bg-card", failed ? "border-danger-edge" : "border-border")}>
-            <button type="button" className="flex w-full min-w-0 items-center gap-2 p-3 text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <li
+            className={cn(
+                "rounded-lg border bg-card",
+                failed ? "border-danger-edge" : "border-border"
+            )}
+        >
+            <button
+                type="button"
+                className="flex w-full min-w-0 items-center gap-2 p-3 text-left"
+                aria-expanded={open}
+                onClick={() => setOpen(!open)}
+            >
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium" title={label}>
                         {label}
@@ -204,8 +298,13 @@ function StepItem({ step, label, finallyLane, showData }: { step: StepView; labe
                         {step.attempt > 1 ? ` - #${step.attempt}` : ""}
                     </p>
                 </div>
-                <Badge variant={failed ? "danger" : step.status === "ok" ? "success" : "neutral"}>{t(`stepStatus.${stepKey(step.status)}`)}</Badge>
-                <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} aria-hidden="true" />
+                <Badge variant={failed ? "danger" : step.status === "ok" ? "success" : "neutral"}>
+                    {t(`stepStatus.${stepKey(step.status)}`)}
+                </Badge>
+                <ChevronDown
+                    className={cn("size-4 transition-transform", open && "rotate-180")}
+                    aria-hidden="true"
+                />
             </button>
             {open ? (
                 <div className="space-y-2 border-t border-border p-3">
@@ -227,11 +326,15 @@ function DataBlock({ title, value }: { title: string; value: unknown }) {
     const t = useTranslations("automations");
     return (
         <div className="min-w-0 space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">{title}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
+                {title}
+            </p>
             {value === null || value === undefined ? (
                 <p className="text-xs text-muted-foreground">{t("runView.noData")}</p>
             ) : (
-                <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(value, null, 2)}</pre>
+                <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">
+                    {JSON.stringify(value, null, 2)}
+                </pre>
             )}
         </div>
     );

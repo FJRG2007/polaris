@@ -21,8 +21,7 @@ import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
 type Result<T = object> =
-    | ({ ok: true } & T)
-    | { ok: false; error: string; problems?: core.GraphProblem[] };
+    ({ ok: true } & T) | { ok: false; error: string; problems?: core.GraphProblem[] };
 
 async function actor(): Promise<RunActor> {
     const user = await requirePermission("automations.use");
@@ -54,11 +53,16 @@ function refresh(automationId?: string): void {
     if (automationId) revalidatePath(`/automations/${automationId}`);
 }
 
-export async function listAutomationsAction(): Promise<Result<{ rows: service.AutomationRow[]; canEdit: boolean; folders: organize.FolderRow[] }>> {
+export async function listAutomationsAction(): Promise<
+    Result<{ rows: service.AutomationRow[]; canEdit: boolean; folders: organize.FolderRow[] }>
+> {
     try {
         const who = await actor();
         const shelf = await openShelf(who);
-        const [list, folders] = await Promise.all([service.listAutomations(who, shelf), organize.listFolders(who, shelf)]);
+        const [list, folders] = await Promise.all([
+            service.listAutomations(who, shelf),
+            organize.listFolders(who, shelf)
+        ]);
         return { ok: true, ...list, folders };
     } catch (caught) {
         return failure(caught);
@@ -254,13 +258,22 @@ const runsPageInput = z.object({
     filter: z.enum(history.RUN_FILTERS).default("all")
 });
 
-export async function listRunsAction(automationId: unknown, page: unknown = {}): Promise<Result<history.RunsPage>> {
-    const parsed = runsPageInput.safeParse({ ...(page && typeof page === "object" ? page : {}), automationId: automationId ?? undefined });
+export async function listRunsAction(
+    automationId: unknown,
+    page: unknown = {}
+): Promise<Result<history.RunsPage>> {
+    const parsed = runsPageInput.safeParse({
+        ...(page && typeof page === "object" ? page : {}),
+        automationId: automationId ?? undefined
+    });
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
         const { automationId: one, cursor, filter } = parsed.data;
-        return { ok: true, ...(await history.listRuns(who, await openShelf(who), one, { cursor, filter })) };
+        return {
+            ok: true,
+            ...(await history.listRuns(who, await openShelf(who), one, { cursor, filter }))
+        };
     } catch (caught) {
         return failure(caught);
     }
@@ -290,14 +303,26 @@ export async function rerunAction(input: unknown): Promise<Result<{ runId: strin
     }
 }
 
-const testRunInput = z.object({ automationId: id, triggerNodeId: z.string().min(1).max(64).optional() });
+const testRunInput = z.object({
+    automationId: id,
+    triggerNodeId: z.string().min(1).max(64).optional()
+});
 
 export async function startTestRunAction(input: unknown): Promise<Result<{ runId: string }>> {
     const parsed = testRunInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {
-        const answer = await history.startTestRun(await actor(), parsed.data.automationId, parsed.data.triggerNodeId);
-        if ("problems" in answer) return { ok: false, error: (await getTranslations("automations"))("errors.notReady"), problems: answer.problems };
+        const answer = await history.startTestRun(
+            await actor(),
+            parsed.data.automationId,
+            parsed.data.triggerNodeId
+        );
+        if ("problems" in answer)
+            return {
+                ok: false,
+                error: (await getTranslations("automations"))("errors.notReady"),
+                problems: answer.problems
+            };
         return { ok: true, runId: answer.runId };
     } catch (caught) {
         return failure(caught);
@@ -306,14 +331,26 @@ export async function startTestRunAction(input: unknown): Promise<Result<{ runId
 
 const partialRunInput = z.object({ automationId: id, nodeId: z.string().min(1).max(64) });
 
-export async function startPartialRunAction(input: unknown): Promise<Result<{ runId: string }> | { ok: false; error: string; missing: readonly string[] }> {
+export async function startPartialRunAction(
+    input: unknown
+): Promise<Result<{ runId: string }> | { ok: false; error: string; missing: readonly string[] }> {
     const parsed = partialRunInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {
-        const answer = await history.startPartialRun(await actor(), parsed.data.automationId, parsed.data.nodeId);
+        const answer = await history.startPartialRun(
+            await actor(),
+            parsed.data.automationId,
+            parsed.data.nodeId
+        );
         const t = await getTranslations("automations");
-        if ("problems" in answer) return { ok: false, error: t("errors.notReady"), problems: answer.problems };
-        if ("refusal" in answer) return { ok: false, error: t(`errors.partial.${answer.refusal}`), missing: answer.nodes };
+        if ("problems" in answer)
+            return { ok: false, error: t("errors.notReady"), problems: answer.problems };
+        if ("refusal" in answer)
+            return {
+                ok: false,
+                error: t(`errors.partial.${answer.refusal}`),
+                missing: answer.nodes
+            };
         return { ok: true, runId: answer.runId };
     } catch (caught) {
         return failure(caught);
@@ -332,7 +369,9 @@ export async function pinRunDataAction(runId: unknown): Promise<Result<{ automat
     }
 }
 
-export async function listVersionsAction(automationId: unknown): Promise<Result<{ rows: history.VersionRow[] }>> {
+export async function listVersionsAction(
+    automationId: unknown
+): Promise<Result<{ rows: history.VersionRow[] }>> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();
     try {
@@ -343,36 +382,67 @@ export async function listVersionsAction(automationId: unknown): Promise<Result<
 }
 
 const restoreInput = z.object({ automationId: id, versionId: id });
-const renameVersionInput = z.object({ automationId: id, versionId: id, name: core.versionNameSchema });
+const renameVersionInput = z.object({
+    automationId: id,
+    versionId: id,
+    name: core.versionNameSchema
+});
 
-export async function renameVersionAction(input: unknown): Promise<Result<{ name: string | null }>> {
+export async function renameVersionAction(
+    input: unknown
+): Promise<Result<{ name: string | null }>> {
     const parsed = renameVersionInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {
-        await history.renameVersion(await actor(), parsed.data.automationId, parsed.data.versionId, parsed.data.name);
+        await history.renameVersion(
+            await actor(),
+            parsed.data.automationId,
+            parsed.data.versionId,
+            parsed.data.name
+        );
         return { ok: true, name: parsed.data.name };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-const compareInput = z.object({ automationId: id, versionId: id, against: z.union([id, z.literal("draft")]) });
+const compareInput = z.object({
+    automationId: id,
+    versionId: id,
+    against: z.union([id, z.literal("draft")])
+});
 
-export async function compareVersionsAction(input: unknown): Promise<Result<{ comparison: history.VersionComparison }>> {
+export async function compareVersionsAction(
+    input: unknown
+): Promise<Result<{ comparison: history.VersionComparison }>> {
     const parsed = compareInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {
-        return { ok: true, comparison: await history.compareVersions(await actor(), parsed.data.automationId, parsed.data.versionId, parsed.data.against) };
+        return {
+            ok: true,
+            comparison: await history.compareVersions(
+                await actor(),
+                parsed.data.automationId,
+                parsed.data.versionId,
+                parsed.data.against
+            )
+        };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-export async function restoreVersionAction(input: unknown): Promise<Result<{ graph: core.AutomationGraph }>> {
+export async function restoreVersionAction(
+    input: unknown
+): Promise<Result<{ graph: core.AutomationGraph }>> {
     const parsed = restoreInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {
-        const graph = await history.restoreVersion(await actor(), parsed.data.automationId, parsed.data.versionId);
+        const graph = await history.restoreVersion(
+            await actor(),
+            parsed.data.automationId,
+            parsed.data.versionId
+        );
         refresh(parsed.data.automationId);
         return { ok: true, graph };
     } catch (caught) {
@@ -455,7 +525,9 @@ export async function deleteSecretAction(secretId: unknown): Promise<Result> {
 
 const folderInput = z.object({ name: core.automationFolderNameSchema });
 
-export async function createFolderAction(input: unknown): Promise<Result<{ folder: organize.FolderRow }>> {
+export async function createFolderAction(
+    input: unknown
+): Promise<Result<{ folder: organize.FolderRow }>> {
     const parsed = folderInput.safeParse(input);
     if (!parsed.success) return invalid();
     try {

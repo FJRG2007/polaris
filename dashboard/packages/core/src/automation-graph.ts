@@ -589,7 +589,10 @@ export const graphNoteSchema = z.object({
     text: z.string().max(AUTOMATION_LIMITS.noteLength).default(""),
     position: z.object({ x: z.number().finite(), y: z.number().finite() }),
     size: z
-        .object({ width: z.number().finite().min(120).max(1200), height: z.number().finite().min(60).max(1200) })
+        .object({
+            width: z.number().finite().min(120).max(1200),
+            height: z.number().finite().min(60).max(1200)
+        })
         .default({ width: 220, height: 120 })
 });
 export type GraphNote = z.infer<typeof graphNoteSchema>;
@@ -618,7 +621,14 @@ export const automationGraphSchema = z.object({
 export type AutomationGraph = z.infer<typeof automationGraphSchema>;
 
 export function emptyGraph(timeZone = "UTC"): AutomationGraph {
-    return { schema: 1, timeZone, nodes: [], edges: [], finally: { entry: null, onCancel: false }, notes: [] };
+    return {
+        schema: 1,
+        timeZone,
+        nodes: [],
+        edges: [],
+        finally: { entry: null, onCancel: false },
+        notes: []
+    };
 }
 
 export type GraphProblem =
@@ -689,7 +699,8 @@ export function graphProblems(
                 });
         }
         if (node.pinned !== undefined) {
-            if (nodeRole(node.type) === "condition") problems.push({ code: "pinNotAllowed", node: node.id });
+            if (nodeRole(node.type) === "condition")
+                problems.push({ code: "pinNotAllowed", node: node.id });
             else if (byteLength(JSON.stringify(node.pinned) ?? "null") > AUTOMATION_LIMITS.pinBytes)
                 problems.push({ code: "pinTooLarge", node: node.id });
         }

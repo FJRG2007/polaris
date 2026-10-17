@@ -8,7 +8,19 @@
 
 import * as core from "@polaris/core";
 import { ReferenceScope } from "./references";
-import { Copy, CopyPlus, PanelRight, Pencil, Pin, PinOff, Play, Power, PowerOff, Trash2, X } from "lucide-react";
+import {
+    Copy,
+    CopyPlus,
+    PanelRight,
+    Pencil,
+    Pin,
+    PinOff,
+    Play,
+    Power,
+    PowerOff,
+    Trash2,
+    X
+} from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
@@ -34,15 +46,21 @@ import {
     useToast
 } from "@polaris/ui";
 
-type Change = (update: (graph: core.AutomationGraph) => core.AutomationGraph, options?: { group?: boolean }) => void;
+type Change = (
+    update: (graph: core.AutomationGraph) => core.AutomationGraph,
+    options?: { group?: boolean }
+) => void;
 
 /** What a node says under its name: the part of its settings a reader scans for. */
 export function nodeSubtitle(t: T, node: core.GraphNode): string | null {
     const config = (node.config ?? {}) as Record<string, unknown>;
     if (node.alias) return nodeTitle(t, node.type);
-    if (node.type === "core.http") return `${String(config.method ?? "")} ${config.urlSecretId ? t("fields.urlFromSecret") : String(config.url ?? "")}`.trim();
-    if (node.type === "core.notify" || node.type === "core.chat") return typeof config.title === "string" && config.title ? config.title : null;
-    if (node.type === "core.schedule" && config.kind === "cron") return String(config.expression ?? "");
+    if (node.type === "core.http")
+        return `${String(config.method ?? "")} ${config.urlSecretId ? t("fields.urlFromSecret") : String(config.url ?? "")}`.trim();
+    if (node.type === "core.notify" || node.type === "core.chat")
+        return typeof config.title === "string" && config.title ? config.title : null;
+    if (node.type === "core.schedule" && config.kind === "cron")
+        return String(config.expression ?? "");
     return null;
 }
 
@@ -89,7 +107,8 @@ export function CanvasEditor({
     const [refit, setRefit] = useState(0);
     const placeAt = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-    const refuse = (code: core.ConnectRefusal) => toast.show({ title: t(`canvas.refusals.${code}`) });
+    const refuse = (code: core.ConnectRefusal) =>
+        toast.show({ title: t(`canvas.refusals.${code}`) });
     const panelNode = panel ? graph.nodes.find((node) => node.id === panel) : undefined;
 
     const copy = async (cut: boolean) => {
@@ -114,12 +133,26 @@ export function CanvasEditor({
             // No permission to read: whatever this page copied still pastes.
         }
         const fragment = text ? core.parseFragment(text) : null;
-        if (!fragment || fragment.nodes.length + fragment.notes.length === 0) return void toast.show({ title: t("canvas.nothingToPaste") });
-        const origin = core.graphBounds({ ...core.emptyGraph(), nodes: fragment.nodes, notes: fragment.notes }) ?? { x: 0, y: 0 };
-        const pasted = core.pasteFragment(graph, fragment, { x: Math.round(at.x - origin.x), y: Math.round(at.y - origin.y) }, core.automationNodeId);
+        if (!fragment || fragment.nodes.length + fragment.notes.length === 0)
+            return void toast.show({ title: t("canvas.nothingToPaste") });
+        const origin = core.graphBounds({
+            ...core.emptyGraph(),
+            nodes: fragment.nodes,
+            notes: fragment.notes
+        }) ?? { x: 0, y: 0 };
+        const pasted = core.pasteFragment(
+            graph,
+            fragment,
+            { x: Math.round(at.x - origin.x), y: Math.round(at.y - origin.y) },
+            core.automationNodeId
+        );
         if (!pasted) return void toast.show({ title: t("canvas.pasteTooMany") });
         change(() => pasted.graph, { group: false });
-        setSelection({ nodes: new Set(pasted.nodeIds), notes: new Set(pasted.noteIds), edge: null });
+        setSelection({
+            nodes: new Set(pasted.nodeIds),
+            notes: new Set(pasted.noteIds),
+            edge: null
+        });
     };
 
     const remove = () => {
@@ -127,7 +160,9 @@ export function CanvasEditor({
             const key = selection.edge;
             change((current) => core.disconnect(current, key), { group: false });
         } else if (selection.nodes.size || selection.notes.size) {
-            change((current) => core.removeFromGraph(current, selection.nodes, selection.notes), { group: false });
+            change((current) => core.removeFromGraph(current, selection.nodes, selection.notes), {
+                group: false
+            });
             if (panel && selection.nodes.has(panel)) setPanel(null);
         }
         setSelection(NO_SELECTION);
@@ -139,16 +174,30 @@ export function CanvasEditor({
         const pasted = core.pasteFragment(graph, fragment, { x: 32, y: 32 }, core.automationNodeId);
         if (!pasted) return void toast.show({ title: t("canvas.pasteTooMany") });
         change(() => pasted.graph, { group: false });
-        setSelection({ nodes: new Set(pasted.nodeIds), notes: new Set(pasted.noteIds), edge: null });
+        setSelection({
+            nodes: new Set(pasted.nodeIds),
+            notes: new Set(pasted.noteIds),
+            edge: null
+        });
     };
 
     /** Switch the chosen steps off, or back on when every one of them is already off. Triggers have no switch. */
     const toggleEnabled = (ids: ReadonlySet<string>) => {
-        const steps = graph.nodes.filter((node) => ids.has(node.id) && core.nodeRole(node.type) !== "trigger");
+        const steps = graph.nodes.filter(
+            (node) => ids.has(node.id) && core.nodeRole(node.type) !== "trigger"
+        );
         if (steps.length === 0) return;
         const on = steps.every((node) => node.enabled === false);
         const touched = new Set(steps.map((node) => node.id));
-        change((current) => ({ ...current, nodes: current.nodes.map((node) => (touched.has(node.id) ? { ...node, enabled: on ? undefined : false } : node)) }), { group: false });
+        change(
+            (current) => ({
+                ...current,
+                nodes: current.nodes.map((node) =>
+                    touched.has(node.id) ? { ...node, enabled: on ? undefined : false } : node
+                )
+            }),
+            { group: false }
+        );
     };
 
     /** Pin the last test output, or unpin. With nothing to pin yet, the panel opens where a sample can be written. */
@@ -160,18 +209,32 @@ export function CanvasEditor({
             return void toast.show({ title: t("canvas.noSampleToPin") });
         }
         const pinned = node.pinned === undefined ? sample : undefined;
-        change((current) => ({ ...current, nodes: current.nodes.map((entry) => (entry.id === node.id ? { ...entry, pinned } : entry)) }), { group: false });
+        change(
+            (current) => ({
+                ...current,
+                nodes: current.nodes.map((entry) =>
+                    entry.id === node.id ? { ...entry, pinned } : entry
+                )
+            }),
+            { group: false }
+        );
         toast.show({ title: pinned === undefined ? t("canvas.unpinned") : t("canvas.pinSaved") });
     };
 
-    const single = () => (selection.nodes.size === 1 ? graph.nodes.find((node) => selection.nodes.has(node.id)) : undefined);
+    const single = () =>
+        selection.nodes.size === 1
+            ? graph.nodes.find((node) => selection.nodes.has(node.id))
+            : undefined;
 
     const lanes = useMemo(() => core.lanesOf(graph), [graph]);
 
     const nodeMenu = (node: core.GraphNode) => {
-        const runnable = onRunFrom && (core.nodeRole(node.type) === "trigger" || lanes.get(node.id) === "main");
+        const runnable =
+            onRunFrom && (core.nodeRole(node.type) === "trigger" || lanes.get(node.id) === "main");
         const ids = selection.nodes.has(node.id) ? selection.nodes : new Set([node.id]);
-        const steps = graph.nodes.filter((entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger");
+        const steps = graph.nodes.filter(
+            (entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger"
+        );
         const turnOn = steps.length > 0 && steps.every((entry) => entry.enabled === false);
         return (
             <>
@@ -202,12 +265,20 @@ export function CanvasEditor({
                                             {t("canvas.menu.runFromHere")}
                                         </ContextMenuItem>
                                     ) : null}
-                                    {core.canPin(node.type) ? <ContextMenuItem onSelect={() => togglePin(node)}>
-                                        {node.pinned !== undefined ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
-                                        {node.pinned !== undefined ? t("canvas.unpin") : t("canvas.menu.pin")}
-                                        {/* i18n-ignore: a key on the keyboard */}
-                                        <MenuShortcut>P</MenuShortcut>
-                                    </ContextMenuItem> : null}
+                                    {core.canPin(node.type) ? (
+                                        <ContextMenuItem onSelect={() => togglePin(node)}>
+                                            {node.pinned !== undefined ? (
+                                                <PinOff aria-hidden="true" />
+                                            ) : (
+                                                <Pin aria-hidden="true" />
+                                            )}
+                                            {node.pinned !== undefined
+                                                ? t("canvas.unpin")
+                                                : t("canvas.menu.pin")}
+                                            {/* i18n-ignore: a key on the keyboard */}
+                                            <MenuShortcut>P</MenuShortcut>
+                                        </ContextMenuItem>
+                                    ) : null}
                                 </ContextMenuGroup>
                             </>
                         ) : null}
@@ -225,7 +296,11 @@ export function CanvasEditor({
                             </ContextMenuItem>
                             {steps.length > 0 ? (
                                 <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
-                                    {turnOn ? <Power aria-hidden="true" /> : <PowerOff aria-hidden="true" />}
+                                    {turnOn ? (
+                                        <Power aria-hidden="true" />
+                                    ) : (
+                                        <PowerOff aria-hidden="true" />
+                                    )}
                                     {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
                                     {/* i18n-ignore: a key on the keyboard */}
                                     <MenuShortcut>D</MenuShortcut>
@@ -235,7 +310,9 @@ export function CanvasEditor({
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" onSelect={remove}>
                             <Trash2 aria-hidden="true" />
-                            {ids.size > 1 ? t("canvas.menu.deleteMany", { count: ids.size }) : t("canvas.menu.delete")}
+                            {ids.size > 1
+                                ? t("canvas.menu.deleteMany", { count: ids.size })
+                                : t("canvas.menu.delete")}
                             <MenuShortcut keys="Delete" />
                         </ContextMenuItem>
                     </>
@@ -251,7 +328,8 @@ export function CanvasEditor({
     };
 
     const addNode = (type: string) => {
-        if (graph.nodes.length >= core.AUTOMATION_LIMITS.nodes) return void toast.show({ title: t("canvas.pasteTooMany") });
+        if (graph.nodes.length >= core.AUTOMATION_LIMITS.nodes)
+            return void toast.show({ title: t("canvas.pasteTooMany") });
         if (insertOn) {
             const node = newNode(type);
             const inserted = core.insertOnEdge(graph, insertOn, node);
@@ -262,7 +340,13 @@ export function CanvasEditor({
             setPanel(node.id);
             return;
         }
-        const node = { ...newNode(type), position: { x: Math.round(placeAt.current.x - core.CANVAS_NODE.width / 2), y: Math.round(placeAt.current.y - core.CANVAS_NODE.height / 2) } };
+        const node = {
+            ...newNode(type),
+            position: {
+                x: Math.round(placeAt.current.x - core.CANVAS_NODE.width / 2),
+                y: Math.round(placeAt.current.y - core.CANVAS_NODE.height / 2)
+            }
+        };
         change((current) => ({ ...current, nodes: [...current.nodes, node] }), { group: false });
         setSelection({ nodes: new Set([node.id]), notes: new Set(), edge: null });
         setPanel(node.id);
@@ -270,23 +354,38 @@ export function CanvasEditor({
 
     const addNote = (at: { x: number; y: number }) => {
         if (graph.notes.length >= core.AUTOMATION_LIMITS.notes) return;
-        const note: core.GraphNote = { id: core.automationNodeId(), text: "", position: { x: Math.round(at.x - 110), y: Math.round(at.y - 60) }, size: { width: 220, height: 120 } };
+        const note: core.GraphNote = {
+            id: core.automationNodeId(),
+            text: "",
+            position: { x: Math.round(at.x - 110), y: Math.round(at.y - 60) },
+            size: { width: 220, height: 120 }
+        };
         change((current) => ({ ...current, notes: [...current.notes, note] }), { group: false });
         setSelection({ nodes: new Set(), notes: new Set([note.id]), edge: null });
     };
 
-    const onKey = (event: KeyboardEvent<HTMLDivElement>, center: () => { x: number; y: number }): boolean => {
+    const onKey = (
+        event: KeyboardEvent<HTMLDivElement>,
+        center: () => { x: number; y: number }
+    ): boolean => {
         const mod = event.ctrlKey || event.metaKey;
         const key = event.key.toLowerCase();
         if (mod && key === "z" && !readOnly) event.shiftKey ? redo() : undo();
         else if (mod && key === "y" && !readOnly) redo();
-        else if (mod && key === "a") setSelection({ nodes: new Set(graph.nodes.map((node) => node.id)), notes: new Set(graph.notes.map((note) => note.id)), edge: null });
+        else if (mod && key === "a")
+            setSelection({
+                nodes: new Set(graph.nodes.map((node) => node.id)),
+                notes: new Set(graph.notes.map((note) => note.id)),
+                edge: null
+            });
         else if (mod && key === "c") void copy(false);
         else if (mod && key === "x" && !readOnly) void copy(true);
         else if (mod && key === "v" && !readOnly) void paste(center());
         else if (mod && key === "d" && !readOnly) duplicate();
-        else if (key === "d" && !mod && !event.shiftKey && !readOnly && selection.nodes.size > 0) toggleEnabled(selection.nodes);
-        else if (key === "p" && !mod && !event.shiftKey && !readOnly && single()) togglePin(single()!);
+        else if (key === "d" && !mod && !event.shiftKey && !readOnly && selection.nodes.size > 0)
+            toggleEnabled(selection.nodes);
+        else if (key === "p" && !mod && !event.shiftKey && !readOnly && single())
+            togglePin(single()!);
         else if (key === "f2" && !readOnly && single()) setRenaming(single()!.id);
         else if ((key === "delete" || key === "backspace") && !readOnly) remove();
         else if (key === "n" && !mod && !readOnly && !event.shiftKey) {
@@ -322,7 +421,13 @@ export function CanvasEditor({
                     refit={refit}
                     onPalette={() => {
                         setInsertOn(null);
-                        placeAt.current = { x: (core.graphBounds(graph)?.x ?? 0) + (core.graphBounds(graph)?.width ?? 0) + 120, y: core.graphBounds(graph)?.y ?? 0 };
+                        placeAt.current = {
+                            x:
+                                (core.graphBounds(graph)?.x ?? 0) +
+                                (core.graphBounds(graph)?.width ?? 0) +
+                                120,
+                            y: core.graphBounds(graph)?.y ?? 0
+                        };
                         setPalette(true);
                     }}
                     onAddNote={addNote}
@@ -336,12 +441,24 @@ export function CanvasEditor({
                 />
             </div>
             {panelNode ? (
-                <aside className="flex max-h-[60vh] min-h-0 w-full shrink-0 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:w-[24rem]" aria-label={t("canvas.settings")}>
+                <aside
+                    className="flex max-h-[60vh] min-h-0 w-full shrink-0 flex-col rounded-lg border border-border bg-card lg:max-h-none lg:w-[24rem]"
+                    aria-label={t("canvas.settings")}
+                >
                     <header className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-2">
-                        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={nodeLabel(t, panelNode)}>
+                        <h2
+                            className="min-w-0 flex-1 truncate text-sm font-semibold"
+                            title={nodeLabel(t, panelNode)}
+                        >
                             {nodeLabel(t, panelNode)}
                         </h2>
-                        <Button variant="ghost" size="icon-sm" aria-label={t("canvas.closePanel")} title={t("canvas.closePanel")} onClick={() => setPanel(null)}>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("canvas.closePanel")}
+                            title={t("canvas.closePanel")}
+                            onClick={() => setPanel(null)}
+                        >
                             <X aria-hidden="true" />
                         </Button>
                     </header>
@@ -357,7 +474,9 @@ export function CanvasEditor({
                             sample={samples[panelNode.id]}
                             onChanged={onChanged}
                             onRemove={() => {
-                                change((current) => core.removeFromGraph(current, [panelNode.id]), { group: false });
+                                change((current) => core.removeFromGraph(current, [panelNode.id]), {
+                                    group: false
+                                });
                                 setPanel(null);
                                 setSelection(NO_SELECTION);
                             }}
@@ -369,21 +488,42 @@ export function CanvasEditor({
                 node={renaming ? graph.nodes.find((node) => node.id === renaming) : undefined}
                 onClose={() => setRenaming(null)}
                 onRename={(nodeId, alias) =>
-                    change((current) => ({ ...current, nodes: current.nodes.map((node) => (node.id === nodeId ? { ...node, alias } : node)) }), { group: false })
+                    change(
+                        (current) => ({
+                            ...current,
+                            nodes: current.nodes.map((node) =>
+                                node.id === nodeId ? { ...node, alias } : node
+                            )
+                        }),
+                        { group: false }
+                    )
                 }
             />
-            <Palette open={palette} stepsOnly={insertOn !== null} onOpenChange={(open) => {
-                setPalette(open);
-                if (!open) setInsertOn(null);
-            }} onPick={(type) => {
-                setPalette(false);
-                addNode(type);
-            }} />
+            <Palette
+                open={palette}
+                stepsOnly={insertOn !== null}
+                onOpenChange={(open) => {
+                    setPalette(open);
+                    if (!open) setInsertOn(null);
+                }}
+                onPick={(type) => {
+                    setPalette(false);
+                    addNode(type);
+                }}
+            />
         </div>
     );
 }
 
-function RenameDialog({ node, onClose, onRename }: { node: core.GraphNode | undefined; onClose: () => void; onRename: (nodeId: string, alias: string | undefined) => void }) {
+function RenameDialog({
+    node,
+    onClose,
+    onRename
+}: {
+    node: core.GraphNode | undefined;
+    onClose: () => void;
+    onRename: (nodeId: string, alias: string | undefined) => void;
+}) {
     const t = useTranslations("automations");
     const [value, setValue] = useState("");
     const [shownFor, setShownFor] = useState<string | null>(null);
@@ -431,16 +571,36 @@ function RenameDialog({ node, onClose, onRename }: { node: core.GraphNode | unde
     );
 }
 
-function Palette({ open, stepsOnly, onOpenChange, onPick }: { open: boolean; stepsOnly: boolean; onOpenChange: (open: boolean) => void; onPick: (type: string) => void }) {
+function Palette({
+    open,
+    stepsOnly,
+    onOpenChange,
+    onPick
+}: {
+    open: boolean;
+    stepsOnly: boolean;
+    onOpenChange: (open: boolean) => void;
+    onPick: (type: string) => void;
+}) {
     const t = useTranslations("automations");
     const [query, setQuery] = useState("");
     const groups = [
-        ...(stepsOnly ? [] : [{ label: t("canvas.groupTriggers"), types: TRIGGER_TYPES as readonly string[] }]),
+        ...(stepsOnly
+            ? []
+            : [{ label: t("canvas.groupTriggers"), types: TRIGGER_TYPES as readonly string[] }]),
         { label: t("canvas.groupSteps"), types: STEP_TYPES as readonly string[] }
     ];
     const needle = query.trim().toLowerCase();
     const shown = groups
-        .map((group) => ({ ...group, types: group.types.filter((type) => !needle || nodeTitle(t, type).toLowerCase().includes(needle) || type.includes(needle)) }))
+        .map((group) => ({
+            ...group,
+            types: group.types.filter(
+                (type) =>
+                    !needle ||
+                    nodeTitle(t, type).toLowerCase().includes(needle) ||
+                    type.includes(needle)
+            )
+        }))
         .filter((group) => group.types.length > 0);
     const first = shown[0]?.types[0];
     return (
@@ -452,7 +612,9 @@ function Palette({ open, stepsOnly, onOpenChange, onPick }: { open: boolean; ste
             }}
         >
             <DialogContent className="max-w-md">
-                <DialogTitle>{stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}</DialogTitle>
+                <DialogTitle>
+                    {stepsOnly ? t("canvas.insertTitle") : t("canvas.paletteTitle")}
+                </DialogTitle>
                 <DialogDescription>{t("canvas.paletteHint")}</DialogDescription>
                 <Input
                     autoFocus
@@ -469,10 +631,14 @@ function Palette({ open, stepsOnly, onOpenChange, onPick }: { open: boolean; ste
                     }}
                 />
                 <div className="max-h-80 space-y-3 overflow-y-auto overscroll-contain">
-                    {shown.length === 0 ? <p className="text-sm text-muted-foreground">{t("canvas.noMatches")}</p> : null}
+                    {shown.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("canvas.noMatches")}</p>
+                    ) : null}
                     {shown.map((group) => (
                         <div key={group.label} className="space-y-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">{group.label}</p>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-subtle">
+                                {group.label}
+                            </p>
                             {group.types.map((type) => (
                                 <button
                                     key={type}
@@ -516,10 +682,18 @@ function NodePanel({
     const toast = useToast();
     const [pinText, setPinText] = useState<string | null>(null);
     const set = (update: Partial<core.GraphNode>) =>
-        change((current) => ({ ...current, nodes: current.nodes.map((entry) => (entry.id === node.id ? { ...entry, ...update } : entry)) }));
+        change((current) => ({
+            ...current,
+            nodes: current.nodes.map((entry) =>
+                entry.id === node.id ? { ...entry, ...update } : entry
+            )
+        }));
     const role = core.nodeRole(node.type);
     const ports = core.nodePorts(node.type);
-    const byId = useMemo(() => new Map(graph.nodes.map((entry) => [entry.id, entry])), [graph.nodes]);
+    const byId = useMemo(
+        () => new Map(graph.nodes.map((entry) => [entry.id, entry])),
+        [graph.nodes]
+    );
     const shownSample = node.pinned !== undefined ? node.pinned : sample;
     const pinJson = (() => {
         try {
@@ -528,24 +702,38 @@ function NodePanel({
             return undefined;
         }
     })();
-    const pinTooLarge = pinText !== null && core.byteLength(pinText) > core.AUTOMATION_LIMITS.pinBytes;
+    const pinTooLarge =
+        pinText !== null && core.byteLength(pinText) > core.AUTOMATION_LIMITS.pinBytes;
 
     return (
         <>
             <fieldset disabled={readOnly} className="space-y-3">
                 <label className="block space-y-1 text-sm">
                     <span>{t("canvas.alias")}</span>
-                    <Input value={node.alias ?? ""} maxLength={80} placeholder={nodeTitle(t, node.type)} onChange={(event) => set({ alias: event.target.value || undefined })} />
+                    <Input
+                        value={node.alias ?? ""}
+                        maxLength={80}
+                        placeholder={nodeTitle(t, node.type)}
+                        onChange={(event) => set({ alias: event.target.value || undefined })}
+                    />
                 </label>
                 <ReferenceScope nodeId={node.id}>
-                    <NodeFields node={node} setConfig={(config) => set({ config })} detail={detail} secrets={secrets} onChanged={onChanged} />
+                    <NodeFields
+                        node={node}
+                        setConfig={(config) => set({ config })}
+                        detail={detail}
+                        secrets={secrets}
+                        onChanged={onChanged}
+                    />
                 </ReferenceScope>
                 {role === "action" ? (
                     <label className="block space-y-1 text-sm">
                         <span>{t("editor.ifFails")}</span>
                         <Select
                             value={node.onError ?? "stop"}
-                            onValueChange={(value) => set({ onError: value as "stop" | "continue" })}
+                            onValueChange={(value) =>
+                                set({ onError: value as "stop" | "continue" })
+                            }
                             options={[
                                 { value: "stop", label: t("editor.onErrorStop") },
                                 { value: "continue", label: t("editor.onErrorContinue") }
@@ -557,32 +745,76 @@ function NodePanel({
                 {role !== "trigger" ? (
                     <label className="flex items-center justify-between gap-2 text-sm">
                         <span className="min-w-0">{t("canvas.enabled")}</span>
-                        <Switch checked={node.enabled !== false} aria-label={t("canvas.enabled")} onChange={(on: boolean) => set({ enabled: on ? undefined : false })} />
+                        <Switch
+                            checked={node.enabled !== false}
+                            aria-label={t("canvas.enabled")}
+                            onChange={(on: boolean) => set({ enabled: on ? undefined : false })}
+                        />
                     </label>
                 ) : null}
                 <label className="block space-y-1 text-sm">
                     <span>{t("canvas.note")}</span>
-                    <Textarea rows={2} maxLength={250} value={node.note ?? ""} onChange={(event) => set({ note: event.target.value || undefined })} />
+                    <Textarea
+                        rows={2}
+                        maxLength={250}
+                        value={node.note ?? ""}
+                        onChange={(event) => set({ note: event.target.value || undefined })}
+                    />
                 </label>
             </fieldset>
 
             <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">{t("canvas.connections")}</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">
+                    {t("canvas.connections")}
+                </h3>
                 {ports.map((port) => {
-                    const targets = graph.edges.filter((edge) => edge.from.node === node.id && edge.from.port === port);
+                    const targets = graph.edges.filter(
+                        (edge) => edge.from.node === node.id && edge.from.port === port
+                    );
                     const options = graph.nodes
-                        .filter((entry) => core.connectRefusal(graph, { node: node.id, port }, entry.id) === null)
+                        .filter(
+                            (entry) =>
+                                core.connectRefusal(graph, { node: node.id, port }, entry.id) ===
+                                null
+                        )
                         .map((entry) => ({ value: entry.id, label: nodeLabel(t, entry) }));
                     return (
                         <div key={port} className="space-y-1">
-                            {ports.length > 1 ? <p className="text-xs text-muted-foreground">{t(`canvas.ports.${port === "then" ? "then" : port === "else" ? "else" : "next"}`)}</p> : null}
+                            {ports.length > 1 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    {t(
+                                        `canvas.ports.${port === "then" ? "then" : port === "else" ? "else" : "next"}`
+                                    )}
+                                </p>
+                            ) : null}
                             {targets.map((edge) => (
-                                <div key={core.edgeKey(edge)} className="flex min-w-0 items-center gap-2 text-sm">
-                                    <span className="min-w-0 flex-1 truncate" title={nodeLabel(t, byId.get(edge.to.node))}>
+                                <div
+                                    key={core.edgeKey(edge)}
+                                    className="flex min-w-0 items-center gap-2 text-sm"
+                                >
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={nodeLabel(t, byId.get(edge.to.node))}
+                                    >
                                         {nodeLabel(t, byId.get(edge.to.node))}
                                     </span>
                                     {!readOnly ? (
-                                        <Button variant="ghost" size="icon-sm" aria-label={t("canvas.removeEdge")} title={t("canvas.removeEdge")} onClick={() => change((current) => core.disconnect(current, core.edgeKey(edge)), { group: false })}>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("canvas.removeEdge")}
+                                            title={t("canvas.removeEdge")}
+                                            onClick={() =>
+                                                change(
+                                                    (current) =>
+                                                        core.disconnect(
+                                                            current,
+                                                            core.edgeKey(edge)
+                                                        ),
+                                                    { group: false }
+                                                )
+                                            }
+                                        >
                                             <X aria-hidden="true" />
                                         </Button>
                                     ) : null}
@@ -595,10 +827,22 @@ function NodePanel({
                                         placeholder={t("canvas.connectTo")}
                                         options={options}
                                         aria-label={t("canvas.connectTo")}
-                                        onValueChange={(target) => change((current) => core.connect(current, { node: node.id, port }, target), { group: false })}
+                                        onValueChange={(target) =>
+                                            change(
+                                                (current) =>
+                                                    core.connect(
+                                                        current,
+                                                        { node: node.id, port },
+                                                        target
+                                                    ),
+                                                { group: false }
+                                            )
+                                        }
                                     />
                                 ) : (
-                                    <p className="text-xs text-foreground-subtle">{t("canvas.noTargets")}</p>
+                                    <p className="text-xs text-foreground-subtle">
+                                        {t("canvas.noTargets")}
+                                    </p>
                                 )
                             ) : null}
                         </div>
@@ -606,15 +850,34 @@ function NodePanel({
                 })}
             </section>
 
-            {!readOnly && role !== "trigger" ? <AlwaysLane node={node} graph={graph} change={change} /> : null}
+            {!readOnly && role !== "trigger" ? (
+                <AlwaysLane node={node} graph={graph} change={change} />
+            ) : null}
 
             {core.canPin(node.type) ? (
                 <section className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">{node.pinned !== undefined ? t("canvas.pinnedSample") : t("canvas.lastOutput")}</h3>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">
+                        {node.pinned !== undefined
+                            ? t("canvas.pinnedSample")
+                            : t("canvas.lastOutput")}
+                    </h3>
                     {pinText !== null ? (
                         <>
-                            <Textarea rows={8} className="font-mono text-xs" aria-label={t("canvas.editPin")} value={pinText} aria-invalid={pinJson === undefined || pinTooLarge ? true : undefined} onChange={(event) => setPinText(event.target.value)} />
-                            {pinJson === undefined ? <p className="text-xs text-danger">{t("canvas.pinInvalid")}</p> : pinTooLarge ? <p className="text-xs text-danger">{t("canvas.pinTooLarge")}</p> : null}
+                            <Textarea
+                                rows={8}
+                                className="font-mono text-xs"
+                                aria-label={t("canvas.editPin")}
+                                value={pinText}
+                                aria-invalid={
+                                    pinJson === undefined || pinTooLarge ? true : undefined
+                                }
+                                onChange={(event) => setPinText(event.target.value)}
+                            />
+                            {pinJson === undefined ? (
+                                <p className="text-xs text-danger">{t("canvas.pinInvalid")}</p>
+                            ) : pinTooLarge ? (
+                                <p className="text-xs text-danger">{t("canvas.pinTooLarge")}</p>
+                            ) : null}
                             <div className="flex flex-wrap justify-end gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setPinText(null)}>
                                     {t("canvas.cancel")}
@@ -633,23 +896,41 @@ function NodePanel({
                             </div>
                         </>
                     ) : shownSample !== undefined && shownSample !== null ? (
-                        <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">{JSON.stringify(shownSample, null, 2)}</pre>
+                        <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">
+                            {JSON.stringify(shownSample, null, 2)}
+                        </pre>
                     ) : (
                         <p className="text-xs text-muted-foreground">{t("canvas.noOutput")}</p>
                     )}
                     {!readOnly && pinText === null ? (
                         <div className="flex flex-wrap gap-2">
-                            {node.pinned === undefined && sample !== undefined && sample !== null ? (
-                                <Button variant="outline" size="sm" onClick={() => set({ pinned: sample })}>
+                            {node.pinned === undefined &&
+                            sample !== undefined &&
+                            sample !== null ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => set({ pinned: sample })}
+                                >
                                     <Pin aria-hidden="true" />
                                     {t("canvas.pin")}
                                 </Button>
                             ) : null}
-                            <Button variant="outline" size="sm" onClick={() => setPinText(JSON.stringify(shownSample ?? {}, null, 2))}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setPinText(JSON.stringify(shownSample ?? {}, null, 2))
+                                }
+                            >
                                 {t("canvas.editPin")}
                             </Button>
                             {node.pinned !== undefined ? (
-                                <Button variant="ghost" size="sm" onClick={() => set({ pinned: undefined })}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => set({ pinned: undefined })}
+                                >
                                     <PinOff aria-hidden="true" />
                                     {t("canvas.unpin")}
                                 </Button>
@@ -671,22 +952,42 @@ function NodePanel({
 }
 
 /** Start the Always lane at this node, or take it out: the panel's way to do what dragging from the lane's dot does. */
-function AlwaysLane({ node, graph, change }: { node: core.GraphNode; graph: core.AutomationGraph; change: Change }) {
+function AlwaysLane({
+    node,
+    graph,
+    change
+}: {
+    node: core.GraphNode;
+    graph: core.AutomationGraph;
+    change: Change;
+}) {
     const t = useTranslations("automations");
     const starts = graph.finally.entry === node.id;
-    const refusal = starts ? null : core.connectRefusal(graph, { node: core.FINALLY_SOURCE, port: "next" }, node.id);
+    const refusal = starts
+        ? null
+        : core.connectRefusal(graph, { node: core.FINALLY_SOURCE, port: "next" }, node.id);
     if (!starts && refusal !== null) return null;
     return (
         <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">{t("editor.always")}</h3>
-            {starts ? <p className="text-xs text-muted-foreground">{t("canvas.alwaysStarts")}</p> : null}
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">
+                {t("editor.always")}
+            </h3>
+            {starts ? (
+                <p className="text-xs text-muted-foreground">{t("canvas.alwaysStarts")}</p>
+            ) : null}
             <Button
                 variant="outline"
                 size="sm"
                 onClick={() =>
                     change(
                         (current) =>
-                            starts ? core.disconnect(current, `${core.FINALLY_SOURCE}>${node.id}`) : core.connect(current, { node: core.FINALLY_SOURCE, port: "next" }, node.id),
+                            starts
+                                ? core.disconnect(current, `${core.FINALLY_SOURCE}>${node.id}`)
+                                : core.connect(
+                                      current,
+                                      { node: core.FINALLY_SOURCE, port: "next" },
+                                      node.id
+                                  ),
                         { group: false }
                     )
                 }

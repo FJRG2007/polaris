@@ -19,9 +19,37 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { LayoutGrid, Map as MapIcon, Maximize, Plus, StickyNote, ZoomIn, ZoomOut } from "lucide-react";
-import { Badge, Button, ContextMenu, ContextMenuContent, ContextMenuTrigger, cn, fitBoard, useBoardGestures, zoomViewAt, type BoardView } from "@polaris/ui";
-import { useCallback, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+    LayoutGrid,
+    Map as MapIcon,
+    Maximize,
+    Plus,
+    StickyNote,
+    ZoomIn,
+    ZoomOut
+} from "lucide-react";
+import {
+    Badge,
+    Button,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuTrigger,
+    cn,
+    fitBoard,
+    useBoardGestures,
+    zoomViewAt,
+    type BoardView
+} from "@polaris/ui";
+import {
+    useCallback,
+    useId,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type KeyboardEvent,
+    type PointerEvent as ReactPointerEvent,
+    type ReactNode
+} from "react";
 
 const N = core.CANVAS_NODE;
 const LIMITS = { min: 0.2, max: 2 };
@@ -79,7 +107,10 @@ export function wirePath(from: Point, to: Point): string {
 /** The middle of the curve `wirePath` draws, where its insert button sits. */
 export function wireMiddle(from: Point, to: Point): Point {
     const reach = Math.max(40, Math.abs(to.x - from.x) * 0.5);
-    return { x: (from.x + 3 * (from.x + reach) + 3 * (to.x - reach) + to.x) / 8, y: (from.y + to.y) / 2 };
+    return {
+        x: (from.x + 3 * (from.x + reach) + 3 * (to.x - reach) + to.x) / 8,
+        y: (from.y + to.y) / 2
+    };
 }
 
 export interface CanvasBoardProps {
@@ -87,7 +118,10 @@ export interface CanvasBoardProps {
     readonly readOnly: boolean;
     readonly selection: CanvasSelection;
     readonly onSelect: (selection: CanvasSelection) => void;
-    readonly onChange: (update: (graph: core.AutomationGraph) => core.AutomationGraph, options?: { group?: boolean }) => void;
+    readonly onChange: (
+        update: (graph: core.AutomationGraph) => core.AutomationGraph,
+        options?: { group?: boolean }
+    ) => void;
     readonly onOpen: (nodeId: string) => void;
     readonly onPalette: () => void;
     /** Add a node on a connection, between its two ends. */
@@ -116,24 +150,34 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const viewRef = useRef(view);
     viewRef.current = view;
     const [drag, setDrag] = useState<Point | null>(null);
-    const [wire, setWire] = useState<{ from: { node: string; port: string }; to: Point } | null>(null);
+    const [wire, setWire] = useState<{ from: { node: string; port: string }; to: Point } | null>(
+        null
+    );
     const [marquee, setMarquee] = useState<{ a: Point; b: Point } | null>(null);
     const [editingNote, setEditingNote] = useState<string | null>(null);
     const [overview, setOverview] = useState(graph.nodes.length >= 8);
     const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
-    const [resizing, setResizing] = useState<{ id: string; width: number; height: number } | null>(null);
+    const [resizing, setResizing] = useState<{ id: string; width: number; height: number } | null>(
+        null
+    );
     const shift = useRef(false);
     const help = useId();
 
     const toBoard = useCallback((clientX: number, clientY: number): Point => {
         const rect = frame.current?.getBoundingClientRect();
         const current = viewRef.current;
-        return { x: (clientX - (rect?.left ?? 0) - current.x) / current.zoom, y: (clientY - (rect?.top ?? 0) - current.y) / current.zoom };
+        return {
+            x: (clientX - (rect?.left ?? 0) - current.x) / current.zoom,
+            y: (clientY - (rect?.top ?? 0) - current.y) / current.zoom
+        };
     }, []);
 
     const center = useCallback((): Point => {
         const rect = frame.current?.getBoundingClientRect();
-        return toBoard((rect?.left ?? 0) + (rect?.width ?? 0) / 2, (rect?.top ?? 0) + (rect?.height ?? 0) / 2);
+        return toBoard(
+            (rect?.left ?? 0) + (rect?.width ?? 0) / 2,
+            (rect?.top ?? 0) + (rect?.height ?? 0) / 2
+        );
     }, [toBoard]);
 
     const fit = useCallback(() => {
@@ -161,13 +205,23 @@ export function CanvasBoard(props: CanvasBoardProps) {
 
     useBoardGestures(frame, {
         onZoom: (factor, at) => setView((current) => zoomViewAt(current, factor, at, LIMITS)),
-        onPan: (dx, dy) => setView((current) => ({ ...current, x: current.x + dx, y: current.y + dy })),
-        grabs: (target) => !shift.current && !target.closest("[data-canvas-item], [data-port], button, textarea, input")
+        onPan: (dx, dy) =>
+            setView((current) => ({ ...current, x: current.x + dx, y: current.y + dy })),
+        grabs: (target) =>
+            !shift.current &&
+            !target.closest("[data-canvas-item], [data-port], button, textarea, input")
     });
 
     const zoomCentre = (factor: number) => {
         const rect = frame.current?.getBoundingClientRect();
-        setView((current) => zoomViewAt(current, factor, { x: (rect?.width ?? 0) / 2, y: (rect?.height ?? 0) / 2 }, LIMITS));
+        setView((current) =>
+            zoomViewAt(
+                current,
+                factor,
+                { x: (rect?.width ?? 0) / 2, y: (rect?.height ?? 0) / 2 },
+                LIMITS
+            )
+        );
     };
 
     // ---- moving the selection -------------------------------------------------
@@ -187,7 +241,10 @@ export function CanvasBoard(props: CanvasBoardProps) {
             return;
         }
         if (!inSelection) {
-            picked = kind === "node" ? { nodes: new Set([id]), notes: new Set(), edge: null } : { nodes: new Set(), notes: new Set([id]), edge: null };
+            picked =
+                kind === "node"
+                    ? { nodes: new Set([id]), notes: new Set(), edge: null }
+                    : { nodes: new Set(), notes: new Set([id]), edge: null };
             onSelect(picked);
         }
         if (readOnly) return;
@@ -195,8 +252,15 @@ export function CanvasBoard(props: CanvasBoardProps) {
         let moved: Point | null = null;
         const move = (next: PointerEvent) => {
             const zoom = viewRef.current.zoom;
-            const delta = { x: (next.clientX - start.x) / zoom, y: (next.clientY - start.y) / zoom };
-            if (!moved && Math.abs(next.clientX - start.x) + Math.abs(next.clientY - start.y) <= SLOP) return;
+            const delta = {
+                x: (next.clientX - start.x) / zoom,
+                y: (next.clientY - start.y) / zoom
+            };
+            if (
+                !moved &&
+                Math.abs(next.clientX - start.x) + Math.abs(next.clientY - start.y) <= SLOP
+            )
+                return;
             moved = delta;
             setDrag(delta);
         };
@@ -207,7 +271,11 @@ export function CanvasBoard(props: CanvasBoardProps) {
             setDrag(null);
             if (moved) {
                 const delta = moved;
-                onChange((current) => core.moveInGraph(current, picked.nodes, picked.notes, delta.x, delta.y), { group: false });
+                onChange(
+                    (current) =>
+                        core.moveInGraph(current, picked.nodes, picked.notes, delta.x, delta.y),
+                    { group: false }
+                );
             }
         };
         window.addEventListener("pointermove", move);
@@ -224,7 +292,10 @@ export function CanvasBoard(props: CanvasBoardProps) {
         let size: { width: number; height: number } | null = null;
         const move = (next: PointerEvent) => {
             const zoom = viewRef.current.zoom;
-            size = core.clampNoteSize({ width: note.size.width + (next.clientX - start.x) / zoom, height: note.size.height + (next.clientY - start.y) / zoom });
+            size = core.clampNoteSize({
+                width: note.size.width + (next.clientX - start.x) / zoom,
+                height: note.size.height + (next.clientY - start.y) / zoom
+            });
             setResizing({ id: note.id, ...size });
         };
         const up = () => {
@@ -248,13 +319,16 @@ export function CanvasBoard(props: CanvasBoardProps) {
         event.stopPropagation();
         event.preventDefault();
         setWire({ from, to: toBoard(event.clientX, event.clientY) });
-        const move = (next: PointerEvent) => setWire({ from, to: toBoard(next.clientX, next.clientY) });
+        const move = (next: PointerEvent) =>
+            setWire({ from, to: toBoard(next.clientX, next.clientY) });
         const up = (next: PointerEvent) => {
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             window.removeEventListener("pointercancel", up);
             setWire(null);
-            const over = document.elementFromPoint(next.clientX, next.clientY)?.closest<HTMLElement>("[data-node-id]");
+            const over = document
+                .elementFromPoint(next.clientX, next.clientY)
+                ?.closest<HTMLElement>("[data-node-id]");
             const target = over?.dataset.nodeId;
             if (!target) return;
             const refusal = core.connectRefusal(graph, from, target);
@@ -274,18 +348,40 @@ export function CanvasBoard(props: CanvasBoardProps) {
         if (target.closest("[data-canvas-item], [data-port], button")) return;
         const a = toBoard(event.clientX, event.clientY);
         setMarquee({ a, b: a });
-        const move = (next: PointerEvent) => setMarquee({ a, b: toBoard(next.clientX, next.clientY) });
+        const move = (next: PointerEvent) =>
+            setMarquee({ a, b: toBoard(next.clientX, next.clientY) });
         const up = (next: PointerEvent) => {
             window.removeEventListener("pointermove", move);
             window.removeEventListener("pointerup", up);
             shift.current = false;
             setMarquee(null);
             const b = toBoard(next.clientX, next.clientY);
-            const box = { left: Math.min(a.x, b.x), right: Math.max(a.x, b.x), top: Math.min(a.y, b.y), bottom: Math.max(a.y, b.y) };
-            const inside = (at: Point, width: number, height: number) => at.x < box.right && at.x + width > box.left && at.y < box.bottom && at.y + height > box.top;
+            const box = {
+                left: Math.min(a.x, b.x),
+                right: Math.max(a.x, b.x),
+                top: Math.min(a.y, b.y),
+                bottom: Math.max(a.y, b.y)
+            };
+            const inside = (at: Point, width: number, height: number) =>
+                at.x < box.right &&
+                at.x + width > box.left &&
+                at.y < box.bottom &&
+                at.y + height > box.top;
             onSelect({
-                nodes: new Set([...selection.nodes, ...graph.nodes.filter((node) => inside(node.position ?? { x: 0, y: 0 }, N.width, N.height)).map((node) => node.id)]),
-                notes: new Set([...selection.notes, ...graph.notes.filter((note) => inside(note.position, note.size.width, note.size.height)).map((note) => note.id)]),
+                nodes: new Set([
+                    ...selection.nodes,
+                    ...graph.nodes
+                        .filter((node) =>
+                            inside(node.position ?? { x: 0, y: 0 }, N.width, N.height)
+                        )
+                        .map((node) => node.id)
+                ]),
+                notes: new Set([
+                    ...selection.notes,
+                    ...graph.notes
+                        .filter((note) => inside(note.position, note.size.width, note.size.height))
+                        .map((note) => note.id)
+                ]),
                 edge: null
             });
         };
@@ -302,19 +398,34 @@ export function CanvasBoard(props: CanvasBoardProps) {
         if (key === "+" || key === "=") zoomCentre(STEP);
         else if (key === "-") zoomCentre(1 / STEP);
         else if (key === "1" && !event.ctrlKey && !event.metaKey) fit();
-        else if (key === "0" && !event.ctrlKey && !event.metaKey) setView((current) => zoomViewAt(current, 1 / current.zoom, { x: 0, y: 0 }, LIMITS));
-        else if (key.startsWith("Arrow") && event.altKey && !readOnly && selection.notes.size === 1 && selection.nodes.size === 0) {
+        else if (key === "0" && !event.ctrlKey && !event.metaKey)
+            setView((current) => zoomViewAt(current, 1 / current.zoom, { x: 0, y: 0 }, LIMITS));
+        else if (
+            key.startsWith("Arrow") &&
+            event.altKey &&
+            !readOnly &&
+            selection.notes.size === 1 &&
+            selection.nodes.size === 0
+        ) {
             const note = graph.notes.find((entry) => selection.notes.has(entry.id));
             if (!note) return;
             const by = event.shiftKey ? 60 : 20;
-            const width = note.size.width + (key === "ArrowLeft" ? -by : key === "ArrowRight" ? by : 0);
-            const height = note.size.height + (key === "ArrowUp" ? -by : key === "ArrowDown" ? by : 0);
+            const width =
+                note.size.width + (key === "ArrowLeft" ? -by : key === "ArrowRight" ? by : 0);
+            const height =
+                note.size.height + (key === "ArrowUp" ? -by : key === "ArrowDown" ? by : 0);
             onChange((current) => core.resizeNote(current, note.id, { width, height }));
-        } else if (key.startsWith("Arrow") && !readOnly && (selection.nodes.size > 0 || selection.notes.size > 0)) {
+        } else if (
+            key.startsWith("Arrow") &&
+            !readOnly &&
+            (selection.nodes.size > 0 || selection.notes.size > 0)
+        ) {
             const by = event.shiftKey ? 60 : 12;
             const dx = key === "ArrowLeft" ? -by : key === "ArrowRight" ? by : 0;
             const dy = key === "ArrowUp" ? -by : key === "ArrowDown" ? by : 0;
-            onChange((current) => core.moveInGraph(current, selection.nodes, selection.notes, dx, dy));
+            onChange((current) =>
+                core.moveInGraph(current, selection.nodes, selection.notes, dx, dy)
+            );
         } else if (key === "Escape") onSelect(NO_SELECTION);
         else return;
         event.preventDefault();
@@ -323,7 +434,15 @@ export function CanvasBoard(props: CanvasBoardProps) {
     // ---- drawing ----------------------------------------------------------------
     const byId = new Map(graph.nodes.map((node) => [node.id, node]));
     const shifted = (node: core.GraphNode): core.GraphNode =>
-        drag && selection.nodes.has(node.id) ? { ...node, position: { x: (node.position?.x ?? 0) + drag.x, y: (node.position?.y ?? 0) + drag.y } } : node;
+        drag && selection.nodes.has(node.id)
+            ? {
+                  ...node,
+                  position: {
+                      x: (node.position?.x ?? 0) + drag.x,
+                      y: (node.position?.y ?? 0) + drag.y
+                  }
+              }
+            : node;
     const lanes = core.lanesOf(graph);
     const band = core.finallyBand(graph);
     const bounds = core.graphBounds(graph) ?? { x: 0, y: 0, width: N.width, height: N.height };
@@ -342,9 +461,18 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const entry = graph.finally.entry ? byId.get(graph.finally.entry) : undefined;
     if (entry) {
         const b = portAnchor(shifted(entry), null);
-        edges.push({ key: `${core.FINALLY_SOURCE}>${entry.id}`, d: wirePath(finallySource, b), middle: wireMiddle(finallySource, b) });
+        edges.push({
+            key: `${core.FINALLY_SOURCE}>${entry.id}`,
+            d: wirePath(finallySource, b),
+            middle: wireMiddle(finallySource, b)
+        });
     }
-    const insertAt = !readOnly && props.onInsert && !drag && !wire ? edges.find((edge) => edge && (edge.key === hoveredEdge || edge.key === selection.edge)) : undefined;
+    const insertAt =
+        !readOnly && props.onInsert && !drag && !wire
+            ? edges.find(
+                  (edge) => edge && (edge.key === hoveredEdge || edge.key === selection.edge)
+              )
+            : undefined;
 
     const frameRect = frame.current?.getBoundingClientRect();
 
@@ -364,24 +492,46 @@ export function CanvasBoard(props: CanvasBoardProps) {
             onPointerDownCapture={pressBoard}
             onKeyDown={keyDown}
             onClick={(event) => {
-                if (!(event.target as Element).closest("[data-canvas-item], [data-edge], button, [data-port]")) onSelect(NO_SELECTION);
+                if (
+                    !(event.target as Element).closest(
+                        "[data-canvas-item], [data-edge], button, [data-port]"
+                    )
+                )
+                    onSelect(NO_SELECTION);
             }}
         >
             <p id={help} className="sr-only">
                 {readOnly ? t("canvas.helpReadOnly") : t("canvas.help")}
             </p>
-            <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
+            <div
+                className="absolute left-0 top-0 origin-top-left"
+                style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
+            >
                 <div
                     className="absolute rounded-lg border border-dashed border-border-strong bg-card/40"
-                    style={{ left: bandLeft, top: band.top, width: bandWidth, height: band.bottom - band.top }}
+                    style={{
+                        left: bandLeft,
+                        top: band.top,
+                        width: bandWidth,
+                        height: band.bottom - band.top
+                    }}
                     aria-hidden="true"
                 >
-                    <span className="absolute left-6 top-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("editor.always")}</span>
+                    <span className="absolute left-6 top-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("editor.always")}
+                    </span>
                     {!graph.finally.entry ? (
-                        <span className="absolute left-6 top-6 max-w-[16rem] text-xs text-foreground-subtle">{readOnly ? t("canvas.alwaysEmpty") : t("canvas.alwaysHint")}</span>
+                        <span className="absolute left-6 top-6 max-w-[16rem] text-xs text-foreground-subtle">
+                            {readOnly ? t("canvas.alwaysEmpty") : t("canvas.alwaysHint")}
+                        </span>
                     ) : null}
                 </div>
-                <svg aria-hidden="true" className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
+                <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-0 top-0 overflow-visible"
+                    width={1}
+                    height={1}
+                >
                     {edges.map((edge) =>
                         edge ? (
                             <g key={edge.key}>
@@ -391,18 +541,33 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     fill="none"
                                     stroke="transparent"
                                     strokeWidth={14}
-                                    style={{ pointerEvents: readOnly ? "none" : "stroke", cursor: "pointer" }}
+                                    style={{
+                                        pointerEvents: readOnly ? "none" : "stroke",
+                                        cursor: "pointer"
+                                    }}
                                     onPointerEnter={() => setHoveredEdge(edge.key)}
-                                    onPointerLeave={() => setHoveredEdge((current) => (current === edge.key ? null : current))}
+                                    onPointerLeave={() =>
+                                        setHoveredEdge((current) =>
+                                            current === edge.key ? null : current
+                                        )
+                                    }
                                     onClick={(event) => {
                                         event.stopPropagation();
-                                        onSelect({ nodes: new Set(), notes: new Set(), edge: edge.key });
+                                        onSelect({
+                                            nodes: new Set(),
+                                            notes: new Set(),
+                                            edge: edge.key
+                                        });
                                     }}
                                 />
                                 <path
                                     d={edge.d}
                                     fill="none"
-                                    stroke={selection.edge === edge.key ? "hsl(var(--primary))" : "hsl(var(--border-strong))"}
+                                    stroke={
+                                        selection.edge === edge.key
+                                            ? "hsl(var(--primary))"
+                                            : "hsl(var(--border-strong))"
+                                    }
                                     strokeWidth={selection.edge === edge.key ? 2.5 : 1.5}
                                 />
                             </g>
@@ -411,7 +576,9 @@ export function CanvasBoard(props: CanvasBoardProps) {
                     {wire ? (
                         <path
                             d={wirePath(
-                                wire.from.node === core.FINALLY_SOURCE ? finallySource : portAnchor(byId.get(wire.from.node)!, wire.from.port),
+                                wire.from.node === core.FINALLY_SOURCE
+                                    ? finallySource
+                                    : portAnchor(byId.get(wire.from.node)!, wire.from.port),
                                 wire.to
                             )}
                             fill="none"
@@ -445,12 +612,22 @@ export function CanvasBoard(props: CanvasBoardProps) {
                         role="presentation"
                         title={t("canvas.alwaysStart")}
                         className="absolute cursor-crosshair rounded-full border-2 border-background bg-muted-foreground hover:bg-primary"
-                        style={{ left: finallySource.x - PORT / 2, top: finallySource.y - PORT / 2, width: PORT, height: PORT }}
-                        onPointerDown={(event) => pressPort(event, { node: core.FINALLY_SOURCE, port: "next" })}
+                        style={{
+                            left: finallySource.x - PORT / 2,
+                            top: finallySource.y - PORT / 2,
+                            width: PORT,
+                            height: PORT
+                        }}
+                        onPointerDown={(event) =>
+                            pressPort(event, { node: core.FINALLY_SOURCE, port: "next" })
+                        }
                     />
                 ) : null}
                 {graph.notes.map((note) => {
-                    const at = drag && selection.notes.has(note.id) ? { x: note.position.x + drag.x, y: note.position.y + drag.y } : note.position;
+                    const at =
+                        drag && selection.notes.has(note.id)
+                            ? { x: note.position.x + drag.x, y: note.position.y + drag.y }
+                            : note.position;
                     const selected = selection.notes.has(note.id);
                     const size = resizing?.id === note.id ? resizing : note.size;
                     return (
@@ -459,10 +636,19 @@ export function CanvasBoard(props: CanvasBoardProps) {
                             data-canvas-item
                             className={cn(
                                 "absolute overflow-hidden rounded-md border bg-warning-soft p-2 text-xs text-foreground",
-                                selected ? "border-primary ring-1 ring-primary" : "border-warning-edge"
+                                selected
+                                    ? "border-primary ring-1 ring-primary"
+                                    : "border-warning-edge"
                             )}
-                            style={{ left: at.x, top: at.y, width: size.width, height: size.height }}
-                            onPointerDown={(event) => editingNote !== note.id && pressItem(event, "note", note.id)}
+                            style={{
+                                left: at.x,
+                                top: at.y,
+                                width: size.width,
+                                height: size.height
+                            }}
+                            onPointerDown={(event) =>
+                                editingNote !== note.id && pressItem(event, "note", note.id)
+                            }
                             onDoubleClick={() => !readOnly && setEditingNote(note.id)}
                         >
                             {editingNote === note.id ? (
@@ -475,15 +661,30 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     onBlur={(event) => {
                                         const text = event.target.value;
                                         setEditingNote(null);
-                                        if (text !== note.text) onChange((current) => ({ ...current, notes: current.notes.map((entry) => (entry.id === note.id ? { ...entry, text } : entry)) }));
+                                        if (text !== note.text)
+                                            onChange((current) => ({
+                                                ...current,
+                                                notes: current.notes.map((entry) =>
+                                                    entry.id === note.id
+                                                        ? { ...entry, text }
+                                                        : entry
+                                                )
+                                            }));
                                     }}
                                     onKeyDown={(event) => {
-                                        if (event.key === "Escape") (event.target as HTMLTextAreaElement).blur();
+                                        if (event.key === "Escape")
+                                            (event.target as HTMLTextAreaElement).blur();
                                         event.stopPropagation();
                                     }}
                                 />
                             ) : (
-                                <p className="whitespace-pre-wrap break-words">{note.text || <span className="text-foreground-subtle">{t("canvas.notePlaceholder")}</span>}</p>
+                                <p className="whitespace-pre-wrap break-words">
+                                    {note.text || (
+                                        <span className="text-foreground-subtle">
+                                            {t("canvas.notePlaceholder")}
+                                        </span>
+                                    )}
+                                </p>
                             )}
                             {selected && !readOnly && editingNote !== note.id ? (
                                 <span
@@ -516,46 +717,88 @@ export function CanvasBoard(props: CanvasBoardProps) {
                             aria-label={`${props.title(node)}${state ? ` - ${t(`stepStatus.${stepKey(state)}`)}` : ""}`}
                             className={cn(
                                 "absolute flex items-center gap-2 rounded-lg border-2 bg-card px-3 shadow-none",
-                                state ? STATE_RING[state] ?? "border-border" : "border-border",
-                                selected && "ring-2 ring-primary ring-offset-1 ring-offset-background",
+                                state ? (STATE_RING[state] ?? "border-border") : "border-border",
+                                selected &&
+                                    "ring-2 ring-primary ring-offset-1 ring-offset-background",
                                 node.enabled === false && "opacity-60",
                                 state === "skipped" && "opacity-60",
                                 !readOnly && "cursor-grab"
                             )}
                             style={{ left: at.x, top: at.y, width: N.width, height: N.height }}
                             onPointerDown={(event) => pressItem(event, "node", node.id)}
-                            onContextMenu={() => !selected && onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null })}
+                            onContextMenu={() =>
+                                !selected &&
+                                onSelect({
+                                    nodes: new Set([node.id]),
+                                    notes: new Set(),
+                                    edge: null
+                                })
+                            }
                             onDoubleClick={() => props.onOpen(node.id)}
                             onKeyDown={(event) => {
                                 if (event.key === "Enter" || event.key === " ") {
                                     event.preventDefault();
-                                    onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null });
+                                    onSelect({
+                                        nodes: new Set([node.id]),
+                                        notes: new Set(),
+                                        edge: null
+                                    });
                                     props.onOpen(node.id);
                                 }
                             }}
                             onFocus={(event) => {
                                 // Only a keyboard arrival selects: a press already chose (and Shift+click added to) the selection.
-                                if (!selected && !drag && focusedByKey(event.currentTarget)) onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null });
+                                if (!selected && !drag && focusedByKey(event.currentTarget))
+                                    onSelect({
+                                        nodes: new Set([node.id]),
+                                        notes: new Set(),
+                                        edge: null
+                                    });
                             }}
                         >
                             <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium" title={props.title(node)}>
+                                <p
+                                    className="truncate text-sm font-medium"
+                                    title={props.title(node)}
+                                >
                                     {props.title(node)}
                                 </p>
                                 {subtitle ? (
-                                    <p className="truncate text-xs text-muted-foreground" title={subtitle}>
+                                    <p
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={subtitle}
+                                    >
                                         {subtitle}
                                     </p>
                                 ) : null}
                                 <div className="mt-0.5 flex min-w-0 gap-1">
-                                    {props.incomplete(node) ? <span className="truncate text-[11px] text-warning-ink">{t("runErrors.badConfig")}</span> : null}
-                                    {node.pinned !== undefined ? <span className="truncate text-[11px] text-primary">{t("canvas.pinned")}</span> : null}
-                                    {node.enabled === false ? <span className="truncate text-[11px] text-muted-foreground">{t("canvas.off")}</span> : null}
-                                    {lanes.get(node.id) === "loose" && !trigger ? <span className="truncate text-[11px] text-foreground-subtle">{t("canvas.loose")}</span> : null}
+                                    {props.incomplete(node) ? (
+                                        <span className="truncate text-[11px] text-warning-ink">
+                                            {t("runErrors.badConfig")}
+                                        </span>
+                                    ) : null}
+                                    {node.pinned !== undefined ? (
+                                        <span className="truncate text-[11px] text-primary">
+                                            {t("canvas.pinned")}
+                                        </span>
+                                    ) : null}
+                                    {node.enabled === false ? (
+                                        <span className="truncate text-[11px] text-muted-foreground">
+                                            {t("canvas.off")}
+                                        </span>
+                                    ) : null}
+                                    {lanes.get(node.id) === "loose" && !trigger ? (
+                                        <span className="truncate text-[11px] text-foreground-subtle">
+                                            {t("canvas.loose")}
+                                        </span>
+                                    ) : null}
                                 </div>
                             </div>
                             {state ? (
-                                <Badge variant={STATE_BADGE[state] ?? "neutral"} className="shrink-0">
+                                <Badge
+                                    variant={STATE_BADGE[state] ?? "neutral"}
+                                    className="shrink-0"
+                                >
                                     {t(`stepStatus.${stepKey(state)}`)}
                                 </Badge>
                             ) : null}
@@ -563,7 +806,12 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 <span
                                     aria-hidden="true"
                                     className="pointer-events-none absolute rounded-full border-2 border-background bg-border-strong"
-                                    style={{ left: -PORT / 2, top: N.height / 2 - PORT / 2, width: PORT, height: PORT }}
+                                    style={{
+                                        left: -PORT / 2,
+                                        top: N.height / 2 - PORT / 2,
+                                        width: PORT,
+                                        height: PORT
+                                    }}
                                 />
                             ) : null}
                             {ports.map((port, index) => {
@@ -571,8 +819,13 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 return (
                                     <span key={port}>
                                         {port !== "next" ? (
-                                            <span className="pointer-events-none absolute text-[10px] font-medium text-muted-foreground" style={{ right: 10, top: y - 7 }}>
-                                                {t(`canvas.ports.${port === "then" ? "then" : port === "else" ? "else" : "next"}`)}
+                                            <span
+                                                className="pointer-events-none absolute text-[10px] font-medium text-muted-foreground"
+                                                style={{ right: 10, top: y - 7 }}
+                                            >
+                                                {t(
+                                                    `canvas.ports.${port === "then" ? "then" : port === "else" ? "else" : "next"}`
+                                                )}
                                             </span>
                                         ) : null}
                                         <span
@@ -583,8 +836,15 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                                 "absolute rounded-full border-2 border-background bg-muted-foreground",
                                                 !readOnly && "cursor-crosshair hover:bg-primary"
                                             )}
-                                            style={{ left: N.width - PORT / 2, top: y - PORT / 2, width: PORT, height: PORT }}
-                                            onPointerDown={(event) => pressPort(event, { node: node.id, port })}
+                                            style={{
+                                                left: N.width - PORT / 2,
+                                                top: y - PORT / 2,
+                                                width: PORT,
+                                                height: PORT
+                                            }}
+                                            onPointerDown={(event) =>
+                                                pressPort(event, { node: node.id, port })
+                                            }
                                         />
                                     </span>
                                 );
@@ -615,16 +875,34 @@ export function CanvasBoard(props: CanvasBoardProps) {
             </div>
 
             {overview && frameRect ? (
-                <Overview graph={graph} view={view} frame={{ width: frameRect.width, height: frameRect.height }} onCentre={(at) => setView((current) => ({ ...current, x: frameRect.width / 2 - at.x * current.zoom, y: frameRect.height / 2 - at.y * current.zoom }))} label={t("canvas.minimap")} />
+                <Overview
+                    graph={graph}
+                    view={view}
+                    frame={{ width: frameRect.width, height: frameRect.height }}
+                    onCentre={(at) =>
+                        setView((current) => ({
+                            ...current,
+                            x: frameRect.width / 2 - at.x * current.zoom,
+                            y: frameRect.height / 2 - at.y * current.zoom
+                        }))
+                    }
+                    label={t("canvas.minimap")}
+                />
             ) : null}
 
-            <div className="absolute bottom-2 right-2 flex items-center rounded-md border border-border bg-elevated shadow-popover" onClick={(event) => event.stopPropagation()}>
+            <div
+                className="absolute bottom-2 right-2 flex items-center rounded-md border border-border bg-elevated shadow-popover"
+                onClick={(event) => event.stopPropagation()}
+            >
                 {!readOnly ? (
                     <>
                         <ToolButton label={t("canvas.addNode")} onClick={props.onPalette}>
                             <Plus aria-hidden="true" />
                         </ToolButton>
-                        <ToolButton label={t("canvas.addNote")} onClick={() => props.onAddNote(center())}>
+                        <ToolButton
+                            label={t("canvas.addNote")}
+                            onClick={() => props.onAddNote(center())}
+                        >
                             <StickyNote aria-hidden="true" />
                         </ToolButton>
                         {props.onTidy && graph.nodes.length > 1 ? (
@@ -643,7 +921,11 @@ export function CanvasBoard(props: CanvasBoardProps) {
                 <ToolButton label={t("canvas.fit")} onClick={fit}>
                     <Maximize aria-hidden="true" />
                 </ToolButton>
-                <ToolButton label={t("canvas.minimap")} pressed={overview} onClick={() => setOverview(!overview)}>
+                <ToolButton
+                    label={t("canvas.minimap")}
+                    pressed={overview}
+                    onClick={() => setOverview(!overview)}
+                >
                     <MapIcon aria-hidden="true" />
                 </ToolButton>
             </div>
@@ -659,14 +941,44 @@ function focusedByKey(element: Element): boolean {
     }
 }
 
-const STEP_KEYS = ["ready", "running", "waiting", "ok", "failed", "skipped", "refused", "timedOut", "interrupted"] as const;
+const STEP_KEYS = [
+    "ready",
+    "running",
+    "waiting",
+    "ok",
+    "failed",
+    "skipped",
+    "refused",
+    "timedOut",
+    "interrupted"
+] as const;
 export function stepKey(status: string): (typeof STEP_KEYS)[number] {
-    return (STEP_KEYS as readonly string[]).includes(status) ? (status as (typeof STEP_KEYS)[number]) : "failed";
+    return (STEP_KEYS as readonly string[]).includes(status)
+        ? (status as (typeof STEP_KEYS)[number])
+        : "failed";
 }
 
-function ToolButton({ label, pressed, onClick, children }: { label: string; pressed?: boolean; onClick: () => void; children: React.ReactNode }) {
+function ToolButton({
+    label,
+    pressed,
+    onClick,
+    children
+}: {
+    label: string;
+    pressed?: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
     return (
-        <Button size="sm" variant="ghost" className="size-8 p-0" aria-label={label} title={label} aria-pressed={pressed} onClick={onClick}>
+        <Button
+            size="sm"
+            variant="ghost"
+            className="size-8 p-0"
+            aria-label={label}
+            title={label}
+            aria-pressed={pressed}
+            onClick={onClick}
+        >
             {children}
         </Button>
     );
@@ -694,7 +1006,12 @@ function Overview({
     const scale = Math.min(width / (bounds.width + pad * 2), height / (bounds.height + pad * 2));
     const ox = bounds.x - pad;
     const oy = bounds.y - pad;
-    const seen = { x: -view.x / view.zoom, y: -view.y / view.zoom, width: frame.width / view.zoom, height: frame.height / view.zoom };
+    const seen = {
+        x: -view.x / view.zoom,
+        y: -view.y / view.zoom,
+        width: frame.width / view.zoom,
+        height: frame.height / view.zoom
+    };
     return (
         <svg
             role="img"
@@ -705,16 +1022,43 @@ function Overview({
             onClick={(event) => {
                 event.stopPropagation();
                 const rect = event.currentTarget.getBoundingClientRect();
-                onCentre({ x: (event.clientX - rect.left) / scale + ox, y: (event.clientY - rect.top) / scale + oy });
+                onCentre({
+                    x: (event.clientX - rect.left) / scale + ox,
+                    y: (event.clientY - rect.top) / scale + oy
+                });
             }}
         >
             {graph.nodes.map((node) => (
-                <rect key={node.id} x={((node.position?.x ?? 0) - ox) * scale} y={((node.position?.y ?? 0) - oy) * scale} width={N.width * scale} height={N.height * scale} rx={2} fill="hsl(var(--border-strong))" />
+                <rect
+                    key={node.id}
+                    x={((node.position?.x ?? 0) - ox) * scale}
+                    y={((node.position?.y ?? 0) - oy) * scale}
+                    width={N.width * scale}
+                    height={N.height * scale}
+                    rx={2}
+                    fill="hsl(var(--border-strong))"
+                />
             ))}
             {graph.notes.map((note) => (
-                <rect key={note.id} x={(note.position.x - ox) * scale} y={(note.position.y - oy) * scale} width={note.size.width * scale} height={note.size.height * scale} rx={2} fill="hsl(var(--warning) / 0.4)" />
+                <rect
+                    key={note.id}
+                    x={(note.position.x - ox) * scale}
+                    y={(note.position.y - oy) * scale}
+                    width={note.size.width * scale}
+                    height={note.size.height * scale}
+                    rx={2}
+                    fill="hsl(var(--warning) / 0.4)"
+                />
             ))}
-            <rect x={(seen.x - ox) * scale} y={(seen.y - oy) * scale} width={seen.width * scale} height={seen.height * scale} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.5} />
+            <rect
+                x={(seen.x - ox) * scale}
+                y={(seen.y - oy) * scale}
+                width={seen.width * scale}
+                height={seen.height * scale}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={1.5}
+            />
         </svg>
     );
 }

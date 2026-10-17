@@ -140,7 +140,11 @@ export interface AutomationDetail {
     readonly hooks: Readonly<Record<string, string>>;
     readonly isOrg: boolean;
     /** The live version, to tell the draft from it. */
-    readonly publishedVersion: { readonly id: string; readonly number: number; readonly graph: core.AutomationGraph } | null;
+    readonly publishedVersion: {
+        readonly id: string;
+        readonly number: number;
+        readonly graph: core.AutomationGraph;
+    } | null;
     /** The newest test run of the draft, whose outputs the canvas shows on each node. */
     readonly lastTestRunId: string | null;
 }
@@ -165,10 +169,17 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
     const [live, lastTest] = await Promise.all([
         row.publishedVersionId
-            ? prisma.automationVersion.findUnique({ where: { id: row.publishedVersionId }, select: { id: true, number: true, graph: true } })
+            ? prisma.automationVersion.findUnique({
+                  where: { id: row.publishedVersionId },
+                  select: { id: true, number: true, graph: true }
+              })
             : null,
         canEdit
-            ? prisma.automationRun.findFirst({ where: { automationId: row.id, test: true }, orderBy: { queuedAt: "desc" }, select: { id: true } })
+            ? prisma.automationRun.findFirst({
+                  where: { automationId: row.id, test: true },
+                  orderBy: { queuedAt: "desc" },
+                  select: { id: true }
+              })
             : null
     ]);
     const liveGraph = live ? core.automationGraphSchema.safeParse(live.graph) : null;
@@ -189,7 +200,10 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         draft,
         hooks,
         isOrg: row.orgId !== null,
-        publishedVersion: live && liveGraph?.success ? { id: live.id, number: live.number, graph: liveGraph.data } : null,
+        publishedVersion:
+            live && liveGraph?.success
+                ? { id: live.id, number: live.number, graph: liveGraph.data }
+                : null,
         lastTestRunId: lastTest?.id ?? null
     };
 }
