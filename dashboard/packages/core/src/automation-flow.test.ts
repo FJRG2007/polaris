@@ -138,3 +138,110 @@ describe("conditions and combinators", () => {
         );
     });
 });
+
+describe("the list view of flow control", () => {
+    const n = (id: string, type: string, config: unknown = {}): ag.GraphNode => ({
+        id,
+        type,
+        typeVersion: 1,
+        config
+    });
+    it("round-trips Choose, At the same time and loops", () => {
+        const flow: ag.ListFlow = {
+            timeZone: "UTC",
+            triggers: [n("t1", "core.manual")],
+            steps: [
+                {
+                    node: n("sw", "core.switch", {
+                        kind: "value",
+                        value: "{{trigger.a}}",
+                        cases: [{ equals: "x" }]
+                    }),
+                    branches: [[{ node: n("a", "core.notify", { title: "a" }) }], []]
+                },
+                {
+                    node: n("par", "core.parallel", { lanes: 2 }),
+                    branches: [[{ node: n("b", "core.notify", { title: "b" }) }], [{ node: n("c", "core.notify", { title: "c" }) }]]
+                },
+                { node: n("join", "core.join", {}) },
+                {
+                    node: n("each", "core.forEach", { items: "{{trigger.list}}" }),
+                    body: [{ node: n("d", "core.notify", { title: "d" }) }]
+                },
+                { node: n("stop", "core.stop", {}) }
+            ],
+            finally: [],
+            finallyOnCancel: false
+        };
+        const graph = ag.graphFromList(flow);
+        expect(ag.graphProblems(graph, { forPublish: true })).toEqual([]);
+        const back = ag.listFromGraph(graph);
+        expect(back).not.toBeNull();
+        expect(ag.graphFromList(back!)).toEqual(graph);
+        expect(ag.listStepFor(n("x", "core.parallel", { lanes: 3 })).branches).toHaveLength(3);
+    });
+});
+
+describe("ports that follow a change of settings", () => {
+    const first = { label: "a", condition: always };
+    const second = { label: "b", condition: always };
+    const third = { label: "c", condition: always };
+    const choose = (cases: unknown[], fallback = true) =>
+        node("sw", "core.switch", { kind: "rules", cases, fallback });
+
+    it("keeps a case's wires when a case before it is removed", () => {
+        const moves = ag.portMoves(choose([first, second, third]), choose([first, third]));
+        expect(Object.fromEntries(moves)).toEqual({
+            case1: "case1",
+            case2: null,
+            case3: "case2",
+            otherwise: "otherwise"
+        });
+    });
+
+    it("keeps wires by position when a case is only edited, and drops Otherwise when it goes", () => {
+        const edited = { ...second, label: "renamed" };
+        const moves = ag.portMoves(choose([first, second]), choose([first, edited], false));
+        expect(Object.fromEntries(moves)).toEqual({ case1: "case1", case2: "case2", otherwise: null });
+    });
+
+    it("drops the lanes a parallel no longer has and the error port once it is off", () => {
+        const lanes = (count: number) => node("par", "core.parallel", { lanes: count });
+        expect(Object.fromEntries(ag.portMoves(lanes(3), lanes(2)))).toEqual({
+            lane1: "lane1",
+            lane2: "lane2",
+            lane3: null
+        });
+        const http = node("h", "core.http", {}, { onError: "port" });
+        expect(ag.portMoves(http, { ...http, onError: "stop" }).get("error")).toBeNull();
+    });
+});
+
+describe("node height on the canvas", () => {
+    it("grows a node with many ports and lays the next one below it", async () => {
+        const canvas = await import("./automation-canvas.js");
+        const many = node("sw", "core.switch", {
+            kind: "rules",
+            cases: Array.from({ length: 8 }, (_, at) => ({ label: `c${at}`, condition: always }))
+        });
+        expect(canvas.canvasNodeHeight(node("n", "core.notify", { title: "x" }))).toBe(
+            canvas.CANVAS_NODE.height
+        );
+        expect(canvas.canvasNodeHeight(many)).toBeGreaterThan(canvas.CANVAS_NODE.height);
+        const graph = canvas.layoutGraph(
+            build(
+                [node("t", "core.manual"), many, node("a", "core.manual")],
+                [edge("t", "next", "sw")]
+            )
+        );
+        const [top, , below] = graph.nodes;
+        expect(below!.position!.y).toBeGreaterThanOrEqual(
+            top!.position!.y + canvas.canvasNodeHeight(top!)
+        );
+        const sw = graph.nodes[1]!;
+        const bounds = canvas.graphBounds(graph)!;
+        expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(
+            sw.position!.y + canvas.canvasNodeHeight(sw)
+        );
+    });
+});

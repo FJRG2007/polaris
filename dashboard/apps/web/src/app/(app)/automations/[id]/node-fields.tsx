@@ -8,7 +8,6 @@
  */
 
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
 import * as core from "@polaris/core";
 import {
     Button,
@@ -24,6 +23,13 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { rotateHookAction } from "../actions";
 import { RefInput, RefTextarea } from "./references";
+import {
+    ConditionEditor,
+    FLOW_FIELD_TYPES,
+    FlowNodeFields,
+    emptyCondition,
+    triggerChoices
+} from "./flow-fields";
 
 export type T = ReturnType<typeof useTranslations<"automations">>;
 
@@ -34,13 +40,30 @@ const PRESET_NAMES: Record<core.ChatPreset, string> = {
     teams: "Teams" // i18n-ignore
 };
 
-export const TRIGGER_TYPES = ["core.manual", "core.schedule", "core.webhook"] as const;
+export const TRIGGER_TYPES = [
+    "core.manual",
+    "core.schedule",
+    "core.webhook",
+    "core.onEvent",
+    "core.failed",
+    "core.called"
+] as const;
 export const STEP_TYPES = [
     "core.if",
+    "core.switch",
+    "core.parallel",
+    "core.join",
+    "core.forEach",
+    "core.repeat",
     "core.wait",
+    "core.waitEvent",
     "core.notify",
     "core.http",
-    "core.chat"
+    "core.chat",
+    "core.run",
+    "core.answer",
+    "core.announce",
+    "core.stop"
 ] as const;
 
 export const DEFAULT_CONFIG: Record<string, () => unknown> = {
@@ -67,6 +90,24 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
         timeoutSeconds: 15,
         acceptAnyStatus: false
     }),
+    "core.called": () => ({ inputs: [] }),
+    "core.onEvent": () => ({ name: "" }),
+    "core.failed": () => ({ automations: [] }),
+    "core.switch": () => ({
+        kind: "rules",
+        cases: [{ label: "", condition: emptyCondition() }],
+        every: false,
+        fallback: true
+    }),
+    "core.parallel": () => ({ lanes: 2 }),
+    "core.join": () => ({ wait: "all", count: 2, output: "byInput", keep: null }),
+    "core.forEach": () => ({ items: "", batch: 1 }),
+    "core.repeat": () => ({ kind: "times", count: 3 }),
+    "core.stop": () => ({ as: "succeeded", reason: "" }),
+    "core.waitEvent": () => ({ name: "", timeout: { amount: 1, unit: "hours" } }),
+    "core.run": () => ({ automationId: "", inputs: [], wait: true }),
+    "core.answer": () => ({ outputs: [] }),
+    "core.announce": () => ({ name: "", payload: [] }),
     "core.chat": () => ({
         preset: "slack",
         secretId: "",
@@ -172,6 +213,9 @@ export function NodeFields({
         { value: "hours", label: t("fields.hours") },
         { value: "days", label: t("fields.days") }
     ];
+
+    if (FLOW_FIELD_TYPES.has(node.type))
+        return <FlowNodeFields node={node} setConfig={setConfig} detail={detail} />;
 
     switch (node.type) {
         case "core.manual":
@@ -308,107 +352,14 @@ export function NodeFields({
                     )}
                 </div>
             );
-        case "core.if": {
-            const group = config.condition as core.ConditionGroup;
-            const leaves = group.items.filter(
-                (item): item is core.CompareLeaf => item.kind === "compare"
-            );
-            const setGroup = (change: Partial<core.ConditionGroup>) =>
-                set({ condition: { ...group, ...change } });
+        case "core.if":
             return (
-                <div className="space-y-3">
-                    <Field label={t("fields.join")}>
-                        <Select
-                            value={group.join}
-                            onValueChange={(join) => setGroup({ join: join as "all" | "any" })}
-                            options={[
-                                { value: "all", label: t("fields.joinAll") },
-                                { value: "any", label: t("fields.joinAny") }
-                            ]}
-                            aria-label={t("fields.join")}
-                        />
-                    </Field>
-                    {leaves.map((leaf, index) => (
-                        <div key={index} className="grid gap-2 sm:grid-cols-[1fr_10rem_1fr_auto]">
-                            <RefInput
-                                aria-label={t("fields.left")}
-                                placeholder="{{trigger.body.value}}"
-                                value={leaf.left}
-                                onChange={(event) =>
-                                    setGroup({
-                                        items: leaves.map((entry, at) =>
-                                            at === index
-                                                ? { ...entry, left: event.target.value }
-                                                : entry
-                                        )
-                                    })
-                                }
-                            />
-                            <Select
-                                value={leaf.op}
-                                onValueChange={(op) =>
-                                    setGroup({
-                                        items: leaves.map((entry, at) =>
-                                            at === index
-                                                ? { ...entry, op: op as core.CompareOperator }
-                                                : entry
-                                        )
-                                    })
-                                }
-                                options={core.COMPARE_OPERATORS.map((op) => ({
-                                    value: op,
-                                    label: t(`operators.${op}`)
-                                }))}
-                                aria-label={t("fields.op")}
-                            />
-                            {core.UNARY_OPERATORS.includes(leaf.op) ? (
-                                <span />
-                            ) : (
-                                <RefInput
-                                    aria-label={t("fields.right")}
-                                    value={leaf.right}
-                                    onChange={(event) =>
-                                        setGroup({
-                                            items: leaves.map((entry, at) =>
-                                                at === index
-                                                    ? { ...entry, right: event.target.value }
-                                                    : entry
-                                            )
-                                        })
-                                    }
-                                />
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={t("editor.remove")}
-                                title={t("editor.remove")}
-                                disabled={leaves.length === 1}
-                                onClick={() =>
-                                    setGroup({ items: leaves.filter((_, at) => at !== index) })
-                                }
-                            >
-                                <Trash2 aria-hidden="true" />
-                            </Button>
-                        </div>
-                    ))}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                            setGroup({
-                                items: [
-                                    ...leaves,
-                                    { kind: "compare", left: "", op: "eq", right: "" }
-                                ]
-                            })
-                        }
-                    >
-                        {t("fields.addCondition")}
-                    </Button>
-                </div>
+                <ConditionEditor
+                    value={config.condition as core.ConditionGroup}
+                    onChange={(condition) => set({ condition })}
+                    triggers={triggerChoices(t, detail.draft)}
+                />
             );
-        }
         case "core.wait":
             return (
                 <div className="space-y-3">

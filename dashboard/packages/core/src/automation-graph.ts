@@ -718,6 +718,32 @@ export function switchPorts(config: unknown): string[] {
     return parsed.data.fallback ? [...cases, "otherwise"] : cases;
 }
 
+/**
+ * Where each output port of a node goes when its settings change, so the wires
+ * and nested steps behind it follow: a Choose case keeps its own when cases
+ * are added or removed around it (matched by the case itself, since an edit
+ * replaces only the case it touches), every other port by its name. A port
+ * that no longer exists maps to null.
+ */
+export function portMoves(
+    before: { readonly type: string; readonly config?: unknown; readonly onError?: string },
+    after: { readonly type: string; readonly config?: unknown; readonly onError?: string }
+): Map<string, string | null> {
+    const next = new Set(nodePorts(after.type, after));
+    const oldCases = (before.config as { cases?: unknown[] } | undefined)?.cases ?? [];
+    const newCases = (after.config as { cases?: unknown[] } | undefined)?.cases ?? [];
+    const moves = new Map<string, string | null>();
+    for (const port of nodePorts(before.type, before)) {
+        const choice = /^case(\d+)$/.exec(port);
+        if (choice && oldCases.length !== newCases.length) {
+            const at = newCases.indexOf(oldCases[Number(choice[1]) - 1]);
+            const moved = at >= 0 ? `case${at + 1}` : null;
+            moves.set(port, moved && next.has(moved) ? moved : null);
+        } else moves.set(port, next.has(port) ? port : null);
+    }
+    return moves;
+}
+
 export function parallelPorts(config: unknown): string[] {
     const parsed = CORE_NODE_CONFIGS["core.parallel"].safeParse(config);
     const lanes = parsed.success ? parsed.data.lanes : 2;
@@ -1061,11 +1087,28 @@ export function graphProblems(
 // The list view
 // ---------------------------------------------------------------------------
 
-/** One row of the list view: a node, and for an If, what it does either way. */
+/**
+ * One row of the list view: a node; for an If, what it does either way; for a
+ * Choose or At the same time, one list per port; for a loop, its body.
+ */
 export interface ListStep {
     node: GraphNode;
     then?: ListStep[];
     else?: ListStep[];
+    branches?: ListStep[][];
+    body?: ListStep[];
+}
+
+/** Node types the list view draws with one nested list per output port. */
+const BRANCHING = new Set(["core.switch", "core.parallel"]);
+
+/** A new list row for a node, with the empty nested lists its type draws. */
+export function listStepFor(node: GraphNode): ListStep {
+    if (node.type === "core.if") return { node, then: [], else: [] };
+    if (BRANCHING.has(node.type))
+        return { node, branches: nodePorts(node.type, node).map(() => []) };
+    if (isLoopNode(node.type)) return { node, body: [] };
+    return { node };
 }
 
 export interface ListFlow {
@@ -1074,6 +1117,8 @@ export interface ListFlow {
     steps: ListStep[];
     finally: ListStep[];
     finallyOnCancel: boolean;
+    /** How the triggers combine; any one starts a run when absent. */
+    when?: WhenConfig;
 }
 
 function chain(
@@ -1094,6 +1139,18 @@ function chain(
                 edges.push({ from: { node: step.node.id, port: "then" }, to: { node: thenStart } });
             if (elseStart)
                 edges.push({ from: { node: step.node.id, port: "else" }, to: { node: elseStart } });
+        } else if (BRANCHING.has(step.node.type)) {
+            const ports = nodePorts(step.node.type, step.node);
+            ports.forEach((port, at) => {
+                const start = chain(step.branches?.[at] ?? [], next, nodes, edges);
+                if (start) edges.push({ from: { node: step.node.id, port }, to: { node: start } });
+            });
+        } else if (isLoopNode(step.node.type)) {
+            const start = chain(step.body ?? [], null, nodes, edges);
+            if (start) edges.push({ from: { node: step.node.id, port: "each" }, to: { node: start } });
+            if (next) edges.push({ from: { node: step.node.id, port: "done" }, to: { node: next } });
+        } else if (step.node.type === "core.stop") {
+            // A Stop ends the run: nothing follows it.
         } else if (next) {
             edges.push({ from: { node: step.node.id, port: "next" }, to: { node: next } });
         }
@@ -1118,7 +1175,7 @@ export function graphFromList(flow: ListFlow): AutomationGraph {
         edges,
         finally: { entry, onCancel: flow.finallyOnCancel },
         notes: [],
-        when: { kind: "any" }
+        when: flow.when ?? { kind: "any" }
     };
 }
 
@@ -1138,6 +1195,22 @@ function sameGraphShape(a: AutomationGraph, b: AutomationGraph): boolean {
         ids(a) === ids(b) &&
         (a.finally.entry ?? "") === (b.finally.entry ?? "")
     );
+}
+
+/** The node where every branch meets again, or null when they run off the end. */
+function meetingOf(graph: AutomationGraph, starts: readonly (string | undefined)[]): string | null {
+    const present = starts.filter((start): start is string => Boolean(start));
+    if (present.length < 2) return null;
+    let at: string | null = present[0]!;
+    for (const other of present.slice(1)) {
+        if (!at) return null;
+        const met = meeting(graph, at, other);
+        // The meeting of the branches so far with the next one, measured from each start.
+        at = met;
+    }
+    if (!at) return null;
+    // Every branch must reach it.
+    return present.every((start) => reachableFrom(graph, start).has(at!)) ? at : null;
 }
 
 /** The node where both branches of an If meet again, or null when they both run off the end. */
@@ -1195,6 +1268,23 @@ function walk(
             steps.push({ node, then: thenSteps, else: elseSteps });
             at = join ?? undefined;
             if (at === stop) break;
+        } else if (BRANCHING.has(node.type)) {
+            const starts = nodePorts(node.type, node).map((port) => successors(graph, at!, port)[0]);
+            const join = meetingOf(graph, starts) ?? stop;
+            const branches: ListStep[][] = [];
+            for (const start of starts) {
+                const branch = walk(graph, start, join, budget);
+                if (!branch) return null;
+                branches.push(branch);
+            }
+            steps.push({ node, branches });
+            at = join ?? undefined;
+            if (at === stop) break;
+        } else if (isLoopNode(node.type)) {
+            const body = walk(graph, successors(graph, at, "each")[0], null, budget);
+            if (!body) return null;
+            steps.push({ node, body });
+            at = successors(graph, at, "done")[0];
         } else {
             steps.push({ node });
             at = successors(graph, at, "next")[0];
@@ -1222,7 +1312,8 @@ export function listFromGraph(graph: AutomationGraph): ListFlow | null {
         triggers,
         steps,
         finally: lane,
-        finallyOnCancel: graph.finally.onCancel
+        finallyOnCancel: graph.finally.onCancel,
+        when: graph.when
     };
     return sameGraphShape(graphFromList(flow), graph) ? flow : null;
 }

@@ -78,12 +78,16 @@ import {
     LoadFailed,
     RowsSkeleton,
     Section,
+    NodeIcon,
     StatusChip,
+    nodeHint,
     nodeTitle,
+    portLabel,
     useCachedAction,
     when
 } from "../shared";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode } from "./node-fields";
+import { FailureFields, WhenFields } from "./flow-fields";
 
 export function AutomationEditor({ id }: { id: string }) {
     const t = useTranslations("automations");
@@ -489,7 +493,16 @@ function Loaded({
                     <p className="text-xs text-muted-foreground">
                         {t("editor.references", { example: "{{trigger.body.name}}" })}
                     </p>
-                    <Section title={t("editor.when")} hint={t("editor.whenHint")}>
+                    <Section
+                        title={t("editor.when")}
+                        hint={flow.when && flow.when.kind !== "any" ? t("flow.whenCombined") : t("editor.whenHint")}
+                    >
+                        <WhenFields
+                            when={flow.when ?? { kind: "any" }}
+                            triggers={flow.triggers.length}
+                            readOnly={!detail.canEdit}
+                            onChange={(when) => update({ when })}
+                        />
                         <NodeList
                             nodes={flow.triggers.map((node) => ({ node }))}
                             onChange={(steps) =>
@@ -1110,10 +1123,7 @@ function NodeList({ nodes, onChange, types, addLabel, ...rest }: ListProps) {
                     className="w-full sm:w-56"
                     onValueChange={(type) => {
                         const node = newNode(type);
-                        onChange([
-                            ...nodes,
-                            type === "core.if" ? { node, then: [], else: [] } : { node }
-                        ]);
+                        onChange([...nodes, core.listStepFor(node)]);
                     }}
                 />
             )}
@@ -1141,13 +1151,28 @@ function NodeCard({
     const t = useTranslations("automations");
     const [open, setOpen] = useState(() => !configValid(step.node));
     const valid = configValid(step.node);
-    const setConfig = (config: unknown) => onChange({ ...step, node: { ...step.node, config } });
-    const isAction = core.nodeRole(step.node.type) === "action";
+    // Nested lists follow their output when a Choose case or a lane is added or removed.
+    const setNode = (change: Partial<core.GraphNode>) => {
+        const node = { ...step.node, ...change };
+        if (!step.branches) return onChange({ ...step, node });
+        const moves = core.portMoves(step.node, node);
+        const old = core.nodePorts(step.node.type, step.node);
+        const branches = core.nodePorts(node.type, node).map((port) => {
+            const from = old.find((before) => moves.get(before) === port);
+            return from ? (step.branches?.[old.indexOf(from)] ?? []) : [];
+        });
+        onChange({ ...step, node, branches });
+    };
+    const setConfig = (config: unknown) => setNode({ config });
     return (
         <div className="rounded-lg border border-border bg-card">
             <div className="flex items-center gap-2 p-3">
+                <NodeIcon type={step.node.type} />
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{nodeTitle(t, step.node.type)}</p>
+                    {open ? null : (
+                        <p className="truncate text-xs text-muted-foreground">{nodeHint(t, step.node.type)}</p>
+                    )}
                     {!valid ? (
                         <p className="text-xs text-warning-ink">{t("runErrors.badConfig")}</p>
                     ) : null}
@@ -1206,30 +1231,57 @@ function NodeCard({
                             onChanged={onChanged}
                         />
                     </ReferenceScope>
-                    {isAction ? (
-                        <label className="block space-y-1 text-sm">
-                            <span>{t("editor.ifFails")}</span>
-                            <Select
-                                value={step.node.onError ?? "stop"}
-                                onValueChange={(value) =>
+                    <FailureFields
+                        node={step.node}
+                        onChange={setNode}
+                        allowPort={false}
+                    />
+                </fieldset>
+            ) : null}
+            {step.branches ? (
+                <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">
+                    {core.nodePorts(step.node.type, step.node).map((port, at) => (
+                        <div key={port} className="space-y-2">
+                            <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                {portLabel(t, step.node, port)}
+                            </p>
+                            <NodeList
+                                nodes={step.branches?.[at] ?? []}
+                                onChange={(branch) =>
                                     onChange({
                                         ...step,
-                                        node: {
-                                            ...step.node,
-                                            onError: value as "stop" | "continue"
-                                        }
+                                        branches: core
+                                            .nodePorts(step.node.type, step.node)
+                                            .map((_, index) => (index === at ? branch : (step.branches?.[index] ?? [])))
                                     })
                                 }
-                                options={[
-                                    { value: "stop", label: t("editor.onErrorStop") },
-                                    { value: "continue", label: t("editor.onErrorContinue") }
-                                ]}
-                                aria-label={t("editor.ifFails")}
-                                className="w-full sm:w-56"
+                                types={STEP_TYPES}
+                                addLabel={t("editor.addStep")}
+                                detail={detail}
+                                secrets={secrets}
+                                readOnly={readOnly}
+                                onChanged={onChanged}
                             />
-                        </label>
-                    ) : null}
-                </fieldset>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+            {step.body ? (
+                <div className="space-y-2 border-t border-border p-3 pl-4 sm:pl-6">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        {portLabel(t, step.node, "each")}
+                    </p>
+                    <NodeList
+                        nodes={step.body}
+                        onChange={(body) => onChange({ ...step, body })}
+                        types={STEP_TYPES}
+                        addLabel={t("editor.addStep")}
+                        detail={detail}
+                        secrets={secrets}
+                        readOnly={readOnly}
+                        onChanged={onChanged}
+                    />
+                </div>
             ) : null}
             {step.node.type === "core.if" ? (
                 <div className="space-y-3 border-t border-border p-3 pl-4 sm:pl-6">

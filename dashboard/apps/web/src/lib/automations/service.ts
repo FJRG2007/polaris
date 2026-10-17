@@ -148,6 +148,8 @@ export interface AutomationDetail {
     } | null;
     /** The newest test run of the draft, whose outputs the canvas shows on each node. */
     readonly lastTestRunId: string | null;
+    /** The other automations on the same shelf: what Run another automation and An automation failed can name. */
+    readonly others: readonly { readonly id: string; readonly name: string }[];
 }
 
 export async function getAutomation(actor: RunActor, id: string): Promise<AutomationDetail> {
@@ -168,7 +170,7 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
                 );
             }
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
-    const [live, lastTest] = await Promise.all([
+    const [live, lastTest, others] = await Promise.all([
         row.publishedVersionId
             ? prisma.automationVersion.findUnique({
                   where: { id: row.publishedVersionId },
@@ -181,7 +183,16 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
                   orderBy: { queuedAt: "desc" },
                   select: { id: true }
               })
-            : null
+            : null,
+        prisma.automation.findMany({
+            where: {
+                ...(row.orgId ? { orgId: row.orgId } : { orgId: null, userId: row.userId }),
+                id: { not: row.id }
+            },
+            orderBy: { name: "asc" },
+            take: 200,
+            select: { id: true, name: true }
+        })
     ]);
     const liveGraph = live ? core.automationGraphSchema.safeParse(live.graph) : null;
     return {
@@ -205,7 +216,8 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
             live && liveGraph?.success
                 ? { id: live.id, number: live.number, graph: liveGraph.data }
                 : null,
-        lastTestRunId: lastTest?.id ?? null
+        lastTestRunId: lastTest?.id ?? null,
+        others
     };
 }
 

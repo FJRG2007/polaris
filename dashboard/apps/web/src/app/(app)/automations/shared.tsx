@@ -6,6 +6,31 @@
  */
 
 import { Badge, Button, Skeleton } from "@polaris/ui";
+import {
+    Bell,
+    CircleStop,
+    Clock,
+    Columns3,
+    Ear,
+    GitBranch,
+    Globe,
+    Hand,
+    Hourglass,
+    ListOrdered,
+    Megaphone,
+    Merge,
+    MessageSquare,
+    PhoneIncoming,
+    Puzzle,
+    Radio,
+    Repeat,
+    Reply,
+    Split,
+    TriangleAlert,
+    Webhook,
+    Workflow,
+    type LucideIcon
+} from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -166,7 +191,21 @@ const RUN_ERRORS = [
     "responseTooLarge",
     "tooManyRedirects",
     "graphUnreadable",
-    "nodeMissing"
+    "nodeMissing",
+    "notAList",
+    "tooManyItems",
+    "listTooLarge",
+    "stoppedAsFailed",
+    "callForbidden",
+    "callOff",
+    "callNoTrigger",
+    "callInputMissing",
+    "callInputInvalid",
+    "callFailed",
+    "callerEnded",
+    "answerTooLarge",
+    "announceLimited",
+    "announceFailed"
 ] as const;
 
 /** A stored error code in the reader's words. */
@@ -191,8 +230,95 @@ const NODE_KEYS = {
     "core.wait": "wait",
     "core.notify": "notify",
     "core.http": "http",
-    "core.chat": "chat"
+    "core.chat": "chat",
+    "core.called": "called",
+    "core.onEvent": "onEvent",
+    "core.failed": "failed",
+    "core.switch": "switch",
+    "core.parallel": "parallel",
+    "core.join": "join",
+    "core.forEach": "forEach",
+    "core.repeat": "repeat",
+    "core.stop": "stop",
+    "core.waitEvent": "waitEvent",
+    "core.run": "run",
+    "core.answer": "answer",
+    "core.announce": "announce"
 } as const;
+
+const NODE_ICONS: Record<string, LucideIcon> = {
+    "core.manual": Hand,
+    "core.schedule": Clock,
+    "core.webhook": Webhook,
+    "core.if": GitBranch,
+    "core.wait": Hourglass,
+    "core.notify": Bell,
+    "core.http": Globe,
+    "core.chat": MessageSquare,
+    "core.called": PhoneIncoming,
+    "core.onEvent": Radio,
+    "core.failed": TriangleAlert,
+    "core.switch": Split,
+    "core.parallel": Columns3,
+    "core.join": Merge,
+    "core.forEach": ListOrdered,
+    "core.repeat": Repeat,
+    "core.stop": CircleStop,
+    "core.waitEvent": Ear,
+    "core.run": Workflow,
+    "core.answer": Reply,
+    "core.announce": Megaphone
+};
+
+/** A node type's icon; an app's node without one gets the generic piece. */
+export function NodeIcon({ type, className }: { type: string; className?: string }) {
+    const Icon = NODE_ICONS[type] ?? Puzzle;
+    return <Icon aria-hidden="true" className={className ?? "size-4 shrink-0 text-muted-foreground"} />;
+}
+
+/** A node type's one-line description, or null for an app's node. */
+export function nodeHint(
+    t: ReturnType<typeof useTranslations<"automations">>,
+    type: string
+): string | null {
+    const key = (NODE_KEYS as Record<string, NodeKey>)[type];
+    return key ? t(`nodeHints.${key}`) : null;
+}
+
+/** An output port in the reader's words: Then, Else, a Choose case (by its label), a lane, Each, Done, Error, Timed out. */
+export function portLabel(
+    t: ReturnType<typeof useTranslations<"automations">>,
+    node: { readonly type: string; readonly config?: unknown },
+    port: string
+): string {
+    const lane = /^lane(\d+)$/.exec(port);
+    if (lane) return t("canvas.ports.lane", { number: lane[1]! });
+    const choice = /^case(\d+)$/.exec(port);
+    if (choice) {
+        const label = ((node.config as { cases?: { label?: string }[] } | undefined)?.cases ?? [])[
+            Number(choice[1]) - 1
+        ]?.label;
+        return label?.trim() || t("canvas.ports.case", { number: choice[1]! });
+    }
+    const known = ["then", "else", "otherwise", "each", "done", "error", "timeout"] as const;
+    return (known as readonly string[]).includes(port)
+        ? t(`canvas.ports.${port as (typeof known)[number]}`)
+        : t("canvas.ports.next");
+}
+/**
+ * Which pass of each enclosing loop a step ran in, from its iteration path
+ * ("0/<loop>:<pass>/..."), counted from 1 and outermost first; null outside a loop.
+ */
+export function passOf(iteration: string): string | null {
+    const passes = iteration
+        .split("/")
+        .slice(1)
+        .map((segment) => Number(segment.slice(segment.lastIndexOf(":") + 1)))
+        .filter((pass) => Number.isInteger(pass) && pass >= 0)
+        .map((pass) => String(pass + 1));
+    return passes.length ? passes.join(".") : null;
+}
+
 type NodeKey = (typeof NODE_KEYS)[keyof typeof NODE_KEYS];
 
 /** A node type in the reader's words. */

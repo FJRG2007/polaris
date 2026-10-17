@@ -32,6 +32,8 @@ import {
     RowsSkeleton,
     StatusChip,
     dropCache,
+    passOf,
+    portLabel,
     useCachedAction,
     useRunError,
     when
@@ -102,7 +104,10 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
     const graph = useMemo(() => (run.graph ? core.layoutGraph(run.graph) : null), [run.graph]);
     const states = useMemo(() => {
         const out: Record<string, string> = {};
-        for (const step of run.steps) out[step.nodeId] = step.status;
+        // A node a loop ran many times shows its latest pass, unless one of them failed.
+        const sticks = new Set(["failed", "refused", "timedOut", "interrupted"]);
+        for (const step of run.steps)
+            if (!sticks.has(out[step.nodeId] ?? "")) out[step.nodeId] = step.status;
         return out;
     }, [run.steps]);
     const byId = useMemo(
@@ -248,7 +253,9 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                                 key={step.id}
                                 step={step}
                                 label={nodeLabel(t, byId.get(step.nodeId))}
-                                finallyLane={step.iteration === core.FINALLY_ITERATION}
+                                node={byId.get(step.nodeId)}
+                                finallyLane={step.iteration.split("/")[0] === core.FINALLY_ITERATION}
+                                pass={passOf(step.iteration)}
                                 showData={run.canSeeData}
                             />
                         ))}
@@ -259,21 +266,39 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
     );
 }
 
+/** The outputs a step left by, in the reader's words, when it is not the plain "next". */
+function wentBy(
+    t: ReturnType<typeof useTranslations<"automations">>,
+    node: core.GraphNode | undefined,
+    port: string | null
+): string | null {
+    if (!node || !port || port === "next") return null;
+    return port
+        .split(",")
+        .map((one) => portLabel(t, node, one))
+        .join(", ");
+}
+
 function StepItem({
     step,
     label,
+    node,
     finallyLane,
+    pass,
     showData
 }: {
     step: StepView;
     label: string;
+    node: core.GraphNode | undefined;
     finallyLane: boolean;
+    pass: string | null;
     showData: boolean;
 }) {
     const t = useTranslations("automations");
     const words = useRunError();
     const [open, setOpen] = useState(step.status === "failed");
     const failed = ["failed", "refused", "timedOut", "interrupted"].includes(step.status);
+    const went = wentBy(t, node, step.port);
     return (
         <li
             className={cn(
@@ -295,10 +320,22 @@ function StepItem({
                         {finallyLane ? `${t("editor.always")} - ` : ""}
                         {step.finishedAt ? took(step.startedAt, step.finishedAt) : ""}
                         {step.error ? ` - ${words(step.error)}` : ""}
-                        {step.attempt > 1 ? ` - #${step.attempt}` : ""}
+                        {pass !== null ? ` - ${t("runView.pass", { number: pass })}` : ""}
+                        {step.attempt > 1 ? ` - ${t("runView.attempt", { number: step.attempt })}` : ""}
+                        {went ? ` - ${t("runView.went", { port: went })}` : ""}
                     </p>
                 </div>
-                <Badge variant={failed ? "danger" : step.status === "ok" ? "success" : "neutral"}>
+                <Badge
+                    variant={
+                        failed
+                            ? "danger"
+                            : step.status === "ok"
+                              ? "success"
+                              : step.status === "retried"
+                                ? "warning"
+                                : "neutral"
+                    }
+                >
                     {t(`stepStatus.${stepKey(step.status)}`)}
                 </Badge>
                 <ChevronDown

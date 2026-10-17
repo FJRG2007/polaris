@@ -12,6 +12,24 @@ import * as graphs from "./automation-graph.js";
 
 /** The size every node card is drawn at, in board units. */
 export const CANVAS_NODE = { width: 240, height: 72 } as const;
+/** Room each output port needs, so a Choose with many cases keeps its port labels apart. */
+export const CANVAS_PORT_PITCH = 18;
+
+/** How tall a node card is drawn: the standard height, taller when its ports need the room. */
+export function canvasNodeHeight(node: {
+    readonly type: string;
+    readonly config?: unknown;
+    readonly onError?: string;
+}): number {
+    const ports = graphs.nodePorts(node.type, node).length;
+    return Math.max(CANVAS_NODE.height, (ports + 1) * CANVAS_PORT_PITCH);
+}
+
+/** The box a node occupies on the board. */
+function nodeBox(node: graphs.GraphNode, at: { x: number; y: number }): CanvasBox {
+    return { ...at, width: CANVAS_NODE.width, height: canvasNodeHeight(node) };
+}
+
 /** Room between layout columns and rows. */
 export const CANVAS_GAP = { x: 96, y: 36 } as const;
 /** How far the "Always, at the end" lane sits below the main flow. */
@@ -66,16 +84,16 @@ function placeBand(
 ): number {
     if (ids.size === 0) return top;
     const column = columns(graph, ids);
-    const rows = new Map<number, number>();
+    const next = new Map<number, number>();
     let bottom = top;
     for (const node of graph.nodes) {
         if (!ids.has(node.id)) continue;
         const at = column.get(node.id)!;
-        const row = rows.get(at) ?? 0;
-        rows.set(at, row + 1);
-        const y = top + row * (CANVAS_NODE.height + CANVAS_GAP.y);
+        const y = next.get(at) ?? top;
+        const height = canvasNodeHeight(node);
+        next.set(at, y + height + CANVAS_GAP.y);
         into.set(node.id, { x: at * (CANVAS_NODE.width + CANVAS_GAP.x), y });
-        bottom = Math.max(bottom, y + CANVAS_NODE.height);
+        bottom = Math.max(bottom, y + height);
     }
     return bottom;
 }
@@ -133,11 +151,11 @@ export function placeNew(graph: graphs.AutomationGraph): graphs.AutomationGraph 
     const placed = new Map<string, { x: number; y: number }>();
     for (const node of graph.nodes) if (node.position) placed.set(node.id, node.position);
     const boxes: CanvasBox[] = [
-        ...[...placed.values()].map((at) => ({ ...at, ...CANVAS_NODE })),
+        ...graph.nodes.filter((node) => node.position).map((node) => nodeBox(node, node.position!)),
         ...graph.notes.map((note) => ({ ...note.position, ...note.size }))
     ];
-    const settle = (at: { x: number; y: number }) => {
-        const box = { ...at, ...CANVAS_NODE };
+    const settle = (node: graphs.GraphNode, at: { x: number; y: number }) => {
+        const box = { ...nodeBox(node, at) };
         while (boxes.some((other) => overlaps(box, other)))
             box.y += CANVAS_NODE.height + CANVAS_GAP.y;
         boxes.push(box);
@@ -169,7 +187,7 @@ export function placeNew(graph: graphs.AutomationGraph): graphs.AutomationGraph 
             if (placed.has(node.id)) continue;
             const at = near(node.id);
             if (!at) continue;
-            placed.set(node.id, settle(at));
+            placed.set(node.id, settle(node, at));
             progress = true;
         }
     }
@@ -179,7 +197,7 @@ export function placeNew(graph: graphs.AutomationGraph): graphs.AutomationGraph 
         const left = Math.min(...boxes.map((box) => box.x));
         placed.set(
             node.id,
-            settle({ x: Number.isFinite(left) ? left : 0, y: bottom + CANVAS_GAP.y })
+            settle(node, { x: Number.isFinite(left) ? left : 0, y: bottom + CANVAS_GAP.y })
         );
     }
     return {
@@ -193,7 +211,7 @@ export function placeNew(graph: graphs.AutomationGraph): graphs.AutomationGraph 
 /** The box around every node and note, or null for an empty canvas. */
 export function graphBounds(graph: graphs.AutomationGraph): CanvasBox | null {
     const boxes: CanvasBox[] = [
-        ...graph.nodes.map((node) => ({ ...(node.position ?? { x: 0, y: 0 }), ...CANVAS_NODE })),
+        ...graph.nodes.map((node) => nodeBox(node, node.position ?? { x: 0, y: 0 })),
         ...graph.notes.map((note) => ({ ...note.position, ...note.size }))
     ];
     if (boxes.length === 0) return null;
@@ -210,16 +228,19 @@ export function finallyBand(graph: graphs.AutomationGraph): { top: number; botto
     const ys = (lane: Lane) =>
         graph.nodes
             .filter((node) => lanes.get(node.id) === lane)
-            .map((node) => node.position?.y ?? 0);
+            .map((node) => (node.position?.y ?? 0) + canvasNodeHeight(node));
     const lane = ys("finally");
     const main = ys("main");
-    const mainBottom = main.length ? Math.max(...main) + CANVAS_NODE.height : 0;
+    const tops = graph.nodes
+        .filter((node) => lanes.get(node.id) === "finally")
+        .map((node) => node.position?.y ?? 0);
+    const mainBottom = main.length ? Math.max(...main) : 0;
     if (lane.length === 0)
         return {
             top: mainBottom + FINALLY_LANE_GAP / 2,
             bottom: mainBottom + FINALLY_LANE_GAP / 2 + CANVAS_NODE.height + 48
         };
-    return { top: Math.min(...lane) - 36, bottom: Math.max(...lane) + CANVAS_NODE.height + 24 };
+    return { top: Math.min(...tops) - 36, bottom: Math.max(...lane) + 24 };
 }
 
 // ---------------------------------------------------------------------------

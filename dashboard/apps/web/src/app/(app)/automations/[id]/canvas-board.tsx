@@ -19,6 +19,7 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { NodeIcon, portLabel } from "../shared";
 import {
     LayoutGrid,
     Map as MapIcon,
@@ -75,6 +76,7 @@ const STATE_RING: Record<string, string> = {
     refused: "border-danger-edge",
     timedOut: "border-danger-edge",
     interrupted: "border-danger-edge",
+    retried: "border-warning-edge",
     waiting: "border-primary",
     running: "border-primary",
     ready: "border-primary"
@@ -85,6 +87,7 @@ const STATE_BADGE: Record<string, "success" | "danger" | "primary" | "neutral" |
     refused: "danger",
     timedOut: "danger",
     interrupted: "danger",
+    retried: "warning",
     waiting: "primary",
     running: "primary",
     ready: "primary",
@@ -93,10 +96,11 @@ const STATE_BADGE: Record<string, "success" | "danger" | "primary" | "neutral" |
 
 export function portAnchor(node: core.GraphNode, port: string | null): Point {
     const at = node.position ?? { x: 0, y: 0 };
-    if (port === null) return { x: at.x, y: at.y + N.height / 2 };
-    const ports = core.nodePorts(node.type);
+    const height = core.canvasNodeHeight(node);
+    if (port === null) return { x: at.x, y: at.y + height / 2 };
+    const ports = core.nodePorts(node.type, node);
     const index = Math.max(0, ports.indexOf(port));
-    return { x: at.x + N.width, y: at.y + (N.height * (index + 1)) / (ports.length + 1) };
+    return { x: at.x + N.width, y: at.y + (height * (index + 1)) / (ports.length + 1) };
 }
 
 export function wirePath(from: Point, to: Point): string {
@@ -372,7 +376,11 @@ export function CanvasBoard(props: CanvasBoardProps) {
                     ...selection.nodes,
                     ...graph.nodes
                         .filter((node) =>
-                            inside(node.position ?? { x: 0, y: 0 }, N.width, N.height)
+                            inside(
+                                node.position ?? { x: 0, y: 0 },
+                                N.width,
+                                core.canvasNodeHeight(node)
+                            )
                         )
                         .map((node) => node.id)
                 ]),
@@ -456,7 +464,12 @@ export function CanvasBoard(props: CanvasBoardProps) {
         if (!from || !to) return null;
         const a = portAnchor(shifted(from), edge.from.port);
         const b = portAnchor(shifted(to), null);
-        return { key: core.edgeKey(edge), d: wirePath(a, b), middle: wireMiddle(a, b) };
+        return {
+            key: core.edgeKey(edge),
+            d: wirePath(a, b),
+            middle: wireMiddle(a, b),
+            error: edge.from.port === "error"
+        };
     });
     const entry = graph.finally.entry ? byId.get(graph.finally.entry) : undefined;
     if (entry) {
@@ -464,7 +477,8 @@ export function CanvasBoard(props: CanvasBoardProps) {
         edges.push({
             key: `${core.FINALLY_SOURCE}>${entry.id}`,
             d: wirePath(finallySource, b),
-            middle: wireMiddle(finallySource, b)
+            middle: wireMiddle(finallySource, b),
+            error: false
         });
     }
     const insertAt =
@@ -566,8 +580,11 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     stroke={
                                         selection.edge === edge.key
                                             ? "hsl(var(--primary))"
-                                            : "hsl(var(--border-strong))"
+                                            : edge.error
+                                              ? "hsl(var(--danger))"
+                                              : "hsl(var(--border-strong))"
                                     }
+                                    strokeDasharray={edge.error ? "5 4" : undefined}
                                     strokeWidth={selection.edge === edge.key ? 2.5 : 1.5}
                                 />
                             </g>
@@ -703,7 +720,8 @@ export function CanvasBoard(props: CanvasBoardProps) {
                     const at = node.position ?? { x: 0, y: 0 };
                     const selected = selection.nodes.has(node.id);
                     const state = states?.[node.id];
-                    const ports = core.nodePorts(node.type);
+                    const ports = core.nodePorts(node.type, node);
+                    const height = core.canvasNodeHeight(node);
                     const trigger = core.nodeRole(node.type) === "trigger";
                     const subtitle = props.subtitle(node);
                     const card = (
@@ -724,7 +742,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 state === "skipped" && "opacity-60",
                                 !readOnly && "cursor-grab"
                             )}
-                            style={{ left: at.x, top: at.y, width: N.width, height: N.height }}
+                            style={{ left: at.x, top: at.y, width: N.width, height }}
                             onPointerDown={(event) => pressItem(event, "node", node.id)}
                             onContextMenu={() =>
                                 !selected &&
@@ -756,6 +774,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     });
                             }}
                         >
+                            <NodeIcon type={node.type} />
                             <div className="min-w-0 flex-1">
                                 <p
                                     className="truncate text-sm font-medium"
@@ -808,24 +827,26 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     className="pointer-events-none absolute rounded-full border-2 border-background bg-border-strong"
                                     style={{
                                         left: -PORT / 2,
-                                        top: N.height / 2 - PORT / 2,
+                                        top: height / 2 - PORT / 2,
                                         width: PORT,
                                         height: PORT
                                     }}
                                 />
                             ) : null}
                             {ports.map((port, index) => {
-                                const y = (N.height * (index + 1)) / (ports.length + 1);
+                                const y = (height * (index + 1)) / (ports.length + 1);
+                                const error = port === "error";
                                 return (
                                     <span key={port}>
                                         {port !== "next" ? (
                                             <span
-                                                className="pointer-events-none absolute text-[10px] font-medium text-muted-foreground"
+                                                className={cn(
+                                                    "pointer-events-none absolute max-w-[7rem] truncate text-[10px] font-medium",
+                                                    error ? "text-danger" : "text-muted-foreground"
+                                                )}
                                                 style={{ right: 10, top: y - 7 }}
                                             >
-                                                {t(
-                                                    `canvas.ports.${port === "then" ? "then" : port === "else" ? "else" : "next"}`
-                                                )}
+                                                {portLabel(t, node, port)}
                                             </span>
                                         ) : null}
                                         <span
@@ -833,7 +854,10 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                             role="presentation"
                                             title={t("canvas.dragToConnect")}
                                             className={cn(
-                                                "absolute rounded-full border-2 border-background bg-muted-foreground",
+                                                "absolute border-2 border-background",
+                                                error
+                                                    ? "rounded-sm bg-danger"
+                                                    : "rounded-full bg-muted-foreground",
                                                 !readOnly && "cursor-crosshair hover:bg-primary"
                                             )}
                                             style={{
@@ -950,7 +974,8 @@ const STEP_KEYS = [
     "skipped",
     "refused",
     "timedOut",
-    "interrupted"
+    "interrupted",
+    "retried"
 ] as const;
 export function stepKey(status: string): (typeof STEP_KEYS)[number] {
     return (STEP_KEYS as readonly string[]).includes(status)
@@ -1034,7 +1059,7 @@ function Overview({
                     x={((node.position?.x ?? 0) - ox) * scale}
                     y={((node.position?.y ?? 0) - oy) * scale}
                     width={N.width * scale}
-                    height={N.height * scale}
+                    height={core.canvasNodeHeight(node) * scale}
                     rx={2}
                     fill="hsl(var(--border-strong))"
                 />
