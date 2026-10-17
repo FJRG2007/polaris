@@ -838,6 +838,28 @@ export function isCoreNodeType(type: string): type is CoreNodeType {
     return Object.prototype.hasOwnProperty.call(CORE_NODE_CONFIGS, type);
 }
 
+/** The roles an app's node type may have, named in its type. */
+export const APP_NODE_ROLES = ["trigger", "condition", "action"] as const;
+export type AppNodeRole = (typeof APP_NODE_ROLES)[number];
+
+/**
+ * An app's node type names its role: `<app>.<role>.<name>`, e.g.
+ * `places.trigger.change`. Read from the type alone, so a graph holding a node
+ * of an app that is not installed keeps its ports and its place in the run.
+ */
+export function appNodeRole(type: string): AppNodeRole | null {
+    const parts = type.split(".");
+    if (parts.length < 3 || parts[0] === "core" || !parts[0] || !parts[2]) return null;
+    return (APP_NODE_ROLES as readonly string[]).includes(parts[1]!)
+        ? (parts[1] as AppNodeRole)
+        : null;
+}
+
+/** The app an app's node type belongs to, or null for core's own. */
+export function nodeTypeApp(type: string): string | null {
+    return appNodeRole(type) ? type.split(".")[0]! : null;
+}
+
 /**
  * The ports a node may be wired from. A condition and an `own` flow node have
  * only their own; everything else has "next". Given the node, the ports its
@@ -848,7 +870,10 @@ export function nodePorts(
     node?: { readonly config?: unknown; readonly onError?: string }
 ): readonly string[] {
     const errorPort = node?.onError === "port" && canTakeErrorPort(type) ? ["error"] : [];
-    if (!isCoreNodeType(type)) return ["next", ...errorPort];
+    if (!isCoreNodeType(type))
+        return appNodeRole(type) === "condition"
+            ? ["then", "else", ...errorPort]
+            : ["next", ...errorPort];
     const meta = CORE_NODE_META[type];
     if (type === "core.switch") return switchPorts(node?.config);
     if (type === "core.parallel") return parallelPorts(node?.config);
@@ -866,7 +891,7 @@ export function passPort(type: string, node?: { readonly config?: unknown }): st
 }
 
 export function nodeRole(type: string): NodeRole | null {
-    return isCoreNodeType(type) ? CORE_NODE_META[type].role : null;
+    return isCoreNodeType(type) ? CORE_NODE_META[type].role : appNodeRole(type);
 }
 
 /** The next time a schedule is due after `after`, in the automation's time zone. */

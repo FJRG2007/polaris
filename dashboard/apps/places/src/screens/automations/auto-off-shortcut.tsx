@@ -89,7 +89,7 @@ export function AutoOffShortcut({
                         open: (chunks) => (
                             <Link
                                 key="open"
-                                href={`/places/devices/automations/${made.id}`}
+                                href={auto.automationHref(made)}
                                 className="font-medium text-foreground underline underline-offset-2"
                             >
                                 {chunks}

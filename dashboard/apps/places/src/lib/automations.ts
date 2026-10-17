@@ -13,11 +13,13 @@
 import { z } from "zod";
 import { getPlace } from "./places";
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { listFloors, listRooms } from "./rooms";
 import { listDevices } from "./devices";
 import { HomeError } from "./home-error";
 import * as auto from "./automation-kinds";
 import { automationEngine } from "./automation-runtime";
+import { LEGACY_PREFIX } from "./automation-central";
 import { json, toAutomation, toRun } from "./automation-store";
 
 const FIELDS = {
@@ -31,7 +33,8 @@ const FIELDS = {
     armedAt: true,
     lastRunAt: true,
     lastStatus: true,
-    updatedAt: true
+    updatedAt: true,
+    movedToId: true
 } as const;
 
 type Row = {
@@ -46,6 +49,7 @@ type Row = {
     lastRunAt: Date | null;
     lastStatus: string | null;
     updatedAt: Date;
+    movedToId?: string | null;
 };
 
 async function ownerNames(ids: readonly string[]): Promise<Map<string, string>> {
@@ -69,8 +73,34 @@ function toView(row: Row, owners: ReadonlyMap<string, string>): auto.AutomationV
         definition: record.definition,
         lastRunAt: row.lastRunAt?.toISOString() ?? null,
         lastStatus: auto.runStatus(row.lastStatus),
-        updatedAt: row.updatedAt.toISOString()
+        updatedAt: row.updatedAt.toISOString(),
+        movedTo: row.movedToId ?? null
     };
+}
+
+/**
+ * A moved row as it is now: switched, renamed and run on the central engine,
+ * where this row no longer follows it. A twin that cannot be read leaves the
+ * row as it was.
+ */
+async function withCentral(views: auto.AutomationView[]): Promise<auto.AutomationView[]> {
+    const moved = views.filter((view) => view.movedTo);
+    if (moved.length === 0) return views;
+    const central = await host.automations
+        .legacySummaries(moved.map((view) => `${LEGACY_PREFIX}${view.id}`))
+        .catch(() => ({}) as Record<string, never>);
+    return views.map((view) => {
+        const twin = view.movedTo ? central[`${LEGACY_PREFIX}${view.id}`] : undefined;
+        if (!twin) return view;
+        return {
+            ...view,
+            movedTo: twin.id,
+            name: twin.name,
+            enabled: twin.enabled,
+            lastRunAt: twin.lastRunAt,
+            lastStatus: auto.runStatus(twin.lastStatus)
+        };
+    });
 }
 
 const idSchema = z.string().uuid();
@@ -97,7 +127,7 @@ export async function listAutomations(
         select: FIELDS
     });
     const owners = await ownerNames(rows.map((row) => row.ownerId));
-    return rows.flatMap((row) => toView(row, owners) ?? []);
+    return withCentral(rows.flatMap((row) => toView(row, owners) ?? []));
 }
 
 export async function getAutomation(

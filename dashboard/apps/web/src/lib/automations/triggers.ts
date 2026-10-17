@@ -93,6 +93,17 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (core.appNodeRole(node.type) === "trigger") {
+            // An app's trigger: the app reads these rows and decides when one
+            // fires (app-bridge.ts). Kept while the app is away, never read then.
+            out.push({
+                nodeId: node.id,
+                eventType: node.type,
+                subjectKey: null,
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.schedule") {
             const config = core.scheduleConfigSchema.parse(node.config);
             const before = existing.find((row) => row.nodeId === node.id);

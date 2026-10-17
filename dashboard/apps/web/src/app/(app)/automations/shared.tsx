@@ -7,26 +7,31 @@
 
 import { Badge, Button, Skeleton } from "@polaris/ui";
 import {
+    Activity,
     Bell,
     CircleStop,
     Clock,
     Columns3,
     Ear,
+    Gauge,
     GitBranch,
     Globe,
     Hand,
     Hourglass,
     LifeBuoy,
+    ListChecks,
     ListOrdered,
     Megaphone,
     Merge,
     MessageSquare,
     PhoneIncoming,
+    Power,
     Puzzle,
     Radio,
     Repeat,
     Reply,
     Split,
+    Sunrise,
     Timer,
     TriangleAlert,
     Webhook,
@@ -250,7 +255,38 @@ const NODE_KEYS = {
     "core.waitCondition": "waitCondition"
 } as const;
 
+/**
+ * The nodes installable apps bring, named here too: an automation that uses one
+ * still reads in words where the app is not installed. Keyed by type.
+ */
+const APP_NODE_KEYS = {
+    "home.trigger.time": "homeTime",
+    "home.trigger.interval": "homeInterval",
+    "home.trigger.change": "homeChange",
+    "home.trigger.stays": "homeStays",
+    "home.trigger.threshold": "homeThreshold",
+    "home.trigger.sun": "homeSun",
+    "home.condition.check": "homeCheck",
+    "home.action.device": "homeDevice",
+    "home.action.wait": "homeWait",
+    "home.action.notify": "homeNotify",
+    "home.action.run": "homeRun"
+} as const;
+
+type AppNodeKey = (typeof APP_NODE_KEYS)[keyof typeof APP_NODE_KEYS];
+
 const NODE_ICONS: Record<string, LucideIcon> = {
+    "home.trigger.time": Clock,
+    "home.trigger.interval": Repeat,
+    "home.trigger.change": Activity,
+    "home.trigger.stays": Timer,
+    "home.trigger.threshold": Gauge,
+    "home.trigger.sun": Sunrise,
+    "home.condition.check": ListChecks,
+    "home.action.device": Power,
+    "home.action.wait": Hourglass,
+    "home.action.notify": Bell,
+    "home.action.run": Workflow,
     "core.manual": Hand,
     "core.schedule": Clock,
     "core.webhook": Webhook,
@@ -346,7 +382,9 @@ export function nodeTitle(
     type: string
 ): string {
     const key = (NODE_KEYS as Record<string, NodeKey>)[type];
-    return key ? t(`nodes.${key}`) : t("nodes.unknown");
+    if (key) return t(`nodes.${key}`);
+    const app = (APP_NODE_KEYS as Record<string, AppNodeKey>)[type];
+    return app ? t(`appNodes.${app}`) : t("nodes.unknown");
 }
 
 export function Section({

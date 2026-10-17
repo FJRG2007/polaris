@@ -1680,6 +1680,21 @@ export interface AutomationView {
     readonly lastRunAt: string | null;
     readonly lastStatus: RunStatus | null;
     readonly updatedAt: string;
+    /** The automation it became on the central engine, once moved; its screen is there. */
+    readonly movedTo?: string | null;
+}
+
+/** Where an automation's screen is: the central one once it moved, else here. */
+export function automationHref(
+    automation: { readonly id: string; readonly movedTo?: string | null },
+    tab?: "runs"
+): string {
+    if (automation.movedTo) {
+        return tab === "runs"
+            ? `/automations/runs?automation=${automation.movedTo}`
+            : `/automations/${automation.movedTo}`;
+    }
+    return `/places/devices/automations/${automation.id}${tab === "runs" ? "?tab=runs" : ""}`;
 }
 
 export function runStatus(value: string | null | undefined): RunStatus | null {

@@ -97,6 +97,10 @@ const EAGER = [
     // The staging helpers a backup source is written against, and the error it
     // throws to say it cannot be reached: a class, which a stand-in could not be.
     "backupsSourcesTypes.SourceUnavailableError",
+    // The errors an app's automation node throws to fail or refuse a step: classes
+    // the engine tells apart with instanceof, which a stand-in could not be.
+    "automations.StepError",
+    "automations.StepRefusal",
     "backupsSourcesTypes.shellQuote",
     "backupsSourcesTypes.stageDir",
     "backupsSourcesTypes.stagedFrom",

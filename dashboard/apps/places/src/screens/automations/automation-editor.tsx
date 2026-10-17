@@ -481,7 +481,9 @@ export function AutomationEditor({
         );
         setAttempted(false);
         setNotice(t("automations.editor.saved"));
-        if (!automationId) router.replace(`/places/devices/automations/${result.automation.id}`);
+        // Moved on save: from here on it is edited where it now runs.
+        if (result.automation.movedTo) router.replace(auto.automationHref(result.automation));
+        else if (!automationId) router.replace(auto.automationHref(result.automation));
         return true;
     };
 
@@ -1372,7 +1374,7 @@ export function AutomationEditor({
     );
 }
 
-function TriggerCard({
+export function TriggerCard({
     trigger,
     number,
     path,
@@ -1731,7 +1733,7 @@ function TriggerCard({
     );
 }
 
-function ConditionGroupCard({
+export function ConditionGroupCard({
     group,
     path,
     devices,
@@ -2120,7 +2122,7 @@ function ConditionCard({
     );
 }
 
-function StepCard({
+export function StepCard({
     number,
     step,
     path,

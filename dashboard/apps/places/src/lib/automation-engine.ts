@@ -72,6 +72,13 @@ export interface AutomationRecord {
     /** Where its place is, for the sun. Absent or null, a sun trigger never
      *  fires and a sun condition never passes. */
     readonly location?: Coordinate | null;
+    /** Set for an automation that lives in the central engine: its triggers are
+     *  decided here, by the same rules, and a firing starts a central run. */
+    readonly central?: {
+        readonly automationId: string;
+        /** The Places automation it moved from, whose own runs already hold some firings. */
+        readonly legacyId: string | null;
+    };
 }
 
 export interface RunRecord {
@@ -293,6 +300,13 @@ export interface EnginePorts {
      *  device moved into the kitchen counts for "the kitchen" from then on.
      *  Absent, a room or a floor holds nothing. */
     readonly places?: (installedAppId: string, placeId: string) => Promise<auto.TargetScope>;
+    /** Start a central run for an automation that has `central`. True when one started. */
+    readonly central?: (
+        automation: AutomationRecord,
+        firingKey: string,
+        cause: auto.RunCause,
+        depth: number
+    ) => Promise<boolean>;
     /** Come back and drain in this many milliseconds. */
     readonly wake?: (ms: number) => void;
     /** Where a fault that is not a refusal is written. */
@@ -302,6 +316,9 @@ export interface EnginePorts {
 /** Which run, if any, the current work is being done on behalf of - so a device
  *  it moves passes its depth on to whatever that change fires. */
 const causeContext = new AsyncLocalStorage<{ readonly depth: number }>();
+
+/** Central firings remembered as handed over; the oldest is forgotten first. */
+const DELIVERED_KEPT = 5000;
 
 function iso(date: Date): string {
     return date.toISOString();
@@ -479,6 +496,35 @@ export function createEngine(ports: EnginePorts) {
     let draining: Promise<void> | null = null;
     let again = false;
 
+    /**
+     * Central firings already handed over, by automation, arming and key. A
+     * trigger that has to last is true on every pass for as long as it holds,
+     * and a clock trigger for its whole catch-up window; the central engine
+     * dedupes them by key, but each pass would still cost it a round trip. A
+     * firing it answered - started, or already had - is not handed again. Kept
+     * in memory and bounded: after a restart, or once evicted, the next pass
+     * hands it once more and the central side dedupes it as before.
+     */
+    const delivered = new Set<string>();
+
+    async function fireCentral(
+        automation: AutomationRecord,
+        firingKey: string,
+        cause: auto.RunCause,
+        depth: number
+    ): Promise<boolean> {
+        if (!ports.central) return false;
+        const key = `${automation.id}|${automation.armedAt.getTime()}|${firingKey}`;
+        if (delivered.has(key)) return false;
+        const started = await ports.central(automation, firingKey, cause, depth);
+        if (delivered.size >= DELIVERED_KEPT) {
+            const oldest = delivered.values().next();
+            if (!oldest.done) delivered.delete(oldest.value);
+        }
+        delivered.add(key);
+        return started;
+    }
+
     const fault = (message: string, error: unknown) =>
         (ports.log ?? ((said, caught) => console.error(`places: ${said}`, caught)))(message, error);
 
@@ -492,6 +538,7 @@ export function createEngine(ports: EnginePorts) {
         cause: auto.RunCause,
         depth: number
     ): Promise<boolean> {
+        if (automation.central) return fireCentral(automation, firingKey, cause, depth);
         const now = ports.now();
         if (depth > MAX_DEPTH) {
             // Written once per firing, so the log says why a chain stopped rather
@@ -1213,27 +1260,12 @@ export function createEngine(ports: EnginePorts) {
             }
 
             if (step.kind === "wait") {
-                const members = auto.deviceTargets(step);
-                const read = await Promise.all(
-                    members.map((id) => ports.devices.read(automation.installedAppId, id))
-                );
-                // One device that is gone ends the run, as it always has; a set
-                // waits on what is left of it, and ends only once none is.
-                if (read.every((device) => !device)) {
+                const reached = await waitReached(automation, step);
+                if (reached === null) {
                     log("failed", { code: "deviceGone" });
                     await finish(run, "failed", steps, "step");
                     return;
                 }
-                const there = read.flatMap((device) =>
-                    device && (device.online || step.attribute === "online")
-                        ? [same(attributeOf(device, step.attribute), step.is)]
-                        : members.length > 1
-                          ? []
-                          : [false]
-                );
-                const reached =
-                    there.length > 0 &&
-                    (step.quantifier === "all" ? there.every(Boolean) : there.some(Boolean));
                 if (reached) {
                     log("ok");
                     waitUntil = null;
@@ -1337,6 +1369,30 @@ export function createEngine(ports: EnginePorts) {
             if (!kept) return;
         }
         await finish(run, "succeeded", steps);
+    }
+
+    /** Whether a wait step's devices are where it waits for them now; null when
+     *  every one of them is gone. */
+    async function waitReached(
+        automation: AutomationRecord,
+        step: Extract<auto.Step, { kind: "wait" }>
+    ): Promise<boolean | null> {
+        const members = auto.deviceTargets(step);
+        const read = await Promise.all(
+            members.map((id) => ports.devices.read(automation.installedAppId, id))
+        );
+        if (read.every((device) => !device)) return null;
+        const there = read.flatMap((device) =>
+            device && (device.online || step.attribute === "online")
+                ? [same(attributeOf(device, step.attribute), step.is)]
+                : members.length > 1
+                  ? []
+                  : [false]
+        );
+        return (
+            there.length > 0 &&
+            (step.quantifier === "all" ? there.every(Boolean) : there.some(Boolean))
+        );
     }
 
     async function deviceStep(
@@ -1527,7 +1583,26 @@ export function createEngine(ports: EnginePorts) {
         return from < to ? minute >= from && minute < to : minute >= from || minute < to;
     }
 
-    return { observe, evaluateSchedules, runNow, drain, fire, conditionsHold };
+    /** One device step for a central run, as an old run would take it. */
+    function actFor(
+        automation: AutomationRecord,
+        depth: number,
+        step: Extract<auto.Step, { kind: "device" }>
+    ) {
+        return deviceStep(automation, { depth } as RunRecord, step);
+    }
+
+    return {
+        observe,
+        evaluateSchedules,
+        runNow,
+        drain,
+        fire,
+        conditionsHold,
+        placed,
+        waitReached,
+        actFor
+    };
 }
 
 export type AutomationEngine = ReturnType<typeof createEngine>;

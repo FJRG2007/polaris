@@ -27,7 +27,14 @@ import { randomBytes } from "node:crypto";
 import { automationRunner, mayAllowLocalNetwork } from "./runner";
 import { serverNode } from "./node-registry";
 import { readSecretForRun } from "./secrets";
-import { StepError, StepRefusal, type NodeIo, type NodeResult, type RunContext } from "./types";
+import {
+    StepError,
+    StepRefusal,
+    type NodeIo,
+    type NodeResult,
+    type RunContext,
+    type StopAs
+} from "./types";
 
 const L = core.AUTOMATION_LIMITS;
 const MAIN = core.MAIN_ITERATION;
@@ -858,7 +865,7 @@ type ControlResult =
           };
           readonly start?: { readonly iteration: string; readonly nodes: string[] };
       }
-    | { readonly stop: { readonly as: "succeeded" | "failed"; readonly reason: string } };
+    | { readonly stop: { readonly as: StopAs; readonly reason: string } };
 
 async function executeStep(
     run: RunRow,
@@ -933,6 +940,8 @@ async function executeStep(
         automationId: run.automation.id,
         idempotencyKey: `${run.id}:${node.id}:${step.iteration}`,
         depth: run.depth,
+        since: step.createdAt,
+        leads: (port) => leaving(graph, node.id, port).length > 0,
         shelf: { orgId: run.automation.orgId, userId: run.automation.userId },
         timeZone: graph.timeZone,
         signal: controller.signal,
@@ -993,7 +1002,12 @@ async function executeStep(
             if (until.getTime() - Date.now() > L.longestWaitMs) throw new StepError("waitTooLong");
             await prisma.automationStep.updateMany({
                 where: { id: step.id, status: "running" },
-                data: { status: "waiting", waitUntil: until, input: store(input) }
+                data: {
+                    status: "waiting",
+                    waitUntil: until,
+                    waitKey: result.wait.recheck ?? null,
+                    input: store(input)
+                }
             });
             return;
         }
@@ -1774,7 +1788,7 @@ async function stopLane(
     run: RunRow,
     graph: core.AutomationGraph,
     lane: string,
-    as: "succeeded" | "failed"
+    as: StopAs
 ): Promise<void> {
     await skipLane(run.id, lane);
     if (lane === FINALLY) {
@@ -1789,7 +1803,7 @@ async function stopLane(
     await enterFinallyOrFinish(
         run,
         graph,
-        as === "failed" ? "failed" : "stopped",
+        as === "failed" ? "failed" : as === "skipped" ? "skipped" : "stopped",
         as === "failed" ? "stoppedAsFailed" : null
     );
 }
@@ -1954,6 +1968,9 @@ async function cancelChildren(runId: string): Promise<void> {
 // Waits
 // ---------------------------------------------------------------------------
 
+/** A step that waits to be run again (an app's "wait until a device is ..."): its wait key starts with this. */
+export const RECHECK_PREFIX = "recheck:";
+
 /** Finish every wait that is due and put its run back to work. Returns the runs to step. */
 export async function resumeDueWaits(limit = 100): Promise<string[]> {
     const due = await prisma.automationStep.findMany({
@@ -1986,7 +2003,7 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
             where: { id: step.runId, status: "waiting" },
             data: { status: "running", dueAt: null }
         });
-        if (step.waitKey === "retry") {
+        if (step.waitKey === "retry" || step.waitKey?.startsWith(RECHECK_PREFIX)) {
             await prisma.automationStep.updateMany({
                 where: { id: step.id, status: "waiting" },
                 data: { status: "ready", waitUntil: null }

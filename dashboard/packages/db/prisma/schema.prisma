@@ -11292,6 +11292,10 @@ model PlaceAutomation {
     lastRunAt      DateTime?
     /// succeeded | failed | skipped | stopped | refused | limited
     lastStatus     String?
+    /// The central automation this one moved to. Set, the old engine starts no
+    /// new run for it and only finishes the ones already waiting; cleared, it
+    /// is this engine's again. No FK: the central row may be removed alone.
+    movedToId      String?  @db.Uuid
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

@@ -1861,6 +1861,9 @@
         "other": "A {kind} at the {camera}"
     },
     "automations": {
+        "nodeFields": {
+            "groupsMatch": "How the groups join"
+        },
         "anyValue": "Any value",
         "missingDevice": "A device no longer here",
         "missingAutomation": "An automation no longer here",
@@ -2048,6 +2051,8 @@
         },
         "list": {
             "intro": "What this place does by itself. Each one acts as whoever last saved it.",
+            "unmovedTitle": "Not moved yet",
+            "unmovedHint": "These run as before here. They move to the list above once they can.",
             "new": "New automation",
             "blank": "Start empty",
             "emptyTitle": "No automations yet",

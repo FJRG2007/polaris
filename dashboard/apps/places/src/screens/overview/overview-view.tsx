@@ -29,6 +29,7 @@ import { CameraViewer } from "../camera-viewer";
 import { hostUi } from "@polaris/app-host/client";
 import type { CameraView } from "../../lib/cameras";
 import * as words from "../../lib/automation-words";
+import * as auto from "../../lib/automation-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import { DeviceDialog } from "../devices/device-dialog";
 import { useDeviceAct } from "../devices/use-device-act";
@@ -917,7 +918,7 @@ function RoutinesCard({
                                 className="flex min-w-0 items-center gap-2 px-4 py-2"
                             >
                                 <Link
-                                    href={`/places/devices/automations/${automation.id}`}
+                                    href={auto.automationHref(automation)}
                                     className="flex min-w-0 flex-1 flex-col"
                                 >
                                     <span

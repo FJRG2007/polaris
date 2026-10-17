@@ -71,6 +71,15 @@ export interface ExtensionInstall {
     readonly ownerId: string;
 }
 
+/** One run an app's own engine ran before its automation moved. */
+export interface LegacyRunRow {
+    readonly id: string;
+    /** A run status (`core.RUN_STATUSES`); anything else reads as failed. */
+    readonly status: string;
+    readonly startedAt: string;
+    readonly finishedAt: string | null;
+}
+
 export interface AppExtension {
     /** The catalog id of the app, the one its install row carries. */
     readonly id: string;
@@ -84,6 +93,12 @@ export interface AppExtension {
      * extension module on boot.
      */
     readonly automationNodes?: () => Promise<readonly AutomationServerNode[]>;
+
+    /**
+     * The runs an automation it moved to the central engine had before the
+     * move, newest first, read-only: `legacyRef` is the one it imported it with.
+     */
+    readonly automationHistory?: (legacyRef: string) => Promise<readonly LegacyRunRow[]>;
 
     /** The backup sources it provides, by resource kind. */
     readonly backupSources?: () => Readonly<Partial<Record<BackupSource["kind"], BackupSource>>>;

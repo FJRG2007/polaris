@@ -19,6 +19,7 @@
 
 import * as mime from "@/lib/mime";
 import { McpRefusal, defineMcpTool } from "@/lib/mcp/protocol";
+import { StepError, StepRefusal } from "@/lib/automations/types";
 import { defineMcpSearch } from "@/lib/mcp/search";
 import { portKey } from "@/lib/apps/port-key";
 import * as appsCatalog from "@/lib/apps/catalog";
@@ -100,6 +101,7 @@ const load = {
     accessGrants: once(() => import("@/lib/access/grants")),
     activityLive: once(() => import("@/lib/presence-activity/live")),
     apiSession: once(() => import("@/lib/api-session")),
+    automations: once(() => import("@/lib/automations/app-bridge")),
     appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
     appsInstallAccess: once(() => import("@/lib/apps/install-access")),
     appsInstallConfig: once(() => import("@/lib/apps/install-config")),
@@ -504,6 +506,18 @@ export const serverHost = {
     serverMetricsService: {
         getServerMetrics: later(load.serverMetricsService, "getServerMetrics"),
         peekServerMetrics: later(load.serverMetricsService, "peekServerMetrics")
+    },
+    // An app's own triggers firing runs, a move of its automations, its waits woken.
+    automations: {
+        appTriggers: later(load.automations, "appTriggers"),
+        automationForLegacy: later(load.automations, "automationForLegacy"),
+        automationsForLegacy: later(load.automations, "automationsForLegacy"),
+        fireAppTrigger: later(load.automations, "fireAppTrigger"),
+        importLegacyAutomation: later(load.automations, "importLegacyAutomation"),
+        legacySummaries: later(load.automations, "legacySummaries"),
+        StepError,
+        StepRefusal,
+        wakeAppWaits: later(load.automations, "wakeAppWaits")
     },
     session: {
         homePathForUser: later(load.session, "homePathForUser"),

@@ -36,6 +36,15 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     deleteAutomationAction: vi.fn()
 }));
 
+// The central list is the dashboard's own screen, tested there; here only what it is handed.
+vi.mock("@/app/(app)/automations/embedded-list", () => ({
+    EmbeddedAutomationsList: ({
+        from
+    }: {
+        from?: { origin: string; originRef?: string | null };
+    }) => <div data-testid="central-list">{`${from?.origin}:${from?.originRef}`}</div>
+}));
+
 import { AutomationsView } from "@polaris-app/places/src/screens/automations/automations-view";
 
 const blankDefinition = {
@@ -123,5 +132,30 @@ describe("the places automation list, on the shared rule pieces", () => {
         expect(screen.queryByRole("button", { name: /Run .* now/ })).toBeNull();
         expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
         expect(screen.getByRole("link", { name: "What Porch light at dusk did" })).toBeTruthy();
+    });
+
+    it("shows the central list of this place's automations, and a moved row only there", async () => {
+        state.rows = [
+            { ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" },
+            {
+                ...(state.rows[0] as object),
+                id: "88888888-8888-4888-8888-888888888888",
+                name: "Still here"
+            }
+        ];
+        open();
+        expect((await screen.findByTestId("central-list")).textContent).toBe("home:place-1");
+        expect(await screen.findByText("Still here")).toBeTruthy();
+        expect(screen.getByText("Not moved yet")).toBeTruthy();
+        expect(screen.queryByText("Porch light at dusk")).toBeNull();
+    });
+
+    it("draws no leftover section once everything moved", async () => {
+        state.rows = [
+            { ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" }
+        ];
+        open();
+        await screen.findByTestId("central-list");
+        await waitFor(() => expect(screen.queryByText("Not moved yet")).toBeNull());
     });
 });

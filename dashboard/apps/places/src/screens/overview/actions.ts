@@ -46,6 +46,8 @@ export interface OverviewAutomation {
     readonly enabled: boolean;
     readonly lastRunAt: string | null;
     readonly lastStatus: AutomationView["lastStatus"];
+    /** Set once it runs on the central engine, whose screen it opens. */
+    readonly movedTo?: string | null;
 }
 
 export interface PlaceOverview {
@@ -92,7 +94,8 @@ export async function placeOverviewAction(
                     name: automation.name,
                     enabled: automation.enabled,
                     lastRunAt: automation.lastRunAt,
-                    lastStatus: automation.lastStatus
+                    lastStatus: automation.lastStatus,
+                    movedTo: automation.movedTo ?? null
                 })) ?? null,
             events: eventList ? await withNames(install.id, eventList) : null
         };

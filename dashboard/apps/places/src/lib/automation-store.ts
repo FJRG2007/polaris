@@ -277,7 +277,9 @@ const LIVE = ["queued", "waiting", "running"];
 export const prismaAutomationStore: AutomationStore = {
     async enabledAutomations(installedAppId) {
         const rows = await prisma.placeAutomation.findMany({
-            where: { installedAppId, enabled: true },
+            // A row moved to the central engine starts nothing here any more; its
+            // runs already waiting still finish (claimDueRuns does not ask).
+            where: { installedAppId, enabled: true, movedToId: null },
             select: AUTOMATION_FIELDS
         });
         return rows.flatMap((row) => toAutomation(row) ?? []);
@@ -286,9 +288,16 @@ export const prismaAutomationStore: AutomationStore = {
     async automation(id) {
         const row = await prisma.placeAutomation.findUnique({
             where: { id },
-            select: AUTOMATION_FIELDS
+            select: { ...AUTOMATION_FIELDS, movedToId: true }
         });
-        return row ? toAutomation(row) : null;
+        if (!row) return null;
+        const { movedToId, ...own } = row;
+        const record = toAutomation(own);
+        // Moved: a run already waiting still finishes here, but anything new -
+        // Run now, another automation's "run" step - starts its central twin.
+        return record && movedToId
+            ? { ...record, central: { automationId: movedToId, legacyId: id } }
+            : record;
     },
 
     async createRun(input) {

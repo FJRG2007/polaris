@@ -1861,6 +1861,9 @@
         "other": "{kind, select, vehicle {Un vehículo} animal {Un animal} package {Un paquete} other {Algo}} en {camera}"
     },
     "automations": {
+        "nodeFields": {
+            "groupsMatch": "Cómo se unen los grupos"
+        },
         "anyValue": "Cualquiera",
         "missingDevice": "Un dispositivo que ya no está",
         "missingAutomation": "Una automatización que ya no está",
@@ -2048,6 +2051,8 @@
         },
         "list": {
             "intro": "Lo que este sitio hace solo. Cada una actúa como quien la guardó por última vez.",
+            "unmovedTitle": "Sin mover todavía",
+            "unmovedHint": "Siguen funcionando aquí. Pasarán a la lista de arriba cuando puedan.",
             "new": "Crear nueva",
             "blank": "Empezar vacía",
             "emptyTitle": "Sin automatizaciones",

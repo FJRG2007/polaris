@@ -6,6 +6,7 @@
  * what they would refuse, and every read is bounded.
  */
 
+import type { AppSlot } from "@/lib/app-extensions/types";
 import { prisma } from "@polaris/db";
 import { cancelRun, loadGraph } from "./engine";
 import * as core from "@polaris/core";
@@ -16,6 +17,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { emitAutomationEvent, kickIntake } from "./outbox";
 import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
 import { callCycle } from "./calls";
+import { graphProblems } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 
 const L = core.AUTOMATION_LIMITS;
@@ -59,13 +61,25 @@ export interface AutomationRow {
     readonly tags: readonly string[];
 }
 
+/** The app an automation came from, and the thing of that app it belongs to - a place. */
+export interface OriginFilter {
+    readonly origin: string;
+    readonly originRef?: string | null;
+}
+
 export async function listAutomations(
     actor: RunActor,
-    shelf: Shelf
+    shelf: Shelf,
+    from?: OriginFilter
 ): Promise<{ rows: AutomationRow[]; canEdit: boolean }> {
     if (!(await mayReadShelf(actor, shelf))) return { rows: [], canEdit: false };
     const rows = await prisma.automation.findMany({
-        where: shelfWhere(shelf),
+        where: {
+            ...shelfWhere(shelf),
+            ...(from
+                ? { origin: from.origin, ...(from.originRef ? { originRef: from.originRef } : {}) }
+                : {})
+        },
         orderBy: { updatedAt: "desc" },
         take: L.perShelf,
         select: {
@@ -126,6 +140,8 @@ export async function load(actor: RunActor, id: string, write: boolean) {
 }
 
 export interface AutomationDetail {
+    /** Where installed apps draw their nodes' settings, by app id; filled in by the screen's action. */
+    readonly appNodes?: Readonly<Record<string, AppSlot>>;
     readonly id: string;
     readonly name: string;
     readonly description: string;
@@ -309,7 +325,7 @@ export async function saveDraft(
     graph: core.AutomationGraph
 ): Promise<core.GraphProblem[]> {
     const row = await load(actor, id, true);
-    const problems = core.graphProblems(graph);
+    const problems = await graphProblems(graph);
     if (problems.some((problem) => problem.code !== "badConfig")) return problems;
     await checkSecrets(row, graph);
     await prisma.automation.update({
@@ -324,7 +340,7 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
-    const problems = core.graphProblems(parsed.data, { forPublish: true });
+    const problems = await graphProblems(parsed.data, { forPublish: true });
     if (problems.length > 0) return problems;
     const cycle = await callCycle(id, parsed.data, async (target) => {
         const other = await prisma.automation.findUnique({

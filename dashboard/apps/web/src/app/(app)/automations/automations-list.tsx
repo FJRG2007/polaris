@@ -60,14 +60,33 @@ import {
 const ALL = "all";
 const NONE = "none";
 
-export function AutomationsList() {
+/**
+ * Every automation on the open shelf, or - given `from` - only those an app made
+ * (and of one thing of it, such as a place), which is how an app's own screen
+ * shows its automations. Those are started from the app's screen, so the list
+ * offers no blank one of its own there.
+ */
+export function AutomationsList({
+    from
+}: {
+    from?: { readonly origin: string; readonly originRef?: string | null };
+} = {}) {
     const t = useTranslations("automations");
     const locale = useLocale();
     const toast = useToast();
-    const { data, error, refresh, replace } = useCachedAction(
-        "polaris.automations.list",
-        listAutomationsAction
+    const origin = from?.origin ?? null;
+    const originRef = from?.originRef ?? null;
+    const load = useMemo(
+        () => () => listAutomationsAction(origin ? { origin, originRef } : undefined),
+        [origin, originRef]
     );
+    const { data, error, refresh, replace } = useCachedAction(
+        origin
+            ? `polaris.automations.list.${origin}.${originRef ?? ""}`
+            : "polaris.automations.list",
+        load
+    );
+    const mayCreate = Boolean(data?.canEdit) && !origin;
     const [creating, setCreating] = useState(false);
     const [folder, setFolder] = useState<string>(ALL);
     const [tag, setTag] = useState<string | null>(null);
@@ -161,7 +180,7 @@ export function AutomationsList() {
                     </Button>
                 ) : null}
                 <div className="ml-auto">
-                    {data?.canEdit ? (
+                    {mayCreate ? (
                         <Button onClick={() => setCreating(true)}>
                             <Plus aria-hidden="true" />
                             {t("newAutomation")}
@@ -202,10 +221,14 @@ export function AutomationsList() {
                     icon={<Workflow aria-hidden="true" />}
                     title={t("list.emptyTitle")}
                     description={
-                        data.canEdit ? t("list.emptyDescription") : t("list.emptyReadOnly")
+                        origin
+                            ? t("list.emptyFromApp")
+                            : data.canEdit
+                              ? t("list.emptyDescription")
+                              : t("list.emptyReadOnly")
                     }
                     action={
-                        data.canEdit ? (
+                        mayCreate ? (
                             <Button onClick={() => setCreating(true)}>
                                 <Plus aria-hidden="true" />
                                 {t("newAutomation")}
