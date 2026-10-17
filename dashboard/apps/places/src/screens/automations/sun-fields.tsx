@@ -86,25 +86,33 @@ export function todayAt(
     return `${String(clock.hours).padStart(2, "0")}:${String(clock.minutes).padStart(2, "0")}`;
 }
 
-/** "Today: 08:21", "Not today", or - with no location - what is missing and the
- *  button that sets it, right there. */
+/** What is missing for the sun to be timed and the button that sets it, right
+ *  there - once per block, however many events the block names. Nothing once
+ *  the place has a location. */
+function SunLocationNotice() {
+    const t = usePlacesT();
+    const scope = useScope();
+    if (scope.location) return null;
+    return (
+        <div className="flex min-w-0 flex-col gap-2 rounded-md bg-muted px-3 py-2 sm:col-span-2">
+            <p className="text-xs text-muted-foreground">
+                {t(
+                    scope.setLocation
+                        ? "automations.fields.noLocation"
+                        : "automations.fields.noLocationAsk"
+                )}
+            </p>
+            {scope.setLocation ? <UseLocationButton onLocated={scope.setLocation} /> : null}
+        </div>
+    );
+}
+
+/** "Today: 08:21" or "Not today" for one event; nothing without a location,
+ *  which `SunLocationNotice` asks for once for the whole block. */
 function SunToday({ event, offset }: { event: SunEvent; offset?: Offset }) {
     const t = usePlacesT();
     const scope = useScope();
-    if (!scope.location) {
-        return (
-            <div className="flex min-w-0 flex-col gap-2 rounded-md bg-muted px-3 py-2 sm:col-span-2">
-                <p className="text-xs text-muted-foreground">
-                    {t(
-                        scope.setLocation
-                            ? "automations.fields.noLocation"
-                            : "automations.fields.noLocationAsk"
-                    )}
-                </p>
-                {scope.setLocation ? <UseLocationButton onLocated={scope.setLocation} /> : null}
-            </div>
-        );
-    }
+    if (!scope.location) return null;
     const time = todayAt(
         event,
         offset,
@@ -249,6 +257,7 @@ export function SunTriggerFields({
                 }}
             />
             <SunToday event={trigger.event} offset={trigger.offset} />
+            <SunLocationNotice />
         </>
     );
 }
@@ -335,6 +344,7 @@ export function SunConditionFields({
             <div className="hidden sm:block" />
             {side("after")}
             {side("before")}
+            <SunLocationNotice />
         </>
     );
 }
