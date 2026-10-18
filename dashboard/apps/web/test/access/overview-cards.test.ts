@@ -46,6 +46,15 @@ describe("availableOverviewWidgets", () => {
         );
     });
 
+    it("offers the ad blocker only to an administrator of an instance that installed it", async () => {
+        const installed = { features: { dnsBlocker: true } };
+        expect(await availableOverviewWidgets({ ...holding(), ...installed })).not.toContain("dnsBlocker");
+        expect(await availableOverviewWidgets({ ...holding(), isAdmin: true })).not.toContain("dnsBlocker");
+        expect(await availableOverviewWidgets({ ...holding(), isAdmin: true, ...installed })).toContain(
+            "dnsBlocker"
+        );
+    });
+
     it("keeps the catalogue order, so the grid is arranged the way it is written", async () => {
         const offered = await availableOverviewWidgets({
             ...holding("drive.read", "deploy.read", "tasks.read", "games.read"),

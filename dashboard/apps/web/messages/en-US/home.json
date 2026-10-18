@@ -88,6 +88,10 @@
         "activity": {
             "label": "Recent activity",
             "description": "What was done with your account, and from where."
+        },
+        "dnsBlocker": {
+            "label": "Ad blocker",
+            "description": "Today's lookups on your network, and how many were blocked."
         }
     },
     "picker": {
@@ -196,5 +200,20 @@
         "pick": "Choose what to show",
         "increase": "Raise {label} on {name}",
         "decrease": "Lower {label} on {name}"
+    },
+    "dnsBlocker": {
+        "unavailable": "The ad blocker could not be read just now.",
+        "off": "Blocking is off, so nothing is filtered yet.",
+        "open": "Open Ad blocker",
+        "active": "Blocking",
+        "paused": "Paused",
+        "pausedFor": "Paused for {minutes} min",
+        "pause": "Pause 15 min",
+        "pauseHint": "Let every lookup through for 15 minutes",
+        "resume": "Resume",
+        "queries": "Queries, last 24 h",
+        "blocked": "Blocked",
+        "share": "Share blocked",
+        "permitted": "Permitted"
     }
 }

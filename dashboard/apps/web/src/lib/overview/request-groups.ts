@@ -12,7 +12,13 @@
  */
 
 /** The cards whose read is slow enough to be asked for on its own. */
-export const SLOW_OVERVIEW_WIDGETS: ReadonlySet<string> = new Set(["usage", "alarms", "storage"]);
+export const SLOW_OVERVIEW_WIDGETS: ReadonlySet<string> = new Set([
+    "usage",
+    "alarms",
+    "storage",
+    // Read out of the DNS server's container: a file copy and a command.
+    "dnsBlocker"
+]);
 
 /** The cards asked for, split into the requests to send: the quick ones and the
  *  slow ones, each left out when empty. Order within a group is kept. */

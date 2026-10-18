@@ -31,6 +31,7 @@ import type { MetricSubjectType } from "@/lib/metrics-shared";
 import { gameServerSummaries, upcomingEventsFor } from "@/lib/app-extensions/registry";
 import type { UpcomingEvent } from "@/lib/app-extensions/types";
 import { getWatchOverview } from "@/lib/watch-overview-service";
+import { dnsBlockerSummary, type DnsBlockerSummary } from "@/lib/dns-blocker/insights";
 import { inFlightDeployments, listProjects } from "@/lib/deploy-service";
 import { myUrgentTasks, myWorkCounts } from "@/lib/tasks/report-service";
 import { HOST_CONNECTION_PREFIX, listAccessibleConnections } from "@/lib/storage-service";
@@ -163,6 +164,13 @@ export interface OverviewData {
     activity?: OverviewActivityEntry[] | null;
     games?: OverviewGames | null;
     calendar?: OverviewCalendar | null;
+    dnsBlocker?: OverviewDnsBlocker | null;
+}
+
+/** The network's ad blocker today. `today` is null while its DNS server is not
+ *  running, which is a state of its own rather than a failed read. */
+export interface OverviewDnsBlocker {
+    today: DnsBlockerSummary | null;
 }
 
 /** The next events in the reader's calendars. */
@@ -181,7 +189,8 @@ const SERVER_WIDGETS = [
     "sessions",
     "activity",
     "games",
-    "calendar"
+    "calendar",
+    "dnsBlocker"
 ] as const;
 
 type ServerWidgetId = (typeof SERVER_WIDGETS)[number];
@@ -225,8 +234,22 @@ export async function getOverviewData(
             ? card(() => getWatchOverview(user.id))
             : null;
 
-    const [services, monitoring, events, tasks, storage, sessions, activity, games, calendar] =
-        await Promise.all([
+    // The ad blocker answers every device's lookups, so its screen is for
+    // administrators only, and so is its card: the same check as the app.
+    const canDnsBlocker = asked.has("dnsBlocker") && user.isAdmin;
+
+    const [
+        services,
+        monitoring,
+        events,
+        tasks,
+        storage,
+        sessions,
+        activity,
+        games,
+        calendar,
+        dnsBlocker
+    ] = await Promise.all([
             asked.has("services") && canDeploy
                 ? card(() => deployedServices(user))
                 : Promise.resolve(undefined),
@@ -255,6 +278,9 @@ export async function getOverviewData(
                       if (!upcoming) throw new Error("No installed app keeps calendars");
                       return { events: upcoming };
                   })
+                : Promise.resolve(undefined),
+            canDnsBlocker
+                ? card(async () => ({ today: await dnsBlockerSummary() }))
                 : Promise.resolve(undefined)
         ]);
 
@@ -294,6 +320,7 @@ export async function getOverviewData(
     if (asked.has("activity")) data.activity = activity ?? null;
     if (asked.has("games")) data.games = canGames ? (games ?? null) : null;
     if (asked.has("calendar")) data.calendar = canCalendar ? (calendar ?? null) : null;
+    if (asked.has("dnsBlocker")) data.dnsBlocker = canDnsBlocker ? (dnsBlocker ?? null) : null;
     return data;
 }
 
