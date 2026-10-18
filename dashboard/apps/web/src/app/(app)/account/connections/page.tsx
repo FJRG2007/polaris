@@ -27,7 +27,7 @@ export default async function ConnectionsPage({
     searchParams
 }: {
     searchParams?: Promise<Record<string, string | string[] | undefined>>;
-} = {}) {
+}) {
     // Only what the screen reads on its first render: which service an app sent
     // somebody here for, and the app to offer the way back to.
     const params = (await searchParams) ?? {};
