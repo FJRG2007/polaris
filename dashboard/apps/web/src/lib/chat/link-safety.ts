@@ -13,7 +13,11 @@
  * - VirusTotal, about the link's host - the same domain lookup the mail filter
  *   makes, under the same cache entry, so a domain mail already asked about is
  *   not bought again for chat.
- * - Dymo, about the link itself - its data verifier's URL verdict.
+ * - Dymo, about the page itself - its data verifier's URL verdict, asked
+ *   without the query string.
+ *
+ * Links to this deployment and to hosts inside the network are never sent
+ * anywhere (`isOutsideHost`).
  *
  * **Silence is not an accusation**, as in mail: an unconfigured, broken, slow or
  * out-of-budget provider contributes nothing, and an unknown domain is not a
@@ -21,14 +25,17 @@
  */
 
 import { z } from "zod";
+import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
+import { dashboardHosts } from "@/lib/domain-edge";
 import { verifyUrl } from "@/lib/integrations/dymo";
 import { lookupDomain } from "@/lib/integrations/virustotal";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { knownReputation, rememberReputation, type Verdict } from "@/lib/reputation";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { resetLookupBudget, takeLookup } from "@/lib/reputation-budget";
 
 export const LINK_SAFETY_PROVIDERS = ["virustotal", "dymo"] as const;
 export type LinkSafetyProvider = (typeof LINK_SAFETY_PROVIDERS)[number];
@@ -77,49 +84,41 @@ export async function saveLinkSafetySettings(input: unknown): Promise<LinkSafety
  *  a list of fifty addresses must not cost fifty lookups. */
 export const MAX_CHECKED_LINKS = 10;
 
-/**
- * How many lookups each provider may be sent from this process.
- *
- * VirusTotal's figures are its free Public API's: four a minute and 500 a day.
- * A paid key allows more and simply never meets them. Dymo's quota depends on
- * the plan and is not something Polaris can read, so its ceiling here is
- * Polaris's own guard against one busy channel spending the month's quota in an
- * afternoon, not the provider's limit. Past either, a link goes unchecked rather
- * than waiting: the cache keeps the answers already bought, and the next message
- * with that link asks again.
- */
-const BUDGET: Readonly<Record<LinkSafetyProvider, { perMinute: number; perDay: number }>> = {
-    virustotal: { perMinute: 4, perDay: 500 },
-    dymo: { perMinute: 30, perDay: 2000 }
-};
-
-const MINUTE_MS = 60 * 1000;
-const DAY_MS = 24 * 60 * MINUTE_MS;
-
-/** When each lookup in the last day was sent, per provider. In memory: one
- *  process is one deployment's dashboard, and a restart forgetting a day's count
- *  costs at most one day's budget again. */
-const spent = new Map<LinkSafetyProvider, number[]>();
-
-/** Take one lookup from the provider's budget, or answer false when there is
- *  none left in this minute or this day. */
-function takeBudget(provider: LinkSafetyProvider, now = Date.now()): boolean {
-    const times = (spent.get(provider) ?? []).filter((at) => now - at < DAY_MS);
-    const lastMinute = times.filter((at) => now - at < MINUTE_MS).length;
-    const limit = BUDGET[provider];
-    if (times.length >= limit.perDay || lastMinute >= limit.perMinute) {
-        spent.set(provider, times);
-        return false;
-    }
-    times.push(now);
-    spent.set(provider, times);
-    return true;
-}
+/** The part of each provider's budget chat may spend. Chat checks after the
+ *  send and can go without; the mail filter decides where a message lands, so
+ *  the other half is left for it. */
+const CHAT_SHARE = 0.5;
 
 /** Forget what was spent. For the tests. */
 export function resetLinkSafetyBudget(): void {
-    spent.clear();
+    resetLookupBudget();
     inFlight.clear();
+}
+
+/** Host endings that only resolve inside somebody's own network. */
+const LOCAL_SUFFIXES = [".local", ".localhost", ".internal", ".lan", ".home.arpa"];
+
+/**
+ * Whether a link's host is one an outside service may be told about.
+ *
+ * Not this deployment's own names or anything under them - its share and invite
+ * links carry their secret in the address - and not a host that only exists
+ * inside the network (loopback, a private range, a bare machine name), which no
+ * outside service can know anything about and which says how the network is laid
+ * out.
+ */
+export function isOutsideHost(host: string, ownHosts: readonly string[]): boolean {
+    const bare = host.toLowerCase().replace(/^\[|\]$/g, "");
+    if (isIP(bare)) return !core.isPrivateIp(bare);
+    if (!bare.includes(".") || LOCAL_SUFFIXES.some((suffix) => bare.endsWith(suffix))) return false;
+    return !ownHosts.some((own) => bare === own || bare.endsWith(`.${own}`));
+}
+
+/** The part of a link Dymo is asked about: the page, without its query, which
+ *  is where a signed or one-time address keeps its secret. */
+export function lookupAddress(url: string): string {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
 }
 
 /** The same question asked twice at once is asked once: two messages posted
@@ -142,7 +141,7 @@ async function virusTotalOpinion(host: string): Promise<Verdict | null> {
     if (known) return known;
     return once(`virustotal:${host}`, async () => {
         const apiKey = await getIntegrationSecret("virustotal");
-        if (!apiKey || !takeBudget("virustotal")) return null;
+        if (!apiKey || !takeLookup("virustotal", CHAT_SHARE)) return null;
         const verdict = await lookupDomain(apiKey, host);
         if (verdict.kind === "error" || verdict.kind === "unknown") return null;
         const flagged = verdict.kind === "malicious" || verdict.kind === "suspicious";
@@ -157,13 +156,14 @@ async function virusTotalOpinion(host: string): Promise<Verdict | null> {
     });
 }
 
-/** What Dymo says about the link itself, cached per link. */
-async function dymoOpinion(url: string): Promise<Verdict | null> {
+/** What Dymo says about the page a link is to, cached per page. */
+async function dymoOpinion(link: string): Promise<Verdict | null> {
+    const url = lookupAddress(link);
     const known = await knownReputation("url", url, "dymo");
     if (known) return known;
     return once(`dymo:${url}`, async () => {
         const apiKey = await getIntegrationSecret("dymo");
-        if (!apiKey || !takeBudget("dymo")) return null;
+        if (!apiKey || !takeLookup("dymo", CHAT_SHARE)) return null;
         try {
             const { fraud } = await verifyUrl(apiKey, url);
             const remembered: Verdict = {
@@ -235,7 +235,7 @@ export async function checkMessageLinks(messageId: string): Promise<void> {
     });
     if (!message || message.deletedAt) return;
 
-    const links = [
+    const candidates = [
         ...new Set(
             core
                 .linksIn(message.body, MAX_CHECKED_LINKS)
@@ -243,6 +243,8 @@ export async function checkMessageLinks(messageId: string): Promise<void> {
                 .filter((link): link is string => link !== null)
         )
     ];
+    const ownHosts = candidates.length > 0 ? await dashboardHosts() : [];
+    const links = candidates.filter((link) => isOutsideHost(new URL(link).hostname, ownHosts));
 
     const flagged: FlaggedLink[] = [];
     for (const url of links) {

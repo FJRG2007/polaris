@@ -83,12 +83,16 @@ vi.mock("@/lib/reputation", () => ({
 }));
 vi.mock("@/lib/integrations/virustotal", () => ({ lookupDomain }));
 vi.mock("@/lib/integrations/dymo", () => ({ verifyUrl }));
+vi.mock("@/lib/domain-edge", () => ({
+    dashboardHosts: vi.fn(async () => ["polaris.example"])
+}));
 const publishChatChange = vi.fn();
 vi.mock("../../src/lib/chat/live", () => ({ publishChatChange }));
 
-const { checkMessageLinks, flaggedLinksFor, resetLinkSafetyBudget } = await import(
+const { checkMessageLinks, flaggedLinksFor, isOutsideHost, resetLinkSafetyBudget } = await import(
     "../../src/lib/chat/link-safety"
 );
+const { takeLookup } = await import("../../src/lib/reputation-budget");
 
 const { prisma } = await import("@polaris/db");
 
@@ -143,6 +147,18 @@ describe("normalizeLink", () => {
     });
 });
 
+describe("isOutsideHost", () => {
+    it("answers for public hosts only", () => {
+        expect(isOutsideHost("example.com", ["polaris.example"])).toBe(true);
+        expect(isOutsideHost("8.8.8.8", [])).toBe(true);
+        expect(isOutsideHost("notpolaris.example", ["polaris.example"])).toBe(true);
+        expect(isOutsideHost("polaris.example", ["polaris.example"])).toBe(false);
+        expect(isOutsideHost("172.16.0.1", [])).toBe(false);
+        expect(isOutsideHost("[fd00::1]", [])).toBe(false);
+        expect(isOutsideHost("box.internal", [])).toBe(false);
+    });
+});
+
 describe("checkMessageLinks", () => {
     it("does nothing at all when it is off", async () => {
         state.enabled.add("virustotal");
@@ -190,8 +206,48 @@ describe("checkMessageLinks", () => {
         const body = Array.from({ length: 8 }, (_, i) => `https://host${i}.example/`).join(" ");
         state.bodies.set(MESSAGE, [body]);
         await checkMessageLinks(MESSAGE);
-        // VirusTotal's free tier: four a minute.
-        expect(lookupDomain).toHaveBeenCalledTimes(4);
+        // Half of VirusTotal's free tier of four a minute: the rest is mail's.
+        expect(lookupDomain).toHaveBeenCalledTimes(2);
+    });
+
+    it("leaves the mail filter room in the budget it shares", async () => {
+        turnOn(["virustotal"]);
+        const body = Array.from({ length: 8 }, (_, i) => `https://host${i}.example/`).join(" ");
+        state.bodies.set(MESSAGE, [body]);
+        await checkMessageLinks(MESSAGE);
+        expect(takeLookup("virustotal")).toBe(true);
+        expect(takeLookup("virustotal")).toBe(true);
+        expect(takeLookup("virustotal")).toBe(false);
+    });
+
+    it("never tells anybody about this deployment's links or the network's own hosts", async () => {
+        turnOn(["virustotal", "dymo"]);
+        state.bodies.set(MESSAGE, [
+            [
+                "https://polaris.example/s/secret-token",
+                "https://drive.polaris.example/share/abc",
+                "http://localhost:3000/x",
+                "http://192.168.1.10/admin",
+                "http://10.0.0.5/",
+                "http://[::1]/",
+                "http://nas/",
+                "http://printer.local/",
+                "http://router.home.arpa/"
+            ].join(" ")
+        ]);
+        await checkMessageLinks(MESSAGE);
+        expect(lookupDomain).not.toHaveBeenCalled();
+        expect(verifyUrl).not.toHaveBeenCalled();
+    });
+
+    it("asks Dymo about the page without its query string", async () => {
+        turnOn(["dymo"]);
+        state.bodies.set(MESSAGE, ["https://shop.example/scam?token=s3cret&id=1"]);
+        await checkMessageLinks(MESSAGE);
+        expect(verifyUrl).toHaveBeenCalledWith("test-key", "https://shop.example/scam");
+        expect((await flaggedLinksFor([MESSAGE])).get(MESSAGE)?.map((f) => f.url)).toEqual([
+            "https://shop.example/scam?token=s3cret&id=1"
+        ]);
     });
 
     it("an edit replaces what the earlier version was flagged for", async () => {
