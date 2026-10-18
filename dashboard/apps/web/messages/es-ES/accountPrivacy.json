@@ -213,16 +213,33 @@
                 "hint": "Cuando juegas en uno de los servidores de Minecraft de este Polaris como un jugador vinculado a tu cuenta."
             }
         },
-        "games": "Juegos",
+        "status": {
+            "title": "Estado de actividad",
+            "who": "Quién puede verlo se decide en la página de <link>Privacidad</link>, con todo lo demás."
+        },
+        "registered": {
+            "title": "Juegos registrados",
+            "description": "Cada juego que la app de escritorio te ha visto jugar, y los que añadiste. Desactiva uno y nunca se mostrará.",
+            "nowPlaying": "Jugando ahora",
+            "noneDetected": "Sin juego detectado",
+            "addHint": "¿No ves tu juego? Añádelo abajo.",
+            "added": "Tus juegos",
+            "addedByYou": "Añadido por ti",
+            "lastPlayed": "Jugado <when></when>"
+        },
         "noGames": "Todavía ninguno. Un juego aparece aquí la primera vez que la app de escritorio lo ve en marcha, y desde entonces puedes ocultarlo.",
         "neverShown": "Nunca visible",
-        "showGame": "Mostrar {name}"
+        "showGame": "Mostrar {name}",
+        "page": {
+            "title": "Compartir actividad",
+            "summary": "Lo que juegas o escuchas, y tus juegos registrados."
+        }
     },
     "ownGames": {
         "full": "La lista está llena con {count}. Quita uno para añadir otro.",
         "taken": "Ese programa ya está en la lista.",
         "check": "Revisa el programa y el nombre.",
-        "title": "Tus propios juegos",
+        "title": "Añadir juego",
         "description": "Un juego que la app de escritorio todavía no conoce: el programa que lo ejecuta y cómo llamarlo.",
         "remove": "Quitar {name}",
         "program": "Programa",

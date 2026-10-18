@@ -213,16 +213,33 @@
                 "hint": "When you play on one of this Polaris's Minecraft servers as a player linked to your account."
             }
         },
-        "games": "Games",
+        "status": {
+            "title": "Activity status",
+            "who": "Who can see it is set on the <link>Privacy</link> page, with everything else."
+        },
+        "registered": {
+            "title": "Registered games",
+            "description": "Every game the desktop app has seen you play, and the ones you added. Turn one off and it is never shown.",
+            "nowPlaying": "Now playing",
+            "noneDetected": "No game detected",
+            "addHint": "Not seeing your game? Add it below.",
+            "added": "Your games",
+            "addedByYou": "Added by you",
+            "lastPlayed": "Last played <when></when>"
+        },
         "noGames": "None yet. A game shows up here the first time the desktop app sees it running, and you can hide it from then on.",
         "neverShown": "Never shown",
-        "showGame": "Show {name}"
+        "showGame": "Show {name}",
+        "page": {
+            "title": "Activity sharing",
+            "summary": "What you play or listen to, and your registered games."
+        }
     },
     "ownGames": {
         "full": "The list is full at {count}. Remove one to add another.",
         "taken": "That program is already on the list.",
         "check": "Check the program and the name.",
-        "title": "Your own games",
+        "title": "Add a game",
         "description": "A game the desktop app does not know yet: the program that runs it, and what to call it.",
         "remove": "Remove {name}",
         "program": "Program",

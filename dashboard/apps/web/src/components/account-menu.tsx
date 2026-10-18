@@ -26,6 +26,7 @@ import {
     CalendarClock,
     Check,
     Compass,
+    Gamepad2,
     Link2,
     LogOut,
     MessageSquareText,
@@ -584,6 +585,14 @@ export function AccountMenu({
                         <Link href="/account/notifications">
                             <Bell className="size-4" />
                             {t("account.notifications")}
+                        </Link>
+                    </DropdownMenuItem>
+                    {/* What is shown beside your name while you play or listen,
+                        one press from the face it is shown on. */}
+                    <DropdownMenuItem asChild>
+                        <Link href="/account/privacy/activity">
+                            <Gamepad2 className="size-4" />
+                            {t("account.activitySharing")}
                         </Link>
                     </DropdownMenuItem>
                     {/* Where the apps are. It existed and was reachable from

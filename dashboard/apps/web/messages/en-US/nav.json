@@ -47,6 +47,7 @@
         "setStatus": "Set a status",
         "myAccount": "My account",
         "notifications": "Notifications",
+        "activitySharing": "Activity sharing",
         "getApps": "Get the apps",
         "sharedLinks": "Shared links",
         "signOut": "Sign out",
@@ -342,7 +343,8 @@
         "Cloud servers": "Cloud servers",
         "Compare": "Compare",
         "Insights": "Insights",
-        "Rollouts": "Rollouts"
+        "Rollouts": "Rollouts",
+        "Activity sharing": "Activity sharing"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",
