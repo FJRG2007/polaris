@@ -13246,6 +13246,9 @@ model ClockAlarm {
     nextFireAt    DateTime?
     /// The next ring is a snooze rather than the alarm's own time.
     snoozed       Boolean   @default(false)
+    /// The ring somebody stopped or snoozed, by when it was due: what tells
+    /// every other tab and device still sounding it to fall quiet.
+    stoppedDue    DateTime?
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -13274,6 +13277,8 @@ model ClockTimer {
     /// A focus (Pomodoro) cycle: its lengths and where in the cycle it is, as
     /// JSON. Null for a plain timer.
     pomodoro    String?
+    /// The ring somebody stopped, by when it was due (see ClockAlarm).
+    stoppedDue  DateTime?
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 

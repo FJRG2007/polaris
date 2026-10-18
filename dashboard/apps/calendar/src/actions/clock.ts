@@ -46,7 +46,7 @@ const alarmChangeSchema = z.discriminatedUnion("change", [
     z.object({ id, change: z.literal("enable"), enabled: z.boolean() }),
     z.object({ id, change: z.literal("delete") }),
     z.object({ id, change: z.literal("skip") }),
-    z.object({ id, change: z.literal("snooze") }),
+    z.object({ id, change: z.literal("snooze"), due: z.string().datetime().optional() }),
     z.object({ id, change: z.literal("dismiss"), due: z.string().datetime() })
 ]);
 
@@ -63,7 +63,12 @@ export async function changeAlarmAction(input: unknown): Promise<Snapshot> {
             case "skip":
                 return clock.skipAlarm(userId, request.id);
             case "snooze":
-                return clock.snoozeAlarm(userId, request.id);
+                return clock.snoozeAlarm(
+                    userId,
+                    request.id,
+                    new Date(),
+                    request.due ? new Date(request.due) : undefined
+                );
             case "dismiss":
                 return clock.dismissAlarm(userId, request.id, new Date(request.due));
         }
@@ -91,18 +96,20 @@ export async function startFocusAction(input: unknown): Promise<Snapshot> {
 
 const timerChangeSchema = z.object({
     id,
-    change: z.enum(["start", "pause", "reset", "addMinute", "skip", "delete", "dismiss"])
+    change: z.enum(["start", "pause", "reset", "addMinute", "skip", "delete", "dismiss"]),
+    /** The ring a "dismiss" stops, by when it was due. */
+    due: z.string().datetime().optional()
 });
 
 export async function changeTimerAction(input: unknown): Promise<Snapshot> {
     const parsed = timerChangeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error.issues);
-    const { id: timerId, change } = parsed.data;
+    const { id: timerId, change, due } = parsed.data;
     return answer((userId) =>
         change === "delete"
             ? clock.deleteTimer(userId, timerId)
             : change === "dismiss"
-              ? clock.dismissTimer(userId, timerId)
+              ? clock.dismissTimer(userId, timerId, new Date(), due ? new Date(due) : undefined)
               : clock.changeTimer(userId, timerId, change)
     );
 }

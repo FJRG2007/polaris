@@ -267,6 +267,8 @@ export interface AlarmView {
     readonly zone: string;
     readonly nextFireAt: string | null;
     readonly snoozed: boolean;
+    /** When the ring somebody last stopped or snoozed was due. */
+    readonly stoppedDue: string | null;
 }
 
 export interface TimerView {
@@ -278,6 +280,8 @@ export interface TimerView {
     readonly remainingMs: number | null;
     readonly firedAt: string | null;
     readonly pomodoro: PomodoroState | null;
+    /** When the ring somebody last stopped was due. */
+    readonly stoppedDue: string | null;
 }
 
 export interface StopwatchView {

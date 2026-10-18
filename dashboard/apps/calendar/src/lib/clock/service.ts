@@ -38,7 +38,8 @@ const ALARM_SELECT = {
     enabled: true,
     zone: true,
     nextFireAt: true,
-    snoozed: true
+    snoozed: true,
+    stoppedDue: true
 } as const;
 
 const TIMER_SELECT = {
@@ -49,7 +50,8 @@ const TIMER_SELECT = {
     endsAt: true,
     remainingMs: true,
     firedAt: true,
-    pomodoro: true
+    pomodoro: true,
+    stoppedDue: true
 } as const;
 
 type AlarmRow = {
@@ -63,6 +65,7 @@ type AlarmRow = {
     zone: string;
     nextFireAt: Date | null;
     snoozed: boolean;
+    stoppedDue: Date | null;
 };
 
 type TimerRow = {
@@ -74,6 +77,7 @@ type TimerRow = {
     remainingMs: number | null;
     firedAt: Date | null;
     pomodoro: string | null;
+    stoppedDue: Date | null;
 };
 
 function alarmView(row: AlarmRow): model.AlarmView {
@@ -87,7 +91,8 @@ function alarmView(row: AlarmRow): model.AlarmView {
         enabled: row.enabled,
         zone: row.zone,
         nextFireAt: row.nextFireAt?.toISOString() ?? null,
-        snoozed: row.snoozed
+        snoozed: row.snoozed,
+        stoppedDue: row.stoppedDue?.toISOString() ?? null
     };
 }
 
@@ -100,7 +105,8 @@ function timerView(row: TimerRow): model.TimerView {
         endsAt: row.endsAt?.toISOString() ?? null,
         remainingMs: row.remainingMs,
         firedAt: row.firedAt?.toISOString() ?? null,
-        pomodoro: model.readPomodoro(row.pomodoro)
+        pomodoro: model.readPomodoro(row.pomodoro),
+        stoppedDue: row.stoppedDue?.toISOString() ?? null
     };
 }
 
@@ -177,8 +183,13 @@ export async function saveAlarm(
         await prisma.clockAlarm.create({ data: { userId, ...data } });
         return;
     }
+    const before = await prisma.clockAlarm.findFirst({
+        where: { id, userId },
+        select: { nextFireAt: true }
+    });
     const changed = await prisma.clockAlarm.updateMany({ where: { id, userId }, data });
     if (changed.count === 0) await refusal(userId, "time.errors.gone");
+    await answerRinging(userId, id, before?.nextFireAt ?? null, now);
 }
 
 /** Turn an alarm on or off. On, it rings at its next time from now. */
@@ -190,7 +201,7 @@ export async function setAlarmEnabled(
 ): Promise<void> {
     const alarm = await prisma.clockAlarm.findFirst({
         where: { id, userId },
-        select: { time: true, days: true, zone: true }
+        select: { time: true, days: true, zone: true, nextFireAt: true }
     });
     if (!alarm) return refusal(userId, "time.errors.gone");
     await prisma.clockAlarm.updateMany({
@@ -201,6 +212,7 @@ export async function setAlarmEnabled(
             nextFireAt: enabled ? model.nextAlarmFire(alarm, now) : null
         }
     });
+    await answerRinging(userId, id, alarm.nextFireAt, now);
 }
 
 export async function deleteAlarm(userId: string, id: string): Promise<void> {
@@ -240,6 +252,35 @@ async function ownAlarm(userId: string, id: string): Promise<AlarmRow> {
     return alarm;
 }
 
+/**
+ * Note that somebody stopped or snoozed the ring due at `due`, so every other
+ * tab and device still sounding it falls quiet. The scheduler moving a ring on
+ * says nothing of the kind - it does that whether anybody heard it or not - so
+ * this is the only word a ringing screen takes as "stop".
+ */
+async function noteStopped(
+    table: "alarm" | "timer",
+    userId: string,
+    id: string,
+    due: Date
+): Promise<void> {
+    const where = { id, userId };
+    const data = { stoppedDue: due };
+    if (table === "alarm") await prisma.clockAlarm.updateMany({ where, data });
+    else await prisma.clockTimer.updateMany({ where, data });
+}
+
+/** Turning off, skipping or editing an alarm whose ring is due answers that
+ *  ring too, wherever it is still sounding. */
+async function answerRinging(
+    userId: string,
+    id: string,
+    due: Date | null,
+    now: Date
+): Promise<void> {
+    if (due && due.getTime() <= now.getTime()) await noteStopped("alarm", userId, id, due);
+}
+
 /** Somebody stopped an alarm that rang in their tab at `due`. */
 export async function dismissAlarm(
     userId: string,
@@ -249,6 +290,7 @@ export async function dismissAlarm(
 ): Promise<void> {
     const alarm = await ownAlarm(userId, id);
     if (alarm.nextFireAt?.getTime() === due.getTime()) await passRing(alarm, due, now);
+    await noteStopped("alarm", userId, id, due);
 }
 
 /** Skip the next ring of an alarm that is on, keeping the ones after it. */
@@ -256,19 +298,27 @@ export async function skipAlarm(userId: string, id: string, now = new Date()): P
     const alarm = await ownAlarm(userId, id);
     if (!alarm.enabled || !alarm.nextFireAt) return;
     await passRing(alarm, alarm.nextFireAt, now);
+    await answerRinging(userId, id, alarm.nextFireAt, now);
 }
 
 /** Ring again in the alarm's snooze length from now. Snoozing a ring that has
  *  already been passed on - by the server - still snoozes: the person is the
  *  one who decides they want another few minutes. */
-export async function snoozeAlarm(userId: string, id: string, now = new Date()): Promise<void> {
+export async function snoozeAlarm(
+    userId: string,
+    id: string,
+    now = new Date(),
+    due?: Date
+): Promise<void> {
     const alarm = await ownAlarm(userId, id);
     await prisma.clockAlarm.updateMany({
         where: { id, userId },
         data: {
             nextFireAt: new Date(now.getTime() + alarm.snoozeMinutes * 60_000),
             snoozed: true,
-            enabled: true
+            enabled: true,
+            // The ring being snoozed, so the other screens sounding it stop.
+            ...(due ? { stoppedDue: due } : {})
         }
     });
 }
@@ -392,6 +442,15 @@ export async function changeTimer(
         data = phaseAdvance(cycle, now, state === "running" || cycle.auto);
     }
     if (!(await writeTimer(userId, timer, data))) await refusal(userId, "time.errors.changed");
+    // Restarting, resetting or adding a minute to a timer that is ringing - or
+    // has rung - answers that ring too, wherever it is still sounding.
+    const ringing =
+        state === "rung"
+            ? timer.firedAt
+            : timer.endsAt !== null && timer.endsAt.getTime() <= at
+              ? timer.endsAt
+              : null;
+    if (ringing) await noteStopped("timer", userId, id, ringing);
 }
 
 export async function deleteTimer(userId: string, id: string): Promise<void> {
@@ -434,11 +493,22 @@ function afterRing(timer: TimerRow, due: Date, now: Date): Partial<Omit<TimerRow
     return phaseAdvance(cycle, due.getTime() + 60_000 < now.getTime() ? now : due, cycle.auto);
 }
 
-/** Somebody stopped a timer that rang in their tab. */
-export async function dismissTimer(userId: string, id: string, now = new Date()): Promise<void> {
+/** Somebody stopped a timer that rang in their tab - the ring that ended at
+ *  `due`, which the scheduler may already have moved on. */
+export async function dismissTimer(
+    userId: string,
+    id: string,
+    now = new Date(),
+    due?: Date
+): Promise<void> {
     const timer = await ownTimer(userId, id);
-    if (timer.endsAt === null || timer.endsAt.getTime() > now.getTime()) return;
-    await writeTimer(userId, timer, afterRing(timer, timer.endsAt, now));
+    const ended =
+        timer.endsAt !== null &&
+        timer.endsAt.getTime() <= now.getTime() &&
+        (!due || timer.endsAt.getTime() === due.getTime());
+    if (ended) await writeTimer(userId, timer, afterRing(timer, timer.endsAt!, now));
+    const rung = due ?? (ended ? timer.endsAt : null);
+    if (rung) await noteStopped("timer", userId, id, rung);
 }
 
 // ---------------------------------------------------------------------------

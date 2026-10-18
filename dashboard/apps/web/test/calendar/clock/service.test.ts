@@ -214,6 +214,40 @@ describe("the Time area on the server", () => {
             );
         });
 
+        it("answers a ringing alarm turned off, skipped or edited on another screen", async () => {
+            await clock.saveAlarm(alice.id, null, alarm(), ZONE, world.NOW);
+            const id = db.rows("clockAlarm")[0]!.id as string;
+            const due = db.rows("clockAlarm")[0]!.nextFireAt as Date;
+            const ringing = at("2026-10-02T05:00:01Z");
+            await clock.setAlarmEnabled(alice.id, id, false, ringing);
+            expect((db.rows("clockAlarm")[0]!.stoppedDue as Date).toISOString()).toBe(
+                due.toISOString()
+            );
+
+            await clock.saveAlarm(alice.id, id, alarm(), ZONE, world.NOW);
+            db.rows("clockAlarm")[0]!.stoppedDue = null;
+            await clock.skipAlarm(alice.id, id, ringing);
+            expect((db.rows("clockAlarm")[0]!.stoppedDue as Date).toISOString()).toBe(
+                due.toISOString()
+            );
+
+            await clock.saveAlarm(alice.id, id, alarm(), ZONE, world.NOW);
+            db.rows("clockAlarm")[0]!.stoppedDue = null;
+            await clock.saveAlarm(alice.id, id, alarm({ label: "Gym" }), ZONE, ringing);
+            expect((db.rows("clockAlarm")[0]!.stoppedDue as Date).toISOString()).toBe(
+                due.toISOString()
+            );
+        });
+
+        it("leaves a ring that is not due yet unanswered when the alarm changes", async () => {
+            await clock.saveAlarm(alice.id, null, alarm(), ZONE, world.NOW);
+            const id = db.rows("clockAlarm")[0]!.id as string;
+            await clock.setAlarmEnabled(alice.id, id, false, world.NOW);
+            await clock.saveAlarm(alice.id, id, alarm(), ZONE, world.NOW);
+            await clock.skipAlarm(alice.id, id, world.NOW);
+            expect(db.rows("clockAlarm")[0]!.stoppedDue ?? null).toBeNull();
+        });
+
         it("skips the next ring and keeps the ones after it", async () => {
             await clock.saveAlarm(alice.id, null, alarm(), ZONE, world.NOW);
             await clock.skipAlarm(alice.id, db.rows("clockAlarm")[0]!.id as string, world.NOW);
@@ -333,6 +367,25 @@ describe("the Time area on the server", () => {
             await clock.fireDueClocks(at("2026-10-01T08:01:10Z"));
             expect(fake.notices).toHaveLength(0);
             expect(db.rows("clockTimer")[0]!.firedAt).not.toBeNull();
+        });
+
+        it("does not move on a newer ring when an older one is stopped late", async () => {
+            const id = await clock.createTimer(
+                alice.id,
+                { label: "", durationMs: 60_000, sound: "chime", start: true },
+                world.NOW
+            );
+            const first = db.rows("clockTimer")[0]!.endsAt as Date;
+            await clock.changeTimer(alice.id, id, "reset", at("2026-10-01T08:00:30Z"));
+            await clock.changeTimer(alice.id, id, "start", at("2026-10-01T08:00:30Z"));
+            const second = db.rows("clockTimer")[0]!.endsAt as Date;
+            await clock.dismissTimer(alice.id, id, at("2026-10-01T08:01:40Z"), first);
+            expect((db.rows("clockTimer")[0]!.endsAt as Date).toISOString()).toBe(
+                second.toISOString()
+            );
+            expect((db.rows("clockTimer")[0]!.stoppedDue as Date).toISOString()).toBe(
+                first.toISOString()
+            );
         });
 
         it("holds at most its limit per person", async () => {
