@@ -240,7 +240,11 @@ export async function hookAddressAction(
     rotation: unknown
 ): Promise<Result<{ path: string }>> {
     const parsed = z
-        .tuple([id, z.string().min(1).max(64), core.CORE_NODE_CONFIGS["core.webhook"].shape.rotation])
+        .tuple([
+            id,
+            z.string().min(1).max(64),
+            core.CORE_NODE_CONFIGS["core.webhook"].shape.rotation
+        ])
         .safeParse([automationId, nodeId, rotation]);
     if (!parsed.success) return invalid();
     try {
