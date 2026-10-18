@@ -88,6 +88,8 @@ jobs:
           # when it moves its tag: untagged, one per image per build, and nothing
           # else was ever going to collect it.
           CACHE_PACKAGES: polaris-buildcache
+          # Service images living in the dashboard's package under their own tag.
+          SERVICE_TAGS: latest-service-dns-blocker
         run: |
           set -uo pipefail
           repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")
@@ -130,6 +132,17 @@ jobs:
               fi
               keep=$(echo "$index" | jq -r '.manifests[]?.digest')
               echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
+              # Service images published into the dashboard's package so they
+              # are public without anybody changing a visibility by hand (see the
+              # dnsblock job). Each is a multi-arch index: the tag keeps the index,
+              # and its per-architecture children are kept here. A tag not
+              # published yet has nothing to keep.
+              if [ "$package" = polaris-dashboard ]; then
+                for tag in $SERVICE_TAGS; do
+                  side=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:$tag" --raw 2>/dev/null) || continue
+                  keep=$(printf '%s\n%s' "$keep" "$(echo "$side" | jq -r '.manifests[]?.digest')")
+                done
+              fi
             fi
             refused=0
 
@@ -161,6 +174,7 @@ jobs:
                 # latest dashboard downloads; a bundle it has moved off is a
                 # replaced build like any other.
                 case ",${tags:-}," in *,latest-app-*) continue;; esac
+                case ",${tags:-}," in *,latest-service-*) continue;; esac
                 # Fed by a here-string, not a pipe: `grep -q` closing the pipe on
                 # its first hit fails the writer under `pipefail`, and a digest
                 # that is on the keep list would read as one that is not.

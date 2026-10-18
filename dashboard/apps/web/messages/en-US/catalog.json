@@ -100,6 +100,10 @@
             "summary": "Your calendars and the ones you link, with invitations and booking pages.",
             "description": "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris."
         },
+        "dns-blocker": {
+            "summary": "Blocks ads, trackers and malware for every device on your network.",
+            "description": "A DNS server for your whole network that refuses to look up ad, tracker and malware domains, so phones, TVs and consoles are covered without installing anything on them. Pick blocklists by category, allow or block your own domains, choose an encrypted resolver, and name devices on your network. Installing downloads nothing: the blocker starts on this machine, on port 53, when you turn it on."
+        },
         "mail-server": {
             "summary": "Mail at your own domains, with its DNS written and checked for you.",
             "description": "Send and receive mail at your own domains. Polaris writes the SPF, DKIM and DMARC records, checks that they are published, and files the DMARC reports receivers send back. Create mailboxes, aliases and forwards from here. Installing downloads nothing: each mail server you set up runs as a container on the machine you choose, and publishes ports 25, 465, 587, 993 and 4190 there."

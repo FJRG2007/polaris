@@ -86,6 +86,7 @@ export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">>
     "mqtt-broker": "capabilities.mqttBroker",
     "home-hub": "capabilities.homeHub",
     "mail-server": "capabilities.mailServer",
+    "dns-blocker": "capabilities.dnsBlocker",
     tool: "capabilities.tool"
 };
 
