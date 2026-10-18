@@ -36,6 +36,7 @@ import * as backupsSourcesTypes from "@/lib/backups/sources/types";
 import { readInstallConfig } from "@/lib/apps/install-config-value";
 import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
 import type {
+    AppAutomationsFilter,
     AppExtension,
     AppJob,
     AppWidgetDefinition,
@@ -560,6 +561,7 @@ type ServerHost = typeof serverHost;
 declare module "@polaris/app-host" {
     interface AppHost extends ServerHost {}
     interface AppHostTypes {
+        AppAutomationsFilter: AppAutomationsFilter;
         AppExtension: AppExtension;
         AppJob: AppJob;
         AppWidgetDefinition: AppWidgetDefinition;

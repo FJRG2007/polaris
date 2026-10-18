@@ -2072,7 +2072,8 @@
             "removeName": "Quitar {name}",
             "removeTitle": "Quitar automatización",
             "removeQuestion": "¿Quitar {name}?",
-            "removeBody": "Se para en el acto, también lo que estuviera esperando para hacer, y su registro se va con ella."
+            "removeBody": "Se para en el acto, también lo que estuviera esperando para hacer, y su registro se va con ella.",
+            "appName": "Lugares"
         },
         "editor": {
             "back": "Automatizaciones",

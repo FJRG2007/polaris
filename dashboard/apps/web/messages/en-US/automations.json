@@ -13,7 +13,9 @@
         "never": "Never run",
         "lastRun": "Last run {when}",
         "switchLabel": "Run {name} when triggered",
-        "notPublished": "Publish it first to switch it on"
+        "notPublished": "Publish it first to switch it on",
+        "runs": "Run history",
+        "runOff": "Switch it on first"
     },
     "modes": {
         "single": "One at a time",
@@ -441,7 +443,14 @@
             "enable": "Switch on",
             "delete": "Delete",
             "deleteMany": "Delete {count} nodes",
-            "runFromHere": "Run from here"
+            "runFromHere": "Run from here",
+            "cut": "Cut",
+            "paste": "Paste",
+            "selectAll": "Select all",
+            "undo": "Undo last change",
+            "redo": "Redo last change",
+            "deleteEdge": "Delete connection",
+            "deleteSelection": "Delete selection"
         },
         "noSampleToPin": "Run a test first, or write a sample here.",
         "unpinned": "Sample unpinned",
@@ -699,5 +708,9 @@
         "homeRun": "Places: run another",
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
         "install": "Install the app"
+    },
+    "filter": {
+        "label": "Filters",
+        "remove": "Remove filter {name}"
     }
 }

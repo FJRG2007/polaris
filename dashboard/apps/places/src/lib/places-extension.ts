@@ -87,6 +87,9 @@ export const placesExtension: AppExtension = {
     // What a moved automation ran before the move, read from the Places tables.
     automationHistory: async (legacyRef) =>
         (await import("./automation-move")).legacyRuns(legacyRef),
+    // The central list narrowed to its automations: the chips' names, its New
+    // menu and what has not moved yet.
+    automationsFilter: async (ref) => (await import("./automation-filter")).automationsFilter(ref),
 
     // The Overview's cards: the devices somebody picks, at a glance, and the
     // controls they reach for. Loaded when a card is drawn or pressed; see

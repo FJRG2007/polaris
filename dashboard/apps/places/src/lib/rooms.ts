@@ -48,10 +48,17 @@ function toView(row: {
     };
 }
 
-/** A place's rooms, by floor and then by name. Bounded by what one house has. */
-export async function listRooms(installedAppId: string, placeId: string): Promise<RoomView[]> {
+/** A place's rooms, or several places', by floor and then by name. Bounded by
+ *  what one house has. */
+export async function listRooms(
+    installedAppId: string,
+    placeId: string | readonly string[]
+): Promise<RoomView[]> {
     const rows = await prisma.placeRoom.findMany({
-        where: { installedAppId, placeId },
+        where: {
+            installedAppId,
+            placeId: typeof placeId === "string" ? placeId : { in: [...placeId] }
+        },
         orderBy: [{ floor: "asc" }, { name: "asc" }],
         select: ROOM_FIELDS,
         take: 500

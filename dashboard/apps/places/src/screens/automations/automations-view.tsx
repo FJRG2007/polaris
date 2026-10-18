@@ -35,7 +35,6 @@ import type { RoomView } from "../../lib/room-kinds";
 const { runAction } = hostUi.runAction;
 const { RelativeTime } = hostUi.relativeTime;
 const { readSnapshot, writeSnapshot } = hostUi.snapshotCache;
-const { AutomationsList } = hostUi.automationsList;
 
 /** How long a copy of the list is good for painting from. */
 const CACHE_MS = 30_000;
@@ -47,7 +46,65 @@ interface Listing {
     readonly rooms?: RoomView[];
 }
 
+/** Its own screen, for somebody the central list is not open to: the New menu
+ *  and what it still runs itself. Everybody else is sent to the central list. */
 export function AutomationsView({ placeId, canManage }: { placeId: string; canManage: boolean }) {
+    const t = usePlacesT();
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+                <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    {t("automations.list.intro")}
+                </p>
+                {canManage ? <NewAutomationMenu placeId={placeId} /> : null}
+            </div>
+            <UnmovedAutomations placeId={placeId} canManage={canManage} />
+        </div>
+    );
+}
+
+/** New, blank or from a template, at the place the screen is about (null: the
+ *  one being looked at). */
+export function NewAutomationMenu({ placeId }: { placeId: string | null }) {
+    const t = usePlacesT();
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                    <Plus className="size-4 shrink-0" />
+                    {t("automations.list.new")}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <Link href={auto.newAutomationHref(placeId)}>
+                        {t("automations.list.blank")}
+                    </Link>
+                </DropdownMenuItem>
+                {auto.TEMPLATES.map((template) => (
+                    <DropdownMenuItem key={template} asChild>
+                        <Link href={auto.newAutomationHref(placeId, template)}>
+                            {t(`automations.templates.${template}.title`)}
+                        </Link>
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/**
+ * The automations of a place - or of every place, given null - that have not
+ * moved to the central engine: this build could not convert them, so they still
+ * run here, and are listed here with what the old list offered.
+ */
+export function UnmovedAutomations({
+    placeId,
+    canManage
+}: {
+    placeId: string | null;
+    canManage: boolean;
+}) {
     const t = usePlacesT();
     const [listing, setListing] = useState<Listing | null>(null);
     const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
@@ -58,10 +115,14 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
 
     useEffect(() => {
         let cancelled = false;
-        const cached = readSnapshot<Listing>(automationsCacheKey(placeId), CACHE_MS);
+        const key = automationsCacheKey(placeId ?? "all");
+        const cached = readSnapshot<Listing>(key, CACHE_MS);
         if (cached) setListing(cached.value);
         void (async () => {
-            const result = await runAction(() => actions.listAutomationsAction(), setError);
+            const result = await runAction(
+                () => actions.listAutomationsAction(placeId ? { placeId } : "all"),
+                setError
+            );
             if (cancelled || !result) return;
             if (result.error) {
                 setError(result.error);
@@ -74,7 +135,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                 rooms: result.rooms ?? []
             };
             setListing(next);
-            writeSnapshot(automationsCacheKey(placeId), next);
+            writeSnapshot(key, next);
         })();
         return () => {
             cancelled = true;
@@ -192,40 +253,8 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
         dropAutomationsCache();
     };
 
-    const newMenu = canManage ? (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                    <Plus className="size-4 shrink-0" />
-                    {t("automations.list.new")}
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                    <Link href="/places/devices/automations/new">
-                        {t("automations.list.blank")}
-                    </Link>
-                </DropdownMenuItem>
-                {auto.TEMPLATES.map((template) => (
-                    <DropdownMenuItem key={template} asChild>
-                        <Link href={`/places/devices/automations/new?template=${template}`}>
-                            {t(`automations.templates.${template}.title`)}
-                        </Link>
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    ) : null;
-
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-                    {t("automations.list.intro")}
-                </p>
-                {newMenu}
-            </div>
-
             {error && (
                 <p
                     role="alert"
@@ -234,8 +263,6 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                     {error}
                 </p>
             )}
-
-            <AutomationsList from={{ origin: "home", originRef: placeId }} />
 
             {shown.length > 0 && (
                 <section className="flex flex-col gap-2" aria-labelledby="places-unmoved">

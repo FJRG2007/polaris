@@ -59,6 +59,9 @@ export interface AutomationRow {
     readonly updatedAt: string;
     readonly folderId: string | null;
     readonly tags: readonly string[];
+    /** Whether Run now would start it: switched on, published, with a Run by
+     *  hand trigger in what is published. Absent on a list cached before. */
+    readonly runnable?: boolean;
 }
 
 /** The app an automation came from, and the thing of that app it belongs to - a place. */
@@ -96,6 +99,20 @@ export async function listAutomations(
             tags: true
         }
     });
+    const live = rows.flatMap((row) =>
+        row.enabled && row.publishedVersionId ? [row.publishedVersionId] : []
+    );
+    const manual = live.length
+        ? await prisma.automationTrigger.findMany({
+              where: {
+                  automationId: { in: rows.map((row) => row.id) },
+                  versionId: { in: live },
+                  eventType: "core.manual"
+              },
+              select: { versionId: true }
+          })
+        : [];
+    const runnable = new Set(manual.map((trigger) => trigger.versionId));
     return {
         canEdit: await mayEditShelf(actor, shelf),
         rows: rows.map((row) => ({
@@ -109,7 +126,11 @@ export async function listAutomations(
             lastStatus: row.lastStatus,
             updatedAt: row.updatedAt.toISOString(),
             folderId: row.folderId,
-            tags: row.tags ?? []
+            tags: row.tags ?? [],
+            runnable:
+                row.enabled &&
+                row.publishedVersionId !== null &&
+                runnable.has(row.publishedVersionId)
         }))
     };
 }
@@ -131,6 +152,8 @@ export async function load(actor: RunActor, id: string, write: boolean) {
             rateLimit: true,
             allowLocalNetwork: true,
             runAsId: true,
+            origin: true,
+            originRef: true,
             updatedAt: true
         }
     });
@@ -158,6 +181,10 @@ export interface AutomationDetail {
     /** The path of each webhook trigger's address, by node id. Shown only to editors. */
     readonly hooks: Readonly<Record<string, string>>;
     readonly isOrg: boolean;
+    /** The app that made it and the thing of that app it belongs to, such as a
+     *  place; null for one made here. Its list is filtered to them. */
+    readonly origin: string | null;
+    readonly originRef: string | null;
     /** The live version, to tell the draft from it. */
     readonly publishedVersion: {
         readonly id: string;
@@ -239,6 +266,8 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         draft,
         hooks,
         isOrg: row.orgId !== null,
+        origin: row.origin ?? null,
+        originRef: row.originRef ?? null,
         publishedVersion:
             live && liveGraph?.success
                 ? { id: live.id, number: live.number, graph: liveGraph.data }

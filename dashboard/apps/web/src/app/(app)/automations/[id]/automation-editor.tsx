@@ -89,6 +89,13 @@ import {
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
 
+/** The list it belongs in: narrowed to the app and the thing of it that made it. */
+function listHref(detail: Pick<AutomationDetail, "origin" | "originRef"> | undefined): string {
+    return detail?.origin
+        ? core.automationsListHref(detail.origin, detail.originRef)
+        : core.AUTOMATIONS_LIST_PATH;
+}
+
 export function AutomationEditor({ id }: { id: string }) {
     const t = useTranslations("automations");
     const { data, error, refresh, replace } = useCachedAction(`polaris.automations.one.${id}`, () =>
@@ -98,7 +105,7 @@ export function AutomationEditor({ id }: { id: string }) {
     return (
         <div className="space-y-6">
             <Link
-                href="/automations"
+                href={listHref(data?.automation)}
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden="true" />
@@ -617,7 +624,7 @@ function Loaded({
                         const answer = await deleteAutomationAction(detail.id);
                         if (!answer.ok) return void toast.show({ title: answer.error });
                         toast.show({ title: t("editor.deleted") });
-                        router.push("/automations");
+                        router.push(listHref(detail));
                     })
                 }
             />

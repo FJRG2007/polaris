@@ -266,6 +266,7 @@ export function OverviewView({
                     {resident ? (
                         <div className="order-3 min-w-0 lg:order-none">
                             <RoutinesCard
+                                placeId={placeId}
                                 automations={data?.automations ?? null}
                                 canManage={canManage}
                                 onRan={(id, status) =>
@@ -833,10 +834,12 @@ function CameraThumb({
 /** The automations of this place, the latest to have run first, each a press
  *  from running. */
 function RoutinesCard({
+    placeId,
     automations,
     canManage,
     onRan
 }: {
+    placeId: string;
     automations: readonly actions.OverviewAutomation[] | null;
     canManage: boolean;
     onRan: (id: string, status: actions.OverviewAutomation["lastStatus"]) => void;
@@ -881,7 +884,7 @@ function RoutinesCard({
         <OverviewCard
             title={t("placeOverview.routines.title")}
             icon={Workflow}
-            href="/places/devices/automations"
+            href={auto.placesAutomationsHref(placeId)}
         >
             {automations === null ? (
                 <div className="flex flex-col gap-3 p-4" aria-busy="true">
@@ -895,7 +898,7 @@ function RoutinesCard({
                     </p>
                     {canManage ? (
                         <Button asChild size="sm" variant="outline">
-                            <Link href="/places/devices/automations/new">
+                            <Link href={auto.newAutomationHref(placeId)}>
                                 {t("placeOverview.routines.create")}
                             </Link>
                         </Button>

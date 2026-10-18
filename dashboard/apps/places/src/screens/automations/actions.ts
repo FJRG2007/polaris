@@ -42,8 +42,11 @@ export interface AutomationFieldIssue {
     readonly message: string;
 }
 
-/** The automations of the place being looked at, and the devices they name. */
-export async function listAutomationsAction(): Promise<{
+/** Which places a list is of: one, every one, or (absent) the one being looked at. */
+const listScope = z.union([z.object({ placeId: z.string().uuid() }), z.literal("all")]).optional();
+
+/** The automations of the place being looked at - or of `scope` - and the devices they name. */
+export async function listAutomationsAction(scope?: unknown): Promise<{
     automations?: auto.AutomationView[];
     devices?: DeviceView[];
     /** The place's rooms, which a block naming a room or a floor is told by. */
@@ -52,14 +55,32 @@ export async function listAutomationsAction(): Promise<{
     error?: string;
 }> {
     const { install } = await requireHome("home.read");
+    const asked = listScope.safeParse(scope);
+    if (!asked.success) return { error: (await placesT())("automations.errors.placeGone") };
     const result = await guard(async () => {
-        const { current } = await currentPlace(install.id);
-        const [list, found, roomList] = await Promise.all([
-            automations.listAutomations(install.id, current.id),
-            devices.listDevices(install.id, current.id),
-            rooms.listRooms(install.id, current.id)
-        ]);
-        return { list, found, roomList, placeId: current.id };
+        const { current, places: every } = await currentPlace(install.id);
+        // An id from another install is not one of these, and lists nothing.
+        const ids =
+            asked.data === "all"
+                ? every.map((place) => place.id)
+                : asked.data
+                  ? every.some((place) => place.id === asked.data.placeId)
+                      ? [asked.data.placeId]
+                      : []
+                  : [current.id];
+        const list = ids.length > 0 ? await automations.listAutomations(install.id, ids) : [];
+        const [found, roomList] = list.some((automation) => !automation.movedTo)
+            ? await Promise.all([
+                  devices.listDevices(install.id, ids.length === 1 ? ids[0] : null),
+                  rooms.listRooms(install.id, ids)
+              ])
+            : [[], []];
+        return {
+            list,
+            found,
+            roomList,
+            placeId: ids.length === 1 ? ids[0] : undefined
+        };
     });
     if (result.error) return { error: result.error };
     return {
@@ -120,7 +141,11 @@ export async function nodeContextAction(
 /** One automation with what its editor needs: its log, the devices its pickers
  *  offer and the automations a step can start. A null id is a new one, at the
  *  place being looked at. */
-export async function getAutomationAction(id: string | null): Promise<{
+export async function getAutomationAction(
+    id: string | null,
+    /** For a new one: the place it is made at, when not the one being looked at. */
+    atPlace?: string | null
+): Promise<{
     automation?: auto.AutomationView;
     runs?: auto.RunView[];
     context?: EditorContext;
@@ -129,11 +154,12 @@ export async function getAutomationAction(id: string | null): Promise<{
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         if (!id) {
-            const { current } = await currentPlace(install.id);
+            const { current, places: every } = await currentPlace(install.id);
+            const at = every.find((place) => place.id === atPlace) ?? current;
             return {
                 automation: undefined,
                 runs: [],
-                context: await editorContext(install.id, current.id)
+                context: await editorContext(install.id, at.id)
             };
         }
         const automation = await automations.getAutomation(install.id, String(id));

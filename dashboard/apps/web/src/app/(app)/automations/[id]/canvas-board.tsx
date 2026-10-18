@@ -48,6 +48,7 @@ import {
     useRef,
     useState,
     type KeyboardEvent,
+    type MouseEvent as ReactMouseEvent,
     type PointerEvent as ReactPointerEvent,
     type ReactNode
 } from "react";
@@ -117,6 +118,19 @@ export function wireMiddle(from: Point, to: Point): Point {
     };
 }
 
+/** What a right-click outside a node landed on. A node has its own menu (`menu`). */
+export type CanvasMenuTarget =
+    | { readonly kind: "canvas"; readonly at: Point }
+    | { readonly kind: "edge"; readonly key: string }
+    | { readonly kind: "selection" };
+
+/** The view moves a menu can offer, done by the board as its own keys do them. */
+export interface CanvasViewActions {
+    readonly fit: () => void;
+    readonly zoomIn: () => void;
+    readonly zoomOut: () => void;
+}
+
 export interface CanvasBoardProps {
     readonly graph: core.AutomationGraph;
     readonly readOnly: boolean;
@@ -142,6 +156,9 @@ export interface CanvasBoardProps {
     readonly states?: Readonly<Record<string, string>>;
     /** The items of a node's right-click menu; the node is selected first when it was not already. */
     readonly menu?: (node: core.GraphNode) => ReactNode;
+    /** The items of the right-click menu on the empty canvas, a connection or a
+     *  selected note; what was clicked is selected first. */
+    readonly boardMenu?: (target: CanvasMenuTarget, view: CanvasViewActions) => ReactNode;
     /** Bumped by the editor to frame the whole graph again (after a tidy). */
     readonly refit?: number;
 }
@@ -161,6 +178,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const [editingNote, setEditingNote] = useState<string | null>(null);
     const [overview, setOverview] = useState(graph.nodes.length >= 8);
     const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+    const [menuTarget, setMenuTarget] = useState<CanvasMenuTarget | null>(null);
     const [resizing, setResizing] = useState<{ id: string; width: number; height: number } | null>(
         null
     );
@@ -490,7 +508,30 @@ export function CanvasBoard(props: CanvasBoardProps) {
 
     const frameRect = frame.current?.getBoundingClientRect();
 
-    return (
+    /** Work out what a right-click outside a node is on, and select it, before the menu opens. */
+    function openMenu(event: ReactMouseEvent<HTMLDivElement>): void {
+        const target = event.target as Element;
+        // A node opens its own menu.
+        if (target.closest("[data-node-id]")) return;
+        const edgeKey = target.closest("[data-edge-key]")?.getAttribute("data-edge-key");
+        const noteId = target.closest("[data-note-id]")?.getAttribute("data-note-id");
+        if (edgeKey && !readOnly) {
+            onSelect({ nodes: new Set(), notes: new Set(), edge: edgeKey });
+            setMenuTarget({ kind: "edge", key: edgeKey });
+        } else if (noteId) {
+            if (!selection.notes.has(noteId))
+                onSelect({ nodes: new Set(), notes: new Set([noteId]), edge: null });
+            setMenuTarget({ kind: "selection" });
+        } else setMenuTarget({ kind: "canvas", at: toBoard(event.clientX, event.clientY) });
+    }
+
+    const viewActions: CanvasViewActions = {
+        fit,
+        zoomIn: () => zoomCentre(STEP),
+        zoomOut: () => zoomCentre(1 / STEP)
+    };
+
+    const board = (
         <div
             ref={frame}
             tabIndex={0}
@@ -504,6 +545,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                 backgroundPosition: `${view.x}px ${view.y}px`
             }}
             onPointerDownCapture={pressBoard}
+            onContextMenu={props.boardMenu ? openMenu : undefined}
             onKeyDown={keyDown}
             onClick={(event) => {
                 if (
@@ -552,6 +594,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 <path
                                     d={edge.d}
                                     data-edge
+                                    data-edge-key={edge.key}
                                     fill="none"
                                     stroke="transparent"
                                     strokeWidth={14}
@@ -669,6 +712,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                         <div
                             key={note.id}
                             data-canvas-item
+                            data-note-id={note.id}
                             className={cn(
                                 "absolute overflow-hidden rounded-md border bg-warning-soft p-2 text-xs text-foreground",
                                 selected
@@ -711,6 +755,8 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                             (event.target as HTMLTextAreaElement).blur();
                                         event.stopPropagation();
                                     }}
+                                    // Text being written keeps the browser's own menu.
+                                    onContextMenu={(event) => event.stopPropagation()}
                                 />
                             ) : (
                                 <p className="whitespace-pre-wrap break-words">
@@ -972,6 +1018,16 @@ export function CanvasBoard(props: CanvasBoardProps) {
                 </ToolButton>
             </div>
         </div>
+    );
+
+    if (!props.boardMenu) return board;
+    return (
+        <ContextMenu onOpenChange={(open) => !open && setMenuTarget(null)}>
+            <ContextMenuTrigger asChild>{board}</ContextMenuTrigger>
+            <ContextMenuContent>
+                {menuTarget ? props.boardMenu(menuTarget, viewActions) : null}
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }
 

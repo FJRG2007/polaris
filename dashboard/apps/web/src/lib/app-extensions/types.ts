@@ -83,6 +83,19 @@ export interface LegacyRunRow {
     readonly finishedAt: string | null;
 }
 
+/** The app side of the central automations list filtered to one app. */
+export interface AppAutomationsFilter {
+    /** The app's name, in the reader's language. */
+    readonly name: string;
+    /** The name of the thing `ref` names; null when the filter names none, or
+     *  when it names one this viewer cannot see. */
+    readonly refName: string | null;
+    /** Drawn in the list's toolbar: the app's own ways to start one. */
+    readonly actions: AppSlot | null;
+    /** Drawn under the list: what the app still keeps of its own. */
+    readonly after: AppSlot | null;
+}
+
 export interface AppExtension {
     /** The catalog id of the app, the one its install row carries. */
     readonly id: string;
@@ -102,6 +115,15 @@ export interface AppExtension {
      * move, newest first, read-only: `legacyRef` is the one it imported it with.
      */
     readonly automationHistory?: (legacyRef: string) => Promise<readonly LegacyRunRow[]>;
+
+    /**
+     * What the central automations list shows when it is filtered to the
+     * automations this app made (`/automations?app=<id>&ref=<ref>`): the names
+     * its filter chips read, and what it draws beside the list. `ref` is the
+     * thing of the app the filter names, such as a place; null is all of them.
+     * Null when this viewer has nothing of the app to filter by.
+     */
+    readonly automationsFilter?: (ref: string | null) => Promise<AppAutomationsFilter | null>;
 
     /** The backup sources it provides, by resource kind. */
     readonly backupSources?: () => Readonly<Partial<Record<BackupSource["kind"], BackupSource>>>;

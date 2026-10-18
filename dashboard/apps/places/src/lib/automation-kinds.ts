@@ -17,6 +17,7 @@
 import { z } from "zod";
 import * as kinds from "./device-kinds";
 import {
+    automationsListHref,
     automationNodeId,
     behaviourSchema,
     blockBaseShape,
@@ -1682,6 +1683,21 @@ export interface AutomationView {
     readonly updatedAt: string;
     /** The automation it became on the central engine, once moved; its screen is there. */
     readonly movedTo?: string | null;
+}
+
+/** The automations list, narrowed to Places' and - given one - to one place. */
+export function placesAutomationsHref(placeId?: string | null): string {
+    // "home" is Places' app id, the origin its automations carry centrally.
+    return automationsListHref("home", placeId);
+}
+
+/** A new automation, at a place when the screen it was started from names one. */
+export function newAutomationHref(placeId?: string | null, template?: string): string {
+    const query = new URLSearchParams();
+    if (template) query.set("template", template);
+    if (placeId) query.set("place", placeId);
+    const rest = query.toString();
+    return `/places/devices/automations/new${rest ? `?${rest}` : ""}`;
 }
 
 /** Where an automation's screen is: the central one once it moved, else here. */

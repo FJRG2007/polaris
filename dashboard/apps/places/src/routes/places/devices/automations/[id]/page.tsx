@@ -2,7 +2,8 @@
  * One automation: its flow to read and change, and the log of what it did.
  *
  * `/places/devices/automations/new` is a new one, started from a template when
- * the address names one (`?template=autoOff&device=<id>`).
+ * the address names one (`?template=autoOff&device=<id>`), at the place it
+ * names (`&place=<id>`) or else the one being looked at.
  */
 
 import { redirect } from "next/navigation";
@@ -51,6 +52,7 @@ export default async function AutomationPage({
                         : null
                 }
                 deviceId={one(query.device)}
+                placeId={one(query.place)}
                 canManage={canManage}
                 canControl={canControl}
                 initialTab={one(query.tab) === "runs" ? "runs" : "flow"}

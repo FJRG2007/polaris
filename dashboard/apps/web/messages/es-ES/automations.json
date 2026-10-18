@@ -13,7 +13,9 @@
         "never": "Sin ejecutar",
         "lastRun": "Última vez {when}",
         "switchLabel": "Ejecutar {name} al dispararse",
-        "notPublished": "Publícalo antes de activarlo"
+        "notPublished": "Publícalo antes de activarlo",
+        "runs": "Historial",
+        "runOff": "Actívalo primero"
     },
     "modes": {
         "single": "De uno en uno",
@@ -441,7 +443,14 @@
             "enable": "Encender",
             "delete": "Eliminar",
             "deleteMany": "Eliminar {count} nodos",
-            "runFromHere": "Probar desde aquí"
+            "runFromHere": "Probar desde aquí",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "selectAll": "Elegir todo",
+            "undo": "Deshacer cambio",
+            "redo": "Rehacer cambio",
+            "deleteEdge": "Borrar conexión",
+            "deleteSelection": "Borrar selección"
         },
         "noSampleToPin": "Haz antes una prueba o escribe aquí una muestra.",
         "unpinned": "Muestra soltada",
@@ -699,5 +708,9 @@
         "homeRun": "Lugares: ejecutar otro",
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
         "install": "Instalar la app"
+    },
+    "filter": {
+        "label": "Filtros",
+        "remove": "Quitar filtro {name}"
     }
 }
