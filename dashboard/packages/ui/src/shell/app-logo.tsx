@@ -330,6 +330,17 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // The Ad blocker: a lookup refused - a no-entry sign over the network.
+    "dns-blocker": {
+        palette: ["#818CF8", "#4F46E5", "#3730A3"],
+        draw: ({ base, face }) => (
+            <>
+                <circle cx="16" cy="16" r="12.5" fill={base} />
+                <circle cx="16" cy="16" r="8.5" fill={face} />
+                <path d="M10.6 21.4l10.8-10.8" {...LINE} strokeWidth={3.2} />
+            </>
+        )
+    },
     // Management: three sliders set to different values.
     admin: {
         palette: ["#CBD5E1", "#64748B", "#334155"],

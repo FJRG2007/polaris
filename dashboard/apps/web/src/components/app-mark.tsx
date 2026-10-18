@@ -9,9 +9,9 @@
  * shelf is the same six glyphs is a store nobody can scan.
  *
  * A catalog entry that installs one of Polaris's own apps (Tools, Calendar,
- * CRM, Places, Game servers) wears that app's own `AppLogo` (`OWN_APPS`
- * below), so the card in the store is the tile the launcher will show once it
- * is installed.
+ * CRM, Status pages, the Ad blocker, Places, Game servers) wears that app's
+ * own `AppLogo` (`OWN_APPS` below), so the card in the store is the tile the
+ * launcher will show once it is installed.
  *
  * **Otherwise a real logo is used where Polaris already has the official
  * one**, from `brand-icons`, which holds marks taken from each project's own
@@ -58,6 +58,8 @@ const OWN_APPS: Readonly<Record<string, string>> = {
     tools: "tools",
     calendar: "calendar",
     crm: "crm",
+    "status-pages": "status-pages",
+    "dns-blocker": "dns-blocker",
     home: "home",
     "game-servers": "games"
 };

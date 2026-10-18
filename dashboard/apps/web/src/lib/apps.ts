@@ -574,6 +574,18 @@ const DEVICES_GROUP = "Devices";
 const MACHINES_GROUP = "Machines";
 const OPERATIONS_GROUP = "Operations";
 
+/** What people call the Ad blocker when they search for it: the rail and the
+ *  store both find it by these. */
+export const DNS_BLOCKER_KEYWORDS: readonly string[] = [
+    "dns",
+    "pi-hole",
+    "adguard",
+    "blocklist",
+    "trackers",
+    "malware",
+    "port 53"
+];
+
 /**
  * The heading the account's privacy screens are read under.
  *
@@ -967,7 +979,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             requiresApp: "dns-blocker",
             icon: ShieldBan,
             group: OPERATIONS_GROUP,
-            keywords: ["dns", "pi-hole", "adguard", "blocklist", "trackers", "malware", "port 53"]
+            keywords: [...DNS_BLOCKER_KEYWORDS]
         }
     ],
     watch: [
