@@ -1,0 +1,43 @@
+name: Extension version check
+
+# A pull request that changes what the extension ships has to bump its version,
+# because the version reaching main is what releases it (see
+# `extension-auto-release.yml`). Without the bump the change lands and never
+# reaches a browser. Tests and docs ship nothing, so they need no bump.
+
+on:
+  pull_request:
+    paths:
+      - "dashboard/apps/extension/**"
+
+permissions:
+  contents: read
+
+jobs:
+  bumped:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: The version moves when shipped files change
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          shipped="$(git diff --name-only "$BASE" "$HEAD" -- dashboard/apps/extension \
+            | grep -v -E '^dashboard/apps/extension/(test/|README\.md$|.*\.md$|vitest\.config\.ts$)' || true)"
+          if [ -z "$shipped" ]; then
+            echo "Only tests or docs changed; no bump needed."
+            exit 0
+          fi
+          before="$(git show "$BASE:dashboard/apps/extension/package.json" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
+          after="$(git show "$HEAD:dashboard/apps/extension/package.json" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
+          if [ "$before" = "$after" ]; then
+            echo "These extension files change what ships, but the version is still $before:" >&2
+            echo "$shipped" >&2
+            echo "Bump \"version\" in dashboard/apps/extension/package.json (and the lockfile entry)." >&2
+            exit 1
+          fi
+          echo "Version $before -> $after."
