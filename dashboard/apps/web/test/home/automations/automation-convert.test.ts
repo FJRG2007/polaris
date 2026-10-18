@@ -429,3 +429,34 @@ describe("convertPlaceAutomation: refusals and older shapes", () => {
         });
     });
 });
+
+describe("draftGraph", () => {
+    it("lays out a template whose blocks are not filled in yet, for the central editor to finish", () => {
+        const graph = convert.draftGraph(
+            PLACE,
+            definition({
+                triggers: [{ id: "trig01", kind: "stays", is: "on" }],
+                actions: [{ id: "step01", kind: "device" }]
+            })
+        );
+        expect(graph).not.toBeNull();
+        expect(graph!.nodes.map((entry) => entry.id)).toEqual(["trig01", "step01"]);
+        expect(graph!.edges).toEqual([
+            { from: { node: "trig01", port: "next" }, to: { node: "step01" } }
+        ]);
+        expect(graph!.nodes[1]!.config).toMatchObject({ placeId: PLACE });
+    });
+
+    it("lays out a finished one exactly as a saved one converts", () => {
+        const parts = {};
+        expect(convert.draftGraph(PLACE, definition(parts))).toEqual(converted(parts));
+    });
+
+    it("answers null for what is not a Places definition, or names a kind it does not have", () => {
+        expect(convert.draftGraph(PLACE, null)).toBeNull();
+        expect(convert.draftGraph(PLACE, { triggers: "x" })).toBeNull();
+        expect(
+            convert.draftGraph(PLACE, definition({ triggers: [{ id: "t", kind: "explode" }] }))
+        ).toBeNull();
+    });
+});

@@ -130,7 +130,8 @@
         "answer": "Answer",
         "announce": "Announce",
         "try": "Try block",
-        "waitCondition": "Wait for a condition"
+        "waitCondition": "Wait for a condition",
+        "set": "Set values"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -276,7 +277,8 @@
         "callerEnded": "The automation that called it ended",
         "answerTooLarge": "The answer was too large",
         "announceLimited": "Too many announcements",
-        "announceFailed": "The announcement was not sent"
+        "announceFailed": "The announcement was not sent",
+        "valuesTooLarge": "The values were too large"
     },
     "secrets": {
         "title": "Secrets",
@@ -598,7 +600,8 @@
         "answer": "Send values back to the automation that called.",
         "announce": "Tell other automations that something happened.",
         "try": "Run the steps inside, and choose what follows a failure.",
-        "waitCondition": "Pause until a condition is true, or time runs out."
+        "waitCondition": "Pause until a condition is true, or time runs out.",
+        "set": "Work values out once. Later steps pick them from this step's values."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -692,7 +695,8 @@
         "eventNameReserved": "Names starting with {prefix} are kept for Polaris.",
         "useFinished": "Use it",
         "outcomes": "Only when it ends as",
-        "outcomesAny": "None ticked takes any ending. Read it as {example}."
+        "outcomesAny": "None ticked takes any ending. Read it as {example}.",
+        "values": "Values"
     },
     "appNodes": {
         "homeTime": "Places: at a time",

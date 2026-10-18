@@ -21,7 +21,8 @@ import {
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
-import { rotateHookAction } from "../actions";
+import { useEffect, useState } from "react";
+import { hookAddressAction, rotateHookAction } from "../actions";
 import { RefInput, RefTextarea } from "./references";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -65,6 +66,7 @@ export const STEP_TYPES = [
     "core.chat",
     "core.run",
     "core.answer",
+    "core.set",
     "core.announce",
     "core.stop"
 ] as const;
@@ -120,6 +122,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     }),
     "core.run": () => ({ automationId: "", inputs: [], wait: true }),
     "core.answer": () => ({ outputs: [] }),
+    "core.set": () => ({ values: [] }),
     "core.announce": () => ({ name: "", payload: [] }),
     "core.chat": () => ({
         preset: "slack",
@@ -232,7 +235,6 @@ export function NodeFields({
     onChanged: () => void;
 }) {
     const t = useTranslations("automations");
-    const toast = useToast();
     const config = (node.config ?? {}) as Config;
     const set = (change: Config) => setConfig({ ...config, ...change });
     const secretOptions = (kinds: readonly string[]) =>
@@ -271,9 +273,6 @@ export function NodeFields({
         case "core.manual":
             return null;
         case "core.webhook": {
-            const path = detail.hooks[node.id];
-            const url =
-                path && typeof window !== "undefined" ? `${window.location.origin}${path}` : null;
             return (
                 <div className="space-y-3">
                     <Field label={t("fields.method")}>
@@ -289,43 +288,13 @@ export function NodeFields({
                             aria-label={t("fields.method")}
                         />
                     </Field>
-                    <div className="space-y-1 text-sm">
-                        <span>{t("editor.webhookUrl")}</span>
-                        {url ? (
-                            <div className="flex min-w-0 items-center gap-2">
-                                <code
-                                    className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
-                                    title={url}
-                                >
-                                    {url}
-                                </code>
-                                <CopyButton value={url} />
-                            </div>
-                        ) : null}
-                        <p className="text-xs text-muted-foreground">
-                            {t("editor.webhookUnpublished")}
-                        </p>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                                const answer = await rotateHookAction(detail.id, node.id);
-                                toast.show({
-                                    title: answer.ok ? t("editor.newAddressDone") : answer.error
-                                });
-                                if (!answer.ok) return;
-                                set({
-                                    rotation:
-                                        (typeof config.rotation === "number"
-                                            ? config.rotation
-                                            : 0) + 1
-                                });
-                                onChanged();
-                            }}
-                        >
-                            {t("editor.newAddress")}
-                        </Button>
-                    </div>
+                    <WebhookAddress
+                        detail={detail}
+                        nodeId={node.id}
+                        rotation={typeof config.rotation === "number" ? config.rotation : 0}
+                        onRotate={(rotation) => set({ rotation })}
+                        onChanged={onChanged}
+                    />
                 </div>
             );
         }
@@ -720,4 +689,79 @@ export function NodeFields({
                 return <AppNodeFields node={node} setConfig={setConfig} detail={detail} />;
             return <p className="text-sm text-muted-foreground">{t("nodes.unknown")}</p>;
     }
+}
+
+/**
+ * A webhook trigger's address, from the moment the trigger is added: the saved
+ * one when the editor holds the saved rotation, asked for otherwise. "New
+ * address" on a trigger that is not saved yet only moves the rotation here;
+ * the next save keeps it.
+ */
+function WebhookAddress({
+    detail,
+    nodeId,
+    rotation,
+    onRotate,
+    onChanged
+}: {
+    detail: AutomationDetail;
+    nodeId: string;
+    rotation: number;
+    onRotate: (rotation: number) => void;
+    onChanged: () => void;
+}) {
+    const t = useTranslations("automations");
+    const toast = useToast();
+    const savedNode = detail.draft.nodes.find((entry) => entry.id === nodeId);
+    const savedRotation = (savedNode?.config as { rotation?: unknown } | undefined)?.rotation;
+    const known =
+        detail.hooks[nodeId] && (savedRotation ?? 0) === rotation ? detail.hooks[nodeId] : null;
+    const [asked, setAsked] = useState<{ key: string; path: string } | null>(null);
+    const key = `${nodeId}:${rotation}`;
+    useEffect(() => {
+        if (known || asked?.key === key) return;
+        let cancelled = false;
+        void hookAddressAction(detail.id, nodeId, rotation).then((answer) => {
+            if (!cancelled && answer.ok) setAsked({ key, path: answer.path });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [known, asked?.key, key, detail.id, nodeId, rotation]);
+    const path = known ?? (asked?.key === key ? asked.path : null);
+    const url = path && typeof window !== "undefined" ? `${window.location.origin}${path}` : null;
+    return (
+        <div className="space-y-1 text-sm">
+            <span>{t("editor.webhookUrl")}</span>
+            {url ? (
+                <div className="flex min-w-0 items-center gap-2">
+                    <code
+                        className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
+                        title={url}
+                    >
+                        {url}
+                    </code>
+                    <CopyButton value={url} />
+                </div>
+            ) : null}
+            <p className="text-xs text-muted-foreground">{t("editor.webhookUnpublished")}</p>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                    if (!savedNode) {
+                        onRotate(rotation + 1);
+                        return;
+                    }
+                    const answer = await rotateHookAction(detail.id, nodeId);
+                    toast.show({ title: answer.ok ? t("editor.newAddressDone") : answer.error });
+                    if (!answer.ok) return;
+                    onRotate(rotation + 1);
+                    onChanged();
+                }}
+            >
+                {t("editor.newAddress")}
+            </Button>
+        </div>
+    );
 }

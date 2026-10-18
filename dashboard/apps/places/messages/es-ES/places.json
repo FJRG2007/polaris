@@ -2475,6 +2475,11 @@
         "battery": {
             "low": "Baja",
             "ok": "Bien"
+        },
+        "start": {
+            "title": "Nueva automatización",
+            "hint": "Ponle nombre y móntala con todos los disparadores y pasos: dispositivos, webhooks y más. No se ejecuta hasta publicarla.",
+            "create": "Crear"
         }
     },
     "overview": {

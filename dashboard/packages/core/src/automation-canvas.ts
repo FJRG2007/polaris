@@ -676,6 +676,7 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.waitEvent": ["name", "payload", "timedOut"],
     "core.run": ["runId", "status", "outputs"],
     "core.answer": ["outputs"],
+    "core.set": ["values"],
     "core.announce": ["name", "eventId"],
     "core.try": ["failed", "error", "node", "recovered"],
     "core.waitCondition": ["matched", "checks", "timedOut"]

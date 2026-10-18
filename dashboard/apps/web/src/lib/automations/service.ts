@@ -331,6 +331,22 @@ export async function createAutomation(
     return row.id;
 }
 
+/**
+ * The address a webhook trigger answers on, for one the editor holds that is
+ * not saved yet or was given a new address since: the screen shows it from the
+ * moment the trigger is added rather than after a save. Derived as on publish;
+ * it starts working once a version with that node and rotation is published.
+ */
+export async function hookAddress(
+    actor: RunActor,
+    automationId: string,
+    nodeId: string,
+    rotation: number
+): Promise<string> {
+    const row = await load(actor, automationId, true);
+    return hookPath(row.id, nodeId, rotation);
+}
+
 /** Secrets the graph names must be the automation's own shelf's. */
 export async function checkSecrets(shelf: Shelf, graph: core.AutomationGraph): Promise<void> {
     const ids = new Set<string>();

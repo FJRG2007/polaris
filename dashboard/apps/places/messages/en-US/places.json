@@ -2475,6 +2475,11 @@
         "battery": {
             "low": "Low",
             "ok": "Fine"
+        },
+        "start": {
+            "title": "Start an automation",
+            "hint": "Name it, then build it with every trigger and step: devices, web requests, webhooks and more. Nothing runs until you publish it.",
+            "create": "Create"
         }
     },
     "overview": {

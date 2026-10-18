@@ -234,6 +234,23 @@ export async function setLocalNetworkAction(
     }
 }
 
+export async function hookAddressAction(
+    automationId: unknown,
+    nodeId: unknown,
+    rotation: unknown
+): Promise<Result<{ path: string }>> {
+    const parsed = z
+        .tuple([id, z.string().min(1).max(64), core.CORE_NODE_CONFIGS["core.webhook"].shape.rotation])
+        .safeParse([automationId, nodeId, rotation]);
+    if (!parsed.success) return invalid();
+    try {
+        const [automation, node, turn] = parsed.data;
+        return { ok: true, path: await service.hookAddress(await actor(), automation, node, turn) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function rotateHookAction(automationId: unknown, nodeId: unknown): Promise<Result> {
     const parsed = z.tuple([id, z.string().min(1).max(64)]).safeParse([automationId, nodeId]);
     if (!parsed.success) return invalid();

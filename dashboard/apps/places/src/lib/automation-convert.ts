@@ -12,6 +12,7 @@
  * it could not run is refused rather than guessed at.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import * as auto from "./automation-kinds";
 import * as nodes from "./automation-nodes";
@@ -79,14 +80,60 @@ function stepNode(step: auto.Step, placeId: string): GraphNode {
 export function convertPlaceAutomation(row: LegacyAutomation): Converted {
     const parsed = auto.definitionSchema.safeParse(row.definition);
     if (!parsed.success) return { ok: false, reason: "unreadable" };
-    const definition = parsed.data;
+    const checked = core.automationGraphSchema.safeParse(assemble(parsed.data, row.placeId));
+    if (!checked.success || core.graphProblems(checked.data, { forPublish: true }).length > 0)
+        return { ok: false, reason: "invalid" };
+    return { ok: true, graph: checked.data };
+}
+
+/** The block shapes a draft must have to be laid out; each block's own fields are the editor's to check. */
+const draftBlock = (kinds: readonly string[]) =>
+    z
+        .object({
+            id: z.string().min(1).max(64),
+            kind: z.string().refine((kind) => kinds.includes(kind))
+        })
+        .passthrough();
+const draftDefinition = z.object({
+    timeZone: z.string().min(1).max(64),
+    triggers: z.array(draftBlock(auto.TRIGGER_KINDS)).max(50),
+    conditions: z
+        .object({
+            match: z.enum(["all", "any"]),
+            groups: z.array(z.object({ id: z.string().min(1).max(64) }).passthrough()).max(20)
+        })
+        .default({ match: "all", groups: [] }),
+    actions: z.array(draftBlock(auto.STEP_KINDS)).max(100)
+});
+
+/**
+ * A template or a blank Places start as a central draft, before anything in it
+ * is filled in: laid out exactly as a saved one converts, but not required to
+ * be publishable, so a step still waiting for its device opens in the central
+ * editor with that field marked rather than being refused. Null when the input
+ * is not a Places definition at all.
+ */
+export function draftGraph(placeId: string, definition: unknown): core.AutomationGraph | null {
+    const parsed = draftDefinition.safeParse(definition);
+    if (!parsed.success) return null;
+    let graph: core.AutomationGraph;
+    try {
+        graph = assemble(parsed.data as unknown as auto.AutomationDefinition, placeId);
+    } catch {
+        return null;
+    }
+    const checked = core.automationGraphSchema.safeParse(graph);
+    return checked.success ? checked.data : null;
+}
+
+function assemble(definition: auto.AutomationDefinition, placeId: string): core.AutomationGraph {
     const graph = core.emptyGraph(definition.timeZone);
     const edges: core.AutomationGraph["edges"] = [];
     const link = (from: string, port: string, to: string) =>
         edges.push({ from: { node: from, port }, to: { node: to } });
 
-    const triggers = definition.triggers.map((trigger) => triggerNode(trigger, row.placeId));
-    const steps = definition.actions.map((step) => stepNode(step, row.placeId));
+    const triggers = definition.triggers.map((trigger) => triggerNode(trigger, placeId));
+    const steps = definition.actions.map((step) => stepNode(step, placeId));
     const groups = definition.conditions.groups;
     const condition: GraphNode | null =
         groups.length > 0
@@ -95,7 +142,7 @@ export function convertPlaceAutomation(row: LegacyAutomation): Converted {
                   type: nodes.CONDITION_NODE_TYPE,
                   typeVersion: 1,
                   config: {
-                      placeId: row.placeId,
+                      placeId: placeId,
                       match: definition.conditions.match,
                       groups
                   }
@@ -109,8 +156,5 @@ export function convertPlaceAutomation(row: LegacyAutomation): Converted {
 
     graph.nodes = [...triggers, ...(condition ? [condition] : []), ...steps];
     graph.edges = edges;
-    const checked = core.automationGraphSchema.safeParse(graph);
-    if (!checked.success || core.graphProblems(checked.data, { forPublish: true }).length > 0)
-        return { ok: false, reason: "invalid" };
-    return { ok: true, graph: checked.data };
+    return graph;
 }
