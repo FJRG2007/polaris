@@ -3,7 +3,7 @@
  * shape of a vault identity.
  *
  * Read when somebody makes an identity "from my account", so the sign-up forms
- * the extension fills start from the name, addresses and phone they already
+ * the extension fills start from the name, emails and phone they already
  * gave Polaris instead of a blank form. It goes to that person's own browser,
  * which encrypts it like any other item: nothing here is stored.
  */

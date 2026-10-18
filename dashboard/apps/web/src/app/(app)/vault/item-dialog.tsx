@@ -258,7 +258,7 @@ export function ItemDialog({
 
     /**
      * Start the identity from what the account already says: the name, the
-     * company, the phone and the first address. Only into boxes still empty -
+     * company, the phone and the first email. Only into boxes still empty -
      * what somebody typed before pressing it is theirs.
      */
     async function fillFromAccount(): Promise<void> {

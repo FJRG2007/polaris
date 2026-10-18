@@ -16,7 +16,6 @@ import type { UpdateNotice } from "@/lib/update";
 import type { ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
 
-/** One decrypted login, reduced to what a list needs to draw it. */
 /** The id of the identity made from the signed-in account, offered when the
  *  open shelf holds no identity of its own. */
 export const ACCOUNT_IDENTITY = "account";
@@ -51,6 +50,7 @@ export interface IdentityValues {
     readonly country: string;
 }
 
+/** One decrypted login, reduced to what a list needs to draw it. */
 export interface ItemSummary {
     readonly id: string;
     readonly name: string;
