@@ -10,6 +10,7 @@
  * break the file whatever characters it holds.
  */
 
+import { QUERY_LOG_DIR } from "./query-log";
 import {
     DNS_CATEGORIES,
     DNS_LIST_SOURCES,
@@ -118,9 +119,9 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
             : {}),
         caching: { prefetching: true },
         ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
-        // One line per query would fill the container log; the query log is
-        // its own concern.
-        queryLog: { type: "none" },
+        // One file a day inside the container, read back by the screen; two
+        // days kept so the night before midnight is still there in the morning.
+        queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: 2 },
         log: { level: "info", format: "text", timestamp: true, privacy: false }
     };
 }

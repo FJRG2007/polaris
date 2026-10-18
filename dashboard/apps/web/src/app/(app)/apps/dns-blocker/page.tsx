@@ -10,6 +10,7 @@
 
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
+import { DnsInsightsCard } from "./dns-insights";
 import { DnsBlockerView } from "./dns-blocker-view";
 import { DnsBlockerInstallState } from "./install-state";
 import { getTranslations } from "@/lib/i18n/request";
@@ -29,7 +30,14 @@ export default async function DnsBlockerPage() {
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col">
             <PageHeader title={t("page.title")} description={t("page.description")} />
-            {settings ? <DnsBlockerView initial={settings} /> : <DnsBlockerInstallState />}
+            {settings ? (
+                <div className="flex flex-col gap-4">
+                    <DnsBlockerView initial={settings} />
+                    <DnsInsightsCard />
+                </div>
+            ) : (
+                <DnsBlockerInstallState />
+            )}
         </div>
     );
 }

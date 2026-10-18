@@ -43,7 +43,13 @@ const DNS_PORT = 53;
 
 /** Why something the operator asked for was not done, as a key the screen says
  *  in their language (`dnsBlocker` `errors.<code>`). */
-export type DnsRefusalCode = "notInstalled" | "tooLarge" | "noAddress" | "portTaken" | "notApplied";
+export type DnsRefusalCode =
+    | "notInstalled"
+    | "tooLarge"
+    | "noAddress"
+    | "portTaken"
+    | "notApplied"
+    | "notRunning";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -98,7 +104,7 @@ async function appRow(): Promise<{ id: string; config: string | null } | null> {
     });
 }
 
-async function engineRow(): Promise<EngineRow | null> {
+export async function engineRow(): Promise<EngineRow | null> {
     return prisma.installedApp.findFirst({
         where: { catalogId: DNS_ENGINE_APP, status: { not: "removed" } },
         select: { id: true, ownerId: true, applicationId: true, status: true },
