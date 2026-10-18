@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * The row at the top of a call: the raised hand, and a "more" menu with
- * recording and adding somebody.
+ * The row at the top of a call, and the "more" menu with recording and adding
+ * somebody - now at the end of the control bar.
  *
  * The hand used to sit in the control bar, which had grown past what reads at a
  * glance; it is in the top row now, beside the other things nobody reaches for
@@ -112,9 +112,12 @@ describe("the top row of a call", () => {
     it("holds the raised hand, outside the control bar", () => {
         room({ viewerId: "alan" });
         const hand = screen.getByRole("button", { name: /raiseYourHand/ });
-        expect(hand.parentElement).toBe(
-            screen.getByRole("button", { name: /moreForThisCall/ }).parentElement
-        );
+        // The "more" menu moved down into the bar's sharing group; the hand,
+        // which stays up until it is put down, did not.
+        expect(hand.closest('[role="group"]')).toBeNull();
+        expect(
+            screen.getByRole("button", { name: /moreForThisCall/ }).closest('[role="group"]')
+        ).not.toBeNull();
     });
 
     it("offers the hand to a guest, who has no account", () => {

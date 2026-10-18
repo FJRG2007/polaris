@@ -478,7 +478,16 @@
             "left": "{name} se ha ido",
             "joinedMany": "{name} y {others, plural, one {# más} other {# más}} se han unido",
             "leftMany": "{name} y {others, plural, one {# más} other {# más}} se han ido"
-        }
+        },
+        "bar": {
+            "media": "Micrófono y cámara",
+            "sharing": "Compartir y más"
+        },
+        "inputDevice": "Entrada de voz",
+        "inputProfile": "Perfil de voz",
+        "outputDevice": "Salida de audio",
+        "systemDefault": "Predeterminado",
+        "voiceSettings": "Ajustes de voz"
     },
     "meetingRoom": {
         "meeting": "Reunión",
