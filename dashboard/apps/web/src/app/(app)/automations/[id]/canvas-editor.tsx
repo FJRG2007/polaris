@@ -333,7 +333,11 @@ export function CanvasEditor({
                     </ContextMenuItem>
                     {steps.length > 0 ? (
                         <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
-                            {turnOn ? <Power aria-hidden="true" /> : <PowerOff aria-hidden="true" />}
+                            {turnOn ? (
+                                <Power aria-hidden="true" />
+                            ) : (
+                                <PowerOff aria-hidden="true" />
+                            )}
                             {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
                             {/* i18n-ignore: a key on the keyboard */}
                             <MenuShortcut>D</MenuShortcut>

@@ -146,16 +146,45 @@ describe("listAutomations, what Run now would start", () => {
         set(noManual, { enabled: true, publishedVersionId: "v-none" });
         const triggers = (fake().tables.automationTrigger ??= []);
         triggers.push(
-            { id: "t1", automationId: ready, versionId: "v-ready", nodeId: "n1", eventType: "core.manual" },
-            { id: "t2", automationId: off, versionId: "v-off", nodeId: "n1", eventType: "core.manual" },
+            {
+                id: "t1",
+                automationId: ready,
+                versionId: "v-ready",
+                nodeId: "n1",
+                eventType: "core.manual"
+            },
+            {
+                id: "t2",
+                automationId: off,
+                versionId: "v-off",
+                nodeId: "n1",
+                eventType: "core.manual"
+            },
             // A manual trigger of an older version does not make the live one runnable.
-            { id: "t3", automationId: noManual, versionId: "v-old", nodeId: "n1", eventType: "core.manual" },
-            { id: "t4", automationId: noManual, versionId: "v-none", nodeId: "n2", eventType: "core.schedule" }
+            {
+                id: "t3",
+                automationId: noManual,
+                versionId: "v-old",
+                nodeId: "n1",
+                eventType: "core.manual"
+            },
+            {
+                id: "t4",
+                automationId: noManual,
+                versionId: "v-none",
+                nodeId: "n2",
+                eventType: "core.schedule"
+            }
         );
         const runnable = Object.fromEntries(
             (await service.listAutomations(actor, mine)).rows.map((row) => [row.id, row.runnable])
         );
-        expect(runnable).toEqual({ [ready]: true, [off]: false, [draftOnly]: false, [noManual]: false });
+        expect(runnable).toEqual({
+            [ready]: true,
+            [off]: false,
+            [draftOnly]: false,
+            [noManual]: false
+        });
     });
 });
 
@@ -163,8 +192,13 @@ describe("the list's address for one app's automations", () => {
     it("carries the app and the thing of it, and reads them back checked", () => {
         expect(core.automationsListHref("home")).toBe("/automations?app=home");
         expect(core.automationsListHref("home", "p-1")).toBe("/automations?app=home&ref=p-1");
-        expect(core.automationsListFilterSchema.parse({ app: "home" })).toEqual({ app: "home", ref: null });
+        expect(core.automationsListFilterSchema.parse({ app: "home" })).toEqual({
+            app: "home",
+            ref: null
+        });
         expect(core.automationsListFilterSchema.safeParse({ app: "Home" }).success).toBe(false);
-        expect(core.automationsListFilterSchema.safeParse({ app: "home", ref: "a b" }).success).toBe(false);
+        expect(
+            core.automationsListFilterSchema.safeParse({ app: "home", ref: "a b" }).success
+        ).toBe(false);
     });
 });
