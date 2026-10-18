@@ -2072,7 +2072,8 @@
             "removeName": "Remove {name}",
             "removeTitle": "Remove automation",
             "removeQuestion": "Remove {name}?",
-            "removeBody": "It stops at once, including anything it was waiting to do, and its log goes with it."
+            "removeBody": "It stops at once, including anything it was waiting to do, and its log goes with it.",
+            "appName": "Places"
         },
         "editor": {
             "back": "All automations",

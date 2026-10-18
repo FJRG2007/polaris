@@ -18,11 +18,15 @@ const state = vi.hoisted(() => ({
     rows: [] as unknown[],
     toggled: [] as unknown[],
     ran: [] as unknown[],
+    scopes: [] as unknown[],
     refuseToggle: false
 }));
 
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
-    listAutomationsAction: async () => ({ ok: true, automations: state.rows, devices: [] }),
+    listAutomationsAction: async (scope?: unknown) => {
+        state.scopes.push(scope);
+        return { ok: true, automations: state.rows, devices: [] };
+    },
     setAutomationEnabledAction: async (id: string, enabled: boolean) => {
         state.toggled.push({ id, enabled });
         return state.refuseToggle
@@ -36,16 +40,11 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     deleteAutomationAction: vi.fn()
 }));
 
-// The central list is the dashboard's own screen, tested there; here only what it is handed.
-vi.mock("@/app/(app)/automations/embedded-list", () => ({
-    EmbeddedAutomationsList: ({
-        from
-    }: {
-        from?: { origin: string; originRef?: string | null };
-    }) => <div data-testid="central-list">{`${from?.origin}:${from?.originRef}`}</div>
-}));
-
-import { AutomationsView } from "@polaris-app/places/src/screens/automations/automations-view";
+import {
+    AutomationsView,
+    NewAutomationMenu,
+    UnmovedAutomations
+} from "@polaris-app/places/src/screens/automations/automations-view";
 
 const blankDefinition = {
     timeZone: "UTC",
@@ -75,6 +74,7 @@ beforeEach(() => {
     ];
     state.toggled = [];
     state.ran = [];
+    state.scopes = [];
     state.refuseToggle = false;
 });
 
@@ -134,7 +134,7 @@ describe("the places automation list, on the shared rule pieces", () => {
         expect(screen.getByRole("link", { name: "What Porch light at dusk did" })).toBeTruthy();
     });
 
-    it("shows the central list of this place's automations, and a moved row only there", async () => {
+    it("lists only what has not moved, of the place it is about", async () => {
         state.rows = [
             { ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" },
             {
@@ -144,8 +144,8 @@ describe("the places automation list, on the shared rule pieces", () => {
             }
         ];
         open();
-        expect((await screen.findByTestId("central-list")).textContent).toBe("home:place-1");
         expect(await screen.findByText("Still here")).toBeTruthy();
+        expect(state.scopes).toEqual([{ placeId: "place-1" }]);
         expect(screen.getByText("Not moved yet")).toBeTruthy();
         expect(screen.queryByText("Porch light at dusk")).toBeNull();
     });
@@ -155,7 +155,24 @@ describe("the places automation list, on the shared rule pieces", () => {
             { ...(state.rows[0] as object), movedTo: "00000000-0000-4000-8000-000000000007" }
         ];
         open();
-        await screen.findByTestId("central-list");
+        await waitFor(() => expect(state.scopes).toHaveLength(1));
         await waitFor(() => expect(screen.queryByText("Not moved yet")).toBeNull());
+    });
+
+    it("asks for every place when the central list is narrowed to Places only", async () => {
+        render(<UnmovedAutomations placeId={null} canManage />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Porch light at dusk")).toBeTruthy();
+        expect(state.scopes).toEqual(["all"]);
+    });
+
+    it("starts a new one, blank or from a template, at the place the list is about", async () => {
+        render(<NewAutomationMenu placeId="place-1" />, { wrapper: MessagesWrapper });
+        fireEvent.keyDown(screen.getByRole("button", { name: "New automation" }), { key: "Enter" });
+        const links = (await screen.findAllByRole("menuitem")).map((item) =>
+            item.getAttribute("href")
+        );
+        expect(links[0]).toBe("/places/devices/automations/new?place=place-1");
+        expect(links.length).toBeGreaterThan(1);
+        for (const href of links.slice(1)) expect(href).toMatch(/\?template=\w+&place=place-1$/);
     });
 });

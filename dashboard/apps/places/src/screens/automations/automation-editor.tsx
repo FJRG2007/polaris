@@ -284,6 +284,7 @@ export function AutomationEditor({
     automationId,
     template,
     deviceId,
+    placeId,
     canManage,
     canControl,
     initialTab
@@ -291,6 +292,8 @@ export function AutomationEditor({
     automationId: string | null;
     template: string | null;
     deviceId: string | null;
+    /** For a new one: the place to make it at, when not the one being looked at. */
+    placeId?: string | null;
     canManage: boolean;
     canControl: boolean;
     initialTab: Tab;
@@ -333,7 +336,7 @@ export function AutomationEditor({
         let cancelled = false;
         void (async () => {
             const result = await runAction(
-                () => actions.getAutomationAction(automationId),
+                () => actions.getAutomationAction(automationId, placeId),
                 setError
             );
             if (cancelled || !result) return;
@@ -672,7 +675,7 @@ export function AutomationEditor({
     const header = (
         <div className="flex flex-wrap items-center gap-2">
             <Button asChild size="sm" variant="ghost" className="px-2">
-                <Link href="/places/devices/automations">
+                <Link href={auto.placesAutomationsHref(loaded?.context.placeId)}>
                     <ArrowLeft className="size-4 shrink-0" />
                     {t("automations.editor.back")}
                 </Link>
