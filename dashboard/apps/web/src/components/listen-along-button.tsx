@@ -19,6 +19,7 @@ import { Button } from "@polaris/ui";
 import { Headphones, Loader2, Square } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 
 const PATH = "/api/activity/listen-along";
 
@@ -89,6 +90,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
         () => null
     );
     const t = useTranslations("components");
+    const connectionsLink = useConnectionsHref("spotify");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<{ text: string; link: boolean } | null>(null);
 
@@ -150,7 +152,7 @@ export function ListenAlongButton({ hostId }: { hostId: string }) {
                 <p role="alert" className="text-[0.6875rem] leading-snug text-danger">
                     {error.text}{" "}
                     {error.link ? (
-                        <Link href="/account/connections" className="underline underline-offset-2">
+                        <Link href={connectionsLink} className="underline underline-offset-2">
                             {t("listen.connections")}
                         </Link>
                     ) : null}

@@ -32,7 +32,8 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { markConnectionProven } from "./proven";
 import { clientIp } from "@/lib/request-context";
-import { safeRedirect } from "@/lib/safe-redirect";
+import { strictSafeRedirect } from "@/lib/safe-redirect";
+import { RETURN_PARAM } from "@/lib/connections/hub-href";
 import { rateLimit } from "@/lib/rate-limit-service";
 import * as core from "@polaris/core";
 import { findConnectionProvider, sameAddress } from "@polaris/core";
@@ -63,8 +64,6 @@ import {
 const STATE_COOKIE = "polaris_connection_state";
 const CONNECTIONS_SCREEN = "/account/connections";
 
-/** The query parameter an app names its own screen in, to be sent back to it. */
-export const RETURN_PARAM = "return";
 /** Where a link started from the Mail app comes back to. */
 const MAIL_SCREEN = "/mail/settings/accounts";
 /** Where a link started from the Calendar app comes back to. */
@@ -218,9 +217,7 @@ function backToLogin(origin: string, provider: string, outcome: SignInOutcome): 
  * and following it anywhere else would make this an open redirect.
  */
 function safeTarget(value: string | null): string | undefined {
-    if (!value) return undefined;
-    const target = safeRedirect(value);
-    return target === "/" && value !== "/" ? undefined : target;
+    return strictSafeRedirect(value) ?? undefined;
 }
 
 /**
@@ -538,7 +535,8 @@ async function finishSteam(url: URL, origin: string, held: FlowState | null): Pr
     } catch (caught) {
         if (caught instanceof ConnectionClaimedError)
             return endLink(origin, STEAM_PROVIDER, "taken", undefined, returnParam(held));
-        if (caught instanceof ConnectionLimitError) return endLink(origin, STEAM_PROVIDER, "limit", undefined, returnParam(held));
+        if (caught instanceof ConnectionLimitError)
+            return endLink(origin, STEAM_PROVIDER, "limit", undefined, returnParam(held));
         return endLink(origin, STEAM_PROVIDER, "error", undefined, returnParam(held));
     }
 }
@@ -771,7 +769,7 @@ function readState(request: Request): FlowState | null {
                     ? held.mode
                     : "link",
             state: held.state,
-            target: typeof held.target === "string" ? held.target : undefined
+            target: typeof held.target === "string" ? safeTarget(held.target) : undefined
         };
     } catch {
         return null;

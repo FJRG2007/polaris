@@ -16,6 +16,7 @@ import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { eventDescription, eventLabel, groupLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import { DestinationsCard } from "./destinations-card";
 import { QuietHoursCard } from "./quiet-hours-card";
 import {
@@ -181,6 +182,7 @@ export function NotificationSettingsView({
  */
 function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: boolean }) {
     const t = useTranslations("accountNotifications");
+    const connectionsLink = useConnectionsHref();
     const hint = (option: inGame.InGameChoice) =>
         t(`inGame.hints.${option}` as const, { size: inGame.SMALL_GROUP_SIZE });
     const [choice, setChoice] = useState(initial);
@@ -234,7 +236,7 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
                             {t("inGame.notReady")}
                         </p>
                         <Button asChild size="sm" variant="outline" className="shrink-0">
-                            <Link href="/account/connections">{t("inGame.connectedAccounts")}</Link>
+                            <Link href={connectionsLink}>{t("inGame.connectedAccounts")}</Link>
                         </Button>
                     </div>
                 )}

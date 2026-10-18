@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useCallback } from "react";
 import { SettingsCard } from "../project-settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import { useLiveRead } from "@/components/use-live-resource";
 import { CheckCircle2, CircleDashed, ExternalLink, Loader2 } from "lucide-react";
 import { CloudflareMark, DockerMark, GitHubMark } from "@/components/brand-icons";
@@ -31,6 +32,7 @@ interface IntegrationState {
 
 export function IntegrationsSection({ projectId }: { projectId: string }) {
     const t = useTranslations("deploySettings");
+    const connectionsLink = useConnectionsHref("github");
     // Instance-wide state with nothing secret in it - whether each is connected,
     // the account names and the registry logins - so the last answer paints at
     // once and the fresh one replaces only what moved.
@@ -102,7 +104,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         }
                         // GitHub is the one here that is not instance-wide: it is
                         // whichever accounts the reader has connected themselves.
-                        href="/account/connections"
+                        href={connectionsLink}
                     />
                     <IntegrationRow
                         icon={<CloudflareMark className="size-5" />}

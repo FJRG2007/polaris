@@ -27,3 +27,14 @@ export function safeRedirect(target: string | null | undefined): string {
     if (/^[\\/]{2}/.test(resolved.pathname)) return "/";
     return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
+
+/**
+ * The same rule for a target that is optional: the resolved path when the value
+ * stays on this origin, and nothing when it is absent or would leave it, rather
+ * than falling back to the root.
+ */
+export function strictSafeRedirect(target: string | null | undefined): string | null {
+    if (!target) return null;
+    const resolved = safeRedirect(target);
+    return resolved === "/" && target !== "/" ? null : resolved;
+}

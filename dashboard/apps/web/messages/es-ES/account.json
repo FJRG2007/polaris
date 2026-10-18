@@ -534,7 +534,7 @@
             "search": "Buscar servicios",
             "categories": "Categorías",
             "connectedCount": "Conectadas",
-            "noMatch": "Ningún servicio es \"{query}\".",
+            "noMatch": "Ningún servicio coincide con \"{query}\".",
             "category": {
                 "all": "Todo",
                 "general": "General",

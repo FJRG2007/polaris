@@ -20,7 +20,8 @@ import {
     minecraftNameSchema,
     type ConnectionCategory
 } from "@polaris/core";
-import { safeRedirect } from "@/lib/safe-redirect";
+import { strictSafeRedirect } from "@/lib/safe-redirect";
+import { RETURN_PARAM } from "@/lib/connections/hub-href";
 import { arrangeProviders } from "@/lib/connections/arrange";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -133,16 +134,13 @@ const OUTCOMES: Record<
  * on this origin, and nothing when it would resolve anywhere else.
  */
 export function readReturnTo(search: string): string | null {
-    const raw = new URLSearchParams(search).get("return");
-    if (!raw) return null;
-    const target = safeRedirect(raw);
-    return target === "/" && raw !== "/" ? null : target;
+    return strictSafeRedirect(new URLSearchParams(search).get(RETURN_PARAM));
 }
 
 /** Where a card's Connect button starts the trip, carrying the way back. */
 export function linkHref(slug: string, returnTo: string | null): string {
     const base = `/api/connections/${slug}/link`;
-    return returnTo ? `${base}?return=${encodeURIComponent(returnTo)}` : base;
+    return returnTo ? `${base}?${RETURN_PARAM}=${encodeURIComponent(returnTo)}` : base;
 }
 
 export function ConnectionsView({
@@ -160,21 +158,18 @@ export function ConnectionsView({
     );
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<ConnectionCategory | null>(null);
-    const [returnTo, setReturnTo] = useState<string | null>(() => readReturnTo(initialSearch));
-    const [focused, setFocused] = useState<string | null>(
-        () => new URLSearchParams(initialSearch).get("provider")
-    );
+    const [returnTo] = useState<string | null>(() => readReturnTo(initialSearch));
+    const [focused] = useState<string | null>(() => {
+        const wanted = new URLSearchParams(initialSearch).get("provider");
+        return wanted && providers.some((entry) => entry.slug === wanted) ? wanted : null;
+    });
 
     // `?provider=` is an app pointing at one service: that card is scrolled to
     // and marked, so nobody has to find it among the rest.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        setReturnTo(readReturnTo(window.location.search));
-        const wanted = params.get("provider");
-        if (!wanted || !providers.some((entry) => entry.slug === wanted)) return;
-        setFocused(wanted);
+        if (!focused) return;
         document
-            .getElementById(`connection-${wanted}`)
+            .getElementById(`connection-${focused}`)
             ?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, []);
 
@@ -566,9 +561,7 @@ function ProviderCard({
                                 size="sm"
                                 variant="secondary"
                                 disabled={!canAdd || pending}
-                                onClick={() =>
-                                    router.push(linkHref(provider.slug, returnTo))
-                                }
+                                onClick={() => router.push(linkHref(provider.slug, returnTo))}
                             >
                                 <Plus className="size-4" />
                                 {t("connections.connectProvider", { provider: provider.name })}

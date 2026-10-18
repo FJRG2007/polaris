@@ -1,0 +1,20 @@
+/**
+ * How an app sends somebody to Connected accounts and gets them back: `?provider=`
+ * marks the service it sent them for, and `?return=` names its own screen, which
+ * the list offers to go back to and the link trip carries through the provider.
+ *
+ * Pure, so the screens that link here and the link flow share one spelling.
+ */
+
+export const CONNECTIONS_HUB = "/account/connections";
+
+/** The query parameter an app names its own screen in, to be sent back to it. */
+export const RETURN_PARAM = "return";
+
+export function connectionsHref(provider?: string | null, returnTo?: string | null): string {
+    const params = new URLSearchParams();
+    if (provider) params.set("provider", provider);
+    if (returnTo) params.set(RETURN_PARAM, returnTo);
+    const search = params.toString();
+    return search ? `${CONNECTIONS_HUB}?${search}` : CONNECTIONS_HUB;
+}
