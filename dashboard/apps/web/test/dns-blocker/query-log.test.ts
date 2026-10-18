@@ -122,19 +122,16 @@ describe("query log", () => {
     });
 
     it("pages the matching rows newest first and says when there is an older page", () => {
-        const first = reader({ outcome: "blocked" });
-        const second = reader({ outcome: "blocked", page: 1 });
+        const log = reader({ outcome: "blocked" });
         for (let at = 0; at < QUERY_LOG_ROWS + 5; at += 1) {
-            const row = line("10.0.0.2", `n${at}.example`, "BLOCKED");
-            first.add(row);
-            second.add(row);
-            first.add(line("10.0.0.2", "ok.example", "RESOLVED"));
+            log.add(line("10.0.0.2", `n${at}.example`, "BLOCKED"));
+            log.add(line("10.0.0.2", "ok.example", "RESOLVED"));
         }
-        const page = first.page();
+        const page = log.page(0);
         expect(page.rows).toHaveLength(QUERY_LOG_ROWS);
         expect(page.rows[0]?.domain).toBe(`n${QUERY_LOG_ROWS + 4}.example`);
         expect(page.hasMore).toBe(true);
-        const older = second.page();
+        const older = log.page(1);
         expect(older.rows).toHaveLength(5);
         expect(older.rows.at(-1)?.domain).toBe("n0.example");
         expect(older.hasMore).toBe(false);
@@ -145,7 +142,7 @@ describe("query log", () => {
         log.add(line("10.0.0.2", "ads.example", "BLOCKED", { type: "AAAA" }));
         log.add(line("10.0.0.3", "ads.example", "BLOCKED", { type: "AAAA" }));
         log.add(line("10.0.0.3", "ads.example", "BLOCKED"));
-        expect(log.page().rows).toHaveLength(1);
+        expect(log.page(0).rows).toHaveLength(1);
     });
 
     it("reads the live tail newest first, dropping a cut first line", () => {

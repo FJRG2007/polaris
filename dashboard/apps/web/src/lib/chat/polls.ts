@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { publishChatChange } from "./live";
 import { ChatAccessError, ChatRuleError, requireChannel, requirePostable } from "./access";
+import * as history from "./history-visibility";
 
 /** One answer, already counted for the reader looking at it. */
 export interface ChatPollOptionView {
@@ -185,6 +186,7 @@ export async function readPoll(
     });
     if (!message) return null;
     await requireChannel(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, messageId);
     if (message.deletedAt) return null;
     return (await pollsFor(actor.id, [messageId])).get(messageId) ?? null;
 }
@@ -224,6 +226,7 @@ export async function vote(
     if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
     await requirePostable(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, input.messageId);
 
     if (core.pollIsClosed(message.poll, now)) throw new ChatRuleError({ key: "errors.pollClosed" });
 
@@ -287,6 +290,7 @@ export async function endPoll(
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
 
     const access = await requirePostable(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, messageId);
     if (message.authorId !== actor.id && !access.mayModerate) {
         throw new ChatAccessError({ key: "errors.pollCloseNotYours" });
     }

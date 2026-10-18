@@ -257,6 +257,17 @@ describe("who may add people to a group", () => {
         expect(written.options).toBeUndefined();
     });
 
+    it("lets the owner alone decide whether people added later read earlier history", async () => {
+        await chat.setGroupOptions(ada, "channel-1", { newcomersReadHistory: false });
+        expect(written.options).toEqual({ newcomerHistory: "off" });
+
+        written = {};
+        await expect(
+            chat.setGroupOptions(grace, "channel-1", { newcomersReadHistory: true })
+        ).rejects.toThrow(/Only the owner/);
+        expect(written.options).toBeUndefined();
+    });
+
     it("is decided the same way for the button as for the service", () => {
         const group = {
             kind: "group",

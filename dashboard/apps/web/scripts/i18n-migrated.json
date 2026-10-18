@@ -806,6 +806,7 @@
         "web/src/app/(app)/chat/new-channel-dialog.tsx",
         "web/src/app/(app)/chat/new-direct-dialog.tsx",
         "web/src/app/(app)/chat/new-space-dialog.tsx",
+        "web/src/app/(app)/chat/newcomer-history-setting.tsx",
         "web/src/app/(app)/chat/nickname-dialog.tsx",
         "web/src/app/(app)/chat/no-audio-notice.tsx",
         "web/src/app/(app)/chat/notify-menu.tsx",

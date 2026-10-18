@@ -32,6 +32,7 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-files";
 import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
+import * as history from "./history-visibility";
 
 /** How much of a message is copied onto the report. Enough to triage without
  *  opening the conversation, short of copying the conversation. */
@@ -142,6 +143,7 @@ export async function reportMessage(
     // guessed would be answered with "reported" or "not there", which is a way
     // to walk the message table one press at a time.
     await requireChannel(actor, message.channelId);
+    await history.requireReadable(actor, message.channelId, input.messageId);
 
     const existing = await prisma.chatReport.findUnique({
         where: { messageId_reporterId: { messageId: message.id, reporterId: actor.id } },

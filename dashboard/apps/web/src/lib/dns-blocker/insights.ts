@@ -32,8 +32,9 @@ import { DNS_ENGINE_HTTP_PORT } from "./render";
 
 const BLOCKY = "/app/blocky";
 
-/** How long one read of the log answers the same filter again: a range that
- *  reaches into past days costs a file per day, and moves by the bar anyway. */
+/** How long one read of the log answers the same filter again, on any page: a
+ *  range that reaches into past days costs a file per day, and moves by the bar
+ *  anyway. */
 const LOG_TTL_MS = { "24h": 10_000, "7d": 60_000, "30d": 120_000 } as const;
 /** How many filters' reads are kept at once. */
 const LOG_CACHE_MAX = 32;
@@ -56,7 +57,7 @@ interface Engine {
 interface LogRead {
     readonly found: boolean;
     readonly stats: QueryStats;
-    readonly log: QueryPage;
+    readonly reader: QueryLogReader;
 }
 
 const logReads = new Map<string, { readonly at: number; readonly read: Promise<LogRead> }>();
@@ -105,19 +106,25 @@ async function readDays(target: Engine, days: readonly Date[], reader: QueryLogR
 }
 
 /** One read of the log per filter for a few seconds, shared by whoever asks
- *  meanwhile, so refreshes and several admins do not each copy the files. */
-function cachedLog(target: Engine, filter: QueryFilter, fresh: boolean): Promise<LogRead> {
+ *  meanwhile and by every page, so refreshes, paging and several admins do not
+ *  each copy the files. */
+function cachedLog(
+    target: Engine,
+    filter: Omit<QueryFilter, "page">,
+    fresh: boolean
+): Promise<LogRead> {
     const now = Date.now();
     const window = rangeWindow(filter.range, now);
     const ttl = LOG_TTL_MS[filter.range];
-    const key = JSON.stringify([target.container, filter]);
+    const { search, outcome, client, type, range } = filter;
+    const key = JSON.stringify([target.container, search, outcome, client, type, range]);
     const hit = logReads.get(key);
     if (hit && !fresh && now - hit.at < ttl) return hit.read;
     const reader = new QueryLogReader(filter, window);
     const read = readDays(target, window.days, reader).then((found) => ({
         found,
         stats: reader.stats(),
-        log: reader.page()
+        reader
     }));
     const entry = { at: now, read };
     read.catch(() => {
@@ -144,12 +151,18 @@ async function blocky(target: Engine, args: readonly string[]): Promise<string> 
  *  blocking is paused. */
 export async function dnsInsights(filter: QueryFilter, fresh = false): Promise<DnsInsights> {
     const target = await engine();
+    const { page, ...rows } = filter;
     const [log, status] = await Promise.all([
-        cachedLog(target, filter, fresh),
+        cachedLog(target, rows, fresh),
         blocky(target, ["blocking", "status"])
     ]);
     const logOff = !log.found && !(await engineConfigCurrent(target.row));
-    return { stats: log.stats, log: log.log, pause: parseBlockingStatus(status), logOff };
+    return {
+        stats: log.stats,
+        log: log.reader.page(page),
+        pause: parseBlockingStatus(status),
+        logOff
+    };
 }
 
 /** The newest lookups that match, for the live view: the end of today's file

@@ -231,7 +231,8 @@ function bump(counts: Map<string, number>, key: string): void {
 /**
  * Folds lines in as they arrive, so no day's file is ever held whole. Every
  * lookup inside the window counts toward the numbers; only the rows that match
- * the filter are kept, and only as many as the asked-for page needs.
+ * the filter are kept, and only as many as the last page needs, so one read
+ * answers every page.
  */
 export class QueryLogReader {
     private queries = 0;
@@ -249,17 +250,16 @@ export class QueryLogReader {
     private readonly blockedClients = new Map<string, number>();
     private readonly names = new Map<string, string>();
     private readonly rows: QueryRow[] = [];
-    private readonly keep: number;
+    // One row past the last page says whether there is an older one.
+    private readonly keep = QUERY_LOG_PAGES * QUERY_LOG_ROWS + 1;
 
     public constructor(
-        private readonly filter: QueryFilter,
+        private readonly filter: Omit<QueryFilter, "page">,
         private readonly window: QueryWindow
     ) {
         this.buckets = Math.round((window.to - window.from) / window.bucketMs);
         this.allowedBars = new Array<number>(this.buckets).fill(0);
         this.blockedBars = new Array<number>(this.buckets).fill(0);
-        // One row past the page says whether there is an older one.
-        this.keep = (filter.page + 1) * QUERY_LOG_ROWS + 1;
     }
 
     public add(line: string): void {
@@ -328,13 +328,13 @@ export class QueryLogReader {
         };
     }
 
-    /** The asked-for page of matching rows, newest first. */
-    public page(): QueryPage {
+    /** One page of matching rows, newest first. */
+    public page(page: number): QueryPage {
         const newest = this.rows.slice(-this.keep).reverse();
-        const start = this.filter.page * QUERY_LOG_ROWS;
+        const start = page * QUERY_LOG_ROWS;
         return {
             rows: newest.slice(start, start + QUERY_LOG_ROWS),
-            page: this.filter.page,
+            page,
             hasMore: newest.length > start + QUERY_LOG_ROWS
         };
     }

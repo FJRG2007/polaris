@@ -78,7 +78,7 @@ vi.mock("@/lib/privacy-service", () => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        chatChannel: { findUnique: async () => ({ kind }) },
+        chatChannel: { findUnique: async () => ({ kind }), findMany: async () => [] },
         chatChannelMember: {
             findUnique: async () => mark,
             findFirst: async () => other,

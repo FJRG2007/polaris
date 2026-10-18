@@ -78,7 +78,9 @@ vi.mock("@polaris/db", () => ({
         chatChannel: {
             update: async () => undefined,
             // Read by the send path for the room's own wait between messages.
-            findUnique: async () => ({ slowmode: 0 })
+            findUnique: async () => ({ slowmode: 0 }),
+            // Nobody here joined too late to read: the history-visibility lookup finds no closed room.
+            findMany: async () => []
         },
         chatChannelMember: { updateMany: async () => undefined, findMany: async () => [] },
         $transaction: async (run: (tx: unknown) => Promise<unknown>) =>

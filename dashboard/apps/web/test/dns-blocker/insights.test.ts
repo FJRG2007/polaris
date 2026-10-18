@@ -75,6 +75,18 @@ describe("dnsInsights", () => {
         expect(readFile).toHaveBeenCalledTimes(perRead * 2);
     });
 
+    it("answers every page of the same filter from one read", async () => {
+        readFile.mockImplementation(async () => file(`${LINE}\n`));
+        const search = { ...filter, search: "pages" };
+        await dnsInsights(search, true);
+        const perRead = readFile.mock.calls.length;
+        const older = await dnsInsights({ ...search, page: 3 });
+        expect(readFile).toHaveBeenCalledTimes(perRead);
+        expect(older.log.page).toBe(3);
+        await dnsInsights({ ...search, outcome: "blocked" });
+        expect(readFile).toHaveBeenCalledTimes(perRead * 2);
+    });
+
     it("says the log is off when the file is missing and the engine runs an older config", async () => {
         readFile.mockRejectedValue(new Error("no such file"));
         engineConfigCurrent.mockResolvedValue(false);
