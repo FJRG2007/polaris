@@ -424,7 +424,9 @@
         "address": "Address of the file",
         "attachIt": "Attach it",
         "noneChosen": "Nothing chosen",
-        "attach": "Attach"
+        "attach": "Attach",
+        "fetching": "Fetching the file",
+        "fetchFailed": "That file could not be fetched."
     },
     "transfers": {
         "label": "Transfers",

@@ -76,6 +76,63 @@ describe("the shared picker in place of a file input", () => {
         await waitFor(() => expect(onFiles).toHaveBeenCalledWith([file]));
     });
 
+    it("keeps a busy dialog up while a storage pick is fetched, then closes", async () => {
+        let release: (answer: Response) => void = () => {};
+        vi.stubGlobal(
+            "fetch",
+            vi.fn((url: string) => {
+                if (url.startsWith("/api/attachments/fetch")) {
+                    return new Promise<Response>((resolve) => {
+                        release = resolve;
+                    });
+                }
+                return Promise.resolve(
+                    new Response(JSON.stringify(url.includes("/sources") ? SOURCES : ENTRIES), {
+                        headers: { "content-type": "application/json" }
+                    })
+                );
+            })
+        );
+        const onFiles = vi.fn();
+        const onClose = vi.fn();
+        render(<ChooseFilesDialog accept="image/png" onFiles={onFiles} onClose={onClose} />, {
+            wrapper: MessagesWrapper
+        });
+        await userEvent.click(await screen.findByText("Skin.png"));
+        await userEvent.click(screen.getByRole("button", { name: "Attach" }));
+        expect(await screen.findByText("Fetching the file")).toBeTruthy();
+        expect(onClose).not.toHaveBeenCalled();
+        release(
+            new Response(new Blob(["png"], { type: "image/png" }), {
+                headers: { "content-type": "image/png", "x-polaris-filename": "Skin.png" }
+            })
+        );
+        await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+        expect(onFiles.mock.calls[0]?.[0]?.[0]?.type).toBe("image/png");
+    });
+
+    it("says why a pick failed in the reader's words", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) =>
+                url.startsWith("/api/attachments/fetch")
+                    ? new Response("nope", { status: 502 })
+                    : new Response(JSON.stringify(url.includes("/sources") ? SOURCES : ENTRIES), {
+                          headers: { "content-type": "application/json" }
+                      })
+            )
+        );
+        const onFailed = vi.fn();
+        render(<ChooseFilesDialog onFiles={() => {}} onFailed={onFailed} onClose={() => {}} />, {
+            wrapper: MessagesWrapper
+        });
+        await userEvent.click(await screen.findByText("Skin.png"));
+        await userEvent.click(screen.getByRole("button", { name: "Attach" }));
+        await waitFor(() =>
+            expect(onFailed).toHaveBeenCalledWith("That file could not be fetched.")
+        );
+    });
+
     it("opens from a picture field's Upload", async () => {
         stubDrive();
         render(<PictureField endpoint="/api/x/picture" preview={null} onDone={() => {}} />, {

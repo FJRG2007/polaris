@@ -424,7 +424,9 @@
         "address": "Dirección del archivo",
         "attachIt": "Adjuntarlo",
         "noneChosen": "Nada elegido",
-        "attach": "Adjuntar"
+        "attach": "Adjuntar",
+        "fetching": "Cargando archivo",
+        "fetchFailed": "No se pudo obtener ese archivo."
     },
     "transfers": {
         "label": "Transferencias",

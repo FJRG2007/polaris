@@ -63,6 +63,7 @@ export function AttachmentSection({
     onError: (message: string) => void;
 }) {
     const t = useTranslations("tasksDetail");
+    const tFiles = useTranslations("components");
     const input = useRef<HTMLInputElement | null>(null);
     const [busy, setBusy] = useState(false);
     const [picking, setPicking] = useState(false);
@@ -77,7 +78,9 @@ export function AttachmentSection({
      * their having to download it first.
      */
     const takePicked = async (picked: readonly PickedFile[]) => {
-        const { files, failed } = await asFiles(picked);
+        const { files, failed } = await asFiles(picked, {
+            unreachable: tFiles("files.fetchFailed")
+        });
         if (failed.length > 0) onError(failed[0] ?? "");
         if (files.length > 0) await upload(files);
     };
