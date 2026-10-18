@@ -20,13 +20,11 @@ import { clientIp } from "@/lib/request-context";
 import { readCappedBody } from "@/lib/request-body";
 import { ChatAccessError } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { postThroughWebhook, webhookFor } from "@/lib/chat/webhooks";
+import { postThroughWebhook, webhookFor, webhookPostAllowed } from "@/lib/chat/webhooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Messages one webhook may post per window. Discord's own is about this. */
-const PER_WEBHOOK = 30;
 /** Wrong addresses one caller may present per window. */
 const MISSES = 60;
 const WINDOW_MS = 60_000;
@@ -53,7 +51,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     const webhook = await resolve(id, token);
     if (webhook instanceof Response) return webhook;
 
-    const allowed = await rateLimit(`chat-webhook:${webhook.id}`, PER_WEBHOOK, WINDOW_MS);
+    const allowed = await webhookPostAllowed(webhook.id);
     if (!allowed.ok) {
         const seconds = Math.max(1, Math.ceil(allowed.retryAfterMs / 1000));
         return NextResponse.json(

@@ -131,7 +131,8 @@
         "announce": "Announce",
         "try": "Try block",
         "waitCondition": "Wait for a condition",
-        "set": "Set values"
+        "set": "Set values",
+        "message": "Post to a chat channel"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -189,7 +190,18 @@
         "levelInfo": "Info",
         "levelSuccess": "Success",
         "levelWarning": "Warning",
-        "levelDanger": "Danger"
+        "levelDanger": "Danger",
+        "webhook": "Channel webhook",
+        "webhookPick": "Pick a webhook",
+        "webhookLoading": "Loading webhooks...",
+        "webhookOption": "{name} in #{channel} ({space})",
+        "webhookNone": "No webhooks on the channels you run. Add one in a channel's settings, under Integrations.",
+        "webhookOpenChat": "Open chat",
+        "webhookGone": "This webhook was deleted, or you no longer run its channel. Pick another.",
+        "webhookReset": "This webhook was given a new secret, so the step stopped posting.",
+        "webhookUseNew": "Keep posting with it",
+        "webhookPostsAs": "Posts as {name}, marked as a bot.",
+        "webhookManage": "Manage webhooks"
     },
     "operators": {
         "eq": "equals",
@@ -278,7 +290,13 @@
         "answerTooLarge": "The answer was too large",
         "announceLimited": "Too many announcements",
         "announceFailed": "The announcement was not sent",
-        "valuesTooLarge": "The values were too large"
+        "valuesTooLarge": "The values were too large",
+        "messageEmpty": "The message came out empty",
+        "messageRefused": "The channel did not take the message",
+        "webhookGone": "The chat webhook was deleted",
+        "webhookReset": "The chat webhook got a new secret",
+        "webhookForbidden": "Its owner no longer runs that channel",
+        "webhookLimited": "The webhook posted too much this minute"
     },
     "secrets": {
         "title": "Secrets",
@@ -319,6 +337,7 @@
         "notPublished": "Publish it first.",
         "noManualTrigger": "Add a Run by hand trigger first.",
         "secretMissing": "A step uses a secret that is not on this shelf.",
+        "webhookUnavailable": "A chat step uses a webhook you cannot post through. Pick it again.",
         "generic": "That did not work. Try again.",
         "nameRequired": "Give it a name.",
         "valueRequired": "Enter the value.",
@@ -601,7 +620,8 @@
         "announce": "Tell other automations that something happened.",
         "try": "Run the steps inside, and choose what follows a failure.",
         "waitCondition": "Pause until a condition is true, or time runs out.",
-        "set": "Work values out once. Later steps pick them from this step's values."
+        "set": "Work values out once. Later steps pick them from this step's values.",
+        "message": "Post in a space channel through its webhook, as a bot."
     },
     "flow": {
         "conditionGroup": "Conditions",

@@ -763,13 +763,22 @@ export async function reachableSpaceIds(actor: ChatActor): Promise<Set<string>> 
         memberOrgIds(actor.id),
         grantedSubjects(actor.id, "chat.space")
     ]);
+    return spacesReachedBy(actor, orgs, granted);
+}
+
+/** `reachableSpaceIds` with the organizations and space grants already read. */
+async function spacesReachedBy(
+    actor: ChatActor,
+    orgs: readonly string[],
+    granted: ReadonlyMap<string, string>
+): Promise<Set<string>> {
     const spaces = await prisma.chatSpace.findMany({
         where: {
             OR: [
                 { ownerId: actor.id },
                 { members: { some: { userId: actor.id } } },
                 { visibility: "internal", orgId: null },
-                ...(orgs.length ? [{ visibility: "internal", orgId: { in: orgs } }] : []),
+                ...(orgs.length ? [{ visibility: "internal", orgId: { in: [...orgs] } }] : []),
                 // Handed to a team or a role. The ids are resolved rather than
                 // joined, because a grant names its principal by kind and id and
                 // there is no relation for the database to walk.
@@ -779,4 +788,128 @@ export async function reachableSpaceIds(actor: ChatActor): Promise<Set<string>> 
         select: { id: true }
     });
     return new Set(spaces.map((space) => space.id));
+}
+
+/** What decides which space channels somebody runs, read once for all of them. */
+export interface AdministeredFacts {
+    /** Every space they reach at all. */
+    readonly reachable: ReadonlySet<string>;
+    /** The spaces they own or administer. */
+    readonly adminSpaces: readonly string[];
+    /** The space channels they have a membership row in, and its role. */
+    readonly rooms: ReadonlyMap<string, string>;
+    /** The channels handed to them by a grant, and its strongest capability. */
+    readonly grantedRooms: ReadonlyMap<string, string>;
+}
+
+/**
+ * The space channels somebody runs, as a where clause: the same answer
+ * `channelAccess` gives as `mayAdminister`, for every channel at once.
+ *
+ * Three ways, each with the condition `channelAccess` puts on it: running the
+ * space runs its open rooms and the private ones they were let into; an
+ * administrator's row in a room counts while the room is still reachable; and a
+ * grant of the room counts where it is asked - when the space is out of reach
+ * or the room is private and they have no row in it. Null when there are none.
+ */
+export function administeredChannelsWhere(
+    facts: AdministeredFacts
+): Prisma.ChatChannelWhereInput | null {
+    const reachable = [...facts.reachable];
+    const member = [...facts.rooms.keys()];
+    const granted = [...facts.grantedRooms.keys()];
+    const adminRooms = [...facts.rooms].filter(([, role]) => role === "admin").map(([id]) => id);
+    const adminGranted = [...facts.grantedRooms]
+        .filter(([, capability]) => capability === "admin")
+        .map(([id]) => id);
+    const entered = [...member, ...granted];
+    const ways: Prisma.ChatChannelWhereInput[] = [
+        ...(facts.adminSpaces.length
+            ? [
+                  {
+                      spaceId: { in: [...facts.adminSpaces] },
+                      OR: [{ private: false }, ...(entered.length ? [{ id: { in: entered } }] : [])]
+                  }
+              ]
+            : []),
+        ...(adminRooms.length && (reachable.length || granted.length)
+            ? [
+                  {
+                      id: { in: adminRooms },
+                      OR: [
+                          ...(reachable.length ? [{ spaceId: { in: reachable } }] : []),
+                          ...(granted.length ? [{ id: { in: granted } }] : [])
+                      ]
+                  }
+              ]
+            : []),
+        ...(adminGranted.length
+            ? [
+                  {
+                      id: { in: adminGranted },
+                      OR: [
+                          { spaceId: { notIn: reachable } },
+                          { private: true, id: { notIn: member } }
+                      ]
+                  }
+              ]
+            : [])
+    ];
+    return ways.length ? { spaceId: { not: null }, OR: ways } : null;
+}
+
+/**
+ * The space channels this actor runs, as a where clause, read in a fixed number
+ * of queries however many there are. Null when they run none.
+ */
+export async function administeredChannels(
+    actor: ChatActor
+): Promise<Prisma.ChatChannelWhereInput | null> {
+    const [orgs, spaceGrants, grantedRooms, rows] = await Promise.all([
+        memberOrgIds(actor.id),
+        grantedSubjects(actor.id, "chat.space"),
+        grantedSubjects(actor.id, "chat.channel"),
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id, channel: { spaceId: { not: null } } },
+            select: { channelId: true, role: true }
+        })
+    ]);
+    const adminGranted = [...spaceGrants]
+        .filter(([, capability]) => capability === "admin")
+        .map(([id]) => id);
+    const [reachable, candidates] = await Promise.all([
+        spacesReachedBy(actor, orgs, spaceGrants),
+        prisma.chatSpace.findMany({
+            where: {
+                OR: [
+                    { ownerId: actor.id },
+                    { members: { some: { userId: actor.id, role: "admin" } } },
+                    ...(adminGranted.length ? [{ id: { in: adminGranted } }] : [])
+                ]
+            },
+            select: {
+                id: true,
+                ownerId: true,
+                orgId: true,
+                visibility: true,
+                members: { where: { userId: actor.id }, select: { role: true }, take: 1 }
+            }
+        })
+    ]);
+    const adminSpaces = candidates
+        .filter((space) => {
+            const standing = standingIn(space, actor.id, {
+                memberRole: space.members[0]?.role ?? null,
+                inOrg: space.orgId !== null && orgs.includes(space.orgId),
+                granted: spaceGrants.get(space.id) ?? ""
+            });
+            return standing === "owner" || standing === "admin";
+        })
+        .map((space) => space.id);
+    return administeredChannelsWhere({
+        reachable,
+        adminSpaces,
+        rooms: new Map(rows.map((row) => [row.channelId, row.role])),
+        grantedRooms
+    });
 }

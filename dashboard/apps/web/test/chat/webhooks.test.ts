@@ -5,7 +5,8 @@
  * secret's hash is stored, a wrong secret and an unknown id are the same answer,
  * resetting stops the old address at once, only whoever runs the channel manages
  * them, and a message posted through one carries the name it was posted under
- * and no account.
+ * and no account. An automation is offered, and may keep, only the webhooks of
+ * channels its owner runs, and loses one the moment its secret is reset.
  */
 
 import { createHash } from "node:crypto";
@@ -28,6 +29,8 @@ const db = vi.hoisted(() => ({
         spaceId: string | null;
         mayAdminister: boolean;
     },
+    /** What `channelAccess` answers per channel, where it differs from `access`. */
+    accessBy: {} as Record<string, { spaceId: string | null; mayAdminister: boolean } | null>,
     channel: { archived: false, space: { archived: false } } as {
         archived: boolean;
         space: { archived: boolean } | null;
@@ -44,8 +47,19 @@ function pick(hook: Hook, select?: Record<string, unknown>) {
 
 vi.mock("@polaris/db", () => {
     const chatWebhook = {
-        findMany: async ({ where }: { where: { channelId: string } }) =>
-            db.hooks.filter((hook) => hook.channelId === where.channelId),
+        findMany: async ({
+            where
+        }: {
+            where: { channelId?: string; channel?: { AND: [{ id: { notIn: string[] } }] } };
+        }) =>
+            where.channelId
+                ? db.hooks.filter((hook) => hook.channelId === where.channelId)
+                : db.hooks
+                      .filter((hook) => !where.channel!.AND[0].id.notIn.includes(hook.channelId))
+                      .map((hook) => ({
+                          ...hook,
+                          channel: { id: hook.channelId, name: "builds", space: { name: "Ops" } }
+                      })),
         count: async ({ where }: { where: { channelId: string } }) =>
             db.hooks.filter((hook) => hook.channelId === where.channelId).length,
         create: async ({
@@ -126,7 +140,14 @@ vi.mock("@/lib/chat/access", async () => {
     const actual = await vi.importActual<typeof import("@/lib/chat/access")>("@/lib/chat/access");
     return {
         ChatAccessError: actual.ChatAccessError,
-        requireChannel: async () => db.access
+        requireChannel: async () => db.access,
+        channelAccess: async (_actor: unknown, channelId: string) =>
+            channelId in db.accessBy ? db.accessBy[channelId] : db.access,
+        administeredChannels: async () => ({
+            id: {
+                notIn: Object.keys(db.accessBy).filter((id) => !db.accessBy[id]?.mayAdminister)
+            }
+        })
     };
 });
 
@@ -148,6 +169,7 @@ beforeEach(() => {
     db.hooks = [];
     db.messages = [];
     db.access = { spaceId: "s1", mayAdminister: true };
+    db.accessBy = {};
     db.channel = { archived: false, space: { archived: false } };
     db.published = [];
     db.unfurled = [];
@@ -242,6 +264,57 @@ describe("posting through one", () => {
         db.channel = { archived: false, space: { archived: true } };
         await expect(webhooks.postThroughWebhook(hook, { content: "x" })).rejects.toThrow();
         expect(db.messages).toEqual([]);
+    });
+});
+
+describe("an automation posting through one", () => {
+    const OTHER = "0190a000-0000-7000-8000-0000000000c2";
+
+    it("is offered only the webhooks of channels its owner runs, never their secret", async () => {
+        const mine = await webhooks.createWebhook(ME, { channelId: CHANNEL, name: "CI" });
+        const theirs = await webhooks.createWebhook(ME, { channelId: OTHER, name: "Theirs" });
+        db.accessBy[OTHER] = { spaceId: "s1", mayAdminister: false };
+        const offered = await webhooks.webhooksToPostThrough(ME);
+        expect(offered.map((entry) => entry.id)).toEqual([mine.webhook.id]);
+        expect(offered[0]).toMatchObject({ name: "CI", channelName: "builds", spaceName: "Ops" });
+        expect(offered[0]!.stamp).toMatch(/^[0-9a-f]{16}$/);
+        const shown = JSON.stringify(offered);
+        expect(shown).not.toContain(mine.token);
+        expect(shown).not.toContain(db.hooks[0]!.tokenHash);
+        expect(shown).not.toContain(theirs.webhook.id);
+    });
+
+    it("keeps the one it chose until it is deleted, reset, or its channel changes hands", async () => {
+        const made = await webhooks.createWebhook(ME, { channelId: CHANNEL, name: "CI" });
+        const [chosen] = await webhooks.webhooksToPostThrough(ME);
+        expect(await webhooks.webhookToPostThrough(ME, made.webhook.id, chosen!.stamp)).toEqual({
+            ok: true,
+            webhook: { id: made.webhook.id, channelId: CHANNEL, name: "CI" }
+        });
+
+        db.access = { spaceId: "s1", mayAdminister: false };
+        expect(await webhooks.webhookToPostThrough(ME, made.webhook.id, chosen!.stamp)).toEqual({
+            ok: false,
+            reason: "forbidden"
+        });
+        db.access = { spaceId: "s1", mayAdminister: true };
+
+        await webhooks.resetWebhook(ME, made.webhook.id);
+        expect(await webhooks.webhookToPostThrough(ME, made.webhook.id, chosen!.stamp)).toEqual({
+            ok: false,
+            reason: "reset"
+        });
+        const [again] = await webhooks.webhooksToPostThrough(ME);
+        expect(again!.stamp).not.toBe(chosen!.stamp);
+        expect((await webhooks.webhookToPostThrough(ME, made.webhook.id, again!.stamp)).ok).toBe(
+            true
+        );
+
+        await webhooks.deleteWebhook(ME, made.webhook.id);
+        expect(await webhooks.webhookToPostThrough(ME, made.webhook.id, again!.stamp)).toEqual({
+            ok: false,
+            reason: "gone"
+        });
     });
 });
 

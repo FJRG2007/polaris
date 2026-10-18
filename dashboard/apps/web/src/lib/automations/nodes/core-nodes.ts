@@ -1,9 +1,10 @@
 /**
  * The node types core contributes that need nothing but Polaris itself:
- * the triggers, If, Choose, At the same time, Wait, Notify, Answer and
- * Announce. HTTP and the chat presets live in `http-node.ts`; the nodes that
- * steer the run itself (Join, loops, Stop, Wait for an event, Run another
- * automation) are listed here with their config and run by the engine.
+ * the triggers, If, Choose, At the same time, Wait, Notify, Post to a chat
+ * channel, Answer and Announce. HTTP and the chat presets live in
+ * `http-node.ts`; the nodes that steer the run itself (Join, loops, Stop, Wait
+ * for an event, Run another automation) are listed here with their config and
+ * run by the engine.
  */
 
 import * as core from "@polaris/core";
@@ -204,6 +205,50 @@ const notifyNode: ServerNode<NotifyConfig> = {
     }
 };
 
+type MessageConfig = ReturnType<(typeof C)["core.message"]["parse"]>;
+
+/**
+ * Post into a space channel through one of its webhooks.
+ *
+ * The message carries the webhook's name and the bot tag, the way a CI run or
+ * a monitor posting to the webhook's address would: an automation never
+ * speaks as a person, and has no way into a direct message or a group. Which
+ * webhook, and whether the account the automation runs as still runs its
+ * channel, is asked again on every run - a webhook deleted or given a new
+ * secret since, or a channel its owner no longer runs, stops the run with the
+ * reason instead of posting.
+ */
+const messageNode: ServerNode<MessageConfig> = {
+    type: "core.message",
+    meta: core.CORE_NODE_META["core.message"],
+    config: C["core.message"],
+    run: async (config, context, io) => {
+        const webhooks = await import("@/lib/chat/webhooks");
+        const { ChatAccessError } = await import("@/lib/chat/access");
+        const body = core.interpolate(config.body, context).slice(0, core.MAX_CHAT_MESSAGE).trim();
+        io.recordInput({ webhookId: config.webhookId, body });
+        if (!body) throw new StepError("messageEmpty");
+        const chosen = await webhooks.webhookToPostThrough(
+            io.actor,
+            config.webhookId,
+            config.stamp
+        );
+        if (!chosen.ok) {
+            if (chosen.reason === "forbidden") throw new StepRefusal("webhookForbidden");
+            throw new StepError(chosen.reason === "gone" ? "webhookGone" : "webhookReset");
+        }
+        if (!(await webhooks.webhookPostAllowed(chosen.webhook.id)).ok)
+            throw new StepError("webhookLimited");
+        try {
+            const messageId = await webhooks.postThroughWebhook(chosen.webhook, { content: body });
+            return { output: { messageId, channelId: chosen.webhook.channelId } };
+        } catch (caught) {
+            if (caught instanceof ChatAccessError) throw new StepError("messageRefused");
+            throw caught;
+        }
+    }
+};
+
 export const CORE_SERVER_NODES: readonly ServerNode[] = [
     declared("core.manual"),
     declared("core.schedule"),
@@ -226,5 +271,6 @@ export const CORE_SERVER_NODES: readonly ServerNode[] = [
     notifyNode as ServerNode,
     answerNode as ServerNode,
     setNode as ServerNode,
-    announceNode as ServerNode
+    announceNode as ServerNode,
+    messageNode as ServerNode
 ];

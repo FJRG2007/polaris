@@ -19,6 +19,7 @@ import * as organize from "@/lib/automations/organize";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
+import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
@@ -653,6 +654,23 @@ export async function setTagsAction(input: unknown): Promise<Result<{ tags: stri
         await organize.setTags(await actor(), parsed.data.automationId, parsed.data.tags);
         refresh(parsed.data.automationId);
         return { ok: true, tags: parsed.data.tags };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+/**
+ * The chat webhooks the signed-in account may post through from an automation:
+ * those on the space channels it runs, as the channel's settings would let it
+ * manage them.
+ */
+export async function chatWebhooksAction(): Promise<
+    Result<{ webhooks: readonly ChatWebhookChoice[] }>
+> {
+    try {
+        const who = await actor();
+        const { webhooksToPostThrough } = await import("@/lib/chat/webhooks");
+        return { ok: true, webhooks: await webhooksToPostThrough(who) };
     } catch (caught) {
         return failure(caught);
     }
