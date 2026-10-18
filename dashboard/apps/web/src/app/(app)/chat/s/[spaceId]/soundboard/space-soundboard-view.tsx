@@ -19,6 +19,7 @@ import Link from "next/link";
 import * as rules from "@/lib/chat/soundboard";
 import { useChat } from "@/app/(app)/chat/chat-context";
 import { PeoplePicker } from "@/components/people-picker";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import { SOUND_GLYPH } from "@/app/(app)/chat/call-signals";
 import { searchPeopleAction } from "@/app/(app)/chat/actions";
@@ -637,7 +638,7 @@ function SoundDialog({
     onSaved: (sound: SoundView) => void;
 }) {
     const t = useTranslations("chat");
-    const chooser = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [decoded, setDecoded] = useState<DecodedSound | null>(null);
     const [decoding, setDecoding] = useState(false);
@@ -767,7 +768,7 @@ function SoundDialog({
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => chooser.current?.click()}
+                                    onClick={() => setPicking(true)}
                                     disabled={decoding}
                                 >
                                     {decoding ? (
@@ -788,18 +789,14 @@ function SoundDialog({
                                     </span>
                                 )}
                             </div>
-                            <input
-                                ref={chooser}
-                                type="file"
-                                accept={SOUND_ACCEPT}
-                                className="sr-only"
-                                tabIndex={-1}
-                                aria-hidden
-                                onChange={(event) => {
-                                    void choose(event.target.files?.[0]);
-                                    event.target.value = "";
-                                }}
-                            />
+                            {picking && (
+                                <ChooseFilesDialog
+                                    accept={SOUND_ACCEPT}
+                                    onClose={() => setPicking(false)}
+                                    onFailed={setError}
+                                    onFiles={(files) => void choose(files[0])}
+                                />
+                            )}
                             {decoded && (
                                 <p className="text-xs text-muted-foreground">
                                     {longer

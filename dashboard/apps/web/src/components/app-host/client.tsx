@@ -57,6 +57,14 @@ const FilePickerDialog = dynamic(
     { ssr: false }
 );
 
+const ChooseFilesDialog = dynamic(
+    () =>
+        import("@/components/file-picker/choose-files-dialog").then(
+            (module) => module.ChooseFilesDialog
+        ),
+    { ssr: false }
+);
+
 const ShareDialog = dynamic(
     () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
     { ssr: false }
@@ -159,7 +167,7 @@ export const clientHost = {
     confirmDialog: { useConfirm },
     copyButton: { CopyButton },
     displayFormat: { useDisplayFormat },
-    filePicker: { FilePickerDialog },
+    filePicker: { ChooseFilesDialog, FilePickerDialog },
     gameLogo: { GameLogo },
     i18nProvider: { useLocale },
     logViewer: { LogViewer },

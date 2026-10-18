@@ -18,6 +18,7 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import { Import, Loader2, Trash2, Users } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 import type { ShelfPerson, ShelfTeam } from "@/lib/notes/shelf-service";
 import {
     Button,
@@ -433,7 +434,8 @@ export function ImportNotesDialog({
 }) {
     const t = useTranslations("notes");
     const router = useRouter();
-    const [files, setFiles] = useState<FileList | null>(null);
+    const [files, setFiles] = useState<readonly File[] | null>(null);
+    const [picking, setPicking] = useState(false);
     const [keepFolders, setKeepFolders] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -457,7 +459,7 @@ export function ImportNotesDialog({
         if (target.spaceId) form.set("spaceId", target.spaceId);
         if (target.folderId) form.set("folderId", target.folderId);
         form.set("keepFolders", keepFolders ? "true" : "false");
-        for (const file of Array.from(files)) form.append("files", file);
+        for (const file of files) form.append("files", file);
 
         const result = await runAction(() => actions.importNotesAction(form), setError);
         setBusy(false);
@@ -499,14 +501,35 @@ export function ImportNotesDialog({
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        <input
-                            type="file"
-                            multiple
-                            accept=".md,.markdown,.mdx,.txt,.zip"
-                            aria-label={t("notebook.filesLabel")}
-                            onChange={(event) => setFiles(event.target.files)}
-                            className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-field file:px-3 file:py-1.5 file:text-sm"
-                        />
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setPicking(true)}
+                            >
+                                <Import className="size-3.5" />
+                                {t("notebook.chooseFiles")}
+                            </Button>
+                            {files && files.length > 0 && (
+                                <span
+                                    className="min-w-0 truncate text-xs text-muted-foreground"
+                                    title={files.map((file) => file.name).join(", ")}
+                                >
+                                    {files.map((file) => file.name).join(", ")}
+                                </span>
+                            )}
+                        </div>
+                        {picking && (
+                            <ChooseFilesDialog
+                                multiple
+                                accept=".md,.markdown,.mdx,.txt,.zip"
+                                title={t("notebook.filesLabel")}
+                                onClose={() => setPicking(false)}
+                                onFailed={setError}
+                                onFiles={setFiles}
+                            />
+                        )}
                         <label className="flex items-center gap-2 text-sm">
                             <input
                                 type="checkbox"

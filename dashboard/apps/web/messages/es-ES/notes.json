@@ -69,6 +69,7 @@
         "linked": "{count, plural, one {Los enlaces de una nota} other {Los enlaces de # notas}} apuntan ya a las notas que nombran.",
         "skipped": "{count, plural, one {Un archivo se ha dejado} other {# archivos se han dejado}} fuera: solo se leen Markdown y texto plano.",
         "filesLabel": "Los archivos que importar",
+        "chooseFiles": "Elegir archivos",
         "keepFolders": "Mantener las carpetas de los archivos",
         "wikiLinks": "Los enlaces escritos como [[otra nota]] se conectan cuando todo está dentro.",
         "bringIn": "Importar"

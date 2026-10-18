@@ -75,6 +75,23 @@ const KINDS: readonly {
     { id: "archive", matches: /\.(?:zip|tar|gz|bz2|xz|7z|rar)$/i }
 ];
 
+/** What a wildcard MIME type in an `accept` covers, by name. */
+const FAMILIES: Readonly<Record<string, RegExp>> = {
+    "image/*": /\.(?:png|jpe?g|gif|webp|avif|bmp|svg|heic)$/i,
+    "audio/*": /\.(?:mp3|wav|flac|m4a|aac|ogg|oga|opus|webm)$/i,
+    "video/*": /\.(?:mp4|mov|mkv|webm|avi)$/i
+};
+
+/** The extensions one `accept` entry stands for: itself when it is one, the
+ *  usual ones for an exact MIME type, nothing for a wildcard. */
+function extensionsOf(entry: string): string[] {
+    if (entry.startsWith(".")) return [entry];
+    if (entry === "image/jpeg") return [".jpg", ".jpeg"];
+    if (entry === "image/svg+xml") return [".svg"];
+    const exact = /^(?:image|audio|video)\/([a-z0-9]+)$/.exec(entry);
+    return exact ? [`.${exact[1]}`] : [];
+}
+
 export function FilePickerDialog({
     onPick,
     onClose,
@@ -179,12 +196,21 @@ export function FilePickerDialog({
     /** Whether one name is something the screen asked for. Nothing when it asked
      *  for anything, which is most screens. */
     const takes = useMemo(() => {
-        const extensions = (accept ?? "")
+        const wanted = (accept ?? "")
             .split(",")
             .map((one) => one.trim().toLowerCase())
-            .filter((one) => one.startsWith("."));
-        if (extensions.length === 0) return null;
-        return (name: string) => extensions.some((one) => name.toLowerCase().endsWith(one));
+            .filter(Boolean);
+        const extensions = wanted.flatMap(extensionsOf);
+        const families = wanted.flatMap((one) => FAMILIES[one] ?? []);
+        // A type this cannot name an extension for: show everything rather than
+        // hide a file the screen would have taken.
+        const unnamed = wanted.some(
+            (one) => !one.startsWith(".") && !FAMILIES[one] && extensionsOf(one).length === 0
+        );
+        if (unnamed || (extensions.length === 0 && families.length === 0)) return null;
+        return (name: string) =>
+            extensions.some((one) => name.toLowerCase().endsWith(one)) ||
+            families.some((one) => one.test(name));
     }, [accept]);
 
     const shown = useMemo(() => {

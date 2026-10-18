@@ -113,7 +113,7 @@ export function SkinDialog({
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [attempt, setAttempt] = useState(0);
-    const fileInput = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
 
     /** What the server says they wear, as something the view can draw. */
     const showLive = useCallback(
@@ -423,11 +423,11 @@ export function SkinDialog({
                                         tabIndex={0}
                                         aria-label={t("skins.dropHere")}
                                         className="flex min-h-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        onClick={() => fileInput.current?.click()}
+                                        onClick={() => setPicking(true)}
                                         onKeyDown={(event) => {
                                             if (event.key === "Enter" || event.key === " ") {
                                                 event.preventDefault();
-                                                fileInput.current?.click();
+                                                setPicking(true);
                                             }
                                         }}
                                         onDragOver={(event) => event.preventDefault()}
@@ -441,18 +441,18 @@ export function SkinDialog({
                                         <Upload className="size-4" aria-hidden />
                                         {t("skins.dropHere")}
                                     </div>
-                                    <input
-                                        ref={fileInput}
-                                        type="file"
-                                        accept="image/png"
-                                        className="hidden"
-                                        aria-label={t("skins.chooseFile")}
-                                        onChange={(event) => {
-                                            const file = event.target.files?.[0];
-                                            event.target.value = "";
-                                            if (file) void importFile(file);
-                                        }}
-                                    />
+                                    {picking ? (
+                                        <hostUi.filePicker.ChooseFilesDialog
+                                            accept="image/png"
+                                            title={t("skins.chooseFile")}
+                                            onClose={() => setPicking(false)}
+                                            onFailed={setError}
+                                            onFiles={(files: File[]) => {
+                                                const file = files[0];
+                                                if (file) void importFile(file);
+                                            }}
+                                        />
+                                    ) : null}
                                     <form
                                         className="flex min-w-0 gap-2"
                                         onSubmit={(event) => {

@@ -11,11 +11,15 @@ import { defaultSkin } from "@polaris-app/game-servers/src/lib/minecraft/default
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const confirm = vi.fn(async () => true);
+const picker = vi.fn((props: { accept?: string }) => (
+    <div role="dialog" aria-label="Shared file picker" data-accept={props.accept} />
+));
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         i18nProvider: { useLocale: () => "en-US" },
-        confirmDialog: { useConfirm: () => [confirm, null] }
+        confirmDialog: { useConfirm: () => [confirm, null] },
+        filePicker: { ChooseFilesDialog: (props: { accept?: string }) => picker(props) }
     }
 }));
 
@@ -178,6 +182,17 @@ describe("SkinDialog", () => {
         expect(screen.getByRole("button", { name: "Load" })).toBeTruthy();
         expect(screen.getByText("Their account's own skin")).toBeTruthy();
         expect(screen.queryByText(/Minecraft's default skin/)).toBeNull();
+    });
+
+    it("offers the shared file picker for a skin, PNG only", async () => {
+        actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null } });
+        open(true);
+        fireEvent.click(
+            await screen.findByRole("button", { name: "Drop or paste a skin image here" })
+        );
+        const dialog = screen.getByRole("dialog", { name: "Shared file picker" });
+        expect(dialog.getAttribute("data-accept")).toBe("image/png");
+        expect(document.querySelector('input[type="file"]')).toBeNull();
     });
 
     it("puts a refusal from the server into a sentence", async () => {
