@@ -87,7 +87,7 @@ export function SecretsView() {
                     {data.rows.map((row) => (
                         <li key={row.id} className="flex items-center gap-3 p-3">
                             <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium" title={row.name}>
+                                <p className="truncate text-sm font-medium" title={row.name}>
                                     {row.name}
                                 </p>
                                 <p className="truncate text-xs text-muted-foreground">

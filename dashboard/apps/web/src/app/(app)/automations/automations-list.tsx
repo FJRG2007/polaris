@@ -297,7 +297,7 @@ export function AutomationsList({
                             <div className="min-w-0 flex-1">
                                 <Link
                                     href={`/automations/${row.id}`}
-                                    className="block truncate font-medium hover:underline"
+                                    className="block truncate text-sm font-medium hover:underline"
                                     title={row.name}
                                 >
                                     {row.name}

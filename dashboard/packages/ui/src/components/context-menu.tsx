@@ -190,7 +190,7 @@ export const ContextMenuItem = forwardRef<
     <RadixMenu.Item
         ref={ref}
         className={cn(
-            "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+            "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0 transition-colors duration-fast focus:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
             variant === "danger" && "text-danger focus:bg-danger-soft",
             className
         )}
@@ -209,7 +209,7 @@ export const ContextMenuSubTrigger = forwardRef<
         <RadixMenu.SubTrigger
             ref={ref}
             className={cn(
-                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none transition-colors duration-fast focus:bg-option-hover data-[state=open]:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                "relative flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-[0.8125rem] outline-none [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0 transition-colors duration-fast focus:bg-option-hover data-[state=open]:bg-option-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                 // A submenu whose options all do the same heavy thing is that
                 // thing, and the trigger is the only part of it anybody reads
                 // before deciding. Same red as an item, for the same reason.
