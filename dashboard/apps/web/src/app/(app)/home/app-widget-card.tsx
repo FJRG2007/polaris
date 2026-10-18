@@ -330,7 +330,9 @@ function ActionControl({
             }}
             className={cn(
                 "h-7 max-w-full truncate rounded-md border px-2.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
-                armed ? "border-warning bg-warning/10 text-warning" : "border-border hover:bg-muted"
+                armed
+                    ? "border-warning-edge bg-warning-soft text-warning-ink"
+                    : "border-border hover:bg-muted"
             )}
         >
             {label}
