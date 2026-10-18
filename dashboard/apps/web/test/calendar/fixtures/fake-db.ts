@@ -315,6 +315,7 @@ const MODELS: Record<string, Model> = {
             zone: undefined,
             nextFireAt: null,
             snoozed: false,
+            stoppedDue: null,
             createdAt: now,
             updatedAt: now
         },
@@ -333,6 +334,7 @@ const MODELS: Record<string, Model> = {
             remainingMs: null,
             firedAt: null,
             pomodoro: null,
+            stoppedDue: null,
             createdAt: now,
             updatedAt: now
         },

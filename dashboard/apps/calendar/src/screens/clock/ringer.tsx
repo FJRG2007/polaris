@@ -10,6 +10,12 @@
  * stopped it first, in which case it says nothing. A ring found more than a
  * minute late (the computer slept) is left to the server, which already told
  * the person.
+ *
+ * Every tab and device with the page open rings, so stopping it in one has to
+ * reach the rest: the stop is written on the row (`stoppedDue`), and while
+ * something rings here the snapshot is read again every few seconds so the
+ * ring falls quiet wherever it was answered. Tabs of this browser hear sooner,
+ * over the clock's broadcast channel.
  */
 
 import { useCalendarT } from "../i18n";
@@ -27,6 +33,8 @@ const LATE_MS = 60_000;
 /** The longest one wait is set for; longer ones are worked out again then. */
 const LONGEST_WAIT_MS = 6 * 60 * 60_000;
 const RANG_KEY = "polaris.clock.rang";
+/** How often a ringing screen asks whether it was answered somewhere else. */
+const ANSWERED_POLL_MS = 4_000;
 
 export interface Ring {
     readonly key: string;
@@ -70,6 +78,22 @@ export function ringsOf(snapshot: model.ClockSnapshot): Ring[] {
         });
     }
     return rings.sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
+}
+
+/**
+ * Whether a ring was answered somewhere - stopped or snoozed on another tab or
+ * device, or its alarm or timer deleted. The scheduler moving a ring on is not
+ * an answer: it does that whether or not anybody heard it.
+ */
+export function answered(ring: Ring, snapshot: model.ClockSnapshot): boolean {
+    const rows: readonly { id: string; stoppedDue: string | null }[] =
+        ring.kind === "alarm" ? snapshot.alarms : snapshot.timers;
+    const row = rows.find((entry) => entry.id === ring.id);
+    if (!row) return true;
+    return (
+        row.stoppedDue !== null &&
+        new Date(row.stoppedDue).getTime() === new Date(ring.due).getTime()
+    );
 }
 
 /** Claim a ring for this tab: false when another tab of this browser has it. */
@@ -121,7 +145,7 @@ export function useRinger(clock: ClockRead): Ringer {
             const local = new Date(ring.due).getTime() - skew;
             if (local <= now) {
                 heard.current.add(ring.key);
-                if (now - local > LATE_MS) continue;
+                if (now - local > LATE_MS || answered(ring, snapshot)) continue;
                 void claim(ring.key).then((mine) => {
                     if (mine)
                         setRings((current) =>
@@ -146,6 +170,24 @@ export function useRinger(clock: ClockRead): Ringer {
         document.addEventListener("visibilitychange", wake);
         return () => document.removeEventListener("visibilitychange", wake);
     }, []);
+
+    // A ring answered on another tab or device stops here too.
+    useEffect(() => {
+        if (!snapshot) return;
+        setRings((current) => {
+            const left = current.filter((ring) => !answered(ring, snapshot));
+            return left.length === current.length ? current : left;
+        });
+    }, [snapshot]);
+
+    // While something rings, keep asking whether it was answered elsewhere.
+    const ringing = rings.length > 0;
+    const refresh = clock.refresh;
+    useEffect(() => {
+        if (!ringing) return;
+        const timer = window.setInterval(refresh, ANSWERED_POLL_MS);
+        return () => window.clearInterval(timer);
+    }, [ringing, refresh]);
 
     // One sound at a time: the first ring's.
     const first = rings[0];
@@ -176,7 +218,11 @@ export function useRinger(clock: ClockRead): Ringer {
                               change: "dismiss",
                               due: ring.due
                           })
-                        : clockActions.changeTimerAction({ id: ring.id, change: "dismiss" }),
+                        : clockActions.changeTimerAction({
+                              id: ring.id,
+                              change: "dismiss",
+                              due: ring.due
+                          }),
                 null,
                 failed
             );
@@ -189,7 +235,12 @@ export function useRinger(clock: ClockRead): Ringer {
             done(ring);
             void mutate(
                 clock,
-                () => clockActions.changeAlarmAction({ id: ring.id, change: "snooze" }),
+                () =>
+                    clockActions.changeAlarmAction({
+                        id: ring.id,
+                        change: "snooze",
+                        due: ring.due
+                    }),
                 null,
                 failed
             );
@@ -203,7 +254,12 @@ export function useRinger(clock: ClockRead): Ringer {
             void (async () => {
                 const stopped = await mutate(
                     clock,
-                    () => clockActions.changeTimerAction({ id: ring.id, change: "dismiss" }),
+                    () =>
+                        clockActions.changeTimerAction({
+                            id: ring.id,
+                            change: "dismiss",
+                            due: ring.due
+                        }),
                     null,
                     failed
                 );
