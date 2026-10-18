@@ -183,8 +183,13 @@ export async function saveAlarm(
         await prisma.clockAlarm.create({ data: { userId, ...data } });
         return;
     }
+    const before = await prisma.clockAlarm.findFirst({
+        where: { id, userId },
+        select: { nextFireAt: true }
+    });
     const changed = await prisma.clockAlarm.updateMany({ where: { id, userId }, data });
     if (changed.count === 0) await refusal(userId, "time.errors.gone");
+    await answerRinging(userId, id, before?.nextFireAt ?? null, now);
 }
 
 /** Turn an alarm on or off. On, it rings at its next time from now. */
@@ -196,7 +201,7 @@ export async function setAlarmEnabled(
 ): Promise<void> {
     const alarm = await prisma.clockAlarm.findFirst({
         where: { id, userId },
-        select: { time: true, days: true, zone: true }
+        select: { time: true, days: true, zone: true, nextFireAt: true }
     });
     if (!alarm) return refusal(userId, "time.errors.gone");
     await prisma.clockAlarm.updateMany({
@@ -207,6 +212,7 @@ export async function setAlarmEnabled(
             nextFireAt: enabled ? model.nextAlarmFire(alarm, now) : null
         }
     });
+    await answerRinging(userId, id, alarm.nextFireAt, now);
 }
 
 export async function deleteAlarm(userId: string, id: string): Promise<void> {
@@ -264,6 +270,17 @@ async function noteStopped(
     else await prisma.clockTimer.updateMany({ where, data });
 }
 
+/** Turning off, skipping or editing an alarm whose ring is due answers that
+ *  ring too, wherever it is still sounding. */
+async function answerRinging(
+    userId: string,
+    id: string,
+    due: Date | null,
+    now: Date
+): Promise<void> {
+    if (due && due.getTime() <= now.getTime()) await noteStopped("alarm", userId, id, due);
+}
+
 /** Somebody stopped an alarm that rang in their tab at `due`. */
 export async function dismissAlarm(
     userId: string,
@@ -281,6 +298,7 @@ export async function skipAlarm(userId: string, id: string, now = new Date()): P
     const alarm = await ownAlarm(userId, id);
     if (!alarm.enabled || !alarm.nextFireAt) return;
     await passRing(alarm, alarm.nextFireAt, now);
+    await answerRinging(userId, id, alarm.nextFireAt, now);
 }
 
 /** Ring again in the alarm's snooze length from now. Snoozing a ring that has
@@ -484,7 +502,10 @@ export async function dismissTimer(
     due?: Date
 ): Promise<void> {
     const timer = await ownTimer(userId, id);
-    const ended = timer.endsAt !== null && timer.endsAt.getTime() <= now.getTime();
+    const ended =
+        timer.endsAt !== null &&
+        timer.endsAt.getTime() <= now.getTime() &&
+        (!due || timer.endsAt.getTime() === due.getTime());
     if (ended) await writeTimer(userId, timer, afterRing(timer, timer.endsAt!, now));
     const rung = due ?? (ended ? timer.endsAt : null);
     if (rung) await noteStopped("timer", userId, id, rung);
