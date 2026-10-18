@@ -44,12 +44,16 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"pillars"> {
     return run.preset.options as catalog.EventOptions<"pillars">;
 }
 
+function designOf(run: stored.EventRun): number {
+    return pi.stateOf(run.game).design;
+}
+
 function layoutOf(run: stored.EventRun): pi.Layout {
-    return pi.layoutFor(run.joined.length, optionsOf(run).middle);
+    return pi.layoutFor(run.joined.length, optionsOf(run).middle, designOf(run));
 }
 
 function atOf(run: stored.EventRun, place: stored.Point = run.place!): pi.Placed {
-    return { x: place.x, y: pi.topOver(place.y, optionsOf(run).height), z: place.z };
+    return { x: place.x, y: pi.topOver(place.y, optionsOf(run).height, designOf(run)), z: place.z };
 }
 
 function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {

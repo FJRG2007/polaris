@@ -63,6 +63,9 @@ const PAD = 6;
 /** How far under the pillars' feet the play area goes, and over their tops. */
 const BELOW = 2;
 const ABOVE = 10;
+/** Design 1's pillars and the room over them, kept for a run built on it. */
+const DEPTH_1 = 24;
+const ABOVE_1 = 16;
 /** Room past the play area to the box's wall (`sky-wars.MARGIN`). */
 export const MARGIN = 12;
 const GALLERY_LIFT = 3;
@@ -340,16 +343,26 @@ export interface Layout {
     readonly pillars: readonly { x: number; z: number }[];
     readonly ring: number;
     readonly middle: boolean;
+    /** How far a pillar reaches down, and the play area over their tops: the
+     *  run's own design's. */
+    readonly depth: number;
+    readonly above: number;
 }
 
-export function layoutFor(players: number, middle: boolean): Layout {
+/** A design's pillar depth and room over the tops: a run built on an older
+ *  one keeps its own. */
+function shapeOf(design: number): { depth: number; above: number } {
+    return design >= 2 ? { depth: PILLAR_DEPTH, above: ABOVE } : { depth: DEPTH_1, above: ABOVE_1 };
+}
+
+export function layoutFor(players: number, middle: boolean, design = DESIGN): Layout {
     const count = Math.max(2, Math.min(MOST, players));
     const ring = Math.max(LEAST_RING, Math.ceil(SPACING / (2 * Math.sin(Math.PI / count))));
     const pillars = Array.from({ length: count }, (_, index) => {
         const angle = (2 * Math.PI * index) / count;
         return { x: Math.round(Math.sin(angle) * ring), z: Math.round(-Math.cos(angle) * ring) };
     });
-    return { pillars, ring, middle };
+    return { pillars, ring, middle, ...shapeOf(design) };
 }
 
 /** Where the ring stands: its middle, at the pillars' top. */
@@ -361,18 +374,18 @@ export interface Placed {
 
 /** The pillars' top over the ground found: `height` up, but never so low that
  *  the box under them reaches the ground. */
-export function topOver(ground: number, height: number): number {
-    return ground + Math.max(height, PILLAR_DEPTH + BELOW + MARGIN + 2);
+export function topOver(ground: number, height: number, design = DESIGN): number {
+    return ground + Math.max(height, shapeOf(design).depth + BELOW + MARGIN + 2);
 }
 
 export function playArea(layout: Layout, at: Placed): Box {
     const reach = layout.ring + PAD;
     return {
         x1: at.x - reach,
-        y1: at.y - PILLAR_DEPTH - BELOW,
+        y1: at.y - layout.depth - BELOW,
         z1: at.z - reach,
         x2: at.x + reach,
-        y2: at.y + ABOVE,
+        y2: at.y + layout.above,
         z2: at.z + reach
     };
 }
@@ -419,7 +432,7 @@ export function arenaFills(layout: Layout, at: Placed): Fill[] {
         box: { x1: x, y1, z1: z, x2: x, y2, z2: z },
         block
     });
-    const foot = at.y - PILLAR_DEPTH + 1;
+    const foot = at.y - layout.depth + 1;
     if (layout.middle)
         fills.push(
             column(at.x, at.z, at.y, at.y, MIDDLE_HEART),

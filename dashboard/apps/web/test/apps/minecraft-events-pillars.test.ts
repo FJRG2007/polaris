@@ -109,6 +109,17 @@ describe("the pillars' ring", () => {
         ).toBeLessThan(120);
     });
 
+    it("keeps design 1's tall pillars for a run built on it", () => {
+        const old = pi.layoutFor(8, true, 1);
+        const top = pi.topOver(64, 0, 1);
+        const play = pi.playArea(old, { ...at, y: top });
+        expect(top).toBe(64 + 24 + 2 + pi.MARGIN + 2);
+        expect(play.y1).toBe(top - 24 - 2);
+        expect(play.y2).toBe(top + 16);
+        expect(pi.galleryFloor(old, { ...at, y: top }).y1).toBe(top + 16 + 3);
+        expect(pi.playArea(pi.layoutFor(8, true), at).y2).toBe(at.y + 10);
+    });
+
     it("is never built so low that its box reaches the ground", () => {
         const layout = pi.layoutFor(8, true);
         const top = pi.topOver(64, 40);
@@ -540,6 +551,16 @@ describe("a pillars game played", () => {
 
     beforeEach(() => {
         packOn = false;
+    });
+
+    it("seats a run built on design 1 on the gallery it was built with", () => {
+        const fresh = runOf(["Ana", "Bo", "Cy"]);
+        const old = stored.runSchema.parse({ ...fresh, game: { design: 1 } });
+        const oldTop = pi.topOver(PLACE.y, 40, 1);
+        const oldLayout = pi.layoutFor(3, true, 1);
+        expect(game.respawn(old)).toEqual(pi.gallerySpot(oldLayout, { ...PLACE, y: oldTop }, 0));
+        expect(game.respawn(old).y).toBe(oldTop + 16 + 3 + 1);
+        expect(game.respawn(fresh).y).toBe(top + 10 + 3 + 1);
     });
 
     it("is an arena kind like SkyWars: stashed first, PvP, last one standing, the pack on", () => {
