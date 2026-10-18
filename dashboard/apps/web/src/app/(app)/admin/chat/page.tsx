@@ -12,15 +12,18 @@ import { OrgChatView } from "./org-chat-view";
 import { orgChatOffered } from "@/lib/chat/isolation";
 import { driveShare } from "@/lib/chat/drive-share";
 import { DriveShareView } from "./drive-share-view";
+import { linkSafetyOverview } from "@/lib/chat/link-safety";
+import { LinkSafetyView } from "./link-safety-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChatRulesPage() {
     await requireAdmin();
-    const [rules, offered, share, t] = await Promise.all([
+    const [rules, offered, share, linkSafety, t] = await Promise.all([
         allChatRules(),
         orgChatOffered(),
         driveShare(),
+        linkSafetyOverview(),
         getTranslations("admin")
     ]);
 
@@ -45,6 +48,9 @@ export default async function ChatRulesPage() {
                 where calls run. */}
             <div className="mt-8">
                 <OrgChatView offered={offered} />
+            </div>
+            <div className="mt-8">
+                <LinkSafetyView initial={linkSafety} />
             </div>
             {/* Under the rules rather than above them: the rules are what an
                 administrator comes here to change, and this is set once and then

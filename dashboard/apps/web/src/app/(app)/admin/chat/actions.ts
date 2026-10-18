@@ -18,6 +18,7 @@ import { isDriveShare, setDriveShare } from "@/lib/chat/drive-share";
 import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
+import { saveLinkSafetySettings } from "@/lib/chat/link-safety";
 
 export async function setChatRulesAction(
     scope: unknown,
@@ -84,6 +85,31 @@ export async function setOrgChatOfferedAction(offered: unknown): Promise<{ error
         targetType: "setting",
         targetId: "chat.orgIsolation",
         metadata: { offered: wanted }
+    });
+    revalidatePath("/admin/chat");
+    return {};
+}
+
+/**
+ * Turn the check of links in messages on or off, and choose who is asked.
+ *
+ * Validated by the same schema the reader parses with, so a provider that is not
+ * one is refused here rather than stored and dropped on the way out.
+ */
+export async function setLinkSafetyAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    let saved;
+    try {
+        saved = await saveLinkSafetySettings(input);
+    } catch {
+        return { error: (await getTranslations("admin"))("chat.errors.notSaved") };
+    }
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.linkSafety.set",
+        targetType: "setting",
+        targetId: "chat.linkSafety",
+        metadata: { ...saved }
     });
     revalidatePath("/admin/chat");
     return {};

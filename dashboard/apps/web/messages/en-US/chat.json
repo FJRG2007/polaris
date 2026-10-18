@@ -577,7 +577,11 @@
         "pinnedHere": "Pinned",
         "app": "APP",
         "webhookHint": "Posted by an app through a webhook, not by a person",
-        "addReaction": "Add reaction"
+        "addReaction": "Add reaction",
+        "linkFlagged": {
+            "yours": "{provider} flagged a link in your message. Others are warned before they open it.",
+            "moderator": "{provider} flagged a link in this message. Others are warned before they open it, and you can delete it from its menu."
+        }
     },
     "composer": {
         "replyingTo": "Replying to",

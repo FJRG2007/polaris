@@ -577,7 +577,11 @@
         "pinnedHere": "Fijado",
         "app": "APP",
         "webhookHint": "Lo publicó una app mediante un webhook, no una persona",
-        "addReaction": "Reaccionar"
+        "addReaction": "Reaccionar",
+        "linkFlagged": {
+            "yours": "{provider} marcó un enlace de tu mensaje. A los demás se les avisa antes de abrirlo.",
+            "moderator": "{provider} marcó un enlace de este mensaje. A los demás se les avisa antes de abrirlo, y puedes borrarlo desde su menú."
+        }
     },
     "composer": {
         "replyingTo": "Respondiendo a",

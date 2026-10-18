@@ -273,4 +273,29 @@ describe("checkMessageLinks", () => {
         expect(prisma.chatMessageLinkFlag.deleteMany).not.toHaveBeenCalled();
         expect(state.flags).toEqual([]);
     });
+
+    it("shows no warning once link safety or the provider is turned off", async () => {
+        turnOn(["dymo"]);
+        state.bodies.set(MESSAGE, ["https://shop.example/scam"]);
+        await checkMessageLinks(MESSAGE);
+        expect((await flaggedLinksFor([MESSAGE])).get(MESSAGE)).toHaveLength(1);
+
+        state.settings = JSON.stringify({ enabled: false, providers: ["dymo"] });
+        expect((await flaggedLinksFor([MESSAGE])).get(MESSAGE)).toBeUndefined();
+
+        state.settings = JSON.stringify({ enabled: true, providers: ["dymo"] });
+        state.enabled.delete("dymo");
+        expect((await flaggedLinksFor([MESSAGE])).get(MESSAGE)).toBeUndefined();
+    });
+
+    it("reads a page of messages in one query, whatever its size", async () => {
+        turnOn(["dymo"]);
+        await flaggedLinksFor(["m1", "m2", "m3"]);
+        expect(prisma.chatMessageLinkFlag.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.chatMessageLinkFlag.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { messageId: { in: ["m1", "m2", "m3"] }, provider: { in: ["dymo"] } }
+            })
+        );
+    });
 });
