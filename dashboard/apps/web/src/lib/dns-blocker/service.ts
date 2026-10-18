@@ -75,7 +75,13 @@ export class DnsBlockerRefusal extends Error {
  * - `noAddress`: this machine has no address on the network Polaris knows of.
  */
 export type DnsBlockerState =
-    "off" | "portTaken" | "starting" | "portHeld" | "conflict" | "blocking" | "noAddress";
+    | "off"
+    | "portTaken"
+    | "starting"
+    | "portHeld"
+    | "conflict"
+    | "blocking"
+    | "noAddress";
 
 export interface DnsBlockerStatus {
     readonly state: DnsBlockerState;
