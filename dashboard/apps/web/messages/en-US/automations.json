@@ -196,7 +196,8 @@
         "conversationLoading": "Loading conversations...",
         "conversationNone": "You are not in any conversation yet.",
         "conversationGone": "You are no longer in this conversation. Pick another.",
-        "conversationSelf": "Just you"
+        "conversationSelf": "Just you",
+        "conversationInSpace": "#{channel} in {space}"
     },
     "operators": {
         "eq": "equals",
@@ -288,6 +289,10 @@
         "valuesTooLarge": "The values were too large",
         "messageEmpty": "The message came out empty",
         "messageRefused": "Chat did not accept the message",
+        "messageTooLong": "The message is longer than that conversation allows",
+        "messageTooOften": "Sent too often for that conversation",
+        "messageMentions": "Too many mentions, or @everyone where it is not allowed",
+        "messageBlocked": "The account it runs as blocked someone in that conversation",
         "messageForbidden": "Can no longer post in that conversation"
     },
     "secrets": {

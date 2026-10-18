@@ -661,13 +661,23 @@ export async function setTagsAction(input: unknown): Promise<Result<{ tags: stri
 /** The conversations the signed-in account is in, for the "Send a chat message" step to pick from. */
 export async function chatConversationsAction(): Promise<
     Result<{
-        conversations: { id: string; kind: string; name: string; others: string[] }[];
+        conversations: {
+            id: string;
+            kind: string;
+            name: string;
+            space: string | null;
+            others: string[];
+        }[];
     }>
 > {
     try {
         const who = await actor();
-        const { listChannels } = await import("@/lib/chat/chat-service");
-        const channels = await listChannels({ id: who.id });
+        const { listChannels, listSpaces } = await import("@/lib/chat/chat-service");
+        const [channels, spaces] = await Promise.all([
+            listChannels({ id: who.id }),
+            listSpaces({ id: who.id })
+        ]);
+        const spaceNames = new Map(spaces.map((space) => [space.id, space.name]));
         return {
             ok: true,
             conversations: channels
@@ -676,6 +686,7 @@ export async function chatConversationsAction(): Promise<
                     id: channel.id,
                     kind: channel.kind,
                     name: channel.name,
+                    space: channel.spaceId ? (spaceNames.get(channel.spaceId) ?? null) : null,
                     others: channel.others.map((other) => other.name)
                 }))
         };

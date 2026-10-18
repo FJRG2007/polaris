@@ -8,6 +8,7 @@
  */
 
 import * as core from "@polaris/core";
+import type { ChatErrorText } from "@/lib/chat/access";
 import { StepError, StepRefusal, type ServerNode } from "../types";
 
 const C = core.CORE_NODE_CONFIGS;
@@ -207,6 +208,20 @@ const notifyNode: ServerNode<NotifyConfig> = {
 
 type MessageConfig = ReturnType<(typeof C)["core.message"]["parse"]>;
 
+/** Chat's refusals the author can act on, by the run error that says what to change. */
+const MESSAGE_REFUSALS: Readonly<Partial<Record<ChatErrorText["key"], string>>> = {
+    "errors.messageTooLong": "messageTooLong",
+    "errors.tooFast": "messageTooOften",
+    "errors.slowMode": "messageTooOften",
+    "errors.repeatedMessage": "messageTooOften",
+    "errors.repeatedMention": "messageMentions",
+    "errors.tooManyMentions": "messageMentions",
+    "errors.roomMentionsPerHour": "messageMentions",
+    "errors.roomMentionOwnerOnly": "messageMentions",
+    "errors.blockedRecipient": "messageBlocked",
+    "errors.blockedRecipientUnnamed": "messageBlocked"
+};
+
 /**
  * Post into a Polaris chat conversation as the account the automation runs as.
  *
@@ -221,10 +236,7 @@ const messageNode: ServerNode<MessageConfig> = {
     run: async (config, context, io) => {
         const chat = await import("@/lib/chat/messages");
         const { ChatAccessError, ChatRuleError } = await import("@/lib/chat/access");
-        const body = core
-            .interpolate(config.body, context)
-            .slice(0, core.MAX_CHAT_MESSAGE)
-            .trim();
+        const body = core.interpolate(config.body, context).slice(0, core.MAX_CHAT_MESSAGE).trim();
         io.recordInput({ channelId: config.channelId, body });
         if (!body) throw new StepError("messageEmpty");
         try {
@@ -234,7 +246,8 @@ const messageNode: ServerNode<MessageConfig> = {
             );
             return { output: { messageId } };
         } catch (caught) {
-            if (caught instanceof ChatRuleError) throw new StepError("messageRefused");
+            if (caught instanceof ChatRuleError)
+                throw new StepError(MESSAGE_REFUSALS[caught.text.key] ?? "messageRefused");
             if (caught instanceof ChatAccessError) throw new StepRefusal("messageForbidden");
             throw caught;
         }

@@ -216,6 +216,10 @@ const RUN_ERRORS = [
     "valuesTooLarge",
     "messageEmpty",
     "messageRefused",
+    "messageTooLong",
+    "messageTooOften",
+    "messageMentions",
+    "messageBlocked",
     "messageForbidden",
     "announceLimited",
     "announceFailed"

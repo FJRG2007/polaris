@@ -770,7 +770,13 @@ export function WebhookAddress({
     );
 }
 
-type Conversation = { id: string; kind: string; name: string; others: string[] };
+type Conversation = {
+    id: string;
+    kind: string;
+    name: string;
+    space: string | null;
+    others: string[];
+};
 
 /**
  * Where "Send a chat message" posts, and what it says.
@@ -795,14 +801,17 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
     }, []);
     const label = (entry: Conversation) =>
         entry.kind === "text" || entry.kind === "voice"
-            ? `#${entry.name}`
+            ? entry.space
+                ? t("fields.conversationInSpace", { channel: entry.name, space: entry.space })
+                : `#${entry.name}`
             : entry.name || entry.others.join(", ") || t("fields.conversationSelf");
     const options: SelectOption[] = (conversations ?? []).map((entry) => ({
         value: entry.id,
         label: label(entry)
     }));
     const chosen = typeof config.channelId === "string" ? config.channelId : "";
-    const missing = conversations !== null && chosen !== "" && !options.some((o) => o.value === chosen);
+    const missing =
+        conversations !== null && chosen !== "" && !options.some((o) => o.value === chosen);
     return (
         <div className="space-y-3">
             <Field label={`${t("fields.conversation")} *`}>
@@ -811,7 +820,9 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
                     onValueChange={(channelId) => set({ channelId })}
                     options={options}
                     placeholder={t(
-                        conversations === null ? "fields.conversationLoading" : "fields.conversationPick"
+                        conversations === null
+                            ? "fields.conversationLoading"
+                            : "fields.conversationPick"
                     )}
                     aria-label={t("fields.conversation")}
                 />
@@ -820,9 +831,7 @@ function ChatMessageFields({ config, set }: { config: Config; set: (change: Conf
             {conversations !== null && options.length === 0 && (
                 <p className="text-xs text-muted-foreground">{t("fields.conversationNone")}</p>
             )}
-            {missing && (
-                <p className="text-xs text-danger-ink">{t("fields.conversationGone")}</p>
-            )}
+            {missing && <p className="text-xs text-danger-ink">{t("fields.conversationGone")}</p>}
             <Field label={`${t("fields.body")} *`}>
                 <RefTextarea
                     rows={3}

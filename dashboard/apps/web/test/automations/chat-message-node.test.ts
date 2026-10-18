@@ -72,6 +72,16 @@ describe("Send a chat message", () => {
         await expect(attempt).rejects.toBeInstanceOf(StepError);
     });
 
+    it.each([
+        [{ key: "errors.slowMode", params: { wait: "1 minute" } }, "messageTooOften"],
+        [{ key: "errors.messageTooLong", params: { count: 10 } }, "messageTooLong"],
+        [{ key: "errors.tooManyMentions", params: { count: 5 } }, "messageMentions"],
+        [{ key: "errors.blockedRecipientUnnamed" }, "messageBlocked"]
+    ])("says what to change when chat refuses with %o", async (text, code) => {
+        refusal = new ChatRuleError(text as never);
+        await expect(run("Hello")).rejects.toMatchObject({ code });
+    });
+
     it("sends nothing when the filled-in body is blank", async () => {
         await expect(run("{{trigger.missing}}", { trigger: {} })).rejects.toMatchObject({
             code: "messageEmpty"

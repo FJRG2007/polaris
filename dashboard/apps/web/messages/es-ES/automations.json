@@ -196,7 +196,8 @@
         "conversationLoading": "Cargando conversaciones...",
         "conversationNone": "Aún no estás en ninguna conversación.",
         "conversationGone": "Ya no estás en esta conversación. Elige otra.",
-        "conversationSelf": "Solo tú"
+        "conversationSelf": "Solo tú",
+        "conversationInSpace": "#{channel} en {space}"
     },
     "operators": {
         "eq": "igual a",
@@ -288,6 +289,10 @@
         "valuesTooLarge": "Valores demasiado grandes",
         "messageEmpty": "El mensaje quedó vacío",
         "messageRefused": "El chat rechazó el mensaje",
+        "messageTooLong": "El mensaje supera la longitud que permite esa conversación",
+        "messageTooOften": "Enviado con demasiada frecuencia para esa conversación",
+        "messageMentions": "Demasiadas menciones, o @everyone donde no se permite",
+        "messageBlocked": "La cuenta con la que se ejecuta bloqueó a alguien de esa conversación",
         "messageForbidden": "Ya no puede escribir en esa conversación"
     },
     "secrets": {
