@@ -12,9 +12,26 @@ export const CONNECTIONS_HUB = "/account/connections";
 export const RETURN_PARAM = "return";
 
 export function connectionsHref(provider?: string | null, returnTo?: string | null): string {
+    return withHubParams(CONNECTIONS_HUB, provider, returnTo);
+}
+
+/** The same hub for what one organization owns, in that organization's screens. */
+export function orgConnectionsHref(
+    slug: string,
+    provider?: string | null,
+    returnTo?: string | null
+): string {
+    return withHubParams(
+        `/account/organizations/${encodeURIComponent(slug)}/connections`,
+        provider,
+        returnTo
+    );
+}
+
+function withHubParams(base: string, provider?: string | null, returnTo?: string | null): string {
     const params = new URLSearchParams();
     if (provider) params.set("provider", provider);
     if (returnTo) params.set(RETURN_PARAM, returnTo);
     const search = params.toString();
-    return search ? `${CONNECTIONS_HUB}?${search}` : CONNECTIONS_HUB;
+    return search ? `${base}?${search}` : base;
 }

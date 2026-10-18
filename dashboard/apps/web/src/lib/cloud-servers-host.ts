@@ -12,10 +12,27 @@
  */
 
 import { loadEnv } from "@polaris/config";
+import {
+    managedConnectionOrgs,
+    managesOrgConnections,
+    orgActorFor,
+    type ManagedConnectionOrg
+} from "@/lib/connections/org-scope";
 import type { SealedSecret } from "@/lib/calendar-host";
 import { removeServer } from "@/lib/server-removal-service";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { getEnrollmentStatus, openEnrollment } from "@/lib/enrollment-service";
+
+/** The organizations this account may connect cloud accounts for, by name. */
+export async function cloudConnectionOrgs(userId: string): Promise<ManagedConnectionOrg[]> {
+    return managedConnectionOrgs(await orgActorFor(userId));
+}
+
+/** Whether this account may connect, use and remove one organization's cloud
+ *  accounts: the same check the organization's Connections screen draws from. */
+export async function managesCloudOrg(userId: string, orgId: string): Promise<boolean> {
+    return managesOrgConnections(await orgActorFor(userId), orgId);
+}
 
 /** Seal a provider credential for storage. */
 export async function sealCloudSecret(secret: string): Promise<SealedSecret> {

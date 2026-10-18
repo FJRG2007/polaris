@@ -427,5 +427,11 @@
             "cpus": "Esto pasaría tu organización de su límite de {limit} núcleos de CPU. Pide a un admin que lo suba.",
             "memoryMb": "Esto pasaría tu organización de su límite de {limit} MB de memoria. Pide a un admin que lo suba."
         }
+    },
+    "connections": {
+        "title": "Cuentas conectadas",
+        "intro": "Cuentas conectadas para esta organización y no para una persona. Quien gestiona la organización puede usarlas y quitarlas.",
+        "readOnly": "Cuentas conectadas para esta organización. Solo quien gestiona la organización puede conectarlas o quitarlas.",
+        "empty": "Ninguna app de este Polaris conecta todavía cuentas para una organización."
     }
 }

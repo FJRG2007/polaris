@@ -6253,6 +6253,7 @@ model ConnectivityOutageMonth {
 // large they may get are administrator settings rather than schema (see
 // ORGANIZATION_POLICY in @polaris/core).
 model Organization {
+    cloudAccounts     CloudAccount[]
     automations       Automation[]
     automationSecrets AutomationSecret[]
     automationFolders AutomationFolder[]
@@ -14183,15 +14184,23 @@ model CloudAccount {
     encryptedSecret Bytes
     secretNonce     Bytes
     secretKeyId     String
+    // The organization the account is connected for, or null for its owner's
+    // own. Set, it is the organization's: whoever may manage the organization's
+    // connections may use and remove it, and `ownerId` only records who connected
+    // it. Losing the organization hands it back to that person rather than
+    // dropping an account whose servers may still be running.
+    organizationId  String?  @db.Uuid
     // The last refusal the provider answered with, shown on the account.
     lastError       String?
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
-    owner   User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-    servers CloudServer[]
+    owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+    servers      CloudServer[]
 
     @@index([ownerId])
+    @@index([organizationId])
 }
 
 // A server the Cloud servers app created. Kept after it is destroyed

@@ -648,6 +648,10 @@
                 "refused": "Spotify did not accept that client id and secret. Copy both again from the app's Basic Information.",
                 "unreachable": "Spotify could not be reached. Try again in a moment."
             }
+        },
+        "orgHub": {
+            "title": "For an organization",
+            "intro": "An account connected for an organization belongs to it. Open its connections to connect one there."
         }
     },
     "details": {

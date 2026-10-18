@@ -34,7 +34,9 @@ export async function overviewAction(): Promise<Outcome<Overview>> {
 const accountSchema = z.object({
     provider: z.enum(PROVIDERS),
     name: z.string().trim().min(1).max(60),
-    credentials: z.record(z.string().max(12_000)).refine((r) => Object.keys(r).length <= 8)
+    credentials: z.record(z.string().max(12_000)).refine((r) => Object.keys(r).length <= 8),
+    // The organization it is connected for; absent or null for the person's own.
+    orgId: id.nullable().optional()
 });
 
 export async function connectAccountAction(
@@ -44,7 +46,8 @@ export async function connectAccountAction(
     if (!parsed.success) return invalid();
     return outcome(async () => {
         const user = await service.requireCloudUser();
-        return { account: await service.addAccount(user.id, parsed.data) };
+        const { orgId, ...account } = parsed.data;
+        return { account: await service.addAccount(user.id, account, orgId ?? null) };
     });
 }
 

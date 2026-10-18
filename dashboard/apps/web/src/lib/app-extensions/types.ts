@@ -96,6 +96,29 @@ export interface AppAutomationsFilter {
     readonly after: AppSlot | null;
 }
 
+/**
+ * Whose connections a hub is listing: the reader's own, or one organization's.
+ * `canManage` is the organization's own answer (`lib/connections/org-scope`);
+ * an app may narrow it further with its own rules, never widen it.
+ */
+export type ConnectionsScope =
+    | { readonly kind: "personal" }
+    | {
+          readonly kind: "org";
+          readonly orgId: string;
+          readonly orgSlug: string;
+          readonly orgName: string;
+          readonly canManage: boolean;
+      };
+
+/** Who is reading a connections hub, and the screen it was opened from. */
+export interface ConnectionsViewer {
+    readonly userId: string;
+    readonly scope: ConnectionsScope;
+    /** A same-origin path already checked by the hub, or null. */
+    readonly returnTo: string | null;
+}
+
 export interface AppExtension {
     /** The catalog id of the app, the one its install row carries. */
     readonly id: string;
@@ -244,6 +267,13 @@ export interface AppExtension {
 
     /** The panel an installed-app page draws for one of its installs. */
     readonly installedPanelSlot?: (install: ExtensionInstall) => Promise<AppSlot | null>;
+    /**
+     * The section it adds to a connections hub - Profile > Connections, or an
+     * organization's - for the accounts it connects itself. The slot's root
+     * element carries `id="connection-<app id>"` so `?provider=<app id>` can
+     * point at it. Null when this viewer has nothing of it to see.
+     */
+    readonly connectionsSlot?: (viewer: ConnectionsViewer) => Promise<AppSlot | null>;
 
     /** Work started once when the dashboard boots. Must not wait on anything:
      *  the server is still starting. */

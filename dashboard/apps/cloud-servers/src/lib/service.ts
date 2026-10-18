@@ -127,9 +127,24 @@ async function adapterOf(account: AccountRow): Promise<ProviderAdapter> {
     return adapterFor(account.provider as ProviderId, secret);
 }
 
+/**
+ * The accounts this person may use: their own, and those of every organization
+ * whose connections they manage. Asked of the dashboard each time, so somebody
+ * who stops managing an organization stops reaching its accounts at once.
+ */
+async function usableWhere(userId: string) {
+    const orgs = await host.cloudServersHost.cloudConnectionOrgs(userId);
+    return {
+        OR: [
+            { ownerId: userId, organizationId: null },
+            ...(orgs.length > 0 ? [{ organizationId: { in: orgs.map((org) => org.id) } }] : [])
+        ]
+    };
+}
+
 async function ownAccount(userId: string, accountId: string) {
     const account = await prisma.cloudAccount.findFirst({
-        where: { id: accountId, ownerId: userId },
+        where: { id: accountId, ...(await usableWhere(userId)) },
         select: accountSelect
     });
     return account ?? refuse("errors.accountNotFound");
@@ -150,23 +165,66 @@ export interface AccountView {
     readonly provider: ProviderId;
     readonly name: string;
     readonly lastError: string | null;
+    /** The organization it was connected for; null when it is its owner's own. */
+    readonly organization: { readonly id: string; readonly name: string } | null;
 }
 
+const accountViewSelect = {
+    id: true,
+    provider: true,
+    name: true,
+    lastError: true,
+    organization: { select: { id: true, name: true } }
+} as const;
+
+function toView(row: {
+    id: string;
+    provider: string;
+    name: string;
+    lastError: string | null;
+    organization: { id: string; name: string } | null;
+}): AccountView {
+    return { ...row, provider: row.provider as ProviderId };
+}
+
+/** Every account this person may create servers at. */
 export async function listAccounts(userId: string): Promise<AccountView[]> {
     const rows = await prisma.cloudAccount.findMany({
-        where: { ownerId: userId },
-        select: { id: true, provider: true, name: true, lastError: true },
+        where: await usableWhere(userId),
+        select: accountViewSelect,
         orderBy: { createdAt: "asc" },
         take: 100
     });
-    return rows.map((r) => ({ ...r, provider: r.provider as ProviderId }));
+    return rows.map(toView);
+}
+
+/**
+ * The accounts one connections hub lists: this person's own, or one
+ * organization's. The hub decided the reader may see that organization; this
+ * reads nothing secret.
+ */
+export async function listScopedAccounts(
+    userId: string,
+    orgId: string | null
+): Promise<AccountView[]> {
+    const rows = await prisma.cloudAccount.findMany({
+        where: orgId ? { organizationId: orgId } : { ownerId: userId, organizationId: null },
+        select: accountViewSelect,
+        orderBy: { createdAt: "asc" },
+        take: 100
+    });
+    return rows.map(toView);
 }
 
 /** Connect an account, after one read proves the credential works. */
 export async function addAccount(
     userId: string,
-    input: { provider: ProviderId; name: string; credentials: Record<string, string> }
+    input: { provider: ProviderId; name: string; credentials: Record<string, string> },
+    orgId: string | null = null
 ): Promise<AccountView> {
+    if (orgId && !(await host.cloudServersHost.managesCloudOrg(userId, orgId))) {
+        return refuse("errors.orgNotManaged");
+    }
     const parsed = credentialSchemas[input.provider].safeParse(input.credentials);
     if (!parsed.success) return refuse("errors.credentials");
     const json = JSON.stringify(parsed.data);
@@ -174,17 +232,23 @@ export async function addAccount(
     await adapter.listRegions().catch(providerRefusal);
     const sealed = await host.cloudServersHost.sealCloudSecret(json);
     const row = await prisma.cloudAccount.create({
-        data: { ownerId: userId, provider: input.provider, name: input.name, ...sealed },
-        select: { id: true, provider: true, name: true, lastError: true }
+        data: {
+            ownerId: userId,
+            organizationId: orgId,
+            provider: input.provider,
+            name: input.name,
+            ...sealed
+        },
+        select: accountViewSelect
     });
     await host.auditService.recordAudit({
         actorId: userId,
         action: "cloud.account.connect",
         targetType: "cloud-account",
         targetId: row.id,
-        metadata: { provider: input.provider }
+        metadata: { provider: input.provider, ...(orgId ? { organizationId: orgId } : {}) }
     });
-    return { ...row, provider: input.provider };
+    return toView(row);
 }
 
 /** Forget an account. Refused while it still has servers, which would go on

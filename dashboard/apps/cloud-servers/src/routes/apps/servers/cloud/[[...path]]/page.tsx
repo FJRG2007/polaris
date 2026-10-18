@@ -5,20 +5,26 @@
  */
 
 import { PAGE_FILL } from "@polaris/ui";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireCloudUser } from "../../../../../lib/service";
 import { CloudServersScreen } from "../../../../../screens/cloud-servers-screen";
+import { CONNECT_HREF, cloudPathTarget } from "../../../../../lib/cloud-routes";
 
 export const dynamic = "force-dynamic";
 
 export default async function CloudServersPage({
-    params
+    params,
+    searchParams
 }: {
     params: Promise<Record<string, string | string[]>>;
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
     await requireCloudUser();
-    const raw = (await params).path;
-    if (raw !== undefined && (!Array.isArray(raw) || raw.length > 0)) notFound();
+    const target = cloudPathTarget((await params).path);
+    if (target === null) notFound();
+    // Connecting an account moved to the connections hub; an old link to it,
+    // `/connect` or `?connect`, lands there and comes back here.
+    if (target === "connect" || (await searchParams)?.connect !== undefined) redirect(CONNECT_HREF);
     return (
         <div className={PAGE_FILL}>
             <CloudServersScreen />

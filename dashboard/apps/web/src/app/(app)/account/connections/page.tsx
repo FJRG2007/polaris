@@ -8,7 +8,11 @@
  * alone.
  */
 
+import Link from "next/link";
 import { getTranslations } from "@/lib/i18n/request";
+import { hubAppSections, hubSearch } from "./app-sections";
+import { managedConnectionOrgs } from "@/lib/connections/org-scope";
+import { orgConnectionsHref, RETURN_PARAM } from "@/lib/connections/hub-href";
 import { requireUser, sessionCan } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
@@ -30,18 +34,15 @@ export default async function ConnectionsPage({
 }) {
     // Only what the screen reads on its first render: which service an app sent
     // somebody here for, and the app to offer the way back to.
-    const params = (await searchParams) ?? {};
-    const initial = new URLSearchParams();
-    for (const key of ["provider", "return"]) {
-        const value = params[key];
-        if (typeof value === "string") initial.set(key, value);
-    }
+    const search = hubSearch((await searchParams) ?? {});
     const user = await requireUser();
     const t = await getTranslations("account");
-    const [linked, lastfmReady, canConfigure] = await Promise.all([
+    const [linked, lastfmReady, canConfigure, apps, orgs] = await Promise.all([
         listConnections(user.id),
         lastfmApiKey().then((key) => key !== null),
-        sessionCan(user, "settings.manage")
+        sessionCan(user, "settings.manage"),
+        hubAppSections(user.id, { kind: "personal" }, search),
+        managedConnectionOrgs(user)
     ]);
 
     const providers = await Promise.all(
@@ -106,7 +107,40 @@ export default async function ConnectionsPage({
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
             </div>
-            <ConnectionsView providers={providers} initialSearch={initial.toString()} />
+            <ConnectionsView
+                providers={providers}
+                initialSearch={search}
+                appSections={apps.node}
+                appSectionIds={apps.ids}
+            />
+            {/* What somebody connects for an organization is the organization's,
+                and lives in its own hub - offered here, carrying where they came
+                from, to whoever manages one. */}
+            {orgs.length > 0 && apps.ids.length > 0 ? (
+                <section aria-labelledby="org-connections" className="flex flex-col gap-2">
+                    <h2 id="org-connections" className="text-sm font-medium text-muted-foreground">
+                        {t("connections.orgHub.title")}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">{t("connections.orgHub.intro")}</p>
+                    <ul className="flex flex-wrap gap-2">
+                        {orgs.map((org) => (
+                            <li key={org.id} className="min-w-0">
+                                <Link
+                                    href={orgConnectionsHref(
+                                        org.slug,
+                                        new URLSearchParams(search).get("provider"),
+                                        new URLSearchParams(search).get(RETURN_PARAM)
+                                    )}
+                                    className="block max-w-64 truncate rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                                    title={org.name}
+                                >
+                                    {org.name}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
         </div>
     );
 }
