@@ -142,7 +142,14 @@ export function ConversationNote({
                 // The reply field handles its own Escape: it closes the field.
                 if (event.key === "Escape" && !event.defaultPrevented) {
                     event.preventDefault();
-                    onDismiss();
+                    if (choosing) {
+                        if (acting === null) {
+                            setChoosing(null);
+                            setProblem(null);
+                        }
+                    } else {
+                        onDismiss();
+                    }
                 }
             }}
             className={cn(
