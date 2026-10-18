@@ -231,6 +231,23 @@ export async function ruleFromLogAction(
     }
 }
 
+/** Which addresses asked the blocker today, for the check under the router
+ *  steps. The same read of the log as the insights card's unfiltered view. */
+export async function dnsClientsAction(
+    fresh?: unknown
+): Promise<Result<{ clients: readonly string[]; logOff: boolean }>> {
+    await requireAdmin();
+    try {
+        const read = await insights.dnsInsights(
+            queryLog.queryFilterSchema.parse({}),
+            z.boolean().default(false).parse(fresh)
+        );
+        return { clients: read.stats.clients.map((client) => client.address), logOff: read.logOff };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 /** Let every lookup through for the given seconds, or until resumed (0). */
 export async function pauseDnsBlockingAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();

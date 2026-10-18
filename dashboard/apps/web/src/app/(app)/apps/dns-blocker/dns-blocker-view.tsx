@@ -37,6 +37,7 @@ import {
     turnOnDnsBlockerAction
 } from "./actions";
 import { DnsInsightsCard } from "./dns-insights";
+import { RouterDnsGuide } from "./router-dns-guide";
 
 /** One rule or resolver per line, blank lines ignored. */
 function lines(text: string): string[] {
@@ -391,12 +392,7 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                             <Skeleton className="h-5 w-28" />
                         )}
                     </div>
-                    <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
-                        <li>{t("router.step1")}</li>
-                        <li>{t("router.step2", { address: status?.address ?? "-" })}</li>
-                        <li>{t("router.step3")}</li>
-                        <li>{t("router.step4")}</li>
-                    </ol>
+                    <RouterDnsGuide address={status?.address ?? null} blocking={state === "blocking"} />
                 </CardBody>
             </Card>
 

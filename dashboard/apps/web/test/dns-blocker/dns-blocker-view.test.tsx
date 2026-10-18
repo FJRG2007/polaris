@@ -21,6 +21,7 @@ vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     turnOffDnsBlockerAction: async () => ({}),
     turnOnDnsBlockerAction,
     dnsInsightsAction,
+    dnsClientsAction: async () => ({ clients: [], logOff: false }),
     pauseDnsBlockingAction: async () => ({}),
     dnsListsAction: async () => ({ metrics: null }),
     dnsTailAction: async () => ({ rows: [] }),

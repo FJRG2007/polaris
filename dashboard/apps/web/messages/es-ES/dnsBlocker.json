@@ -257,5 +257,35 @@
         "days": "Días de consultas guardados",
         "namesFrom": "Router con nombres de equipos",
         "namesFromHint": "Su dirección. Así los dispositivos se muestran por nombre en vez de por dirección. Déjalo vacío para ver direcciones."
+    },
+    "routerGuide": {
+        "brand": "Tu router",
+        "otherBrand": "Otra marca",
+        "open": "Abrir el router",
+        "thisServer": "la dirección del servidor",
+        "ipv6Address": "la IPv6 de este servidor",
+        "signIn": "Abre la página de ajustes del router e inicia sesión.",
+        "lan": "Ve a <b>{path}</b> y pon en <b>{field}</b>",
+        "relay": "Ve a <b>{path}</b>, elige <b>{field}</b> y escribe como servidor principal",
+        "save": "Después pulsa <b>{button}</b>.",
+        "ipv6": "Si tu red usa IPv6, ve a <b>{path}</b> y pon en <b>{field}</b>",
+        "conflict": "Ve a <b>{path}</b> y desactiva <b>{field}</b>. Mientras esté activo, el router manda los dispositivos a su propio DNS y se salta este.",
+        "relayNote": "Este router sigue repartiendo su propia dirección y pregunta al bloqueador en nombre de cada dispositivo. Los anuncios se bloquean igual, pero todas las consultas aparecen como del router.",
+        "source": "Pasos de la documentación de {brand}",
+        "notes": {
+            "fritzbox": "Para IPv6, marca también \"Also announce DNSv6 server via router advertisement (RFC 5006)\". Después puede que fritz.box deje de abrir en tus dispositivos; usa 192.168.178.1.",
+            "tplink": "En un Deco, el mismo campo está en la app en More > Advanced > DHCP Server. Reinicia el Deco principal tras guardar.",
+            "unifi": "Los dispositivos lo toman al renovar su concesión, normalmente en un día. Apagar y encender el dispositivo es más rápido.",
+            "netgear": "Los dispositivos siguen usando el router como DNS, así que en ellos no cambia nada ni hace falta reconectar."
+        },
+        "check": {
+            "title": "¿Lo usan los dispositivos?",
+            "again": "Comprobar",
+            "none": "Ningún dispositivo ha preguntado nada al bloqueador hoy. El router aún reparte otro servidor DNS, o los dispositivos no han renovado su dirección.",
+            "routerOnly": "Solo el router ({router}) pregunta al bloqueador. Los dispositivos pasan por el router, así que están cubiertos, pero el bloqueador no los distingue. Cambia arriba el DNS del DHCP para ver cada uno.",
+            "relayed": "El router ({router}) pregunta al bloqueador por tus dispositivos, como se espera en este router. Los anuncios se están bloqueando.",
+            "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador hoy:",
+            "logOff": "El bloqueador aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
+        }
     }
 }

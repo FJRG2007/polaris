@@ -28,9 +28,9 @@ import {
     fitRuleNames,
     likelyGateway,
     mergeProtocolRules,
+    routerBrandsFor,
     routerGuide,
     FORWARD_RULES,
-    ROUTER_BRANDS,
     type RouterBrand,
     type RouterForwardRule,
     type RouterFormField
@@ -143,7 +143,7 @@ export function RouterSteps({
                             picked.current = true;
                             setBrand(value as RouterBrand);
                         }}
-                        options={ROUTER_BRANDS.map((entry) => ({ value: entry.id, label: routerGuideIn(t, entry).label }))}
+                        options={routerBrandsFor("forward").map((entry) => ({ value: entry.id, label: routerGuideIn(t, entry).label }))}
                     />
                 </label>
                 {adminUrl && (
