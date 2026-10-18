@@ -12,6 +12,7 @@
 
 import { english } from "../setup/game-english";
 import { describe, expect, it, vi } from "vitest";
+import type { SavedCommand } from "@polaris-app/game-servers/src/lib/console-commands";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@polaris/app-host", () => ({
@@ -96,6 +97,10 @@ describe("keeping a sequence", () => {
             "There is no command in that."
         );
         expect(commands.normalizeSavedCommand({ id: "a", command: "say a\nwait 500" })).toBeNull();
+        expect(english(commands.savedCommandProblem("say a\nwait {delay=5}\nsay b")!)).toBe(
+            "Line 2 pauses for a variable. A pause takes a number of seconds, like wait 10."
+        );
+        expect(commands.savedCommandProblem("say {x=1}\nwait 5\nsay {x}")).toBeNull();
     });
 
     it("reads back a command kept before sequences, unchanged", () => {
@@ -181,5 +186,54 @@ describe("running a sequence", () => {
                 target: null
             })
         ).toEqual(["SpawnDino Rex"]);
+    });
+});
+
+describe("pressing a kept command", () => {
+    const entry = (command: string, variables: SavedCommand["variables"] = []): SavedCommand => ({
+        id: "k",
+        label: "Kept",
+        command,
+        variables
+    });
+
+    it("runs a sequence step by step, pauses and all", () => {
+        expect(commands.keptPress(entry("say a\nwait 2\nsay b"), "java")).toEqual({
+            kind: "queue",
+            steps: [
+                { kind: "command", line: "say a" },
+                { kind: "wait", ms: 2000 },
+                { kind: "command", line: "say b" }
+            ]
+        });
+    });
+
+    it("opens a sequence with a blank in Run several", () => {
+        expect(commands.keptPress(entry("say <message>\nsay b"), "java")).toEqual({
+            kind: "batch"
+        });
+    });
+
+    it("asks first for a sequence with a value to give, and fills one the server can", () => {
+        expect(commands.keptPress(entry("say {x=1}\nsay {x}"), "java")).toEqual({ kind: "ask" });
+        expect(commands.keptPress(entry("say {player}\nwait 1\nsay b"), "java")).toEqual({
+            kind: "ask"
+        });
+        expect(commands.keptPress(entry("say {server.name}\nsay b"), "java")).toEqual({
+            kind: "fill"
+        });
+    });
+
+    it("refuses a sequence Run several would refuse", () => {
+        const press = commands.keptPress(entry("say a\nwait 500"), "java");
+        expect(press.kind).toBe("refuse");
+        expect(press.kind === "refuse" && english(press.problem)).toBe(
+            "Line 2 waits longer than 120 seconds. Use the Schedule tab for that."
+        );
+    });
+
+    it("sends or loads a single command as before", () => {
+        expect(commands.keptPress(entry("wait 10"), "java")).toEqual({ kind: "send" });
+        expect(commands.keptPress(entry("Broadcast <message>"), null)).toEqual({ kind: "load" });
     });
 });

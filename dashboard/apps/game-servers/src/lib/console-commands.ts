@@ -27,8 +27,11 @@
  */
 
 import { gameMessage } from "./game-message";
-import { commandCount, parseQueue, type QueueStep } from "./console-queue";
+import type { MinecraftEdition } from "./minecraft/service";
+import { MAX_CONSOLE_LINE, commandCount, parseQueue, type QueueStep } from "./console-queue";
 import {
+    hasVariables,
+    needsAsking,
     customVariablesProblem,
     normalizeCustomVariable,
     readCustomVariables,
@@ -129,6 +132,12 @@ export function savedCommandProblem(command: string): string | null {
     if (command.length > MAX_SAVED_SEQUENCE) {
         return gameMessage("games", "lib.sequenceTooLong", { max: MAX_SAVED_SEQUENCE });
     }
+    const waitWithVariable = command
+        .split("\n")
+        .findIndex((line) => /^\/?wait\s.*\{/i.test(line));
+    if (waitWithVariable >= 0) {
+        return gameMessage("games", "lib.waitVariable", { line: waitWithVariable + 1 });
+    }
     return parseQueue(command, MAX_SAVED_COMMAND).problem;
 }
 
@@ -216,6 +225,33 @@ export function withSavedCommand(
 
 export function withoutSavedCommand(list: readonly SavedCommand[], id: string): SavedCommand[] {
     return list.filter((kept) => kept.id !== id);
+}
+
+/** What pressing a kept command does: ask first, have the server fill it in,
+ *  open a sequence with a blank in "Run several", run a sequence step by step,
+ *  load a line with a blank into the box, or send it as it stands. */
+export type KeptPress =
+    | { readonly kind: "ask" }
+    | { readonly kind: "fill" }
+    | { readonly kind: "batch" }
+    | { readonly kind: "queue"; readonly steps: readonly QueueStep[] }
+    | { readonly kind: "refuse"; readonly problem: string }
+    | { readonly kind: "load" }
+    | { readonly kind: "send" };
+
+/** How the console answers a kept command being pressed. */
+export function keptPress(entry: SavedCommand, edition: MinecraftEdition | null): KeptPress {
+    const declared = entry.variables ?? [];
+    if (needsAsking(entry.command, edition, declared)) return { kind: "ask" };
+    if (hasVariables(entry.command, edition, declared)) return { kind: "fill" };
+    if (isSequence(entry.command)) {
+        if (placeholderRange(entry.command)) return { kind: "batch" };
+        const parsed = parseQueue(entry.command, MAX_CONSOLE_LINE);
+        return parsed.problem
+            ? { kind: "refuse", problem: parsed.problem }
+            : { kind: "queue", steps: parsed.steps };
+    }
+    return placeholderRange(entry.command) ? { kind: "load" } : { kind: "send" };
 }
 
 /** Where the first blank to fill in is, or null for a command that is complete as

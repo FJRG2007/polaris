@@ -827,6 +827,7 @@
         "maxCommands": "Solo se pueden guardar {count} comandos",
         "tooManyLines": "Una secuencia guarda hasta {count} líneas.",
         "sequenceTooLong": "Esa secuencia pasa de {max} caracteres.",
+        "waitVariable": "La línea {line} pausa con una variable. Una pausa lleva segundos, como wait 10.",
         "pausesOnlyLive": "Una secuencia con pausas solo va desde la consola, no programada.",
         "waitTooLong": "La línea {line} espera más de {seconds} segundos. Usa la pestaña Horario para eso.",
         "lineTooLong": "La línea {line} pasa de los {max} caracteres que el servidor admite en un comando.",

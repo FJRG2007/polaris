@@ -827,6 +827,7 @@
         "maxCommands": "Only {count} commands can be kept",
         "tooManyLines": "A kept sequence holds up to {count} lines.",
         "sequenceTooLong": "That sequence is longer than {max} characters.",
+        "waitVariable": "Line {line} pauses for a variable. A pause takes a number of seconds, like wait 10.",
         "pausesOnlyLive": "A sequence with pauses runs only from the console, not on a schedule.",
         "waitTooLong": "Line {line} waits longer than {seconds} seconds. Use the Schedule tab for that.",
         "lineTooLong": "Line {line} is longer than the {max} characters the server takes in one command.",

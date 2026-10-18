@@ -43,11 +43,11 @@ import {
 import * as consoleActions from "./console-actions";
 import {
     isSequence,
+    keptPress,
     normalizeCommandText,
     placeholderRange,
     type SavedCommand
 } from "../../lib/console-commands";
-import { hasVariables, needsAsking } from "../../lib/console-vars";
 import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
 import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
@@ -217,6 +217,7 @@ export function GameConsole({
         null
     );
     const stopQueue = useRef(false);
+    const queueRunning = useRef(false);
     const parsedBatch = useMemo(
         () => (batch === null ? null : parseQueue(batch, MAX_CONSOLE_LINE)),
         [batch]
@@ -357,6 +358,8 @@ export function GameConsole({
      */
     const runQueue = useCallback(
         async (steps: readonly QueueStep[]) => {
+            if (queueRunning.current) return;
+            queueRunning.current = true;
             const total = commandCount(steps);
             stopQueue.current = false;
             setQueue({ done: 0, total, waiting: 0 });
@@ -409,6 +412,7 @@ export function GameConsole({
                     ].slice(-KEPT_REPLIES)
                 );
             }
+            queueRunning.current = false;
             setQueue(null);
             void refresh();
         },
@@ -506,23 +510,15 @@ export function GameConsole({
      *  `Broadcast <message>` verbatim is never what anybody meant; the rest run. */
     const pressSaved = useCallback(
         (entry: SavedCommand) => {
-            const declared = entry.variables ?? [];
-            if (needsAsking(entry.command, edition, declared)) {
+            const press = keptPress(entry, edition);
+            if (press.kind === "ask") {
                 setAskError("");
                 setAsking({ entry, mode: "run" });
-            } else if (hasVariables(entry.command, edition, declared)) {
-                runKept(entry, { values: {}, target: null }, false);
-            } else if (isSequence(entry.command)) {
-                // A sequence with a blank opens in "Run several", the box a
-                // block of lines is filled in; one without runs as that would.
-                if (placeholderRange(entry.command)) {
-                    setBatch(entry.command);
-                    return;
-                }
-                const parsed = parseQueue(entry.command, MAX_CONSOLE_LINE);
-                if (parsed.problem) refuseKept(entry, schemaText(parsed.problem), false);
-                else void runQueue(parsed.steps);
-            } else if (placeholderRange(entry.command)) load(entry.command);
+            } else if (press.kind === "fill") runKept(entry, { values: {}, target: null }, false);
+            else if (press.kind === "batch") setBatch(entry.command);
+            else if (press.kind === "refuse") refuseKept(entry, schemaText(press.problem), false);
+            else if (press.kind === "queue") void runQueue(press.steps);
+            else if (press.kind === "load") load(entry.command);
             else submit(entry.command);
         },
         [edition, load, refuseKept, runKept, runQueue, schemaText, submit]
@@ -730,7 +726,7 @@ export function GameConsole({
                     {saved.length > 0 && (
                         <KeptCommandsMenu
                             saved={saved}
-                            canRun={running && !pending && heard}
+                            canRun={running && !pending && heard && queue === null}
                             canManage={heard}
                             onRun={pressSaved}
                             onEdit={(entry) => {
