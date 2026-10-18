@@ -49,7 +49,8 @@ export function useDeviceAct({
                   {
                       kind: device.kind,
                       climate: device.climate ?? null,
-                      air: device.air ?? null
+                      air: device.air ?? null,
+                      light: device.light ?? null
                   },
                   command
               )
@@ -59,8 +60,10 @@ export function useDeviceAct({
                 ? { ...device.climate, ...applied.climate }
                 : null;
         const air = applied && "air" in applied ? applied.air : null;
+        const light = applied && "light" in applied ? applied.light : null;
         if (climate) settle({ ...device, climate });
         else if (air) settle({ ...device, air });
+        else if (light) settle({ ...device, light });
         else if (settled) settle({ ...device, state: settled });
         const result = await runAction(
             () => actions.operateDeviceAction(device.id, action, command),
@@ -70,13 +73,14 @@ export function useDeviceAct({
         if (!result || result.error) {
             // Only what this press changed is put back, and only while it is
             // still what this press made it: a later press, or a sync, wins.
-            if (climate || air || settled) {
+            if (climate || air || light || settled) {
                 update((entry) => {
                     if (entry.id !== device.id) return entry;
                     if (climate && entry.climate === climate)
                         return { ...entry, climate: device.climate };
                     if (air && entry.air === air) return { ...entry, air: device.air };
-                    if (!climate && !air && settled && entry.state === settled)
+                    if (light && entry.light === light) return { ...entry, light: device.light };
+                    if (!climate && !air && !light && settled && entry.state === settled)
                         return { ...entry, state: device.state };
                     return entry;
                 });

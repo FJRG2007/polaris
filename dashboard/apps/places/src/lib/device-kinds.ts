@@ -28,9 +28,17 @@ import {
 } from "./air-kinds";
 
 import { applianceStatusText, type ApplianceView } from "./appliance-kinds";
+import {
+    applyLight,
+    lightCommandIssue,
+    lightCommandSchema,
+    type LightCommand,
+    type LightSettings
+} from "./light-kinds";
 
 export * from "./air-kinds";
 export * from "./appliance-kinds";
+export * from "./light-kinds";
 
 /** What a device does, which is what decides the buttons it gets. */
 export const DEVICE_KINDS = [
@@ -272,10 +280,20 @@ export const DEVICE_ACTIONS = [
     "set-fan",
     "set-option",
     "set-humidity",
+    "set-brightness",
+    "set-color-temp",
+    "set-color",
     "stop"
 ] as const;
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
+
+/** The actions a light takes from its sliders rather than from a button. */
+export const LIGHT_ACTIONS: readonly DeviceAction[] = [
+    "set-brightness",
+    "set-color-temp",
+    "set-color"
+];
 
 export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     lock: en("devices.actions.lock"),
@@ -288,6 +306,9 @@ export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     "set-fan": en("devices.actions.set-fan"),
     "set-option": en("devices.actions.set-option"),
     "set-humidity": en("devices.actions.set-humidity"),
+    "set-brightness": en("devices.actions.set-brightness"),
+    "set-color-temp": en("devices.actions.set-color-temp"),
+    "set-color": en("devices.actions.set-color"),
     stop: en("devices.actions.stop")
 };
 
@@ -305,6 +326,9 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     "set-fan": "change fan speed",
     "set-option": "change a setting",
     "set-humidity": "change humidity",
+    "set-brightness": "change brightness",
+    "set-color-temp": "change color temperature",
+    "set-color": "change color",
     stop: "stop"
 };
 
@@ -329,7 +353,9 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     air: ["turn-on", "turn-off", "set-mode", "set-fan", "set-option", "set-humidity"],
     switch: ["turn-on", "turn-off"],
     outlet: ["turn-on", "turn-off"],
-    light: ["turn-on", "turn-off"],
+    // A light dims, warms and colours only where the bulb can: what one lacks,
+    // `lightCommandIssue` refuses.
+    light: ["turn-on", "turn-off", "set-brightness", "set-color-temp", "set-color"],
     // A sensor is not done, it is read. Nothing to press, and a row that offered
     // something would be offering to change the weather.
     sensor: [],
@@ -344,9 +370,10 @@ export function actionsFor(kind: string): readonly DeviceAction[] {
 }
 
 /** Whether a kind is worked by one switch rather than a row of buttons: it has
- *  on and off and nothing else, so the control is where it is now. */
+ *  on and off and nothing else drawn as a button, so the control is where it is
+ *  now. A light's brightness and colour are sliders under its switch. */
 export function isSwitchable(kind: string): boolean {
-    const actions = actionsFor(kind);
+    const actions = actionsFor(kind).filter((action) => !LIGHT_ACTIONS.includes(action));
     return actions.length === 2 && actions.includes("turn-on") && actions.includes("turn-off");
 }
 
@@ -467,7 +494,10 @@ export function needsCommand(action: DeviceAction): boolean {
         action === "set-temperature" ||
         action === "set-fan" ||
         action === "set-option" ||
-        action === "set-humidity"
+        action === "set-humidity" ||
+        action === "set-brightness" ||
+        action === "set-color-temp" ||
+        action === "set-color"
     );
 }
 
@@ -581,25 +611,35 @@ export function applyClimate(settings: ClimateSettings, command: ClimateCommand)
 
 /** One change to a device that takes a setting: an air conditioner's or a
  *  purifier's. The two share action words and differ in what they carry. */
-export type DeviceCommand = ClimateCommand | AirCommand;
+export type DeviceCommand = ClimateCommand | AirCommand | LightCommand;
 
 /** The shape of a setting as it arrives from anywhere, either kind's. Which kind
  *  it has to be is the device's to decide: `commandIssue` checks it again
  *  against that kind alone. */
-export const deviceCommandSchema = z.union([climateCommandSchema, airCommandSchema]);
+export const deviceCommandSchema = z.union([
+    climateCommandSchema,
+    airCommandSchema,
+    lightCommandSchema
+]);
 
 /** What a device holds that a command is checked against. */
 export interface CommandTarget {
     readonly kind: string;
     readonly climate: ClimateSettings | null;
     readonly air: AirSettings | null;
+    /** A light's; optional so a caller that never targets a light needs none. */
+    readonly light?: LightSettings | null;
 }
 
 /** The command, read as the device's own kind's, or null when it is not one. */
 export function commandFor(
     kind: string,
     command: unknown
-): { kind: "climate"; command: ClimateCommand } | { kind: "air"; command: AirCommand } | null {
+):
+    | { kind: "climate"; command: ClimateCommand }
+    | { kind: "air"; command: AirCommand }
+    | { kind: "light"; command: LightCommand }
+    | null {
     const which = deviceKind(kind);
     if (which === "climate") {
         const parsed = climateCommandSchema.safeParse(command);
@@ -609,6 +649,10 @@ export function commandFor(
         const parsed = airCommandSchema.safeParse(command);
         return parsed.success ? { kind: "air", command: parsed.data } : null;
     }
+    if (which === "light") {
+        const parsed = lightCommandSchema.safeParse(command);
+        return parsed.success ? { kind: "light", command: parsed.data } : null;
+    }
     return null;
 }
 
@@ -616,6 +660,12 @@ export function commandFor(
  *  climate driver is handed, so a purifier's setting can never reach it. */
 export function climateCommandOf(command: DeviceCommand | undefined): ClimateCommand | undefined {
     const parsed = climateCommandSchema.safeParse(command);
+    return parsed.success ? parsed.data : undefined;
+}
+
+/** The command as a light's, or nothing when it is not one. */
+export function lightCommandOf(command: DeviceCommand | undefined): LightCommand | undefined {
+    const parsed = lightCommandSchema.safeParse(command);
     return parsed.success ? parsed.data : undefined;
 }
 
@@ -629,6 +679,7 @@ export function airCommandOf(command: DeviceCommand | undefined): AirCommand | u
 export function commandIssue(device: CommandTarget, command: DeviceCommand): string | null {
     const read = commandFor(device.kind, command);
     if (!read) return "That device cannot be told to do that";
+    if (read.kind === "light") return lightCommandIssue(device.light ?? null, read.command);
     return read.kind === "climate"
         ? climateCommandIssue(device.climate, read.command)
         : airCommandIssue(device.air, read.command);
@@ -639,9 +690,11 @@ export function commandIssue(device: CommandTarget, command: DeviceCommand): str
 export function applyCommand(
     device: CommandTarget,
     command: DeviceCommand
-): { climate: ClimateSettings } | { air: AirSettings } | null {
+): { climate: ClimateSettings } | { air: AirSettings } | { light: LightSettings } | null {
     const read = commandFor(device.kind, command);
     if (!read) return null;
+    if (read.kind === "light")
+        return device.light ? { light: applyLight(device.light, read.command) } : null;
     if (read.kind === "climate")
         return device.climate ? { climate: applyClimate(device.climate, read.command) } : null;
     return device.air ? { air: applyAir(device.air, read.command) } : null;
@@ -738,6 +791,8 @@ export interface DeviceView {
     /** How a purifier or humidifier is set and what it last read. Null, or
      *  absent, for every other kind. */
     readonly air?: AirSettings | null;
+    /** How bright, warm and coloured a light is, where it can be any of them. */
+    readonly light?: LightSettings | null;
     /** What a kitchen appliance is doing. Null, or absent, for every other kind. */
     readonly appliance?: ApplianceView | null;
     /** The account it is read through, for reading that account again. Null on a

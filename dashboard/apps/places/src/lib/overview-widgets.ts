@@ -48,6 +48,24 @@ export const LOCK = "lock";
 export const UNLOCK = "unlock";
 export const UNLATCH = "unlatch";
 export const STOP = "stop";
+export const BRIGHTNESS = "brightness";
+export const WARMTH = "warmth";
+export const COLOR = "color";
+export const FAN = "fan";
+export const HUMIDITY = "humidity";
+/** A climate extra's switch is `option:<name>`, one per extra the unit has. */
+const OPTION_PREFIX = "option:";
+/** The colours a card offers, as hues: the full slider is the device panel's. */
+const CARD_HUES: Readonly<Record<string, number>> = {
+    red: 0,
+    orange: 30,
+    yellow: 55,
+    green: 120,
+    cyan: 180,
+    blue: 230,
+    purple: 275,
+    pink: 320
+};
 /** What a glance card draws, and so all it may be pressed for. */
 const GLANCE_CONTROLS: readonly string[] = [POWER, LOCK, UNLOCK, STOP];
 
@@ -245,6 +263,89 @@ export function deviceItem(
                 disabled: blocked
             });
         }
+        if (actions.includes("set-fan") && climate && climate.fans.length > 1) {
+            controls.push({
+                kind: "choice",
+                id: FAN,
+                label: t("overview.fan"),
+                value: climate.fan,
+                options: climate.fans.map((value) => ({
+                    value,
+                    label: t(`devices.climate.fans.${value}`)
+                })),
+                disabled: blocked
+            });
+        }
+        if (actions.includes("set-option") && climate) {
+            for (const option of kinds.CLIMATE_OPTIONS) {
+                const on = climate.options[option];
+                if (on === undefined) continue;
+                controls.push({
+                    kind: "toggle",
+                    id: `${OPTION_PREFIX}${option}`,
+                    label: t(`devices.climate.options.${option}`),
+                    on,
+                    disabled: blocked
+                });
+            }
+        }
+        if (actions.includes("set-humidity") && air?.humidity) {
+            controls.push({
+                kind: "number",
+                id: HUMIDITY,
+                label: t("overview.humidityTarget"),
+                value: air.humidity.target,
+                min: air.humidity.min,
+                max: air.humidity.max,
+                step: air.humidity.step,
+                unit: "%",
+                disabled: blocked
+            });
+        }
+        const light = device.light ?? null;
+        if (actions.includes("set-brightness") && light?.brightness) {
+            controls.push({
+                kind: "number",
+                id: BRIGHTNESS,
+                label: t("overview.brightness"),
+                value: light.brightness.level,
+                min: 1,
+                max: 100,
+                step: 10,
+                unit: "%",
+                disabled: blocked
+            });
+        }
+        if (actions.includes("set-color-temp") && light?.temperature) {
+            controls.push({
+                kind: "number",
+                id: WARMTH,
+                label: t("overview.warmth"),
+                value: light.temperature.kelvin,
+                min: light.temperature.min,
+                max: light.temperature.max,
+                step: 100,
+                unit: " K",
+                disabled: blocked
+            });
+        }
+        if (actions.includes("set-color") && light?.color) {
+            const hue = light.color.hue;
+            const picked = Object.entries(CARD_HUES).find(
+                ([, value]) => hue !== null && Math.abs(value - hue) < 1
+            );
+            controls.push({
+                kind: "choice",
+                id: COLOR,
+                label: t("overview.color"),
+                value: picked ? picked[0] : null,
+                options: Object.keys(CARD_HUES).map((value) => ({
+                    value,
+                    label: t(`overview.colors.${value}`)
+                })),
+                disabled: blocked
+            });
+        }
         if (actions.includes("set-temperature") && climate) {
             controls.push({
                 kind: "number",
@@ -328,6 +429,29 @@ export function pressAsAction(
         (control === LOCK || control === UNLOCK || control === UNLATCH || control === STOP)
     ) {
         return { action: control };
+    }
+    if (control === BRIGHTNESS && typeof value === "number" && Number.isFinite(value)) {
+        return { action: "set-brightness", command: { action: "set-brightness", level: value } };
+    }
+    if (control === WARMTH && typeof value === "number" && Number.isFinite(value)) {
+        return { action: "set-color-temp", command: { action: "set-color-temp", kelvin: value } };
+    }
+    if (control === COLOR && typeof value === "string" && value in CARD_HUES) {
+        const hue = CARD_HUES[value]!;
+        return { action: "set-color", command: { action: "set-color", hue, saturation: 100 } };
+    }
+    if (control === HUMIDITY && typeof value === "number" && Number.isFinite(value)) {
+        const command = kinds.commandFor(kind, { action: "set-humidity", target: value });
+        return command ? { action: "set-humidity", command: command.command } : null;
+    }
+    if (control === FAN && typeof value === "string") {
+        const command = kinds.commandFor(kind, { action: "set-fan", fan: value });
+        return command ? { action: "set-fan", command: command.command } : null;
+    }
+    if (control.startsWith(OPTION_PREFIX) && typeof value === "boolean") {
+        const option = control.slice(OPTION_PREFIX.length);
+        const command = kinds.commandFor(kind, { action: "set-option", option, on: value });
+        return command ? { action: "set-option", command: command.command } : null;
     }
     if (control === MODE && typeof value === "string") {
         // Read as the device's own kind's mode; the service checks it against the

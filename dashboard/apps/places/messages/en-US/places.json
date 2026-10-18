@@ -519,7 +519,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} appliance {kitchen appliance} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} stop {stop} other {do that}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} appliance {kitchen appliance} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} setBrightness {change brightness} setColorTemp {change color temperature} setColor {change color} stop {stop} other {do that}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",
@@ -572,6 +572,7 @@
         "shellyThrottled": "The Shelly is refusing requests for a while after too many wrong passwords.",
         "shellyNothing": "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
         "shellyCannot": "A Shelly cannot be told to do that",
+        "shellyLightCannot": "That Shelly light cannot be told to do that",
         "shellyChannelGone": "That device is no longer on this Shelly.",
         "hueKey": "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",
         "hueNotBridge": "That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.",
@@ -625,6 +626,11 @@
         "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
         "airNoHumidity": "That device does not humidify",
         "airHumidity": "That humidity is not one this device accepts",
+        "lightUnknown": "That light has not said what it can be set to yet",
+        "lightNoDimming": "That light does not dim",
+        "lightNoTemperature": "That light has no color temperature to change",
+        "lightTemperature": "That color temperature is not one this light accepts",
+        "lightNoColor": "That light has no color to change",
         "philipsQuiet": "The air purifier did not answer.",
         "philipsLocalOff": "This model's firmware does not allow local control. It answers on your network but not to the local protocol Polaris uses. Try connecting it with a Philips Air+ account instead.",
         "philipsGarbled": "The air purifier answered in a way Polaris could not read.",
@@ -1400,6 +1406,9 @@
             "set-fan": "Fan speed",
             "set-option": "Setting",
             "set-humidity": "Humidity",
+            "set-brightness": "Brightness",
+            "set-color-temp": "Color temperature",
+            "set-color": "Color",
             "stop": "Stop"
         },
         "via": {
@@ -1428,6 +1437,9 @@
             "set-fan": "Fan speed changed",
             "set-option": "Setting changed",
             "set-humidity": "Humidity set",
+            "set-brightness": "Brightness set",
+            "set-color-temp": "Color temperature set",
+            "set-color": "Color set",
             "stop": "Stopped"
         },
         "kindStates": {
@@ -2488,7 +2500,7 @@
         "statusLabel": "Devices at a glance",
         "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
         "controlsLabel": "Quick controls",
-        "controlsHint": "Switch, lock and set the devices you pick: power, mode and temperature.",
+        "controlsHint": "Switch, lock and set the devices you pick: power, climate, humidity and lights.",
         "room": "Room",
         "target": "Set to",
         "mode": "Mode",
@@ -2503,7 +2515,22 @@
         "watchOnly": "Set to be watched, not operated",
         "noControl": "You cannot operate this from here",
         "unlatch": "Open door",
-        "unlatchConfirm": "Open now?"
+        "unlatchConfirm": "Open now?",
+        "fan": "Fan speed",
+        "humidityTarget": "Humidity target",
+        "brightness": "Brightness",
+        "warmth": "Warmth",
+        "color": "Color",
+        "colors": {
+            "red": "Red",
+            "orange": "Orange",
+            "yellow": "Yellow",
+            "green": "Green",
+            "cyan": "Cyan",
+            "blue": "Blue",
+            "purple": "Purple",
+            "pink": "Pink"
+        }
     },
     "nukiLocal": {
         "title": "Connect your Nuki locks locally",

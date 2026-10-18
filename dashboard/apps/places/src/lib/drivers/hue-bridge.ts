@@ -16,7 +16,8 @@
 
 import { HomeError } from "../home-error";
 import * as hue from "../integrations/hue-api";
-import type { DeviceKind } from "../device-kinds";
+import { lightCommandOf, type DeviceKind } from "../device-kinds";
+import { hueLightSettings, hueLightUpdate } from "./hue-light";
 import { deviceHost } from "../integrations/lan-http";
 import { subnetTargets } from "../integrations/lan-unit";
 import { forbiddenAddress } from "../integrations/lan-address";
@@ -154,12 +155,18 @@ export const hueBridgeDriver: DeviceDriver = {
                 doorState: "none",
                 batteryPercent: null,
                 batteryCritical: false,
-                online
+                online,
+                light: online ? hueLightSettings(light) : null
             };
         });
     },
 
-    async act(credentials, device, action) {
+    async act(credentials, device, action, command) {
+        const light = lightCommandOf(command);
+        if (light) {
+            await hue.updateLight(bridgeOf(credentials), device.externalId, hueLightUpdate(light));
+            return;
+        }
         if (action !== "turn-on" && action !== "turn-off") {
             throw new HomeError("A Hue light cannot be told to do that");
         }

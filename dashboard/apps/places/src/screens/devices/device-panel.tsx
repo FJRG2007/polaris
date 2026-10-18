@@ -33,6 +33,7 @@ import type {
 import { DeviceSwitch } from "./device-switch";
 import { AirControls, FilterChip } from "./air-controls";
 import { ClimateControls } from "./climate-controls";
+import { LightControls } from "./light-controls";
 import { ApplianceControls } from "./appliance-controls";
 import {
     Badge,
@@ -57,12 +58,15 @@ import {
     Loader2,
     Lock,
     LockOpen,
+    Palette,
     Pencil,
     Share2,
     Plug,
     Power,
     PowerOff,
     Square,
+    Sun,
+    Thermometer,
     ToggleRight,
     Wind
 } from "lucide-react";
@@ -87,6 +91,9 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     "set-fan": AirVent,
     "set-option": AirVent,
     "set-humidity": Droplets,
+    "set-brightness": Sun,
+    "set-color-temp": Thermometer,
+    "set-color": Palette,
     stop: Square
 };
 
@@ -159,6 +166,24 @@ export function DeviceControls({
     className?: string;
 }) {
     const t = usePlacesT();
+    if (kinds.deviceKind(device.kind) === "light" && device.light) {
+        // The switch as any light has it, with what this one also dims, warms
+        // and colours beneath it.
+        return (
+            <div className={cn("flex min-w-0 flex-col gap-3", className)}>
+                <DeviceControls
+                    device={{ ...device, light: null }}
+                    canControl={canControl}
+                    busy={busy}
+                    onAct={onAct}
+                    detailed={detailed}
+                />
+                {detailed ? (
+                    <LightControls device={device} canControl={canControl} onAct={onAct} />
+                ) : null}
+            </div>
+        );
+    }
     if (kinds.deviceKind(device.kind) === "climate") {
         return (
             <ClimateControls

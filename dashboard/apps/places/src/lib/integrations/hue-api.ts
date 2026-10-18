@@ -300,7 +300,23 @@ const lightSchema = z
             .object({ name: z.string().default(""), archetype: z.string().default("") })
             .partial()
             .default({}),
-        on: z.object({ on: z.boolean() }).optional()
+        on: z.object({ on: z.boolean() }).optional(),
+        // CLIP v2 light resource: present only on a light that has each.
+        // Brightness is a percent; colour temperature is in mirek, with the
+        // range the bulb accepts; colour is CIE xy.
+        dimming: z.object({ brightness: z.number().finite() }).optional(),
+        color_temperature: z
+            .object({
+                mirek: z.number().finite().nullable().optional(),
+                mirek_schema: z
+                    .object({
+                        mirek_minimum: z.number().finite(),
+                        mirek_maximum: z.number().finite()
+                    })
+                    .optional()
+            })
+            .optional(),
+        color: z.object({ xy: z.object({ x: z.number(), y: z.number() }) }).optional()
     })
     .passthrough();
 
@@ -356,6 +372,23 @@ export async function readBridge(bridge: HueBridge): Promise<{
         devices: each(deviceSchema, devices),
         connectivity: each(connectivitySchema, connectivity)
     };
+}
+
+/** What a light is set to beyond on and off, as a CLIP v2 light update body.
+ *  It switches the light on as well, the way Home Assistant's `light.turn_on` does. */
+export type HueLightUpdate = { readonly on: { readonly on: true } } & (
+    | { readonly dimming: { readonly brightness: number } }
+    | { readonly color_temperature: { readonly mirek: number } }
+    | { readonly color: { readonly xy: { readonly x: number; readonly y: number } } }
+);
+
+/** Dim, warm or colour one light service. */
+export async function updateLight(
+    bridge: HueBridge,
+    lightId: string,
+    body: HueLightUpdate
+): Promise<void> {
+    await clip(bridge, "PUT", `light/${encodeURIComponent(lightId)}`, body);
 }
 
 /** Switch one light service on or off. A plug is a light service too. */

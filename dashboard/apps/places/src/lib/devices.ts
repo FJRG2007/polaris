@@ -71,6 +71,7 @@ const DEVICE_FIELDS = {
     unit: true,
     climate: true,
     air: true,
+    light: true,
     appliance: true,
     stateAt: true
 } as const;
@@ -96,6 +97,7 @@ type DeviceRow = {
     unit: string | null;
     climate: Prisma.JsonValue | null;
     air: Prisma.JsonValue | null;
+    light: Prisma.JsonValue | null;
     appliance: Prisma.JsonValue | null;
     stateAt: Date | null;
 };
@@ -118,6 +120,19 @@ function airColumn(
     settings: kinds.AirSettings | null | undefined
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
     const storable = kinds.storableAir(settings);
+    return storable ? (storable as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
+/** A light's settings, as stored. Null for every other kind. */
+function lightOf(row: Pick<DeviceRow, "kind" | "light">): kinds.LightSettings | null {
+    return kinds.deviceKind(row.kind) === "light" ? kinds.lightSettings(row.light) : null;
+}
+
+/** A light's settings to store, as the column takes them. */
+function lightColumn(
+    settings: kinds.LightSettings | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    const storable = kinds.storableLight(settings);
     return storable ? (storable as Prisma.InputJsonValue) : Prisma.DbNull;
 }
 
@@ -164,6 +179,7 @@ function toView(row: DeviceRow): kinds.DeviceView {
         stateAt: row.stateAt?.toISOString() ?? null,
         climate: climateOf(row),
         air: airOf(row),
+        light: lightOf(row),
         appliance: applianceOf(row),
         accountId: row.accountId
     };
@@ -302,7 +318,8 @@ export async function actOnDevice(
     const target: kinds.CommandTarget = {
         kind: device.kind,
         climate: kinds.climateSettings(device.climate),
-        air: airOf(device)
+        air: airOf(device),
+        light: lightOf(device)
     };
     if (kinds.needsCommand(action)) {
         if (!command || command.action !== action) throw new HomeError("Say what to set it to");
@@ -366,7 +383,9 @@ export async function actOnDevice(
     const settled = applied
         ? "climate" in applied
             ? { climate: climateColumn(applied.climate) }
-            : { air: airColumn(applied.air) }
+            : "light" in applied
+              ? { light: lightColumn(applied.light) }
+              : { air: airColumn(applied.air) }
         : kinds.needsCommand(action) || action === "stop"
           ? // A stopped appliance says where it ended up at the next read.
             {}
@@ -498,6 +517,7 @@ async function syncAccount(
                 unit: snapshot.unit ?? null,
                 climate: climateColumn(snapshot.climate),
                 air: airColumn(snapshot.air),
+                light: lightColumn(snapshot.light),
                 appliance: applianceColumn(snapshot.appliance),
                 stateAt: new Date()
             };
