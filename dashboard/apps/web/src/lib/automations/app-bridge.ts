@@ -17,6 +17,7 @@ import * as core from "@polaris/core";
 import { fireTrigger } from "./combine";
 import { armVersion } from "./triggers";
 import { graphProblems } from "./node-registry";
+import { AutomationAccessError } from "./access-error";
 import { advanceRun, loadGraph, resumeDueWaits, RECHECK_PREFIX } from "./engine";
 
 const L = core.AUTOMATION_LIMITS;
@@ -275,7 +276,7 @@ export async function startAppAutomation(input: z.input<typeof startInput>): Pro
     const count = await prisma.automation.count({
         where: { orgId: null, userId: given.ownerId }
     });
-    if (count >= L.perShelf) throw new Error("limit");
+    if (count >= L.perShelf) throw new AutomationAccessError("limit");
     const parsed = core.automationGraphSchema.safeParse(given.graph);
     const graph = parsed.success && parsed.data.nodes.length > 0 ? parsed.data : core.emptyGraph();
     if (!parsed.success || parsed.data.nodes.length === 0) {

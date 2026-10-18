@@ -434,6 +434,22 @@ describe("startAppAutomation", () => {
         expect(draft.nodes.map((entry) => entry.type)).toEqual(["core.manual"]);
     });
 
+    it("refuses with a typed limit once the owner's shelf is full", async () => {
+        vi.spyOn(fake().prisma.automation, "count").mockResolvedValueOnce(
+            core.AUTOMATION_LIMITS.perShelf
+        );
+        await expect(
+            bridge.startAppAutomation({
+                name: "One too many",
+                ownerId: OWNER,
+                origin: "fixture",
+                originRef: null,
+                graph: null
+            })
+        ).rejects.toMatchObject({ name: "AutomationAccessError", code: "limit" });
+        expect(fake().tables.automation ?? []).toHaveLength(0);
+    });
+
     it("refuses a name that is blank", async () => {
         await expect(
             bridge.startAppAutomation({

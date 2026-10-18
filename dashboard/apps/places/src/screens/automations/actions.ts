@@ -265,15 +265,22 @@ export async function startAutomationAction(
     if (!parsed.success) return { error: t("automations.errors.name") };
     const result = await guard(async () => {
         const place = await places.getPlace(install.id, parsed.data.placeId);
-        if (!place) return null;
+        if (!place) return { refused: "automations.errors.placeGone" } as const;
         const graph = draftGraph(place.id, parsed.data.definition);
-        const id = await host.automations.startAppAutomation({
-            name: parsed.data.name,
-            ownerId: user.id,
-            origin: "home",
-            originRef: place.id,
-            graph
-        });
+        if (!graph) return { refused: "automations.errors.template" } as const;
+        const id = await host.automations
+            .startAppAutomation({
+                name: parsed.data.name,
+                ownerId: user.id,
+                origin: "home",
+                originRef: place.id,
+                graph
+            })
+            .catch((caught: unknown) => {
+                if (atShelfLimit(caught)) return null;
+                throw caught;
+            });
+        if (!id) return { refused: "automations.errors.limit" } as const;
         await recordAudit({
             actorId: user.id,
             action: "places.automation.create",
@@ -281,11 +288,20 @@ export async function startAutomationAction(
             targetId: id,
             metadata: { name: parsed.data.name }
         });
-        return id;
+        return { id };
     });
     if (result.error) return { error: result.error };
-    if (!result.value) return { error: t("automations.errors.placeGone") };
-    return { id: result.value };
+    if (!result.value) return { error: t("refusals.failed") };
+    if (result.value.refused) return { error: t(result.value.refused) };
+    return { id: result.value.id };
+}
+
+function atShelfLimit(caught: unknown): boolean {
+    return (
+        caught instanceof Error &&
+        caught.name === "AutomationAccessError" &&
+        (caught as { code?: unknown }).code === "limit"
+    );
 }
 
 export async function setAutomationEnabledAction(

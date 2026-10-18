@@ -231,6 +231,7 @@
         "places/src/screens/automations/auto-off-shortcut.tsx",
         "places/src/screens/automations/automation-canvas.tsx",
         "places/src/screens/automations/automation-editor.tsx",
+        "places/src/screens/automations/automation-starter.tsx",
         "places/src/screens/automations/automations-view.tsx",
         "places/src/screens/automations/cache.ts",
         "places/src/screens/automations/flow-fields.tsx",

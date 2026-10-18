@@ -20,6 +20,8 @@ import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 const replaced: string[] = [];
 const pushed: string[] = [];
 const saved: unknown[] = [];
+const started: unknown[] = [];
+let startAnswer: { id?: string; error?: string } = { id: "central-1" };
 const contextAsked: (string | null)[] = [];
 let toggleAnswer: { error?: string; automation?: AutomationView } = {};
 
@@ -258,6 +260,26 @@ const SET_SAVED: AutomationView = {
     }
 };
 
+/** What the starter leaves in the central editor's place: a template laid out, or nothing yet. */
+const DRAFTS: Record<string, AutomationView> = {
+    "draft-autoOff": {
+        ...SAVED,
+        id: "draft-autoOff",
+        name: "Turn off Fixture plug after 30 minutes",
+        definition: auto.autoOffDefinition(DEVICES[0]!, 30, "UTC"),
+        lastRunAt: null,
+        lastStatus: null
+    },
+    "draft-blank": {
+        ...SAVED,
+        id: "draft-blank",
+        name: "Blank",
+        definition: auto.blankDefinition("UTC"),
+        lastRunAt: null,
+        lastStatus: null
+    }
+};
+
 const RUNS: RunView[] = [
     {
         id: "run-1",
@@ -294,7 +316,7 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
                       : id === "auto-icons"
                         ? ICONS_SAVED
                         : id
-                          ? SAVED
+                          ? (DRAFTS[id] ?? SAVED)
                           : undefined,
         runs: id ? RUNS : [],
         context: {
@@ -314,6 +336,10 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
         saved.push(input);
         const value = input as Pick<AutomationView, "name" | "enabled" | "placeId" | "definition">;
         return { automation: { ...SAVED, ...value, id: "auto-2" } };
+    },
+    startAutomationAction: async (input: unknown) => {
+        started.push(input);
+        return startAnswer;
     },
     automationRunsAction: async () => ({ runs: RUNS }),
     runAutomationAction: async () => ({}),
@@ -341,9 +367,17 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
 const { AutomationEditor, conditionFor, stepFor, triggerFor } = await import(
     "@polaris-app/places/src/screens/automations/automation-editor"
 );
+const { AutomationStarter } = await import(
+    "@polaris-app/places/src/screens/automations/automation-starter"
+);
 const { AutomationsView } = await import(
     "@polaris-app/places/src/screens/automations/automations-view"
 );
+
+/** Changes the name, which is enough to leave something unsaved. */
+function rename(name: string): void {
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: name } });
+}
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -388,6 +422,8 @@ beforeEach(() => {
     replaced.length = 0;
     pushed.length = 0;
     saved.length = 0;
+    started.length = 0;
+    startAnswer = { id: "central-1" };
     toggleAnswer = {};
     try {
         sessionStorage.clear();
@@ -399,32 +435,26 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("a new automation from the switch-off template", () => {
-    it("is laid out as when, if and then, ready to save", async () => {
-        render(
-            <AutomationEditor
-                automationId={null}
-                template="autoOff"
-                deviceId="plug"
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+    it("is named and laid out by the starter, then opened in the central editor", async () => {
+        render(<AutomationStarter template="autoOff" deviceId="plug" placeId={null} />);
         await painted();
-        expect(screen.getByRole("heading", { name: "When" })).toBeDefined();
-        expect(screen.getByRole("heading", { name: "If" })).toBeDefined();
-        expect(screen.getByRole("heading", { name: "Then" })).toBeDefined();
         expect((screen.getByLabelText(/Name/) as HTMLInputElement).value).toBe(
             "Turn off Fixture plug after 30 minutes"
         );
 
-        const save = screen.getByRole("button", { name: "Save" });
-        expect(save.getAttribute("aria-disabled")).toBeNull();
-        fireEvent.click(save);
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
         await painted();
 
-        expect(saved).toHaveLength(1);
-        const input = saved[0] as { definition: { triggers: unknown[]; actions: unknown[] } };
+        expect(started).toHaveLength(1);
+        const input = started[0] as {
+            name: string;
+            placeId: string;
+            definition: { triggers: unknown[]; actions: unknown[] };
+        };
+        expect(input).toMatchObject({
+            name: "Turn off Fixture plug after 30 minutes",
+            placeId: "place-1"
+        });
         expect(input.definition.triggers).toEqual([
             expect.objectContaining({
                 kind: "stays",
@@ -437,19 +467,26 @@ describe("a new automation from the switch-off template", () => {
         expect(input.definition.actions).toEqual([
             expect.objectContaining({ kind: "device", deviceId: "plug", do: "turn-off" })
         ]);
-        expect(replaced).toEqual(["/places/devices/automations/auto-2"]);
+        expect(replaced).toEqual(["/automations/central-1"]);
+    });
+
+    it("says why it was not started, and stays on the starter", async () => {
+        startAnswer = {
+            error: "You have as many automations as you can. Delete one to start another."
+        };
+        render(<AutomationStarter template="autoOff" deviceId="plug" placeId={null} />);
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+        await painted();
+        expect(screen.getByRole("alert").textContent).toBe(
+            "You have as many automations as you can. Delete one to start another."
+        );
+        expect(replaced).toEqual([]);
     });
 
     it("says a wrong number under its field as it is typed", async () => {
         render(
-            <AutomationEditor
-                automationId={null}
-                template="autoOff"
-                deviceId="plug"
-                canManage
-                canControl
-                initialTab="flow"
-            />
+            <AutomationEditor automationId="draft-autoOff" canManage canControl initialTab="flow" />
         );
         await painted();
         openRow("When");
@@ -468,16 +505,10 @@ describe("a new automation from the switch-off template", () => {
 describe("an empty automation", () => {
     it("marks what is missing, and names it only when Save is pressed", async () => {
         render(
-            <AutomationEditor
-                automationId={null}
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
+            <AutomationEditor automationId="draft-blank" canManage canControl initialTab="flow" />
         );
         await painted();
+        rename("");
         expect(screen.queryByText("Give it a name.")).toBeNull();
         const save = screen.getByRole("button", { name: "Save" });
         expect(save.getAttribute("aria-disabled")).toBe("true");
@@ -491,14 +522,7 @@ describe("an empty automation", () => {
 
     it("adds steps, moves them and removes them", async () => {
         render(
-            <AutomationEditor
-                automationId={null}
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
+            <AutomationEditor automationId="draft-blank" canManage canControl initialTab="flow" />
         );
         await painted();
         await addFromDialog("Add step", "Wait a while", "Time");
@@ -519,9 +543,7 @@ describe("an empty automation", () => {
     it("offers no device to a step when the reader cannot operate them", async () => {
         render(
             <AutomationEditor
-                automationId={null}
-                template={null}
-                deviceId={null}
+                automationId="draft-blank"
                 canManage
                 canControl={false}
                 initialTab="flow"
@@ -537,16 +559,7 @@ describe("an empty automation", () => {
 
 describe("the log of a saved automation", () => {
     it("says what happened in words, the device's refusal included", async () => {
-        render(
-            <AutomationEditor
-                automationId="auto-1"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="runs"
-            />
-        );
+        render(<AutomationEditor automationId="auto-1" canManage canControl initialTab="runs" />);
         await painted();
         expect(screen.getByText("Run by Fixture owner")).toBeDefined();
         fireEvent.click(screen.getByRole("button", { name: /Run by Fixture owner/ }));
@@ -591,14 +604,7 @@ describe("the list", () => {
 describe("a step that sets an air conditioner", () => {
     it("shows what it sets, and refuses at once a value the unit does not accept", async () => {
         render(
-            <AutomationEditor
-                automationId="auto-climate"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
+            <AutomationEditor automationId="auto-climate" canManage canControl initialTab="flow" />
         );
         await painted();
         openRow("Then");
@@ -627,16 +633,7 @@ describe("a step that sets an air conditioner", () => {
 
 describe("an automation on an air purifier", () => {
     it("compares the figure it names, and sets a speed the unit has", async () => {
-        render(
-            <AutomationEditor
-                automationId="auto-air"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+        render(<AutomationEditor automationId="auto-air" canManage canControl initialTab="flow" />);
         await painted();
         openRow("When");
         expect(screen.getByRole("combobox", { name: /^Watch/ }).textContent).toContain("PM2.5");
@@ -675,14 +672,7 @@ describe("what a block watches on a device", () => {
     });
 
     const editor = () => (
-        <AutomationEditor
-            automationId="auto-mode"
-            template={null}
-            deviceId={null}
-            canManage
-            canControl
-            initialTab="flow"
-        />
+        <AutomationEditor automationId="auto-mode" canManage canControl initialTab="flow" />
     );
 
     it("offers an air conditioner's temperature beside its state and mode", async () => {
@@ -820,15 +810,8 @@ describe("what a block watches on a device", () => {
 });
 
 describe("the block editor", () => {
-    const editor = (id: string | null, template: string | null = null) => (
-        <AutomationEditor
-            automationId={id}
-            template={template}
-            deviceId={template ? "plug" : null}
-            canManage
-            canControl
-            initialTab="flow"
-        />
+    const editor = (id: string) => (
+        <AutomationEditor automationId={id} canManage canControl initialTab="flow" />
     );
     const inputOf = (view: AutomationView) => ({
         name: view.name,
@@ -866,7 +849,7 @@ describe("the block editor", () => {
     });
 
     it("renames a block from its menu and saves the name with it", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
         const menu = within(screen.getByRole("list", { name: "When" })).getAllByRole("button", {
             name: /^More actions/
@@ -887,7 +870,7 @@ describe("the block editor", () => {
     });
 
     it("copies and pastes the selected block, and undoes and redoes with the keyboard", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
         const before = rowCount("Then");
         openRow("Then");
@@ -904,7 +887,7 @@ describe("the block editor", () => {
     });
 
     it("deletes a block from its menu, and Undo in the header brings it back", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
         const before = rowCount("Then");
         const menus = within(screen.getByRole("list", { name: "Then" })).getAllByRole("button", {
@@ -920,13 +903,14 @@ describe("the block editor", () => {
     });
 
     it("asks before leaving with changes not saved", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
+        rename("Changed");
         fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
-        expect(await screen.findByText("Save the new automation?")).toBeDefined();
+        expect(await screen.findByText("Save changes?")).toBeDefined();
         fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
         await painted();
-        expect(screen.queryByText("Save the new automation?")).toBeNull();
+        expect(screen.queryByText("Save changes?")).toBeNull();
     });
 
     /** Opens the menu of one row of a stage and picks one of its items. */
@@ -1020,8 +1004,9 @@ describe("the block editor", () => {
     });
 
     it("saves with Ctrl+S", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
+        rename("Changed");
         fireEvent.keyDown(window, { key: "s", ctrlKey: true });
         await painted();
         expect(saved).toHaveLength(1);
@@ -1049,7 +1034,7 @@ describe("the block editor", () => {
         await painted();
         await pick("Then", 0, /^Copy/);
         cleanup();
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
         const before = rowCount("Then");
         await pick("Then", 0, /^Paste/);
@@ -1081,7 +1066,7 @@ describe("the block editor", () => {
     });
 
     it("deletes the selected block with Ctrl+Delete", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
         const before = rowCount("Then");
         openRow("Then");
@@ -1091,8 +1076,9 @@ describe("the block editor", () => {
     });
 
     it("leaves without saving when asked to", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
+        rename("Changed");
         fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
         fireEvent.click(await screen.findByRole("button", { name: /^Leave without/ }));
         await painted();
@@ -1101,8 +1087,9 @@ describe("the block editor", () => {
     });
 
     it("saves and then leaves", async () => {
-        render(editor(null, "autoOff"));
+        render(editor("draft-autoOff"));
         await painted();
+        rename("Changed");
         fireEvent.click(screen.getByRole("link", { name: /All automations/ }));
         fireEvent.click(await screen.findByRole("button", { name: "Save and leave" }));
         await painted();
@@ -1169,9 +1156,7 @@ describe("a block added for a device", () => {
 describe("the add dialog", () => {
     const editor = (template: string | null = null) => (
         <AutomationEditor
-            automationId={null}
-            template={template}
-            deviceId={template ? "plug" : null}
+            automationId={template ? `draft-${template}` : "draft-blank"}
             canManage
             canControl
             initialTab="flow"
@@ -1301,14 +1286,7 @@ describe("the add dialog", () => {
 describe("the icon on each row", () => {
     it("is what the block is for, else its kind's", async () => {
         render(
-            <AutomationEditor
-                automationId="auto-icons"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
+            <AutomationEditor automationId="auto-icons" canManage canControl initialTab="flow" />
         );
         await painted();
         const iconOf = (row: HTMLElement) =>
@@ -1327,16 +1305,7 @@ describe("a block on a set of devices", () => {
     });
 
     it("adds another device of the same kind, counts them as asked, and saves the set", async () => {
-        render(
-            <AutomationEditor
-                automationId="auto-set"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+        render(<AutomationEditor automationId="auto-set" canManage canControl initialTab="flow" />);
         await painted();
         openRow("When");
         expect(screen.queryByRole("combobox", { name: /^Fires for/ })).toBeNull();
@@ -1370,16 +1339,7 @@ describe("a block on a set of devices", () => {
     });
 
     it("is the block as it was once it is one device again", async () => {
-        render(
-            <AutomationEditor
-                automationId="auto-set"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+        render(<AutomationEditor automationId="auto-set" canManage canControl initialTab="flow" />);
         await painted();
         openRow("When");
         fireEvent.click(screen.getByRole("button", { name: "Add a device" }));
@@ -1394,16 +1354,7 @@ describe("a block on a set of devices", () => {
     });
 
     it("groups the devices of a room under it, and the room under its floor, on By target", async () => {
-        render(
-            <AutomationEditor
-                automationId="auto-set"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+        render(<AutomationEditor automationId="auto-set" canManage canControl initialTab="flow" />);
         await painted();
         fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
         const dialog = await screen.findByRole("dialog");

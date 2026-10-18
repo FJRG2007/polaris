@@ -2028,6 +2028,8 @@
             "sameTime": "El inicio y el final son la misma hora.",
             "name": "Ponle un nombre.",
             "place": "Ese sitio ya no está.",
+            "template": "No se ha podido abrir esa plantilla. Empieza una en blanco.",
+            "limit": "Ya tienes el máximo de automatizaciones. Elimina una para crear otra.",
             "deviceGone": "Ese dispositivo ya no está en este sitio.",
             "attribute": "Ese dispositivo no tiene nada así que vigilar.",
             "notSensor": "Elige un sensor, un aire acondicionado o un purificador.",

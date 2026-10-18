@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DeviceView } from "@polaris-app/places/src/lib/device-kinds";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { AutomationView } from "@polaris-app/places/src/lib/automation-kinds";
+import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 
 const saved: unknown[] = [];
 let wide = true;
@@ -109,7 +110,12 @@ const SAVED: AutomationView = {
 
 vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     getAutomationAction: async (id: string | null) => ({
-        automation: id ? SAVED : undefined,
+        automation:
+            id === "draft-blank"
+                ? { ...SAVED, id, name: "Blank", definition: auto.blankDefinition("UTC") }
+                : id
+                  ? SAVED
+                  : undefined,
         runs: [],
         context: {
             placeId: "place-1",
@@ -143,12 +149,10 @@ async function painted(): Promise<void> {
     });
 }
 
-async function openVisual(automationId: string | null, canManage = true): Promise<void> {
+async function openVisual(automationId: string, canManage = true): Promise<void> {
     render(
         <AutomationEditor
             automationId={automationId}
-            template={null}
-            deviceId={null}
             canManage={canManage}
             canControl
             initialTab="flow"
@@ -252,16 +256,7 @@ describe("an automation saved by the form, opened as a diagram", () => {
     it("remembers the layout for the next automation opened", async () => {
         await openVisual("auto-1");
         cleanup();
-        render(
-            <AutomationEditor
-                automationId="auto-1"
-                template={null}
-                deviceId={null}
-                canManage
-                canControl
-                initialTab="flow"
-            />
-        );
+        render(<AutomationEditor automationId="auto-1" canManage canControl initialTab="flow" />);
         await painted();
         expect(screen.getByRole("radio", { name: "Visual" }).getAttribute("aria-checked")).toBe(
             "true"
@@ -375,7 +370,7 @@ describe("an automation saved by the form, opened as a diagram", () => {
 
 describe("the palette", () => {
     it("adds a step, opens it, and says what it still needs only when Save is pressed", async () => {
-        await openVisual(null);
+        await openVisual("draft-blank");
         expect(screen.queryByText("Add at least one trigger.")).toBeNull();
         await pick("Add trigger", "Only by hand");
         await pick("Add step", "Notify me");

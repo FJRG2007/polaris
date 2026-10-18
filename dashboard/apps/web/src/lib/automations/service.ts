@@ -19,29 +19,12 @@ import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
 import { callCycle } from "./calls";
 import { graphProblems } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
+import { AutomationAccessError } from "./access-error";
+
+export { AutomationAccessError };
 
 const L = core.AUTOMATION_LIMITS;
 const OTHERS_LISTED = 1000;
-
-/** A refusal the screens put into words by its code. */
-export class AutomationAccessError extends Error {
-    constructor(
-        readonly code:
-            | "notFound"
-            | "forbidden"
-            | "limit"
-            | "invalid"
-            | "notPublished"
-            | "noManualTrigger"
-            | "secretMissing"
-            | "noTrigger"
-            | "triggerGone"
-            | "tooLarge"
-    ) {
-        super(code);
-        this.name = "AutomationAccessError";
-    }
-}
 
 export function shelfWhere(shelf: Shelf) {
     return shelf.orgId ? { orgId: shelf.orgId } : { userId: shelf.userId, orgId: null };

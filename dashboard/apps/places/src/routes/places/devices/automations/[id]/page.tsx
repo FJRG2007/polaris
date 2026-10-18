@@ -45,20 +45,13 @@ export default async function AutomationPage({
         <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4">
             <h1 className="sr-only">{t("pages.automations.title")}</h1>
             {automationId ? (
-            <AutomationEditor
-                key={automationId}
-                automationId={automationId}
-                template={
-                    template && (TEMPLATES as readonly string[]).includes(template)
-                        ? template
-                        : null
-                }
-                deviceId={one(query.device)}
-                placeId={one(query.place)}
-                canManage={canManage}
-                canControl={canControl}
-                initialTab={one(query.tab) === "runs" ? "runs" : "flow"}
-            />
+                <AutomationEditor
+                    key={automationId}
+                    automationId={automationId}
+                    canManage={canManage}
+                    canControl={canControl}
+                    initialTab={one(query.tab) === "runs" ? "runs" : "flow"}
+                />
             ) : (
                 <AutomationStarter
                     template={
