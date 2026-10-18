@@ -15,12 +15,14 @@ export const FRIEND_NOTE_MAX = 300;
  *  blank lines folded to one. Empty is no note at all. */
 export function normalizeFriendNote(raw: unknown): string {
     if (typeof raw !== "string") return "";
-    return raw
-        .replace(/\r\n?/g, "\n")
-        // eslint-disable-next-line no-control-regex
-        .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "")
-        .replace(/\n{3,}/g, "\n\n")
-        .trim();
+    return (
+        raw
+            .replace(/\r\n?/g, "\n")
+            // eslint-disable-next-line no-control-regex
+            .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
+    );
 }
 
 /** What the server accepts: nothing, or a normalized note within the limit. */

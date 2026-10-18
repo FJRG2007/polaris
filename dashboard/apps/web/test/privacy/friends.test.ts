@@ -87,7 +87,8 @@ let notices: Notice[] = [];
 function noticeMatches(row: Notice, where: Record<string, unknown>): boolean {
     if (where.userId !== undefined && row.userId !== where.userId) return false;
     if (where.type !== undefined && row.type !== where.type) return false;
-    if (where.actionRequired !== undefined && row.actionRequired !== where.actionRequired) return false;
+    if (where.actionRequired !== undefined && row.actionRequired !== where.actionRequired)
+        return false;
     const contains = (where.metadata as { contains?: string } | undefined)?.contains;
     if (contains !== undefined && !(row.metadata ?? "").includes(contains)) return false;
     const id = where.id as { gt?: string; in?: string[] } | undefined;
@@ -157,7 +158,9 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const friends = await import("@/lib/friends-service");
-const { FRIEND_NOTE_MAX, friendNoteSchema, normalizeFriendNote } = await import("@/lib/friend-note");
+const { FRIEND_NOTE_MAX, friendNoteSchema, normalizeFriendNote } = await import(
+    "@/lib/friend-note"
+);
 
 beforeEach(() => {
     rows = [];
@@ -380,17 +383,27 @@ describe("stopping", () => {
 
 /** A "wants to be added" alert in somebody's bell about somebody. */
 function asked(id: string, userId: string, personId: string, actionRequired = true): Notice {
-    return { id, userId, type: "account.friend", actionRequired, metadata: JSON.stringify({ personId }) };
+    return {
+        id,
+        userId,
+        type: "account.friend",
+        actionRequired,
+        metadata: JSON.stringify({ personId })
+    };
 }
 
 describe("the note on a request", () => {
     it("is stored with the request and read back with it", async () => {
         await friends.requestFriend("ada", "grace", "We met at the meetup");
-        expect(created).toEqual([{ requesterId: "ada", addresseeId: "grace", note: "We met at the meetup" }]);
+        expect(created).toEqual([
+            { requesterId: "ada", addresseeId: "grace", note: "We met at the meetup" }
+        ]);
     });
 
     it("is cleared when the request is accepted, and the request alert goes", async () => {
-        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }];
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
         notices = [asked("n1", "ada", "grace"), asked("n2", "ada", "alan")];
         await friends.respondToRequest("ada", "r1", true);
         expect(rows[0]?.note).toBeNull();
@@ -398,7 +411,9 @@ describe("the note on a request", () => {
     });
 
     it("is cleared on the other path into a friendship too", async () => {
-        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }];
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
         notices = [asked("n1", "ada", "grace")];
         await friends.requestFriend("ada", "grace");
         expect(rows[0]?.note).toBeNull();
@@ -406,7 +421,9 @@ describe("the note on a request", () => {
     });
 
     it("goes with the row when turned down or withdrawn, and so does the alert", async () => {
-        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }];
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
         notices = [asked("n1", "ada", "grace")];
         await friends.respondToRequest("grace", "r1", false);
         expect(rows).toEqual([]);
@@ -417,7 +434,11 @@ describe("the note on a request", () => {
 describe("what a friendship leaves behind", () => {
     it("drops the friend alerts in both bells when it ends", async () => {
         rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "accepted" }];
-        notices = [asked("n1", "grace", "ada", false), asked("n2", "ada", "grace", false), asked("n3", "ada", "alan", false)];
+        notices = [
+            asked("n1", "grace", "ada", false),
+            asked("n2", "ada", "grace", false),
+            asked("n3", "ada", "alan", false)
+        ];
         await friends.removeFriend("ada", "grace");
         expect(notices.map((row) => row.id)).toEqual(["n3"]);
     });
@@ -440,7 +461,13 @@ describe("what a friendship leaves behind", () => {
             asked("n1", "ada", "grace"),
             asked("n2", "ada", "alan"),
             asked("n3", "ada", "alan", false),
-            { id: "n4", userId: "ada", type: "account.friend", actionRequired: true, metadata: null }
+            {
+                id: "n4",
+                userId: "ada",
+                type: "account.friend",
+                actionRequired: true,
+                metadata: null
+            }
         ];
         expect(await friends.sweepEndedFriendRequestNotices()).toEqual({ removed: 1 });
         expect(notices.map((row) => row.id)).toEqual(["n1", "n3", "n4"]);

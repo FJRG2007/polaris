@@ -302,7 +302,8 @@ async function announce(
     // Never the address. An alert naming somebody is still a screen showing one
     // account something about another, and this one goes out by mail as well.
     const t = await wordsFor(userId, "notices");
-    const name = person?.name || (person?.username ? `@${person.username}` : "") || t("friends.somebody");
+    const name =
+        person?.name || (person?.username ? `@${person.username}` : "") || t("friends.somebody");
     await notify({
         userId,
         event: "account.friend",
@@ -583,8 +584,11 @@ async function dropFriendNotices(
             select: { id: true, metadata: true },
             take: NOTICES_ABOUT_ONE
         });
-        const ids = rows.filter((row) => notificationIsAbout(row.metadata, personId)).map((row) => row.id);
-        if (ids.length > 0) await prisma.notification.deleteMany({ where: { id: { in: ids }, userId } });
+        const ids = rows
+            .filter((row) => notificationIsAbout(row.metadata, personId))
+            .map((row) => row.id);
+        if (ids.length > 0)
+            await prisma.notification.deleteMany({ where: { id: { in: ids }, userId } });
     } catch (caught) {
         console.error("polaris: could not tidy friend alerts:", caught);
     }
@@ -634,7 +638,9 @@ export async function sweepEndedFriendRequestNotices(): Promise<{ removed: numbe
         select: { requesterId: true, addresseeId: true }
     });
     const waiting = new Set(open.map((row) => `${row.addresseeId}:${row.requesterId}`));
-    const ended = named.filter((row) => !waiting.has(`${row.userId}:${row.personId}`)).map((row) => row.id);
+    const ended = named
+        .filter((row) => !waiting.has(`${row.userId}:${row.personId}`))
+        .map((row) => row.id);
     if (ended.length === 0) return { removed: 0 };
     const gone = await prisma.notification.deleteMany({ where: { id: { in: ended } } });
     return { removed: gone.count };
@@ -645,7 +651,10 @@ function personIdOf(metadata: string | null): string | null {
     if (!metadata) return null;
     try {
         const parsed: unknown = JSON.parse(metadata);
-        const id = parsed && typeof parsed === "object" ? (parsed as { personId?: unknown }).personId : null;
+        const id =
+            parsed && typeof parsed === "object"
+                ? (parsed as { personId?: unknown }).personId
+                : null;
         return typeof id === "string" ? id : null;
     } catch {
         return null;

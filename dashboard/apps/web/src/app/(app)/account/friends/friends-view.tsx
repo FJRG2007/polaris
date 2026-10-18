@@ -175,10 +175,7 @@ function FriendsCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
-                <AddFriend
-                    exclude={people.map((friend) => friend.id)}
-                    onAsk={act}
-                />
+                <AddFriend exclude={people.map((friend) => friend.id)} onAsk={act} />
 
                 {waiting.length > 0 && (
                     <ul className="flex flex-col gap-1">
@@ -198,7 +195,9 @@ function FriendsCard({
                                         />
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
-                                        {request.outgoing ? t("friends.youAsked") : t("friends.wantsAdding")}
+                                        {request.outgoing
+                                            ? t("friends.youAsked")
+                                            : t("friends.wantsAdding")}
                                     </span>
                                     {request.note ? (
                                         <span
@@ -225,7 +224,11 @@ function FriendsCard({
                                     size="xs"
                                     variant="ghost"
                                     disabled={busy}
-                                    aria-label={request.outgoing ? t("friends.withdraw") : t("friends.turnDown")}
+                                    aria-label={
+                                        request.outgoing
+                                            ? t("friends.withdraw")
+                                            : t("friends.turnDown")
+                                    }
                                     onClick={() =>
                                         void act(() => respondToRequestAction(request.id, false))
                                     }
@@ -238,9 +241,7 @@ function FriendsCard({
                 )}
 
                 {people.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        {t("friends.empty")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("friends.empty")}</p>
                 ) : (
                     <>
                         <ul className="flex flex-col gap-1">
@@ -253,7 +254,10 @@ function FriendsCard({
                                 >
                                     <Avatar openable person={friend} size={24} />
                                     <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-sm" title={friend.name}>
+                                        <span
+                                            className="block truncate text-sm"
+                                            title={friend.name}
+                                        >
                                             <PersonName id={friend.id} name={friend.name} />
                                         </span>
                                         <span className="block truncate text-xs text-muted-foreground">
@@ -273,8 +277,17 @@ function FriendsCard({
                                 </PersonRow>
                             ))}
                         </ul>
-                        <MoreWhenSeen enabled={cursor !== null} loading={loading} onReach={loadMore}>
-                            <Button size="sm" variant="ghost" onClick={() => void loadMore()} disabled={loading}>
+                        <MoreWhenSeen
+                            enabled={cursor !== null}
+                            loading={loading}
+                            onReach={loadMore}
+                        >
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void loadMore()}
+                                disabled={loading}
+                            >
                                 {loading ? <Loader2 className="size-4 animate-spin" /> : null}
                                 {t("friends.showMore")}
                             </Button>
@@ -338,11 +351,7 @@ function MoreWhenSeen({
     if (!enabled) return null;
     return (
         <div ref={foot} className="flex justify-center py-1">
-            {loading ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (
-                children
-            )}
+            {loading ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : children}
         </div>
     );
 }
@@ -496,7 +505,8 @@ function AddFriend({
                                     const words = note;
                                     setQuery("");
                                     setSaid("");
-                                    if (await onAsk(() => requestFriendAction(person.id, words))) sent();
+                                    if (await onAsk(() => requestFriendAction(person.id, words)))
+                                        sent();
                                 }}
                                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                             >
@@ -511,10 +521,7 @@ function AddFriend({
                 </ul>
             )}
 
-            <span className="text-xs text-muted-foreground">
-                {said ||
-                    t("friends.hint")}
-            </span>
+            <span className="text-xs text-muted-foreground">{said || t("friends.hint")}</span>
         </div>
     );
 }

@@ -71,7 +71,8 @@ async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
 export async function savePrivacyAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.privacySettingsSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
 
     return guard(() => setPrivacy(user.id, parsed.data));
 }
@@ -84,7 +85,11 @@ export async function createPrivacyListAction(input: unknown): Promise<{ error?:
     const user = await requireUser();
     const parsed = core.privacyListSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.checkList") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountPrivacy"))("errors.checkList")
+        };
     }
 
     return guard(async () => {
@@ -99,7 +104,11 @@ export async function updatePrivacyListAction(
     const user = await requireUser();
     const parsed = core.privacyListSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.checkList") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountPrivacy"))("errors.checkList")
+        };
     }
 
     return guard(() => updateList(user.id, String(listId), parsed.data));
@@ -132,10 +141,15 @@ export async function searchPeopleAction(
 async function readNote(raw: unknown): Promise<{ note: string | null } | { error: string }> {
     const parsed = friendNoteSchema.safeParse(raw);
     if (parsed.success) return { note: parsed.data };
-    return { error: (await getTranslations("account"))("friends.noteTooLong", { max: FRIEND_NOTE_MAX }) };
+    return {
+        error: (await getTranslations("account"))("friends.noteTooLong", { max: FRIEND_NOTE_MAX })
+    };
 }
 
-export async function requestFriendAction(userId: string, note?: unknown): Promise<{ error?: string }> {
+export async function requestFriendAction(
+    userId: string,
+    note?: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const read = await readNote(note);
     if ("error" in read) return read;
@@ -157,7 +171,9 @@ export async function requestFriendByUsernameAction(
     const user = await requireUser();
     const read = await readNote(note);
     if ("error" in read) return { said: "", error: read.error };
-    const result = await guard(() => requestFriendByUsername(user.id, String(username ?? ""), read.note));
+    const result = await guard(() =>
+        requestFriendByUsername(user.id, String(username ?? ""), read.note)
+    );
     if (result.error) return { said: "", error: result.error };
     return { said: (await getTranslations("accountPrivacy"))("friends.asked") };
 }
@@ -229,7 +245,8 @@ function blockMoved(userId: string): void {
 export async function blockPersonAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.blockSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.cannotBlock") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountPrivacy"))("errors.cannotBlock") };
 
     const result = await guard(() => block(user.id, parsed.data.userId));
     if (!result.error) blockMoved(user.id);
@@ -240,7 +257,8 @@ export async function blockPersonAction(input: unknown): Promise<{ error?: strin
 export async function unblockPersonAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = core.blockSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("errors.cannotUnblock") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountPrivacy"))("errors.cannotUnblock") };
 
     const result = await guard(() => unblock(user.id, parsed.data.userId));
     if (!result.error) blockMoved(user.id);
@@ -270,7 +288,11 @@ export async function saveActivitySettingsAction(input: unknown): Promise<{ erro
     const user = await requireUser();
     const parsed = core.activitySettingsSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountPrivacy"))("errors.notSaved")
+        };
     }
     await saveActivitySettings(user.id, parsed.data);
     await announceActivity([user.id]);
