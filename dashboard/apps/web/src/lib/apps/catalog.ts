@@ -27,6 +27,7 @@ import {
     ScanFace,
     Video,
     RadioTower,
+    ShieldBan,
     Wrench,
     type LucideIcon
 } from "lucide-react";
@@ -45,6 +46,7 @@ export type AppCapability =
     | "mqtt-broker"
     | "home-hub"
     | "mail-server"
+    | "dns-blocker"
     | "tool";
 
 /** How an app is provisioned. `compose-template` runs a compose stack via Deploy;
@@ -387,6 +389,55 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         dashboard: "builtin",
         singleton: true,
         instanceWide: true
+    },
+    {
+        // A Pi-hole for the house. Installing it runs nothing: it puts the Ad
+        // blocker screen here, and the DNS engine starts only when somebody
+        // presses Turn on in it - a DNS server answers for every device on the
+        // network, so it is never something an install or an update starts.
+        id: "dns-blocker",
+        name: "Ad blocker",
+        category: "Tools",
+        icon: ShieldBan,
+        opensAt: "/apps/dns-blocker",
+        summary: "Blocks ads, trackers and malware for every device on your network.",
+        description:
+            "A DNS server for your whole network that refuses to look up ad, tracker and malware domains, so phones, TVs and consoles are covered without installing anything on them. Pick blocklists by category, allow or block your own domains, choose an encrypted resolver, and name devices on your network. Installing downloads nothing: the blocker starts on this machine, on port 53, when you turn it on.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["dns-blocker"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // The DNS engine behind the Ad blocker. Never offered on its own: the Ad
+        // blocker installs it when somebody turns blocking on and removes it when
+        // they turn it off. Its ports are pinned to 53 by that caller, because a
+        // DNS server on any other port is one no router can be pointed at.
+        id: "dns-blocker-engine",
+        name: "Ad blocker DNS server",
+        internal: true,
+        ownedBy: "dns-blocker",
+        category: "Tools",
+        icon: ShieldBan,
+        summary: "The DNS server that answers for your network and leaves out what is blocked.",
+        description:
+            "The resolver behind the Ad blocker. It answers every lookup on your network, refuses the domains your blocklists name and forwards the rest to the resolver you chose.", // i18n-ignore
+        docsUrl: "https://0xerr0r.github.io/blocky/",
+        installMethod: "compose-template",
+        capabilities: ["dns-blocker"],
+        dashboard: "generic",
+        singleton: true,
+        instanceWide: true,
+        template: {
+            // Published by CI (.github/workflows/dashboard-publish.yml, `dnsblock`
+            // job) from dashboard/services/dns-blocker into the dashboard's own
+            // public package: Blocky, with an entrypoint that writes the
+            // configuration Polaris renders (BLOCKY_CONFIG_BASE64).
+            image: "ghcr.io/fjrg2007/polaris-dashboard:latest-service-dns-blocker",
+            build: "dashboard/services/dns-blocker",
+            ports: [{ container: 53, protocol: "udp", host: 53, label: "DNS" }] // i18n-ignore
+        }
     },
     {
         // One app for every game rather than one per game. Installing it turns the

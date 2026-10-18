@@ -100,6 +100,10 @@
             "summary": "Tus calendarios y los que enlaces, con invitaciones y páginas de reserva.",
             "description": "Ten calendarios en Polaris y ve a su lado los de Google, Outlook, iCloud y cualquier CalDAV, sincronizados en ambos sentidos. Vistas de día, semana, mes, año y agenda, eventos que se repiten, recordatorios, invitaciones que se responden desde el correo, encontrar una hora que convenga a todos, compartir con personas y equipos, enlaces públicos y páginas de reserva para quien no está en Polaris."
         },
+        "dns-blocker": {
+            "summary": "Bloquea anuncios, rastreadores y malware en todos los dispositivos de tu red.",
+            "description": "Un servidor DNS para toda tu red que se niega a resolver dominios de anuncios, rastreadores y malware, así móviles, teles y consolas quedan protegidos sin instalarles nada. Elige listas por categoría, permite o bloquea tus propios dominios, elige un resolutor cifrado y pon nombre a los dispositivos de tu red. Instalarlo no descarga nada: el bloqueador arranca en esta máquina, en el puerto 53, cuando lo enciendes."
+        },
         "mail-server": {
             "summary": "Correo en tus propios dominios, con el DNS escrito y comprobado por ti.",
             "description": "Envía y recibe correo en tus propios dominios. Polaris escribe los registros SPF, DKIM y DMARC, comprueba que están publicados y archiva los informes DMARC que devuelven los receptores. Crea buzones, alias y reenvíos desde aquí. Instalarlo no descarga nada: cada servidor de correo que configures se ejecuta como un contenedor en el equipo que elijas y publica allí los puertos 25, 465, 587, 993 y 4190."

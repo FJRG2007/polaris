@@ -103,7 +103,8 @@
         "apps": {
             "notAnApp": "Eso no es una app.",
             "appMissing": "Esta versión de Polaris no tiene esa app.",
-            "native": "Forma parte de Servidores y no se puede desinstalar."
+            "native": "Forma parte de Servidores y no se puede desinstalar.",
+            "dnsBlockerRunning": "Apaga primero el bloqueador desde su pantalla. Desinstalarlo encendido dejaría sin DNS a todos los dispositivos que lo usan."
         },
         "mail": {
             "channelGone": "Ese canal de correo ya no existe.",

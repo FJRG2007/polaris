@@ -1,0 +1,145 @@
+{
+    "page": {
+        "title": "Antianuncios",
+        "description": "Bloquea anuncios, rastreadores y malware en todos los dispositivos de tu red."
+    },
+    "install": {
+        "title": "Antianuncios no está instalado",
+        "body": "Instálalo para bloquear anuncios, rastreadores y malware en cada dispositivo de tu red. Instalarlo no arranca nada; enciendes el bloqueador después.",
+        "pending": "Instalando...",
+        "install": "Instalar",
+        "view": "Ver en Marketplace"
+    },
+    "status": {
+        "title": "Estado",
+        "check": "Comprobar"
+    },
+    "states": {
+        "off": {
+            "label": "Apagado",
+            "body": "El bloqueador está apagado. Enciéndelo para arrancar un servidor DNS en esta máquina en {address}."
+        },
+        "portTaken": {
+            "label": "Puerto ocupado",
+            "body": "Otro servidor DNS ya responde en el puerto 53 de {address}, así que el bloqueador no puede arrancar ahí. Apaga ese y vuelve a intentarlo."
+        },
+        "starting": {
+            "label": "Arrancando",
+            "body": "El servidor DNS está arrancando en {address}. Las primeras listas pueden tardar un minuto en descargarse."
+        },
+        "stalled": {
+            "label": "No arranca",
+            "body": "El servidor DNS en {address} lleva un minuto sin responder. Puede que no consiga arrancar con estos ajustes. Vuelve a intentarlo o apágalo."
+        },
+        "portHeld": {
+            "label": "No arrancó",
+            "body": "El servidor DNS no pudo arrancar en {address}. Lo más habitual es que el puerto 53 de esta máquina lo ocupe un servicio que solo responde a la propia máquina; también puede ser una descarga fallida. Nada ha cambiado en tu red. Vuelve a intentarlo."
+        },
+        "conflict": {
+            "label": "Sin respuesta",
+            "body": "Algo distinto del bloqueador responde en el puerto 53 de {address}. Reintenta para arrancar el bloqueador de nuevo."
+        },
+        "blocking": {
+            "label": "Bloqueando",
+            "body": "Bloqueando en {address}. Los dispositivos que usan esta dirección como servidor DNS están protegidos."
+        },
+        "noAddress": {
+            "label": "Sin dirección",
+            "body": "Polaris aún no conoce ninguna dirección de esta máquina en tu red, así que no hay a qué apuntar los dispositivos. Vuelve a comprobarlo en un minuto."
+        }
+    },
+    "actions": {
+        "turnOn": "Encender",
+        "turnOff": "Apagar",
+        "retry": "Reintentar"
+    },
+    "router": {
+        "title": "Apunta tu red hacia él",
+        "intro": "Los dispositivos usan el bloqueador cuando tu router reparte su dirección como servidor DNS.",
+        "dnsServer": "Servidor DNS",
+        "noAddress": "Aún no se sabe",
+        "step1": "Abre la página de ajustes de tu router y busca los ajustes de DHCP o LAN.",
+        "step2": "Pon {address} como servidor DNS principal.",
+        "step3": "Deja vacío el servidor DNS secundario. Los dispositivos lo usan cuando quieren y dejaría pasar anuncios.",
+        "step4": "Guarda y vuelve a conectar tus dispositivos, o espera a que renueven su dirección."
+    },
+    "lists": {
+        "title": "Listas de bloqueo",
+        "intro": "Las listas se vuelven a descargar según el plazo de abajo. Más listas bloquean más y rompen más webs.",
+        "custom": "Tus listas",
+        "remove": "Quitar lista",
+        "url": "Dirección",
+        "category": "Categoría",
+        "add": "Añadir"
+    },
+    "categories": {
+        "ads": "Anuncios",
+        "trackers": "Rastreo",
+        "malware": "Malware",
+        "adult": "Adultos",
+        "gambling": "Apuestas",
+        "social": "Redes"
+    },
+    "sources": {
+        "hagezi-pro": "HaGeZi Pro",
+        "stevenblack": "StevenBlack hosts",
+        "oisd-big": "OISD big",
+        "hagezi-popupads": "HaGeZi emergentes",
+        "hagezi-native-windows": "Telemetría Windows y Office",
+        "hagezi-tif": "HaGeZi amenazas",
+        "hagezi-nsfw": "HaGeZi adultos",
+        "oisd-nsfw": "OISD adultos",
+        "hagezi-gambling": "HaGeZi apuestas",
+        "hagezi-social": "HaGeZi redes sociales"
+    },
+    "rules": {
+        "title": "Tus reglas",
+        "intro": "Una por línea: un nombre, *.nombre para todo lo que cuelga de él, o /regex/. Los nombres permitidos ganan a cualquier lista.",
+        "allow": "Permitir siempre",
+        "deny": "Bloquear siempre"
+    },
+    "upstream": {
+        "title": "Resolutor",
+        "intro": "Dónde se consultan los nombres permitidos. Los cifrados ocultan tus consultas a tu proveedor.",
+        "custom": "Tus resolutores"
+    },
+    "upstreams": {
+        "cloudflare": "Cloudflare (cifrado)",
+        "quad9": "Quad9 (cifrado)",
+        "google": "Google (cifrado)",
+        "plain-cloudflare": "Cloudflare (sin cifrar)",
+        "custom": "El tuyo"
+    },
+    "records": {
+        "title": "Nombres de red",
+        "intro": "Nombres que tu red responde por sí misma, como nas.home.",
+        "empty": "Aún no hay nombres locales.",
+        "remove": "Quitar nombre",
+        "name": "Nombre",
+        "address": "Dirección",
+        "add": "Añadir"
+    },
+    "settings": {
+        "refresh": "Actualizar listas cada (horas)",
+        "save": "Guardar",
+        "saveApply": "Guardar y aplicar",
+        "saved": "Guardado."
+    },
+    "validation": {
+        "invalidUrl": "Escribe una dirección http o https.",
+        "invalidRule": "No es un nombre, *.nombre ni /regex/:",
+        "invalidUpstream": "No es la dirección de un resolutor:",
+        "upstreamMissing": "Añade al menos un resolutor.",
+        "tooMany": "Deja cada lista en {max} reglas como mucho.",
+        "refresh": "Escribe un número entero de 1 a 168."
+    },
+    "errors": {
+        "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
+        "tooLarge": "Estas reglas son demasiado largas para aplicarlas. Quita algunas de las tuyas y guarda de nuevo.",
+        "noAddress": "Esta máquina aún no tiene dirección en tu red. Vuelve a comprobarlo en un minuto.",
+        "portTaken": "Otro servidor DNS ya responde aquí en el puerto 53. Apágalo y vuelve a intentarlo.",
+        "notApplied": "Tus ajustes están guardados, pero el servidor DNS no arrancó con ellos. Mira el estado de arriba y vuelve a intentarlo.",
+        "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
+        "generic": "No ha funcionado. Inténtalo de nuevo en un momento."
+    }
+}

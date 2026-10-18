@@ -80,6 +80,7 @@ import {
     Server,
     Settings,
     Share2,
+    ShieldBan,
     ShieldCheck,
     SlidersHorizontal,
     ToggleRight,
@@ -955,6 +956,18 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "forwards",
                 "catch-all"
             ]
+        },
+        {
+            // Beside the mail server for the same reason: a service the operator
+            // runs for their network. Only here once it is installed, and only
+            // for an administrator - it answers every device's lookups.
+            label: "Ad blocker", // i18n-ignore
+            href: "/apps/dns-blocker",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: ShieldBan,
+            group: OPERATIONS_GROUP,
+            keywords: ["dns", "pi-hole", "adguard", "blocklist", "trackers", "malware", "port 53"]
         }
     ],
     watch: [

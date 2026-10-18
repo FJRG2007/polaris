@@ -1,0 +1,145 @@
+{
+    "page": {
+        "title": "Ad blocker",
+        "description": "Blocks ads, trackers and malware for every device on your network."
+    },
+    "install": {
+        "title": "Ad blocker is not installed",
+        "body": "Install it to block ads, trackers and malware on every device that uses your network. Installing starts nothing; you turn the blocker on afterwards.",
+        "pending": "Installing...",
+        "install": "Install",
+        "view": "View in Marketplace"
+    },
+    "status": {
+        "title": "Status",
+        "check": "Check again"
+    },
+    "states": {
+        "off": {
+            "label": "Turned off",
+            "body": "The blocker is off. Turn it on to start a DNS server on this machine at {address}."
+        },
+        "portTaken": {
+            "label": "Port in use",
+            "body": "Another DNS server already answers on port 53 at {address}, so the blocker cannot start there. Turn that one off, then retry."
+        },
+        "starting": {
+            "label": "Starting",
+            "body": "The DNS server is starting at {address}. The first blocklists can take a minute to download."
+        },
+        "stalled": {
+            "label": "Not starting",
+            "body": "The DNS server at {address} has not answered for a minute. It may be failing to start with these settings. Try again, or turn it off."
+        },
+        "portHeld": {
+            "label": "Could not start",
+            "body": "The DNS server could not start at {address}. Most often port 53 on this machine is held by a service that only answers the machine itself; it can also be a download that failed. Nothing on your network changed. Try again."
+        },
+        "conflict": {
+            "label": "Not answering",
+            "body": "Something other than the blocker answers on port 53 at {address}. Retry to start the blocker again."
+        },
+        "blocking": {
+            "label": "Blocking",
+            "body": "Blocking at {address}. Devices that use this address as their DNS server are protected."
+        },
+        "noAddress": {
+            "label": "No address",
+            "body": "This machine has no address on your network that Polaris knows of yet, so there is nothing to point devices at. Check again in a minute."
+        }
+    },
+    "actions": {
+        "turnOn": "Turn on",
+        "turnOff": "Turn off",
+        "retry": "Try again"
+    },
+    "router": {
+        "title": "Point your network at it",
+        "intro": "Devices use the blocker once your router hands out its address as the DNS server.",
+        "dnsServer": "DNS server",
+        "noAddress": "Not known yet",
+        "step1": "Open your router's settings page and find the DHCP or LAN settings.",
+        "step2": "Set the primary DNS server to {address}.",
+        "step3": "Leave the secondary DNS server empty. Devices use it whenever they like, and it would let ads through.",
+        "step4": "Save, then reconnect your devices or wait for them to renew their address."
+    },
+    "lists": {
+        "title": "Lists to block",
+        "intro": "Lists are downloaded again on the schedule below. More lists block more, and break more sites.",
+        "custom": "Your lists",
+        "remove": "Remove list",
+        "url": "List address",
+        "category": "Category",
+        "add": "Add list"
+    },
+    "categories": {
+        "ads": "Advertising",
+        "trackers": "Trackers",
+        "malware": "Malware",
+        "adult": "Adult",
+        "gambling": "Gambling",
+        "social": "Social"
+    },
+    "sources": {
+        "hagezi-pro": "HaGeZi Pro",
+        "stevenblack": "StevenBlack hosts",
+        "oisd-big": "OISD big",
+        "hagezi-popupads": "HaGeZi pop-up ads",
+        "hagezi-native-windows": "Windows and Office telemetry",
+        "hagezi-tif": "HaGeZi threat intelligence",
+        "hagezi-nsfw": "HaGeZi adult",
+        "oisd-nsfw": "OISD adult",
+        "hagezi-gambling": "HaGeZi gambling",
+        "hagezi-social": "HaGeZi social networks"
+    },
+    "rules": {
+        "title": "Your rules",
+        "intro": "One per line: a name, *.name for everything under it, or /regex/. Allowed names win over every list.",
+        "allow": "Always allowed",
+        "deny": "Always blocked"
+    },
+    "upstream": {
+        "title": "Resolver",
+        "intro": "Where allowed names are looked up. The encrypted ones keep your lookups private from your provider.",
+        "custom": "Your resolvers"
+    },
+    "upstreams": {
+        "cloudflare": "Cloudflare (encrypted)",
+        "quad9": "Quad9 (encrypted)",
+        "google": "Google (encrypted)",
+        "plain-cloudflare": "Cloudflare (unencrypted)",
+        "custom": "Your own"
+    },
+    "records": {
+        "title": "Local names",
+        "intro": "Names your network answers itself, like nas.home.",
+        "empty": "No local names yet.",
+        "remove": "Remove name",
+        "name": "Name",
+        "address": "Address",
+        "add": "Add name"
+    },
+    "settings": {
+        "refresh": "Refresh lists every (hours)",
+        "save": "Save",
+        "saveApply": "Save and apply",
+        "saved": "Saved."
+    },
+    "validation": {
+        "invalidUrl": "Enter an http or https address.",
+        "invalidRule": "Not a name, *.name or /regex/:",
+        "invalidUpstream": "Not a resolver address:",
+        "upstreamMissing": "Add at least one resolver.",
+        "tooMany": "Keep each list to {max} rules.",
+        "refresh": "Enter a whole number from 1 to 168."
+    },
+    "errors": {
+        "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
+        "tooLarge": "These rules are too long to apply. Remove some of your own rules and save again.",
+        "noAddress": "This machine has no address on your network yet. Check again in a minute.",
+        "portTaken": "Another DNS server already answers on port 53 here. Turn it off, then retry.",
+        "notApplied": "Your settings are saved, but the DNS server did not start with them. See the status above and try again.",
+        "invalid": "Some values are not valid. Fix the marked fields and save again.",
+        "generic": "That did not work. Try again in a moment."
+    }
+}

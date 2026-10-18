@@ -9,6 +9,7 @@
         "mqttBroker": "Local broker",
         "homeHub": "Home",
         "mailServer": "Mail",
+        "dnsBlocker": "DNS blocking",
         "tool": "Tool"
     },
     "statuses": {

@@ -19,6 +19,7 @@ import { POLARIS_APP_CATALOG } from "@/lib/apps/catalog";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { isNativeApp } from "@/lib/apps/native-apps";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { DNS_BLOCKER_APP, DNS_ENGINE_APP } from "@/lib/dns-blocker/settings";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { deployApplication, removeApplicationDeployment } from "@/lib/deploy-service";
 
@@ -46,6 +47,16 @@ export async function appUninstallRefusal(row: {
     // Part of Servers on every Polaris: an install row left from when it was a
     // marketplace app is not something to remove.
     if (isNativeApp(row.catalogId)) return (await readerWords("api"))("refusals.apps.native");
+    // The ad blocker answers DNS for every device pointed at it. Taking the app
+    // away while its engine runs would leave the engine with no screen to turn it
+    // off from - or, paused with the app, the whole network without names.
+    if (row.catalogId === DNS_BLOCKER_APP) {
+        const engine = await prisma.installedApp.findFirst({
+            where: { catalogId: DNS_ENGINE_APP, status: { not: "removed" } },
+            select: { id: true }
+        });
+        return engine ? (await readerWords("api"))("refusals.apps.dnsBlockerRunning") : null;
+    }
     if (row.catalogId !== GAME_SERVERS_APP_ID) return null;
     const servers = await prisma.installedApp.findMany({
         where: {
