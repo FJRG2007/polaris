@@ -8,6 +8,11 @@
  * every player's in one batch. Each tick plays out the part SkyWars plays too
  * (`last-standing-service.ts`), with whoever the void caught put out for it,
  * and stirs in a twist when one is due. The last one left wins.
+ *
+ * What the players are shown is the same as everywhere else in the events: a
+ * title and the start's bell at "Go!", the boss bar with who is left and when
+ * the void rises (`barName`), the void drawn where it stands once it rises, a thud everybody hears when somebody is out, and the winner's title
+ * and burst of sparks with the results (`stage.finishBurst`).
  */
 
 import * as pi from "./pillars";
@@ -19,6 +24,7 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
 import * as said from "./pillars-messages";
+import * as stage from "./stage";
 import * as hitsService from "./hits-service";
 import * as standing from "./last-standing-service";
 import type { ArenaGame, KindContext } from "./arena-game";
@@ -28,16 +34,26 @@ const pillarMessages = speech.spoken(said);
 
 const lower = (name: string) => name.toLowerCase();
 
+/** Everybody in the game, standing or out, at their own position. */
+const IN_GAME = `@a[tag=${pi.IN_TAG}]`;
+
+/** The thud everybody in the game hears when somebody is out. */
+const OUT_SOUND = `execute as ${IN_GAME} at @s run playsound minecraft:block.anvil.land master @s ~ ~ ~ 0.4 1.6`;
+
 function optionsOf(run: stored.EventRun): catalog.EventOptions<"pillars"> {
     return run.preset.options as catalog.EventOptions<"pillars">;
 }
 
+function designOf(run: stored.EventRun): number {
+    return pi.stateOf(run.game).design;
+}
+
 function layoutOf(run: stored.EventRun): pi.Layout {
-    return pi.layoutFor(run.joined.length, optionsOf(run).middle);
+    return pi.layoutFor(run.joined.length, optionsOf(run).middle, designOf(run));
 }
 
 function atOf(run: stored.EventRun, place: stored.Point = run.place!): pi.Placed {
-    return { x: place.x, y: pi.topOver(place.y, optionsOf(run).height), z: place.z };
+    return { x: place.x, y: pi.topOver(place.y, optionsOf(run).height, designOf(run)), z: place.z };
 }
 
 function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {
@@ -68,6 +84,9 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                 pillarMessages.goSubtitle(ctx.language)
             )
         );
+    out.push(
+        `execute as ${IN_GAME} at @s run playsound ${commands.SOUNDS.start} master @s ~ ~ ~ 1 1 0`
+    );
     // Survival only with a marker to tell the kit from anything else
     // (`arena.killBrokenDrops`), so nothing unmarked is carried home.
     if (run.marker) {
@@ -109,7 +128,11 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         kit: pi.KIT_IDS,
         why: (name, where) =>
             risen && (where.y < floor || swallowed.has(lower(name))) ? "void" : null,
-        outLines: (name) => [`tag ${name} remove ${pi.VOID_TAG}`, `effect clear ${name}`],
+        outLines: (name) => [
+            `tag ${name} remove ${pi.VOID_TAG}`,
+            `effect clear ${name}`,
+            OUT_SOUND
+        ],
         said: pillarMessages,
         tag: messages.tag(language)
     });
@@ -127,7 +150,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 const standingNow = left
                     .filter((one) => here.has(lower(one.name)))
                     .map((one) => one.name);
-                lines.push(...pi.dropLines(run.id, due - 1, standingNow, options.pool, marker));
+                lines.push(
+                    ...pi.dropLines(run.id, due - 1, standingNow, options.pool, marker),
+                    ...pi.DROP_FEEDBACK
+                );
                 state.drops = due;
             }
         }
@@ -154,21 +180,13 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         }
         if (risen && !state.rising) {
             state.rising = true;
-            lines.push(commands.say(messages.tag(language) + pillarMessages.voidRising(language)));
+            lines.push(
+                commands.say(messages.tag(language) + pillarMessages.voidRising(language)),
+                `execute as ${IN_GAME} at @s run playsound minecraft:entity.wither.ambient master @s ~ ~ ~ 0.6 0.6`
+            );
         }
     }
-
-    lines.push(
-        `bossbar set ${commands.BAR} name ${commands.text(
-            pillarMessages.bar(
-                left.length,
-                messages.clock((run.endsAt - now) / 1000),
-                state.rising,
-                language
-            )
-        )}`,
-        ...arena.keepThrown(run.arena!.box)
-    );
+    lines.push(...pi.voidLines(play, floor), ...arena.keepThrown(run.arena!.box));
     await standing.keep(ctx, state, before);
     return decided;
 }
@@ -195,6 +213,21 @@ export const pillars: ArenaGame = {
     ],
     goLines,
     tick,
+    barName: (run, now, language) => {
+        const state = pi.stateOf(run.game);
+        const left = run.entrants.filter(
+            (one) => !state.out.some((out) => lower(out.name) === lower(one.name))
+        ).length;
+        const { voidAfter } = optionsOf(run);
+        const voidIn = pi.voidRisesIn(run.readyAt, voidAfter, now);
+        return pillarMessages.bar(
+            left,
+            messages.clock((run.endsAt - now) / 1000),
+            voidIn === null ? null : messages.clock(voidIn),
+            voidIn === null && voidAfter > 0 && run.readyAt !== null,
+            language
+        );
+    },
     quickLines: (run) => {
         const at = atOf(run);
         const layout = layoutOf(run);
@@ -224,9 +257,19 @@ export const pillars: ArenaGame = {
         const left = run.entrants.filter(
             (one) => !state.out.some((out) => lower(out.name) === lower(one.name))
         );
-        return left.length === 1 && !disqualified.has(lower(left[0]!.name))
-            ? [commands.say(pillarMessages.winner(left[0]!.name, language))]
-            : [];
+        if (left.length !== 1 || disqualified.has(lower(left[0]!.name))) return [];
+        const name = left[0]!.name;
+        return [
+            commands.say(pillarMessages.winner(name, language)),
+            ...run.entrants.flatMap((one) =>
+                arena.titleTo(
+                    one.name,
+                    pillarMessages.winnerTitle(name, language),
+                    pillarMessages.winnerSubtitle(language)
+                )
+            ),
+            ...stage.finishBurst(name)
+        ];
     },
     endLines: () => [...pi.STOP_LINES, ...sw.TEARDOWN],
     closeLines: (box) => [

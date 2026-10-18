@@ -1850,7 +1850,7 @@
             },
             "pillars": {
                 "label": "Pillars",
-                "summary": "Each player who joins starts alone on top of a tall bedrock pillar in a ring over a long drop. Every few seconds everybody gets one random item: blocks, weapons, pearls, potions and more. Bridge across, knock the others off, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
+                "summary": "Each player who joins starts alone on top of a stone pillar in a ring over the void. Every few seconds everybody gets one random item: blocks, weapons, pearls, potions and more. Bridge across, knock the others off, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
                 "unit": "points"
             }
         },
