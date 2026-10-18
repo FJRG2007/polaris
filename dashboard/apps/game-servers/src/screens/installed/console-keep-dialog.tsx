@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Keeping a console command: the line, its name, and the variables it asks for.
+ * Keeping a console command: the line - or several, run in order - its name, and
+ * the variables it asks for.
  *
  * Beside the form, the same list of variables the side panel shows
  * (`VariablesHelp`), each one a button that puts it where the caret is - the
@@ -21,12 +22,20 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    Textarea
 } from "@polaris/ui";
 import { useGameText, useSchemaText } from "../game-text";
 import { VariablesHelp } from "../../components/variables-help";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
-import { MAX_SAVED_COMMAND, MAX_SAVED_LABEL } from "../../lib/console-commands";
+import {
+    MAX_SAVED_LABEL,
+    MAX_SAVED_SEQUENCE,
+    isSequence,
+    keptCommandCount,
+    normalizeCommandText,
+    savedCommandProblem
+} from "../../lib/console-commands";
 import * as vars from "../../lib/console-vars";
 
 /** What the dialog is writing. `id` is set when an existing one is edited. */
@@ -57,7 +66,20 @@ export function KeepCommandDialog({
     const t = useGameText("games");
     const schemaText = useSchemaText();
     const [draft, setDraft] = useState<KeepDraft>(initial);
-    const field = useRef<HTMLInputElement | null>(null);
+    const field = useRef<HTMLTextAreaElement | null>(null);
+    // What is kept: every line trimmed and the empty ones dropped, as the server
+    // will store it, so what is checked here is what is checked there.
+    const command = useMemo(() => normalizeCommandText(draft.command), [draft.command]);
+    // A box of several lines puts the caret at its start; what was carried in
+    // from the console is added to at its end. Placed once, when the box is
+    // first attached - the dialog's portal mounts it after this renders.
+    const placed = useRef(false);
+    const attach = (box: HTMLTextAreaElement | null) => {
+        field.current = box;
+        if (!box || placed.current) return;
+        placed.current = true;
+        box.setSelectionRange(box.value.length, box.value.length);
+    };
 
     const set = (patch: Partial<KeepDraft>) => setDraft((current) => ({ ...current, ...patch }));
     const setVariable = (index: number, patch: Partial<vars.CustomVariable>) =>
@@ -79,21 +101,21 @@ export function KeepCommandDialog({
     );
     const problem = useMemo(
         () =>
-            draft.command.trim()
-                ? vars.customVariablesProblem(draft.command.trim(), normalized)
+            command
+                ? (savedCommandProblem(command) ?? vars.customVariablesProblem(command, normalized))
                 : null,
-        [draft.command, normalized]
+        [command, normalized]
     );
     // The ones the command declares itself, `{x}` or `{x=100}`: asked for when
     // it runs, without a row of their own.
     const inline = useMemo(
         () =>
             vars
-                .commandVariables(draft.command.trim(), normalized)
+                .commandVariables(command, normalized)
                 .custom.filter((one) => !normalized.some((declared) => declared.name === one.name)),
-        [draft.command, normalized]
+        [command, normalized]
     );
-    const ready = draft.command.trim().length > 0 && !problem && !unnamed && !pending;
+    const ready = command.length > 0 && !problem && !unnamed && !pending;
 
     /** Put a `{name}` where the caret is, and leave the caret after it. */
     function insert(token: string): void {
@@ -102,7 +124,7 @@ export function KeepCommandDialog({
         const end = input?.selectionEnd ?? start;
         const command = (draft.command.slice(0, start) + token + draft.command.slice(end)).slice(
             0,
-            MAX_SAVED_COMMAND
+            MAX_SAVED_SEQUENCE
         );
         set({ command });
         requestAnimationFrame(() => {
@@ -134,18 +156,28 @@ export function KeepCommandDialog({
                     <div className="flex min-w-0 flex-col gap-3">
                         <label className="flex flex-col gap-1">
                             <span className="text-sm font-medium">{t("console.command")}</span>
-                            <Input
-                                ref={field}
+                            <Textarea
+                                ref={attach}
                                 autoFocus
                                 value={draft.command}
-                                maxLength={MAX_SAVED_COMMAND}
-                                className="font-mono"
+                                rows={isSequence(command) ? 6 : 2}
+                                spellCheck={false}
+                                maxLength={MAX_SAVED_SEQUENCE}
+                                className="font-mono text-xs"
                                 placeholder={hint ?? t("console.defaultHint")}
                                 onChange={(event) => set({ command: event.target.value })}
                             />
                             <span className="text-xs text-muted-foreground">
+                                {t.rich<ReactNode>("console.sequenceHint", {
+                                    wait: () => <code key="wait">wait 10</code> // i18n-ignore: a command, typed as is
+                                })}{" "}
                                 {t("consoleVars.commandHint")}
                             </span>
+                            {isSequence(command) && !problem && (
+                                <span className="text-xs text-muted-foreground">
+                                    {t("console.keptCount", { count: keptCommandCount(command) })}
+                                </span>
+                            )}
                             {inline.length > 0 && (
                                 <span className="text-xs break-words text-muted-foreground">
                                     {t("consoleVars.fromCommand", {
@@ -234,7 +266,7 @@ export function KeepCommandDialog({
                             ready &&
                             onKeep({
                                 ...draft,
-                                command: draft.command.trim(),
+                                command,
                                 variables: normalized
                             })
                         }

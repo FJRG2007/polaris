@@ -41,8 +41,13 @@ import {
     type QueueStep
 } from "../../lib/console-queue";
 import * as consoleActions from "./console-actions";
-import { placeholderRange, type SavedCommand } from "../../lib/console-commands";
-import { hasVariables, needsAsking } from "../../lib/console-vars";
+import {
+    isSequence,
+    keptPress,
+    normalizeCommandText,
+    placeholderRange,
+    type SavedCommand
+} from "../../lib/console-commands";
 import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
 import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
@@ -212,6 +217,7 @@ export function GameConsole({
         null
     );
     const stopQueue = useRef(false);
+    const queueRunning = useRef(false);
     const parsedBatch = useMemo(
         () => (batch === null ? null : parseQueue(batch, MAX_CONSOLE_LINE)),
         [batch]
@@ -352,6 +358,8 @@ export function GameConsole({
      */
     const runQueue = useCallback(
         async (steps: readonly QueueStep[]) => {
+            if (queueRunning.current) return;
+            queueRunning.current = true;
             const total = commandCount(steps);
             stopQueue.current = false;
             setQueue({ done: 0, total, waiting: 0 });
@@ -404,16 +412,52 @@ export function GameConsole({
                     ].slice(-KEPT_REPLIES)
                 );
             }
+            queueRunning.current = false;
             setQueue(null);
             void refresh();
         },
         [installedAppId, refresh, remember]
     );
 
+    /** Say a kept command could not be run, where it was pressed from. */
+    const refuseKept = useCallback((entry: SavedCommand, why: string, inDialog: boolean) => {
+        if (inDialog) {
+            setAskError(why);
+            return;
+        }
+        setReplies((current) =>
+            [...current, { command: entry.label, output: why, failed: true }].slice(-KEPT_REPLIES)
+        );
+    }, []);
+
+    /** A kept sequence with variables: the server fills every line in, and the
+     *  console runs the steps it hands back the way it runs "Run several", so
+     *  its pauses can be watched and stopped. */
+    const runKeptSequence = useCallback(
+        (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
+            startTransition(async () => {
+                const result = await consoleActions
+                    .keptStepsAction({ installedAppId, id: entry.id, ...choice })
+                    .catch(() => ({ error: t("console.theServerDidNotAnswer"), steps: undefined }));
+                if (result.error || !result.steps) {
+                    refuseKept(entry, result.error ?? t("console.theServerDidNotAnswer"), inDialog);
+                    return;
+                }
+                setAsking(null);
+                void runQueue(result.steps);
+            });
+        },
+        [installedAppId, refuseKept, runQueue, t]
+    );
+
     /** A kept command with variables, filled in and sent by the server. */
     const runKept = useCallback(
         (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
             setAskError("");
+            if (isSequence(entry.command)) {
+                runKeptSequence(entry, choice, inDialog);
+                return;
+            }
             startTransition(async () => {
                 const result = await consoleActions
                     .runKeptCommandAction({ installedAppId, id: entry.id, ...choice })
@@ -455,7 +499,7 @@ export function GameConsole({
                 void refresh();
             });
         },
-        [installedAppId, refresh, t]
+        [installedAppId, refresh, t, runKeptSequence]
     );
 
     /** Pressing a kept command. One that asks for something opens the dialog that
@@ -464,16 +508,18 @@ export function GameConsole({
      *  `Broadcast <message>` verbatim is never what anybody meant; the rest run. */
     const pressSaved = useCallback(
         (entry: SavedCommand) => {
-            const declared = entry.variables ?? [];
-            if (needsAsking(entry.command, edition, declared)) {
+            const press = keptPress(entry, edition);
+            if (press.kind === "ask") {
                 setAskError("");
                 setAsking({ entry, mode: "run" });
-            } else if (hasVariables(entry.command, edition, declared)) {
-                runKept(entry, { values: {}, target: null }, false);
-            } else if (placeholderRange(entry.command)) load(entry.command);
+            } else if (press.kind === "fill") runKept(entry, { values: {}, target: null }, false);
+            else if (press.kind === "batch") setBatch(entry.command);
+            else if (press.kind === "refuse") refuseKept(entry, schemaText(press.problem), false);
+            else if (press.kind === "queue") void runQueue(press.steps);
+            else if (press.kind === "load") load(entry.command);
             else submit(entry.command);
         },
-        [edition, load, runKept, submit]
+        [edition, load, refuseKept, runKept, runQueue, schemaText, submit]
     );
 
     function schedule(entry: SavedCommand, choice: ScheduleChoice): void {
@@ -678,7 +724,7 @@ export function GameConsole({
                     {saved.length > 0 && (
                         <KeptCommandsMenu
                             saved={saved}
-                            canRun={running && !pending && heard}
+                            canRun={running && !pending && heard && queue === null}
                             canManage={heard}
                             onRun={pressSaved}
                             onEdit={(entry) => {
@@ -694,7 +740,11 @@ export function GameConsole({
                                 setAskError("");
                                 setAsking({ entry, mode: "schedule" });
                             }}
-                            onLoad={(entry) => load(entry.command)}
+                            onLoad={(entry) =>
+                                isSequence(entry.command)
+                                    ? setBatch(entry.command)
+                                    : load(entry.command)
+                            }
                             onDuplicate={(entry) => {
                                 setKeepError("");
                                 setKeeping(
@@ -908,6 +958,21 @@ export function GameConsole({
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setBatch(null)}>
                                     {t("console.cancel")}
+                                </Button>
+                                {/* The same block, kept as one command that runs it. */}
+                                <Button
+                                    variant="outline"
+                                    disabled={
+                                        pending || !parsedBatch || parsedBatch.problem !== null
+                                    }
+                                    onClick={() => {
+                                        const block = normalizeCommandText(batch);
+                                        setBatch(null);
+                                        setKeepError("");
+                                        setKeeping({ label: "", command: block, variables: [] });
+                                    }}
+                                >
+                                    <Plus className="size-4" /> {t("console.keepThese")}
                                 </Button>
                                 <Button
                                     disabled={

@@ -31,10 +31,12 @@ describe("normalizeSavedCommand", () => {
         ).toBe("Save the world");
     });
 
-    it("refuses a line that would become two commands", () => {
-        // A kept button that quietly sends a second command against a live server
-        // is the one surprise nobody wants.
-        expect(normalizeSavedCommand({ id: "a", command: "SaveWorld\nBroadcast bye" })).toBeNull();
+    it("keeps several lines as one sequence, each line trimmed and the empty ones dropped", () => {
+        // A second line is a sequence the person wrote, shown as one on its
+        // button - never a single command that quietly became two.
+        expect(
+            normalizeSavedCommand({ id: "a", command: " SaveWorld \r\n\n  Broadcast bye\n" })
+        ).toEqual({ id: "a", label: "SaveWorld", command: "SaveWorld\nBroadcast bye" });
     });
 
     it("refuses an empty command and one nobody could send", () => {

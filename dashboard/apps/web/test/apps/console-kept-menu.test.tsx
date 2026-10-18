@@ -130,6 +130,52 @@ describe("the menu", () => {
     });
 });
 
+describe("a kept sequence", () => {
+    const SEQUENCE: SavedCommand = {
+        id: "restart",
+        label: "Restart",
+        command: "say Restarting\nwait 5\nstop"
+    };
+
+    function renderSequence() {
+        const onSchedule = vi.fn();
+        render(
+            <KeptCommandsMenu
+                saved={[SEQUENCE]}
+                canRun
+                canManage
+                onRun={vi.fn()}
+                onEdit={vi.fn()}
+                onSchedule={onSchedule}
+                onLoad={vi.fn()}
+                onDuplicate={vi.fn()}
+                onForget={vi.fn()}
+            />
+        );
+        return onSchedule;
+    }
+
+    it("says how many commands it sends, with its lines on one row", async () => {
+        const user = userEvent.setup();
+        renderSequence();
+        await user.click(screen.getByRole("button", { name: /Kept commands/ }));
+        expect(await screen.findByText("2 commands")).toBeTruthy();
+        expect(screen.getByText("say Restarting | wait 5 | stop")).toBeTruthy();
+    });
+
+    it("offers no schedule for one that pauses, and says why", async () => {
+        const user = userEvent.setup();
+        const onSchedule = renderSequence();
+        await user.click(screen.getByRole("button", { name: /Kept commands/ }));
+        screen.getByRole("menuitem", { name: "More for Restart" }).focus();
+        await user.keyboard("{ArrowRight}");
+        const schedule = await screen.findByRole("menuitem", { name: /Schedule/ });
+        expect(schedule.getAttribute("aria-disabled")).toBe("true");
+        expect(schedule.textContent).toContain("With pauses it runs only from the console");
+        expect(onSchedule).not.toHaveBeenCalled();
+    });
+});
+
 describe("duplicating a kept command", () => {
     const copyName = (name: string) => `${name} (copy)`;
 

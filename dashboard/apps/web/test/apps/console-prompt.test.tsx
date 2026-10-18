@@ -100,6 +100,48 @@ describe("keeping a command", () => {
         );
     });
 
+    it("keeps several lines as one sequence, asking once for a variable used on each", () => {
+        const onKeep = vi.fn();
+        render(
+            <KeepCommandDialog
+                initial={{ label: "", command: "", variables: [] }}
+                edition="java"
+                pending={false}
+                error=""
+                onClose={() => undefined}
+                onKeep={onKeep}
+            />
+        );
+        fireEvent.change(screen.getByRole("textbox", { name: /^Command/ }), {
+            target: { value: "  say in {x=10}s \n\n wait 5\nsay {x}\n" }
+        });
+        expect(screen.getByText("2 commands")).toBeTruthy();
+        expect(screen.getByText(/x = 10/)).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+        expect(onKeep).toHaveBeenCalledWith(
+            expect.objectContaining({ command: "say in {x=10}s\nwait 5\nsay {x}" })
+        );
+    });
+
+    it("says what is wrong with a sequence Run several would refuse", () => {
+        const onKeep = vi.fn();
+        render(
+            <KeepCommandDialog
+                initial={{ label: "", command: "say a\nwait 500", variables: [] }}
+                edition="java"
+                pending={false}
+                error=""
+                onClose={() => undefined}
+                onKeep={onKeep}
+            />
+        );
+        expect(screen.getByRole("alert").textContent).toBe(
+            "Line 2 waits longer than 120 seconds. Use the Schedule tab for that."
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+        expect(onKeep).not.toHaveBeenCalled();
+    });
+
     it("says the game has none of Polaris's own on another game", () => {
         render(
             <KeepCommandDialog
