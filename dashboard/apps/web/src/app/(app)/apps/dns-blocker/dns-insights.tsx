@@ -350,7 +350,7 @@ function QueryRows({
             <p className="text-xs text-muted-foreground">
                 {t("insights.showing", { count: data.rows.length })}
             </p>
-            <div className="max-h-96 overflow-auto rounded-md border border-border">
+            <div className="max-h-96 overflow-auto overscroll-contain rounded-md border border-border">
                 <table className="w-full table-fixed text-sm">
                     <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                         <tr>
