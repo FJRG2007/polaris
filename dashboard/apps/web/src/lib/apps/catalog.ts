@@ -12,6 +12,7 @@
  */
 
 import { ARK_MAPS, DEFAULT_ARK_MAP, MINECRAFT_SOFTWARE } from "@polaris/core";
+import { DNS_BLOCKER_KEYWORDS } from "@/lib/apps";
 import { NATIVE_APPS, isNativeApp } from "@/lib/apps/native-apps";
 import {
     Bot,
@@ -407,7 +408,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         icon: ShieldBan,
         opensAt: "/apps/dns-blocker",
         summary: "Blocks ads, trackers and malware for every device on your network.",
-        keywords: ["dns", "pi-hole", "adguard", "blocklist", "trackers", "malware"], // i18n-ignore
+        keywords: DNS_BLOCKER_KEYWORDS,
         description:
             "A DNS server for your whole network that refuses to look up ad, tracker and malware domains, so phones, TVs and consoles are covered without installing anything on them. Pick blocklists by category, allow or block your own domains, choose an encrypted resolver, and name devices on your network. Installing downloads nothing: the blocker starts on this machine, on port 53, when you turn it on.", // i18n-ignore
         installMethod: "builtin",

@@ -332,7 +332,7 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
     },
     // The Ad blocker: a lookup refused - a no-entry sign over the network.
     "dns-blocker": {
-        palette: ["#FCA5A5", "#DC2626", "#7F1D1D"],
+        palette: ["#818CF8", "#4F46E5", "#3730A3"],
         draw: ({ base, face }) => (
             <>
                 <circle cx="16" cy="16" r="12.5" fill={base} />
