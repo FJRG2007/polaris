@@ -9,23 +9,40 @@
 import * as core from "@polaris/core";
 import { ReferenceScope } from "./references";
 import {
+    ClipboardPaste,
     Copy,
     CopyPlus,
+    LayoutGrid,
+    Maximize,
     PanelRight,
     Pencil,
     Pin,
     PinOff,
     Play,
+    Plus,
     Power,
     PowerOff,
+    Redo2,
+    Scissors,
+    SquareDashedMousePointer,
+    StickyNote,
     Trash2,
-    X
+    Undo2,
+    X,
+    ZoomIn,
+    ZoomOut
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { CanvasBoard, NO_SELECTION, type CanvasSelection } from "./canvas-board";
+import {
+    CanvasBoard,
+    NO_SELECTION,
+    type CanvasMenuTarget,
+    type CanvasSelection,
+    type CanvasViewActions
+} from "./canvas-board";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode, type T } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
 import { nodeTitle } from "../shared";
@@ -233,10 +250,8 @@ export function CanvasEditor({
         const runnable =
             onRunFrom && (core.nodeRole(node.type) === "trigger" || lanes.get(node.id) === "main");
         const ids = selection.nodes.has(node.id) ? selection.nodes : new Set([node.id]);
-        const steps = graph.nodes.filter(
-            (entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger"
-        );
-        const turnOn = steps.length > 0 && steps.every((entry) => entry.enabled === false);
+        // One of several selected: only what acts on all of them, as in n8n.
+        if (ids.size + selection.notes.size > 1) return selectionMenu(ids);
         return (
             <>
                 <ContextMenuGroup>
@@ -284,40 +299,186 @@ export function CanvasEditor({
                             </>
                         ) : null}
                         <ContextMenuSeparator />
+                        {editItems(ids)}
+                    </>
+                ) : null}
+            </>
+        );
+    };
+
+    /** Duplicate, copy, cut, switch off and delete: what acts on a whole selection. */
+    const editItems = (ids: ReadonlySet<string>) => {
+        const steps = graph.nodes.filter(
+            (entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger"
+        );
+        const turnOn = steps.length > 0 && steps.every((entry) => entry.enabled === false);
+        const count = ids.size + selection.notes.size;
+        return (
+            <>
+                <ContextMenuGroup>
+                    <ContextMenuItem onSelect={duplicate}>
+                        <CopyPlus aria-hidden="true" />
+                        {t("canvas.menu.duplicate")}
+                        <MenuShortcut keys="Mod+D" />
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void copy(false)}>
+                        <Copy aria-hidden="true" />
+                        {t("canvas.menu.copy")}
+                        <MenuShortcut keys="Mod+C" />
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void copy(true)}>
+                        <Scissors aria-hidden="true" />
+                        {t("canvas.menu.cut")}
+                        <MenuShortcut keys="Mod+X" />
+                    </ContextMenuItem>
+                    {steps.length > 0 ? (
+                        <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
+                            {turnOn ? <Power aria-hidden="true" /> : <PowerOff aria-hidden="true" />}
+                            {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
+                            {/* i18n-ignore: a key on the keyboard */}
+                            <MenuShortcut>D</MenuShortcut>
+                        </ContextMenuItem>
+                    ) : null}
+                </ContextMenuGroup>
+                <ContextMenuSeparator />
+                <ContextMenuItem variant="danger" onSelect={remove}>
+                    <Trash2 aria-hidden="true" />
+                    {selection.notes.size > 0
+                        ? t("canvas.menu.deleteSelection")
+                        : count > 1
+                          ? t("canvas.menu.deleteMany", { count })
+                          : t("canvas.menu.delete")}
+                    <MenuShortcut keys="Delete" />
+                </ContextMenuItem>
+            </>
+        );
+    };
+
+    /** Several things selected, or a note: only what acts on all of them. */
+    const selectionMenu = (ids: ReadonlySet<string> = selection.nodes) =>
+        readOnly ? (
+            <ContextMenuItem onSelect={() => void copy(false)}>
+                <Copy aria-hidden="true" />
+                {t("canvas.menu.copy")}
+                <MenuShortcut keys="Mod+C" />
+            </ContextMenuItem>
+        ) : (
+            editItems(ids)
+        );
+
+    const selectAll = () =>
+        setSelection({
+            nodes: new Set(graph.nodes.map((node) => node.id)),
+            notes: new Set(graph.notes.map((note) => note.id)),
+            edge: null
+        });
+
+    /** The empty canvas, a connection, or a selected note. */
+    const boardMenu = (target: CanvasMenuTarget, view: CanvasViewActions) => {
+        if (target.kind === "selection") return selectionMenu();
+        if (target.kind === "edge")
+            return readOnly ? null : (
+                <>
+                    <ContextMenuItem
+                        onSelect={() => {
+                            setInsertOn(target.key);
+                            setPalette(true);
+                        }}
+                    >
+                        <Plus aria-hidden="true" />
+                        {t("canvas.insertHere")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="danger" onSelect={remove}>
+                        <Trash2 aria-hidden="true" />
+                        {t("canvas.menu.deleteEdge")}
+                        <MenuShortcut keys="Delete" />
+                    </ContextMenuItem>
+                </>
+            );
+        const at = target.at;
+        return (
+            <>
+                {!readOnly ? (
+                    <>
                         <ContextMenuGroup>
-                            <ContextMenuItem onSelect={duplicate}>
-                                <CopyPlus aria-hidden="true" />
-                                {t("canvas.menu.duplicate")}
-                                <MenuShortcut keys="Mod+D" />
+                            <ContextMenuItem
+                                onSelect={() => {
+                                    placeAt.current = at;
+                                    setInsertOn(null);
+                                    setPalette(true);
+                                }}
+                            >
+                                <Plus aria-hidden="true" />
+                                {t("canvas.addNode")}
+                                {/* i18n-ignore: a key on the keyboard */}
+                                <MenuShortcut>N</MenuShortcut>
                             </ContextMenuItem>
-                            <ContextMenuItem onSelect={() => void copy(false)}>
-                                <Copy aria-hidden="true" />
-                                {t("canvas.menu.copy")}
-                                <MenuShortcut keys="Mod+C" />
+                            <ContextMenuItem onSelect={() => addNote(at)}>
+                                <StickyNote aria-hidden="true" />
+                                {t("canvas.addNote")}
+                                <MenuShortcut keys="Shift+S" />
                             </ContextMenuItem>
-                            {steps.length > 0 ? (
-                                <ContextMenuItem onSelect={() => toggleEnabled(ids)}>
-                                    {turnOn ? (
-                                        <Power aria-hidden="true" />
-                                    ) : (
-                                        <PowerOff aria-hidden="true" />
-                                    )}
-                                    {turnOn ? t("canvas.menu.enable") : t("canvas.menu.disable")}
-                                    {/* i18n-ignore: a key on the keyboard */}
-                                    <MenuShortcut>D</MenuShortcut>
+                            <ContextMenuItem onSelect={() => void paste(at)}>
+                                <ClipboardPaste aria-hidden="true" />
+                                {t("canvas.menu.paste")}
+                                <MenuShortcut keys="Mod+V" />
+                            </ContextMenuItem>
+                        </ContextMenuGroup>
+                        <ContextMenuSeparator />
+                        <ContextMenuGroup>
+                            <ContextMenuItem onSelect={undo}>
+                                <Undo2 aria-hidden="true" />
+                                {t("canvas.menu.undo")}
+                                <MenuShortcut keys="Mod+Z" />
+                            </ContextMenuItem>
+                            <ContextMenuItem onSelect={redo}>
+                                <Redo2 aria-hidden="true" />
+                                {t("canvas.menu.redo")}
+                                <MenuShortcut keys="Mod+Shift+Z" />
+                            </ContextMenuItem>
+                        </ContextMenuGroup>
+                        <ContextMenuSeparator />
+                    </>
+                ) : null}
+                {graph.nodes.length + graph.notes.length > 0 || graph.nodes.length > 1 ? (
+                    <>
+                        <ContextMenuGroup>
+                            {graph.nodes.length + graph.notes.length > 0 ? (
+                                <ContextMenuItem onSelect={selectAll}>
+                                    <SquareDashedMousePointer aria-hidden="true" />
+                                    {t("canvas.menu.selectAll")}
+                                    <MenuShortcut keys="Mod+A" />
+                                </ContextMenuItem>
+                            ) : null}
+                            {!readOnly && graph.nodes.length > 1 ? (
+                                <ContextMenuItem onSelect={tidy}>
+                                    <LayoutGrid aria-hidden="true" />
+                                    {t("canvas.tidy")}
+                                    <MenuShortcut keys="Shift+Alt+T" />
                                 </ContextMenuItem>
                             ) : null}
                         </ContextMenuGroup>
                         <ContextMenuSeparator />
-                        <ContextMenuItem variant="danger" onSelect={remove}>
-                            <Trash2 aria-hidden="true" />
-                            {ids.size > 1
-                                ? t("canvas.menu.deleteMany", { count: ids.size })
-                                : t("canvas.menu.delete")}
-                            <MenuShortcut keys="Delete" />
-                        </ContextMenuItem>
                     </>
                 ) : null}
+                <ContextMenuGroup>
+                    <ContextMenuItem onSelect={view.fit}>
+                        <Maximize aria-hidden="true" />
+                        {t("canvas.fit")}
+                        <MenuShortcut keys="1" />
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={view.zoomIn}>
+                        <ZoomIn aria-hidden="true" />
+                        {t("canvas.zoomIn")}
+                        <MenuShortcut keys="+" />
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={view.zoomOut}>
+                        <ZoomOut aria-hidden="true" />
+                        {t("canvas.zoomOut")}
+                        <MenuShortcut keys="-" />
+                    </ContextMenuItem>
+                </ContextMenuGroup>
             </>
         );
     };
@@ -373,12 +534,7 @@ export function CanvasEditor({
         const key = event.key.toLowerCase();
         if (mod && key === "z" && !readOnly) event.shiftKey ? redo() : undo();
         else if (mod && key === "y" && !readOnly) redo();
-        else if (mod && key === "a")
-            setSelection({
-                nodes: new Set(graph.nodes.map((node) => node.id)),
-                notes: new Set(graph.notes.map((note) => note.id)),
-                edge: null
-            });
+        else if (mod && key === "a") selectAll();
         else if (mod && key === "c") void copy(false);
         else if (mod && key === "x" && !readOnly) void copy(true);
         else if (mod && key === "v" && !readOnly) void paste(center());
@@ -439,6 +595,7 @@ export function CanvasEditor({
                     incomplete={(node) => !configValid(node)}
                     states={states}
                     menu={nodeMenu}
+                    boardMenu={boardMenu}
                 />
             </div>
             {panelNode ? (

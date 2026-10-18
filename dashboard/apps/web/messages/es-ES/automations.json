@@ -443,7 +443,14 @@
             "enable": "Encender",
             "delete": "Eliminar",
             "deleteMany": "Eliminar {count} nodos",
-            "runFromHere": "Probar desde aquí"
+            "runFromHere": "Probar desde aquí",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "selectAll": "Elegir todo",
+            "undo": "Deshacer cambio",
+            "redo": "Rehacer cambio",
+            "deleteEdge": "Borrar conexión",
+            "deleteSelection": "Borrar selección"
         },
         "noSampleToPin": "Haz antes una prueba o escribe aquí una muestra.",
         "unpinned": "Muestra soltada",

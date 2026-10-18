@@ -443,7 +443,14 @@
             "enable": "Switch on",
             "delete": "Delete",
             "deleteMany": "Delete {count} nodes",
-            "runFromHere": "Run from here"
+            "runFromHere": "Run from here",
+            "cut": "Cut",
+            "paste": "Paste",
+            "selectAll": "Select all",
+            "undo": "Undo last change",
+            "redo": "Redo last change",
+            "deleteEdge": "Delete connection",
+            "deleteSelection": "Delete selection"
         },
         "noSampleToPin": "Run a test first, or write a sample here.",
         "unpinned": "Sample unpinned",
