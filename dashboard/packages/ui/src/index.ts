@@ -17,6 +17,7 @@ export {
     useRangeSelection,
     type PressKeys
 } from "./lib/range-selection";
+export { useRowSelection } from "./lib/row-selection";
 export { MenuSearch, menuSearchMatches } from "./components/menu-search";
 export { refocusMenuSearch } from "./lib/menu-search-focus";
 export { MenuSurfaceProvider, useMenuSurface, type MenuSurfaceState } from "./lib/menu-surface";

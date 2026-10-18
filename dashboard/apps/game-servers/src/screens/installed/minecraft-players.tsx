@@ -29,14 +29,27 @@ import type { PlayerWords } from "../../lib/player-vocabulary";
 import { forgetLoginAction } from "./minecraft-login-actions";
 import type { PlayerSeen } from "../../lib/games-activity";
 import type { MinecraftModeration } from "./minecraft-actions";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+    useEffect,
+    useMemo,
+    useState,
+    useTransition,
+    type KeyboardEvent,
+    type MouseEvent,
+    type ReactNode
+} from "react";
 import type { PlayerSessionEvent } from "../../lib/minecraft/sessions";
 import { PlayerTimeoutDialog } from "../../components/player-timeout-dialog";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
-import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
+import {
+    InventoryExportMenu,
+    InventoryImportButton,
+    InventoryImportDialog,
+    useInventoryExport
+} from "./minecraft-inventory-transfer";
 import { SkinDialog } from "./minecraft-skin-dialog";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
 import type { QueuedAction } from "../../lib/minecraft/queue";
@@ -56,13 +69,24 @@ import {
     PlayerAccessDialog,
     type PlayerDialog
 } from "./minecraft-player-dialogs";
-import { Badge, Button, Card, CardBody, Skeleton, Switch, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    Skeleton,
+    Switch,
+    cn,
+    useRowSelection
+} from "@polaris/ui";
 import {
     Backpack,
     Ban,
     Clock,
     Crown,
     DoorOpen,
+    Download,
     Gamepad2,
     History,
     KeyRound,
@@ -76,6 +100,7 @@ import {
     Skull,
     Sparkles,
     Timer,
+    Upload,
     UserMinus,
     UserPlus,
     Users,
@@ -93,6 +118,10 @@ const { useKeptSnapshot } = hostUi.liveRead;
 
 /** Nobody known to be idle: the screen before the first answer about it. */
 const NOBODY_IDLE: Readonly<Record<string, number>> = {};
+/** Nobody's game mode known yet. */
+const NOBODY_IDLE_MODES: Readonly<Record<string, string>> = {};
+/** The most names one game-mode command takes - see `setGamemodeAction`. */
+const GAMEMODE_BATCH = 50;
 
 type Filter = "all" | "online" | "allowed" | "operators" | "banned";
 
@@ -108,6 +137,7 @@ export function MinecraftPlayers({
     timeouts,
     levels,
     idle = NOBODY_IDLE,
+    modes = NOBODY_IDLE_MODES,
     lastLevels,
     pending: waiting,
     passwords,
@@ -145,6 +175,9 @@ export function MinecraftPlayers({
     levels: Readonly<Record<string, number>>;
     /** Since when each player on has not moved, turned or fought, by name. */
     idle?: Readonly<Record<string, number>>;
+    /** The game mode each player on was last read in, by name - what the row
+     *  menu ticks. */
+    modes?: Readonly<Record<string, string>>;
     /** The level each player was last seen on, for the rows of players who are
      *  not on right now. */
     lastLevels: Readonly<Record<string, RememberedLevel>>;
@@ -313,6 +346,20 @@ export function MinecraftPlayers({
         });
     }, [players, query, filter]);
 
+    // Choosing rows the way Drive's file list does - see `useRowSelection`. Only
+    // the rows drawn count: a bulk action never reaches somebody off screen.
+    const drawn = useMemo(() => shown.slice(0, rowLimit), [shown, rowLimit]);
+    const drawnNames = useMemo(() => drawn.map((player) => player.name), [drawn]);
+    const selection = useRowSelection(drawnNames);
+    const chosenPlayers = useMemo(
+        () => drawn.filter((player) => selection.chosen.includes(player.name)),
+        [drawn, selection.chosen]
+    );
+    const inventoryExport = useInventoryExport(installedAppId, (message) => {
+        setNote(message.note ?? null);
+        setError(message.error ?? null);
+    });
+
     function run(action: () => Promise<{ error?: string }>, rollback?: () => void): void {
         setError(null);
         startTransition(async () => {
@@ -372,6 +419,138 @@ export function MinecraftPlayers({
         )
             return;
         moderate(input);
+    }
+
+    /**
+     * One verb for several players: each shown as done at once, put back one by
+     * one if the server refuses it, and one re-read at the end. In turn rather
+     * than all at once, because each is a command on the same console.
+     */
+    function moderateMany(action: MinecraftModeration["action"], names: readonly string[]): void {
+        if (names.length === 0) return;
+        const expectation = expectationOf(action);
+        const rollbacks = new Map(
+            names.map((name) => [name, expectation ? expect(name, expectation) : undefined])
+        );
+        setError(null);
+        startTransition(async () => {
+            let failure: string | undefined;
+            for (const player of names) {
+                const result = await actions
+                    .moderatePlayerAction({ installedAppId, action, player })
+                    .catch(() => ({ error: t("errors.checkTheDetailsAndTry") }));
+                if (result.error) {
+                    rollbacks.get(player)?.();
+                    failure ??= result.error;
+                }
+            }
+            if (failure) setError(failure);
+            onChanged();
+        });
+    }
+
+    async function confirmMany(
+        action: MinecraftModeration["action"],
+        names: readonly string[],
+        title: string,
+        description: string
+    ): Promise<void> {
+        if (names.length === 0) return;
+        const agreed = await confirm({
+            title,
+            description,
+            confirmLabel: t("playersTab.confirm"),
+            danger: true
+        });
+        if (agreed) moderateMany(action, names);
+    }
+
+    /** Several into one game mode, fifty names to a command. */
+    async function setGamemodeMany(names: readonly string[], mode: string): Promise<void> {
+        setError(null);
+        let failure: string | undefined;
+        for (let at = 0; at < names.length; at += GAMEMODE_BATCH) {
+            const answer = await actions
+                .setGamemodeAction({
+                    installedAppId,
+                    players: names.slice(at, at + GAMEMODE_BATCH),
+                    mode
+                })
+                .catch(() => ({ error: t("errors.checkTheDetailsAndTry") }));
+            failure ??= answer.error;
+        }
+        if (failure) setError(failure);
+        onChanged();
+    }
+
+    /** Take away the access of everybody chosen who has any. */
+    async function removeMany(names: readonly string[]): Promise<void> {
+        if (names.length === 0) return;
+        const agreed = await confirm({
+            title: t("playersTab.selection.removeTitle", { count: names.length }),
+            description: t("playersTab.selection.removeBody"),
+            confirmLabel: t("playersTab.remove"),
+            danger: true
+        });
+        if (!agreed) return;
+        run(async () => {
+            const removed: string[] = [];
+            for (const name of names) {
+                const result = await actions.revokePlayerAccessAction(installedAppId, name);
+                if (result.error) {
+                    if (removed.length > 0) {
+                        selection.forget(removed);
+                        onChanged();
+                    }
+                    return result;
+                }
+                removed.push(name);
+            }
+            selection.forget(names);
+            return {};
+        });
+    }
+
+    /** What the chosen rows can all take, for the bar, the right button and keys. */
+    const removable = chosenPlayers
+        .filter((player) => player.addresses.length > 0)
+        .map((player) => player.name);
+    const bulk: RowMenuEntry[] = bulkEntries({
+        t,
+        players: chosenPlayers,
+        bedrock,
+        live: answering && !pending,
+        modes,
+        exportEntries: inventoryExport.entries(chosenPlayers.map((player) => player.name)),
+        onModerate: moderateMany,
+        onConfirm: confirmMany,
+        onGamemode: setGamemodeMany,
+        onRemove: () => void removeMany(removable),
+        canRemove: removable.length > 0 && !pending,
+        onSelectAll: () => selection.toggleAll(),
+        onClear: selection.clear
+    });
+
+    /** Keys heard anywhere in the table. Never while typing in a field. */
+    function onTableKey(event: KeyboardEvent<HTMLDivElement>): void {
+        const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
+        if (target.closest("input:not([type=checkbox]), textarea, [contenteditable=true]")) return;
+        if (event.key === "Delete" && removable.length > 0 && !pending) {
+            event.preventDefault();
+            void removeMany(removable);
+            return;
+        }
+        selection.onKeyDown(event);
+    }
+
+    /** A press on a row: with Shift or Ctrl (Cmd) it adds to the selection, a
+     *  plain one chooses that row alone - unless it landed on a control. */
+    function pressRow(name: string, event: MouseEvent<HTMLTableRowElement>): void {
+        const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
+        if (target.closest("button, a, input, label, [role=menuitem]")) return;
+        if (!selection.pressRow(name, event)) selection.pressOnly(name);
     }
 
     /** Forget somebody's Polaris login password, so they set a new one on their
@@ -758,6 +937,43 @@ export function MinecraftPlayers({
                         </Button>
                     </>
                 }
+                selection={{
+                    all: selection.all,
+                    some: selection.some,
+                    onToggleAll: selection.toggleAll,
+                    label: t("playersTab.selection.selectAll")
+                }}
+                onKeyDown={onTableKey}
+                selectionBar={
+                    selection.chosen.length > 0 ? (
+                        <div
+                            role="region"
+                            aria-label={t("playersTab.selection.label")}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2"
+                        >
+                            <span className="text-sm font-medium">
+                                {t("playersTab.selection.count", {
+                                    count: selection.chosen.length
+                                })}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <RowMenuButton
+                                    entries={bulk}
+                                    label={t("playersTab.selection.actions")}
+                                />
+                                <Button
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    aria-label={t("playersTab.selection.clear")}
+                                    title={t("playersTab.selection.clear")}
+                                    onClick={selection.clear}
+                                >
+                                    <X className="size-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null
+                }
                 isEmpty={shown.length === 0}
                 empty={
                     !answering && players.length === 0
@@ -766,10 +982,22 @@ export function MinecraftPlayers({
                           ? t("playersTab.nobodyAtAll")
                           : t("playersTab.nobodyMatches")
                 }
-                rows={shown.slice(0, rowLimit).map((player) => (
+                rows={drawn.map((player) => (
                     <PlayerRow
                         key={player.name.toLowerCase()}
                         player={player}
+                        mode={modes[player.name] ?? null}
+                        chosen={selection.isChosen(player.name)}
+                        // Right-clicking a row that is one of several chosen
+                        // offers what they can all take, as a file list does.
+                        bulk={
+                            selection.isChosen(player.name) && selection.chosen.length > 1
+                                ? bulk
+                                : null
+                        }
+                        exportEntries={inventoryExport.entries([player.name])}
+                        onPress={(event) => pressRow(player.name, event)}
+                        onBox={(event) => selection.pressBox(player.name, event)}
                         read={status !== null}
                         bedrock={bedrock}
                         answering={answering}
@@ -938,6 +1166,14 @@ export function MinecraftPlayers({
                     onChanged={onChanged}
                 />
             )}
+            {acting?.dialog === "importInventory" && target && (
+                <InventoryImportDialog
+                    installedAppId={installedAppId}
+                    into={target.name}
+                    onClose={() => setActing(null)}
+                    onDone={onChanged}
+                />
+            )}
             {acting?.dialog === "skin" && target && (
                 <SkinDialog
                     installedAppId={installedAppId}
@@ -994,6 +1230,12 @@ export function MinecraftPlayers({
 
 function PlayerRow({
     player,
+    mode,
+    chosen,
+    bulk,
+    exportEntries,
+    onPress,
+    onBox,
     read,
     bedrock,
     answering,
@@ -1013,6 +1255,17 @@ function PlayerRow({
     onRevoke
 }: {
     player: PlayerEntry;
+    /** The game mode they were last read in, while they are on. */
+    mode: string | null;
+    /** Whether the row is one of those chosen. */
+    chosen: boolean;
+    /** What several chosen rows can all take, when this row is one of them -
+     *  the right button offers that instead of this row's own verbs. */
+    bulk: readonly RowMenuEntry[] | null;
+    /** The ways out for this player's bag. */
+    exportEntries: readonly RowMenuEntry[];
+    onPress: (event: MouseEvent<HTMLTableRowElement>) => void;
+    onBox: (event: MouseEvent) => void;
     /** Whether the server has been asked yet who is on it. Before that nobody is
      *  offline - they are simply not known about, and a grey "Offline" against a
      *  name that is playing is worse than saying nothing. */
@@ -1083,17 +1336,40 @@ function PlayerRow({
         onOpen,
         onModerateWithConfirm,
         onGamemode,
-        onResetPassword
+        onResetPassword,
+        mode,
+        exportEntries
     });
 
     return (
-        <RowContextMenu entries={[...quick, { kind: "separator" } as const, ...more]}>
+        <RowContextMenu entries={bulk ?? [...quick, { kind: "separator" } as const, ...more]}>
             <tr
+                tabIndex={0}
+                aria-selected={chosen}
+                onClick={onPress}
+                // Enter on a focused row opens its record, as it opens a file.
+                onKeyDown={(event) => {
+                    if (event.key !== "Enter" || event.target !== event.currentTarget) return;
+                    event.preventDefault();
+                    onOpen("access");
+                }}
                 className={cn(
-                    "border-t border-border hover:bg-card-hover",
+                    "border-t border-border outline-none hover:bg-card-hover focus-visible:bg-card-hover",
+                    chosen && "bg-primary/5",
                     player.banned && "opacity-60"
                 )}
             >
+                <td className="w-10 px-3 py-2">
+                    <Checkbox
+                        aria-label={t("playersTab.selection.selectNamed", { name })}
+                        checked={chosen}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onBox(event);
+                        }}
+                        onChange={() => undefined}
+                    />
+                </td>
                 <td className="px-3 py-2">
                     <p className="flex items-center gap-1.5 truncate font-medium" title={name}>
                         {player.operator && <Crown className="size-3.5 shrink-0 text-warning" />}
@@ -1501,6 +1777,8 @@ function moreEntries({
     onModerateWithConfirm,
     onGamemode,
     onResetPassword,
+    mode,
+    exportEntries,
     t,
     words
 }: {
@@ -1509,6 +1787,9 @@ function moreEntries({
     player: PlayerEntry;
     bedrock: boolean;
     live: boolean;
+    /** The game mode they were last read in, ticked in its submenu. */
+    mode: string | null;
+    exportEntries: readonly RowMenuEntry[];
     onOpen: (dialog: PlayerDialog) => void;
     onModerateWithConfirm: (
         input: Omit<MinecraftModeration, "installedAppId">,
@@ -1529,6 +1810,7 @@ function moreEntries({
             kind: "item",
             text: playerMenuItem.edit,
             icon: <Pencil className="size-4" />,
+            shortcut: "Enter",
             onSelect: () => onOpen("access")
         },
         // One door for looking at the bag and for changing what is in it: somebody
@@ -1546,6 +1828,24 @@ function moreEntries({
             disabled: !live || bedrock,
             onSelect: () => onOpen("inventory")
         },
+        // The bag as a file and back, without opening the editor first. Java
+        // only, which is where a bag is read and written slot by slot.
+        ...(bedrock
+            ? []
+            : ([
+                  {
+                      kind: "submenu",
+                      text: t("playersTab.menu.exportInventory"),
+                      icon: <Download className="size-4" />,
+                      entries: exportEntries
+                  },
+                  {
+                      kind: "item",
+                      text: t("playersTab.menu.importInventory"),
+                      icon: <Upload className="size-4" />,
+                      onSelect: () => onOpen("importInventory")
+                  }
+              ] as RowMenuEntry[])),
         // Read by anybody on this screen; the dialog offers changing it only to
         // whoever may moderate.
         {
@@ -1595,18 +1895,22 @@ function moreEntries({
               ] as RowMenuEntry[])
             : []),
         { kind: "separator" },
-        // Flat rather than a submenu. Four items is not enough to be worth a
-        // second layer somebody has to hover exactly onto.
-        { kind: "label", text: t("playersTab.menu.gameMode"), muted: true },
-        ...GAME_MODES.map(
-            (mode): RowMenuEntry => ({
-                kind: "item",
-                text: t(`playersTab.modes.${mode}`),
-                icon: <Gamepad2 className="size-4" />,
-                disabled: !live || !player.online,
-                onSelect: () => void onGamemode([player.name], mode)
-            })
-        ),
+        // One line with the modes behind it, the one they are in ticked: the
+        // menu stays the same length however many modes a server offers.
+        {
+            kind: "submenu",
+            text: t("playersTab.menu.gameMode"),
+            icon: <Gamepad2 className="size-4" />,
+            disabled: !live || !player.online,
+            entries: GAME_MODES.map(
+                (one): RowMenuEntry => ({
+                    kind: "item",
+                    text: t(`playersTab.modes.${one}`),
+                    checked: mode === one,
+                    onSelect: () => void onGamemode([player.name], one)
+                })
+            )
+        },
         { kind: "separator" },
         {
             kind: "item",
@@ -1630,6 +1934,185 @@ function moreEntries({
             onSelect: () => onOpen("timeout")
         }
     ];
+}
+
+/**
+ * What several chosen players can all take - the verbs of one row that make
+ * sense for a group, each reaching only the chosen players it applies to (a
+ * kick only those on, a ban only those not banned). Shown in the selection
+ * bar and on the right button over any chosen row.
+ */
+function bulkEntries({
+    t,
+    players,
+    bedrock,
+    live,
+    modes,
+    exportEntries,
+    onModerate,
+    onConfirm,
+    onGamemode,
+    onRemove,
+    canRemove,
+    onSelectAll,
+    onClear
+}: {
+    t: GameText<"minecraft">;
+    players: readonly PlayerEntry[];
+    bedrock: boolean;
+    live: boolean;
+    modes: Readonly<Record<string, string>>;
+    exportEntries: readonly RowMenuEntry[];
+    onModerate: (action: MinecraftModeration["action"], names: readonly string[]) => void;
+    onConfirm: (
+        action: MinecraftModeration["action"],
+        names: readonly string[],
+        title: string,
+        description: string
+    ) => Promise<void>;
+    onGamemode: (names: readonly string[], mode: string) => Promise<void>;
+    onRemove: () => void;
+    canRemove: boolean;
+    onSelectAll: () => void;
+    onClear: () => void;
+}): RowMenuEntry[] {
+    const names = (keep: (player: PlayerEntry) => boolean) =>
+        players.filter(keep).map((player) => player.name);
+    const online = names((player) => player.online);
+    const count = players.length;
+    // Ticked only when every one of them on is known to be in the same mode.
+    const shared = online.length > 0 ? modes[online[0] as string] : undefined;
+    const common = online.every((name) => modes[name] === shared) ? shared : undefined;
+    const verb = (
+        text: string,
+        icon: ReactNode,
+        targets: readonly string[],
+        onSelect: (targets: readonly string[]) => void,
+        danger = false
+    ): RowMenuEntry => ({
+        kind: "item",
+        text,
+        icon,
+        danger,
+        disabled: !live || targets.length === 0,
+        onSelect: () => onSelect(targets)
+    });
+    const entries: RowMenuEntry[] = [
+        { kind: "label", text: t("playersTab.selection.count", { count }) },
+        { kind: "separator" },
+        {
+            kind: "submenu",
+            text: t("playersTab.menu.gameMode"),
+            icon: <Gamepad2 className="size-4" />,
+            disabled: !live || online.length === 0,
+            entries: GAME_MODES.map(
+                (one): RowMenuEntry => ({
+                    kind: "item",
+                    text: t(`playersTab.modes.${one}`),
+                    checked: common === one,
+                    onSelect: () => void onGamemode(online, one)
+                })
+            )
+        }
+    ];
+    if (!bedrock) {
+        entries.push(
+            {
+                kind: "submenu",
+                text: t("playersTab.selection.exportInventories"),
+                icon: <Download className="size-4" />,
+                entries: exportEntries
+            },
+            { kind: "separator" },
+            verb(
+                t("playersTab.selection.op"),
+                <ShieldPlus className="size-4" />,
+                names((player) => !player.operator),
+                (targets) => onModerate("op", targets)
+            ),
+            verb(
+                t("playersTab.selection.deop"),
+                <ShieldMinus className="size-4" />,
+                names((player) => player.operator),
+                (targets) => onModerate("deop", targets)
+            ),
+            verb(
+                t("playersTab.selection.whitelistAdd"),
+                <UserPlus className="size-4" />,
+                names((player) => !player.whitelisted),
+                (targets) => onModerate("whitelist-add", targets)
+            ),
+            verb(
+                t("playersTab.selection.whitelistRemove"),
+                <UserMinus className="size-4" />,
+                names((player) => player.whitelisted),
+                (targets) => onModerate("whitelist-remove", targets)
+            )
+        );
+    }
+    entries.push(
+        { kind: "separator" },
+        verb(
+            t("playersTab.selection.kick"),
+            <DoorOpen className="size-4" />,
+            online,
+            (targets) =>
+                void onConfirm(
+                    "kick",
+                    targets,
+                    t("playersTab.selection.kickTitle", { count: targets.length }),
+                    t("playersTab.selection.kickBody")
+                )
+        )
+    );
+    if (!bedrock) {
+        entries.push(
+            verb(
+                t("playersTab.selection.pardon"),
+                <UserPlus className="size-4" />,
+                names((player) => player.banned),
+                (targets) => onModerate("pardon", targets)
+            ),
+            verb(
+                t("playersTab.selection.ban"),
+                <Ban className="size-4" />,
+                names((player) => !player.banned),
+                (targets) =>
+                    void onConfirm(
+                        "ban",
+                        targets,
+                        t("playersTab.selection.banTitle", { count: targets.length }),
+                        t("playersTab.selection.banBody")
+                    ),
+                true
+            )
+        );
+    }
+    entries.push(
+        {
+            kind: "item",
+            text: t("playersTab.selection.remove"),
+            icon: <UserMinus className="size-4" />,
+            danger: true,
+            shortcut: "Delete",
+            disabled: !canRemove,
+            onSelect: onRemove
+        },
+        { kind: "separator" },
+        {
+            kind: "item",
+            text: t("playersTab.selection.selectAll"),
+            shortcut: "Mod+A",
+            onSelect: onSelectAll
+        },
+        {
+            kind: "item",
+            text: t("playersTab.selection.clear"),
+            shortcut: "Escape",
+            onSelect: onClear
+        }
+    );
+    return entries;
 }
 
 /** Whether the game's own whitelist is enforced at all - a list nobody is checked

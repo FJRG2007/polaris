@@ -14,9 +14,8 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { SelectionBar } from "./drop-points-view";
-import { useRowSelection } from "./use-row-selection";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, Checkbox, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Checkbox, cn, useRowSelection } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { Ban, Check, Copy, Lock, MessageSquare, RotateCcw, Trash2 } from "lucide-react";
 import {

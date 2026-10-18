@@ -16,6 +16,8 @@ import * as commands from "./events/commands";
 import * as stage from "./events/kinds/stage";
 import type { ServerContainer } from "./service";
 import { fresh } from "../fresh";
+import { GAME_MODES } from "./players";
+import type { GameMode } from "./announce-target";
 
 /** The least time between two looks at one server, however many ask. */
 const LOOK_EVERY_MS = 15_000;
@@ -115,6 +117,17 @@ export function idleSince(
     for (const one of seen.values()) {
         const acted = one.movedAt ?? one.since;
         if (now - acted >= afkMinutes * 60_000) found[one.name] = acted;
+    }
+    return found;
+}
+
+/** The game mode each of them was last read in, by name: `playerGameType`'s
+ *  0-3 as the words the game's own command takes. Anybody not read is left out. */
+export function gameModes(seen: ReadonlyMap<string, plan.Seen>): Record<string, GameMode> {
+    const found: Record<string, GameMode> = {};
+    for (const one of seen.values()) {
+        const mode = typeof one.mode === "number" ? GAME_MODES[one.mode] : undefined;
+        if (mode) found[one.name] = mode;
     }
     return found;
 }

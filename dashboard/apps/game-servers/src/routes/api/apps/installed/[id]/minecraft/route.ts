@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { gameWords } from "../../../../../../screens/game-words";
 import { reachAdviceFor } from "../../../../../../lib/minecraft/reach";
 import { readLastSeen } from "../../../../../../lib/games-activity-service";
-import { idleSince, lookIfDue } from "../../../../../../lib/minecraft/activity";
+import { gameModes, idleSince, lookIfDue } from "../../../../../../lib/minecraft/activity";
 import { afkMinutesFor } from "../../../../../../lib/minecraft/events/events-service";
 import { sweepWatchedGameSchedules } from "../../../../../../lib/minecraft/schedule-service";
 import { drainQueue, pendingFor } from "../../../../../../lib/minecraft/queue-service";
@@ -118,15 +118,16 @@ export async function GET(
                 // AFK, and since when. Looked at no more often than every few seconds
                 // however many screens ask.
                 wantsRoster && online.length > 0
-                    ? withServerContainer(server.ownerId, id, async (container) =>
-                          container.running
-                              ? idleSince(
-                                    await lookIfDue(id, container),
-                                    await afkMinutesFor(id),
-                                    Date.now()
-                                )
-                              : null
-                      ).catch(() => null)
+                    ? withServerContainer(server.ownerId, id, async (container) => {
+                          if (!container.running) return null;
+                          const looked = await lookIfDue(id, container);
+                          return {
+                              idle: idleSince(looked, await afkMinutesFor(id), Date.now()),
+                              // The same look says which game mode each of them is
+                              // in, which is what the row menu ticks.
+                              modes: gameModes(looked)
+                          };
+                      }).catch(() => null)
                     : null
             ] as const);
             return {
@@ -142,11 +143,12 @@ export async function GET(
                 online,
                 live: second[0],
                 levels: second[1],
-                idle: second[3]
+                idle: second[3]?.idle ?? null,
+                modes: second[3]?.modes ?? null
             };
         });
         const { status, reach, access, firewall, sessions, timeouts, lastLevels, pending } = read;
-        const { online, live, levels, idle } = read;
+        const { online, live, levels, idle, modes } = read;
         /*
          * What the server last said about who may play on it.
          *
@@ -240,6 +242,7 @@ export async function GET(
             lastLevels,
             pending,
             idle,
+            modes,
             now: new Date().toISOString()
         });
     } catch (caught) {

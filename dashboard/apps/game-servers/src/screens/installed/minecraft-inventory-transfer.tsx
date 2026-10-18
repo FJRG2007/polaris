@@ -31,6 +31,7 @@ import {
 import { hostUi } from "@polaris/app-host/client";
 import { Download, FileUp, Loader2, Upload } from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
+import type { RowMenuEntry } from "../../components/row-menu";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -57,10 +58,82 @@ function csvOf(t: GameText<"minecraft">, file: transfer.TransferFile): string {
     return transfer.toCsv(file, header, (slot) => slotLabelIn(t, slot));
 }
 
+/** How an export leaves the screen. */
+export type ExportHow = "copy" | "json" | "csv";
+
 /**
- * Export: one player's bag, or every bag Polaris can read or has kept, copied as
- * JSON or downloaded as JSON or CSV.
+ * Exporting bags: one player's, a chosen few, or every bag Polaris can read or
+ * has kept - copied as JSON or downloaded as JSON or CSV. One implementation
+ * behind the toolbar's menu, a row's menu and the menu of a selection.
  */
+export function useInventoryExport(
+    installedAppId: string,
+    onMessage: (message: { note?: string; error?: string }) => void
+) {
+    const t = useGameText("minecraft");
+    const [pending, startTransition] = useTransition();
+
+    const exportAs = (players: readonly string[] | "all", how: ExportHow) => {
+        const all = players === "all";
+        const base = all
+            ? "inventories"
+            : players.length === 1
+              ? `inventory-${players[0]}`
+              : `inventories-${players.length}`;
+        startTransition(async () => {
+            const result = await actions
+                .exportInventoriesAction({ installedAppId, players: all ? "all" : [...players] })
+                .catch(() => ({ file: undefined, missing: undefined, error: undefined }));
+            if (!result.file) {
+                onMessage({ error: result.error ?? t("inventoryTransfer.couldNotExport") });
+                return;
+            }
+            const file = result.file;
+            onMessage({
+                note:
+                    result.missing && result.missing.length > 0
+                        ? t("inventoryTransfer.missing", { names: result.missing.join(", ") })
+                        : undefined
+            });
+            if (how === "copy") {
+                try {
+                    await navigator.clipboard.writeText(transfer.toJson(file));
+                    onMessage({ note: t("inventoryTransfer.copied") });
+                } catch {
+                    onMessage({ error: t("inventoryTransfer.copyFailed") });
+                }
+            } else if (how === "json") {
+                download(`${base}-${stamp()}.json`, transfer.toJson(file), "application/json");
+            } else {
+                download(`${base}-${stamp()}.csv`, csvOf(t, file), "text/csv;charset=utf-8");
+            }
+        });
+    };
+
+    /** The three ways out, as row-menu entries - for a submenu of a row or of a
+     *  selection. */
+    const entries = (players: readonly string[] | "all"): RowMenuEntry[] => [
+        {
+            kind: "item",
+            text: t("inventoryTransfer.copyJson"),
+            onSelect: () => exportAs(players, "copy")
+        },
+        {
+            kind: "item",
+            text: t("inventoryTransfer.downloadJson"),
+            onSelect: () => exportAs(players, "json")
+        },
+        {
+            kind: "item",
+            text: t("inventoryTransfer.downloadCsv"),
+            onSelect: () => exportAs(players, "csv")
+        }
+    ];
+
+    return { pending, exportAs, entries };
+}
+
+/** Export every bag, from the toolbar. */
 export function InventoryExportMenu({
     installedAppId,
     players,
@@ -73,27 +146,9 @@ export function InventoryExportMenu({
     onMessage: (message: { note?: string; error?: string }) => void;
 }) {
     const t = useGameText("minecraft");
-    const [pending, startTransition] = useTransition();
     const all = players === "all";
-    const base = all ? "inventories" : `inventory-${players}`;
-
-    const run = (use: (file: transfer.TransferFile) => Promise<void> | void) =>
-        startTransition(async () => {
-            const result = await actions
-                .exportInventoriesAction({ installedAppId, players: all ? "all" : [players] })
-                .catch(() => ({ file: undefined, missing: undefined, error: undefined }));
-            if (!result.file) {
-                onMessage({ error: result.error ?? t("inventoryTransfer.couldNotExport") });
-                return;
-            }
-            onMessage({
-                note:
-                    result.missing && result.missing.length > 0
-                        ? t("inventoryTransfer.missing", { names: result.missing.join(", ") })
-                        : undefined
-            });
-            await use(result.file);
-        });
+    const { pending, exportAs } = useInventoryExport(installedAppId, onMessage);
+    const which = all ? "all" : [players];
 
     return (
         <DropdownMenu>
@@ -108,44 +163,13 @@ export function InventoryExportMenu({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                    onSelect={() =>
-                        run(async (file) => {
-                            try {
-                                await navigator.clipboard.writeText(transfer.toJson(file));
-                                onMessage({ note: t("inventoryTransfer.copied") });
-                            } catch {
-                                onMessage({ error: t("inventoryTransfer.copyFailed") });
-                            }
-                        })
-                    }
-                >
+                <DropdownMenuItem onSelect={() => exportAs(which, "copy")}>
                     {t("inventoryTransfer.copyJson")}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                    onSelect={() =>
-                        run((file) =>
-                            download(
-                                `${base}-${stamp()}.json`,
-                                transfer.toJson(file),
-                                "application/json"
-                            )
-                        )
-                    }
-                >
+                <DropdownMenuItem onSelect={() => exportAs(which, "json")}>
                     {t("inventoryTransfer.downloadJson")}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                    onSelect={() =>
-                        run((file) =>
-                            download(
-                                `${base}-${stamp()}.csv`,
-                                csvOf(t, file),
-                                "text/csv;charset=utf-8"
-                            )
-                        )
-                    }
-                >
+                <DropdownMenuItem onSelect={() => exportAs(which, "csv")}>
                     {t("inventoryTransfer.downloadCsv")}
                 </DropdownMenuItem>
                 <DropdownMenuLabel className="max-w-64 whitespace-normal text-xs font-normal text-muted-foreground">
@@ -197,7 +221,8 @@ function stackText(t: GameText<"minecraft">, item: InventoryItem | null): string
     return `${item.count} x ${item.id.replace(/^minecraft:/, "")}${details ? ` (${details})` : ""}`;
 }
 
-function InventoryImportDialog({
+/** The import dialog on its own, for a menu that opens it rather than a button. */
+export function InventoryImportDialog({
     installedAppId,
     into,
     onClose,

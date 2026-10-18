@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Choosing rows of a drop point table the way Drive's file list does.
+ * Choosing rows of a table the way Drive's file list does.
  *
  * The checkbox toggles one row, Shift with a press takes the whole stretch from
  * the last one pressed, Ctrl (Cmd) with a press on the row toggles it without
@@ -14,7 +14,7 @@
  * see.
  */
 
-import { allChosen, useRangeSelection } from "@polaris/ui";
+import { allChosen, useRangeSelection } from "./range-selection";
 import { useCallback, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 export function useRowSelection(ids: readonly string[]) {
@@ -52,6 +52,20 @@ export function useRowSelection(ids: readonly string[]) {
         [range]
     );
 
+    /**
+     * A plain press on the row, as a file list answers one: that row alone,
+     * or nothing when it already was the only one. It becomes the anchor a
+     * Shift press stretches from.
+     */
+    const pressOnly = useCallback(
+        (id: string) => {
+            const alone = chosen.length === 1 && chosen[0] === id;
+            range.reanchor(id);
+            setPicked(alone ? [] : [id]);
+        },
+        [chosen, range]
+    );
+
     const onKeyDown = useCallback(
         (event: KeyboardEvent) => {
             if (event.key === "Escape" && chosen.length > 0) {
@@ -73,6 +87,7 @@ export function useRowSelection(ids: readonly string[]) {
         clear,
         pressBox,
         pressRow,
+        pressOnly,
         onKeyDown,
         /** Drop rows that are gone - deleted, say - from what is chosen. */
         forget: (gone: readonly string[]) =>
