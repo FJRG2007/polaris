@@ -17,6 +17,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import * as dnsCutover from "./deploy/dns-cutover";
 import { copyGroupLinks, groupLayers } from "@/lib/deploy/variable-groups";
 import * as follow from "./follow/follow";
+import { isIP } from "node:net";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
 import { stagingDir } from "./deploy/staging";
@@ -3078,6 +3079,11 @@ async function buildAppPlan(
     // derived one nobody would guess. Pinned at install; absent for everything else.
     const storedHostPort = typeof source.hostPort === "number" ? source.hostPort : undefined;
     const hostProtocol = source.hostProtocol === "udp" ? "udp" : undefined;
+    // The one host address every published port binds, when not all of them: the
+    // ad blocker's DNS server takes port 53 on the LAN address only, so it does not
+    // collide with the machine's own resolver on a loopback address of :53.
+    const hostIp =
+        typeof source.hostIp === "string" && isIP(source.hostIp) !== 0 ? source.hostIp : undefined;
     // Further doors into the same service (a Java Minecraft server that Bedrock
     // clients join answers on a UDP port beside its own).
     // TCP proxies added from the service's networking panel publish the same way.
@@ -3095,7 +3101,8 @@ async function buildAppPlan(
                       {
                           host: port.host,
                           container: port.container,
-                          ...(port.protocol === "udp" ? { protocol: "udp" as const } : {})
+                          ...(port.protocol === "udp" ? { protocol: "udp" as const } : {}),
+                          ...(hostIp ? { hostIp } : {})
                       }
                   ];
               })
@@ -3170,7 +3177,8 @@ async function buildAppPlan(
         expose: {
             host: storedHostPort ?? hostPortForApp(kept ? release.id : app.id),
             container: containerPort,
-            ...(hostProtocol ? { protocol: hostProtocol } : {})
+            ...(hostProtocol ? { protocol: hostProtocol } : {}),
+            ...(hostIp ? { hostIp } : {})
         },
         // Kept off the host's interfaces when the operator said so. Never a kept
         // release: those are each reached on a port of their own, which is the whole

@@ -14,6 +14,7 @@
  * Server-only.
  */
 
+import { connect } from "node:net";
 import { randomInt } from "node:crypto";
 import { createSocket } from "node:dgram";
 
@@ -111,4 +112,23 @@ export async function probeDns(
 /** Whether an answer for the check name says blocking is on. */
 export function answerBlocks(answer: DnsProbeAnswer): boolean {
     return answer.kind === "answered" && answer.addresses.includes("0.0.0.0");
+}
+
+/**
+ * Whether anything accepts a TCP connection on `server` port 53. The UDP question
+ * misses a holder that listens but does not answer; a TCP listener, answering or
+ * not, takes the connection, and the blocker publishes TCP 53 too.
+ */
+export async function tcpListening(server: string, timeoutMs = 1500): Promise<boolean> {
+    return new Promise((resolve) => {
+        const socket = connect({ host: server, port: 53 });
+        const done = (listening: boolean): void => {
+            clearTimeout(timer);
+            socket.destroy();
+            resolve(listening);
+        };
+        const timer = setTimeout(() => done(false), timeoutMs);
+        socket.once("connect", () => done(true));
+        socket.once("error", () => done(false));
+    });
 }

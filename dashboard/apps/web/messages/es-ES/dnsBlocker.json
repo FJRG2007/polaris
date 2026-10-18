@@ -33,7 +33,7 @@
         },
         "portHeld": {
             "label": "No arrancó",
-            "body": "El servidor DNS no pudo arrancar en {address}. Lo más habitual es que el puerto 53 de esta máquina lo ocupe un servicio que solo responde a la propia máquina; también puede ser una descarga fallida. Nada ha cambiado en tu red. Vuelve a intentarlo."
+            "body": "El servidor DNS no pudo arrancar en {address}. Puede que otro programa de esta máquina use el puerto 53, o que fallara una descarga. Nada ha cambiado en tu red. Vuelve a intentarlo."
         },
         "conflict": {
             "label": "Sin respuesta",
@@ -138,6 +138,7 @@
         "tooLarge": "Estas reglas son demasiado largas para aplicarlas. Quita algunas de las tuyas y guarda de nuevo.",
         "noAddress": "Esta máquina aún no tiene dirección en tu red. Vuelve a comprobarlo en un minuto.",
         "portTaken": "Otro servidor DNS ya responde aquí en el puerto 53. Apágalo y vuelve a intentarlo.",
+        "portBusy": "Otro programa de esta máquina ya usa el puerto 53, así que el servidor DNS no puede arrancar. Ciérralo y vuelve a intentarlo.",
         "notApplied": "Tus ajustes están guardados, pero el servidor DNS no arrancó con ellos. Mira el estado de arriba y vuelve a intentarlo.",
         "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
         "generic": "No ha funcionado. Inténtalo de nuevo en un momento.",

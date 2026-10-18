@@ -154,6 +154,11 @@ pub struct PortSpec {
     /// published as TCP it answers nothing at all.
     #[serde(default)]
     pub protocol: Option<String>,
+    /// The host address to bind, when not every interface. Absent means all of
+    /// them, as before. A DNS server binds the LAN address only, so it does not
+    /// collide with the machine's own resolver on a loopback address of :53.
+    #[serde(default, rename = "hostIp")]
+    pub host_ip: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -232,6 +237,13 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
         if let Some(policy) = &service.pull_policy {
             if !ALLOWED_PULL_POLICY.contains(&policy.as_str()) {
                 return Err(format!("invalid pull policy: {policy}"));
+            }
+        }
+        for port in &service.ports {
+            if let Some(ip) = &port.host_ip {
+                if ip.parse::<std::net::IpAddr>().is_err() {
+                    return Err(format!("invalid host address for {}: {ip}", service.name));
+                }
             }
         }
         for net in &service.networks {
@@ -504,9 +516,16 @@ pub fn render_compose(spec: &DeploySpec, config: &Config) -> String {
                     Some("udp") => "/udp",
                     _ => "",
                 };
+                // An IPv6 address is bracketed, or compose reads its colons as the
+                // separators between the host and container ports.
+                let bind = match port.host_ip.as_deref().map(str::parse::<std::net::IpAddr>) {
+                    Some(Ok(std::net::IpAddr::V4(ip))) => format!("{ip}:"),
+                    Some(Ok(std::net::IpAddr::V6(ip))) => format!("[{ip}]:"),
+                    _ => String::new(),
+                };
                 out.push_str(&format!(
                     "      - {}\n",
-                    yaml_quote(&format!("{}:{}{}", port.host, port.container, suffix))
+                    yaml_quote(&format!("{bind}{}:{}{}", port.host, port.container, suffix))
                 ));
             }
         }
@@ -1489,6 +1508,28 @@ mod tests {
         let rendered = render_compose(&s, &config);
         assert!(rendered.contains("\"19132:19132/udp\""));
         assert!(rendered.contains("\"25565:25565\""));
+    }
+
+    #[test]
+    fn binds_a_port_to_one_host_address_and_refuses_an_invented_one() {
+        // A DNS server on 0.0.0.0:53 collides with the machine's own resolver on
+        // 127.0.0.53:53; bound to the LAN address it does not. An older dashboard
+        // sends no address, and that still parses and binds every interface.
+        let config = test_config();
+        let s = spec(
+            r#"{"project":"p","services":[{"name":"dns","image":"spx01/blocky","ports":[{"host":53,"container":53,"protocol":"udp","hostIp":"192.168.1.20"},{"host":53,"container":53,"hostIp":"192.168.1.20"},{"host":8080,"container":80},{"host":5353,"container":53,"hostIp":"fd00::2"}]}]}"#,
+        );
+        assert!(validate_spec(&s, &config).is_ok());
+        let rendered = render_compose(&s, &config);
+        assert!(rendered.contains("\"192.168.1.20:53:53/udp\""));
+        assert!(rendered.contains("\"192.168.1.20:53:53\""));
+        assert!(rendered.contains("\"8080:80\""));
+        assert!(rendered.contains("\"[fd00::2]:5353:53\""));
+
+        let bad = spec(
+            r#"{"project":"p","services":[{"name":"dns","image":"spx01/blocky","ports":[{"host":53,"container":53,"hostIp":"0.0.0.0:53:53"}]}]}"#,
+        );
+        assert!(validate_spec(&bad, &config).is_err());
     }
 
     #[test]

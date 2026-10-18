@@ -139,7 +139,12 @@ export {
 } from "./private-names.js";
 export { ComposeRuntime } from "./runtime/compose.js";
 export { mountFailureReason } from "./mount-failure.js";
-export { deployFailureReason, isOutOfSpace, parseReclaimedBytes } from "./deploy-failure.js";
+export {
+    deployFailureReason,
+    isOutOfSpace,
+    isPortTaken,
+    parseReclaimedBytes
+} from "./deploy-failure.js";
 export { SwarmRuntime } from "./runtime/swarm.js";
 export { parseContainerState, type ContainerState } from "./runtime/status.js";
 export {

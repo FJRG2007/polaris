@@ -19,13 +19,15 @@
 
 import { prisma } from "@polaris/db";
 import { randomUUID } from "node:crypto";
+import { isPortTaken } from "@polaris/deploy";
 import { ENV_VALUE_MAX } from "@polaris/core";
+import { boundSource, dnsPublishSpec } from "./publish";
 import { getHostLanIp } from "@/lib/host-address";
 import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { DNS_CHECK_NAME, encodeBlockyConfig } from "./render";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
-import { answerBlocks, probeDns, type DnsProbeAnswer } from "./probe";
+import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import {
     DNS_BLOCKER_APP,
@@ -39,7 +41,6 @@ import {
 export const DNS_CONFIG_ENV = "BLOCKY_CONFIG_BASE64";
 /** The key the settings live under on the app's install row. */
 const CONFIG_KEY = "dns";
-const DNS_PORT = 53;
 
 /** Why something the operator asked for was not done, as a key the screen says
  *  in their language (`dnsBlocker` `errors.<code>`). */
@@ -48,6 +49,7 @@ export type DnsRefusalCode =
     | "tooLarge"
     | "noAddress"
     | "portTaken"
+    | "portBusy"
     | "notApplied"
     | "notRunning"
     | "notAnswering";
@@ -193,6 +195,10 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
     };
 }
 
+function messageOf(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
 /** Write the configuration onto the engine and deploy it again. A failed deploy
  *  is logged and marked on the engine, where the status reads it as `portHeld`,
  *  and refused so the press that asked for it is not answered with success. */
@@ -214,7 +220,7 @@ async function apply(engine: EngineRow, encoded: string, actorId: string): Promi
     } catch (error) {
         console.error("polaris: the ad blocker's DNS server did not deploy:", error);
         await prisma.installedApp.update({ where: { id: engine.id }, data: { status: "failed" } });
-        throw new DnsBlockerRefusal("notApplied");
+        throw new DnsBlockerRefusal(isPortTaken(messageOf(error)) ? "portBusy" : "notApplied");
     }
 }
 
@@ -231,11 +237,43 @@ export async function saveSettings(input: unknown, actorId: string): Promise<Dns
 }
 
 /**
+ * Port 53 at `address`, asked on both transports before a deploy that would bind
+ * it: `portTaken` when another DNS server answers there, `portBusy` when
+ * something listens on TCP without being one. Nothing is refused when what
+ * answers is the blocker itself.
+ */
+async function checkPort(address: string): Promise<void> {
+    const [answer, listening] = await Promise.all([
+        probeDns(address, DNS_CHECK_NAME),
+        tcpListening(address)
+    ]);
+    if (answerBlocks(answer)) return;
+    if (answer.kind === "answered") throw new DnsBlockerRefusal("portTaken");
+    if (listening) throw new DnsBlockerRefusal("portBusy");
+}
+
+/** Bind an existing engine's ports to `address` before it deploys again, which is
+ *  what lets an engine installed on every interface recover on Retry. */
+async function bindEngineTo(engine: EngineRow, address: string): Promise<void> {
+    if (!engine.applicationId) return;
+    const app = await prisma.application.findUnique({
+        where: { id: engine.applicationId },
+        select: { sourceConfig: true }
+    });
+    const next = app ? boundSource(app.sourceConfig, address) : null;
+    if (next === null) return;
+    await prisma.application.update({
+        where: { id: engine.applicationId },
+        data: { sourceConfig: next }
+    });
+}
+
+/**
  * Start the DNS server on this machine, or deploy it again when it exists - which
  * is also what Retry is. Only ever called from somebody's press.
  *
- * Refused before anything is created when another DNS server already answers on
- * port 53 here: the engine could not bind it, and the operator would be left with
+ * Port 53 is checked first, on both transports, every time the server is not
+ * already up: the engine could not bind it, and the operator would be left with
  * a container that fails for a reason it cannot show.
  */
 export async function turnOn(actorId: string): Promise<void> {
@@ -245,35 +283,36 @@ export async function turnOn(actorId: string): Promise<void> {
     if (!address) throw new DnsBlockerRefusal("noAddress");
     const engine = await engineRow();
     if (engine) {
+        // A running engine holds port 53 itself; only a failed one is checked.
+        if (await lastDeployFailed(engine)) await checkPort(address);
+        await bindEngineTo(engine, address);
         await apply(engine, encoded, actorId);
         return;
     }
-    const answer = await probeDns(address, DNS_CHECK_NAME);
-    if (answer.kind === "answered" && !answerBlocks(answer))
-        throw new DnsBlockerRefusal("portTaken");
-    await installApp(
-        actorId,
-        actorId,
-        {
-            catalogId: DNS_ENGINE_APP,
-            name: "Ad blocker DNS server", // i18n-ignore
-            serverId: "local",
-            storage: [],
-            env: []
-        },
-        // Exactly 53, on both transports: a router can only be pointed at an
-        // address, never a port, and DNS falls back to TCP for long answers.
-        {
-            primary: { host: DNS_PORT, container: DNS_PORT, protocol: "udp" },
-            extra: [{ host: DNS_PORT, container: DNS_PORT, protocol: "tcp" }]
-        },
-        // Seeded rather than passed as a form value: the configuration is longer
-        // than any value a form may send.
-        {
-            installedAppId: randomUUID(),
-            env: [{ key: DNS_CONFIG_ENV, value: encoded, isSecret: false }]
-        }
-    );
+    await checkPort(address);
+    try {
+        await installApp(
+            actorId,
+            actorId,
+            {
+                catalogId: DNS_ENGINE_APP,
+                name: "Ad blocker DNS server", // i18n-ignore
+                serverId: "local",
+                storage: [],
+                env: []
+            },
+            dnsPublishSpec(address),
+            // Seeded rather than passed as a form value: the configuration is
+            // longer than any value a form may send.
+            {
+                installedAppId: randomUUID(),
+                env: [{ key: DNS_CONFIG_ENV, value: encoded, isSecret: false }]
+            }
+        );
+    } catch (error) {
+        if (isPortTaken(messageOf(error))) throw new DnsBlockerRefusal("portBusy");
+        throw error;
+    }
 }
 
 /** Stop and remove the DNS server. The settings stay on the app. */

@@ -49,6 +49,16 @@ interface Meaning {
  * In order: the first that matches wins, so the specific ones come before the
  * general. Every entry is a message seen in the wild.
  */
+// Docker's own words for a port already taken. The daemon's "failed programming
+// external connectivity" is how a published port it could not bind starts, the
+// reason itself often cut off after it.
+const PORT_TAKEN_SIGNS = [
+    "address already in use",
+    "port is already allocated",
+    "bind for",
+    "failed programming external connectivity"
+];
+
 const MEANINGS: readonly Meaning[] = [
     {
         // Out of room, in each of its disguises. A layer the image store could
@@ -112,7 +122,7 @@ const MEANINGS: readonly Meaning[] = [
     {
         // Docker's own words for a port already taken, which reads as a compose
         // problem and is somebody else's container.
-        signs: ["address already in use", "port is already allocated", "bind for"],
+        signs: PORT_TAKEN_SIGNS,
         says: "something on that machine is already using a port this needs."
     },
     {
@@ -120,6 +130,12 @@ const MEANINGS: readonly Meaning[] = [
         says: "that image was not built for this machine's processor."
     }
 ];
+
+/** Whether this failure was a port somebody else already holds. */
+export function isPortTaken(raw: string): boolean {
+    const lowered = raw.toLowerCase();
+    return PORT_TAKEN_SIGNS.some((sign) => lowered.includes(sign));
+}
 
 /**
  * Turn what the runtime said into a sentence, keeping the original.
