@@ -13,6 +13,7 @@
 
 import type {
     AirSettings,
+    LightSettings,
     ApplianceView,
     ClimateSettings,
     DeviceCommand,
@@ -72,6 +73,9 @@ export interface DeviceSnapshot {
     /** How a purifier or humidifier is set, what it can be set to and what it
      *  measures. Its headline figure is also `value`, in `unit`. */
     readonly air?: AirSettings | null;
+    /** How bright, warm and coloured a light is, and what it accepts. Null or
+     *  absent for a light that only switches. */
+    readonly light?: LightSettings | null;
     /** What a kitchen appliance is doing, as far as it says. */
     readonly appliance?: ApplianceView | null;
 }

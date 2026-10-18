@@ -24,9 +24,11 @@ import {
     MEASURE_UNITS,
     airHeadline,
     climateCommandOf,
+    lightCommandOf,
     type DeviceKind
 } from "../device-kinds";
 import { haClimateService, haClimateSettings } from "./home-assistant-climate";
+import { haLightData, haLightSettings } from "./home-assistant-light";
 import { haAirService, haAirSettings, haAirUnits, type HaAirUnit } from "./home-assistant-air";
 import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
 
@@ -136,7 +138,8 @@ function toSnapshot(entity: ha.HomeAssistantState, unit: "C" | "F" = "C"): Devic
         online,
         value: reading?.value ?? null,
         unit: reading?.unit ?? null,
-        climate: kind === "climate" && online ? haClimateSettings(entity, unit) : null
+        climate: kind === "climate" && online ? haClimateSettings(entity, unit) : null,
+        light: kind === "light" && online ? haLightSettings(entity) : null
     };
 }
 
@@ -271,6 +274,18 @@ export const homeAssistantDriver: DeviceDriver = {
             if (!unit) throw new HomeError("That device is not here");
             const call = haAirService(unit, action, command);
             await ha.callService(home, call.domain, call.service, call.entityId, call.data);
+            return;
+        }
+        const light = domain === "light" ? lightCommandOf(command) : undefined;
+        if (light) {
+            // Brightness, warmth and colour are all `light.turn_on` with what to set.
+            await ha.callService(
+                homeOf(credentials),
+                domain,
+                "turn_on",
+                device.externalId,
+                haLightData(light)
+            );
             return;
         }
         const service = serviceFor(domain, action);

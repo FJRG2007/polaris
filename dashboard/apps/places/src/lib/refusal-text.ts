@@ -197,6 +197,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.shellyNothing"
     ],
     ["A Shelly cannot be told to do that", "refusals.shellyCannot"],
+    ["That Shelly light cannot be told to do that", "refusals.shellyLightCannot"],
     ["That device is no longer on this Shelly.", "refusals.shellyChannelGone"],
     [
         "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",

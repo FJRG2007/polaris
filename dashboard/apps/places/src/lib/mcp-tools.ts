@@ -325,6 +325,9 @@ const ACTION_WORDS: Readonly<Record<DeviceAction, { name: string; hint: string }
     "set-fan": { name: "set-fan", hint: "with fan" },
     "set-option": { name: "set-option", hint: "with option and on" },
     "set-humidity": { name: "set-humidity", hint: "with target" },
+    "set-brightness": { name: "set-brightness", hint: "with level, 1 to 100" },
+    "set-color-temp": { name: "set-color-temp", hint: "with kelvin" },
+    "set-color": { name: "set-color", hint: "with hue and saturation" },
     stop: { name: "stop", hint: "stops a moving device" }
 };
 
@@ -365,7 +368,15 @@ const controlInput = z.object({
         .optional()
         .describe("For set-temperature and set-humidity: the value to reach."),
     option: z.string().trim().max(40).optional().describe("For set-option: which option."),
-    on: z.boolean().optional().describe("For set-option: on or off.")
+    on: z.boolean().optional().describe("For set-option: on or off."),
+    level: z.number().finite().optional().describe("For set-brightness: the brightness, 1 to 100."),
+    kelvin: z
+        .number()
+        .finite()
+        .optional()
+        .describe("For set-color-temp: the colour temperature in kelvin."),
+    hue: z.number().finite().optional().describe("For set-color: the hue, 0 to 360."),
+    saturation: z.number().finite().optional().describe("For set-color: the saturation, 0 to 100.")
 });
 
 const controlTool = () =>
@@ -375,7 +386,7 @@ const controlTool = () =>
         title: "Operate a device",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Open, unlock or lock a door, switch something on or off, or set an air conditioner or purifier. To open a door use action open, not unlock: unlock leaves it shut. Acts in the real world at once: confirm with the person before opening or unlocking a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
+            "Open, unlock or lock a door, switch something on or off, dim or colour a light, or set an air conditioner or purifier. To open a door use action open, not unlock: unlock leaves it shut. Acts in the real world at once: confirm with the person before opening or unlocking a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
         input: controlInput,
         category: "home",
         scope: "places.control",
@@ -395,7 +406,14 @@ const controlTool = () =>
                     ...(input.action === "set-temperature" || input.action === "set-humidity"
                         ? { target: input.target }
                         : {}),
-                    ...(input.action === "set-option" ? { option: input.option, on: input.on } : {})
+                    ...(input.action === "set-option"
+                        ? { option: input.option, on: input.on }
+                        : {}),
+                    ...(input.action === "set-brightness" ? { level: input.level } : {}),
+                    ...(input.action === "set-color-temp" ? { kelvin: input.kelvin } : {}),
+                    ...(input.action === "set-color"
+                        ? { hue: input.hue, saturation: input.saturation }
+                        : {})
                 });
                 if (!parsed.success)
                     refuse(

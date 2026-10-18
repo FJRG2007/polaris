@@ -14,6 +14,8 @@
  * Server-only.
  */
 
+import { lightCommandOf, type LightSettings } from "../device-kinds";
+import { shellyLightCall, shellyLightSettings } from "./shelly-light";
 import { HomeError } from "../home-error";
 import type { DeviceKind } from "../device-kinds";
 import * as shelly from "../integrations/shelly-api";
@@ -65,7 +67,8 @@ function row(
     name: string,
     model: string | null,
     firmware: string | null,
-    on: boolean | null
+    on: boolean | null,
+    light: LightSettings | null = null
 ): DeviceSnapshot {
     return {
         externalId,
@@ -77,7 +80,8 @@ function row(
         doorState: "none",
         batteryPercent: null,
         batteryCritical: false,
-        online: true
+        online: true,
+        light
     };
 }
 
@@ -145,7 +149,8 @@ async function readRpc(
                 channelName(text(record(config[key]).name), device, switches.length + index, total),
                 model,
                 firmware,
-                typeof output === "boolean" ? output : null
+                typeof output === "boolean" ? output : null,
+                shellyLightSettings(record(status[key]), "brightness", output === true, false)
             )
         );
     }
@@ -217,7 +222,13 @@ async function readGen1(
                     ),
                     model,
                     firmware,
-                    typeof light.ison === "boolean" ? light.ison : null
+                    typeof light.ison === "boolean" ? light.ison : null,
+                    shellyLightSettings(
+                        light,
+                        path === "color" ? "gain" : "brightness",
+                        light.ison === true,
+                        path === "color"
+                    )
                 )
             );
         });
@@ -257,13 +268,21 @@ export const shellyLocalDriver: DeviceDriver = {
         return read(credentials);
     },
 
-    async act(credentials, device, action) {
+    async act(credentials, device, action, command) {
+        const address = addressOf(credentials);
+        const channel = channelOf(device.externalId);
+        const light = lightCommandOf(command);
+        if (light) {
+            const call = shellyLightCall(channel, light);
+            if (!call) throw new HomeError("That Shelly light cannot be told to do that");
+            if (call.rpc) await shelly.shellyRpc(address, "Light.Set", call.rpc);
+            else await shelly.shellyGet(address, call.path);
+            return;
+        }
         if (action !== "turn-on" && action !== "turn-off") {
             throw new HomeError("A Shelly cannot be told to do that");
         }
         const on = action === "turn-on";
-        const address = addressOf(credentials);
-        const channel = channelOf(device.externalId);
 
         const rpc = /^(switch|light):(\d+)$/.exec(channel);
         if (rpc) {

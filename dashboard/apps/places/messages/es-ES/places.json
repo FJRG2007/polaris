@@ -572,6 +572,7 @@
         "shellyThrottled": "El Shelly rechaza peticiones durante un rato tras demasiadas contraseñas erróneas.",
         "shellyNothing": "Ese Shelly no tiene relé ni luz que controlar. Persianas y medidores aún no se pueden manejar desde Polaris.",
         "shellyCannot": "A un Shelly no se le puede pedir eso",
+        "shellyLightCannot": "A esa luz Shelly no se le puede pedir eso",
         "shellyChannelGone": "Ese dispositivo ya no está en este Shelly.",
         "hueKey": "El puente Hue ya no acepta a Polaris. Vuelve a conectarlo pulsando antes el botón del puente.",
         "hueNotBridge": "Esa dirección no respondió con un certificado de puente Hue. Revisa la dirección y, si es un puente antiguo, actualízalo en la app Hue.",
@@ -1409,6 +1410,9 @@
             "set-fan": "Ventilador",
             "set-option": "Ajuste",
             "set-humidity": "Humedad",
+            "set-brightness": "Brillo",
+            "set-color-temp": "Temperatura de color",
+            "set-color": "Color",
             "stop": "Parar"
         },
         "via": {
@@ -1437,6 +1441,9 @@
             "set-fan": "Ventilador cambiado",
             "set-option": "Ajuste cambiado",
             "set-humidity": "Humedad fijada",
+            "set-brightness": "Brillo fijado",
+            "set-color-temp": "Temperatura de color fijada",
+            "set-color": "Color fijado",
             "stop": "Parado"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
@@ -2488,7 +2495,7 @@
         "statusLabel": "Estado de dispositivos",
         "statusHint": "Cómo están los dispositivos que elijas: temperaturas, calidad del aire, lecturas y baterías.",
         "controlsLabel": "Controles rápidos",
-        "controlsHint": "Enciende, cierra y ajusta lo que elijas: encendido, modo y temperatura.",
+        "controlsHint": "Enciende, cierra y ajusta lo que elijas: encendido, clima, humedad y luces.",
         "room": "Sala",
         "target": "Fijado a",
         "mode": "Modo",
@@ -2503,7 +2510,22 @@
         "watchOnly": "Solo para vigilar, no para manejar",
         "noControl": "No puedes manejarlo desde aquí",
         "unlatch": "Abrir puerta",
-        "unlatchConfirm": "¿Abrir ya?"
+        "unlatchConfirm": "¿Abrir ya?",
+        "fan": "Ventilador",
+        "humidityTarget": "Humedad objetivo",
+        "brightness": "Brillo",
+        "warmth": "Calidez",
+        "color": "Color",
+        "colors": {
+            "red": "Rojo",
+            "orange": "Naranja",
+            "yellow": "Amarillo",
+            "green": "Verde",
+            "cyan": "Cian",
+            "blue": "Azul",
+            "purple": "Morado",
+            "pink": "Rosa"
+        }
     },
     "nukiLocal": {
         "title": "Conecta tus cerraduras Nuki en local",

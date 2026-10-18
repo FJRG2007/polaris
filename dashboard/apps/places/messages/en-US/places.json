@@ -572,6 +572,7 @@
         "shellyThrottled": "The Shelly is refusing requests for a while after too many wrong passwords.",
         "shellyNothing": "That Shelly has no relay or light to control. Blinds and meters are not something Polaris can operate yet.",
         "shellyCannot": "A Shelly cannot be told to do that",
+        "shellyLightCannot": "That Shelly light cannot be told to do that",
         "shellyChannelGone": "That device is no longer on this Shelly.",
         "hueKey": "The Hue bridge no longer accepts Polaris. Connect it again, pressing the button on the bridge first.",
         "hueNotBridge": "That address did not answer with a Hue bridge certificate. Check the address, and update the bridge in the Hue app if it is an old one.",
@@ -1400,6 +1401,9 @@
             "set-fan": "Fan speed",
             "set-option": "Setting",
             "set-humidity": "Humidity",
+            "set-brightness": "Brightness",
+            "set-color-temp": "Colour temperature",
+            "set-color": "Colour",
             "stop": "Stop"
         },
         "via": {
@@ -1428,6 +1432,9 @@
             "set-fan": "Fan speed changed",
             "set-option": "Setting changed",
             "set-humidity": "Humidity set",
+            "set-brightness": "Brightness set",
+            "set-color-temp": "Colour temperature set",
+            "set-color": "Colour set",
             "stop": "Stopped"
         },
         "kindStates": {
@@ -2488,7 +2495,7 @@
         "statusLabel": "Devices at a glance",
         "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
         "controlsLabel": "Quick controls",
-        "controlsHint": "Switch, lock and set the devices you pick: power, mode and temperature.",
+        "controlsHint": "Switch, lock and set the devices you pick: power, climate, humidity and lights.",
         "room": "Room",
         "target": "Set to",
         "mode": "Mode",
@@ -2503,7 +2510,22 @@
         "watchOnly": "Set to be watched, not operated",
         "noControl": "You cannot operate this from here",
         "unlatch": "Open door",
-        "unlatchConfirm": "Open now?"
+        "unlatchConfirm": "Open now?",
+        "fan": "Fan speed",
+        "humidityTarget": "Humidity target",
+        "brightness": "Brightness",
+        "warmth": "Warmth",
+        "color": "Colour",
+        "colors": {
+            "red": "Red",
+            "orange": "Orange",
+            "yellow": "Yellow",
+            "green": "Green",
+            "cyan": "Cyan",
+            "blue": "Blue",
+            "purple": "Purple",
+            "pink": "Pink"
+        }
     },
     "nukiLocal": {
         "title": "Connect your Nuki locks locally",
