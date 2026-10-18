@@ -86,6 +86,9 @@ export interface OverviewApp {
  *  read, short enough that the landing screen is never stale for long. */
 const DATA_TTL_MS = 30_000;
 
+/** How often the game servers' card is read again while the page is in front. */
+const GAMES_REFRESH_MS = 60_000;
+
 /** How long changes are collected before they are saved, so moving a card three
  *  places is one write rather than three. */
 const SAVE_DEBOUNCE_MS = 600;
@@ -381,6 +384,40 @@ export function OverviewGrid({
         }
         return () => controller.abort();
     }, [key, asked, on, nonce]);
+
+    // The game servers' player counts are the one figure on the Overview that
+    // moves minute to minute. Only that card is read again, once a minute while
+    // the page is in front - the pace the activity sweep takes its readings at,
+    // so asking more often could only return the same number.
+    const watchingGames = wanted.includes("games");
+    useEffect(() => {
+        if (!watchingGames) return;
+        const controller = new AbortController();
+        const timer = window.setInterval(() => {
+            if (document.visibilityState !== "visible") return;
+            void fetch("/api/overview?widgets=games", {
+                cache: "no-store",
+                signal: controller.signal
+            })
+                .then((response) => (response.ok ? response.json() : null))
+                .then((body: OverviewData | null) => {
+                    if (!body?.games) return;
+                    const games = body.games;
+                    setData((previous) => ({ ...previous, games }));
+                    for (const [held, entry] of dataCache) {
+                        if (held.startsWith(`${on}|`) && "games" in entry.data)
+                            dataCache.set(held, { at: entry.at, data: { ...entry.data, games } });
+                    }
+                })
+                .catch(() => {
+                    // What is on screen stays; the next minute asks again.
+                });
+        }, GAMES_REFRESH_MS);
+        return () => {
+            window.clearInterval(timer);
+            controller.abort();
+        };
+    }, [watchingGames, on]);
 
     function refresh(): void {
         dataCache.clear();

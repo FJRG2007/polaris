@@ -159,7 +159,9 @@
         "count": "<big>{running}</big><rest> of {total, plural, one {# server} other {# servers}} up</rest>",
         "slots": "{count} slots",
         "up": "Up",
-        "stopped": "Stopped"
+        "stopped": "Stopped",
+        "playersTitle": "{online} of {max} players online",
+        "onlineTitle": "{online, plural, one {# player} other {# players}} online"
     },
     "calendar": {
         "unavailable": "Your calendars could not be read just now.",

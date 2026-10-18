@@ -494,6 +494,38 @@ export async function readPlayerCounts(
     return fillGaps(rows, SAMPLE_EVERY_MS);
 }
 
+/** How old the last reading may be and still be said as who is on now: the
+ *  sweep reads every minute, so three minutes is two missed passes. */
+const CURRENT_READING_MS = 3 * SAMPLE_EVERY_MS;
+
+/**
+ * Who is on each of a set of servers, from the sweep's last reading - never by
+ * asking the servers, which is what that sweep already spends once a minute.
+ * One query for the whole set, bounded to the last few minutes; a server with
+ * no reading that recent is left out, because silence is not nobody.
+ */
+export async function readCurrentPlayers(
+    installedAppIds: readonly string[],
+    now: Date = new Date()
+): Promise<Map<string, number>> {
+    const found = new Map<string, number>();
+    if (installedAppIds.length === 0) return found;
+    const rows = await prisma.gameSample
+        .findMany({
+            where: {
+                installedAppId: { in: [...new Set(installedAppIds)] },
+                ts: { gte: new Date(now.getTime() - CURRENT_READING_MS) }
+            },
+            select: { installedAppId: true, playersOnline: true },
+            orderBy: { ts: "desc" }
+        })
+        .catch(() => []);
+    for (const row of rows) {
+        if (!found.has(row.installedAppId)) found.set(row.installedAppId, row.playersOnline);
+    }
+    return found;
+}
+
 /**
  * Close every visit on a server nobody is going to ask again.
  *

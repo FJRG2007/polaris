@@ -29,7 +29,7 @@
 import Link from "next/link";
 import * as nav from "@/lib/apps";
 import { useEffect, useState } from "react";
-import { readPlace } from "@/lib/last-place";
+import { useLastPlaces } from "@/lib/last-place";
 import { usePathname } from "next/navigation";
 import { readMenuUsage } from "@/lib/app-usage";
 import { ArrowUpDown, CheckCheck, Store } from "lucide-react";
@@ -77,7 +77,7 @@ export function AppNav({
     const allowed = new Set(appIds);
     const asGuest = new Set(guestAppIds);
     const waiting = useAppUnread();
-    const [places, setPlaces] = useState<Record<string, string>>({});
+    const places = useLastPlaces(nav.POLARIS_APPS);
     const [usage, setUsage] = useState<{ usage: AppUsage; at: number }>({ usage: {}, at: 0 });
     // A game server's own screens live with the installed apps, and belong to
     // Game servers. The path only says "an installed app"; whether it is a game
@@ -88,12 +88,6 @@ export function AppNav({
     // Re-read on every navigation: leaving Tasks is the moment the entry that
     // leads back into it becomes wrong, and the moment it was used once more.
     useEffect(() => {
-        const found: Record<string, string> = {};
-        for (const app of nav.POLARIS_APPS) {
-            const place = readPlace(app.id, app.href);
-            if (place) found[app.id] = place;
-        }
-        setPlaces(found);
         setUsage(readMenuUsage());
     }, [pathname]);
 

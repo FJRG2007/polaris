@@ -159,16 +159,22 @@ export const gameServersExtension: AppExtension = {
         });
     },
 
-    gameServerSummaries: async (userId) =>
-        (await (await games()).listGameServerFacts(userId)).map((server) => ({
+    gameServerSummaries: async (userId) => {
+        const servers = await (await games()).listGameServerFacts(userId);
+        const online = await (
+            await import("./games-activity-service")
+        ).readCurrentPlayers(servers.filter((server) => server.running).map((server) => server.id));
+        return servers.map((server) => ({
             id: server.id,
             name: server.name,
             game: server.game,
             catalogName: server.catalogName,
             serverName: server.serverName,
             running: server.running,
-            slots: server.slots
-        })),
+            slots: server.slots,
+            online: server.running ? (online.get(server.id) ?? null) : null
+        }));
+    },
 
     forwardedPorts: async () => (await games()).listGamePorts(),
 

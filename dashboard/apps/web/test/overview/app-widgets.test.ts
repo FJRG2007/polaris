@@ -133,9 +133,23 @@ describe("a press", () => {
 
     it("is validated in shape before anything", () => {
         expect(
-            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: "on" })
+            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: "  " })
                 .success
         ).toBe(false);
+        expect(
+            widgets.appWidgetInputSchema.safeParse({
+                item: "t1",
+                control: "x",
+                value: "x".repeat(65)
+            }).success
+        ).toBe(false);
+        expect(
+            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: {} }).success
+        ).toBe(false);
+        expect(
+            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: "heat" })
+                .success
+        ).toBe(true);
         expect(
             widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: Number.NaN })
                 .success

@@ -99,14 +99,10 @@ export const placesExtension: AppExtension = {
             targets: async () => (await overviewCards()).deviceTargets(mode),
             read: async (targets: readonly string[]) =>
                 (await overviewCards()).readDevices(targets, mode),
-            ...(mode === "controls"
-                ? {
-                      act: async (
-                          targets: readonly string[],
-                          input: { item: string; control: string; value: boolean | number }
-                      ) => (await overviewCards()).operate(targets, input)
-                  }
-                : {})
+            act: async (
+                targets: readonly string[],
+                input: { item: string; control: string; value: boolean | number | string }
+            ) => (await overviewCards()).operate(targets, input, mode)
         })),
 
     // Uninstalling with the data deletes the footage files too, not only the

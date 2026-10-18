@@ -110,7 +110,7 @@ export async function readAppWidgets(
 export const appWidgetInputSchema = z.object({
     item: z.string().trim().min(1).max(64),
     control: z.string().trim().min(1).max(64),
-    value: z.union([z.boolean(), z.number().finite()])
+    value: z.union([z.boolean(), z.number().finite(), z.string().trim().min(1).max(64)])
 });
 
 /**
