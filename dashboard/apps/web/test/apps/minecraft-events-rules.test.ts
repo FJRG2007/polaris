@@ -1444,3 +1444,56 @@ describe("the king of the ring's size", () => {
         expect(read(catalog.DEFAULTS_VERSION, 6)).toBe(6);
     });
 });
+
+describe("a pillars game's pace", () => {
+    type Pillars = catalog.EventPreset & { options: catalog.EventOptions<"pillars"> };
+    const pillars = (interval: number, voidAfter: number, minutes: number) => {
+        const preset = catalog.newPreset("pillars", "pillars") as Pillars;
+        return { ...preset, minutes, options: { ...preset.options, interval, voidAfter } } as Pillars;
+    };
+    const read = (preset: Pillars, defaults: number) =>
+        catalog
+            .readEventsConfig({
+                [catalog.EVENTS_KEY]: { presets: [preset], settings: { defaults } }
+            })
+            .presets.find((one) => one.id === "pillars")! as Pillars;
+
+    it("gives a new one the quicker pace", () => {
+        const fresh = catalog.newPreset("pillars", "x") as Pillars;
+        expect(fresh.options.interval).toBe(4);
+        expect(fresh.options.voidAfter).toBe(2);
+        expect(catalog.DEFAULT_MINUTES.pillars).toBe(5);
+    });
+
+    it("brings one saved on the old pace up to the new one, once", () => {
+        const moved = read(pillars(7, 4, 10), 14);
+        expect(moved.options.interval).toBe(4);
+        expect(moved.options.voidAfter).toBe(2);
+        expect(moved.minutes).toBe(5);
+        expect(catalog.presetSchema.safeParse(moved).success).toBe(true);
+    });
+
+    it("keeps every value the operator changed, value by value", () => {
+        const mixed = read(pillars(10, 4, 8), 14);
+        expect(mixed.options.interval).toBe(10);
+        expect(mixed.options.voidAfter).toBe(2);
+        expect(mixed.minutes).toBe(8);
+        const other = read(pillars(7, 6, 10), 14);
+        expect(other.options.interval).toBe(4);
+        expect(other.options.voidAfter).toBe(6);
+        expect(other.minutes).toBe(5);
+        expect(read(pillars(7, 0, 12), 14).options.voidAfter).toBe(0);
+    });
+
+    it("leaves alone one saved since, even on the old values", () => {
+        const kept = read(pillars(7, 4, 10), catalog.DEFAULTS_VERSION);
+        expect(kept.options.interval).toBe(7);
+        expect(kept.options.voidAfter).toBe(4);
+        expect(kept.minutes).toBe(10);
+    });
+
+    it("touches no other kind", () => {
+        const preset = catalog.newPreset("sky-wars", "sky");
+        expect(catalog.toPillarsPace(preset)).toBe(preset);
+    });
+});

@@ -1850,7 +1850,7 @@
             },
             "pillars": {
                 "label": "Pilares",
-                "summary": "Cada jugador que se une empieza solo en lo alto de un pilar de roca madre, en un anillo sobre una gran caída. Cada pocos segundos todos reciben un objeto al azar: bloques, armas, perlas, pociones y más. Tiende puentes, tira a los demás y sé el último en pie. Caer o morir solo te deja fuera: las cosas de cada uno se guardan y se devuelven.",
+                "summary": "Cada jugador que se une empieza solo en lo alto de un pilar de piedra, en un anillo sobre el vacío. Cada pocos segundos todos reciben un objeto al azar: bloques, armas, perlas, pociones y más. Tiende puentes, tira a los demás y sé el último en pie. Caer o morir solo te deja fuera: las cosas de cada uno se guardan y se devuelven.",
                 "unit": "puntos"
             }
         },

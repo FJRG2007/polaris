@@ -67,21 +67,46 @@ describe("the pillars' ring", () => {
         });
     }
 
-    it("has a barrier floor under everything, a bedrock pillar each, and the middle only when asked", () => {
-        const fills = pi.arenaFills(pi.layoutFor(4, true), at);
-        const box = pi.arenaBox(pi.layoutFor(4, true), at);
+    it("has a barrier floor under everything, a built pillar each, and the middle only when asked", () => {
+        const layout = pi.layoutFor(4, true);
+        const fills = pi.arenaFills(layout, at);
+        const box = pi.arenaBox(layout, at);
         expect(fills[0]).toEqual({ box: { ...box, y2: box.y1 }, block: "minecraft:barrier" });
-        expect(fills.filter((one) => one.block === "minecraft:bedrock")).toHaveLength(4);
-        for (const one of fills.filter((fill) => fill.block === "minecraft:bedrock")) {
-            expect(one.box.y2).toBe(at.y);
-            expect(one.box.y2 - one.box.y1 + 1).toBe(pi.PILLAR_DEPTH);
+        for (const pillar of layout.pillars) {
+            const x = at.x + pillar.x;
+            const z = at.z + pillar.z;
+            const column = fills.filter((one) => one.box.x1 === x && one.box.z1 === z);
+            const by = (block: string) => column.filter((one) => one.block === block);
+            // A bedrock top to stand on, a stone brick shaft, a lantern at its foot.
+            expect(by("minecraft:bedrock").map((one) => [one.box.y1, one.box.y2])).toEqual([
+                [at.y, at.y]
+            ]);
+            expect(by("minecraft:stone_bricks").map((one) => [one.box.y1, one.box.y2])).toEqual([
+                [at.y - pi.PILLAR_DEPTH + 2, at.y - 1]
+            ]);
+            expect(by("minecraft:sea_lantern").map((one) => one.box.y1)).toEqual([
+                at.y - pi.PILLAR_DEPTH + 1
+            ]);
         }
-        expect(fills.some((one) => one.block === "minecraft:smooth_stone")).toBe(true);
+        // The tops go in last: the block the build is proved by.
+        expect(fills.at(-1)!.block).toBe("minecraft:bedrock");
+        const middle = (one: { box: { x1: number; z1: number }; block: string }) =>
+            one.block === "minecraft:gold_block" ||
+            (one.block === "minecraft:polished_andesite" && one.box.x1 === at.x - 1);
+        expect(fills.filter(middle)).toHaveLength(2);
+        expect(pi.arenaFills(pi.layoutFor(4, false), at).some(middle)).toBe(false);
+    });
+
+    it("stands in a box short enough to be counted, built and taken down quickly", () => {
+        const layout = pi.layoutFor(8, true);
+        const box = pi.arenaBox(layout, { ...at, y: pi.topOver(64, 40) });
+        // 57 x 67 x 57 (seven slices to count, 120 fills to take down) before.
+        expect(box.y2 - box.y1 + 1).toBeLessThanOrEqual(49);
+        expect(arena.slices(box)).toHaveLength(5);
         expect(
-            pi
-                .arenaFills(pi.layoutFor(4, false), at)
-                .some((one) => one.block === "minecraft:smooth_stone")
-        ).toBe(false);
+            arena.teardown({ box, blocks: [...pi.ARENA_BLOCKS], proved: box })
+                .length
+        ).toBeLessThan(120);
     });
 
     it("is never built so low that its box reaches the ground", () => {
@@ -527,8 +552,8 @@ describe("a pillars game played", () => {
         expect(catalog.presetSchema.safeParse(preset).success).toBe(true);
         expect(preset.options).toMatchObject({
             pool: "balanced",
-            interval: 7,
-            voidAfter: 4,
+            interval: 4,
+            voidAfter: 2,
             middle: true,
             twists: true
         });
@@ -566,9 +591,13 @@ describe("a pillars game played", () => {
         world.at(15_000);
         const lines: string[] = [];
         expect(await game.tick(world.ctx, lines)).toBeNull();
-        // Due at 0, 7 and 14 seconds: one each, the missed ones never made up.
+        // Due at 0, 4, 8 and 12 seconds: one each, the missed ones never made up.
         expect(lines.filter((line) => line.startsWith("give "))).toHaveLength(3);
-        expect(pi.stateOf(world.run.game).drops).toBe(3);
+        expect(pi.stateOf(world.run.game).drops).toBe(4);
+        // Felt as it lands: the pop and the sparks, once for the batch.
+        expect(lines.filter((line) => pi.DROP_FEEDBACK.includes(line))).toHaveLength(
+            pi.DROP_FEEDBACK.length
+        );
         const again: string[] = [];
         await game.tick(world.ctx, again);
         expect(again.filter((line) => line.startsWith("give "))).toHaveLength(0);
@@ -585,6 +614,84 @@ describe("a pillars game played", () => {
         const fromPack: string[] = [];
         await game.tick(packed.ctx, fromPack);
         expect(fromPack.filter((line) => line.startsWith("give "))).toHaveLength(0);
+    });
+
+    it("keeps the shared standing bar, and names who is left and when the void rises on the boss bar", async () => {
+        const run = runOf(["Ana", "Ben", "Cy"], { twists: false, voidAfter: 2 });
+        const world = contextFor(run);
+        world.place({ Ana: spot(0), Ben: spot(1), Cy: spot(2) });
+        world.at(5_000);
+        const lines: string[] = [];
+        await game.tick(world.ctx, lines);
+        // Nothing of its own over the action bar every standing player has.
+        const bar = lines.filter((line) => line.includes(" actionbar "));
+        expect(bar).toHaveLength(3);
+        expect(bar.every((line) => line.includes("3 left "))).toBe(true);
+        // The boss bar is the clock's, a second at a time: not set by the tick.
+        expect(lines.some((line) => line.startsWith("bossbar "))).toBe(false);
+
+        // 5 s into a 10 minute game whose void rises at 2 minutes.
+        const before = game.barName!(run, 5_000, "en");
+        expect(before).toContain("3 left");
+        expect(before).toContain("9:55");
+        expect(before).toContain("void in &f1:55");
+        expect(game.barName!(run, 5_000, "es")).toContain("vacío en &f1:55");
+        // Rising: said so, and no countdown.
+        const rising = game.barName!(run, 125_000, "en");
+        expect(rising).toContain("void rising");
+        expect(rising).not.toContain("void in");
+        // One put out: one fewer left.
+        const out = stored.runSchema.parse({
+            ...run,
+            game: { ...pi.stateOf(run.game), out: [{ name: "Cy", why: "fell", at: 1 }] }
+        });
+        expect(game.barName!(out, 5_000, "en")).toContain("2 left");
+        // A void that never rises is not mentioned.
+        expect(game.barName!(runOf(["Ana", "Ben"], { voidAfter: 0 }), 5_000, "en")).not.toContain(
+            "void"
+        );
+        expect(pi.voidRisesIn(0, 2, 0)).toBe(120);
+        expect(pi.voidRisesIn(0, 2, 120_000)).toBeNull();
+        expect(pi.voidRisesIn(null, 2, 0)).toBeNull();
+        expect(pi.voidRisesIn(0, 0, 0)).toBeNull();
+    });
+
+    it("draws the void where it stands once it rises, and nothing before", () => {
+        const play = pi.playArea(layout, { ...PLACE, y: top });
+        expect(pi.voidLines(play, play.y1)).toEqual([]);
+        const drawn = pi.voidLines(play, play.y1 + 4);
+        expect(drawn).toHaveLength(1);
+        expect(drawn[0]).toContain("particle minecraft:portal");
+        expect(drawn[0]).toContain(` ${play.y1 + 4} `);
+        // From the play area's floor to the tops in about ten seconds.
+        expect(pi.voidLevel(play, 0, 2, 2 * 60_000 + (pi.PILLAR_DEPTH + 2) * 1_000)).toBe(top);
+    });
+
+    it("plays the bell at Go and a thud for everybody when somebody is out", async () => {
+        const run = runOf(["Ana", "Ben", "Cy"], { twists: false });
+        const go = await game.goLines(contextFor(run).ctx, {
+            marker: "components",
+            itemCommand: true
+        });
+        expect(go.some((line) => line.includes(`playsound ${commands.SOUNDS.start}`))).toBe(true);
+        const world = contextFor(run);
+        const play = pi.playArea(layout, { ...PLACE, y: top });
+        world.place({ Ana: spot(0), Ben: { ...spot(1), y: play.y1 - 3 }, Cy: spot(2) });
+        const lines: string[] = [];
+        await game.tick(world.ctx, lines);
+        expect(lines.some((line) => line.includes("block.anvil.land"))).toBe(true);
+    });
+
+    it("crowns the winner with a title for everybody in the game and a burst of sparks", () => {
+        const run = {
+            ...runOf(["Ana", "Ben"]),
+            game: { ...pi.stateOf(null), out: [{ name: "Ben", at: 1, why: "fell" as const }] }
+        };
+        const lines = game.resultLines(run, "es", new Set());
+        expect(lines.some((line) => line.includes("title Ana title") && line.includes("Gana Ana"))).toBe(true);
+        expect(lines.some((line) => line.includes("title Ben title") && line.includes("Gana Ana"))).toBe(true);
+        expect(lines.some((line) => line.includes("particle minecraft:firework"))).toBe(true);
+        expect(game.resultLines(run, "es", new Set(["ana"]))).toEqual([]);
     });
 
     it("puts out whoever died or fell, takes their kit back, and ends with one left", async () => {
@@ -715,6 +822,17 @@ describe("a pillars game played", () => {
                 en.length + Math.max(3, Math.ceil(en.length * 0.25))
             );
         }
-        expect(said.bar(3, "1:00", true, "es")).toContain("vacío");
+        expect(said.bar(3, "1:00", null, true, "es")).toContain("vacío");
+        for (const [voidIn, rising] of [
+            ["1:30", false],
+            [null, true],
+            [null, false]
+        ] as const) {
+            const en = said.bar(16, "10:00", voidIn, rising, "en");
+            const es = said.bar(16, "10:00", voidIn, rising, "es");
+            expect(es.length).toBeLessThanOrEqual(
+                en.length + Math.max(3, Math.ceil(en.length * 0.25))
+            );
+        }
     });
 });

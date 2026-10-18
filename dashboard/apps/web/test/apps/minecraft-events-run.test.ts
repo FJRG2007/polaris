@@ -13351,7 +13351,10 @@ describe("Pillars", () => {
             names.length
         );
         expect(fills().some((line) => line.endsWith(" minecraft:barrier keep"))).toBe(true);
-        expect(fills().some((line) => line.endsWith(" minecraft:smooth_stone keep"))).toBe(true);
+        // Built, not bare: a shaft and a light under each top, a floor round a
+        // gold block in the middle.
+        for (const block of ["stone_bricks", "sea_lantern", "polished_andesite", "gold_block"])
+            expect(fills().some((line) => line.endsWith(` minecraft:${block} keep`))).toBe(true);
         // Each on top of their own pillar, in survival from "Go!".
         for (const [index, name] of names.entries()) {
             const spot = pi.startSpot(layout, at, index);
@@ -13372,7 +13375,7 @@ describe("Pillars", () => {
         expect(
             JSON.parse(packed("data/polaris/loot_table/pillars/balanced_components.json")!)
         ).toEqual(pi.lootTable("balanced", "components"));
-        for (const line of pi.armLines(7, "balanced", "components"))
+        for (const line of pi.armLines(4, "balanced", "components"))
             expect(world.sent).toContain(line);
         expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
         await play(2_100);
@@ -13417,7 +13420,14 @@ describe("Pillars", () => {
         // The drops off, the ring down by kind, everybody's own things back
         // byte for byte, and nothing kept.
         for (const line of pi.STOP_LINES) expect(world.sent).toContain(line);
-        for (const block of ["minecraft:bedrock", "minecraft:barrier", "minecraft:smooth_stone"])
+        for (const block of [
+            "minecraft:bedrock",
+            "minecraft:barrier",
+            "minecraft:stone_bricks",
+            "minecraft:sea_lantern",
+            "minecraft:polished_andesite",
+            "minecraft:gold_block"
+        ])
             expect(fills().some((line) => line.endsWith(` minecraft:air replace ${block}`))).toBe(
                 true
             );

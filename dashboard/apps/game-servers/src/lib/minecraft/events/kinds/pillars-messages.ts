@@ -77,10 +77,25 @@ export function galleryBar(language: Language): string {
         : `${INFO}You are out: watching from above`;
 }
 
-/** The boss bar: who is left, the time, and the void once it rises. */
-export function bar(left: number, clock: string, rising: boolean, language: Language): string {
+/** The boss bar: who is left, the time, and the void - when it rises (`voidIn`,
+ *  a clock) or that it is rising. Neither when it never rises. */
+export function bar(
+    left: number,
+    clock: string,
+    voidIn: string | null,
+    rising: boolean,
+    language: Language
+): string {
     const head = language === "es" ? `&6Quedan ${left}` : `&6${left} left`;
-    const rise = rising ? (language === "es" ? " &7- &cel vacío sube" : " &7- &cvoid rising") : "";
+    const rise = rising
+        ? language === "es"
+            ? " &7- &cel vacío sube"
+            : " &7- &cvoid rising"
+        : voidIn !== null
+          ? language === "es"
+              ? ` &7- vacío en &f${voidIn}`
+              : ` &7- void in &f${voidIn}`
+          : "";
     return `${head} &7- &f${clock}${rise}`;
 }
 
@@ -114,6 +129,15 @@ export function winner(name: string, language: Language): string {
     return language === "es"
         ? `${GOOD}${mark(name, GOOD)} es el último en pie y gana.`
         : `${GOOD}${mark(name, GOOD)} is the last one standing and wins.`;
+}
+
+/** The winner's name, as the title everybody in the game sees. */
+export function winnerTitle(name: string, language: Language): string {
+    return language === "es" ? `${GOOD}¡Gana ${name}!` : `${GOOD}${name} wins!`;
+}
+
+export function winnerSubtitle(language: Language): string {
+    return language === "es" ? "&fÚltimo en pie" : "&fLast one standing";
 }
 
 /** Why it ended before its time. */

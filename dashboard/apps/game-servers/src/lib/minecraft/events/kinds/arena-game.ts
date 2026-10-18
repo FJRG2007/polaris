@@ -139,6 +139,9 @@ export interface ArenaGame {
     goLines(ctx: KindContext, syntax: ItemSyntax): Promise<string[]>;
     /** One tick of play; a sentence when it is decided before its time is up. */
     tick(ctx: KindContext, lines: string[]): Promise<string | null>;
+    /** The boss bar's name while it plays, in place of the event's name and
+     *  clock (`events-service` showClock), redrawn every second. */
+    barName?(run: stored.EventRun, now: number, language: speech.Speech): string;
     /** Sent far oftener than the tick (`events-service` quick look), nothing read. */
     quickLines?(run: stored.EventRun): string[];
     /** The final scores, by name. */

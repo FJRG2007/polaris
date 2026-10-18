@@ -57,6 +57,7 @@ import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
 import * as snowballPackService from "./kinds/snowball-pack-service";
 import * as arenaService from "./kinds/arena-service";
+import * as arenaGames from "./kinds/arena-games";
 import * as pace from "./kinds/pace";
 import * as arena from "./kinds/arena";
 import * as outsiders from "./kinds/outsiders";
@@ -1723,10 +1724,16 @@ async function showClock(installedAppId: string, loop: Loop): Promise<void> {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;
         const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
-        // A meteor shower says how many are there to mine, and how many are
-        // still to fall.
+        // An arena game that keeps its own bar says what it says; a meteor
+        // shower says how many are there to mine, and how many are still to
+        // fall.
+        const own =
+            loop.run.phase === "running"
+                ? arenaGames.gameOf(preset.kind)?.barName?.(loop.run, now, loop.language)
+                : undefined;
         const name =
-            preset.kind === "meteor-shower"
+            own ??
+            (preset.kind === "meteor-shower"
                 ? messages.meteorBar(
                       preset.name,
                       loop.run.meteors.filter((meteor) => meteor.blocks.length > 0).length,
@@ -1738,7 +1745,7 @@ async function showClock(installedAppId: string, loop: Loop): Promise<void> {
                       left,
                       loop.language
                   )
-                : messages.barName(preset.name, left);
+                : messages.barName(preset.name, left));
         lines.push(...commands.barUpdate(name, left, total));
     }
     if (lines.length > 0) await server.sayAll(lines).catch(() => undefined);

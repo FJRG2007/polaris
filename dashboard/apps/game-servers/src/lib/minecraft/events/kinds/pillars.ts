@@ -1,12 +1,21 @@
 /**
- * Pillars: every player alone on a tall pillar of bedrock in a ring, an item
- * each every few seconds, and the last one left wins.
+ * Pillars: every player alone on a pillar in a ring, an item each every few
+ * seconds, and the last one left wins.
  *
  * The ring is one pillar a player, spaced so no jump reaches the next one (a
  * player bridges with what they are given), round an optional small platform
- * in the middle. The pillars are one block wide and `PILLAR_DEPTH` tall over a
- * long drop; under the play area a barrier floor spans the whole box, so
- * water, lava and whatever falls stay inside it and come down with the arena.
+ * in the middle. A pillar is one block wide and `PILLAR_DEPTH` tall: a bedrock
+ * top to stand on, a shaft of stone bricks and a sea lantern at its foot, so
+ * the ring reads as built rather than a row of bare posts; the middle is a
+ * small floor round a gold block. Under the play area a barrier floor spans
+ * the whole box, so water, lava and whatever falls stay inside it and come
+ * down with the arena.
+ *
+ * Kept short on purpose: the box is what the site is counted, built and taken
+ * down over (`arena-service`), block kind by block kind, so every layer of it
+ * is time at the start and at the end. A drop of `PILLAR_DEPTH` is as final as
+ * a long one - under the pillars is out - and the void has that much less to
+ * climb before it ends the game.
  *
  * The items come from a weighted pool (`POOLS`): a balanced mix, blocks only,
  * or chaos. They are handed out inside the server by the events data pack
@@ -18,8 +27,9 @@
  * are given back untouched.
  *
  * Out is out, as in SkyWars: dead, fallen under the pillars, past the play
- * area, or caught by the void, which starts rising after `voidAfter` minutes so
- * a game always ends. Optional twists (`TWISTS`) stir the game up now and then.
+ * area, or caught by the void, which starts rising after `voidAfter` minutes
+ * and reaches the pillars' tops within `PILLAR_DEPTH` seconds, so a game always
+ * ends. Optional twists (`TWISTS`) stir the game up now and then.
  *
  * Pure; the loop is `pillars-service.ts`.
  */
@@ -32,8 +42,9 @@ import type { Fill } from "./arena-game";
 import type { Box, Marker } from "../state";
 import type { EventOptions } from "../catalog";
 
-/** The layout's version, written into the run when it is built. */
-export const DESIGN = 1;
+/** The layout's version, written into the run when it is built. 2: the
+ *  shorter, themed pillars. */
+export const DESIGN = 2;
 
 /** How many can play: a pillar each. */
 export const MOST = 16;
@@ -44,14 +55,14 @@ const SPACING = 6;
 /** The ring's radius, at the least. */
 const LEAST_RING = 10;
 /** How far a pillar reaches down from its top. */
-export const PILLAR_DEPTH = 24;
+export const PILLAR_DEPTH = 10;
 /** The middle platform's half width. */
 const MIDDLE_HALF = 1;
 /** Room round the ring that is still the play area. */
 const PAD = 6;
 /** How far under the pillars' feet the play area goes, and over their tops. */
 const BELOW = 2;
-const ABOVE = 16;
+const ABOVE = 10;
 /** Room past the play area to the box's wall (`sky-wars.MARGIN`). */
 export const MARGIN = 12;
 const GALLERY_LIFT = 3;
@@ -59,7 +70,12 @@ const GALLERY_HALF = 3;
 
 const BEDROCK = "minecraft:bedrock";
 const BARRIER = "minecraft:barrier";
-const MIDDLE = "minecraft:smooth_stone";
+/** A pillar's shaft and the light at its foot. Every block here is one every
+ *  release since 1.13 knows. */
+const SHAFT = "minecraft:stone_bricks";
+const FOOT = "minecraft:sea_lantern";
+const MIDDLE = "minecraft:polished_andesite";
+const MIDDLE_HEART = "minecraft:gold_block";
 
 export type Pool = EventOptions<"pillars">["pool"];
 
@@ -249,6 +265,14 @@ function rollLines(era: Marker): string[] {
     );
 }
 
+/** What everybody still standing sees and hears as an item lands: the pop of a
+ *  pickup and a few green sparks round them. Played by the pack at each drop,
+ *  and by the loop with its own where the pack is not on. */
+export const DROP_FEEDBACK: readonly string[] = [
+    `execute as ${TARGET} at @s run playsound minecraft:entity.item.pickup player @s ~ ~ ~ 0.6 1.4`,
+    `execute as ${TARGET} at @s run particle minecraft:happy_villager ~ ~1 ~ 0.4 0.5 0.4 0 8`
+];
+
 /**
  * The pack's part: with the switch on, a countdown of game ticks, and at zero
  * one roll of the pool for each player still in. Bounded by the players in
@@ -270,7 +294,7 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `scoreboard players operation #left ${OBJECTIVE} = #every ${OBJECTIVE}`,
         `execute if score #era ${OBJECTIVE} matches 1 run function polaris:pillars/drop_components`,
         `execute if score #era ${OBJECTIVE} matches 0 run function polaris:pillars/drop_tag`,
-        `execute as ${TARGET} at @s run playsound minecraft:entity.item.pickup player @s ~ ~ ~ 0.6 1.4`
+        ...DROP_FEEDBACK
     ],
     drop_components: rollLines("components"),
     drop_tag: rollLines("tag")
@@ -382,37 +406,45 @@ export function reachOf(layout: Layout): number {
     return layout.ring + PAD + MARGIN;
 }
 
-/** The barrier floor at the box's bottom, the gallery, the pillars, the middle. */
+/** The barrier floor at the box's bottom, the gallery, the middle, then each
+ *  pillar foot, shaft and top - its top last, the block whose being there
+ *  proves the build went in (`arena-service.raise`). */
 export function arenaFills(layout: Layout, at: Placed): Fill[] {
     const box = arenaBox(layout, at);
     const fills: Fill[] = [
         { box: { ...box, y2: box.y1 }, block: BARRIER },
         { box: galleryFloor(layout, at), block: BARRIER }
     ];
+    const column = (x: number, z: number, y1: number, y2: number, block: string): Fill => ({
+        box: { x1: x, y1, z1: z, x2: x, y2, z2: z },
+        block
+    });
+    const foot = at.y - PILLAR_DEPTH + 1;
     if (layout.middle)
-        fills.push({
-            box: {
-                x1: at.x - MIDDLE_HALF,
-                y1: at.y,
-                z1: at.z - MIDDLE_HALF,
-                x2: at.x + MIDDLE_HALF,
-                y2: at.y,
-                z2: at.z + MIDDLE_HALF
+        fills.push(
+            column(at.x, at.z, at.y, at.y, MIDDLE_HEART),
+            {
+                box: {
+                    x1: at.x - MIDDLE_HALF,
+                    y1: at.y,
+                    z1: at.z - MIDDLE_HALF,
+                    x2: at.x + MIDDLE_HALF,
+                    y2: at.y,
+                    z2: at.z + MIDDLE_HALF
+                },
+                block: MIDDLE
             },
-            block: MIDDLE
-        });
+            column(at.x, at.z, foot + 1, at.y - 1, SHAFT),
+            column(at.x, at.z, foot, foot, FOOT)
+        );
     for (const one of layout.pillars)
-        fills.push({
-            box: {
-                x1: at.x + one.x,
-                y1: at.y - PILLAR_DEPTH + 1,
-                z1: at.z + one.z,
-                x2: at.x + one.x,
-                y2: at.y,
-                z2: at.z + one.z
-            },
-            block: BEDROCK
-        });
+        fills.push(
+            column(at.x + one.x, at.z + one.z, foot, foot, FOOT),
+            column(at.x + one.x, at.z + one.z, foot + 1, at.y - 1, SHAFT)
+        );
+    // The tops last: the block the build is proved by.
+    for (const one of layout.pillars)
+        fills.push(column(at.x + one.x, at.z + one.z, at.y, at.y, BEDROCK));
     return fills;
 }
 
@@ -431,7 +463,10 @@ export const ARENA_BLOCKS: readonly string[] = [
     "minecraft:oak_log",
     "minecraft:glass",
     "minecraft:slime_block",
+    MIDDLE_HEART,
     MIDDLE,
+    SHAFT,
+    FOOT,
     BEDROCK,
     BARRIER
 ];
@@ -464,8 +499,9 @@ export function decorSpots(layout: Layout, at: Placed): decor.Spot[] {
 
 // ------------------------------------------------------------------ the void
 
-/** How long the void takes to rise a block, once it rises. */
-export const RISE_MS = 3_000;
+/** How long the void takes to rise a block, once it rises: from the play
+ *  area's floor to the pillars' tops in `PILLAR_DEPTH + BELOW` seconds. */
+export const RISE_MS = 1_000;
 
 /** The void's level at `now`: the play area's floor until `voidAfter`
  *  minutes into the game, then a block every `RISE_MS`, up to the play
@@ -480,6 +516,14 @@ export function voidLevel(
     const rising = now - readyAt - voidAfter * 60_000;
     if (rising <= 0) return play.y1;
     return Math.min(play.y2, play.y1 + Math.floor(rising / RISE_MS));
+}
+
+/** Seconds until the void starts rising, or null: it never does, the game has
+ *  not started, or it is rising already. */
+export function voidRisesIn(readyAt: number | null, voidAfter: number, now: number): number | null {
+    if (voidAfter <= 0 || readyAt === null) return null;
+    const left = readyAt + voidAfter * 60_000 - now;
+    return left > 0 ? left / 1000 : null;
 }
 
 /**
@@ -528,6 +572,19 @@ export function quickLines(
             (one) => `execute in minecraft:overworld run tag @a[${who},${one}] add ${GONE_TAG}`
         ),
         `execute in minecraft:overworld run tp @a[${who},tag=${GONE_TAG}] ${seat.x + 0.5} ${seat.y} ${seat.z + 0.5}`
+    ];
+}
+
+/** The void, seen: a sheet of portal sparks across the play area at its level,
+ *  once it rises. One line a tick, particles only. */
+export function voidLines(play: Box, floor: number): string[] {
+    if (floor <= play.y1) return [];
+    const x = (play.x1 + play.x2 + 1) / 2;
+    const z = (play.z1 + play.z2 + 1) / 2;
+    const dx = (play.x2 - play.x1 + 1) / 4;
+    const dz = (play.z2 - play.z1 + 1) / 4;
+    return [
+        `execute in minecraft:overworld run particle minecraft:portal ${x} ${floor} ${z} ${dx} 0.2 ${dz} 0.4 600 force`
     ];
 }
 

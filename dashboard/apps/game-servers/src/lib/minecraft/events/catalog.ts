@@ -258,6 +258,15 @@ export const THEME_MODES = ["random", "mine"] as const;
 export const BINGO_GOALS = ["line", "card"] as const;
 /** What a SkyWars island's chests hold: plain survival gear, or rich. */
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
+/** A pillars game's pace: an item every few seconds and the void rising after
+ *  two minutes, so a round is over in about the time the other last-standing
+ *  games take. Before `PILLARS_PACE_SINCE` it was 7 seconds and 4 minutes. */
+const PILLARS_INTERVAL = 4;
+const PILLARS_VOID_AFTER = 2;
+const OLD_PILLARS_INTERVAL = 7;
+const OLD_PILLARS_VOID_AFTER = 4;
+const OLD_PILLARS_MINUTES = 10;
+
 /** What a pillars game hands out: a mix, blocks only, or the wild stuff too. */
 export const PILLAR_POOLS = ["balanced", "blocks", "chaos"] as const;
 
@@ -966,7 +975,7 @@ export const optionsSchemas = {
             .int()
             .min(3, problem("atLeast", { count: 3 }))
             .max(20, problem("atMost", { count: 20 }))
-            .default(7),
+            .default(PILLARS_INTERVAL),
         height: z
             .number()
             .int()
@@ -983,7 +992,7 @@ export const optionsSchemas = {
             .int()
             .min(0, problem("atLeast", { count: 0 }))
             .max(15, problem("atMost", { count: 15 }))
-            .default(4)
+            .default(PILLARS_VOID_AFTER)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -1225,7 +1234,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 14;
+export const DEFAULTS_VERSION = 15;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1244,6 +1253,10 @@ const LATER_HIDE_SECONDS_SINCE = 10;
 /** A meteor shower saved before this was paid the steady-work prizes
  *  (`STANDARD`), and is brought up to its own once (`toMeteorPrizes`). */
 const METEOR_PRIZES_SINCE = 9;
+
+/** Pillars saved before this were given the slower pace (`OLD_PILLARS_*`), and
+ *  are brought up to the new one once, value by value (`toPillarsPace`). */
+const PILLARS_PACE_SINCE = 15;
 
 /**
  * The defaults version each kind joined the catalog at. A server whose events
@@ -1727,7 +1740,7 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     impostor: 15,
     "glass-bridge": 10,
     "tug-of-war": 4,
-    pillars: 10
+    pillars: 5
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1913,6 +1926,25 @@ export function toMeteorPrizes(preset: EventPreset): EventPreset {
     return { ...preset, rewards: METEOR };
 }
 
+/** A pillars game still on the old pace, value by value, given the new one:
+ *  an item every `OLD_PILLARS_INTERVAL` seconds, the void after
+ *  `OLD_PILLARS_VOID_AFTER` minutes, `OLD_PILLARS_MINUTES` in all. A value the
+ *  operator changed stays theirs. */
+export function toPillarsPace(preset: EventPreset): EventPreset {
+    if (preset.kind !== "pillars") return preset;
+    const options = preset.options as EventOptions<"pillars">;
+    return {
+        ...preset,
+        minutes: preset.minutes === OLD_PILLARS_MINUTES ? DEFAULT_MINUTES.pillars : preset.minutes,
+        options: {
+            ...options,
+            interval: options.interval === OLD_PILLARS_INTERVAL ? PILLARS_INTERVAL : options.interval,
+            voidAfter:
+                options.voidAfter === OLD_PILLARS_VOID_AFTER ? PILLARS_VOID_AFTER : options.voidAfter
+        }
+    } as EventPreset;
+}
+
 /** The name the first events gave a horde defense. */
 const BRITISH_HORDE_NAME = "Horde defence";
 
@@ -2053,7 +2085,8 @@ export function readEventsConfig(
                 ? toRingRadius(toHideSeconds(preset, LATER_HIDE_SECONDS))
                 : preset
         )
-        .map((preset) => (saved < METEOR_PRIZES_SINCE ? toMeteorPrizes(preset) : preset));
+        .map((preset) => (saved < METEOR_PRIZES_SINCE ? toMeteorPrizes(preset) : preset))
+        .map((preset) => (saved < PILLARS_PACE_SINCE ? toPillarsPace(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));
