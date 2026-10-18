@@ -66,6 +66,8 @@ export {
     type Toast,
     type ToastAction,
     type ToastChoice,
+    type ToastConversation,
+    type ToastLine,
     type ToastReply
 } from "./components/toast";
 export {

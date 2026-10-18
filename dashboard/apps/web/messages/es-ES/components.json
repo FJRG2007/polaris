@@ -79,7 +79,9 @@
             "day": "24 horas",
             "forever": "Hasta reactivar"
         },
-        "noticeGone": "Ya no se puede responder a ese aviso"
+        "noticeGone": "Ya no se puede responder a ese aviso",
+        "direct": "Mensaje directo",
+        "count": "{count} mensajes"
     },
     "mailUnread": {
         "title": "Correo nuevo",
