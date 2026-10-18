@@ -281,10 +281,14 @@ function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): s
  * what a thing does, and the category is the tie-break rather than the answer.
  * The description is deliberately left out: it is a paragraph, and matching
  * inside one puts apps at the top for a word buried in their third sentence.
+ * The manifest's keywords are read instead, for the name of the kind of thing an
+ * app is when its own name is not it - "dns" found the Mail server, whose
+ * summary mentions DNS, and not the Ad blocker, whose whole job is DNS.
  */
 const APP_FIELDS: readonly SearchField<AppManifest>[] = [
     { text: (app) => app.name, weight: 3 },
     { text: (app) => app.summary, weight: 2 },
+    { text: (app) => app.keywords, weight: 1 },
     { text: (app) => app.category, weight: 1 }
 ];
 
