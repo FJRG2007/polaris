@@ -1847,6 +1847,11 @@
                 "label": "Tug of war",
                 "summary": "Players who join are split into two even teams, each in a pen at one end of a platform in the sky, with a rope between them and a marker in its middle. Every right-click with the rod handed out is a pull, counted by the server and capped at what a quick hand can do, and each team's pulls are averaged over its players so a smaller team is not behind. The marker moves toward the team pulling harder; pull it over your line to win, or be ahead when time is up. The losers' floor opens and they drop into water below. Nobody is hurt and nothing of anybody's is lost.",
                 "unit": "points"
+            },
+            "pillars": {
+                "label": "Pillars",
+                "summary": "Each player who joins starts alone on top of a tall bedrock pillar in a ring over a long drop. Every few seconds everybody gets one random item: blocks, weapons, pearls, potions and more. Bridge across, knock the others off, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2451,6 +2456,11 @@
             "downhillSteepness": {
                 "gentle": "Gentle",
                 "steep": "Steep"
+            },
+            "pillarPool": {
+                "balanced": "Balanced",
+                "blocks": "Blocks only",
+                "chaos": "Chaos: TNT, fire and more"
             }
         },
         "place": {
@@ -2470,7 +2480,8 @@
             "maze": "The maze is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
             "acid": "The arena is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
             "elytra": "The course is hung 50 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
-            "downhill": "The finish is built 30 blocks up and the start higher, about 30 blocks around a player who is in the Overworld when it starts."
+            "downhill": "The finish is built 30 blocks up and the start higher, about 30 blocks around a player who is in the Overworld when it starts.",
+            "pillars": "The pillars are built 40 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
         },
         "floorSizeHint": "5 to 15: this one is {size} by {size}.",
         "range": "{min} to {max}",
@@ -2581,7 +2592,16 @@
         "glassSteps": "Rows of glass",
         "glassStepsHint": "6 to 20.",
         "turnSeconds": "Time for each row (seconds)",
-        "turnSecondsHint": "10 to 60 a player in turns has to reach the next row before they are out."
+        "turnSecondsHint": "10 to 60 a player in turns has to reach the next row before they are out.",
+        "itemPool": "Items",
+        "itemInterval": "Seconds between items",
+        "itemIntervalHint": "3 to 20; everybody gets one each time",
+        "pillarHeight": "Height (blocks)",
+        "pillarHeightHint": "40 to 60 above the ground",
+        "voidAfter": "Void rises after (minutes)",
+        "voidAfterHint": "0 to 15; 0 never, so it may run to time",
+        "pillarMiddle": "Small platform in the middle",
+        "pillarTwists": "Random twists during the game"
     },
     "moderation": {
         "announcements": {

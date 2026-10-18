@@ -44,6 +44,7 @@ import * as netherMaze from "./nether-maze";
 import * as acidRain from "./acid-rain";
 import * as elytraRace from "./elytra-race";
 import * as glassBridge from "./glass-bridge";
+import * as pillars from "./pillars";
 import { FLOOR, WARN, type Arena } from "./spleef";
 
 /** The pack's folder under the world's `datapacks`, and its id in `/datapack`. */
@@ -212,6 +213,7 @@ const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string
     ["acid", acidRain.FUNCTIONS],
     ["elytra", elytraRace.FUNCTIONS],
     ["glass", glassBridge.FUNCTIONS],
+    ["pillars", pillars.FUNCTIONS],
     ["hit", hits.FUNCTIONS],
     ["door", doors.FUNCTIONS],
     ["panel", secretPanels.FUNCTIONS]
@@ -251,6 +253,16 @@ export function packFiles(): ReadonlyMap<string, string> {
                 files.set(
                     `data/polaris/${folder}/${game}/${name}.json`,
                     `${JSON.stringify(advancement)}\n`
+                );
+    // Pillars' drops (`pillars.ts`). 1.21 renamed `loot_tables` to
+    // `loot_table`, and every release that reads the new folder writes items
+    // with components, so only those tables go in it.
+    for (const folder of ["loot_tables", "loot_table"])
+        for (const [name, table] of Object.entries(pillars.LOOT_TABLES))
+            if (folder === "loot_tables" || name.endsWith("_components"))
+                files.set(
+                    `data/polaris/${folder}/pillars/${name}.json`,
+                    `${JSON.stringify(table)}\n`
                 );
     for (const folder of ["functions", "function"]) {
         files.set(`data/minecraft/tags/${folder}/tick.json`, tick);

@@ -11,6 +11,7 @@ import { hotPotato } from "./hot-potato-service";
 import { hideAndSeek } from "./hide-and-seek-service";
 import { impostor } from "./impostor-service";
 import { glassBridge } from "./glass-bridge-service";
+import { pillars } from "./pillars-service";
 import { skyWars } from "./sky-wars-service";
 import { tugOfWar } from "./tug-of-war-service";
 
@@ -20,6 +21,7 @@ const GAMES: Partial<Record<EventKind, ArenaGame>> = {
     "glass-bridge": glassBridge,
     "hot-potato": hotPotato,
     impostor,
+    pillars,
     "sky-wars": skyWars,
     "tug-of-war": tugOfWar
 };

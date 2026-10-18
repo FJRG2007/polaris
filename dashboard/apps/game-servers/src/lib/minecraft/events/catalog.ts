@@ -65,7 +65,8 @@ export const EVENT_KINDS = [
     "downhill-race",
     "impostor",
     "glass-bridge",
-    "tug-of-war"
+    "tug-of-war",
+    "pillars"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -257,6 +258,8 @@ export const THEME_MODES = ["random", "mine"] as const;
 export const BINGO_GOALS = ["line", "card"] as const;
 /** What a SkyWars island's chests hold: plain survival gear, or rich. */
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
+/** What a pillars game hands out: a mix, blocks only, or the wild stuff too. */
+export const PILLAR_POOLS = ["balanced", "blocks", "chaos"] as const;
 
 /** How a glass bridge is crossed: everybody at once, or one at a time. */
 export const GLASS_BRIDGE_MODES = ["free", "turns"] as const;
@@ -953,6 +956,34 @@ export const optionsSchemas = {
             .min(6, problem("atLeast", { count: 6 }))
             .max(16, problem("atMost", { count: 16 }))
             .default(10)
+    }),
+    pillars: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        pool: z.enum(PILLAR_POOLS).default("balanced"),
+        /** Seconds between two items. */
+        interval: z
+            .number()
+            .int()
+            .min(3, problem("atLeast", { count: 3 }))
+            .max(20, problem("atMost", { count: 20 }))
+            .default(7),
+        height: z
+            .number()
+            .int()
+            .min(40, problem("atLeast", { count: 40 }))
+            .max(60, problem("atMost", { count: 60 }))
+            .default(40),
+        /** A small platform in the middle of the ring. */
+        middle: z.boolean().default(true),
+        /** Now and then a twist for everybody: speed, a bonus item. */
+        twists: z.boolean().default(true),
+        /** Minutes until the void starts rising, so it always ends; 0 never. */
+        voidAfter: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(15, problem("atMost", { count: 15 }))
+            .default(4)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -1107,6 +1138,10 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("tug-of-war"),
             options: optionsSchemas["tug-of-war"]
+        }),
+        presetBase.extend({
+            kind: z.literal("pillars"),
+            options: optionsSchemas["pillars"]
         })
     ])
     .superRefine((value, context) => {
@@ -1190,7 +1225,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 13;
+export const DEFAULTS_VERSION = 14;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1235,7 +1270,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "downhill-race": 7,
     impostor: 11,
     "glass-bridge": 12,
-    "tug-of-war": 13
+    "tug-of-war": 13,
+    pillars: 14
 };
 
 export const settingsSchema = z.object({
@@ -1337,7 +1373,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" },
     impostor: { en: "Impostor", es: "Impostor" },
     "glass-bridge": { en: "Glass bridge", es: "Puente frágil" },
-    "tug-of-war": { en: "Tug of war", es: "Tira y afloja" }
+    "tug-of-war": { en: "Tug of war", es: "Tira y afloja" },
+    pillars: { en: "Pillars", es: "Pilares" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1497,6 +1534,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "tug-of-war": {
         unit: "points",
         competitive: true
+    },
+    pillars: {
+        unit: "points",
+        competitive: true
     }
 };
 
@@ -1629,7 +1670,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "downhill-race": QUICK,
     impostor: STANDARD,
     "glass-bridge": QUICK,
-    "tug-of-war": QUICK
+    "tug-of-war": QUICK,
+    pillars: HARD
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1684,7 +1726,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "downhill-race": 5,
     impostor: 15,
     "glass-bridge": 10,
-    "tug-of-war": 4
+    "tug-of-war": 4,
+    pillars: 10
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1729,7 +1772,8 @@ export function migratePreset(entry: unknown): unknown {
  */
 function everyShape(entry: object): object {
     const options = (entry as { options?: unknown }).options;
-    if (typeof options !== "object" || options === null || "shapesRevision" in options) return entry;
+    if (typeof options !== "object" || options === null || "shapesRevision" in options)
+        return entry;
     const shapes = (options as { shapes?: unknown }).shapes;
     const old =
         shapes === undefined ||
@@ -2154,7 +2198,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "downhill-race": 1,
     impostor: 10,
     "glass-bridge": 1,
-    "tug-of-war": 10
+    "tug-of-war": 10,
+    pillars: 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -2305,6 +2350,7 @@ export function readyToPlay(run: {
         case "hide-and-seek":
         case "hot-potato":
         case "sky-wars":
+        case "pillars":
         case "impostor":
         case "glass-bridge":
         case "tug-of-war":
@@ -2447,6 +2493,7 @@ export function playsInArena(preset: EventPreset): boolean {
         preset.kind === "hide-and-seek" ||
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
+        preset.kind === "pillars" ||
         preset.kind === "impostor" ||
         preset.kind === "glass-bridge" ||
         preset.kind === "tug-of-war" ||
@@ -2488,7 +2535,7 @@ export function acidParts(score: number): { place: number; dry: number } {
 }
 
 export function stashesFirst(preset: EventPreset): boolean {
-    return preset.kind === "sky-wars";
+    return preset.kind === "sky-wars" || preset.kind === "pillars";
 }
 
 export { versionAtLeast };
@@ -2571,7 +2618,7 @@ export function needsVersion(preset: EventPreset): readonly number[] | null {
 /** Played in an arena until one player is left: ranked by the order they went
  *  out in, so anybody who took part at all is ranked. */
 export function lastStanding(preset: EventPreset): boolean {
-    return preset.kind === "hot-potato" || preset.kind === "sky-wars";
+    return preset.kind === "hot-potato" || preset.kind === "sky-wars" || preset.kind === "pillars";
 }
 
 /**
@@ -2677,7 +2724,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     "downhill-race": { time: "day", weather: "clear" },
     impostor: { time: "day", weather: "clear" },
     "glass-bridge": { time: "day", weather: "clear" },
-    "tug-of-war": { time: "day", weather: "clear" }
+    "tug-of-war": { time: "day", weather: "clear" },
+    pillars: { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
@@ -2735,6 +2783,7 @@ export function needsPvp(preset: EventPreset): boolean {
         preset.kind === "hide-and-seek" ||
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
+        preset.kind === "pillars" ||
         preset.kind === "impostor" ||
         hillFistsOnly(preset)
     );

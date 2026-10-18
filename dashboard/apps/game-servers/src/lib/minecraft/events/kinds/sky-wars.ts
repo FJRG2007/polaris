@@ -1047,7 +1047,14 @@ export function stateOf(game: unknown): WarState {
 
 /** The scores: who went out first has one, each after one more, whoever is
  *  left one more than everybody out. Out at the same moment, the same. */
-export function scoresOf(state: WarState, names: readonly string[]): Map<string, number> {
+/** What the scores are read from: who went out when, and the kills. Pillars'
+ *  state has it too (`pillars.ts`). */
+export type Standing = {
+    readonly out: readonly { readonly name: string; readonly at: number }[];
+    readonly kills: Readonly<Record<string, number>>;
+};
+
+export function scoresOf(state: Standing, names: readonly string[]): Map<string, number> {
     return new Map(
         names.map((name) => {
             const went = state.out.find((one) => one.name.toLowerCase() === name.toLowerCase());
@@ -1060,7 +1067,7 @@ export function scoresOf(state: WarState, names: readonly string[]): Map<string,
 }
 
 /** A tie on place broken by kills. */
-export function tiebreakOf(state: WarState, names: readonly string[]): Record<string, number> {
+export function tiebreakOf(state: Standing, names: readonly string[]): Record<string, number> {
     return Object.fromEntries(names.map((name) => [name, -(state.kills[name] ?? 0)]));
 }
 
