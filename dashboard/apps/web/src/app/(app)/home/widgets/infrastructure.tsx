@@ -86,7 +86,10 @@ export function ServicesWidget({ data }: { data: Loaded<OverviewServices> }) {
                     big: (chunks) => (
                         <span
                             key="big"
-                            className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}
+                            className={cn(
+                                "text-xl font-semibold",
+                                data.running < data.total && "text-warning"
+                            )}
                         >
                             {chunks}
                         </span>
@@ -232,7 +235,13 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
             <p className="text-sm">
                 {t.rich("alarms.firing", {
                     big: (chunks) => (
-                        <span key="big" className={cn("text-xl font-semibold", data.firing > 0 && "text-danger")}>
+                        <span
+                            key="big"
+                            className={cn(
+                                "text-xl font-semibold",
+                                data.firing > 0 && "text-danger"
+                            )}
+                        >
                             {chunks}
                         </span>
                     ),
@@ -250,14 +259,20 @@ export function AlarmsWidget({ data }: { data: Loaded<OverviewAlarms> }) {
                         <li key={event.id} className="flex items-start gap-2">
                             <StateDot
                                 state={event.kind === "resolved" ? "up" : "down"}
-                                label={event.kind === "resolved" ? t("alarms.resolved") : t("alarms.triggered")}
+                                label={
+                                    event.kind === "resolved"
+                                        ? t("alarms.resolved")
+                                        : t("alarms.triggered")
+                                }
                             />
                             <span className="flex min-w-0 flex-1 flex-col">
                                 <span className="truncate text-sm" title={event.name}>
                                     {event.name}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground">
-                                    {event.kind === "resolved" ? t("alarms.resolved") : t("alarms.triggered")}
+                                    {event.kind === "resolved"
+                                        ? t("alarms.resolved")
+                                        : t("alarms.triggered")}
                                     {event.detail ? ` - ${event.detail}` : ""}{" "}
                                     <RelativeTime iso={event.createdAt} />
                                 </span>
@@ -324,7 +339,9 @@ export function StorageWidget({ data }: { data: Loaded<OverviewStorageEntry[]> }
                             {device.usedBytes == null
                                 ? device.totalBytes == null
                                     ? t("storage.usageUnknown")
-                                    : t("storage.usageUnknownOf", { total: formatBytes(device.totalBytes) })
+                                    : t("storage.usageUnknownOf", {
+                                          total: formatBytes(device.totalBytes)
+                                      })
                                 : device.totalBytes == null
                                   ? formatBytes(device.usedBytes)
                                   : t("storage.usedOf", {
@@ -375,7 +392,10 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
                     big: (chunks) => (
                         <span
                             key="big"
-                            className={cn("text-xl font-semibold", data.running < data.total && "text-warning")}
+                            className={cn(
+                                "text-xl font-semibold",
+                                data.running < data.total && "text-warning"
+                            )}
                         >
                             {chunks}
                         </span>
@@ -473,10 +493,14 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                     count: data.assigned
                 })}
                 {data.overdue > 0 ? (
-                    <span className="text-danger">{t("tasks.overdue", { count: data.overdue })}</span>
+                    <span className="text-danger">
+                        {t("tasks.overdue", { count: data.overdue })}
+                    </span>
                 ) : null}
                 {data.dueToday > 0 ? (
-                    <span className="text-warning">{t("tasks.dueToday", { count: data.dueToday })}</span>
+                    <span className="text-warning">
+                        {t("tasks.dueToday", { count: data.dueToday })}
+                    </span>
                 ) : null}
             </p>
             <WidgetList>

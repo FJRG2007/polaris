@@ -50,9 +50,7 @@ export function useLastPlaces(
             const place = readPlace(app.id, app.href);
             if (place) found[app.id] = place;
         }
-        setPlaces((held) =>
-            JSON.stringify(held) === JSON.stringify(found) ? held : found
-        );
+        setPlaces((held) => (JSON.stringify(held) === JSON.stringify(found) ? held : found));
         // `key` stands for the list, whose identity changes on every render.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname, key]);

@@ -28,7 +28,9 @@ describe("the services card in Spanish", () => {
     });
 
     it("reads as it did in English", () => {
-        const markup = renderToStaticMarkup(withMessages(<ServicesWidget data={{ running: 2, total: 3, rows: [] }} />));
+        const markup = renderToStaticMarkup(
+            withMessages(<ServicesWidget data={{ running: 2, total: 3, rows: [] }} />)
+        );
         expect(markup).toContain(" of 3 services running");
     });
 
@@ -44,7 +46,10 @@ describe("the services card in Spanish", () => {
 describe("the work card in Spanish", () => {
     it("counts what is assigned, late and due", () => {
         const markup = renderToStaticMarkup(
-            withMessages(<TasksWidget data={{ assigned: 4, overdue: 1, dueToday: 2, rows: [] }} />, "es-ES")
+            withMessages(
+                <TasksWidget data={{ assigned: 4, overdue: 1, dueToday: 2, rows: [] }} />,
+                "es-ES"
+            )
         );
         expect(markup).toContain("asignadas");
         expect(markup).toContain("1 atrasada");

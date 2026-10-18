@@ -261,7 +261,10 @@ function ChoiceControl({
                         <span className="truncate" title={current?.label}>
                             {current?.label ?? "-"}
                         </span>
-                        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <ChevronDown
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="min-w-36">
@@ -327,9 +330,7 @@ function ActionControl({
             }}
             className={cn(
                 "h-7 max-w-full truncate rounded-md border px-2.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
-                armed
-                    ? "border-warning bg-warning/10 text-warning"
-                    : "border-border hover:bg-muted"
+                armed ? "border-warning bg-warning/10 text-warning" : "border-border hover:bg-muted"
             )}
         >
             {label}

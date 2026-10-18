@@ -335,7 +335,10 @@ export interface SpaceMemberView {
  *  in a shape it can trust - the row's label is whatever was last typed into it,
  *  and a rename in another tab does not reach it. */
 export async function getSpace(spaceId: string): Promise<{ id: string; name: string } | null> {
-    return prisma.taskSpace.findUnique({ where: { id: spaceId }, select: { id: true, name: true } });
+    return prisma.taskSpace.findUnique({
+        where: { id: spaceId },
+        select: { id: true, name: true }
+    });
 }
 
 export async function listSpaceMembers(
@@ -428,9 +431,7 @@ export async function removeSpaceMember(spaceId: string, userId: string): Promis
  * folders was given, since a team grant is exactly as real a way in as a
  * personal one and work nobody can be assigned is work the team cannot run.
  */
-export async function spacePeople(
-    spaceId: string
-): Promise<{ id: string; name: string }[]> {
+export async function spacePeople(spaceId: string): Promise<{ id: string; name: string }[]> {
     const [space, grantees, spaceTeams, folderTeams] = await Promise.all([
         // Its own read rather than `listSpaceMembers`: a picker needs a name and
         // a face, and asking for the roster would work out what each of them is
@@ -1137,7 +1138,10 @@ export async function deleteStatus(
     }
 
     await prisma.$transaction([
-        prisma.task.updateMany({ where: { statusId, spaceId }, data: { statusId: replacementId! } }),
+        prisma.task.updateMany({
+            where: { statusId, spaceId },
+            data: { statusId: replacementId! }
+        }),
         prisma.taskStatus.deleteMany({ where: { id: statusId, spaceId } })
     ]);
 }
