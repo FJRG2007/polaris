@@ -2081,8 +2081,8 @@ const NARROW_BAR = 440;
 const TINTS: Record<"secondary" | "danger" | "success" | "primary", string | undefined> = {
     secondary: undefined,
     primary: undefined,
-    danger: "border-danger/30 bg-danger/15 text-danger hover:bg-danger/25",
-    success: "border-success/30 bg-success/15 text-success hover:bg-success/25"
+    danger: "border-danger-edge bg-danger-soft text-danger-ink hover:brightness-110",
+    success: "border-success-edge bg-success-soft text-success-ink hover:brightness-110"
 };
 
 /** Where the devices, the voice and the camera are set for good. */

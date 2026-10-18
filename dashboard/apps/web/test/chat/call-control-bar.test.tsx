@@ -161,8 +161,8 @@ describe("the call's control bar", () => {
         room({ micOn: false, cameraOn: true });
         const mic = screen.getByRole("button", { name: /unmute/ });
         const camera = screen.getByRole("button", { name: /stopVideo/ });
-        expect(mic.className).toContain("bg-danger/15");
-        expect(camera.className).toContain("bg-success/15");
+        expect(mic.className).toContain("bg-danger-soft");
+        expect(camera.className).toContain("bg-success-soft");
         expect(mic.getAttribute("aria-pressed")).toBe("true");
     });
 
@@ -177,7 +177,7 @@ describe("the call's control bar", () => {
     it("shows a deafened seat on the microphone, in red", () => {
         room({ deafened: true });
         const mic = screen.getByRole("button", { name: /callRoom\.mute$/ });
-        expect(mic.className).toContain("bg-danger/15");
+        expect(mic.className).toContain("bg-danger-soft");
         expect(mic.getAttribute("title")).toMatch(/withKey|youCannotHearAnybodyAnd/);
     });
 
