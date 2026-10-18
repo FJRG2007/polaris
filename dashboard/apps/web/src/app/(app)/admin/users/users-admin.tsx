@@ -72,8 +72,11 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
+    MenuShortcut,
     Select,
-    cn
+    ShortcutHint,
+    cn,
+    shortcutPressed
 } from "@polaris/ui";
 
 /** How long typing settles before the search asks the server. */
@@ -436,6 +439,14 @@ export function UsersAdmin({
                                         if (event.key === "Enter" || event.key === " ") {
                                             event.preventDefault();
                                             router.push(`/admin/users/${user.id}`);
+                                        } else if (
+                                            event.target === event.currentTarget &&
+                                            user.id !== viewerId &&
+                                            shortcutPressed(event.nativeEvent, "general.delete")
+                                        ) {
+                                            // Asks first, as the menu's own item does.
+                                            event.preventDefault();
+                                            void remove(user);
                                         }
                                     }}
                                     className={cn(
@@ -533,6 +544,7 @@ export function UsersAdmin({
                                         >
                                             <Shield className="size-4" />
                                             {t("users.menu.openRecord")}
+                                            <MenuShortcut keys="Enter" />
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
                                         {/* Asserting it rather than proving it,
@@ -603,6 +615,7 @@ export function UsersAdmin({
                                                 >
                                                     <Trash2 className="size-4" />
                                                     {t("users.menu.delete")}
+                                                    <ShortcutHint id="general.delete" />
                                                 </ContextMenuItem>
                                             </>
                                         )}

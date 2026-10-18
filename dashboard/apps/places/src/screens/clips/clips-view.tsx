@@ -47,7 +47,8 @@ import {
     ContextMenuSeparator,
     ConfirmDeleteDialog,
     Select,
-    shortcutPressed
+    shortcutPressed,
+    ShortcutHint
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -513,6 +514,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                         >
                                             <Play className="size-4 shrink-0" />
                                             {playing === clip.id ? t("clips.stop") : t("clips.play")}
+                                            <ShortcutHint id="places.clips.open" />
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() => {
@@ -544,6 +546,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             onSelect={() => setSelected(new Set(keys))}
                                         >
                                             {t("clips.selectAll")}
+                                            <ShortcutHint id="places.clips.selectAll" />
                                         </ContextMenuItem>
                                         {canManage ? (
                                             <>
@@ -556,6 +559,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
                                                     {t("clips.delete")}
+                                                    <ShortcutHint id="places.clips.delete" />
                                                 </ContextMenuItem>
                                             </>
                                         ) : null}

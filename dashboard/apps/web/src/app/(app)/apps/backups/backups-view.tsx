@@ -56,8 +56,11 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
+    MenuShortcut,
     Select,
-    Skeleton
+    ShortcutHint,
+    Skeleton,
+    shortcutPressed
 } from "@polaris/ui";
 
 /** How many rows a page holds. Enough to fill a screen twice over. */
@@ -480,7 +483,16 @@ function ResourceLine({
     return (
         <ContextMenu>
             <ContextMenuTrigger asChild>
-                <tr className="border-b border-border last:border-0 hover:bg-muted/40">
+                <tr
+                    className="border-b border-border last:border-0 hover:bg-muted/40"
+                    // Delete on the row's name asks to stop, as the menu's item
+                    // does; Enter on the name is the link opening.
+                    onKeyDown={(event) => {
+                        if (!shortcutPressed(event.nativeEvent, "general.delete")) return;
+                        event.preventDefault();
+                        onRemove();
+                    }}
+                >
                     <td className="px-3 py-2.5">
                         <Link href={`/apps/backups/${row.id}`} className="font-medium hover:underline">
                             {row.name}
@@ -558,7 +570,10 @@ function ResourceLine({
             <ContextMenuContent>
                 <ContextMenuLabel>{row.name}</ContextMenuLabel>
                 <ContextMenuItem asChild>
-                    <Link href={`/apps/backups/${row.id}`}>{t("table.open")}</Link>
+                    <Link href={`/apps/backups/${row.id}`}>
+                        {t("table.open")}
+                        <MenuShortcut keys="Enter" />
+                    </Link>
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={onBackUp}>{t("table.backUp")}</ContextMenuItem>
                 <ContextMenuSeparator />
@@ -567,6 +582,7 @@ function ResourceLine({
                 <ContextMenuSeparator />
                 <ContextMenuItem variant="danger" onSelect={onRemove}>
                     {t("table.stop")}
+                    <ShortcutHint id="general.delete" />
                 </ContextMenuItem>
             </ContextMenuContent>
         </ContextMenu>

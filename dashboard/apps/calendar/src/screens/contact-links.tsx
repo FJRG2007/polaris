@@ -28,6 +28,7 @@ import {
     ContextMenuItem,
     ContextMenuLabel,
     ContextMenuTrigger,
+    MenuShortcut,
     useToast
 } from "@polaris/ui";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -141,6 +142,19 @@ function LinkMenu({
                         rel={external ? "noopener noreferrer" : undefined}
                         className={cn(LINK_CLASS, className)}
                         title={title}
+                        // Ctrl+C on a focused link copies nothing in a browser, so
+                        // here it copies the address, as the menu's item says -
+                        // unless some text is selected, which it then leaves alone.
+                        onKeyDown={(event) => {
+                            const copyKey =
+                                (event.ctrlKey || event.metaKey) &&
+                                !event.altKey &&
+                                !event.shiftKey &&
+                                event.key.toLowerCase() === "c";
+                            if (!copyKey || window.getSelection()?.toString()) return;
+                            event.preventDefault();
+                            void copy();
+                        }}
                     >
                         {children}
                     </a>
@@ -162,11 +176,13 @@ function LinkMenu({
                                 <ExternalLink className="size-4" />
                             )}
                             {kind === "email" ? t("links.sendEmail") : t("links.openLink")}
+                            <MenuShortcut keys="Enter" />
                         </a>
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copy()}>
                         <Copy className="size-4" />
                         {kind === "email" ? t("links.copyEmail") : t("links.copyLink")}
+                        <MenuShortcut keys="Mod+c" />
                     </ContextMenuItem>
                 </ContextMenuContent>
             </ContextMenu>

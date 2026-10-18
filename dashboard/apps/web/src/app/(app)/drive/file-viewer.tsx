@@ -17,6 +17,8 @@
  */
 
 import { viewerKind } from "./viewer/kind";
+import { useRef } from "react";
+import * as flying from "@/components/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
 import { DocView } from "./viewer/doc-view";
@@ -62,7 +64,8 @@ export function FilePreview({
     onSaved,
     urlFor,
     token,
-    readOnly = false
+    readOnly = false,
+    from
 }: {
     target: ViewerTarget;
     onSaved?: (name: string) => void;
@@ -72,6 +75,10 @@ export function FilePreview({
      *  came through - a share visitor has no session to authorise it. */
     token?: string;
     readOnly?: boolean;
+    /** Where an image grows from when it opens: its thumbnail's box, measured
+     *  before the preview took the listing's place. Null fades it in place;
+     *  left out, it simply appears. */
+    from?: flying.Box | null;
 }) {
     const src = (urlFor ?? driveByteUrl)(target, true);
     const kind = viewerKind(target.name);
@@ -79,12 +86,7 @@ export function FilePreview({
     if (kind === "image") {
         return (
             <div className="flex items-center justify-center p-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                    src={src}
-                    alt={target.name}
-                    className="max-h-[80vh] max-w-full object-contain"
-                />
+                <PreviewPicture src={src} alt={target.name} from={from} />
             </div>
         );
     }
@@ -108,6 +110,54 @@ export function FilePreview({
     if (kind === "code")
         return <CodeView src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
     return <PlainTextEditor src={src} target={target} readOnly={readOnly} onSaved={onSaved} />;
+}
+
+/**
+ * The image preview's picture, grown out of its thumbnail once it has a size.
+ *
+ * The flight is made by a copy above the page, because the picture sits in a
+ * scrolling box that would clip it on the way in; the real one waits hidden
+ * underneath and shows when the copy lands. Once per opening.
+ */
+function PreviewPicture({
+    src,
+    alt,
+    from
+}: {
+    src: string;
+    alt: string;
+    from: flying.Box | null | undefined;
+}) {
+    const flown = useRef(false);
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={src}
+            alt={alt}
+            data-preview-picture=""
+            onLoad={(event) => {
+                const picture = event.currentTarget;
+                if (from === undefined || flown.current || picture.offsetWidth < 1) return;
+                flown.current = true;
+                if (!flying.canFly(picture)) return;
+                const at = flying.boxOf(picture);
+                if (!from) {
+                    flying.growIn(picture, at, null);
+                    return;
+                }
+                const copy = flying.pictureCopy(picture.currentSrc || src, at);
+                picture.style.visibility = "hidden";
+                const land = () => {
+                    copy.remove();
+                    picture.style.visibility = "";
+                };
+                flying.growIn(copy, at, from).finished.then(land, land);
+                // A tab in the background may never finish it.
+                setTimeout(land, flying.OPEN_MS + 120);
+            }}
+            className="max-h-[80vh] max-w-full object-contain"
+        />
+    );
 }
 
 /**

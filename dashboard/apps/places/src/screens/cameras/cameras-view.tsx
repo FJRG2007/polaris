@@ -40,7 +40,8 @@ import {
     ContextMenuTrigger,
     ContextMenuSeparator,
     ConfirmDeleteDialog,
-    shortcutPressed
+    shortcutPressed,
+    ShortcutHint
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -404,6 +405,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                 >
                                                     <Pencil className="size-4 shrink-0" />
                                                     {t("cameras.renameAndChange")}
+                                                    <ShortcutHint id="general.rename" />
                                                 </ContextMenuItem>
                                                 <ContextMenuItem
                                                     onSelect={() => setDrawing(camera)}
@@ -424,6 +426,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                 >
                                                     <Trash2 className="size-4 shrink-0" />
                                                     {t("cameras.remove")}
+                                                    <ShortcutHint id="general.delete" />
                                                 </ContextMenuItem>
                                             </>
                                         ) : (

@@ -1482,6 +1482,7 @@ function StagedFile({
      * is the same picture before and after sending, so it opens the same way.
      */
     const [open, setOpen] = useState(false);
+    const thumbnail = useRef<HTMLButtonElement | null>(null);
     const type = file.type.split(";")[0]?.trim().toLowerCase() ?? "";
     const watchable = WATCHABLE.has(type);
 
@@ -1572,6 +1573,7 @@ function StagedFile({
                 // a halo, which reads as a broken thumbnail rather than a covered
                 // one.
                 <button
+                    ref={thumbnail}
                     type="button"
                     onClick={() => setOpen(true)}
                     aria-label={t("composer.openNamed", { name: file.name })}
@@ -1596,6 +1598,7 @@ function StagedFile({
             <ImageViewer
                 image={open && !watchable ? { url: preview, name: file.name } : null}
                 onClose={() => setOpen(false)}
+                origin={() => thumbnail.current}
             />
         </li>
     );

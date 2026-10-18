@@ -172,9 +172,13 @@ export function EntryThumbnail({
         return () => watch.disconnect();
     }, [asked, connectionId, path, version]);
 
-
     return (
-        <span ref={holder} className={cn("relative flex items-center justify-center", className)}>
+        <span
+            ref={holder}
+            // Found by the preview, which grows the file's picture out of it.
+            data-drive-thumbnail={path}
+            className={cn("relative flex items-center justify-center", className)}
+        >
             {/* The icon is what is there until a picture is, and it goes the
                 moment one arrives - whichever of the two arrived. A video's
                 frame sets `frame` rather than `drawn`, and leaving the icon out

@@ -36,7 +36,8 @@ import {
     ContextMenuTrigger,
     ContextMenuSeparator,
     ConfirmDeleteDialog,
-    shortcutPressed
+    shortcutPressed,
+    ShortcutHint
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -330,6 +331,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                         <ContextMenuItem onSelect={() => startRename(person)}>
                                             <Pencil className="size-4 shrink-0" />
                                             {t("people.rename")}
+                                            <ShortcutHint id="general.rename" />
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             disabled={!ready}
@@ -345,6 +347,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                         >
                                             <Trash2 className="size-4 shrink-0" />
                                             {t("people.forget")}
+                                            <ShortcutHint id="general.delete" />
                                         </ContextMenuItem>
                                     </>
                                 ) : (
