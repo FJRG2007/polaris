@@ -23,7 +23,9 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined })
 }));
 vi.mock("next/link", () => ({
-    default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>
+    default: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    )
 }));
 vi.mock("@/lib/session", () => ({}));
 vi.mock("@/lib/auth", () => ({}));
@@ -145,9 +147,16 @@ async function expectAsked(question: string, removed: () => unknown[][]) {
 
 describe("the Friends screen", () => {
     const draw = () =>
-        render(<FriendsView friends={[{ id: "bob", name: "Bob", contact: "@bob" }]} requests={[]} more={null} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <FriendsView
+                friends={[{ id: "bob", name: "Bob", contact: "@bob" }]}
+                requests={[]}
+                more={null}
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
 
     it("asks before removing, and removes on yes", async () => {
         draw();
@@ -183,7 +192,9 @@ describe("the profile page", () => {
     } as never;
 
     async function openMenu() {
-        render(<ProfileActions personId="bob" name="Bob" standing={standing} />, { wrapper: MessagesWrapper });
+        render(<ProfileActions personId="bob" name="Bob" standing={standing} />, {
+            wrapper: MessagesWrapper
+        });
         const more = screen.getByRole("button", { name: /Bob/ });
         fireEvent.pointerDown(more, { button: 0, ctrlKey: false, pointerType: "mouse" });
         await act(async () => {
@@ -197,7 +208,9 @@ describe("the profile page", () => {
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Stop being friends" }));
         });
-        await waitFor(() => expect(stopBeingFriendsAction).toHaveBeenCalledWith({ personId: "bob" }));
+        await waitFor(() =>
+            expect(stopBeingFriendsAction).toHaveBeenCalledWith({ personId: "bob" })
+        );
     });
 
     it("removes nobody on cancel", async () => {
@@ -241,7 +254,12 @@ describe("the card a name opens", () => {
     function Name() {
         const press = usePersonPress();
         return (
-            <button type="button" onClick={(event) => press?.({ id: "bob", name: "Bob" } as never, event.currentTarget)}>
+            <button
+                type="button"
+                onClick={(event) =>
+                    press?.({ id: "bob", name: "Bob" } as never, event.currentTarget)
+                }
+            >
                 Bob name
             </button>
         );
