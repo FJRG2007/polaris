@@ -22,7 +22,7 @@ import { withMessages } from "../setup/i18n";
 
 let statuses: ServerStatus[] = [];
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
         data: { servers: statuses, machineName: "node-0" } satisfies ServerStatusPayload,

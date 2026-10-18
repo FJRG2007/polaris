@@ -63,7 +63,8 @@ import {
     keepFocusOnClose,
     useDeferredFocus,
     ShortcutHint,
-    shortcutPressed
+    shortcutPressed,
+    rowClickIntent
 } from "@polaris/ui";
 
 /** How often reachability is re-checked. A server going down is worth noticing
@@ -110,6 +111,20 @@ export function ServersView({
     const remotes = servers.filter((server) => server.kind === "host");
 
     const nameOf = (server: ServerRow): string => renamed[server.id] ?? server.name;
+
+    function openRow(event: MouseEvent, id: string): void {
+        const href = `/apps/servers/${id}`;
+        const intent = rowClickIntent({
+            target: event.target instanceof Element ? event.target : null,
+            button: event.button,
+            metaKey: event.metaKey,
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            selection: window.getSelection()?.toString() ?? ""
+        });
+        if (intent === "open") router.push(href);
+        else if (intent === "new-tab") window.open(href, "_blank", "noopener");
+    }
 
     // F2 renames and Delete asks to remove, on the row pointed at or else the one
     // selected. Listened for on the document, so pointing is enough - but never
@@ -266,9 +281,30 @@ export function ServersView({
                                                     hovered.current = null;
                                             }}
                                             onFocus={() => setSelected(server.id)}
-                                            onClick={() => setSelected(server.id)}
+                                            // The whole row opens the server, as a game
+                                            // server's row does - not only its name,
+                                            // which stays the link a keyboard reaches.
+                                            // Its own buttons and menus keep their clicks.
+                                            onClick={(event) => {
+                                                setSelected(server.id);
+                                                if (renaming !== server.id)
+                                                    openRow(event.nativeEvent, server.id);
+                                            }}
+                                            onAuxClick={(event) => {
+                                                if (renaming !== server.id)
+                                                    openRow(event.nativeEvent, server.id);
+                                            }}
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" &&
+                                                    event.target === event.currentTarget
+                                                ) {
+                                                    event.preventDefault();
+                                                    router.push(`/apps/servers/${server.id}`);
+                                                }
+                                            }}
                                             className={cn(
-                                                "border-t border-border outline-none hover:bg-card-hover focus-visible:bg-card-hover",
+                                                "cursor-pointer border-t border-border outline-none hover:bg-card-hover focus-visible:bg-card-hover",
                                                 selected === server.id && "bg-muted"
                                             )}
                                         >
@@ -352,7 +388,9 @@ export function ServersView({
                                                 server can have granted, and a server that has it should
                                                 never be one anybody has to go and check. */}
                                                     {server.sudo ? (
-                                                        <Badge variant="warning">{t("list.root")}</Badge>
+                                                        <Badge variant="warning">
+                                                            {t("list.root")}
+                                                        </Badge>
                                                     ) : null}
                                                 </div>
                                             </td>
@@ -369,8 +407,14 @@ export function ServersView({
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 disabled={down}
-                                                                aria-label={t("list.shellOn", { name: server.name })}
-                                                                title={down ? t("list.notAnsweringSsh") : t("list.shell")}
+                                                                aria-label={t("list.shellOn", {
+                                                                    name: server.name
+                                                                })}
+                                                                title={
+                                                                    down
+                                                                        ? t("list.notAnsweringSsh")
+                                                                        : t("list.shell")
+                                                                }
                                                                 onClick={() => setShell(server)}
                                                             >
                                                                 <SquareTerminal className="size-4" />
@@ -380,8 +424,12 @@ export function ServersView({
                                                                     size="icon"
                                                                     variant="ghost"
                                                                     disabled
-                                                                    aria-label={t("list.filesOn", { name: server.name })}
-                                                                    title={t("list.notAnsweringSsh")}
+                                                                    aria-label={t("list.filesOn", {
+                                                                        name: server.name
+                                                                    })}
+                                                                    title={t(
+                                                                        "list.notAnsweringSsh"
+                                                                    )}
                                                                 >
                                                                     <FolderOpen className="size-4" />
                                                                 </Button>
@@ -393,7 +441,10 @@ export function ServersView({
                                                                 >
                                                                     <Link
                                                                         href={`/drive?c=host:${server.hostId}`}
-                                                                        aria-label={t("list.filesOn", { name: server.name })}
+                                                                        aria-label={t(
+                                                                            "list.filesOn",
+                                                                            { name: server.name }
+                                                                        )}
                                                                         title={t("list.files")}
                                                                     >
                                                                         <FolderOpen className="size-4" />
@@ -417,7 +468,9 @@ export function ServersView({
                                                     <Button size="icon" variant="ghost" asChild>
                                                         <Link
                                                             href={`/apps/servers/${server.id}`}
-                                                            aria-label={t("list.open", { name: server.name })}
+                                                            aria-label={t("list.open", {
+                                                                name: server.name
+                                                            })}
                                                             title={t("list.detailsHint")}
                                                         >
                                                             <Settings2 className="size-4" />
@@ -433,8 +486,12 @@ export function ServersView({
                                                             variant="ghost"
                                                             aria-label={
                                                                 server.kind === "local"
-                                                                    ? t("list.stopReaching", { name: server.name })
-                                                                    : t("list.removeNamed", { name: server.name })
+                                                                    ? t("list.stopReaching", {
+                                                                          name: server.name
+                                                                      })
+                                                                    : t("list.removeNamed", {
+                                                                          name: server.name
+                                                                      })
                                                             }
                                                             title={
                                                                 server.kind === "local"
@@ -462,7 +519,8 @@ export function ServersView({
                                         <ContextMenuSeparator />
                                         <ContextMenuItem asChild>
                                             <Link href={`/apps/servers/${server.id}`}>
-                                                <Settings2 className="size-4" /> {t("list.openItem")}
+                                                <Settings2 className="size-4" />{" "}
+                                                {t("list.openItem")}
                                             </Link>
                                         </ContextMenuItem>
                                         {server.hostId ? (
@@ -471,7 +529,8 @@ export function ServersView({
                                                     disabled={down}
                                                     onSelect={() => setShell(server)}
                                                 >
-                                                    <SquareTerminal className="size-4" /> {t("list.shell")}
+                                                    <SquareTerminal className="size-4" />{" "}
+                                                    {t("list.shell")}
                                                     {down ? (
                                                         <span className="ml-auto pl-3 text-xs">
                                                             {t("list.notAnswering")}
@@ -482,7 +541,8 @@ export function ServersView({
                                                     // A disabled item takes no pointer
                                                     // events, so it says why itself.
                                                     <ContextMenuItem disabled>
-                                                        <FolderOpen className="size-4" /> {t("list.files")}
+                                                        <FolderOpen className="size-4" />{" "}
+                                                        {t("list.files")}
                                                         <span className="ml-auto pl-3 text-xs">
                                                             {t("list.notAnswering")}
                                                         </span>
@@ -492,14 +552,16 @@ export function ServersView({
                                                         <Link
                                                             href={`/drive?c=host:${server.hostId}`}
                                                         >
-                                                            <FolderOpen className="size-4" /> {t("list.files")}
+                                                            <FolderOpen className="size-4" />{" "}
+                                                            {t("list.files")}
                                                         </Link>
                                                     </ContextMenuItem>
                                                 )}
                                             </>
                                         ) : server.kind === "local" ? (
                                             <ContextMenuItem onSelect={() => setEnrollLocal(true)}>
-                                                <SquareTerminal className="size-4" /> {t("list.enable")}
+                                                <SquareTerminal className="size-4" />{" "}
+                                                {t("list.enable")}
                                             </ContextMenuItem>
                                         ) : null}
                                         <ContextMenuSeparator />
@@ -535,7 +597,9 @@ export function ServersView({
                                                     }
                                                 >
                                                     <Trash2 className="size-4" />
-                                                    {server.kind === "local" ? t("list.giveUpLogin") : t("list.remove")}
+                                                    {server.kind === "local"
+                                                        ? t("list.giveUpLogin")
+                                                        : t("list.remove")}
                                                     <ShortcutHint id="general.delete" />
                                                 </ContextMenuItem>
                                             </>
@@ -549,9 +613,7 @@ export function ServersView({
             </div>
 
             {remotes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    {t("list.empty")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("list.empty")}</p>
             ) : null}
 
             <EnvironmentDialog target={target} onClose={() => setTarget(null)} />
@@ -683,7 +745,8 @@ function RenameField({
 function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerStatus | null }) {
     const t = useTranslations("servers");
     if (kind === "local") return <Badge variant="success">{t("status.up")}</Badge>;
-    if (!status) return <span className="text-xs text-muted-foreground">{t("status.checking")}</span>;
+    if (!status)
+        return <span className="text-xs text-muted-foreground">{t("status.checking")}</span>;
     if (status.state === "down") {
         return (
             <Badge variant="danger" title={status.detail ?? undefined}>
@@ -693,7 +756,9 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
     }
     return (
         <Badge variant="success">
-            {status.latencyMs === null ? t("status.up") : t("status.latency", { ms: status.latencyMs })}
+            {status.latencyMs === null
+                ? t("status.up")
+                : t("status.latency", { ms: status.latencyMs })}
         </Badge>
     );
 }
@@ -740,7 +805,9 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                             variant="ghost"
                             onClick={() => setAsRoot((current) => !current)}
                         >
-                            {asRoot ? t("shell.backTo", { login: server.detail }) : t("shell.openAsRoot")}
+                            {asRoot
+                                ? t("shell.backTo", { login: server.detail })
+                                : t("shell.openAsRoot")}
                         </Button>
                     </DialogFooter>
                 ) : null}

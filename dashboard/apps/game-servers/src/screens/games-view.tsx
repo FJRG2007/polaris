@@ -32,7 +32,6 @@ import { useGameText, useSchemaText } from "./game-text";
 import Link from "next/link";
 import * as list from "./list";
 import { useRouter, useSearchParams } from "next/navigation";
-import { rowClickIntent } from "../lib/row-open";
 import { GameLogo } from "../components/game-picker";
 import { NewServerDialog } from "./new-server-dialog";
 import { CopyStatus, DuplicateServerDialog } from "./duplicate-parts";
@@ -93,7 +92,8 @@ import {
     Input,
     PageHeader,
     Select,
-    Skeleton
+    Skeleton,
+    rowClickIntent
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 

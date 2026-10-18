@@ -29,6 +29,9 @@ import {
     useOneClickInstall
 } from "../marketplace-view";
 import styles from "./screenshots.module.css";
+import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
+import { GameLogo } from "@/components/game-logo";
+import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 /** The manifest, in the reader's words. Null for an id the catalog does not know. */
 function useLocalizedApp(appId: string): AppManifest | null {
@@ -38,6 +41,40 @@ function useLocalizedApp(appId: string): AppManifest | null {
         const app = findApp(appId);
         return app ? localizeApp(words, app, navLabel) : null;
     }, [appId, words, navLabel]);
+}
+
+/**
+ * The games Game servers can run, each with its own logo - the first thing
+ * somebody choosing it wants to know is whether their game is one of them.
+ * Read from the same catalogue the app itself offers when a server is made.
+ */
+function SupportedGames() {
+    const t = useTranslations("marketplace");
+    return (
+        <section className="flex min-w-0 flex-col gap-3" aria-label={t("detail.games")}>
+            <h2 className="text-sm font-medium">{t("detail.games")}</h2>
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {GAMES.map((game) => {
+                    const key = `detail.gameSummaries.${game.id}`;
+                    const summary = t.has(key) ? t(key as never) : game.summary;
+                    return (
+                        <li
+                            key={game.id}
+                            className="flex min-w-0 items-start gap-3 rounded-lg border border-border bg-card p-3"
+                        >
+                            <GameLogo game={game} className="size-10 shrink-0" />
+                            <div className="flex min-w-0 flex-col gap-0.5">
+                                <span className="truncate text-sm font-medium" title={game.name}>
+                                    {game.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{summary}</span>
+                            </div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </section>
+    );
 }
 
 /** The version an app's image is pinned to, when its tag says one. */
@@ -53,11 +90,29 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
     const navLabel = useNavLabel();
     const locale = useLocale();
     const app = useLocalizedApp(appId);
+    const [viewing, setViewing] = useState<ViewedImage | null>(null);
+    const [gallery, setGallery] = useState<ViewedImage[]>([]);
     if (!app) return null;
     const from = appProvenance(app);
     const shots = appScreenshots(app.id, locale);
     const image = app.template?.image;
     const version = imageVersion(image);
+    // The screenshots as the viewer pages through them, in the reader's theme
+    // at the moment one is opened: the page picks by CSS, so the class on the
+    // document then is the answer, and a theme switched later is read afresh.
+    const open = (index: number) => {
+        const root = document.documentElement;
+        const light =
+            root.classList.contains("light") ||
+            (root.classList.contains("system") &&
+                window.matchMedia("(prefers-color-scheme: light)").matches);
+        const now: ViewedImage[] = shots.map((shot, at) => ({
+            url: shot[light ? "light" : "dark"].desktop,
+            name: t("detail.screenshotAlt", { name: app.name, index: at + 1 })
+        }));
+        setGallery(now);
+        setViewing(now[index] ?? null);
+    };
 
     return (
         <div className="flex min-w-0 flex-col gap-6">
@@ -97,27 +152,42 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                                     key={shot.dark.desktop}
                                     className="w-[85%] max-w-2xl shrink-0 snap-start sm:w-[70%]"
                                 >
-                                    {(["dark", "light"] as const).map((theme) => (
-                                        <picture key={theme} className={styles[theme]}>
-                                            <source
-                                                media="(max-width: 640px)"
-                                                srcSet={shot[theme].mobile}
-                                            />
-                                            {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
-                                            <img
-                                                src={shot[theme].desktop}
-                                                alt={alt}
-                                                loading={index === 0 ? "eager" : "lazy"}
-                                                className="border-border w-full rounded-md border"
-                                            />
-                                        </picture>
-                                    ))}
+                                    <button
+                                        type="button"
+                                        aria-label={t("detail.openScreenshot", { name: alt })}
+                                        onClick={() => open(index)}
+                                        className="block w-full cursor-zoom-in rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        {(["dark", "light"] as const).map((theme) => (
+                                            <picture key={theme} className={styles[theme]}>
+                                                <source
+                                                    media="(max-width: 640px)"
+                                                    srcSet={shot[theme].mobile}
+                                                />
+                                                {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
+                                                <img
+                                                    src={shot[theme].desktop}
+                                                    alt={alt}
+                                                    loading={index === 0 ? "eager" : "lazy"}
+                                                    className="border-border w-full rounded-md border"
+                                                />
+                                            </picture>
+                                        ))}
+                                    </button>
                                 </figure>
                             );
                         })}
                     </div>
+                    <ImageViewer
+                        image={viewing}
+                        gallery={gallery}
+                        onNavigate={setViewing}
+                        onClose={() => setViewing(null)}
+                    />
                 </section>
             )}
+
+            {app.id === GAME_SERVERS_APP_ID ? <SupportedGames /> : null}
 
             <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-sm font-medium">{t("detail.about")}</h2>

@@ -16,7 +16,7 @@ import { environmentWords } from "@/app/(app)/apps/servers/environment-meta";
 import type { ServerRow, ServerStatusPayload } from "@/app/(app)/apps/servers/types";
 import { enrollmentRefusalText } from "@/app/(app)/apps/servers/enrollment-refusal-text";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 vi.mock("@/components/use-live-resource", () => ({
     useLiveResource: () => ({
         data: { servers: [], machineName: "node-0" } satisfies ServerStatusPayload,

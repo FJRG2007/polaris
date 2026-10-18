@@ -2,7 +2,8 @@
  * A row that stands for a record opens it when it is clicked anywhere that is
  * not one of its own controls.
  *
- * A list of servers made you aim for the name: the rest of the row - the
+ * Shared by every list of records - game servers, machines - so a row
+ * behaves the same wherever it is. A list of servers made you aim for the name: the rest of the row - the
  * status, the players, the empty space - highlighted on hover and did nothing
  * when pressed, which reads as broken. The name stays a real link, so the
  * keyboard, a screen reader and "open in a new tab" keep working exactly as a

@@ -60,7 +60,10 @@ import {
     DropdownMenuTrigger,
     Input,
     Switch,
-    cn
+    cn,
+    MenuShortcut,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 
 export interface ProjectCardData {
@@ -418,16 +421,30 @@ function ProjectMenu({
     return (
         <>
             <ContextMenu>
-                <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+                <ContextMenuTrigger
+                    asChild
+                    // What the menu says the keys do, they do on the focused card:
+                    // Delete asks, as the item does; Enter is the card's own link.
+                    onKeyDown={(event) => {
+                        if (!canManage) return;
+                        if (!shortcutPressed(event.nativeEvent, "general.delete")) return;
+                        event.preventDefault();
+                        setConfirming(true);
+                    }}
+                >
+                    {children}
+                </ContextMenuTrigger>
                 <ContextMenuContent>
                     <ContextMenuLabel>{project.name}</ContextMenuLabel>
                     <ContextMenuItem onSelect={() => router.push(href)}>
                         <ExternalLink className="size-4" /> {t("projects.open")}
+                        <MenuShortcut keys="Enter" />
                     </ContextMenuItem>
                     <ContextMenuItem
                         onSelect={() => window.open(href, "_blank", "noopener,noreferrer")}
                     >
                         <SquareArrowOutUpRight className="size-4" /> {t("projects.openNewTab")}
+                        <MenuShortcut keys="Mod+Enter" />
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => router.push(`${href}/settings`)}>
                         <Settings className="size-4" /> {t("projects.settings")}
@@ -442,6 +459,7 @@ function ProjectMenu({
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={() => setConfirming(true)}>
                                 <Trash2 className="size-4" /> {t("projects.delete")}
+                                <ShortcutHint id="general.delete" />
                             </ContextMenuItem>
                         </>
                     )}
