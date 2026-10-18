@@ -35,6 +35,7 @@
  */
 
 import type { CallState } from "./use-call";
+import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./meeting-actions";
 import { useHeldCall } from "./call-session";
@@ -110,7 +111,6 @@ import {
     Eye,
     EyeOff,
     Hand,
-    Headphones,
     HeadphoneOff,
     ImagePlus,
     Link2,
@@ -125,6 +125,7 @@ import {
     Smile,
     MonitorX,
     PhoneOff,
+    SlidersHorizontal,
     Shrink,
     Square,
     UserPlus,
@@ -147,6 +148,9 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     cn,
     useShortcutHint
@@ -248,6 +252,8 @@ export function CallRoom({
      *  composer asks about clips: the server has no browser to ask. */
     const [screenShareable, setScreenShareable] = useState(false);
     useEffect(() => setScreenShareable(canShareScreen()), []);
+    const bar = useRef<HTMLDivElement>(null);
+    const narrow = useNarrow(bar, NARROW_BAR);
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
@@ -759,53 +765,6 @@ export function CallRoom({
                         </span>
                     )
                 )}
-                {/* Everything else about the call that is not reached for
-                    mid-sentence: starting a recording, bringing somebody in,
-                    and what the caller adds - a meeting's doors. */}
-                {((canRecord && !call.recording) ||
-                    (viewerId && (mayInvite || canShare)) ||
-                    moreItems) && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                type="button"
-                                aria-label={t("callRoom.moreForThisCall")}
-                                title={t("callRoom.moreForThisCall")}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <MoreHorizontal className="size-4" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-72">
-                            {canRecord && !call.recording && (
-                                <DropdownMenuItem
-                                    title={t("callRoom.writeThisCallToA")}
-                                    onSelect={() => setAsking(true)}
-                                >
-                                    <RecordGlyph />
-                                    {t("callRoom.recordThisCall")}
-                                </DropdownMenuItem>
-                            )}
-                            {viewerId && (mayInvite || canShare) && (
-                                <DropdownMenuItem onSelect={() => setInviting(true)}>
-                                    <UserPlus className="size-4" />
-                                    {mayInvite
-                                        ? t("callRoom.addPeople")
-                                        : t("callRoom.shareALinkToThis")}
-                                </DropdownMenuItem>
-                            )}
-                            {moreItems && (
-                                <>
-                                    {((canRecord && !call.recording) ||
-                                        (viewerId && (mayInvite || canShare))) && (
-                                        <DropdownMenuSeparator />
-                                    )}
-                                    {moreItems}
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
             </div>
 
             {/* What the call says about itself, as one line. These used to be a
@@ -1222,149 +1181,225 @@ export function CallRoom({
                 </div>
             )}
 
-            {/* Never squeezed. It wraps to a second row on a narrow window, and
-                a flex row that is allowed to shrink gives that second row away
+            {/* Grouped the way voice clients draw it: what you send, each with
+                its menu; what you put in front of the room; and leaving, apart,
+                so it is never the button pressed on the way to another. Never
+                squeezed: it wraps to a second row on a narrow window, and a
+                flex row that is allowed to shrink gives that second row away
                 to the pictures above it - which is how the button somebody
                 needed to leave the call ended up half off the panel. */}
-            <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
-                <Split
-                    label={call.micOn ? t("callRoom.mute") : t("callRoom.unmute")}
-                    // Only a moderator lifts their own mute, so the button says
-                    // who has it rather than offering to undo it.
-                    title={
-                        call.moderation.serverMuted || call.moderation.serverDeafened
-                            ? t("callRoom.aModeratorMutedYou")
-                            : undefined
-                    }
-                    icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
-                    hint={micHint}
-                    alert={
-                        notices.mic
-                            ? { reason: notices.mic.short, tone: notices.mic.severity }
-                            : null
-                    }
-                    variant={call.micOn ? "secondary" : "danger"}
-                    pressed={!call.micOn}
-                    onClick={call.toggleMic}
-                    devices={call.microphones}
-                    chosenId={call.microphoneId}
-                    devicesLabel={t("callRoom.devices.microphone")}
-                    onChoose={call.chooseMicrophone}
-                    cleanMic={call.cleanMic}
-                    onCleanMic={call.setCleanMic}
-                    filterRunning={call.micFilter}
-                    licensedOffered={call.licensedFilter}
-                    // The call's own microphone, never a second one - see
-                    // `MicLevelMeter`.
-                    meter={call.localStream?.getAudioTracks()[0] ?? null}
-                    sent={call.outgoing}
-                />
-
-                <Split
-                    label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
-                    icon={
-                        call.cameraOn ? (
-                            <Video className="size-4" />
-                        ) : (
-                            <VideoOff className="size-4" />
-                        )
-                    }
-                    variant={call.cameraOn ? "secondary" : "danger"}
-                    pressed={!call.cameraOn}
-                    onClick={call.toggleCamera}
-                    devices={call.cameras}
-                    chosenId={call.cameraId}
-                    devicesLabel={t("callRoom.devices.camera")}
-                    onChoose={call.chooseCamera}
-                    ladder={CAMERA_LADDER}
-                    quality={call.cameraQuality}
-                    level={call.cameraLevel}
-                    onQuality={call.setCameraQuality}
-                    qualityLabel="Video quality"
-                    mirrored={call.mirrored}
-                    onMirror={call.flipCamera}
-                    background={call.background}
-                    onBackground={call.setBackground}
-                    backgroundImage={call.backgroundImage}
-                    onPickBackground={call.pickBackground}
-                    onScene={call.chooseBackgroundScene}
-                    backgroundRunning={call.backgroundRunning}
-                    backgroundProblem={call.backgroundProblem}
-                    look={call.look}
-                    onLook={call.setLook}
-                />
-
-                {/* Left out where it could only fail - every phone - rather
-                    than offered and answered with an error. A share already
-                    running is always given its stop. */}
-                {(screenShareable || call.sharing) && (
+            <div ref={bar} className="flex shrink-0 flex-wrap items-center justify-center gap-3">
+                <div role="group" aria-label={t("callRoom.bar.media")} className={CLUSTER}>
                     <Split
-                        label={call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")}
+                        label={call.micOn ? t("callRoom.mute") : t("callRoom.unmute")}
+                        // Only a moderator lifts their own mute, so the button says
+                        // who has it rather than offering to undo it.
+                        title={
+                            call.moderation.serverMuted || call.moderation.serverDeafened
+                                ? t("callRoom.aModeratorMutedYou")
+                                : call.deafened
+                                  ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+                                  : undefined
+                        }
                         icon={
-                            call.sharing ? (
-                                <MonitorX className="size-4" />
+                            call.deafened ? (
+                                <HeadphoneOff className="size-4" />
+                            ) : call.micOn ? (
+                                <Mic className="size-4" />
                             ) : (
-                                <MonitorUp className="size-4" />
+                                <MicOff className="size-4" />
                             )
                         }
-                        variant={call.sharing ? "primary" : "secondary"}
-                        pressed={call.sharing}
-                        onClick={call.toggleShare}
-                        // A screen is not a device to pick between: the browser's own
-                        // picker does that, every time, and it is the only thing
-                        // allowed to.
-                        devices={[]}
-                        chosenId={null}
-                        devicesLabel={t("callRoom.devices.screen")}
-                        onChoose={() => undefined}
-                        ladder={SCREEN_LADDER}
-                        quality={call.screenQuality}
-                        level={call.screenLevel}
-                        onQuality={call.setScreenQuality}
-                        qualityLabel="Screen quality"
+                        hint={micHint}
+                        alert={
+                            notices.mic
+                                ? { reason: notices.mic.short, tone: notices.mic.severity }
+                                : null
+                        }
+                        variant={call.micOn && !call.deafened ? "secondary" : "danger"}
+                        pressed={!call.micOn}
+                        onClick={call.toggleMic}
+                        devices={call.microphones}
+                        chosenId={call.microphoneId}
+                        devicesLabel={t("callRoom.devices.microphone")}
+                        onChoose={call.chooseMicrophone}
+                        cleanMic={call.cleanMic}
+                        onCleanMic={call.setCleanMic}
+                        filterRunning={call.micFilter}
+                        licensedOffered={call.licensedFilter}
+                        // The call's own microphone, never a second one - see
+                        // `MicLevelMeter`.
+                        meter={call.localStream?.getAudioTracks()[0] ?? null}
+                        sent={call.outgoing}
+                        // Deafening and the output it silences live in this menu,
+                        // beside the input, the way voice clients lay it out.
+                        outputs={speakers}
+                        deafen={{
+                            on: call.deafened,
+                            toggle: call.toggleDeafen,
+                            title: call.moderation.serverDeafened
+                                ? t("callRoom.aModeratorDeafenedYou")
+                                : call.deafened
+                                  ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+                                  : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
+                        }}
                     />
-                )}
 
-                {/* The one device that had no picker. A headset plugged in after
-                    the tab was opened, or a call coming out of a laptop lid in a
-                    room with other people in it, meant leaving the call and
-                    changing it in the operating system. */}
-                <Split
-                    label={call.deafened ? t("callRoom.undeafen") : t("callRoom.deafen")}
-                    title={
-                        call.moderation.serverDeafened
-                            ? t("callRoom.aModeratorDeafenedYou")
-                            : call.deafened
-                              ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
-                              : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
-                    }
-                    icon={
-                        call.deafened ? (
-                            <HeadphoneOff className="size-4" />
-                        ) : (
-                            <Headphones className="size-4" />
-                        )
-                    }
-                    variant={call.deafened ? "danger" : "secondary"}
-                    pressed={call.deafened}
-                    onClick={call.toggleDeafen}
-                    devices={speakers.devices}
-                    chosenId={speakers.chosenId}
-                    devicesLabel={t("callRoom.devices.output")}
-                    onChoose={speakers.choose}
-                />
+                    <Split
+                        label={call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")}
+                        icon={
+                            call.cameraOn ? (
+                                <Video className="size-4" />
+                            ) : (
+                                <VideoOff className="size-4" />
+                            )
+                        }
+                        variant={call.cameraOn ? "success" : "secondary"}
+                        pressed={!call.cameraOn}
+                        onClick={call.toggleCamera}
+                        devices={call.cameras}
+                        chosenId={call.cameraId}
+                        devicesLabel={t("callRoom.devices.camera")}
+                        onChoose={call.chooseCamera}
+                        ladder={CAMERA_LADDER}
+                        quality={call.cameraQuality}
+                        level={call.cameraLevel}
+                        onQuality={call.setCameraQuality}
+                        qualityLabel="Video quality"
+                        mirrored={call.mirrored}
+                        onMirror={call.flipCamera}
+                        background={call.background}
+                        onBackground={call.setBackground}
+                        backgroundImage={call.backgroundImage}
+                        onPickBackground={call.pickBackground}
+                        onScene={call.chooseBackgroundScene}
+                        backgroundRunning={call.backgroundRunning}
+                        backgroundProblem={call.backgroundProblem}
+                        look={call.look}
+                        onLook={call.setLook}
+                    />
+                </div>
 
-                {/* A reaction is over in three seconds, so it stays where the
-                    hands already are. The raised hand, which stays up until it
-                    is put down, sits in the row at the top. See
-                    `call-signals`. */}
-                <ReactionMenu onReact={call.react} />
+                <div role="group" aria-label={t("callRoom.bar.sharing")} className={CLUSTER}>
+                    {/* Left out where it could only fail - every phone - rather
+                        than offered and answered with an error. A share already
+                        running is always given its stop. On a narrow bar it
+                        moves into the menu at the end of this group. */}
+                    {!narrow && (screenShareable || call.sharing) && (
+                        <Split
+                            label={
+                                call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")
+                            }
+                            icon={
+                                call.sharing ? (
+                                    <MonitorX className="size-4" />
+                                ) : (
+                                    <MonitorUp className="size-4" />
+                                )
+                            }
+                            variant={call.sharing ? "primary" : "secondary"}
+                            pressed={call.sharing}
+                            onClick={call.toggleShare}
+                            // A screen is not a device to pick between: the browser's own
+                            // picker does that, every time, and it is the only thing
+                            // allowed to.
+                            devices={[]}
+                            chosenId={null}
+                            devicesLabel={t("callRoom.devices.screen")}
+                            onChoose={() => undefined}
+                            ladder={SCREEN_LADDER}
+                            quality={call.screenQuality}
+                            level={call.screenLevel}
+                            onQuality={call.setScreenQuality}
+                            qualityLabel="Screen quality"
+                        />
+                    )}
 
-                {/* Sounds everybody hears, behind one button - see
-                    `soundboard-picker`. Drawn for every seat, disabled with the
-                    reason for one that may not play, so nobody is offered a
-                    press the server will refuse. */}
-                <SoundboardButton meetingId={meetingId} call={call} />
+                    {/* A reaction is over in three seconds, so it stays beside
+                        the controls. The raised hand, which stays up until it is
+                        put down, sits in the row at the top. */}
+                    {!narrow && <ReactionMenu onReact={call.react} />}
+
+                    {/* Sounds everybody hears - see `soundboard-picker`. Drawn
+                        for every seat, disabled with the reason for one that may
+                        not play. Its picker is anchored to its own button, so it
+                        stays out even on a narrow bar. */}
+                    <SoundboardButton meetingId={meetingId} call={call} />
+
+                    {/* Everything not reached for mid-sentence: recording,
+                        bringing somebody in, what the caller adds - a meeting's
+                        doors - and, on a narrow bar, the rest of this group. */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                aria-label={t("callRoom.moreForThisCall")}
+                                title={t("callRoom.moreForThisCall")}
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" side="top" className="w-72">
+                            {narrow && (screenShareable || call.sharing) && (
+                                <DropdownMenuItem onSelect={call.toggleShare}>
+                                    {call.sharing ? (
+                                        <MonitorX className="size-4 shrink-0" />
+                                    ) : (
+                                        <MonitorUp className="size-4 shrink-0" />
+                                    )}
+                                    {call.sharing
+                                        ? t("callRoom.stopSharing")
+                                        : t("callRoom.shareScreen")}
+                                </DropdownMenuItem>
+                            )}
+                            {narrow && (
+                                <>
+                                    <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
+                                            <Smile className="size-4 shrink-0" />
+                                            {t("callRoom.react")}
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuSubContent className="flex w-auto gap-1 p-1">
+                                            <ReactionItems onReact={call.react} />
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
+                            {canRecord && !call.recording && (
+                                <DropdownMenuItem
+                                    title={t("callRoom.writeThisCallToA")}
+                                    onSelect={() => setAsking(true)}
+                                >
+                                    <RecordGlyph />
+                                    {t("callRoom.recordThisCall")}
+                                </DropdownMenuItem>
+                            )}
+                            {viewerId && (mayInvite || canShare) && (
+                                <DropdownMenuItem onSelect={() => setInviting(true)}>
+                                    <UserPlus className="size-4" />
+                                    {mayInvite
+                                        ? t("callRoom.addPeople")
+                                        : t("callRoom.shareALinkToThis")}
+                                </DropdownMenuItem>
+                            )}
+                            {moreItems && (
+                                <>
+                                    {((canRecord && !call.recording) ||
+                                        (viewerId && (mayInvite || canShare))) && (
+                                        <DropdownMenuSeparator />
+                                    )}
+                                    {moreItems}
+                                </>
+                            )}
+                            {((canRecord && !call.recording) ||
+                                (viewerId && (mayInvite || canShare)) ||
+                                moreItems) && <DropdownMenuSeparator />}
+                            <VoiceSettingsItem />
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
 
                 <Button
                     size="icon"
@@ -1477,6 +1512,8 @@ function Split({
     backgroundProblem,
     look,
     onLook,
+    outputs,
+    deafen,
     title,
     hint,
     alert
@@ -1493,8 +1530,13 @@ function Split({
      *  name - deafening is the one that needs explaining. */
     title?: string;
     icon: React.ReactNode;
-    /** How the button reads: off is danger, on-and-sending is primary. */
-    variant: "secondary" | "danger" | "primary";
+    /** How the button reads: a red tint for a microphone that is off, a
+     *  green one for a camera that is on, primary for a screen being sent. */
+    variant: "secondary" | "danger" | "success" | "primary";
+    /** Microphone only: the outputs, and deafening - both in its menu, beside
+     *  the input, rather than a third button of their own. */
+    outputs?: ReturnType<typeof useSpeakers>;
+    deafen?: { on: boolean; toggle: () => void; title: string };
     pressed: boolean;
     onClick: () => void;
     devices: readonly { id: string; label: string }[];
@@ -1562,6 +1604,7 @@ function Split({
     // choice to make about how much of it to send.
     const hasMenu =
         devices.length > 1 ||
+        outputs !== undefined ||
         onCleanMic !== undefined ||
         onQuality !== undefined ||
         onBackground !== undefined ||
@@ -1581,13 +1624,13 @@ function Split({
                 have been in. */}
             <Button
                 size="icon"
-                variant={variant}
+                variant={variant === "primary" ? "primary" : "secondary"}
                 onClick={onClick}
                 aria-pressed={pressed}
                 aria-label={label}
                 aria-describedby={alert ? alertId : undefined}
                 title={alert ? `${title ?? label}\n${alert.reason}` : (title ?? label)}
-                className={hasMenu ? "rounded-r-none" : undefined}
+                className={cn(TINTS[variant], hasMenu && "rounded-r-none")}
             >
                 {icon}
             </Button>
@@ -1610,15 +1653,44 @@ function Split({
                     <DropdownMenuTrigger asChild>
                         <Button
                             size="icon"
-                            variant={variant}
+                            variant={variant === "primary" ? "primary" : "secondary"}
                             aria-label={t("callRoom.deviceSettings", { device: devicesLabel })}
                             title={t("callRoom.deviceSettings", { device: devicesLabel })}
-                            className="w-6 rounded-l-none border-l border-border-strong"
+                            className={cn(
+                                "w-6 rounded-l-none border-l border-border-strong",
+                                TINTS[variant]
+                            )}
                         >
                             <ChevronUp className="size-3.5" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" side="top" className="max-w-72">
+                        {/* Which device, as a row naming the one in use - the
+                            list itself one step in, because it is chosen once
+                            and read every time the menu opens. */}
+                        {devices.length > 0 && (
+                            <ChoiceSub
+                                label={outputs ? t("callRoom.inputDevice") : devicesLabel}
+                                current={nameOfDevice(devices, chosenId, t)}
+                            >
+                                {devices.map((device) => (
+                                    <DropdownMenuItem
+                                        key={device.id}
+                                        onSelect={() => onChoose(device.id)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "size-3.5 shrink-0",
+                                                device.id === chosenId ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="truncate" title={device.label}>
+                                            {device.label}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </ChoiceSub>
+                        )}
                         {onMirror && (
                             <>
                                 <DropdownMenuItem onSelect={onMirror}>
@@ -1832,11 +1904,13 @@ function Split({
                         )}
                         {onLook && look && <CameraLookMenu look={look} onLook={onLook} />}
                         {onCleanMic && (
-                            <>
-                                <DropdownMenuLabel>
-                                    {t("callRoom.backgroundNoise")}
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
+                            <ChoiceSub
+                                label={t("callRoom.inputProfile")}
+                                current={t(
+                                    (NOISE_LEVELS.find((level) => level.value === cleanMic) ??
+                                        NOISE_LEVELS[0])!.label
+                                )}
+                            >
                                 {NOISE_LEVELS.filter(
                                     (level) => level.value !== "licensed" || licensedOffered
                                 ).map((level) => (
@@ -1873,31 +1947,42 @@ function Split({
                                         {t("callRoom.theLicensedFilterDidNot")}
                                     </p>
                                 )}
-                            </>
+                            </ChoiceSub>
                         )}
-                        {devices.length > 1 && (
-                            <DropdownMenuLabel>{devicesLabel}</DropdownMenuLabel>
+                        {/* Where the call comes out. Only where the browser lets
+                            a page choose - see `speaker-device`. */}
+                        {outputs && outputs.devices.length > 0 && (
+                            <ChoiceSub
+                                label={t("callRoom.outputDevice")}
+                                current={nameOfDevice(outputs.devices, outputs.chosenId, t)}
+                            >
+                                {outputs.devices.map((device) => (
+                                    <DropdownMenuItem
+                                        key={device.id}
+                                        onSelect={() => outputs.choose(device.id)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "size-3.5 shrink-0",
+                                                device.id === outputs.chosenId
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="truncate" title={device.label}>
+                                            {device.label}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </ChoiceSub>
                         )}
-                        {devices.length > 1 && <DropdownMenuSeparator />}
-                        {devices.map((device) => (
-                            <DropdownMenuItem key={device.id} onSelect={() => onChoose(device.id)}>
-                                <Check
-                                    className={cn(
-                                        "size-3.5 shrink-0",
-                                        device.id === chosenId ? "opacity-100" : "opacity-0"
-                                    )}
-                                />
-                                <span className="truncate" title={device.label}>
-                                    {device.label}
-                                </span>
-                            </DropdownMenuItem>
-                        ))}
-                        {/* Whether the microphone picked is hearing anything,
-                            under the list it was picked from. Only measured
-                            while the menu is open - see `MicLevelMeter`. */}
+                        {/* How loud you go out, and whether the microphone
+                            picked is hearing anything. Only measured while the
+                            menu is open - see `MicLevelMeter`. */}
                         {meter !== undefined && (
                             <>
                                 <DropdownMenuSeparator />
+                                <MicVolumeItem />
                                 <DropdownMenuLabel>{t("callRoom.inputLevel")}</DropdownMenuLabel>
                                 <div className="px-2 pb-2">
                                     <MicLevelMeter track={meter} />
@@ -1912,7 +1997,35 @@ function Split({
                                         </div>
                                     </>
                                 )}
-                                <MicVolumeItem />
+                            </>
+                        )}
+                        {deafen && (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    role="menuitemcheckbox"
+                                    aria-checked={deafen.on}
+                                    title={deafen.title}
+                                    // Kept open, so the box is seen to take.
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        deafen.toggle();
+                                    }}
+                                >
+                                    <span
+                                        aria-hidden
+                                        className={cn(
+                                            "flex size-4 shrink-0 items-center justify-center rounded border",
+                                            deafen.on
+                                                ? "border-primary bg-primary text-primary-foreground"
+                                                : "border-border-strong"
+                                        )}
+                                    >
+                                        {deafen.on && <Check className="size-3 shrink-0" />}
+                                    </span>
+                                    {t("callRoom.deafen")}
+                                </DropdownMenuItem>
+                                <VoiceSettingsItem />
                             </>
                         )}
                     </DropdownMenuContent>
@@ -1942,6 +2055,88 @@ function Split({
                 />
             )}
         </span>
+    );
+}
+
+/** The bar's groups: one rounded tray each, the buttons inside it touching. */
+const CLUSTER = "flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1";
+
+/** Below this the sharing group folds into its "more" menu. A phone, and the
+ *  call drawn in a side panel, are both under it. */
+const NARROW_BAR = 440;
+
+/** The state a control is in, said as a tint over the neutral button - so a
+ *  muted microphone reads red and a camera that is on reads green without
+ *  either shouting the way a solid fill does. */
+const TINTS: Record<"secondary" | "danger" | "success" | "primary", string | undefined> = {
+    secondary: undefined,
+    primary: undefined,
+    danger: "border-danger/30 bg-danger/15 text-danger hover:bg-danger/25",
+    success: "border-success/30 bg-success/15 text-success hover:bg-success/25"
+};
+
+/** Where the devices, the voice and the camera are set for good. */
+const VOICE_SETTINGS = "/account/devices";
+
+/** Whether the element is narrower than `below`, kept true to it as it resizes. */
+function useNarrow(ref: React.RefObject<HTMLElement | null>, below: number): boolean {
+    const [narrow, setNarrow] = useState(false);
+    useEffect(() => {
+        const element = ref.current;
+        if (!element || typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(([entry]) => {
+            if (entry) setNarrow(entry.contentRect.width < below);
+        });
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [ref, below]);
+    return narrow;
+}
+
+/** The name of the device in use, or what the system picks when none is. */
+function nameOfDevice(
+    devices: readonly { id: string; label: string }[],
+    chosenId: string | null,
+    t: ReturnType<typeof useTranslations>
+): string {
+    return devices.find((device) => device.id === chosenId)?.label ?? t("callRoom.systemDefault");
+}
+
+/** A setting as one row naming its current value, its choices one step in. */
+function ChoiceSub({
+    label,
+    current,
+    children
+}: {
+    label: string;
+    current: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+                <span className="flex min-w-0 flex-col">
+                    <span>{label}</span>
+                    <span className="truncate text-xs text-muted-foreground" title={current}>
+                        {current}
+                    </span>
+                </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="max-w-72">{children}</DropdownMenuSubContent>
+        </DropdownMenuSub>
+    );
+}
+
+/** The way to the devices screen, where all of this is set for every call. */
+function VoiceSettingsItem() {
+    const t = useTranslations("chat");
+    return (
+        <DropdownMenuItem asChild>
+            <Link href={VOICE_SETTINGS}>
+                <SlidersHorizontal className="size-4 shrink-0" />
+                {t("callRoom.voiceSettings")}
+            </Link>
+        </DropdownMenuItem>
     );
 }
 
@@ -2941,20 +3136,26 @@ function ReactionMenu({ onReact }: { onReact: (reaction: Reaction) => void }) {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" side="top" className="flex w-auto gap-1 p-1">
-                {REACTIONS.map((reaction) => (
-                    <DropdownMenuItem
-                        key={reaction}
-                        onSelect={() => onReact(reaction)}
-                        aria-label={t(`callRoom.reactions.${reaction}`)}
-                        title={t(`callRoom.reactions.${reaction}`)}
-                        className="justify-center px-2 text-lg"
-                    >
-                        {REACTION_GLYPHS[reaction]}
-                    </DropdownMenuItem>
-                ))}
+                <ReactionItems onReact={onReact} />
             </DropdownMenuContent>
         </DropdownMenu>
     );
+}
+
+/** The reactions themselves, for the button's menu and the narrow bar's. */
+function ReactionItems({ onReact }: { onReact: (reaction: Reaction) => void }) {
+    const t = useTranslations("chat");
+    return REACTIONS.map((reaction) => (
+        <DropdownMenuItem
+            key={reaction}
+            onSelect={() => onReact(reaction)}
+            aria-label={t(`callRoom.reactions.${reaction}`)}
+            title={t(`callRoom.reactions.${reaction}`)}
+            className="justify-center px-2 text-lg"
+        >
+            {REACTION_GLYPHS[reaction]}
+        </DropdownMenuItem>
+    ));
 }
 
 /**

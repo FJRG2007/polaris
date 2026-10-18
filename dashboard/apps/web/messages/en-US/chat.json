@@ -478,7 +478,16 @@
             "left": "{name} left",
             "joinedMany": "{name} and {others, plural, one {# other} other {# others}} joined",
             "leftMany": "{name} and {others, plural, one {# other} other {# others}} left"
-        }
+        },
+        "bar": {
+            "media": "Microphone and camera",
+            "sharing": "Sharing and more"
+        },
+        "inputDevice": "Input device",
+        "inputProfile": "Input profile",
+        "outputDevice": "Output device",
+        "systemDefault": "System default",
+        "voiceSettings": "Voice settings"
     },
     "meetingRoom": {
         "meeting": "Meeting",
