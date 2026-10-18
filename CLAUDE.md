@@ -82,6 +82,17 @@ It follows that:
   command that fixes it. It never tells the operator to go and configure
   something Polaris was supposed to set up for them.
 
+## The browser extension ships only as a release
+
+**An extension change is not delivered until a new `extension-v*` release
+exists**, because installed copies update from releases and nothing else. So
+every PR that changes what `dashboard/apps/extension` ships bumps `version` in its
+`package.json` (and the lockfile entry); the `Extension version check` workflow
+(`extension-version-check.yml`, job `bumped`) fails a PR that does not. Once the
+bump reaches main, `extension-auto-release.yml` tags it and starts the release by
+itself. **Never ask the operator before a release** - the merged version is the
+decision.
+
 ## The edge
 
 Traefik ranks routers by **the length of the rule** unless a priority says

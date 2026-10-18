@@ -14,7 +14,9 @@ name: Publish extension
 # stream of near-identical downloads nobody chose. The suites that keep the extension
 # honest already run on every pull request through `dashboard-ci`.
 #
-# Push a tag `extension-v<version>` matching `version` in
+# `extension-auto-release.yml` tags each new version that reaches main and
+# dispatches this workflow on that tag; a tag pushed by hand still works.
+# The tag `extension-v<version>` must match `version` in
 # `dashboard/apps/extension/package.json`. The build refuses a tag that does not
 # match, because a package whose manifest says one version and whose tag says
 # another is the kind of thing nobody notices until an update does not apply.

@@ -1,0 +1,57 @@
+name: Extension auto-release
+
+# Cut the extension release by itself once a version reaches main.
+#
+# Releases used to need somebody to push an `extension-v*` tag by hand, and when
+# nobody did, finished work sat on main for weeks without reaching a single
+# browser. Now the version in `dashboard/apps/extension/package.json` is the
+# decision: a version on main with no tag yet is tagged here, and the existing
+# `extension.yml` builds and attaches the packages.
+#
+# A tag pushed with the workflow's own token starts no other workflow (GitHub
+# blocks that to prevent loops), so the release is started explicitly with a
+# dispatch against the new tag - which `extension.yml` treats exactly like a
+# pushed tag, since `github.ref` is the tag either way.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/apps/extension/package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: extension-auto-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Tag the version and start its release if it has none yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./dashboard/apps/extension/package.json').version")"
+          tag="extension-v${version}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "${tag} is already released; nothing to do."
+            exit 0
+          fi
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} exists without a release; starting it again."
+          else
+            git tag "${tag}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${tag}"
+          fi
+          gh workflow run extension.yml --ref "${tag}"
+          echo "Started the release of ${tag}."
