@@ -84,8 +84,12 @@ export async function block(userId: string, otherId: string): Promise<void> {
     });
     // A request waiting between them is a notification with the other's name
     // on it. Reached at call time: the friends service imports this module.
-    const { endPendingRequests } = await import("@/lib/friends-service");
-    await endPendingRequests(userId, otherId);
+    try {
+        const { endPendingRequests } = await import("@/lib/friends-service");
+        await endPendingRequests(userId, otherId);
+    } catch (caught) {
+        console.error("polaris: could not end requests after a block:", caught);
+    }
 }
 
 /** Let them through again. Also idempotent, and for the same reason. */

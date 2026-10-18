@@ -698,12 +698,5 @@ export async function clearFriendNoticeAbout(userId: string, personId: string): 
  * notification stays where it is.
  */
 export function notificationIsAbout(metadata: string | null, personId: string): boolean {
-    if (!metadata) return false;
-    try {
-        const parsed: unknown = JSON.parse(metadata);
-        if (!parsed || typeof parsed !== "object") return false;
-        return (parsed as { personId?: unknown }).personId === personId;
-    } catch {
-        return false;
-    }
+    return personIdOf(metadata) === personId;
 }

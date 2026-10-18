@@ -121,8 +121,9 @@ function FriendsCard({
         setError("");
         const result = await runAction(run, setError);
         setBusy(false);
-        if (result?.error) return;
+        if (!result || result.error) return false;
         await reload();
+        return true;
     };
 
     /**
@@ -176,7 +177,7 @@ function FriendsCard({
             <CardBody className="flex flex-col gap-4 p-4">
                 <AddFriend
                     exclude={people.map((friend) => friend.id)}
-                    onAsk={(run) => void act(run)}
+                    onAsk={act}
                 />
 
                 {waiting.length > 0 && (
@@ -366,7 +367,7 @@ function AddFriend({
     onAsk
 }: {
     exclude: readonly string[];
-    onAsk: (run: () => Promise<{ error?: string }>) => void;
+    onAsk: (run: () => Promise<{ error?: string }>) => Promise<boolean>;
 }) {
     const t = useTranslations("account");
     const [query, setQuery] = useState("");
@@ -491,12 +492,11 @@ function AddFriend({
                                 personId={person.id}
                                 type="button"
                                 disabled={noteTooLong}
-                                onClick={() => {
+                                onClick={async () => {
                                     const words = note;
                                     setQuery("");
                                     setSaid("");
-                                    sent();
-                                    onAsk(() => requestFriendAction(person.id, words));
+                                    if (await onAsk(() => requestFriendAction(person.id, words))) sent();
                                 }}
                                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                             >
