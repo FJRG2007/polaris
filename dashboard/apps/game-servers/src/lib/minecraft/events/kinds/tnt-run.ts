@@ -50,6 +50,17 @@ const WALL: Box["block"] = "minecraft:glass";
 const NET: Box["block"] = "minecraft:white_stained_glass";
 /** A light at every corner of every rim, and on top of the walls. */
 const LIGHT: Box["block"] = "minecraft:sea_lantern";
+/** The parts that only frame the game (`arena-decor.SEASON_TRIM`): each
+ *  floor's rim, still one color a floor, the walls and the lights. Never the
+ *  TNT, nor the net. */
+export const TRIM: decor.Trim = {
+    [RIMS[0]!]: "rimA",
+    [RIMS[1]!]: "rimB",
+    [RIMS[2]!]: "rimC",
+    [RIMS[3]!]: "rimD",
+    [WALL]: "pane",
+    [LIGHT]: "light"
+};
 /** How far under each floor the next one is: room to fall and to land. */
 export const LAYER_GAP = 7;
 /** How far under the lowest floor the net is. */

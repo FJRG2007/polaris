@@ -116,6 +116,7 @@ export const skyWars: ArenaGame = {
     fills: (run) => sw.arenaFills(layoutOf(run), atOf(run)),
     decorSpots: (run) => sw.decorSpots(layoutOf(run), atOf(run)),
     blocks: () => [...sw.ARENA_BLOCKS],
+    trim: sw.TRIM,
     decorate: (run, _box, syntax: ItemSyntax) =>
         sw.chestLines(
             run.id,

@@ -772,3 +772,23 @@ describe("an arena's season taken down with it", () => {
         }
     );
 });
+
+describe("the trim's teardown order", () => {
+    it("takes a lantern first and a jack o'lantern with the full blocks", () => {
+        const ids = decor.trimIds([
+            "minecraft:jack_o_lantern",
+            "minecraft:soul_lantern[hanging=true]",
+            "minecraft:lantern"
+        ]);
+        expect(ids.first).toEqual(["minecraft:soul_lantern"]);
+        expect(ids.last).toContain("minecraft:jack_o_lantern");
+        const order = decor.TRIM_BLOCKS;
+        const jack = order.indexOf("minecraft:jack_o_lantern");
+        if (jack >= 0) {
+            for (const lantern of ["minecraft:lantern", "minecraft:soul_lantern"]) {
+                const at = order.indexOf(lantern);
+                if (at >= 0) expect(at).toBeLessThan(jack);
+            }
+        }
+    });
+});

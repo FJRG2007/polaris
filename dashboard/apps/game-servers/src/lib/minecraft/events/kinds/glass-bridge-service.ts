@@ -304,6 +304,7 @@ export const glassBridge: ArenaGame = {
     fills: (run, box) => glass.bridgeFills(box, optionsOf(run).steps),
     decorSpots: (run, box) => glass.decorSpots(box, optionsOf(run).steps),
     blocks: () => [...glass.BRIDGE_BLOCKS],
+    trim: glass.TRIM,
     kit: () => [],
     // The events data pack breaks the glass (`glass-bridge.FUNCTIONS`): put on
     // before anything is built.

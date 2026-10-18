@@ -41,6 +41,15 @@ const WALLS: readonly Box["block"][] = [
     "minecraft:lime_stained_glass",
     "minecraft:yellow_stained_glass"
 ];
+/** The parts that only frame the game (`arena-decor.SEASON_TRIM`): each
+ *  floor's wall and its corner lights. Never the snow, which the snowball pack
+ *  reads, nor the net. */
+export const TRIM: decor.Trim = {
+    [CORNER_LIGHT]: "light",
+    [WALLS[0]!]: "wallA",
+    [WALLS[1]!]: "wallB",
+    [WALLS[2]!]: "wallC"
+};
 /** How many floors. */
 export const LAYERS = 3;
 /** How far under each floor the next one is. */

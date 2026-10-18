@@ -23,6 +23,7 @@ import { bingoSchema } from "./kinds/bingo";
 import { fishSchema } from "./kinds/boss-fishing";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
+import { DECORATIONS } from "../seasonal";
 
 export const TRIGGERS = ["manual", "scheduled", "random"] as const;
 export type EventTrigger = (typeof TRIGGERS)[number];
@@ -348,6 +349,23 @@ export const runSchema = z.object({
      *  state - flags, who is out, who holds the potato - read with that kind's
      *  own schema, so a run saved by an older Polaris still reads. */
     game: z.record(z.unknown()).nullable().default(null),
+    /** The season its arena or structure was dressed for, and what the server
+     *  could show of it (`kinds/arena-decor.Dressing`): written with what it
+     *  built, before a block of it went in, and read by the event's ambience
+     *  (`season-ambience.ts`). Null undressed - out of season, switched off, or
+     *  a run saved before it. */
+    season: z
+        .object({
+            season: z.enum(DECORATIONS),
+            era: z.object({
+                lanterns: z.boolean(),
+                soulLanterns: z.boolean(),
+                snowflakes: z.boolean().optional(),
+                components: z.boolean().optional()
+            })
+        })
+        .nullable()
+        .default(null),
     /** A world boss: which one was drawn, and how its fight stands. */
     boss: bossStateSchema.nullable().default(null),
     /** A villager defense: its villager, written down before it is summoned. */

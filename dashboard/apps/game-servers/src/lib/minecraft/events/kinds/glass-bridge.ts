@@ -72,6 +72,22 @@ const POOL_LIGHT = "minecraft:sea_lantern";
 const POOL_WALL = "minecraft:dark_prismarine";
 const WATER = "minecraft:water";
 
+/** The parts that only frame the game (`arena-decor.SEASON_TRIM`): the
+ *  arches and posts, their lanterns, the start's rim, the finish's squares,
+ *  the gallery's walls and the pool's lights. Never the glass panels, which
+ *  are the game. */
+export const TRIM: decor.Trim = {
+    [PILLAR]: "post",
+    [BEAM]: "beam",
+    [LANTERN]: "lantern",
+    [HANGING]: "hangingLantern",
+    [START_RIM]: "edge",
+    [FINISH_DARK]: "checkDark",
+    [FINISH_LIGHT]: "checkLight",
+    [GALLERY_WALL]: "pane",
+    [POOL_LIGHT]: "poolLight"
+};
+
 /** Every kind of block the bridge is built of, as bare ids: what hangs or
  *  stands on something first, so a teardown takes it before what holds it. */
 export const BRIDGE_BLOCKS: readonly string[] = [

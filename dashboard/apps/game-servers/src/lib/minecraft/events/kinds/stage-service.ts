@@ -371,7 +371,40 @@ export function stageDecor(
     if (!dressing) return [];
     const layout = layoutAt(run, origin, origin.y);
     const { spots, rules } = decorOf(layout);
-    return decor.fitted(decor.piecesFor(spots, dressing, rules), layout.boxes, layout.volume);
+    return decor.fitted(
+        decor.piecesFor(spots, dressing, rules),
+        seasonBoxes(layout, dressing),
+        layout.volume
+    );
+}
+
+/** The boxes a structure built at `origin` goes up as, in the season's trim. Pure. */
+export function stageBoxes(
+    run: EventRun,
+    origin: Point,
+    dressing: decor.Dressing | null
+): stage.Box[] {
+    return seasonBoxes(layoutAt(run, origin, origin.y), dressing);
+}
+
+/** Which of a structure's own blocks only frame the game (`arena-decor.Trim`). */
+function trimOf(layout: Layout): decor.Trim | undefined {
+    if (layout.kind === "spleef") return spleef.TRIM;
+    if (layout.kind === "tnt-run") return tntRun.TRIM;
+    return undefined;
+}
+
+/**
+ * A structure's boxes in the season's trim (`arena-decor.SEASON_TRIM`): the
+ * same boxes, in the same order, only a wall, a rim or a light swapped - and
+ * only for a block a stage may be built of (`stage.ARENA_BLOCKS`), which is
+ * what its teardown reads. Exactly its own boxes out of season. Pure.
+ */
+function seasonBoxes(layout: Layout, dressing: decor.Dressing | null): stage.Box[] {
+    const known = new Set<string>(stage.ARENA_BLOCKS);
+    return decor
+        .trimFills(layout.boxes, trimOf(layout), dressing)
+        .map((one, index) => (known.has(one.block) ? one : layout.boxes[index]!));
 }
 
 /** How far under a structure its scenery reaches, when it is not built near the ground. */
@@ -757,7 +790,10 @@ async function raise(
 
     // The season's pieces, worked out before anything is written down so they
     // are written with the rest: built last, so taken down first.
-    const pieces = stageDecor(loop.run, origin, await tools.dressing().catch(() => null));
+    const dressing = await tools.dressing().catch(() => null);
+    const pieces = stageDecor(loop.run, origin, dressing);
+    // Its walls, rims and lights in the season's colors; what is played on as it was.
+    const boxes = seasonBoxes(layout, dressing);
     // The scenery round it after them: built last of all, so taken down first.
     const surround =
         outer && tools.sceneryEra
@@ -766,8 +802,9 @@ async function raise(
     // Written down first, then built - into air only.
     const before = state(loop).boxes;
     change(loop, {
-        boxes: [...before, ...layout.boxes, ...pieces.map(decorBox), ...surround]
+        boxes: [...before, ...boxes, ...pieces.map(decorBox), ...surround]
     });
+    loop.run = { ...loop.run, season: dressing };
     await tools.persist();
     // The scenery first, in one go: a few small boxes, none of them part of
     // the game, so a box the server refused is only missing from the view -
@@ -777,10 +814,10 @@ async function raise(
     const building = Date.now();
     const counts = await pace.answered(
         server,
-        layout.boxes.map((box) => stage.buildLine(box)),
+        boxes.map((box) => stage.buildLine(box)),
         pace.buildPacer()
     );
-    const whole = layout.boxes.every(
+    const whole = boxes.every(
         (box, index) => stage.fillCount(counts[index]!) === stage.volumeOf(box)
     );
     change(loop, { built: true });

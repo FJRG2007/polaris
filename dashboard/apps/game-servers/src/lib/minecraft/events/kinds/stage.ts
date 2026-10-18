@@ -149,7 +149,14 @@ export const ARENA_BLOCKS = [
     "minecraft:white_terracotta",
     "minecraft:brown_terracotta",
     "minecraft:light_gray_terracotta",
-    "minecraft:red_sandstone"
+    "minecraft:red_sandstone",
+    // The season's trim on a spleef's or a TNT run's walls, rims and lights
+    // (`arena-decor.SEASON_TRIM`).
+    "minecraft:orange_stained_glass",
+    "minecraft:purple_stained_glass",
+    "minecraft:black_stained_glass",
+    "minecraft:red_stained_glass",
+    "minecraft:green_stained_glass"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

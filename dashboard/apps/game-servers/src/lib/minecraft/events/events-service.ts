@@ -80,6 +80,7 @@ import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
 import { containerFileSize, readContainerFile, readContainerRange } from "../../container-files";
 import { fresh } from "../../fresh";
+import * as ambience from "./season-ambience";
 
 type RefusalKey =
     GameKey<"minecraft"> extends infer K
@@ -932,6 +933,7 @@ export async function startEvent(input: {
         done: [],
         buildEndsAt: null,
         game: null,
+        season: null,
         boss: null,
         villager: null,
         bingo: null,
@@ -2061,6 +2063,8 @@ async function play(
     const { preset } = loop.run;
     const left = (loop.run.endsAt - now) / 1000;
     const lines: string[] = [];
+    /** The run as the tick found it: what the season's ambience is told from. */
+    const before = loop.run;
 
     // The boss bar's clock is `showClock`'s, a second at a time; the boss's
     // shows its health and a horde defense's the wave.
@@ -2184,6 +2188,7 @@ async function play(
         default:
             break;
     }
+    lines.push(...ambience.tickLines(before, loop.run, now, tickMsOf(preset.kind), loop.language));
     if (lines.length > 0) await server.sayAll(lines);
     return decided;
 }
@@ -4758,6 +4763,13 @@ async function finish(
                 podium: placed.map((one) => one.name),
                 rounds: preset.kind === "trivia" ? { ...run.points } : {}
             };
+            // The season's fireworks over the arena while it still stands and
+            // everybody is in it; nothing out of season.
+            const cheer = ambience.winLines(run, placed[0]?.name ?? null, language);
+            if (cheer.length > 0) {
+                await server.sayAll(cheer).catch(() => undefined);
+                await pace.pause(ambience.ROCKET_HOLD_MS);
+            }
             // The kit off and their own things back first; only then the prizes.
             await bringBack(server);
             const online = new Set(
@@ -5537,7 +5549,9 @@ async function dressingFor(
     if (!season) return null;
     const lanterns = await serverAtLeast(server, [1, 14]).catch(() => false);
     const soulLanterns = lanterns && (await serverAtLeast(server, [1, 16]).catch(() => false));
-    return { season, era: { lanterns, soulLanterns } };
+    const snowflakes = soulLanterns && (await serverAtLeast(server, [1, 17]).catch(() => false));
+    const components = snowflakes && (await serverAtLeast(server, [1, 20, 5]).catch(() => false));
+    return { season, era: { lanterns, soulLanterns, snowflakes, components } };
 }
 
 async function serverAtLeast(server: ServerContainer, wanted: readonly number[]): Promise<boolean> {

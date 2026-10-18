@@ -32,10 +32,15 @@
 
 import type { Decoration } from "../../seasonal";
 
-/** What the server can show: a lantern from 1.14, a soul lantern from 1.16. */
+/** What the server can show: a lantern from 1.14, a soul lantern (and the
+ *  rest of the soul blocks and particles) from 1.16; the snowflake particle
+ *  from 1.17; item components from 1.20.5. The last two are only read by the
+ *  event's ambience (`season-ambience.ts`), and absent is not there. */
 export interface Era {
     readonly lanterns: boolean;
     readonly soulLanterns: boolean;
+    readonly snowflakes?: boolean;
+    readonly components?: boolean;
 }
 
 /** The season an event is built for, and what its server can show of it. */
@@ -306,6 +311,157 @@ export function decorLines(pieces: readonly Piece[]): string[] {
 export function idsOf(pieces: readonly Piece[]): string[] {
     const used = new Set(pieces.map((one) => bareId(one.block)));
     return [...new Set(DECOR_BLOCKS.map(bareId))].filter((id) => used.has(id));
+}
+
+// ------------------------------------------------------------------ trim
+
+/**
+ * The parts of an arena that only frame the game, which the season may
+ * recolor: a floor's walls, a rim, a post, a light. A kind names which of its
+ * own blocks plays which part (`Trim`); nothing it plays on is ever named - a
+ * spleef's snow, a TNT run's TNT, a bridge's glass panels, a pillar's top.
+ */
+export type TrimRole =
+    | "light"
+    | "lantern"
+    | "hangingLantern"
+    | "wallA"
+    | "wallB"
+    | "wallC"
+    | "rimA"
+    | "rimB"
+    | "rimC"
+    | "rimD"
+    | "pane"
+    | "post"
+    | "beam"
+    | "edge"
+    | "checkDark"
+    | "checkLight"
+    | "poolLight"
+    | "trunk"
+    | "leaves"
+    | "boulder"
+    | "column"
+    | "middle";
+
+/** A kind's own trim blocks, exactly as it places them, by the part each plays. */
+export type Trim = Readonly<Record<string, TrimRole>>;
+
+/** A trim block only a server from 1.16 has; `before` under it, or the kind's
+ *  own block when null. */
+interface SoulOnly {
+    readonly soul: string;
+    readonly before: string | null;
+}
+
+const SOUL_HANGING = "minecraft:soul_lantern[hanging=true]";
+
+/**
+ * What each part becomes in each season; a part not listed keeps the kind's
+ * own block. Full blocks only, but for a lantern that takes the place of a
+ * lantern: nothing here falls, melts, grows or is any less solid than the block
+ * it stands in for, so a player is stopped, held up and kept out exactly as
+ * before. The same cells, so the same air proved before it was built.
+ */
+export const SEASON_TRIM: Readonly<
+    Record<Decoration, Readonly<Partial<Record<TrimRole, string | SoulOnly>>>>
+> = {
+    halloween: {
+        light: JACK,
+        lantern: { soul: SOUL_LANTERN, before: null },
+        hangingLantern: { soul: SOUL_HANGING, before: null },
+        wallA: "minecraft:orange_stained_glass",
+        wallB: "minecraft:purple_stained_glass",
+        wallC: "minecraft:black_stained_glass",
+        rimA: "minecraft:orange_concrete",
+        rimB: "minecraft:purple_concrete",
+        rimC: "minecraft:black_concrete",
+        rimD: "minecraft:magenta_concrete",
+        pane: "minecraft:purple_stained_glass",
+        post: { soul: "minecraft:polished_blackstone_bricks", before: "minecraft:black_concrete" },
+        beam: "minecraft:orange_concrete",
+        edge: "minecraft:orange_terracotta",
+        checkLight: "minecraft:orange_concrete",
+        poolLight: { soul: "minecraft:crying_obsidian", before: null },
+        trunk: "minecraft:dark_oak_log",
+        leaves: "minecraft:dark_oak_leaves[persistent=true]",
+        boulder: CARVED,
+        column: { soul: "minecraft:blackstone", before: "minecraft:black_concrete" },
+        middle: JACK
+    },
+    winter: {
+        wallA: "minecraft:red_stained_glass",
+        wallB: "minecraft:green_stained_glass",
+        wallC: "minecraft:white_stained_glass",
+        rimA: "minecraft:red_concrete",
+        rimB: "minecraft:white_concrete",
+        rimC: "minecraft:green_concrete",
+        rimD: "minecraft:light_blue_concrete",
+        pane: "minecraft:white_stained_glass",
+        beam: "minecraft:red_concrete",
+        edge: "minecraft:red_terracotta",
+        checkDark: "minecraft:red_concrete",
+        trunk: "minecraft:spruce_log",
+        leaves: LEAVES,
+        boulder: "minecraft:packed_ice",
+        column: "minecraft:quartz_block",
+        middle: "minecraft:red_concrete"
+    }
+};
+
+/** A lantern, bare: what stands on or hangs from another block. */
+const hangs = (id: string) => id === LANTERN || id === SOUL_LANTERN;
+
+/**
+ * Every block the trim can be, bare, in the order they come down: a lantern
+ * first, before whatever it stands on or hangs from.
+ */
+export const TRIM_BLOCKS: readonly string[] = [
+    ...new Set(
+        Object.values(SEASON_TRIM)
+            .flatMap((parts) => Object.values(parts))
+            .flatMap((one) =>
+                typeof one === "string" ? [one] : [one.soul, ...(one.before ? [one.before] : [])]
+            )
+            .map(bareId)
+            .sort((left, right) => Number(hangs(right)) - Number(hangs(left)))
+    )
+];
+
+/** The season's block for one of a kind's own: the kind's own when it plays
+ *  no part in `trim`, out of season, or for a part the season leaves alone. */
+export function trimmed(block: string, trim: Trim | undefined, dressing: Dressing | null): string {
+    if (!dressing || !trim || !Object.hasOwn(trim, block)) return block;
+    const pick = SEASON_TRIM[dressing.season][trim[block]!];
+    if (pick === undefined) return block;
+    if (typeof pick === "string") return pick;
+    return dressing.era.soulLanterns ? pick.soul : (pick.before ?? block);
+}
+
+/** A kind's fills (or boxes) in the season's trim: the same boxes in the same
+ *  order, only a trim block swapped. Exactly what was given out of season. */
+export function trimFills<T extends { readonly block: string }>(
+    fills: readonly T[],
+    trim: Trim | undefined,
+    dressing: Dressing | null
+): T[] {
+    if (!dressing || !trim) return [...fills];
+    return fills.map((one) => {
+        const block = trimmed(one.block, trim, dressing);
+        return block === one.block ? one : ({ ...one, block } as T);
+    });
+}
+
+/**
+ * The trim blocks among what is built, bare, for an arena's list: a lantern
+ * goes `first`, ahead of everything (it rests on the arena); a full block
+ * `last`, after the kind's own (one of them may hang from it).
+ */
+export function trimIds(blocks: readonly string[]): { first: string[]; last: string[] } {
+    const used = new Set(blocks.map(bareId));
+    const ids = TRIM_BLOCKS.filter((id) => used.has(id));
+    return { first: ids.filter(hangs), last: ids.filter((id) => !hangs(id)) };
 }
 
 /** Four corners of a rectangle, at one height. */
