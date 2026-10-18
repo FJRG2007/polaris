@@ -22,6 +22,9 @@ export interface VaultItem {
     name: string;
     notes: string;
     favorite: boolean;
+    /** An identity this person fills sign-up forms with in the vault it is in.
+     *  Set apart from the item, like a star, so it is never encrypted. */
+    defaultIdentity: boolean;
     folderId: string | null;
     organizationId: string | null;
     deleted: boolean;
@@ -101,6 +104,7 @@ export function emptyItem(type: number): VaultItem {
         name: "",
         notes: "",
         favorite: false,
+        defaultIdentity: false,
         folderId: null,
         organizationId: null,
         deleted: false,
@@ -123,6 +127,7 @@ export async function decryptItem(
     item.name = await open(raw.name, key);
     item.notes = await open(raw.notes, key);
     item.favorite = raw.favorite === true;
+    item.defaultIdentity = raw.defaultIdentity === true;
     item.folderId = typeof raw.folderId === "string" ? raw.folderId : null;
     item.organizationId = typeof raw.organizationId === "string" ? raw.organizationId : null;
     item.deleted = raw.deletedDate !== null && raw.deletedDate !== undefined;

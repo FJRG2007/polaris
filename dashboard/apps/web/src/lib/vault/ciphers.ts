@@ -14,7 +14,7 @@
 import { prisma } from "@polaris/db";
 import type { CipherInput } from "@polaris/core";
 import { bumpRevision, bumpRevisionFor } from "@/lib/vault/account";
-import { ORG_USER_CONFIRMED } from "@polaris/core";
+import { CIPHER_IDENTITY, ORG_USER_CONFIRMED } from "@polaris/core";
 import { deleteVaultBlob } from "@/lib/vault/blobs";
 
 /** The parts of an item that live inside the encrypted document. */
@@ -78,8 +78,18 @@ function toDocument(input: CipherInput): string {
     } satisfies CipherDocument);
 }
 
-/** One item, in the shape a client expects to read. */
-export function toCipherResponse(row: CipherRow, favorite: boolean): Record<string, unknown> {
+/**
+ * One item, in the shape a client expects to read.
+ *
+ * `defaultIdentity` is Polaris's own: whether this identity is the one its
+ * reader fills sign-up forms with in the vault it sits in. Bitwarden clients
+ * ignore a field they do not know; the extension and the vault screen read it.
+ */
+export function toCipherResponse(
+    row: CipherRow,
+    favorite: boolean,
+    defaultIdentity = false
+): Record<string, unknown> {
     const document = documentOf(row);
     return {
         object: "cipherDetails",
@@ -90,6 +100,7 @@ export function toCipherResponse(row: CipherRow, favorite: boolean): Record<stri
         name: document.name,
         notes: document.notes ?? null,
         favorite,
+        defaultIdentity: defaultIdentity && row.type === CIPHER_IDENTITY,
         reprompt: row.reprompt,
         login: document.login ?? null,
         card: document.card ?? null,
@@ -204,17 +215,54 @@ async function starredIds(userId: string, cipherIds: string[]): Promise<Set<stri
     return new Set(rows.map((row) => row.cipherId));
 }
 
+/**
+ * The identities this account fills sign-up forms with, one per vault.
+ *
+ * A row counts only while its item is still an identity, out of the trash, and
+ * in the vault the row was set for: an identity moved into an organization is
+ * not that organization's default because it was somebody's personal one.
+ */
+export async function defaultIdentityIds(userId: string): Promise<Set<string>> {
+    const rows = await prisma.vaultIdentityDefault.findMany({
+        where: { userId },
+        select: {
+            vaultOrganizationId: true,
+            cipher: { select: { id: true, type: true, organizationId: true, deletedDate: true } }
+        }
+    });
+    return new Set(
+        rows
+            .filter(
+                (row) =>
+                    row.cipher.type === CIPHER_IDENTITY &&
+                    row.cipher.deletedDate === null &&
+                    row.cipher.organizationId === row.vaultOrganizationId
+            )
+            .map((row) => row.cipher.id)
+    );
+}
+
+/** One item for a reply to a write, with this account's own marks on it. */
+async function respond(userId: string, row: CipherRow): Promise<Record<string, unknown>> {
+    const [starred, defaults] = await Promise.all([
+        isStarred(userId, row.id),
+        row.type === CIPHER_IDENTITY ? defaultIdentityIds(userId) : new Set<string>()
+    ]);
+    return toCipherResponse(row, starred, defaults.has(row.id));
+}
+
 /** Every item this account can see, trash included - clients draw the trash. */
 export async function listCiphers(userId: string) {
-    const [rows, favorites] = await Promise.all([
+    const [rows, favorites, defaults] = await Promise.all([
         prisma.vaultCipher.findMany({
             where: await reachableCipherFilter(userId),
             select: CIPHER_SELECT
         }),
-        prisma.vaultFavorite.findMany({ where: { userId }, select: { cipherId: true } })
+        prisma.vaultFavorite.findMany({ where: { userId }, select: { cipherId: true } }),
+        defaultIdentityIds(userId)
     ]);
     const starred = new Set(favorites.map((row) => row.cipherId));
-    return rows.map((row) => toCipherResponse(row, starred.has(row.id)));
+    return rows.map((row) => toCipherResponse(row, starred.has(row.id), defaults.has(row.id)));
 }
 
 /** One item this account can see, or null. */
@@ -225,7 +273,7 @@ export async function getCipher(userId: string, cipherId: string) {
         select: CIPHER_SELECT
     });
     if (!row) return null;
-    return toCipherResponse(row, await isStarred(userId, cipherId));
+    return respond(userId, row);
 }
 
 /** Whether this account may WRITE an item, which is narrower than seeing it. */
@@ -415,7 +463,7 @@ export async function updateCipher(
         await setFavorite(userId, cipherId, input.favorite);
     }
     await bumpRevisionFor(userId, [row.organizationId]);
-    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
+    return { ok: true, cipher: await respond(userId, row) };
 }
 
 /**
@@ -447,7 +495,7 @@ export async function updateCipherPartial(
         await setFavorite(userId, cipherId, changes.favorite);
     }
     await bumpRevision(userId);
-    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
+    return { ok: true, cipher: await respond(userId, row) };
 }
 
 /**
@@ -485,7 +533,7 @@ export async function setCipherCollections(
         });
     });
     await bumpRevisionFor(userId, [current.organizationId]);
-    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
+    return { ok: true, cipher: await respond(userId, row) };
 }
 
 /** Every item of one organization this account can see. */
@@ -495,11 +543,14 @@ export async function listOrganizationCiphers(userId: string, organizationId: st
         where: { AND: [{ organizationId }, filter] },
         select: CIPHER_SELECT
     });
-    const starred = await starredIds(
-        userId,
-        rows.map((row) => row.id)
-    );
-    return rows.map((row) => toCipherResponse(row, starred.has(row.id)));
+    const [starred, defaults] = await Promise.all([
+        starredIds(
+            userId,
+            rows.map((row) => row.id)
+        ),
+        defaultIdentityIds(userId)
+    ]);
+    return rows.map((row) => toCipherResponse(row, starred.has(row.id), defaults.has(row.id)));
 }
 
 /**
@@ -573,6 +624,48 @@ export async function setFavorite(
         return;
     }
     await prisma.vaultFavorite.deleteMany({ where: { userId, cipherId } });
+}
+
+/**
+ * Make an identity the one this account fills sign-up forms with in the vault
+ * it sits in, or stop it being that.
+ *
+ * Only an identity this account can see, out of the trash. The vault is read
+ * off the item rather than taken from the caller, so a default can never be
+ * set for a vault the item is not in. Setting one replaces the one before it;
+ * a replacement racing another lands one of the two, never both.
+ */
+export async function setDefaultIdentity(
+    userId: string,
+    cipherId: string,
+    isDefault: boolean
+): Promise<boolean> {
+    const filter = await reachableCipherFilter(userId);
+    const item = await prisma.vaultCipher.findFirst({
+        where: { AND: [{ id: cipherId, type: CIPHER_IDENTITY, deletedDate: null }, filter] },
+        select: { id: true, organizationId: true }
+    });
+    if (!item) return false;
+    const vaultOrganizationId = item.organizationId;
+    if (!isDefault) {
+        await prisma.vaultIdentityDefault.deleteMany({ where: { userId, cipherId } });
+    } else {
+        await prisma
+            .$transaction([
+                prisma.vaultIdentityDefault.deleteMany({ where: { userId, vaultOrganizationId } }),
+                prisma.vaultIdentityDefault.create({
+                    data: { userId, vaultOrganizationId, cipherId }
+                })
+            ])
+            // Unique on the vault: the other write of a race won, and either
+            // answer is one somebody asked for.
+            .catch((error: unknown) => {
+                if ((error as { code?: string }).code !== "P2002") throw error;
+            });
+    }
+    // Every client this account has open pulls the change on its next look.
+    await bumpRevision(userId);
+    return true;
 }
 
 /**
@@ -727,7 +820,7 @@ export async function moveCipher(
         });
     });
     await bumpRevisionFor(userId, [...leaving, target]);
-    return { ok: true, cipher: toCipherResponse(row, await isStarred(userId, cipherId)) };
+    return { ok: true, cipher: await respond(userId, row) };
 }
 
 /** Empty a personal vault. Organization items are not the caller's to purge. */

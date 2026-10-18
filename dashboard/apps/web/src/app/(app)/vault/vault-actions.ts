@@ -26,6 +26,8 @@ import { verifyAccountPassword } from "@polaris/auth";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import * as accessLog from "@/lib/vault/access-log";
 import type { ItemUseEntry } from "@/lib/vault/item-uses";
+import { accountIdentity, type AccountIdentity } from "@/lib/vault/account-identity";
+import { z } from "zod";
 
 /** What the vault screen needs before it can draw anything. */
 export interface VaultState {
@@ -258,6 +260,32 @@ export async function setItemFavoriteAction(itemId: string, favorite: boolean): 
     const user = await requirePermission("vault.use");
     await ciphers.setFavorite(user.id, itemId, favorite);
     revalidatePath("/vault");
+}
+
+const defaultIdentitySchema = z.object({ itemId: z.string().uuid(), isDefault: z.boolean() });
+
+/**
+ * Make an identity the one sign-up forms are filled with in the vault it sits
+ * in, or stop it being that. Per person, like a star.
+ */
+export async function setDefaultIdentityAction(
+    itemId: string,
+    isDefault: boolean
+): Promise<{ error?: string }> {
+    const user = await requirePermission("vault.use");
+    const parsed = defaultIdentitySchema.safeParse({ itemId, isDefault });
+    if (!parsed.success) return { error: await vaultRefusal("errors.invalidRequest") };
+    if (!(await ciphers.setDefaultIdentity(user.id, parsed.data.itemId, parsed.data.isDefault))) {
+        return { error: await vaultRefusal("errors.itemNotYours") };
+    }
+    revalidatePath("/vault");
+    return {};
+}
+
+/** What this account already says about its owner, to start an identity from. */
+export async function accountIdentityAction(): Promise<AccountIdentity | null> {
+    const user = await requirePermission("vault.use");
+    return accountIdentity(user.id);
 }
 
 /** Send an item to the trash, or take it out for good. */

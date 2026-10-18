@@ -37,11 +37,14 @@ import {
     QrCode,
     RefreshCw,
     Trash2,
+    UserRound,
     X
 } from "lucide-react";
 import { emptyItem, type VaultFolder, type VaultItem } from "./vault-model";
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
+import { accountIdentityAction } from "./vault-actions";
+import type { AccountIdentity } from "@/lib/vault/account-identity";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -147,6 +150,10 @@ export function ItemDialog({
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [collectionId, setCollectionId] = useState("");
+    /** The addresses on this account, once an identity has been started from
+     *  it, so the email can be picked from them as well as typed. */
+    const [accountEmails, setAccountEmails] = useState<string[]>([]);
+    const [fromAccount, setFromAccount] = useState<"idle" | "loading" | "failed">("idle");
     // Only a new item chooses: moving one that exists re-encrypts it, which is
     // the move dialog's job and not something a Save button should do quietly.
     const choosable = draft.id
@@ -164,6 +171,8 @@ export function ItemDialog({
         setScanning(false);
         setNewFolder(null);
         setError(null);
+        setAccountEmails([]);
+        setFromAccount("idle");
         // The one-box expiry and the bank are drawn from what was stored: two
         // fields the cipher model has, and one custom field it does not.
         setExpiry(
@@ -245,6 +254,38 @@ export function ItemDialog({
 
     function patch(changes: Partial<VaultItem>): void {
         setDraft((prev) => ({ ...prev, ...changes }));
+    }
+
+    /**
+     * Start the identity from what the account already says: the name, the
+     * company, the phone and the first address. Only into boxes still empty -
+     * what somebody typed before pressing it is theirs.
+     */
+    async function fillFromAccount(): Promise<void> {
+        setFromAccount("loading");
+        const known: AccountIdentity | null = await accountIdentityAction().catch(() => null);
+        if (!known) {
+            setFromAccount("failed");
+            return;
+        }
+        setFromAccount("idle");
+        setAccountEmails(known.emails);
+        setDraft((prev) => {
+            const offered: Record<string, string> = {
+                firstName: known.firstName,
+                lastName: known.lastName,
+                company: known.company,
+                phone: known.phone,
+                username: known.username,
+                email: known.emails[0] ?? ""
+            };
+            const identity = { ...prev.identity };
+            for (const [field, value] of Object.entries(offered)) {
+                if (!identity[field] && value) identity[field] = value;
+            }
+            const whole = [identity.firstName, identity.lastName].filter(Boolean).join(" ");
+            return { ...prev, name: prev.name || whole, identity };
+        });
     }
 
     async function onSubmit(): Promise<void> {
@@ -819,6 +860,29 @@ export function ItemDialog({
                         // the shape an address has: the street lines full width,
                         // the town, county and postcode on one row.
                         <div className="flex flex-col gap-4">
+                            {draft.id ? null : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        disabled={fromAccount === "loading"}
+                                        onClick={() => void fillFromAccount()}
+                                    >
+                                        {fromAccount === "loading" ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <UserRound className="size-4" />
+                                        )}
+                                        {t("identity.fromAccount")}
+                                    </Button>
+                                    {fromAccount === "failed" ? (
+                                        <p role="alert" className="text-xs text-destructive">
+                                            {t("identity.fromAccountFailed")}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )}
                             {IDENTITY_GROUPS.map((group) => (
                                 <fieldset key={group.id} className="flex flex-col gap-2">
                                     <legend className="text-xs font-medium text-muted-foreground">
@@ -850,6 +914,32 @@ export function ItemDialog({
                                                     })()}
                                                     autoComplete="off"
                                                 />
+                                                {field === "email" &&
+                                                accountEmails.length > 1 ? (
+                                                    <Select
+                                                        value={
+                                                            accountEmails.includes(
+                                                                draft.identity.email ?? ""
+                                                            )
+                                                                ? (draft.identity.email ?? "")
+                                                                : ""
+                                                        }
+                                                        onValueChange={(email) =>
+                                                            patch({
+                                                                identity: {
+                                                                    ...draft.identity,
+                                                                    email
+                                                                }
+                                                            })
+                                                        }
+                                                        options={accountEmails.map((email) => ({
+                                                            value: email,
+                                                            label: email
+                                                        }))}
+                                                        placeholder={t("identity.pickEmail")}
+                                                        aria-label={t("identity.pickEmail")}
+                                                    />
+                                                ) : null}
                                             </label>
                                         ))}
                                     </div>

@@ -73,6 +73,7 @@ import {
     restoreItemAction,
     saveFolderAction,
     saveItemAction,
+    setDefaultIdentityAction,
     setItemFavoriteAction,
     vaultContentsAction
 } from "./vault-actions";
@@ -99,7 +100,8 @@ import {
     Share2,
     Star,
     Terminal,
-    Trash2
+    Trash2,
+    UserCheck
 } from "lucide-react";
 
 /** The icon each kind of item is drawn with. */
@@ -444,6 +446,39 @@ export function VaultApp() {
         }
     }
 
+    /**
+     * Make an identity the one sign-up forms are filled with in its vault, or
+     * stop it being that. Shown at once - one default per vault, so the one it
+     * replaces loses the mark too - and put back if the server says no.
+     */
+    async function onToggleDefault(item: VaultItem): Promise<void> {
+        if (!key) return;
+        const next = !item.defaultIdentity;
+        const before = items;
+        setItems((list) =>
+            list.map((entry) =>
+                entry.id === item.id
+                    ? { ...entry, defaultIdentity: next }
+                    : next &&
+                        entry.type === core.CIPHER_IDENTITY &&
+                        entry.organizationId === item.organizationId
+                      ? { ...entry, defaultIdentity: false }
+                      : entry
+            )
+        );
+        const result = await setDefaultIdentityAction(item.id, next);
+        if (result.error) {
+            setItems(before);
+            await confirm({
+                title: t("app.defaultIdentityFailed"),
+                description: result.error,
+                alert: true
+            });
+            return;
+        }
+        await load(key);
+    }
+
     async function onRestore(item: VaultItem): Promise<void> {
         if (!key) return;
         const result = await restoreItemAction(item.id);
@@ -707,6 +742,19 @@ export function VaultApp() {
                                                             ? t("app.menu.unfavourite")
                                                             : t("app.menu.favourite")}
                                                     </ContextMenuItem>
+                                                    {item.type === core.CIPHER_IDENTITY &&
+                                                    !item.deleted ? (
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                void onToggleDefault(item)
+                                                            }
+                                                        >
+                                                            <UserCheck className="size-4" />
+                                                            {item.defaultIdentity
+                                                                ? t("app.menu.notDefaultIdentity")
+                                                                : t("app.menu.defaultIdentity")}
+                                                        </ContextMenuItem>
+                                                    ) : null}
                                                     <ContextMenuItem
                                                         onSelect={() => setMoving(item)}
                                                     >
@@ -775,6 +823,12 @@ export function VaultApp() {
                                     {current.deleted ? (
                                         <Badge variant="neutral">{t("app.inTrash")}</Badge>
                                     ) : null}
+                                    {current.defaultIdentity && !current.deleted ? (
+                                        <Badge variant="neutral">
+                                            <UserCheck className="size-3" />
+                                            {t("app.defaultIdentity")}
+                                        </Badge>
+                                    ) : null}
                                     {current.organizationId ? (
                                         <Badge variant="neutral">
                                             <Building2 className="size-3" />
@@ -802,6 +856,32 @@ export function VaultApp() {
                                             className={`size-4 ${current.favorite ? "fill-amber-400 text-amber-400" : ""}`}
                                         />
                                     </Button>
+                                    {current.type === core.CIPHER_IDENTITY && !current.deleted ? (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            title={
+                                                current.defaultIdentity
+                                                    ? t("app.menu.notDefaultIdentity")
+                                                    : t("app.menu.defaultIdentity")
+                                            }
+                                            aria-label={
+                                                current.defaultIdentity
+                                                    ? t("app.notDefaultIdentityNamed", {
+                                                          name: current.name
+                                                      })
+                                                    : t("app.defaultIdentityNamed", {
+                                                          name: current.name
+                                                      })
+                                            }
+                                            aria-pressed={current.defaultIdentity}
+                                            onClick={() => void onToggleDefault(current)}
+                                        >
+                                            <UserCheck
+                                                className={`size-4 ${current.defaultIdentity ? "text-primary" : ""}`}
+                                            />
+                                        </Button>
+                                    ) : null}
                                     {/* Only when there is somewhere to move it:
                                         another vault whose key this account
                                         holds, or back to its own when it is

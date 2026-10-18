@@ -46,7 +46,8 @@ import {
     readGeneratorOptions,
     type GeneratorOptions
 } from "@/lib/generator";
-import { readForm, type PageFields } from "@/lib/fields";
+import { emptyProfile, PROFILE_PARTS, readForm, type PageFields } from "@/lib/fields";
+import { wholeName } from "@/lib/identity";
 import { enterSendsLogin } from "@/lib/enter-submit";
 import {
     describeInput,
@@ -60,6 +61,7 @@ import { CLIPBOARD_CLEAR_MS } from "@/lib/generator";
 import {
     askBackground,
     speakRepliesIn,
+    type IdentityValues,
     type ItemSummary,
     type OfferedCapture
 } from "@/lib/messages";
@@ -170,6 +172,8 @@ async function start(): Promise<void> {
             fullName: null,
             givenName: null,
             familyName: null,
+            profile: emptyProfile(),
+            usernameAsks: null,
             purpose: "none"
         },
         inputs: []
@@ -469,29 +473,29 @@ async function start(): Promise<void> {
     /**
      * What to offer on a form for an account that is not in the vault yet.
      *
-     * Your own email and name, from the account this extension is signed in as,
-     * into the boxes that ask for them - and a password made here, into the new
-     * password box and its confirmation. Nothing is saved by this: the offer to
-     * save follows the form going, the same as for anything typed by hand.
+     * The identities of the open shelf, its default first - who you are, typed
+     * into the boxes that ask for it - and a password made here, into the new
+     * password box and its confirmation. Only the names travel to the page
+     * when the menu opens; the identity itself crosses once it is picked.
+     * Nothing is saved by this: the offer to save follows the form going.
      */
     const newAccount = async (field: HTMLInputElement): Promise<Choice[]> => {
         const { fields } = seen;
         const offered: Choice[] = [];
 
-        const reply = await askBackground({ kind: "myDetails" });
-        const details = reply.ok && "details" in reply ? reply.details : null;
-        const userBox = at(fields.username) ?? (field.type === "password" ? null : field);
-        if (details?.email && userBox) {
-            const { email, name } = details;
+        const reply = await askBackground({ kind: "identities" });
+        const cards = reply.ok && "identities" in reply ? reply.identities : [];
+        for (const card of cards) {
+            const detail = [card.detail, card.isDefault ? t("inline.identityDefault") : card.vault]
+                .filter(Boolean)
+                .join(" - ");
             offered.push(
-                choice(t("inline.useEmail"), email, () => {
-                    put(userBox, email);
-                    if (name) fillName(name);
+                choice(card.name, detail, () => {
+                    void askBackground({ kind: "identity", id: card.id }).then((answer) => {
+                        if (answer.ok && "identity" in answer) fillIdentity(answer.identity, field);
+                    });
                 })
             );
-        } else if (details?.name && (fields.fullName !== null || fields.givenName !== null)) {
-            const { name } = details;
-            offered.push(choice(t("inline.useName"), name, () => fillName(name)));
         }
 
         const passwordBox =
@@ -512,17 +516,29 @@ async function start(): Promise<void> {
         return offered;
     };
 
-    /** Somebody's name into the boxes that ask for it, whole or in halves. Only
-     *  into empty ones: what was typed by hand is theirs. */
-    const fillName = (name: string): void => {
+    /**
+     * An identity into the boxes that ask for it. Only into empty ones, and the
+     * box the menu was opened on: what was typed by hand elsewhere is theirs.
+     */
+    const fillIdentity = (values: IdentityValues, field: HTMLInputElement): void => {
         const { fields } = seen;
-        const [given = "", ...rest] = name.trim().split(/\s+/);
         const into = (box: HTMLInputElement | null, value: string): void => {
-            if (box && box.value === "" && value !== "") put(box, value);
+            if (box && value !== "" && (box.value === "" || box === field)) put(box, value);
         };
-        into(at(fields.fullName), name.trim());
-        into(at(fields.givenName), given);
-        into(at(fields.familyName), rest.join(" "));
+        // The username box asks for whatever the page says it does; a box that
+        // says nothing is, on a sign-up, most often an email.
+        const login =
+            fields.usernameAsks === "phone"
+                ? values.phone
+                : fields.usernameAsks === "username"
+                  ? values.username || values.email
+                  : values.email || values.username;
+        into(at(fields.username), login);
+        const whole = wholeName(values);
+        into(at(fields.fullName), whole);
+        into(at(fields.givenName), values.firstName);
+        into(at(fields.familyName), values.lastName);
+        for (const part of PROFILE_PARTS) into(at(fields.profile[part]), values[part]);
     };
 
     observer.observe(document.documentElement, WATCH);
