@@ -55,7 +55,7 @@ import type { CameraLook } from "./camera-look";
 import { cameraProblemText, type CameraProblem } from "./camera-problem";
 import { CallNoticeStrip, useCallNotices } from "./call-notice-strip";
 import { playCallSound } from "@/lib/call-sounds";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { FACE_MAX, fillsTile, useFaceSize, useTileFit } from "./call-grid";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
@@ -634,6 +634,8 @@ export function CallRoom({
      *  nowhere to put what it would make. */
     const canRecord =
         (canShare || (Boolean(viewerId) && mayRecord)) && held !== null && held.recording.supported;
+    const mayAdd = Boolean(viewerId) && (mayInvite || canShare);
+    const callItems = (canRecord && !call.recording) || mayAdd || Boolean(moreItems);
     const wasEnded = useRef(false);
     useEffect(() => {
         if (!held && call.ended && !wasEnded.current) playCallSound("hangUp");
@@ -1243,6 +1245,7 @@ export function CallRoom({
                                   ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
                                   : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
                         }}
+                        voiceSettings={Boolean(viewerId)}
                     />
 
                     <Split
@@ -1329,76 +1332,79 @@ export function CallRoom({
                     {/* Everything not reached for mid-sentence: recording,
                         bringing somebody in, what the caller adds - a meeting's
                         doors - and, on a narrow bar, the rest of this group. */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                size="icon"
-                                variant="secondary"
-                                aria-label={t("callRoom.moreForThisCall")}
-                                title={t("callRoom.moreForThisCall")}
-                            >
-                                <MoreHorizontal className="size-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" side="top" className="w-72">
-                            {narrow && (screenShareable || call.sharing) && (
-                                <DropdownMenuItem onSelect={call.toggleShare}>
-                                    {call.sharing ? (
-                                        <MonitorX className="size-4 shrink-0" />
-                                    ) : (
-                                        <MonitorUp className="size-4 shrink-0" />
-                                    )}
-                                    {call.sharing
-                                        ? t("callRoom.stopSharing")
-                                        : t("callRoom.shareScreen")}
-                                </DropdownMenuItem>
-                            )}
-                            {narrow && (
-                                <>
-                                    <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger>
-                                            <Smile className="size-4 shrink-0" />
-                                            {t("callRoom.react")}
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuSubContent className="flex w-auto gap-1 p-1">
-                                            <ReactionItems onReact={call.react} />
-                                        </DropdownMenuSubContent>
-                                    </DropdownMenuSub>
-                                    <DropdownMenuSeparator />
-                                </>
-                            )}
-                            {canRecord && !call.recording && (
-                                <DropdownMenuItem
-                                    title={t("callRoom.writeThisCallToA")}
-                                    onSelect={() => setAsking(true)}
+                    {(narrow || callItems || viewerId) && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    size="icon"
+                                    variant="secondary"
+                                    aria-label={t("callRoom.moreForThisCall")}
+                                    title={t("callRoom.moreForThisCall")}
                                 >
-                                    <RecordGlyph />
-                                    {t("callRoom.recordThisCall")}
-                                </DropdownMenuItem>
-                            )}
-                            {viewerId && (mayInvite || canShare) && (
-                                <DropdownMenuItem onSelect={() => setInviting(true)}>
-                                    <UserPlus className="size-4" />
-                                    {mayInvite
-                                        ? t("callRoom.addPeople")
-                                        : t("callRoom.shareALinkToThis")}
-                                </DropdownMenuItem>
-                            )}
-                            {moreItems && (
-                                <>
-                                    {((canRecord && !call.recording) ||
-                                        (viewerId && (mayInvite || canShare))) && (
-                                        <DropdownMenuSeparator />
-                                    )}
-                                    {moreItems}
-                                </>
-                            )}
-                            {((canRecord && !call.recording) ||
-                                (viewerId && (mayInvite || canShare)) ||
-                                moreItems) && <DropdownMenuSeparator />}
-                            <VoiceSettingsItem />
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                    <MoreHorizontal className="size-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" side="top" className="w-72">
+                                {narrow && (screenShareable || call.sharing) && (
+                                    <DropdownMenuItem onSelect={call.toggleShare}>
+                                        {call.sharing ? (
+                                            <MonitorX className="size-4 shrink-0" />
+                                        ) : (
+                                            <MonitorUp className="size-4 shrink-0" />
+                                        )}
+                                        {call.sharing
+                                            ? t("callRoom.stopSharing")
+                                            : t("callRoom.shareScreen")}
+                                    </DropdownMenuItem>
+                                )}
+                                {narrow && (
+                                    <>
+                                        <DropdownMenuSub>
+                                            <DropdownMenuSubTrigger>
+                                                <Smile className="size-4 shrink-0" />
+                                                {t("callRoom.react")}
+                                            </DropdownMenuSubTrigger>
+                                            <DropdownMenuSubContent className="flex w-auto gap-1 p-1">
+                                                <ReactionItems onReact={call.react} />
+                                            </DropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                        {(callItems || viewerId) && <DropdownMenuSeparator />}
+                                    </>
+                                )}
+                                {canRecord && !call.recording && (
+                                    <DropdownMenuItem
+                                        title={t("callRoom.writeThisCallToA")}
+                                        onSelect={() => setAsking(true)}
+                                    >
+                                        <RecordGlyph />
+                                        {t("callRoom.recordThisCall")}
+                                    </DropdownMenuItem>
+                                )}
+                                {mayAdd && (
+                                    <DropdownMenuItem onSelect={() => setInviting(true)}>
+                                        <UserPlus className="size-4" />
+                                        {mayInvite
+                                            ? t("callRoom.addPeople")
+                                            : t("callRoom.shareALinkToThis")}
+                                    </DropdownMenuItem>
+                                )}
+                                {moreItems && (
+                                    <>
+                                        {((canRecord && !call.recording) || mayAdd) && (
+                                            <DropdownMenuSeparator />
+                                        )}
+                                        {moreItems}
+                                    </>
+                                )}
+                                {viewerId && (
+                                    <>
+                                        {callItems && <DropdownMenuSeparator />}
+                                        <VoiceSettingsItem />
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
 
                 <Button
@@ -1514,6 +1520,7 @@ function Split({
     onLook,
     outputs,
     deafen,
+    voiceSettings,
     title,
     hint,
     alert
@@ -1537,6 +1544,9 @@ function Split({
      *  the input, rather than a third button of their own. */
     outputs?: ReturnType<typeof useSpeakers>;
     deafen?: { on: boolean; toggle: () => void; title: string };
+    /** Whether the way to the devices screen is offered - only to somebody
+     *  signed in, since a guest who follows it leaves the call for a sign-in. */
+    voiceSettings?: boolean;
     pressed: boolean;
     onClick: () => void;
     devices: readonly { id: string; label: string }[];
@@ -2025,7 +2035,7 @@ function Split({
                                     </span>
                                     {t("callRoom.deafen")}
                                 </DropdownMenuItem>
-                                <VoiceSettingsItem />
+                                {voiceSettings && <VoiceSettingsItem />}
                             </>
                         )}
                     </DropdownMenuContent>
@@ -2081,9 +2091,12 @@ const VOICE_SETTINGS = "/account/devices";
 /** Whether the element is narrower than `below`, kept true to it as it resizes. */
 function useNarrow(ref: React.RefObject<HTMLElement | null>, below: number): boolean {
     const [narrow, setNarrow] = useState(false);
-    useEffect(() => {
+    useLayoutEffect(() => {
         const element = ref.current;
-        if (!element || typeof ResizeObserver === "undefined") return;
+        if (!element) return;
+        const width = element.getBoundingClientRect().width;
+        if (width > 0) setNarrow(width < below);
+        if (typeof ResizeObserver === "undefined") return;
         const observer = new ResizeObserver(([entry]) => {
             if (entry) setNarrow(entry.contentRect.width < below);
         });

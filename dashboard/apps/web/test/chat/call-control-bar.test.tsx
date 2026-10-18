@@ -117,13 +117,13 @@ afterEach(() => {
     toggleDeafen.mockClear();
 });
 
-function room(over: Record<string, unknown> = {}) {
+function room(over: Record<string, unknown> = {}, viewerId: string | null = "ada") {
     HTMLMediaElement.prototype.play = () => Promise.resolve();
     return render(
         <CallRoom
             meetingId="m1"
             place="direct"
-            viewerId="ada"
+            viewerId={viewerId ?? undefined}
             call={callWith(over)}
             onLeave={() => undefined}
         />
@@ -218,5 +218,29 @@ describe("the call's control bar", () => {
         expect(within(menu).getByRole("menuitem", { name: /stopSharing/ })).toBeTruthy();
         expect(within(menu).getByRole("menuitem", { name: /callRoom\.react$/ })).toBeTruthy();
         expect(within(menu).getByRole("menuitem", { name: /voiceSettings/ })).toBeTruthy();
+    });
+
+    it("never offers a guest the way to the devices screen", () => {
+        barWidth(900);
+        room({}, null);
+        open(within(group(/bar\.media/)).getAllByRole("button", { name: /deviceSettings/ })[0]!);
+        const menu = screen.getByRole("menu");
+        expect(within(menu).getByRole("menuitemcheckbox", { name: /deafen/ })).toBeTruthy();
+        expect(within(menu).queryByRole("menuitem", { name: /voiceSettings/ })).toBeNull();
+        cleanup();
+
+        room({}, null);
+        const sharing = group(/bar\.sharing/);
+        expect(within(sharing).queryByRole("button", { name: /moreForThisCall/ })).toBeNull();
+    });
+
+    it("measures the bar before the first paint, not after the observer", () => {
+        vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+            width: 360
+        } as DOMRect);
+        room({ sharing: true });
+        const sharing = group(/bar\.sharing/);
+        expect(within(sharing).queryByRole("button", { name: /stopSharing/ })).toBeNull();
+        vi.restoreAllMocks();
     });
 });
