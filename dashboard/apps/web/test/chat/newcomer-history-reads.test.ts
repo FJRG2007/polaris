@@ -26,7 +26,7 @@ function row(id: string, createdAt: Date, parentId: string | null = null) {
         kind: "text",
         replyCount: 0,
         lastReplyAt: null,
-        quotedId: null,
+        replyToId: null as string | null,
         forwarded: false
     };
 }
@@ -203,13 +203,46 @@ describe("a channel page", () => {
 });
 
 describe("a thread", () => {
-    it("shows only the replies written since the join when history is hidden", async () => {
+    it("is not opened when its root predates the join and history is hidden", async () => {
         closed = true;
-        expect(ids(await readThread(reader, "old-1"))).toEqual(["reply"]);
+        expect(ids(await readThread(reader, "old-1"))).toEqual([]);
+        expect(ids(await readThread(reader, "reply"))).toEqual([]);
     });
 
     it("shows the root and every reply when it is not", async () => {
         expect(ids(await readThread(reader, "old-1"))).toEqual(["old-1", "reply"]);
+    });
+});
+
+describe("a reply's quote", () => {
+    const answer = { ...row("answer", new Date(after.getTime() + 3000)), replyToId: "old-1" };
+    const forward = { ...answer, id: "forward", forwarded: true };
+
+    async function quoteOf(id: string) {
+        all.push(answer, forward);
+        try {
+            const page = await readChannel(reader, "c1");
+            return page.messages.find((message) => message.id === id)?.quote;
+        } finally {
+            all.splice(all.indexOf(answer), 2);
+        }
+    }
+
+    it("does not carry a message from before the join when history is hidden", async () => {
+        closed = true;
+        const quote = await quoteOf("answer");
+        expect(quote).toMatchObject({ excerpt: "", authorName: null, channelId: null });
+    });
+
+    it("carries it when history is shown", async () => {
+        const quote = await quoteOf("answer");
+        expect(quote).toMatchObject({ excerpt: "old-1", channelId: "c1", deleted: false });
+    });
+
+    it("keeps a forward's words, without the way back to the hidden original", async () => {
+        closed = true;
+        const quote = await quoteOf("forward");
+        expect(quote).toMatchObject({ excerpt: "old-1", channelId: null, deleted: false });
     });
 });
 

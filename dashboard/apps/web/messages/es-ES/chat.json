@@ -1005,7 +1005,7 @@
         "webhookActions": "Acciones de {name}",
         "esc": "Esc",
         "newcomerHistory": "Mensajes anteriores para nuevos miembros",
-        "newcomerHistoryHint": "Ocultos, quien entre después solo ve lo enviado luego.",
+        "newcomerHistoryHint": "Si se ocultan, quien entre después solo ve los nuevos.",
         "newcomerHistoryInherit": "Por defecto ({state})",
         "newcomerHistoryOn": "Visibles",
         "newcomerHistoryOff": "Ocultos",
@@ -1200,7 +1200,7 @@
         "makeOwner": "Hacer dueño",
         "close": "Cerrar",
         "newcomersReadHistory": "Quien entre después ve los mensajes anteriores",
-        "newcomersReadHistoryHint": "Desactivado, solo ve lo enviado tras unirse."
+        "newcomersReadHistoryHint": "Si se desactiva, solo ve lo enviado tras unirse."
     },
     "newDirect": {
         "newMessage": "Nuevo mensaje",

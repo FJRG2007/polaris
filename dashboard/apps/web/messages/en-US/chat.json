@@ -1005,7 +1005,7 @@
         "webhookActions": "Actions for {name}",
         "esc": "Esc",
         "newcomerHistory": "Earlier messages for new members",
-        "newcomerHistoryHint": "Hidden, people who join later only see what is sent after.",
+        "newcomerHistoryHint": "When hidden, people who join later only see new messages.",
         "newcomerHistoryInherit": "Server default ({state})",
         "newcomerHistoryOn": "Shown",
         "newcomerHistoryOff": "Hidden",
@@ -1200,7 +1200,7 @@
         "makeOwner": "Make owner",
         "close": "Close",
         "newcomersReadHistory": "People added later see earlier messages",
-        "newcomersReadHistoryHint": "Off, they only see what is sent after they join."
+        "newcomersReadHistoryHint": "When off, they only see messages sent after they join."
     },
     "newDirect": {
         "newMessage": "New message",

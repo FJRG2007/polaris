@@ -339,6 +339,7 @@ export async function setNewcomerHistory(
             where: { id: input.spaceId },
             data: { newcomerHistory: input.value }
         });
+        publishChatChange({ channelId: input.spaceId, kind: "channels", actorId: actor.id });
         return;
     }
     const access = await requireChannel(actor, input.channelId);

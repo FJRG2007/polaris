@@ -323,6 +323,13 @@ export async function readThread(
     // A reply passed in place of the root opens the thread it is in, which is
     // what somebody clicking a reply in a search result means.
     const rootId = root.parentId ?? root.id;
+    if (floor) {
+        const head = await prisma.chatMessage.findUnique({
+            where: { id: rootId },
+            select: { createdAt: true }
+        });
+        if (!head || !history.isReadable(floor, head.createdAt)) return [];
+    }
     const rows = await prisma.chatMessage.findMany({
         where: { OR: [{ id: rootId }, { parentId: rootId }], AND: [history.sinceClause(floor)] },
         orderBy: { createdAt: "asc" },
@@ -499,8 +506,10 @@ export async function send(
             // A forward is the one case where the two differ on purpose: it
             // carries a message out of where it was said. The reader is proved
             // against the source before it moves.
-            if (original.channelId === input.channelId) quoted = quote.messageId;
-            else if (quote.forwarded) {
+            if (original.channelId === input.channelId) {
+                await history.requireReadable(actor, original.channelId, quote.messageId);
+                quoted = quote.messageId;
+            } else if (quote.forwarded) {
                 await requireChannel(actor, original.channelId);
                 await history.requireReadable(actor, original.channelId, quote.messageId);
                 quoted = quote.messageId;
@@ -1777,7 +1786,14 @@ export async function decorateMessages(
         quotedIds.length
             ? prisma.chatMessage.findMany({
                   where: { id: { in: quotedIds } },
-                  select: { id: true, channelId: true, authorId: true, body: true, deletedAt: true }
+                  select: {
+                      id: true,
+                      channelId: true,
+                      authorId: true,
+                      body: true,
+                      deletedAt: true,
+                      createdAt: true
+                  }
               })
             : Promise.resolve([]),
         knownPreviews([...links.values()]),
@@ -1828,6 +1844,15 @@ export async function decorateMessages(
             author.id,
             called.get(author.id) ?? author.name
         ])
+    );
+    const quoteFloors = await history.historyFloors(
+        actor.id,
+        quoted.map((row) => row.channelId)
+    );
+    const quoteHidden = new Set(
+        quoted
+            .filter((row) => !history.isReadable(quoteFloors.get(row.channelId), row.createdAt))
+            .map((row) => row.id)
     );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
     const quotedElsewhere = rows.some((row) => {
@@ -1939,7 +1964,7 @@ export async function decorateMessages(
                 ),
             attachments: onMessageFiles.get(row.id) ?? [],
             poll: polls.get(row.id) ?? null,
-            quote: quoteViewOf(row, quotes, names, quoteReachable),
+            quote: quoteViewOf(row, quotes, names, quoteReachable, quoteHidden),
             starred: kept.has(row.id),
             blocked: row.authorId !== null && shut.has(row.authorId),
             mentionsYou: mentioned.has(row.id),
@@ -2076,10 +2101,12 @@ function quoteViewOf(
         }
     >,
     names: ReadonlyMap<string, string>,
-    reachable: ReadonlySet<string>
+    reachable: ReadonlySet<string>,
+    hidden: ReadonlySet<string>
 ): ChatQuoteView | null {
     if (!row.replyToId) return null;
-    const original = quotes.get(row.replyToId);
+    const original =
+        row.forwarded || !hidden.has(row.replyToId) ? quotes.get(row.replyToId) : undefined;
     // The column survives the message it pointed at being deleted, so the
     // absence is said rather than swallowed: an answer with no visible question
     // is worse than one that admits the question is gone.
@@ -2096,7 +2123,8 @@ function quoteViewOf(
     return {
         id: original.id,
         channelId:
-            original.channelId === row.channelId || reachable.has(original.channelId)
+            (original.channelId === row.channelId || reachable.has(original.channelId)) &&
+            !hidden.has(original.id)
                 ? original.channelId
                 : null,
         authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
