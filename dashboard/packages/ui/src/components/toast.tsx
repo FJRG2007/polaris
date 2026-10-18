@@ -154,9 +154,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const latest = useRef<readonly Shown[]>([]);
 
     const replace = useCallback((upcoming: readonly Shown[]) => {
-        const gone = latest.current.filter(
-            (one) => !upcoming.some((other) => other.id === one.id)
-        );
+        const gone = latest.current.filter((one) => !upcoming.some((other) => other.id === one.id));
         latest.current = upcoming;
         setShown(upcoming);
         for (const one of gone) one.onGone?.();

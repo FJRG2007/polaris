@@ -256,7 +256,10 @@ export function ConversationNote({
                                         disabled={acting !== null}
                                         aria-label={words.reply}
                                         title={words.reply}
-                                        className={cn(ICON_BUTTON, "text-primary hover:text-primary")}
+                                        className={cn(
+                                            ICON_BUTTON,
+                                            "text-primary hover:text-primary"
+                                        )}
                                     >
                                         <Reply className="size-4" />
                                     </button>
@@ -338,7 +341,9 @@ function Choices({
         <span className="-ml-1.5 flex flex-wrap items-center gap-1">
             <span className="inline-flex min-w-0 items-center gap-1 px-1.5 py-1 text-xs font-medium text-foreground">
                 {action.icon}
-                <span className="truncate" title={action.label}>{action.label}</span>
+                <span className="truncate" title={action.label}>
+                    {action.label}
+                </span>
             </span>
             {action.choices?.map((choice) => (
                 <button
@@ -414,7 +419,10 @@ function useSwipe(onDismiss: () => void) {
             },
             onPointerUp: end,
             onPointerCancel: end,
-            onClickCapture: (event: { stopPropagation: () => void; preventDefault: () => void }) => {
+            onClickCapture: (event: {
+                stopPropagation: () => void;
+                preventDefault: () => void;
+            }) => {
                 if (!moved.current) return;
                 moved.current = false;
                 event.stopPropagation();
