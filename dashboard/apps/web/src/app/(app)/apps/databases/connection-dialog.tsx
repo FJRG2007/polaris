@@ -87,6 +87,7 @@ import {
     Textarea,
     cn
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 interface Engine {
     id: string;
@@ -1132,7 +1133,7 @@ function FileField({
     error?: string;
 }) {
     const t = useTranslations("databases");
-    const picker = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [over, setOver] = useState(false);
     const [refused, setRefused] = useState("");
 
@@ -1154,22 +1155,19 @@ function FileField({
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
             <div className="flex items-center justify-between gap-2">
                 <span>{label}</span>
-                <Button variant="ghost" size="xs" onClick={() => picker.current?.click()}>
+                <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() =>
+                        void chooseFiles({ accept, onFailed: setRefused }).then((files) =>
+                            take(files[0])
+                        )
+                    }
+                >
                     <Upload />
                     {t("dialog.chooseFile")}
                 </Button>
-                <input
-                    ref={picker}
-                    type="file"
-                    accept={accept}
-                    className="hidden"
-                    aria-hidden
-                    tabIndex={-1}
-                    onChange={(event) => {
-                        take(event.target.files?.[0]);
-                        event.target.value = "";
-                    }}
-                />
+                {chooser}
             </div>
             <Textarea
                 rows={4}

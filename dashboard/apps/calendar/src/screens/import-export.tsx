@@ -10,11 +10,14 @@ import { ColorDot } from "./ui";
 import { useCalendarT } from "./i18n";
 import { unwrap } from "./cached-read";
 import { Download, FileUp } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import type { CalendarSummary } from "../lib/wire";
 import * as transferActions from "../actions/transfer";
 import { CALENDAR_COLORS, nameSchema } from "../lib/schemas";
 import { Button, cn, Input, Select, Skeleton } from "@polaris/ui";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 const MOST_BYTES = 10 * 1024 * 1024;
 const NEW = "new";
@@ -37,7 +40,7 @@ export function ImportExport({
 }) {
     const t = useCalendarT();
     const ids = useId();
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [file, setFile] = useState<{ name: string; text: string } | null>(null);
     const [target, setTarget] = useState<string>(NEW);
     const [name, setName] = useState("");
@@ -132,15 +135,17 @@ export function ImportExport({
                             ? t("transferSection.chosen", { name: file.name })
                             : t("transferSection.drop")}
                     </p>
-                    <input
-                        ref={input}
-                        id={`${ids}-file`}
-                        type="file"
-                        accept=".ics,.ical,.ifb,.json,.jcal,text/calendar,application/calendar+json"
-                        className="sr-only"
-                        onChange={(event) => void read(event.target.files?.[0])}
-                    />
-                    <Button size="sm" variant="outline" onClick={() => input.current?.click()}>
+                    {chooser}
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                            void chooseFiles({
+                                accept: ".ics,.ical,.ifb,.json,.jcal,text/calendar,application/calendar+json",
+                                onFailed: setProblem
+                            }).then((files) => read(files[0]))
+                        }
+                    >
                         {t("transferSection.pick")}
                     </Button>
                 </div>

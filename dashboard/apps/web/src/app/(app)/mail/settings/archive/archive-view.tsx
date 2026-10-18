@@ -20,12 +20,13 @@ import { Download, Upload } from "lucide-react";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
 import type { MailFolderView } from "@/lib/mailbox/views";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLiveRead } from "@/components/use-live-resource";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
 import { Button, EmptyState, Select, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { exportSizeAction, importBatchAction, openImportAction } from "@/app/(app)/mail/actions";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The archive ceiling as the screen says it, from the number the server
  *  enforces. */
@@ -49,7 +50,7 @@ export function ArchiveView({
     const toast = useToast();
     const t = useTranslations("mailSettings");
     const tm = useTranslations("mail");
-    const picker = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState<Progress | null>(null);
@@ -102,7 +103,6 @@ export function ArchiveView({
             toast.show({
                 title: t("archive.tooBig", { limit: ARCHIVE_LIMIT_MB })
             });
-            if (picker.current) picker.current.value = "";
             return;
         }
         setBusy(true);
@@ -170,7 +170,6 @@ export function ArchiveView({
             });
         } finally {
             setBusy(false);
-            if (picker.current) picker.current.value = "";
         }
     }
 
@@ -202,22 +201,20 @@ export function ArchiveView({
                             code: (chunks) => <code key={String(chunks)}>{chunks}</code>
                         })}
                     </p>
-                    <input
-                        ref={picker}
-                        type="file"
-                        accept=".mbox,.eml,message/rfc822,application/mbox,text/plain"
-                        className="hidden"
-                        onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) void bringIn(file);
-                        }}
-                    />
+                    {chooser}
                     <Button
                         className="mt-2"
                         size="sm"
                         variant="primary"
                         disabled={busy || !target}
-                        onClick={() => picker.current?.click()}
+                        onClick={() =>
+                            void chooseFiles({
+                                accept: ".mbox,.eml,message/rfc822,application/mbox,text/plain",
+                                onFailed: (title) => toast.show({ title })
+                            }).then(([file]) => {
+                                if (file) void bringIn(file);
+                            })
+                        }
                     >
                         <Upload className="size-4 shrink-0" aria-hidden />
                         {t("archive.choose")}

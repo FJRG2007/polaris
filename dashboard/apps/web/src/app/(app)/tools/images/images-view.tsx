@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, ImageUp, Loader2, MapPin } from "lucide-react";
 import { Button, Input, Select, Switch, cn, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** What the file says about itself, as the server read it. */
 interface Facts {
@@ -66,7 +67,7 @@ export function ImagesView() {
     const [longest, setLongest] = useState("");
     const [keepMetadata, setKeepMetadata] = useState(false);
 
-    const pickerRef = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     // The object URL of the result, revoked when it is replaced: a slider that
     // re-encodes on every move would otherwise leak one image per move.
     const madeUrl = useRef<string | null>(null);
@@ -157,22 +158,19 @@ export function ImagesView() {
 
     return (
         <div className="flex flex-col gap-4">
-            <input
-                ref={pickerRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                    const chosen = event.target.files?.[0];
-                    if (chosen) void take(chosen);
-                    event.target.value = "";
-                }}
-            />
+            {chooser}
 
             {!file ? (
                 <button
                     type="button"
-                    onClick={() => pickerRef.current?.click()}
+                    onClick={() =>
+                        void chooseFiles({
+                            accept: "image/*",
+                            onFailed: (title) => toast.show({ title })
+                        }).then(([chosen]) => {
+                            if (chosen) void take(chosen);
+                        })
+                    }
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                         event.preventDefault();

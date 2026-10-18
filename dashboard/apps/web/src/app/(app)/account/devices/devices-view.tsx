@@ -63,6 +63,7 @@ import {
     type InputMode,
     type VoiceSettings
 } from "@/app/(app)/chat/voice-settings";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** What every card here is handed: the settings, and the one way to change one. */
 type Change = (next: Partial<VoiceSettings>) => void;
@@ -407,7 +408,19 @@ function CameraCard() {
     const video = useRef<HTMLVideoElement>(null);
     const stream = useRef<MediaStream | null>(null);
     const masked = useRef<MaskedCamera | null>(null);
-    const picker = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
+
+    /** Asks for a picture to sit behind the camera. */
+    const askPicture = () =>
+        void chooseFiles({ accept: "image/*", onFailed: setPickProblem }).then(([file]) => {
+            if (!file) return;
+            setPickProblem("");
+            void pickImage(file).catch((caught: unknown) =>
+                setPickProblem(
+                    caught instanceof Error ? caught.message : t("devices.camera.pictureFailed")
+                )
+            );
+        });
     /**
      * The call's own camera, when there is a call sending one.
      *
@@ -591,7 +604,7 @@ function CameraCard() {
                             // this to turn on, so it asks for one instead.
                             if (next === "image" && !image) {
                                 setPickProblem("");
-                                picker.current?.click();
+                                askPicture();
                                 return;
                             }
                             chooseBackground(next);
@@ -674,7 +687,7 @@ function CameraCard() {
                                     : t("devices.camera.ownPicture")
                             }
                             aria-pressed={own}
-                            onClick={() => picker.current?.click()}
+                            onClick={askPicture}
                             className={cn(
                                 "flex aspect-video items-center justify-center overflow-hidden rounded-md border-2 text-xs text-muted-foreground transition-colors",
                                 own
@@ -693,27 +706,7 @@ function CameraCard() {
                         {t("devices.camera.pictureStays")}
                     </span>
                 </div>
-                <input
-                    ref={picker}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        // Cleared either way, so choosing the same file twice is
-                        // a second change event rather than silence.
-                        event.target.value = "";
-                        if (!file) return;
-                        setPickProblem("");
-                        void pickImage(file).catch((caught: unknown) =>
-                            setPickProblem(
-                                caught instanceof Error
-                                    ? caught.message
-                                    : t("devices.camera.pictureFailed")
-                            )
-                        );
-                    }}
-                />
+                {chooser}
 
                 {/* What the model DID, once it has been asked to - the same
                     answer the microphone gives about its filter, and given for

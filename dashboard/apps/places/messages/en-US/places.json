@@ -1107,7 +1107,8 @@
         "notPort": "Type a port number from 1 to 65535.",
         "notAreas": "Type area numbers from 1 to 255, separated by commas, up to 64 of them.",
         "macShort": "A MAC address has 12 digits.",
-        "macReserved": "That is not a device's MAC address."
+        "macReserved": "That is not a device's MAC address.",
+        "chooseFile": "Choose file"
     },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",

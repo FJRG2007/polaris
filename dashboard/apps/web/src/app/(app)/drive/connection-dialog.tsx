@@ -18,7 +18,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { type ConnectionProviderSlug, type StorageProviderKind } from "@polaris/core";
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
     AlertTriangle,
     ArrowLeft,
@@ -51,6 +51,7 @@ import {
     DialogTrigger,
     DialogDescription
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 interface FieldDef {
     name: string;
@@ -201,20 +202,24 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
 function KeyFileField({ name, label }: { name: string; label: string }) {
     const t = useTranslations("drive");
     const ref = useRef<HTMLTextAreaElement>(null);
-    async function onFile(event: ChangeEvent<HTMLInputElement>) {
-        const file = event.target.files?.[0];
+    const [chooseFiles, chooser] = useChooseFiles();
+    async function onFile() {
+        const [file] = await chooseFiles();
         if (!file || !ref.current) return;
         ref.current.value = await file.text();
-        event.target.value = "";
     }
     return (
         <>
             <span className="flex items-center justify-between gap-2">
                 {label}
-                <label className="cursor-pointer text-xs text-primary hover:underline">
+                <button
+                    type="button"
+                    className="cursor-pointer text-xs text-primary hover:underline"
+                    onClick={() => void onFile()}
+                >
                     {t("connection.uploadKey")}
-                    <input type="file" hidden onChange={onFile} />
-                </label>
+                </button>
+                {chooser}
             </span>
             <Textarea
                 ref={ref}

@@ -3103,6 +3103,7 @@
             "differ": "The two passphrases differ",
             "exported": "Exported {count, plural, one {{shown} row} other {{shown} rows}}.{unreadable, plural, =0 {} other { {unreadableShown} saved secrets could not be opened here and will need entering again.}} Without the passphrase the file cannot be opened.",
             "importIntro": "On a fresh install: read an export in. It replaces every account and setting here, this one included.",
+            "chooseFile": "Choose an export",
             "itsPassphrase": "Its passphrase",
             "uploading": "Uploading",
             "checkFile": "Check file",

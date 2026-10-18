@@ -24,6 +24,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The largest zip the server takes, and the most a folder may hold before it. */
 const MAX_ZIP = 200 * 1024 ** 2;
@@ -128,7 +129,7 @@ export function SourceDropZone({
 }) {
     const t = useTranslations("deploy");
     const folderInput = useRef<HTMLInputElement>(null);
-    const zipInput = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [over, setOver] = useState(false);
     const [reading, setReading] = useState(false);
     const desktop = useDesktopBridge();
@@ -260,7 +261,14 @@ export function SourceDropZone({
                     size="sm"
                     variant="ghost"
                     disabled={disabled || reading}
-                    onClick={() => zipInput.current?.click()}
+                    onClick={() =>
+                        void chooseFiles({
+                            accept: ".zip,application/zip",
+                            onFailed: (message) => onPicked(null, message)
+                        }).then(([file]) => {
+                            if (file) void take(async () => asZip(file));
+                        })
+                    }
                 >
                     {t("upload.chooseZip")}
                 </Button>
@@ -275,17 +283,7 @@ export function SourceDropZone({
                     event.target.value = "";
                 }}
             />
-            <input
-                ref={zipInput}
-                type="file"
-                accept=".zip,application/zip"
-                hidden
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void take(async () => asZip(file));
-                    event.target.value = "";
-                }}
-            />
+            {chooser}
             <span className="text-xs text-muted-foreground">{t("upload.leftOut")}</span>
         </div>
     );

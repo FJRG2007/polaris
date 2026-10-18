@@ -12,7 +12,7 @@ import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@polaris/core";
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { FileArchive, Loader2, Upload } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -24,6 +24,7 @@ import {
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The largest backup the server takes (`MAX_BACKUP_UPLOAD` in the route). */
 const MAX_BACKUP = 5 * 1024 ** 3;
@@ -147,7 +148,7 @@ function sendBackup(
 export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
     const t = useTranslations("deploySafety");
     const router = useRouter();
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [open, setOpen] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [pickError, setPickError] = useState<string | null>(null);
@@ -417,20 +418,16 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                                     size="sm"
                                     variant="outline"
                                     disabled={busy}
-                                    onClick={() => input.current?.click()}
+                                    onClick={() =>
+                                        void chooseFiles({
+                                            accept: ".tar.gz,.tgz,application/gzip",
+                                            onFailed: setPickError
+                                        }).then((files) => pick(files[0]))
+                                    }
                                 >
                                     {t("importSite.choose")}
                                 </Button>
-                                <input
-                                    ref={input}
-                                    type="file"
-                                    accept=".tar.gz,.tgz,application/gzip"
-                                    className="hidden"
-                                    onChange={(event) => {
-                                        pick(event.target.files?.[0]);
-                                        event.target.value = "";
-                                    }}
-                                />
+                                {chooser}
                             </div>
 
                             {pickError && <p className="text-danger-ink">{pickError}</p>}

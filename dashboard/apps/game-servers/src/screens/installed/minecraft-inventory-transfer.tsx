@@ -30,8 +30,10 @@ import {
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { Download, FileUp, Loader2, Upload } from "lucide-react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { RowMenuEntry } from "../../components/row-menu";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 const { useConfirm } = hostUi.confirmDialog;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -243,7 +245,7 @@ export function InventoryImportDialog({
     const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<string[]>([]);
     const [pending, startTransition] = useTransition();
-    const fileInput = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
     // Read as it is typed or chosen, with the same check the server makes.
     const read = useMemo(() => (text.trim() ? transfer.parseTransfer(text) : null), [text]);
@@ -360,23 +362,19 @@ export function InventoryImportDialog({
                     />
                     {problem ? <p className="text-xs text-danger">{problem}</p> : null}
                     <div className="flex flex-wrap items-center gap-3">
-                        <input
-                            ref={fileInput}
-                            type="file"
-                            accept="application/json,.json,text/csv,.csv"
-                            className="hidden"
-                            onChange={async (event) => {
-                                const chosen = event.target.files?.[0];
-                                event.target.value = "";
+                        {chooser}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                const [chosen] = await chooseFiles({
+                                    accept: "application/json,.json,text/csv,.csv",
+                                    onFailed: setError
+                                });
                                 if (!chosen) return;
                                 setText(await chosen.text());
                                 reset();
                             }}
-                        />
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileInput.current?.click()}
                         >
                             <FileUp className="size-4" aria-hidden />
                             {t("inventoryTransfer.chooseFile")}

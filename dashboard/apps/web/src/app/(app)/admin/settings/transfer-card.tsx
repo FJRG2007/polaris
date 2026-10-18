@@ -20,6 +20,7 @@ import { validationMessage } from "@/components/i18n/validation-message";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 const MIN_PASSPHRASE = 12;
 
@@ -47,6 +48,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     } | null>(null);
     const [confirm, setConfirm] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
     // The file is only as safe as this passphrase once it leaves: one already in a
     // breach list, or made of this deployment's own name, is the first guess.
@@ -189,16 +191,28 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                 <section className="flex flex-col gap-2 border-t border-border pt-4">
                     <p className="text-muted-foreground">{t("settings.transfer.importIntro")}</p>
                     <div className="flex flex-wrap gap-2">
-                        <input
-                            type="file"
-                            accept=".polaris"
-                            onChange={(event) => {
-                                setFile(event.target.files?.[0] ?? null);
-                                setUploadId(null);
-                                setPreview(null);
-                            }}
-                            className="min-w-0 flex-1 text-xs"
-                        />
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="min-w-0 max-w-full"
+                            title={file?.name}
+                            onClick={() =>
+                                void chooseFiles({ accept: ".polaris", onFailed: setError }).then(
+                                    ([chosen]) => {
+                                        if (!chosen) return;
+                                        setFile(chosen);
+                                        setUploadId(null);
+                                        setPreview(null);
+                                    }
+                                )
+                            }
+                        >
+                            <span className="min-w-0 truncate">
+                                {file ? file.name : t("settings.transfer.chooseFile")}
+                            </span>
+                        </Button>
+                        {chooser}
                         <Input
                             type="password"
                             value={importPass}

@@ -7,7 +7,7 @@
  * forwarded you can be uploaded.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { collectReportsAction, dmarcAction } from "../actions";
@@ -15,6 +15,7 @@ import { Mono, PanelError, usePanelData, VerdictBadge } from "../ui-bits";
 import { Button, EmptyState, SegmentedControl, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { mailServerRefusalText } from "@/lib/mail-server/refusal-text";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 type Range = "7" | "30" | "90";
 
@@ -25,7 +26,7 @@ export function ReportsTab({ serverId }: { serverId: string }) {
     const panel = usePanelData(`dmarc:${serverId}:${range}`, () => dmarcAction({ serverId, days: Number(range) }));
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
-    const file = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
     async function collect(): Promise<void> {
         setBusy(true);
@@ -86,21 +87,18 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                         <RefreshCw className={busy ? "animate-spin" : undefined} />
                         {t("reports.read")}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => file.current?.click()} disabled={busy}>
+                    <Button size="sm" variant="outline" onClick={() =>
+                            void chooseFiles({
+                                accept: ".xml,.gz,.zip,.eml,application/xml,application/gzip,application/zip,message/rfc822",
+                                onFailed: (text) => setMessage({ tone: "error", text })
+                            }).then(([chosen]) => {
+                                if (chosen) void upload(chosen);
+                            })
+                        } disabled={busy}>
                         <Upload />
                         {t("reports.upload")}
                     </Button>
-                    <input
-                        ref={file}
-                        type="file"
-                        className="hidden"
-                        accept=".xml,.gz,.zip,.eml,application/xml,application/gzip,application/zip,message/rfc822"
-                        onChange={(event) => {
-                            const chosen = event.target.files?.[0];
-                            event.target.value = "";
-                            if (chosen) void upload(chosen);
-                        }}
-                    />
+                    {chooser}
                 </div>
             </div>
             {message ? <p className={message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"}>{message.text}</p> : null}

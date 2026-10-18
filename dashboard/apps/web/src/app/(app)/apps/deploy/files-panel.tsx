@@ -18,8 +18,9 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { asDirectory, parentDirectory } from "./files-path";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowUp, Download, File as FileIcon, Folder, HardDrive, Upload } from "lucide-react";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 interface Entry {
     name: string;
@@ -39,7 +40,7 @@ export function FilesPanel({
     const [entries, setEntries] = useState<Entry[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const fileInput = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
     const load = useCallback(
         async (next: string) => {
@@ -115,21 +116,16 @@ export function FilesPanel({
                     </Button>
                     <Button
                         variant="outline"
-                        onClick={() => fileInput.current?.click()}
+                        onClick={() =>
+                            void chooseFiles({ onFailed: setError }).then(([file]) => {
+                                if (file) void onUpload(file);
+                            })
+                        }
                         disabled={busy}
                     >
                         <Upload className="size-4" /> {t("files.upload")}
                     </Button>
-                    <input
-                        ref={fileInput}
-                        type="file"
-                        className="hidden"
-                        onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) void onUpload(file);
-                            event.target.value = "";
-                        }}
-                    />
+                    {chooser}
                 </div>
             </div>
             {error && <p className="text-xs text-danger">{error}</p>}
