@@ -10,9 +10,18 @@ name: Extension version check
 # No path filter: it runs on every pull request and passes at once when nothing
 # shipped changed, so `bumped` can be a required check without leaving
 # unrelated pull requests waiting on a check that never starts.
+#
+# A green check on a pull request is measured against main as it was when the
+# check ran, and nothing re-runs it when another pull request merges. In a merge
+# queue it runs again against the queued main; on every push to main it runs
+# once more over what that push changed, so a change that landed under a version
+# main already had turns main red instead of never reaching a browser.
 
 on:
   pull_request:
+  merge_group:
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -27,8 +36,9 @@ jobs:
 
       - name: The version moves when shipped files change
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
         run: |
           version() { git show "$1:dashboard/apps/extension/package.json" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version"; }
           # Whether $1 sorts after $2 as a version (0.1.10 after 0.1.9).
@@ -59,8 +69,13 @@ jobs:
           fi
           # Two pull requests bumping from the same version each pass on their
           # own, and the second to merge ships under a number already released.
-          # Past main's version and past the latest release, so it is always new.
-          released="$(git tag -l 'extension-v*' | sed 's/^extension-v//' | sort -V | tail -n1)"
+          # Past main's version and past the latest release when the check runs.
+          # A push to main may already be tagged by the time this runs, so
+          # there the version only has to be past what main had before it.
+          released=""
+          if [ "$EVENT" != "push" ]; then
+            released="$(git tag -l 'extension-v*' | sed 's/^extension-v//' | sort -V | tail -n1)"
+          fi
           for floor in "$main" ${released:+"$released"}; do
             if ! newer "$after" "$floor"; then
               echo "Version $after is not past $floor (main is at $main, latest release ${released:-none})." >&2
