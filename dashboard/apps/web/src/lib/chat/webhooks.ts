@@ -26,9 +26,9 @@ import { publishChatChange } from "./live";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { rateLimit, type RateLimitResult } from "@/lib/rate-limit-service";
 import {
+    administeredChannels,
     ChatAccessError,
     channelAccess,
-    reachableSpaceIds,
     requireChannel,
     type ChatActor
 } from "./access";
@@ -183,15 +183,11 @@ export interface ChatWebhookChoice {
 export async function webhooksToPostThrough(
     actor: ChatActor
 ): Promise<readonly ChatWebhookChoice[]> {
-    const spaces = await reachableSpaceIds(actor);
-    if (spaces.size === 0) return [];
+    const managed = await administeredChannels(actor);
+    if (!managed) return [];
     const rows = await prisma.chatWebhook.findMany({
         where: {
-            channel: {
-                spaceId: { in: [...spaces] },
-                archived: false,
-                space: { archived: false }
-            }
+            channel: { AND: [managed, { archived: false, space: { archived: false } }] }
         },
         orderBy: { createdAt: "asc" },
         take: MAX_CHOICES,
@@ -202,24 +198,14 @@ export async function webhooksToPostThrough(
             channel: { select: { id: true, name: true, space: { select: { name: true } } } }
         }
     });
-    const channels = [...new Set(rows.map((row) => row.channel.id))];
-    const managed = new Set<string>();
-    await Promise.all(
-        channels.map(async (channelId) => {
-            const access = await channelAccess(actor, channelId);
-            if (access?.spaceId && access.mayAdminister) managed.add(channelId);
-        })
-    );
-    return rows
-        .filter((row) => managed.has(row.channel.id))
-        .map((row) => ({
-            id: row.id,
-            name: row.name,
-            channelId: row.channel.id,
-            channelName: row.channel.name,
-            spaceName: row.channel.space?.name ?? "",
-            stamp: stampOf(row.tokenHash)
-        }));
+    return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        channelId: row.channel.id,
+        channelName: row.channel.name,
+        spaceName: row.channel.space?.name ?? "",
+        stamp: stampOf(row.tokenHash)
+    }));
 }
 
 /** Why an automation may not post through the webhook it chose. */

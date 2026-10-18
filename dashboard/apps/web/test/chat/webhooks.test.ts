@@ -47,13 +47,19 @@ function pick(hook: Hook, select?: Record<string, unknown>) {
 
 vi.mock("@polaris/db", () => {
     const chatWebhook = {
-        findMany: async ({ where }: { where: { channelId?: string } }) =>
+        findMany: async ({
+            where
+        }: {
+            where: { channelId?: string; channel?: { AND: [{ id: { notIn: string[] } }] } };
+        }) =>
             where.channelId
                 ? db.hooks.filter((hook) => hook.channelId === where.channelId)
-                : db.hooks.map((hook) => ({
-                      ...hook,
-                      channel: { id: hook.channelId, name: "builds", space: { name: "Ops" } }
-                  })),
+                : db.hooks
+                      .filter((hook) => !where.channel!.AND[0].id.notIn.includes(hook.channelId))
+                      .map((hook) => ({
+                          ...hook,
+                          channel: { id: hook.channelId, name: "builds", space: { name: "Ops" } }
+                      })),
         count: async ({ where }: { where: { channelId: string } }) =>
             db.hooks.filter((hook) => hook.channelId === where.channelId).length,
         create: async ({
@@ -137,7 +143,11 @@ vi.mock("@/lib/chat/access", async () => {
         requireChannel: async () => db.access,
         channelAccess: async (_actor: unknown, channelId: string) =>
             channelId in db.accessBy ? db.accessBy[channelId] : db.access,
-        reachableSpaceIds: async () => new Set(["s1"])
+        administeredChannels: async () => ({
+            id: {
+                notIn: Object.keys(db.accessBy).filter((id) => !db.accessBy[id]?.mayAdminister)
+            }
+        })
     };
 });
 
