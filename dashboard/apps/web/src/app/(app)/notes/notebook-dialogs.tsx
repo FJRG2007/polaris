@@ -68,7 +68,10 @@ export function NewNotebookDialog({
     // the picker entirely.
     useEffect(() => {
         if (!open) return;
-        void actions.noteSpaceOwnersAction().then(setOrgs).catch(() => setOrgs([]));
+        void actions
+            .noteSpaceOwnersAction()
+            .then(setOrgs)
+            .catch(() => setOrgs([]));
     }, [open]);
 
     useEffect(() => {
@@ -102,9 +105,7 @@ export function NewNotebookDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("notebook.newTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("notebook.newDescription")}
-                    </DialogDescription>
+                    <DialogDescription>{t("notebook.newDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
@@ -147,7 +148,9 @@ export function NewNotebookDialog({
                                 { value: "private", label: t("notebook.private") },
                                 {
                                     value: "internal",
-                                    label: orgId ? t("notebook.everybodyOrg") : t("notebook.everybodyHere")
+                                    label: orgId
+                                        ? t("notebook.everybodyOrg")
+                                        : t("notebook.everybodyHere")
                                 }
                             ]}
                         />
@@ -248,9 +251,7 @@ export function NotebookPeopleDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("notebook.peopleTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("notebook.peopleDescription")}
-                    </DialogDescription>
+                    <DialogDescription>{t("notebook.peopleDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
@@ -300,7 +301,10 @@ export function NotebookPeopleDialog({
                                 personId={person.userId}
                                 className="-mx-1.5 flex items-center gap-2 rounded-md px-1.5 py-0.5"
                             >
-                                <span className="min-w-0 flex-1 truncate text-sm" title={person.email}>
+                                <span
+                                    className="min-w-0 flex-1 truncate text-sm"
+                                    title={person.email}
+                                >
                                     <PersonName id={person.userId} name={person.name}>
                                         {person.owner && (
                                             <span className="ml-1 text-xs text-muted-foreground">
@@ -310,7 +314,9 @@ export function NotebookPeopleDialog({
                                     </PersonName>
                                 </span>
                                 {person.owner ? (
-                                    <span className="text-xs text-muted-foreground">{t("notebook.runsIt")}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("notebook.runsIt")}
+                                    </span>
                                 ) : (
                                     <>
                                         <Select
@@ -329,7 +335,9 @@ export function NotebookPeopleDialog({
                                         />
                                         <button
                                             type="button"
-                                            aria-label={t("notebook.takeOffNamed", { name: person.name })}
+                                            aria-label={t("notebook.takeOffNamed", {
+                                                name: person.name
+                                            })}
                                             title={t("notebook.takeOff")}
                                             onClick={() =>
                                                 void act(() =>
@@ -381,7 +389,9 @@ export function NotebookPeopleDialog({
                                             {grant && (
                                                 <button
                                                     type="button"
-                                                    aria-label={t("notebook.takeOffNamed", { name: team.name })}
+                                                    aria-label={t("notebook.takeOffNamed", {
+                                                        name: team.name
+                                                    })}
                                                     title={t("notebook.takeOff")}
                                                     onClick={() =>
                                                         void act(() =>
@@ -439,9 +449,12 @@ export function ImportNotesDialog({
     const [keepFolders, setKeepFolders] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const [done, setDone] = useState<{ notes: number; folders: number; links: number; skipped: number } | null>(
-        null
-    );
+    const [done, setDone] = useState<{
+        notes: number;
+        folders: number;
+        links: number;
+        skipped: number;
+    } | null>(null);
 
     useEffect(() => {
         if (target) {
@@ -487,7 +500,9 @@ export function ImportNotesDialog({
 
                 {done ? (
                     <div className="flex flex-col gap-1 text-sm">
-                        <p>{t("notebook.imported", { notes: done.notes, folders: done.folders })}</p>
+                        <p>
+                            {t("notebook.imported", { notes: done.notes, folders: done.folders })}
+                        </p>
                         {done.links > 0 && (
                             <p className="text-muted-foreground">
                                 {t("notebook.linked", { count: done.links })}
@@ -538,9 +553,7 @@ export function ImportNotesDialog({
                             />
                             {t("notebook.keepFolders")}
                         </label>
-                        <p className="text-xs text-muted-foreground">
-                            {t("notebook.wikiLinks")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("notebook.wikiLinks")}</p>
                     </div>
                 )}
 
@@ -560,7 +573,11 @@ export function ImportNotesDialog({
                             disabled={busy || !files || files.length === 0}
                             onClick={() => void run()}
                         >
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : <Import className="size-4" />}
+                            {busy ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Import className="size-4" />
+                            )}
                             {t("notebook.bringIn")}
                         </Button>
                     )}

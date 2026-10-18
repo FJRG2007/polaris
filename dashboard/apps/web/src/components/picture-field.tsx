@@ -20,7 +20,12 @@
 import { Button } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { CROP_ACCEPTED, ImageCropDialog, TILE_CROP, type CropShape } from "@/components/image-cropper";
+import {
+    CROP_ACCEPTED,
+    ImageCropDialog,
+    TILE_CROP,
+    type CropShape
+} from "@/components/image-cropper";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 

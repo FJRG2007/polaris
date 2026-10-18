@@ -163,7 +163,9 @@ export async function fileFromDrive(
         throw new AttachRefused("That file could not be attached.");
     }
 
-    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(() => null);
+    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(
+        () => null
+    );
     if (!driver) throw new AttachRefused("That file is not yours to attach.");
 
     try {
@@ -224,12 +226,16 @@ function nameFrom(response: { headers: Headers }, target: URL): string {
     const named = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)?.[1];
     if (named) {
         try {
-            return decodeURIComponent(named.replace(/"$/, "")).split(/[\\/]/).at(-1) || "attachment";
+            return (
+                decodeURIComponent(named.replace(/"$/, "")).split(/[\\/]/).at(-1) || "attachment"
+            );
         } catch {
             return named.replace(/"$/, "");
         }
     }
-    return decodeURIComponent(target.pathname.split("/").filter(Boolean).at(-1) ?? "") || "attachment";
+    return (
+        decodeURIComponent(target.pathname.split("/").filter(Boolean).at(-1) ?? "") || "attachment"
+    );
 }
 
 /**
@@ -247,7 +253,9 @@ async function collect(stream: unknown, cap: number): Promise<Uint8Array | null>
     const chunks: Buffer[] = [];
     let size = 0;
     const add = (chunk: unknown): boolean => {
-        const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBufferLike as never);
+        const piece = Buffer.isBuffer(chunk)
+            ? chunk
+            : Buffer.from(chunk as ArrayBufferLike as never);
         size += piece.length;
         if (size > cap) return false;
         chunks.push(piece);

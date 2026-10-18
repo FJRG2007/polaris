@@ -24,7 +24,11 @@ import { AlignCenter, AlignLeft, Check, ImageUp, Loader2, RotateCw, Save } from 
 import { useMemo, useState, useTransition } from "react";
 import { FormattedTextField } from "../../components/formatted-text-field";
 import { McLine } from "../../components/mc-text";
-import { renameGameServerAction, setServerIconAction, updateServerSettingsAction } from "./minecraft-actions";
+import {
+    renameGameServerAction,
+    setServerIconAction,
+    updateServerSettingsAction
+} from "./minecraft-actions";
 import { hostUi } from "@polaris/app-host/client";
 
 const { useConfirm } = hostUi.confirmDialog;
@@ -103,7 +107,10 @@ function NameCard({
                         onClick={() => {
                             setError(null);
                             startTransition(async () => {
-                                const result = await renameGameServerAction(installedAppId, trimmed);
+                                const result = await renameGameServerAction(
+                                    installedAppId,
+                                    trimmed
+                                );
                                 if (result.error) {
                                     setError(result.error);
                                     return;
@@ -112,7 +119,11 @@ function NameCard({
                             });
                         }}
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{" "}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Check className="size-4" />
+                        )}{" "}
                         {t("appearance.rename")}
                     </Button>
                 </div>
@@ -236,8 +247,16 @@ function MotdCard({
                         {/* The image writes server.properties at boot, so saving
                             alone is a real choice and not half an action: it keeps
                             the text and leaves whoever is playing alone. */}
-                        <Button variant="secondary" onClick={() => void save(false)} disabled={pending || !changed}>
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                        <Button
+                            variant="secondary"
+                            onClick={() => void save(false)}
+                            disabled={pending || !changed}
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Save className="size-4" />
+                            )}
                             {t("appearance.save")}
                         </Button>
                         <Button onClick={() => void save(true)} disabled={pending || !changed}>
@@ -378,7 +397,11 @@ function IconCard({
                             onClick={() => setPicking(true)}
                             disabled={pending}
                         >
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <ImageUp className="size-4" />
+                            )}
                             {t("appearance.chooseAnImage")}
                         </Button>
                         <span className="text-xs text-muted-foreground">

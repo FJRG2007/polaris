@@ -120,8 +120,17 @@ export function AttachmentSection({
             <header className="flex items-center justify-between">
                 <h3 className="text-sm font-medium">{t("files.title")}</h3>
                 {canEdit && (
-                    <Button size="sm" variant="ghost" disabled={busy} onClick={() => setPicking(true)}>
-                        {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Paperclip className="size-3.5" />}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => setPicking(true)}
+                    >
+                        {busy ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                            <Paperclip className="size-3.5" />
+                        )}
                         {t("files.attach")}
                     </Button>
                 )}
@@ -158,7 +167,9 @@ export function AttachmentSection({
                     }}
                     className={cn(
                         "rounded-md border border-dashed px-3 py-4 text-center text-xs transition-colors",
-                        dragging ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground"
+                        dragging
+                            ? "border-primary bg-primary/5 text-foreground"
+                            : "border-border text-muted-foreground"
                     )}
                 >
                     <Upload className="mx-auto mb-1 size-4 opacity-60" />
@@ -169,7 +180,10 @@ export function AttachmentSection({
             {images.length > 0 && (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {images.map((file) => (
-                        <figure key={file.id} className="group relative overflow-hidden rounded-md border border-border">
+                        <figure
+                            key={file.id}
+                            className="group relative overflow-hidden rounded-md border border-border"
+                        >
                             <a href={attachmentUrl(file.id)} target="_blank" rel="noreferrer">
                                 <Image
                                     src={attachmentUrl(file.id)}
@@ -311,14 +325,21 @@ export function CommitSection({
                                     <RelativeTime iso={commit.committedAt} />
                                 </span>
                             )}
-                            <CopyButton value={commit.url} label={t("commits.linkLabel")} className="md:opacity-0 md:group-hover:opacity-100" />
+                            <CopyButton
+                                value={commit.url}
+                                label={t("commits.linkLabel")}
+                                className="md:opacity-0 md:group-hover:opacity-100"
+                            />
                             {canEdit && (
                                 <button
                                     type="button"
                                     aria-label={t("commits.unlinkNamed", { sha: commit.shortSha })}
                                     title={t("commits.unlink")}
                                     onClick={async () => {
-                                        await runAction(() => actions.unlinkCommitAction(taskId, commit.id), onError);
+                                        await runAction(
+                                            () => actions.unlinkCommitAction(taskId, commit.id),
+                                            onError
+                                        );
                                         onChanged();
                                     }}
                                     className="rounded p-1 text-muted-foreground transition-opacity md:opacity-0 hover:text-danger md:group-hover:opacity-100"
@@ -343,7 +364,12 @@ export function CommitSection({
                         }}
                         className="h-8 text-sm"
                     />
-                    <Button size="sm" variant="ghost" disabled={busy || !value.trim()} onClick={() => void link()}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={busy || !value.trim()}
+                        onClick={() => void link()}
+                    >
                         {t("commits.link")}
                     </Button>
                 </div>
