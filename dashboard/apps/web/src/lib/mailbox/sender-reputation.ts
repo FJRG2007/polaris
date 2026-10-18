@@ -27,6 +27,7 @@
 
 import * as core from "@polaris/core";
 import { lookupDomain } from "@/lib/integrations/virustotal";
+import { takeLookup } from "@/lib/reputation-budget";
 import { knownReputation, rememberReputation } from "@/lib/reputation";
 import { MAIL_DENY_RULES, verifyDomain, verifyEmail } from "@/lib/integrations/dymo";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
@@ -176,7 +177,8 @@ async function senderIsFraud(address: string, domain: string): Promise<Reputatio
 async function domainIsFraud(domain: string): Promise<ReputationFinding | null> {
     const said = `The domain it came from, ${domain}, is known for defrauding people`;
     const known = await knownReputation("domain", domain, DYMO, DOMAIN_RULES);
-    if (known) return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
+    if (known)
+        return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
 
     const apiKey = await getIntegrationSecret(DYMO);
     if (!apiKey) return null;
@@ -212,7 +214,7 @@ async function domainOpinion(domain: string): Promise<ReputationFinding | null> 
     if (known) return fromVerdict("domain", domain, known);
 
     const apiKey = await getIntegrationSecret(VIRUSTOTAL);
-    if (!apiKey) return null;
+    if (!apiKey || !takeLookup(VIRUSTOTAL)) return null;
 
     const verdict = await lookupDomain(apiKey, domain);
     // An error or an unknown domain is remembered as nothing at all: writing it

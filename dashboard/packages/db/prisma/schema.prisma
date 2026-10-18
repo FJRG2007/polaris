@@ -5828,7 +5828,7 @@ model WafBan {
 // bad is a different question, so it is asked again rather than answered out of
 // a cache that predates the change.
 model SubjectReputation {
-    /// ip | domain | email
+    /// ip | domain | email | url
     kind      String
     /// Normalised by the caller: lower case, and an address without its tag.
     subject   String
@@ -9416,6 +9416,7 @@ model ChatMessage {
     attachments ChatAttachment[]
     poll        ChatPoll?
     stars       ChatStar[]
+    linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
     reports     ChatReport[]
 
@@ -9427,6 +9428,29 @@ model ChatMessage {
     @@index([replyToId])
     // The pins of one conversation, newest first, without reading its messages.
     @@index([channelId, pinnedAt])
+}
+
+// A link in a message that an outside reputation service flagged, written by the
+// check that runs after the message is sent or edited (`lib/chat/link-safety`).
+// Only the flagged ones are stored: a message with nothing here is either clean
+// or not checked, and the screen treats both the same - it never says a link is
+// safe, only that one was found not to be.
+//
+// The verdict itself is cached per link in `SubjectReputation`; this is the
+// per-message answer so the read path is one indexed lookup for a page.
+model ChatMessageLinkFlag {
+    messageId String   @db.Uuid
+    // The link as `normalizeLink` writes it, which is also what the screen
+    // normalizes an address in the message to before looking it up here.
+    url       String
+    // Which service said so: dymo | virustotal
+    provider  String
+    reason    String?
+    createdAt DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@id([messageId, url])
 }
 
 // What one person calls another.
