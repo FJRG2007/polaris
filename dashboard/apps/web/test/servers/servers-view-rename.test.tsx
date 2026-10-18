@@ -19,7 +19,7 @@ let renames: unknown[] = [];
 let renameAnswer: { error?: string } = {};
 let removing: { id: string; name: string } | null = null;
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 vi.mock("next/link", () => ({
     default: ({ children, href, ...props }: { children: ReactNode; href: string }) => (
         <a href={href} {...props}>
