@@ -37,7 +37,15 @@
         "add": "Añadir horario",
         "summaryLine": "{presence} durante {span}. {days}.",
         "summaryOvernight": "{presence} durante {span}, hasta el día siguiente. {days}.",
-        "describe": "{presence} - de {start} a {end} - {days}"
+        "describe": "{presence} - de {start} a {end} - {days}",
+        "margin": {
+            "label": "Variar la hora",
+            "exact": "Minuto exacto",
+            "option": "Hasta {minutes} min arriba o abajo",
+            "row": "varía {minutes} min",
+            "next": "Próximo cambio hacia {time}",
+            "hint": "Un minuto distinto cada día, para que no cambie siempre a la misma hora."
+        }
     },
     "page": {
         "title": "Privacidad",

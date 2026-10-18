@@ -44,6 +44,7 @@ function toRule(row: {
     startMinute: number;
     endMinute: number;
     enabled: boolean;
+    marginMinutes: number;
 }): PresenceScheduleView | null {
     if (!core.isScheduledPresence(row.presence)) return null;
     return {
@@ -52,7 +53,8 @@ function toRule(row: {
         days: row.days,
         startMinute: row.startMinute,
         endMinute: row.endMinute,
-        enabled: row.enabled
+        enabled: row.enabled,
+        marginMinutes: row.marginMinutes
     };
 }
 

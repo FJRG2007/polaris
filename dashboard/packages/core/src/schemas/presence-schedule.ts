@@ -164,6 +164,37 @@ export interface PresenceScheduleRule {
     /** Off keeps the window without applying it, which is what somebody wants
      *  the week they are on holiday and not what "delete" means. */
     readonly enabled: boolean;
+    /** Up to this many minutes either side of each end, different every day,
+     *  so the change does not land on the same minute daily. 0 is exact. */
+    readonly marginMinutes: number;
+}
+
+/** The widest random margin a schedule may ask for, either side. */
+export const MAX_PRESENCE_MARGIN = 60;
+
+/**
+ * How far one end of one day's window moves, in whole minutes within
+ * `[-margin, margin]`.
+ *
+ * Seeded rather than random, by the schedule, the calendar day it opens on and
+ * which end: every read on every server agrees on today's times, the screen can
+ * say when the next change lands, and tomorrow is still a different minute. The
+ * margin is held under half the window so the two ends can never cross.
+ */
+export function marginOffset(
+    seed: { readonly id: string; readonly day: string; readonly end: "open" | "close" },
+    marginMinutes: number,
+    windowMinutes: number
+): number {
+    const margin = Math.min(Math.max(0, Math.floor(marginMinutes)), Math.floor((windowMinutes - 1) / 2));
+    if (margin <= 0) return 0;
+    // FNV-1a, 32 bits: small, stable on every engine, and spread enough for this.
+    let hash = 0x811c9dc5;
+    for (const char of `${seed.id}|${seed.day}|${seed.end}`) {
+        hash ^= char.charCodeAt(0);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return (hash % (2 * margin + 1)) - margin;
 }
 
 /** What a window is worth in one line: "Invisible, 00:00 to 09:00, every day". */
@@ -196,7 +227,8 @@ export const presenceScheduleSchema = z
             .int()
             .min(0)
             .max(MINUTES_IN_DAY - 1),
-        enabled: z.boolean()
+        enabled: z.boolean(),
+        marginMinutes: z.number().int().min(0).max(MAX_PRESENCE_MARGIN).default(0)
     })
     // On the object rather than on either field, because it is a fact about the
     // pair: equal ends are the one shape that cannot be read, since it is both
@@ -260,6 +292,9 @@ export interface WeeklyRule {
     readonly days: number;
     readonly startMinute: number;
     readonly endMinute: number;
+    /** With `marginMinutes`, seeds each day's offset - see `marginOffset`. */
+    readonly id?: string;
+    readonly marginMinutes?: number;
 }
 
 /**
@@ -292,7 +327,14 @@ export function weeklyWindow(
     const closesOn = new Date(opensOn);
     if (rule.endMinute <= rule.startMinute) closesOn.setUTCDate(closesOn.getUTCDate() + 1);
     const closesAt = zonedInstant(readingOf(closesOn, rule.endMinute), timeZone);
-    return { openedAt, closesAt };
+    if (!rule.id || !rule.marginMinutes) return { openedAt, closesAt };
+    const seed = { id: rule.id, day: opensOn.toISOString().slice(0, 10) };
+    const length = windowLength(rule.startMinute, rule.endMinute);
+    const shift = (end: "open" | "close") => marginOffset({ ...seed, end }, rule.marginMinutes ?? 0, length) * 60_000;
+    return {
+        openedAt: new Date(openedAt.getTime() + shift("open")),
+        closesAt: new Date(closesAt.getTime() + shift("close"))
+    };
 }
 
 /** The same, carrying the rule it came from, which is what a presence window

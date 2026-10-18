@@ -57,8 +57,29 @@ const BLANK: core.PresenceScheduleInput = {
     days: core.EVERY_DAY,
     startMinute: 23 * 60,
     endMinute: 7 * 60,
-    enabled: true
+    enabled: true,
+    marginMinutes: 0
 };
+
+/** The margins offered, in minutes either side. 0 is the exact minute. */
+const MARGINS = [0, 5, 10, 15, 30, 60] as const;
+
+/**
+ * When this schedule next starts or ends, margin included, or null when it
+ * never will within a week. The same seeded arithmetic the server applies, so
+ * the time shown is the time it happens.
+ */
+function nextEdge(rule: core.PresenceScheduleRule, timeZone: string, now: Date): Date | null {
+    let soonest: Date | null = null;
+    for (let startedDaysAgo = 1; startedDaysAgo >= -7; startedDaysAgo--) {
+        const window = core.weeklyWindow(rule, timeZone, now, startedDaysAgo);
+        if (!window) continue;
+        for (const edge of [window.openedAt, window.closesAt]) {
+            if (edge > now && (!soonest || edge < soonest)) soonest = edge;
+        }
+    }
+    return soonest;
+}
 
 export function ScheduleView({
     schedules,
@@ -89,6 +110,8 @@ export function ScheduleView({
     // same on both sides. Re-read every half minute so a window that opens while
     // this screen is up says so without a reload.
     const [openId, setOpenId] = useState<string | null>(null);
+    /** Each varied schedule's next change, read on the same half-minute beat. */
+    const [edges, setEdges] = useState<Record<string, Date | null>>({});
     useEffect(() => {
         const enabledNow = () =>
             core.openWindow(
@@ -96,7 +119,17 @@ export function ScheduleView({
                 timeZone,
                 new Date()
             );
-        const read = () => setOpenId(enabledNow()?.rule.id ?? null);
+        const read = () => {
+            setOpenId(enabledNow()?.rule.id ?? null);
+            const now = new Date();
+            setEdges(
+                Object.fromEntries(
+                    schedules
+                        .filter((rule) => rule.marginMinutes > 0)
+                        .map((rule) => [rule.id, nextEdge(rule, timeZone, now)])
+                )
+            );
+        };
         read();
         const timer = setInterval(read, 30_000);
         return () => clearInterval(timer);
@@ -198,7 +231,15 @@ export function ScheduleView({
                                             </span>
                                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                                                 {words.days(rule.days, weekOrder)}
+                                                {rule.marginMinutes > 0
+                                                    ? ` - ${t("schedule.margin.row", { minutes: rule.marginMinutes })}`
+                                                    : null}
                                             </span>
+                                            {enabled && edges[rule.id] ? (
+                                                <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                                    {t("schedule.margin.next", { time: format.dateTime(edges[rule.id]!) })}
+                                                </span>
+                                            ) : null}
                                         </span>
                                         {openId === rule.id && enabled ? (
                                             <Badge variant="success">{t("schedule.runningNow")}</Badge>
@@ -316,6 +357,20 @@ function ScheduleDialog({
                                 change({ presence: value as core.ScheduledPresence })
                             }
                         />
+                    </label>
+
+                    <label className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground">{t("schedule.margin.label")}</span>
+                        <Select
+                            value={String(draft.marginMinutes)}
+                            aria-label={t("schedule.margin.label")}
+                            options={MARGINS.map((minutes) => ({
+                                value: String(minutes),
+                                label: minutes === 0 ? t("schedule.margin.exact") : t("schedule.margin.option", { minutes })
+                            }))}
+                            onValueChange={(value) => change({ marginMinutes: Number(value) })}
+                        />
+                        <span className="text-[0.6875rem] text-foreground-subtle">{t("schedule.margin.hint")}</span>
                     </label>
 
                     <div className="flex gap-2">

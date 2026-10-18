@@ -37,7 +37,15 @@
         "add": "Add schedule",
         "summaryLine": "{presence} for {span}. {days}.",
         "summaryOvernight": "{presence} for {span}, into the next day. {days}.",
-        "describe": "{presence} - {start} to {end} - {days}"
+        "describe": "{presence} - {start} to {end} - {days}",
+        "margin": {
+            "label": "Vary the time",
+            "exact": "Exact minute",
+            "option": "Up to {minutes} min either side",
+            "row": "varies by {minutes} min",
+            "next": "Next change around {time}",
+            "hint": "A different minute each day, so it does not change at the same time daily."
+        }
     },
     "page": {
         "title": "Privacy",
