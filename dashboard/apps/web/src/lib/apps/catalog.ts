@@ -427,6 +427,8 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         installMethod: "compose-template",
         capabilities: ["dns-blocker"],
         dashboard: "generic",
+        singleton: true,
+        instanceWide: true,
         template: {
             // Published by CI (.github/workflows/dashboard-publish.yml, `dnsblock`
             // job) from dashboard/services/dns-blocker into the dashboard's own

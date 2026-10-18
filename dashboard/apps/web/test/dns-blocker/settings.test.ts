@@ -27,7 +27,9 @@ describe("normalizeDnsRule", () => {
         "/(?<=x)ads/",
         "/(?=x)/",
         "/(a)\\1/",
-        "/[unclosed/"
+        "/[unclosed/",
+        "/a\nexample.com/",
+        "ads.example.com\r\ntracker.example.com"
     ])("refuses %j", (input) => {
         expect(dns.normalizeDnsRule(input)).toBeNull();
     });

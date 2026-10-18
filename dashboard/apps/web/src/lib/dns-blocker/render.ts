@@ -67,12 +67,11 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
 
     const groups = [...DNS_CATEGORIES.filter((category) => denylists[category]), OWN_GROUP];
-    // An allow list only overrides the group it sits in, so the operator's one
-    // list is given to every group.
+    // The engine checks a name against the allow lists of every group a client
+    // blocks with before any deny list, so one copy, in the group that always
+    // has a deny list, covers them all.
     const allowlists =
-        settings.allow.length > 0
-            ? Object.fromEntries(groups.map((group) => [group, [inline(settings.allow)]]))
-            : undefined;
+        settings.allow.length > 0 ? { [OWN_GROUP]: [inline(settings.allow)] } : undefined;
 
     const { servers, bootstrap } = upstreamsOf(settings);
     const mapping = new Map<string, string[]>();

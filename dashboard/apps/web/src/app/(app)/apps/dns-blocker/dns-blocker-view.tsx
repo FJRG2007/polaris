@@ -60,6 +60,9 @@ const STATE_TONE: Record<DnsBlockerState, "success" | "warning" | "danger" | "ne
     noAddress: "warning"
 };
 
+/** How many times a starting server is looked at on its own, 4 s apart. */
+const STARTING_CHECKS = 15;
+
 /** States in which a DNS server of ours exists. */
 const ENGINE_STATES: readonly DnsBlockerState[] = ["blocking", "starting", "portHeld", "conflict"];
 
@@ -87,6 +90,8 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
     const [recordName, setRecordName] = useState("");
     const [recordAddress, setRecordAddress] = useState("");
 
+    const [startingChecks, setStartingChecks] = useState(0);
+
     const check = useCallback(() => {
         startChecking(async () => {
             const result = await dnsBlockerStatusAction();
@@ -101,12 +106,23 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
 
     useEffect(() => check(), [check]);
 
-    // While the server is coming up, look again on its own a few times.
+    /** A check somebody asked for, which also starts the automatic ones over. */
+    const recheck = useCallback(() => {
+        setStartingChecks(0);
+        check();
+    }, [check]);
+
+    // While the server is coming up, look again on its own a few times, then
+    // stop and say it has not come up rather than asking for ever.
+    const stalled = status?.state === "starting" && startingChecks >= STARTING_CHECKS;
     useEffect(() => {
-        if (status?.state !== "starting") return;
-        const timer = setTimeout(check, 4000);
+        if (status?.state !== "starting" || startingChecks >= STARTING_CHECKS) return;
+        const timer = setTimeout(() => {
+            setStartingChecks((count) => count + 1);
+            check();
+        }, 4000);
         return () => clearTimeout(timer);
-    }, [status, check]);
+    }, [status, startingChecks, check]);
 
     const badAllow = rejected(allowText, dns.normalizeDnsRule);
     const badDeny = rejected(denyText, dns.normalizeDnsRule);
@@ -151,13 +167,15 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
         setNotice(null);
         startSaving(async () => {
             const result = await saveDnsSettingsAction(draft);
+            const engineOn = status ? ENGINE_STATES.includes(status.state) : false;
             if (result.error) {
                 setNotice({ tone: "error", text: result.error });
+                if (engineOn) recheck();
                 return;
             }
             setSaved(draft);
             setNotice({ tone: "ok", text: t("settings.saved") });
-            if (status && ENGINE_STATES.includes(status.state)) check();
+            if (engineOn) recheck();
         });
     }
 
@@ -166,7 +184,7 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
         startSwitching(async () => {
             const result = on ? await turnOnDnsBlockerAction() : await turnOffDnsBlockerAction();
             if (result.error) setNotice({ tone: "error", text: result.error });
-            check();
+            recheck();
         });
     }
 
@@ -180,13 +198,15 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                     <div className="flex min-w-0 items-center gap-2">
                         <CardTitle className="truncate">{t("status.title")}</CardTitle>
                         {state ? (
-                            <Badge variant={STATE_TONE[state]}>{t(`states.${state}.label`)}</Badge>
+                            <Badge variant={stalled ? "danger" : STATE_TONE[state]}>
+                                {stalled ? t("states.stalled.label") : t(`states.${state}.label`)}
+                            </Badge>
                         ) : null}
                     </div>
                     <Button
                         size="sm"
                         variant="ghost"
-                        onClick={check}
+                        onClick={recheck}
                         disabled={checking}
                         aria-label={t("status.check")}
                         title={t("status.check")}
@@ -198,9 +218,12 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                     {status ? (
                         <>
                             <p className="text-sm text-muted-foreground">
-                                {t(`states.${status.state}.body`, {
-                                    address: status.address ?? ""
-                                })}
+                                {t(
+                                    stalled ? "states.stalled.body" : `states.${status.state}.body`,
+                                    {
+                                        address: status.address ?? ""
+                                    }
+                                )}
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 {!engineExists ? (
@@ -215,7 +238,7 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                                             : t("actions.turnOn")}
                                     </Button>
                                 ) : null}
-                                {state === "portHeld" || state === "conflict" ? (
+                                {state === "portHeld" || state === "conflict" || stalled ? (
                                     <Button
                                         size="sm"
                                         onClick={() => switchTo(true)}
@@ -242,7 +265,12 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                             <p role="alert" className="text-sm text-danger">
                                 {statusError}
                             </p>
-                            <Button size="sm" variant="outline" onClick={check} disabled={checking}>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={recheck}
+                                disabled={checking}
+                            >
                                 {t("actions.retry")}
                             </Button>
                         </div>

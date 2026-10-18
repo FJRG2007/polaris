@@ -27,9 +27,13 @@
             "label": "Starting",
             "body": "The DNS server is starting at {address}. The first blocklists can take a minute to download."
         },
+        "stalled": {
+            "label": "Not starting",
+            "body": "The DNS server at {address} has not answered for a minute. It may be failing to start with these settings. Try again, or turn it off."
+        },
         "portHeld": {
             "label": "Could not start",
-            "body": "Port 53 on this machine is held by its own name service, which only answers this machine, so the blocker could not start. Polaris cannot release that port from here. Nothing on your network changed; retry once the port is free."
+            "body": "The DNS server could not start at {address}. Most often port 53 on this machine is held by a service that only answers the machine itself; it can also be a download that failed. Nothing on your network changed. Try again."
         },
         "conflict": {
             "label": "Not answering",
@@ -134,6 +138,7 @@
         "tooLarge": "These rules are too long to apply. Remove some of your own rules and save again.",
         "noAddress": "This machine has no address on your network yet. Check again in a minute.",
         "portTaken": "Another DNS server already answers on port 53 here. Turn it off, then retry.",
+        "notApplied": "Your settings are saved, but the DNS server did not start with them. See the status above and try again.",
         "invalid": "Some values are not valid. Fix the marked fields and save again.",
         "generic": "That did not work. Try again in a moment."
     }

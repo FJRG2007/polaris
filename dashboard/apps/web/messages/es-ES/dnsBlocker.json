@@ -27,9 +27,13 @@
             "label": "Arrancando",
             "body": "El servidor DNS está arrancando en {address}. Las primeras listas pueden tardar un minuto en descargarse."
         },
+        "stalled": {
+            "label": "No arranca",
+            "body": "El servidor DNS en {address} lleva un minuto sin responder. Puede que no consiga arrancar con estos ajustes. Vuelve a intentarlo o apágalo."
+        },
         "portHeld": {
             "label": "No arrancó",
-            "body": "El puerto 53 de esta máquina lo ocupa su propio servicio de nombres, que solo responde a esta máquina, así que el bloqueador no pudo arrancar. Polaris no puede liberar ese puerto desde aquí. Nada ha cambiado en tu red; reintenta cuando el puerto quede libre."
+            "body": "El servidor DNS no pudo arrancar en {address}. Lo más habitual es que el puerto 53 de esta máquina lo ocupe un servicio que solo responde a la propia máquina; también puede ser una descarga fallida. Nada ha cambiado en tu red. Vuelve a intentarlo."
         },
         "conflict": {
             "label": "Sin respuesta",
@@ -134,6 +138,7 @@
         "tooLarge": "Estas reglas son demasiado largas para aplicarlas. Quita algunas de las tuyas y guarda de nuevo.",
         "noAddress": "Esta máquina aún no tiene dirección en tu red. Vuelve a comprobarlo en un minuto.",
         "portTaken": "Otro servidor DNS ya responde aquí en el puerto 53. Apágalo y vuelve a intentarlo.",
+        "notApplied": "Tus ajustes están guardados, pero el servidor DNS no arrancó con ellos. Mira el estado de arriba y vuelve a intentarlo.",
         "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
         "generic": "No ha funcionado. Inténtalo de nuevo en un momento."
     }

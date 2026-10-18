@@ -77,7 +77,15 @@ export async function dnsBlockerStatusAction(): Promise<
 export async function saveDnsSettingsAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
-        await blocker.saveSettings(input, user.id);
+        // Stored even when the DNS server did not take them, so recorded either way.
+        const notApplied = await blocker.saveSettings(input, user.id).then(
+            () => null,
+            (error: unknown) => {
+                if (error instanceof blocker.DnsBlockerRefusal && error.code === "notApplied")
+                    return error;
+                throw error;
+            }
+        );
         await recordAudit({
             actorId: user.id,
             action: "dnsBlocker.settings",
@@ -85,7 +93,7 @@ export async function saveDnsSettingsAction(input: unknown): Promise<Result> {
             targetId: DNS_BLOCKER_APP
         });
         refresh();
-        return {};
+        return notApplied ? failed(notApplied) : {};
     } catch (error) {
         return failed(error);
     }

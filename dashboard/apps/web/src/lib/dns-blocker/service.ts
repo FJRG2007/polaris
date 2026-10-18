@@ -43,7 +43,7 @@ const DNS_PORT = 53;
 
 /** Why something the operator asked for was not done, as a key the screen says
  *  in their language (`dnsBlocker` `errors.<code>`). */
-export type DnsRefusalCode = "notInstalled" | "tooLarge" | "noAddress" | "portTaken";
+export type DnsRefusalCode = "notInstalled" | "tooLarge" | "noAddress" | "portTaken" | "notApplied";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -59,9 +59,10 @@ export class DnsBlockerRefusal extends Error {
  * - `portTaken`: no engine, and another DNS server already answers on port 53
  *   of this machine - turning on would fail.
  * - `starting`: the engine exists and is coming up.
- * - `portHeld`: the engine could not start and nothing answers: port 53 is held
- *   by something that does not answer the network, which on Linux is the
- *   machine's own resolver listening for itself.
+ * - `portHeld`: the engine's last deploy failed and nothing answers. Most often
+ *   port 53 is held by something that does not answer the network (on Linux,
+ *   the machine's own resolver listening for itself), but a failed image pull
+ *   reads the same.
  * - `conflict`: the engine exists, and what answers port 53 is not it.
  * - `blocking`: the engine answers, and blocks.
  * - `noAddress`: this machine has no address on the network Polaris knows of.
@@ -171,7 +172,8 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
 }
 
 /** Write the configuration onto the engine and deploy it again. A failed deploy
- *  is logged and left for the status to explain: it is what `portHeld` reads. */
+ *  is logged and marked on the engine, where the status reads it as `portHeld`,
+ *  and refused so the press that asked for it is not answered with success. */
 async function apply(engine: EngineRow, encoded: string, actorId: string): Promise<void> {
     if (!engine.applicationId) return;
     await setEnvVar("application", engine.applicationId, engine.ownerId, {
@@ -190,10 +192,12 @@ async function apply(engine: EngineRow, encoded: string, actorId: string): Promi
     } catch (error) {
         console.error("polaris: the ad blocker's DNS server did not deploy:", error);
         await prisma.installedApp.update({ where: { id: engine.id }, data: { status: "failed" } });
+        throw new DnsBlockerRefusal("notApplied");
     }
 }
 
-/** Store new settings, and apply them at once when the blocker is on. */
+/** Store new settings, and apply them at once when the blocker is on. Refused
+ *  with `notApplied` when they were stored but the DNS server did not take them. */
 export async function saveSettings(input: unknown, actorId: string): Promise<DnsSettings> {
     const row = await requireApp();
     const settings = readDnsSettings(dnsSettingsSchema.parse(input));

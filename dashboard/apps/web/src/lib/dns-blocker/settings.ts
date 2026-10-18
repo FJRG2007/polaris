@@ -173,6 +173,9 @@ export function normalizeDnsName(text: string): string {
     return value.replace(/\.$/, "");
 }
 
+/** Rules are written one per line, so a rule cannot hold a line break of its own. */
+const CONTROL = /[\u0000-\u001f\u007f]/;
+
 /** Constructs the engine's regular expressions (Go RE2) do not have. */
 const NOT_RE2 = /\(\?[=!<]|\\[1-9]/;
 
@@ -185,6 +188,7 @@ const NOT_RE2 = /\(\?[=!<]|\\[1-9]/;
  */
 export function normalizeDnsRule(text: string): string | null {
     const trimmed = text.trim();
+    if (CONTROL.test(trimmed)) return null;
     if (trimmed.length > 2 && trimmed.startsWith("/") && trimmed.endsWith("/")) {
         const body = trimmed.slice(1, -1);
         if (body.length > 253 || NOT_RE2.test(body)) return null;
@@ -226,7 +230,7 @@ export function normalizeUpstream(text: string): string | null {
 const ruleSchema = z.string().transform((value, ctx) => {
     const rule = normalizeDnsRule(value);
     if (!rule) {
-        ctx.addIssue({ code: "custom", message: "invalidRule" });
+        ctx.addIssue({ code: "custom", message: "invalidRule" }); // i18n-ignore a key the screen says
         return z.NEVER;
     }
     return rule;
@@ -267,7 +271,7 @@ export const dnsCustomListSchema = z.object({
 const upstreamSchema = z.string().transform((value, ctx) => {
     const upstream = normalizeUpstream(value);
     if (!upstream) {
-        ctx.addIssue({ code: "custom", message: "invalidUpstream" });
+        ctx.addIssue({ code: "custom", message: "invalidUpstream" }); // i18n-ignore a key the screen says
         return z.NEVER;
     }
     return upstream;

@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ENV_VALUE_MAX } from "@polaris/core";
 import * as dns from "@/lib/dns-blocker/settings";
 import * as render from "@/lib/dns-blocker/render";
 
@@ -52,15 +53,18 @@ describe("blockyConfig", () => {
         expect(clientGroupsBlock.default).toEqual(["ads", "malware", "social", "polaris"]);
     });
 
-    it("gives the allow list to every group, and leaves it out when empty", () => {
+    it("writes the allow list once, in the polaris group, and leaves it out when empty", () => {
         expect(blocking(render.blockyConfig(settings())).allowlists).toBeUndefined();
         const config = render.blockyConfig(
-            settings({ sources: ["hagezi-pro"], allow: ["ok.example.test", "*.cdn.example.test"] })
+            settings({
+                sources: ["hagezi-pro", "hagezi-tif"],
+                allow: ["ok.example.test", "*.cdn.example.test"]
+            })
         );
         expect(blocking(config).allowlists).toEqual({
-            ads: ["ok.example.test\n*.cdn.example.test\n"],
             polaris: ["ok.example.test\n*.cdn.example.test\n"]
         });
+        expect(blocking(config).clientGroupsBlock.default).toContain("polaris");
     });
 
     it("uses the preset's resolvers, and a fallback bootstrap only for encrypted custom ones", () => {
@@ -105,5 +109,16 @@ describe("blockyConfig", () => {
         const encoded = render.encodeBlockyConfig(odd);
         expect(encoded).not.toMatch(/[\r\n]/);
         expect(Buffer.from(encoded, "base64").toString("utf8")).toBe(text);
+    });
+
+    it("fits the most allow rules the screen takes into one value, with every list on", () => {
+        const allow = Array.from(
+            { length: dns.DNS_LIMITS.rules },
+            (_, index) => `allowed-${index}.cdn.example.test`
+        );
+        const encoded = render.encodeBlockyConfig(
+            settings({ sources: dns.DNS_LIST_SOURCES.map((source) => source.id), allow })
+        );
+        expect(encoded.length).toBeLessThanOrEqual(ENV_VALUE_MAX);
     });
 });
