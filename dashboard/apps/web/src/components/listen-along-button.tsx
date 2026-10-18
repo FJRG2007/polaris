@@ -75,7 +75,8 @@ function refresh(force = false): void {
     held.asking = fetch(PATH, { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
         .then((body: { hostId?: unknown } | null) => {
-            if (body && held.at === asked) publish(typeof body.hostId === "string" ? body.hostId : null);
+            if (body && held.at === asked)
+                publish(typeof body.hostId === "string" ? body.hostId : null);
         })
         .catch(() => undefined)
         .finally(() => {
