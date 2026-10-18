@@ -48,6 +48,8 @@ export const LOCK = "lock";
 export const UNLOCK = "unlock";
 export const UNLATCH = "unlatch";
 export const STOP = "stop";
+/** What a glance card draws, and so all it may be pressed for. */
+const GLANCE_CONTROLS: readonly string[] = [POWER, LOCK, UNLOCK, STOP];
 
 /** The two kinds' names, in the reader's language. */
 export async function describeCard(mode: DeviceCardMode): Promise<{ label: string; hint: string }> {
@@ -339,10 +341,13 @@ export function pressAsAction(
 /** Press it, through the devices screen's own action and every check it makes. */
 export async function operate(
     targets: readonly string[],
-    input: { item: string; control: string; value: boolean | number | string }
+    input: { item: string; control: string; value: boolean | number | string },
+    mode: DeviceCardMode = "controls"
 ): Promise<{ error?: string }> {
     const t = await placesT();
     if (!targets.includes(input.item)) return { error: t("refusals.deviceCannot") };
+    if (mode === "status" && !GLANCE_CONTROLS.includes(input.control))
+        return { error: t("refusals.deviceCannot") };
     // The device's kind decides which presses it has at all - a lock's bolt on an
     // air conditioner is refused here, before the devices screen is asked - and
     // what a mode may be.

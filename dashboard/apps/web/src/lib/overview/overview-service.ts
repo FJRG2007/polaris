@@ -26,6 +26,7 @@ import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
 import type { MyWorkTask } from "@/lib/tasks/report-service";
 import type { StatusView } from "@/lib/tasks/space-service";
+import { listStatusesFor } from "@/lib/tasks/space-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
 import { gameServerSummaries, upcomingEventsFor } from "@/lib/app-extensions/registry";
 import type { UpcomingEvent } from "@/lib/app-extensions/types";
@@ -468,25 +469,7 @@ async function assignedWork(user: SessionUser): Promise<OverviewTasks> {
         myUrgentTasks(user.id, scope, CARD_ROWS)
     ]);
     // One read for every space the rows are in, rather than one per space.
-    const spaceIds = [...new Set(rows.map((row) => row.spaceId))];
-    const found =
-        spaceIds.length === 0
-            ? []
-            : await prisma.taskStatus.findMany({
-                  where: { spaceId: { in: spaceIds } },
-                  select: { id: true, spaceId: true, name: true, type: true, color: true, order: true },
-                  orderBy: [{ order: "asc" }, { createdAt: "asc" }]
-              });
-    const statuses: Record<string, StatusView[]> = {};
-    for (const status of found) {
-        (statuses[status.spaceId] ??= []).push({
-            id: status.id,
-            name: status.name,
-            type: status.type as StatusView["type"],
-            color: status.color,
-            order: status.order
-        });
-    }
+    const statuses = await listStatusesFor([...new Set(rows.map((row) => row.spaceId))]);
     return { ...counts, rows, statuses };
 }
 

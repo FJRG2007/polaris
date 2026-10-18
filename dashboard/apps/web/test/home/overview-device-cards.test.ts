@@ -222,4 +222,17 @@ describe("a press", () => {
         ).toBeTruthy();
         expect(operateDeviceAction).not.toHaveBeenCalled();
     });
+
+    it("switches a device from a glance card, but nothing the glance card does not draw", async () => {
+        expect(
+            await cards.operate(["ac"], { item: "ac", control: "power", value: false }, "status")
+        ).toEqual({});
+        expect(operateDeviceAction).toHaveBeenLastCalledWith("ac", "turn-off", undefined);
+        operateDeviceAction.mockClear();
+        expect(
+            (await cards.operate(["ac"], { item: "ac", control: "target", value: 21 }, "status"))
+                .error
+        ).toBeTruthy();
+        expect(operateDeviceAction).not.toHaveBeenCalled();
+    });
 });

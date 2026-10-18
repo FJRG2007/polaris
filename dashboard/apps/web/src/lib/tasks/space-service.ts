@@ -981,17 +981,30 @@ export interface StatusView {
 }
 
 export async function listStatuses(spaceId: string): Promise<StatusView[]> {
-    const statuses = await prisma.taskStatus.findMany({
-        where: { spaceId },
+    return (await listStatusesFor([spaceId]))[spaceId] ?? [];
+}
+
+/** Every listed space's statuses in one read, keyed by space. */
+export async function listStatusesFor(
+    spaceIds: readonly string[]
+): Promise<Record<string, StatusView[]>> {
+    const statuses: Record<string, StatusView[]> = {};
+    if (spaceIds.length === 0) return statuses;
+    const found = await prisma.taskStatus.findMany({
+        where: { spaceId: { in: [...spaceIds] } },
+        select: { id: true, spaceId: true, name: true, type: true, color: true, order: true },
         orderBy: [{ order: "asc" }, { createdAt: "asc" }]
     });
-    return statuses.map((status) => ({
-        id: status.id,
-        name: status.name,
-        type: status.type as core.TaskStatusType,
-        color: status.color,
-        order: status.order
-    }));
+    for (const status of found) {
+        (statuses[status.spaceId] ??= []).push({
+            id: status.id,
+            name: status.name,
+            type: status.type as core.TaskStatusType,
+            color: status.color,
+            order: status.order
+        });
+    }
+    return statuses;
 }
 
 /** Add a status to a space, and say which one it is: a status created from a
