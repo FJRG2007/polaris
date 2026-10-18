@@ -98,7 +98,10 @@ export function ScheduleView({
     const words = useScheduleWords();
     const t = useTranslations("accountPrivacy");
     const [confirm, confirmElement] = useConfirm();
-    const [editing, setEditing] = useState<{ id: string | null; draft: core.PresenceScheduleInput } | null>(null);
+    const [editing, setEditing] = useState<{
+        id: string | null;
+        draft: core.PresenceScheduleInput;
+    } | null>(null);
     const [error, setError] = useState("");
     /** What is switched on, held here so a toggle moves under the finger rather
      *  than after the server has been round. */
@@ -163,7 +166,9 @@ export function ScheduleView({
     const remove = async (rule: PresenceScheduleView) => {
         const ok = await confirm({
             title: t("schedule.deleteTitle"),
-            description: t("schedule.deleteDescription", { schedule: words.describe(rule, weekOrder) }),
+            description: t("schedule.deleteDescription", {
+                schedule: words.describe(rule, weekOrder)
+            }),
             confirmLabel: t("lists.delete"),
             danger: true
         });
@@ -221,13 +226,23 @@ export function ScheduleView({
                                                 !enabled && "opacity-40"
                                             )}
                                         />
-                                        <span className={cn("min-w-[12rem] flex-1", !enabled && "opacity-60")}>
+                                        <span
+                                            className={cn(
+                                                "min-w-[12rem] flex-1",
+                                                !enabled && "opacity-60"
+                                            )}
+                                        >
                                             <span className="block text-[0.8125rem]">
-                                                {t(rule.endMinute <= rule.startMinute ? "schedule.rowOvernight" : "schedule.row", {
-                                                    presence: words.presence(rule.presence),
-                                                    start: core.clockTime(rule.startMinute),
-                                                    end: core.clockTime(rule.endMinute)
-                                                })}
+                                                {t(
+                                                    rule.endMinute <= rule.startMinute
+                                                        ? "schedule.rowOvernight"
+                                                        : "schedule.row",
+                                                    {
+                                                        presence: words.presence(rule.presence),
+                                                        start: core.clockTime(rule.startMinute),
+                                                        end: core.clockTime(rule.endMinute)
+                                                    }
+                                                )}
                                             </span>
                                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                                                 {words.days(rule.days, weekOrder)}
@@ -237,23 +252,31 @@ export function ScheduleView({
                                             </span>
                                             {enabled && edges[rule.id] ? (
                                                 <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                                    {t("schedule.margin.next", { time: format.dateTime(edges[rule.id]!) })}
+                                                    {t("schedule.margin.next", {
+                                                        time: format.dateTime(edges[rule.id]!)
+                                                    })}
                                                 </span>
                                             ) : null}
                                         </span>
                                         {openId === rule.id && enabled ? (
-                                            <Badge variant="success">{t("schedule.runningNow")}</Badge>
+                                            <Badge variant="success">
+                                                {t("schedule.runningNow")}
+                                            </Badge>
                                         ) : null}
                                         <Switch
                                             checked={enabled}
-                                            aria-label={t("schedule.use", { schedule: words.describe(rule, weekOrder) })}
+                                            aria-label={t("schedule.use", {
+                                                schedule: words.describe(rule, weekOrder)
+                                            })}
                                             onChange={(next) => void toggle(rule, next)}
                                         />
                                         <Button
                                             size="icon"
                                             variant="ghost"
                                             title={t("lists.edit")}
-                                            aria-label={t("lists.editNamed", { name: words.describe(rule, weekOrder) })}
+                                            aria-label={t("lists.editNamed", {
+                                                name: words.describe(rule, weekOrder)
+                                            })}
                                             onClick={() => setEditing({ id: rule.id, draft: rule })}
                                         >
                                             <Pencil className="size-4" />
@@ -262,7 +285,9 @@ export function ScheduleView({
                                             size="icon"
                                             variant="ghost"
                                             title={t("lists.delete")}
-                                            aria-label={t("lists.deleteNamed", { name: words.describe(rule, weekOrder) })}
+                                            aria-label={t("lists.deleteNamed", {
+                                                name: words.describe(rule, weekOrder)
+                                            })}
                                             onClick={() => void remove(rule)}
                                         >
                                             <Trash2 className="size-4" />
@@ -340,12 +365,16 @@ function ScheduleDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{editing ? t("schedule.editTitle") : t("schedule.new")}</DialogTitle>
+                    <DialogTitle>
+                        {editing ? t("schedule.editTitle") : t("schedule.new")}
+                    </DialogTitle>
                     <DialogDescription>{t("schedule.dialogDescription")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("schedule.appearAs")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("schedule.appearAs")}
+                        </span>
                         <Select
                             value={draft.presence}
                             aria-label={t("schedule.appearAsLabel")}
@@ -360,22 +389,31 @@ function ScheduleDialog({
                     </label>
 
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("schedule.margin.label")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("schedule.margin.label")}
+                        </span>
                         <Select
                             value={String(draft.marginMinutes)}
                             aria-label={t("schedule.margin.label")}
                             options={MARGINS.map((minutes) => ({
                                 value: String(minutes),
-                                label: minutes === 0 ? t("schedule.margin.exact") : t("schedule.margin.option", { minutes })
+                                label:
+                                    minutes === 0
+                                        ? t("schedule.margin.exact")
+                                        : t("schedule.margin.option", { minutes })
                             }))}
                             onValueChange={(value) => change({ marginMinutes: Number(value) })}
                         />
-                        <span className="text-[0.6875rem] text-foreground-subtle">{t("schedule.margin.hint")}</span>
+                        <span className="text-[0.6875rem] text-foreground-subtle">
+                            {t("schedule.margin.hint")}
+                        </span>
                     </label>
 
                     <div className="flex gap-2">
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{t("schedule.from")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("schedule.from")}
+                            </span>
                             <Input
                                 type="time"
                                 value={core.clockTime(draft.startMinute)}
@@ -386,7 +424,9 @@ function ScheduleDialog({
                             />
                         </label>
                         <label className="flex flex-1 flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{t("schedule.until")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("schedule.until")}
+                            </span>
                             <Input
                                 type="time"
                                 value={core.clockTime(draft.endMinute)}
@@ -410,7 +450,9 @@ function ScheduleDialog({
                                         key={day}
                                         type="button"
                                         aria-pressed={on}
-                                        onClick={() => change({ days: core.toggleDay(draft.days, day) })}
+                                        onClick={() =>
+                                            change({ days: core.toggleDay(draft.days, day) })
+                                        }
                                         className={cn(
                                             "h-8 min-w-[2.75rem] rounded-md border px-2 text-xs transition-colors duration-fast",
                                             on
@@ -475,12 +517,17 @@ function summarize(
     const length = core.windowLength(draft.startMinute, draft.endMinute);
     const hours = Math.floor(length / 60);
     const minutes = length % 60;
-    const spans = [hours ? `${hours}h` : "", minutes ? `${minutes}m` : ""].filter(Boolean).join(" ");
-    return t(draft.endMinute <= draft.startMinute ? "schedule.summaryOvernight" : "schedule.summaryLine", {
-        presence: words.presence(draft.presence),
-        span: spans,
-        days: words.days(draft.days, weekOrder)
-    });
+    const spans = [hours ? `${hours}h` : "", minutes ? `${minutes}m` : ""]
+        .filter(Boolean)
+        .join(" ");
+    return t(
+        draft.endMinute <= draft.startMinute ? "schedule.summaryOvernight" : "schedule.summaryLine",
+        {
+            presence: words.presence(draft.presence),
+            span: spans,
+            days: words.days(draft.days, weekOrder)
+        }
+    );
 }
 
 /** The names a schedule is described with, in the reader's language. */

@@ -26,13 +26,17 @@ export default async function ActivityPrivacyPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("activity.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("activity.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("activity.description")}</p>
             </div>
             <ActivitySharingCard
                 settings={activity.settings}
                 seenGames={activity.seenGames}
-                spotify={spotifyLinks.length > 0 ? "linked" : spotifyOffered ? "unlinked" : "unavailable"}
+                spotify={
+                    spotifyLinks.length > 0 ? "linked" : spotifyOffered ? "unlinked" : "unavailable"
+                }
                 userId={session.id}
             />
         </div>

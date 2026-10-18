@@ -49,7 +49,9 @@ describe("the margin", () => {
     });
 
     it("never lets the two ends cross on a short window", () => {
-        expect(core.marginOffset({ id: ID, day: "2026-10-10", end: "open" }, 60, 3)).toBeLessThanOrEqual(1);
+        expect(
+            core.marginOffset({ id: ID, day: "2026-10-10", end: "open" }, 60, 3)
+        ).toBeLessThanOrEqual(1);
         expect(core.marginOffset({ id: ID, day: "2026-10-10", end: "open" }, 60, 1)).toBe(0);
     });
 
@@ -60,14 +62,22 @@ describe("the margin", () => {
         expect(core.presenceInForce(account, [rule(30)], ZONE, before).scheduled).toBe(
             before.getUTCHours() < 7
         );
-        expect(core.presenceInForce(account, [rule(30)], ZONE, new Date(open.getTime() + 1)).scheduled).toBe(true);
-        expect(core.nextPresenceChange(account, [rule(30)], ZONE, new Date(Date.UTC(2026, 9, 10, 12)))?.getTime()).toBe(
-            open.getTime()
-        );
+        expect(
+            core.presenceInForce(account, [rule(30)], ZONE, new Date(open.getTime() + 1)).scheduled
+        ).toBe(true);
+        expect(
+            core
+                .nextPresenceChange(account, [rule(30)], ZONE, new Date(Date.UTC(2026, 9, 10, 12)))
+                ?.getTime()
+        ).toBe(open.getTime());
     });
 
     it("opens on the evening before when the margin pulls a midnight start back", () => {
-        const midnight: core.PresenceScheduleRule = { ...rule(15), startMinute: 0, endMinute: 9 * 60 };
+        const midnight: core.PresenceScheduleRule = {
+            ...rule(15),
+            startMinute: 0,
+            endMinute: 9 * 60
+        };
         const account = { presence: "auto", presenceUntil: null, presenceSetAt: null };
         let checked = 0;
         for (let day = 1; day <= 60; day++) {
@@ -76,9 +86,13 @@ describe("the margin", () => {
             if (next.openedAt.getUTCDate() !== noon.getUTCDate()) continue;
             checked++;
             const inside = new Date(next.openedAt.getTime() + 1);
-            expect(core.openWindow([midnight], ZONE, inside)?.openedAt.getTime()).toBe(next.openedAt.getTime());
+            expect(core.openWindow([midnight], ZONE, inside)?.openedAt.getTime()).toBe(
+                next.openedAt.getTime()
+            );
             expect(core.presenceInForce(account, [midnight], ZONE, inside).scheduled).toBe(true);
-            expect(core.nextPresenceChange(account, [midnight], ZONE, noon)?.getTime()).toBe(next.openedAt.getTime());
+            expect(core.nextPresenceChange(account, [midnight], ZONE, noon)?.getTime()).toBe(
+                next.openedAt.getTime()
+            );
             const before = new Date(next.openedAt.getTime() - 1);
             expect(core.presenceInForce(account, [midnight], ZONE, before).scheduled).toBe(false);
         }
@@ -86,11 +100,16 @@ describe("the margin", () => {
     });
 
     it("stays open past midnight when the margin pushes a late close into the next day", () => {
-        const late: core.PresenceScheduleRule = { ...rule(60), startMinute: 23 * 60 + 50, endMinute: 23 * 60 + 40 };
+        const late: core.PresenceScheduleRule = {
+            ...rule(60),
+            startMinute: 23 * 60 + 50,
+            endMinute: 23 * 60 + 40
+        };
         let checked = 0;
         for (let day = 1; day <= 60; day++) {
             const window = core.weeklyWindow(late, ZONE, new Date(Date.UTC(2026, 9, day, 12)), 0)!;
-            if (window.closesAt.getUTCDate() === new Date(Date.UTC(2026, 9, day + 1)).getUTCDate()) continue;
+            if (window.closesAt.getUTCDate() === new Date(Date.UTC(2026, 9, day + 1)).getUTCDate())
+                continue;
             checked++;
             const inside = new Date(window.closesAt.getTime() - 1);
             expect(core.openWindow([late], ZONE, inside)).not.toBeNull();
@@ -101,8 +120,20 @@ describe("the margin", () => {
     it("is accepted up to the cap and defaults to exact", () => {
         const base = { presence: "busy", days: 1, startMinute: 60, endMinute: 120, enabled: true };
         expect(core.presenceScheduleSchema.parse(base).marginMinutes).toBe(0);
-        expect(core.presenceScheduleSchema.safeParse({ ...base, marginMinutes: core.MAX_PRESENCE_MARGIN }).success).toBe(true);
-        expect(core.presenceScheduleSchema.safeParse({ ...base, marginMinutes: core.MAX_PRESENCE_MARGIN + 1 }).success).toBe(false);
-        expect(core.presenceScheduleSchema.safeParse({ ...base, marginMinutes: -1 }).success).toBe(false);
+        expect(
+            core.presenceScheduleSchema.safeParse({
+                ...base,
+                marginMinutes: core.MAX_PRESENCE_MARGIN
+            }).success
+        ).toBe(true);
+        expect(
+            core.presenceScheduleSchema.safeParse({
+                ...base,
+                marginMinutes: core.MAX_PRESENCE_MARGIN + 1
+            }).success
+        ).toBe(false);
+        expect(core.presenceScheduleSchema.safeParse({ ...base, marginMinutes: -1 }).success).toBe(
+            false
+        );
     });
 });

@@ -186,7 +186,10 @@ export function marginOffset(
     marginMinutes: number,
     windowMinutes: number
 ): number {
-    const margin = Math.min(Math.max(0, Math.floor(marginMinutes)), Math.floor((windowMinutes - 1) / 2));
+    const margin = Math.min(
+        Math.max(0, Math.floor(marginMinutes)),
+        Math.floor((windowMinutes - 1) / 2)
+    );
     if (margin <= 0) return 0;
     // FNV-1a, 32 bits: small, stable on every engine, and spread enough for this.
     let hash = 0x811c9dc5;
@@ -332,7 +335,8 @@ export function weeklyWindow(
     if (!rule.id || !rule.marginMinutes) return { openedAt, closesAt };
     const seed = { id: rule.id, day: opensOn.toISOString().slice(0, 10) };
     const length = windowLength(rule.startMinute, rule.endMinute);
-    const shift = (end: "open" | "close") => marginOffset({ ...seed, end }, rule.marginMinutes ?? 0, length) * 60_000;
+    const shift = (end: "open" | "close") =>
+        marginOffset({ ...seed, end }, rule.marginMinutes ?? 0, length) * 60_000;
     return {
         openedAt: new Date(openedAt.getTime() + shift("open")),
         closesAt: new Date(closesAt.getTime() + shift("close"))

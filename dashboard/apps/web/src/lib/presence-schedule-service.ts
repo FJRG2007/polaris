@@ -135,7 +135,11 @@ export async function createSchedule(
 ): Promise<{ error?: string }> {
     const held = await prisma.presenceSchedule.count({ where: { userId } });
     if (held >= core.MAX_PRESENCE_SCHEDULES) {
-        return { error: (await readerWords("api"))("refusals.presence.limit", { count: core.MAX_PRESENCE_SCHEDULES }) };
+        return {
+            error: (await readerWords("api"))("refusals.presence.limit", {
+                count: core.MAX_PRESENCE_SCHEDULES
+            })
+        };
     }
     await prisma.presenceSchedule.create({ data: { userId, ...input } });
     return {};
@@ -148,7 +152,10 @@ export async function updateSchedule(
     input: core.PresenceScheduleInput
 ): Promise<{ error?: string }> {
     if (!LOOKS_LIKE_AN_ID.test(id)) return GONE;
-    const changed = await prisma.presenceSchedule.updateMany({ where: { id, userId }, data: input });
+    const changed = await prisma.presenceSchedule.updateMany({
+        where: { id, userId },
+        data: input
+    });
     return changed.count === 0 ? GONE : {};
 }
 

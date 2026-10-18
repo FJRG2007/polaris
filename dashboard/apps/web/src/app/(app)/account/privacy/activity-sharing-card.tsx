@@ -181,7 +181,10 @@ export function ActivitySharingCard({
                                 {source === "minecraft" ? (
                                     <IntegrationLogo slug="minecraft" className="size-5 shrink-0" />
                                 ) : (
-                                    <Gamepad2 aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
+                                    <Gamepad2
+                                        aria-hidden="true"
+                                        className="size-5 shrink-0 text-muted-foreground"
+                                    />
                                 )}
                                 <span className="min-w-0 flex-1">
                                     <span className="block text-[0.8125rem]">
@@ -194,7 +197,9 @@ export function ActivitySharingCard({
                                 <Switch
                                     checked={!off && draft[source]}
                                     disabled={off}
-                                    onChange={(on) => commit((state) => ({ ...state, [source]: on }))}
+                                    onChange={(on) =>
+                                        commit((state) => ({ ...state, [source]: on }))
+                                    }
                                     aria-label={t(`activity.sources.${source}.label` as const)}
                                 />
                             </li>
@@ -214,12 +219,20 @@ export function ActivitySharingCard({
 
                     {!off && draft.games ? (
                         <div className="flex items-center gap-3 rounded-md border border-dashed border-border px-3 py-2">
-                            <GameMark name={playing?.name ?? null} gameId={playing?.gameId ?? null} />
+                            <GameMark
+                                name={playing?.name ?? null}
+                                gameId={playing?.gameId ?? null}
+                            />
                             <span className="min-w-0 flex-1">
                                 <span className="block text-[0.6875rem] uppercase tracking-[0.04em] text-foreground-subtle">
-                                    {playing ? t("activity.registered.nowPlaying") : t("activity.registered.noneDetected")}
+                                    {playing
+                                        ? t("activity.registered.nowPlaying")
+                                        : t("activity.registered.noneDetected")}
                                 </span>
-                                <span className="block truncate text-[0.8125rem]" title={playing?.name}>
+                                <span
+                                    className="block truncate text-[0.8125rem]"
+                                    title={playing?.name}
+                                >
                                     {playing ? playing.name : t("activity.registered.addHint")}
                                 </span>
                             </span>
@@ -244,7 +257,10 @@ export function ActivitySharingCard({
                                         <li key={key} className="flex items-center gap-3 px-3 py-2">
                                             <GameMark name={name} gameId={null} />
                                             <span className="min-w-0 flex-1">
-                                                <span className="block truncate text-[0.8125rem]" title={name}>
+                                                <span
+                                                    className="block truncate text-[0.8125rem]"
+                                                    title={name}
+                                                >
                                                     {name}
                                                 </span>
                                                 <span
@@ -254,9 +270,17 @@ export function ActivitySharingCard({
                                                     {hidden
                                                         ? t("activity.neverShown")
                                                         : seen
-                                                          ? t.rich("activity.registered.lastPlayed", {
-                                                                when: () => <RelativeTime key="when" iso={seen} />
-                                                            })
+                                                          ? t.rich(
+                                                                "activity.registered.lastPlayed",
+                                                                {
+                                                                    when: () => (
+                                                                        <RelativeTime
+                                                                            key="when"
+                                                                            iso={seen}
+                                                                        />
+                                                                    )
+                                                                }
+                                                            )
                                                           : own
                                                             ? t("activity.registered.addedByYou")
                                                             : key}
@@ -269,7 +293,9 @@ export function ActivitySharingCard({
                                                     commit((state) => ({
                                                         ...state,
                                                         hiddenGames: shown
-                                                            ? state.hiddenGames.filter((entry) => entry !== key)
+                                                            ? state.hiddenGames.filter(
+                                                                  (entry) => entry !== key
+                                                              )
                                                             : state.hiddenGames.includes(key)
                                                               ? state.hiddenGames
                                                               : [...state.hiddenGames, key]
@@ -306,12 +332,16 @@ export function ActivitySharingCard({
                     <OwnGames
                         games={draft.customGames}
                         disabled={off || !draft.games}
-                        runningPrograms={bridge?.runningPrograms ? () => bridge.runningPrograms!() : null}
+                        runningPrograms={
+                            bridge?.runningPrograms ? () => bridge.runningPrograms!() : null
+                        }
                         onAdd={(game) =>
                             commit((state) => ({
                                 ...state,
                                 customGames: [
-                                    ...state.customGames.filter((entry) => entry.executable !== game.executable),
+                                    ...state.customGames.filter(
+                                        (entry) => entry.executable !== game.executable
+                                    ),
                                     game
                                 ]
                             }))
@@ -339,7 +369,9 @@ function GameMark({ name, gameId }: { name: string | null; gameId: string | null
     const game =
         (gameId ? core.findGame(gameId) : undefined) ??
         (lowered
-            ? core.GAMES.find((entry) => entry.id === lowered || entry.name.toLowerCase() === lowered)
+            ? core.GAMES.find(
+                  (entry) => entry.id === lowered || entry.name.toLowerCase() === lowered
+              )
             : undefined);
     return game ? (
         <GameLogo game={game} className="size-5" />
@@ -404,7 +436,9 @@ function OwnGames({
             <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                 {t("ownGames.title")}
             </h3>
-            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">{t("ownGames.description")}</p>
+            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                {t("ownGames.description")}
+            </p>
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
                     {t("ownGames.program")}
