@@ -352,6 +352,8 @@ describe("the rising void", () => {
         // Nobody but the players carries the tag: never moved, never handed items.
         expect(lines[0]).toBe(`tag @a[tag=${pi.IN_TAG},name=!Ana,name=!Ben] remove ${pi.IN_TAG}`);
         expect(lines[1]).toContain(`dy=${play.y1 + 10 - 1 - (box.y1 - 128)}`);
+        expect(lines[1]).toContain(`add ${pi.VOID_TAG}`);
+        expect(pi.quickLines(layout, at, box, play.y1, ["Ana"]).some((line) => line.includes(pi.VOID_TAG))).toBe(false);
         expect(lines.some((line) => line.includes(`tp @a[tag=${pi.IN_TAG},tag=!${pi.OUT_TAG},tag=${pi.GONE_TAG}]`))).toBe(true);
         // Only marked items are ever taken.
         expect(lines.some((line) => line.startsWith("clear "))).toBe(false);
@@ -380,10 +382,10 @@ function entrant(name: string, side: number) {
 
 const PLACE = { x: 0, y: 64, z: 0 };
 
-function runOf(players: readonly string[], options: Partial<catalog.EventOptions<"pillars">> = {}) {
+function runOf(players: readonly string[], options: Partial<catalog.EventOptions<"pillars">> = {}, id = "run-1") {
     const preset = catalog.newPreset("pillars", "pillars");
     const run = stored.runSchema.parse({
-        id: "run-1",
+        id,
         trigger: "manual",
         startedBy: null,
         preset: { ...preset, options: { ...preset.options, ...options } },
@@ -407,12 +409,16 @@ function runOf(players: readonly string[], options: Partial<catalog.EventOptions
 function contextFor(run: stored.EventRun) {
     let positions = new Map<string, { x: number; y: number; z: number }>();
     let died = new Map<string, number>();
+    const tagged = new Map<string, string[]>();
+    const taggedAs = (line: string) => [...tagged.keys()].find((tag) => line === arena.readTagged(tag));
     const ctx = {
         server: {
             say: async (lines: string[]) =>
                 lines[0] === commands.IN_OVERWORLD
                     ? [...positions].map(([name, spot]) => where(name, spot)).join("")
-                    : lines[0]!.includes("pe_died")
+                    : taggedAs(lines[0]!)
+                      ? tagged.get(taggedAs(lines[0]!)!)!.map((name) => where(name, positions.get(name)!)).join("")
+                      : lines[0]!.includes("pe_died")
                       ? [...died].map(([name, count]) => `${name} has ${count} [pe_died]`).join("\n")
                       : "",
             sayAll: async () => {}
@@ -430,6 +436,7 @@ function contextFor(run: stored.EventRun) {
             positions = new Map(Object.entries(next));
         },
         die: (name: string) => died.set(name, 1),
+        tag: (tag: string, names: string[]) => tagged.set(tag, names),
         at: (now: number) => {
             ctx.now = now;
         },
@@ -476,19 +483,24 @@ describe("a pillars game played", () => {
         expect(off.some((line) => line.includes(pi.OBJECTIVE))).toBe(false);
     });
 
-    it("gives the drops from the loop when the pack is off - each due one once - and none from it when on", async () => {
-        const run = runOf(["Ana", "Ben", "Cy"], { twists: false });
+    it("gives the drops from the loop when the pack is off - only the latest due, nothing made up - and none from it when on", async () => {
+        const run = runOf(["Ana", "Ben", "Cy"], { twists: false, voidAfter: 0 });
         const world = contextFor(run);
         world.place({ Ana: spot(0), Ben: spot(1), Cy: spot(2) });
         world.at(15_000);
         const lines: string[] = [];
         expect(await game.tick(world.ctx, lines)).toBeNull();
-        // Due at 0, 7 and 14 seconds: three each.
-        expect(lines.filter((line) => line.startsWith("give "))).toHaveLength(9);
+        // Due at 0, 7 and 14 seconds: one each, the missed ones never made up.
+        expect(lines.filter((line) => line.startsWith("give "))).toHaveLength(3);
         expect(pi.stateOf(world.run.game).drops).toBe(3);
         const again: string[] = [];
         await game.tick(world.ctx, again);
         expect(again.filter((line) => line.startsWith("give "))).toHaveLength(0);
+        // An hour paused: still one each.
+        world.at(3_600_000);
+        const late: string[] = [];
+        await game.tick(world.ctx, late);
+        expect(late.filter((line) => line.startsWith("give "))).toHaveLength(3);
 
         packOn = true;
         const packed = contextFor(runOf(["Ana", "Ben"], { twists: false }));
@@ -539,7 +551,44 @@ describe("a pillars game played", () => {
         expect(again.some((line) => line.includes("void is rising"))).toBe(false);
     });
 
-    it("stirs in each twist due once, a bonus drop given from the loop when the pack is off", async () => {
+    it("says the void swallowed whoever the quick look caught under it, already moved to the gallery", async () => {
+        const run = runOf(["Ana", "Ben", "Cy"], { twists: false, voidAfter: 1 });
+        const world = contextFor(run);
+        world.place({ Ana: spot(0), Ben: pi.gallerySpot(layout, { ...PLACE, y: top }, 0), Cy: spot(2) });
+        world.tag(pi.GONE_TAG, ["Ben"]);
+        world.tag(pi.VOID_TAG, ["Ben"]);
+        world.at(60_000 + pi.RISE_MS * 10);
+        const lines: string[] = [];
+        await game.tick(world.ctx, lines);
+        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([["Ben", "void"]]);
+        expect(lines).toContain(`tag Ben remove ${pi.VOID_TAG}`);
+    });
+
+    it("tags whoever went out while off the server, and takes their kit, once they are back", async () => {
+        const run = runOf(["Ana", "Ben", "Cy"], { twists: false, voidAfter: 0 }, "run-gone");
+        const world = contextFor(run);
+        world.place({ Ana: spot(0), Cy: spot(2) });
+        for (const now of [1_000, 2_000]) {
+            world.at(now);
+            await game.tick(world.ctx, []);
+        }
+        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([["Ben", "gone"]]);
+        world.place({ Ana: spot(0), Ben: spot(1), Cy: spot(2) });
+        world.at(3_000);
+        const back: string[] = [];
+        await game.tick(world.ctx, back);
+        expect(back).toContain(`tag Ben add ${pi.OUT_TAG}`);
+        expect(back).toContain(arena.clearMarked("Ben", "minecraft:ender_pearl", "components"));
+        expect(back).toContain("gamemode adventure Ben");
+        // The drops only reach whoever is still in.
+        expect(back.filter((line) => line.startsWith("give Ben "))).toHaveLength(0);
+        world.at(4_000);
+        const after: string[] = [];
+        await game.tick(world.ctx, after);
+        expect(after.some((line) => line.startsWith("clear Ben "))).toBe(false);
+    });
+
+    it("stirs in only the latest twist due, never a backlog", async () => {
         const run = runOf(["Ana", "Ben"], { voidAfter: 0 });
         const world = contextFor(run);
         world.place({ Ana: spot(0), Ben: spot(1) });
@@ -547,7 +596,7 @@ describe("a pillars game played", () => {
         const lines: string[] = [];
         await game.tick(world.ctx, lines);
         expect(pi.stateOf(world.run.game).twists).toBe(3);
-        expect(lines.filter((line) => line.includes("Twist:"))).toHaveLength(3);
+        expect(lines.filter((line) => line.includes("Twist:"))).toHaveLength(1);
     });
 
     it("tears its pack switch and tags down at the end", () => {

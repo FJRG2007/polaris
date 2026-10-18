@@ -230,6 +230,8 @@ export const IN_TAG = "pe_pi_in";
 export const OUT_TAG = "pe_pi_out";
 /** Who the quick look found past the play area, for the tick to put out. */
 export const GONE_TAG = "pe_pi_gone";
+/** Who the quick look found under the risen void, so the tick says so. */
+export const VOID_TAG = "pe_pi_void";
 
 const TARGET = `@a[tag=${IN_TAG},tag=!${OUT_TAG}]`;
 
@@ -298,7 +300,8 @@ export const STOP_LINES: readonly string[] = [
     `scoreboard players set #on ${OBJECTIVE} 0`,
     `tag @a remove ${IN_TAG}`,
     `tag @a remove ${OUT_TAG}`,
-    `tag @a remove ${GONE_TAG}`
+    `tag @a remove ${GONE_TAG}`,
+    `tag @a remove ${VOID_TAG}`
 ];
 
 // ------------------------------------------------------------------ the ring
@@ -476,10 +479,10 @@ export function voidLevel(
 
 /**
  * Between ticks, nothing read: whoever crossed the play area's edge or is
- * under the void taken up to the gallery and marked for the tick. First the
- * tag taken from anybody who carries it and is not playing (`names`): one who
- * left, or was offline when the last game ended, is never moved or handed
- * items.
+ * under the void taken up to the gallery and marked for the tick, and under
+ * a risen void marked as caught by it. First the tag taken from anybody who
+ * carries it and is not playing (`names`): one who left, or was offline when
+ * the last game ended, is never moved or handed items.
  */
 export function quickLines(
     layout: Layout,
@@ -506,6 +509,9 @@ export function quickLines(
     const others = names.map((name) => `,name=!${name}`).join("");
     return [
         `tag @a[tag=${IN_TAG}${others}] remove ${IN_TAG}`,
+        ...(floor > play.y1
+            ? [`execute in minecraft:overworld run tag @a[${who},${outside[0]}] add ${VOID_TAG}`]
+            : []),
         ...outside.map(
             (one) => `execute in minecraft:overworld run tag @a[${who},${one}] add ${GONE_TAG}`
         ),
@@ -552,7 +558,7 @@ export function twistLines(twist: Twist): string[] {
 const outSchema = z.object({
     name: z.string(),
     at: z.number(),
-    why: z.enum(["low", "fell", "left", "died", "gone", "void"])
+    why: z.enum(["fell", "left", "died", "gone", "void"])
 });
 
 export const stateSchema = z.object({

@@ -22,7 +22,7 @@ export function goSubtitle(language: Language): string {
 /** Why somebody is out, in a line everybody reads. */
 export function outLine(
     name: string,
-    why: "low" | "fell" | "left" | "died" | "gone" | "void",
+    why: "fell" | "left" | "died" | "gone" | "void",
     by: string | null,
     left: number,
     language: Language

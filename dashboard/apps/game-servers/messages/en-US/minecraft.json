@@ -2460,7 +2460,7 @@
             "pillarPool": {
                 "balanced": "Balanced",
                 "blocks": "Blocks only",
-                "chaos": "Chaos: lava, TNT and more"
+                "chaos": "Chaos: TNT, fire and more"
             }
         },
         "place": {
