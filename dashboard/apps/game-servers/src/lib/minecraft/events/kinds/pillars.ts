@@ -79,6 +79,13 @@ const SHAFT = "minecraft:stone_bricks";
 const FOOT = "minecraft:sea_lantern";
 const MIDDLE = "minecraft:polished_andesite";
 const MIDDLE_HEART = "minecraft:gold_block";
+/** The parts that only frame the game (`arena-decor.SEASON_TRIM`): the
+ *  shafts and the middle's rim. Never a pillar's top, which is stood on and
+ *  proves the build went in, nor the middle's heart. */
+export const TRIM: decor.Trim = {
+    [SHAFT]: "column",
+    [MIDDLE]: "middle"
+};
 
 export type Pool = EventOptions<"pillars">["pool"];
 

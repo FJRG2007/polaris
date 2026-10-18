@@ -199,6 +199,7 @@ export const pillars: ArenaGame = {
     fills: (run) => pi.arenaFills(layoutOf(run), atOf(run)),
     decorSpots: (run) => pi.decorSpots(layoutOf(run), atOf(run)),
     blocks: () => [...pi.ARENA_BLOCKS],
+    trim: pi.TRIM,
     kit: () => [...pi.KIT_IDS],
     // The events pack hands out the drops; put on before anything is built.
     hits: true,

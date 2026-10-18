@@ -111,6 +111,10 @@ export interface ArenaGame {
     decorSpots?(run: stored.EventRun, box: stored.Box): decor.Spot[];
     /** What those pieces must not be (`arena-decor.Rules`). */
     readonly decorRules?: decor.Rules;
+    /** Which of its own blocks only frame the game - walls, rims, posts,
+     *  lights - and so wear the season's (`arena-decor.SEASON_TRIM`); nothing
+     *  played on. None recolored when absent. */
+    readonly trim?: decor.Trim;
     /** Lines run once the fills are in: what a chest holds, say. */
     decorate?(run: stored.EventRun, box: stored.Box, syntax: ItemSyntax): string[];
     /** Every item it hands out, marked, for taking back. */

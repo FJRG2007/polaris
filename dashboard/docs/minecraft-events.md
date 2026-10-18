@@ -1371,6 +1371,34 @@ Everything below is part of the arena's own boxes: built into air with
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
+## Season ambience and trim
+
+Through Halloween and the winter holidays, spleef, TNT run, glass bridge, sky
+wars and Pillars are built in the season's colors and play in its mood. Out of
+season, or where the season could not be read, every line is exactly what it
+was before.
+
+- **Trim** (`kinds/arena-decor.ts` `SEASON_TRIM`, each kind's own `TRIM`):
+  only the blocks that frame the game are swapped - a floor's walls, a rim, a
+  post, a light, an island's tree or boulder, a pillar's shaft - in the same
+  boxes, in the same order. Nothing played on is ever named: the snow, the
+  TNT, the glass panels, an island's ground and chests, a pillar's top. Every
+  swap is a full block (a lantern only for a lantern), so nothing falls, melts
+  or is less solid than before. Soul blocks only from 1.16, with an older
+  block in their place.
+- **Teardown.** A stage writes the trimmed boxes down before it builds them
+  (each trim block is in `stage.ARENA_BLOCKS`); an arena lists the trim in its
+  own blocks, lanterns first. The run records the dressing (`run.season`).
+- **Ambience** (`season-ambience.ts`, commands only): particles round at most
+  `MOST_SHOWN` players in the event (by the tag their kind gives them), seen
+  only by them, once every two seconds (souls from 1.16, snowflakes from 1.17,
+  an older particle before); the season's sounds as it starts and as somebody
+  goes out; a purple boss bar, or red and green by turns; and for the winner
+  at most `MOST_ROCKETS` rockets over the arena, written with item components
+  from 1.20.5. No block, weather or time of day is changed.
+
+Asserted in `test/apps/minecraft-events-season-ambience.test.ts`.
+
 ## Biome scenery round the sky events
 
 Separate from the season's dressing (`kinds/arena-decor.ts`), which sits on the

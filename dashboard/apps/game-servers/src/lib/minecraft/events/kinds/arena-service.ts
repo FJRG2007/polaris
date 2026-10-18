@@ -286,16 +286,6 @@ export function arenaDecor(
     return decor.fitted(decor.piecesFor(spots, dressing, game?.decorRules), own, box);
 }
 
-/** The season's pieces, for this server and this time of year. */
-async function decorFor(
-    ctx: KindContext,
-    run: stored.EventRun,
-    box: stored.Box,
-    fills: readonly { box: stored.Box; block: string }[]
-): Promise<decor.Piece[]> {
-    return arenaDecor(run, box, fills, await ctx.dressing().catch(() => null));
-}
-
 function blocksFor(run: stored.EventRun, box: stored.Box, fills: { block: string }[]): string[] {
     const game = gameOf(run.preset.kind);
     // Bare ids: a block's state (`[facing=north]`) would keep it out of the
@@ -372,8 +362,13 @@ async function raise(ctx: KindContext): Promise<void> {
             game: { ...((run.game as Record<string, unknown> | null) ?? {}), ...prepared }
         };
     }
-    const fills = fillsFor(run, box);
-    const pieces = await decorFor(ctx, run, box, fills);
+    // The season read once: its trim in place of the kind's own on the parts
+    // that only frame the game, its pieces kept to what that leaves room for.
+    const dressing = await ctx.dressing().catch(() => null);
+    const fills = decor.trimFills(fillsFor(run, box), game?.trim, dressing);
+    const pieces = arenaDecor(run, box, fills, dressing);
+    // Out of season nothing is added: the list is exactly the kind's own.
+    const trim = dressing ? decor.trimIds(fills.map((one) => one.block)) : { first: [], last: [] };
     // The batch it goes up in is written down with it, so whatever takes it
     // down calls that off first - should this process stop waiting for it.
     const batch = inServer.batchKey();
@@ -382,14 +377,27 @@ async function raise(ctx: KindContext): Promise<void> {
     // The season's pieces listed first: they come down before what holds them.
     const built: stored.Arena = {
         box,
-        blocks: [...new Set([...decor.idsOf(pieces), ...blocksFor(run, box, fills)])],
+        blocks: [
+            ...new Set([
+                ...trim.first,
+                ...decor.idsOf(pieces),
+                ...blocksFor(run, box, fills),
+                ...trim.last
+            ])
+        ],
         batch,
         proved: box
     };
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
-    ctx.run = { ...ctx.run, arena: built, marker, game: game?.built?.(run) ?? ctx.run.game };
+    ctx.run = {
+        ...ctx.run,
+        arena: built,
+        marker,
+        game: game?.built?.(run) ?? ctx.run.game,
+        season: dressing
+    };
     await ctx.persist();
     // Inside the server where the Polaris mod can (`in-server.build`: a block
     // cap a tick); otherwise a paced trip at a time (`pace.buildPacer`). Either

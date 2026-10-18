@@ -8,6 +8,7 @@
  */
 
 import type { Heading } from "./commands";
+import type { Decoration } from "../seasonal";
 import * as search from "./place-search";
 import {
     itemName,
@@ -48,6 +49,47 @@ export function mark(value: string | number, back: string): string {
 }
 
 const { bad: BAD, reason: REASON, good: GOOD, warn: WARN, info: INFO } = PALETTE;
+
+/**
+ * The palette in a season's colors, for what the event says of the season
+ * itself (`season-ambience.ts`): the tag and the picked-out values in orange
+ * and purple through Halloween, red and green through winter. Everything else
+ * - a call-off in red, a win in green - keeps its meaning.
+ */
+export const SEASON_PALETTE: Readonly<
+    Record<Decoration, Readonly<Record<keyof typeof PALETTE, string>>>
+> = {
+    halloween: { ...PALETTE, tag: "&6&l", mark: "&5&l", good: "&6", info: "&8" },
+    winter: { ...PALETTE, tag: "&c&l", mark: "&a&l", good: "&a", info: "&f" }
+};
+
+const SEASON_GREETING: Readonly<Record<Decoration, Text>> = {
+    halloween: {
+        en: "Happy Halloween! The arena is dressed for the night.",
+        es: "¡Feliz Halloween! La arena se ha vestido para la noche."
+    },
+    winter: {
+        en: "Happy holidays! The arena is dressed for winter.",
+        es: "¡Felices fiestas! La arena se ha vestido para el invierno."
+    }
+};
+
+/** Said to whoever is in as it starts, in the season's colors. */
+export function seasonGreeting(season: Decoration, language: Language): string {
+    const colors = SEASON_PALETTE[season];
+    return `${colors.tag}${pick(SEASON_GREETING[season], language)}`;
+}
+
+const SEASON_WIN: Readonly<Record<Decoration, Text>> = {
+    halloween: { en: "A spooky win for", es: "Una victoria de miedo para" },
+    winter: { en: "A festive win for", es: "Una victoria festiva para" }
+};
+
+/** Said to everybody as the winner's fireworks go up. */
+export function seasonWin(season: Decoration, name: string, language: Language): string {
+    const colors = SEASON_PALETTE[season];
+    return `${colors.good}${pick(SEASON_WIN[season], language)} ${colors.mark}${name}${colors.good}!`;
+}
 
 /** What to do, in one line, said when the countdown starts and again at the start. */
 const RULES: Readonly<Record<EventKind, Text>> = {

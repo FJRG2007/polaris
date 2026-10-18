@@ -39,6 +39,7 @@ import { reachAcross } from "./parkour-layout";
 import type { EventOptions } from "../catalog";
 import { seeded, shuffled } from "../trivia-bank";
 import * as decor from "./arena-decor";
+import { DECORATIONS } from "../../seasonal";
 
 /** The layout's version, written into the run when it is built. */
 export const DESIGN = 1;
@@ -93,16 +94,37 @@ export const BRIDGES = [
     "minecraft:white_wool"
 ] as const;
 
+/** The parts that only frame the game (`arena-decor.SEASON_TRIM`): the
+ *  islands' trees and boulders. Never the ground, the chests or the barriers. */
+export const TRIM: decor.Trim = {
+    [LOG]: "trunk",
+    [LEAVES]: "leaves",
+    [BOULDER]: "boulder"
+};
+
+/** What a tree or a boulder can be in a season, bare: a bridging block goes
+ *  against them as against the island's own. */
+const SEASON_DRESSED = DECORATIONS.flatMap((season) =>
+    Object.keys(TRIM).map((block) =>
+        decor.bareId(
+            decor.trimmed(block, TRIM, { season, era: { lanterns: true, soulLanterns: true } })
+        )
+    )
+);
+
 /** What a bridging block can be put against: an island, a bridge. */
 export const PLACE_ON: readonly string[] = [
-    GRASS,
-    DIRT,
-    STONE,
-    ...SPECKS,
-    LOG,
-    "minecraft:oak_leaves",
-    BOULDER,
-    ...BRIDGES
+    ...new Set([
+        GRASS,
+        DIRT,
+        STONE,
+        ...SPECKS,
+        LOG,
+        "minecraft:oak_leaves",
+        BOULDER,
+        ...BRIDGES,
+        ...SEASON_DRESSED
+    ])
 ];
 
 /** Every kind of block the arena holds, built or placed, as bare ids: the
