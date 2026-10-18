@@ -17,6 +17,7 @@ import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 import type {
+    AppAutomationsFilter,
     AppExtension,
     AppFavorite,
     AppJob,
@@ -38,6 +39,7 @@ import type {
 } from "./types";
 
 export type {
+    AppAutomationsFilter,
     AppExtension,
     AppJob,
     AppMcpTool,
@@ -114,6 +116,29 @@ export async function appAutomationHistory(
     const extension = extensions().find((entry) => entry.id === app);
     if (!extension?.automationHistory || !(await isAppInstalled(app))) return [];
     return [...(await extension.automationHistory(legacyRef))];
+}
+
+/**
+ * What the automations list filtered to one app shows of that app: its name,
+ * the name of the thing `ref` names, and its slots. Null when the app is not
+ * installed, brings no filter, or has nothing of its own for this viewer.
+ */
+export async function appAutomationsFilter(
+    app: string,
+    ref: string | null
+): Promise<AppAutomationsFilter | null> {
+    const extension = extensions().find((entry) => entry.id === app);
+    if (!extension?.automationsFilter || !(await isAppInstalled(app))) return null;
+    const found = await extension.automationsFilter(ref).catch((error: unknown) => {
+        console.error(`polaris: ${app} could not describe its automations filter:`, error);
+        return null;
+    });
+    if (!found) return null;
+    return {
+        ...found,
+        actions: found.actions ? withBundleSlot(found.actions) : null,
+        after: found.after ? withBundleSlot(found.after) : null
+    };
 }
 
 export function appJobs(): AppJob[] {

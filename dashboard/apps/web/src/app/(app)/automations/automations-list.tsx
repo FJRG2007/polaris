@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import {
     FolderInput,
     FolderPlus,
     Folders,
+    History,
     MoreHorizontal,
     Pencil,
+    Play,
     Plus,
     Tags,
     Trash2,
@@ -49,10 +51,12 @@ import {
     createAutomationAction,
     createFolderAction,
     creatableShelvesAction,
+    deleteAutomationAction,
     deleteFolderAction,
     listAutomationsAction,
     moveToFolderAction,
     renameFolderAction,
+    runNowAction,
     setEnabledAction,
     setTagsAction
 } from "./actions";
@@ -64,12 +68,17 @@ const NONE = "none";
  * Every automation on the open shelf, or - given `from` - only those an app made
  * (and of one thing of it, such as a place), which is how an app's own screen
  * shows its automations. Those are started from the app's screen, so the list
- * offers no blank one of its own there.
+ * offers no blank one of its own there: `actions` is what the app offers
+ * instead, in the toolbar, and `after` what it draws under the list.
  */
 export function AutomationsList({
-    from
+    from,
+    actions,
+    after
 }: {
     from?: { readonly origin: string; readonly originRef?: string | null };
+    actions?: ReactNode;
+    after?: ReactNode;
 } = {}) {
     const t = useTranslations("automations");
     const locale = useLocale();
@@ -92,6 +101,7 @@ export function AutomationsList({
     const [tag, setTag] = useState<string | null>(null);
     const [managing, setManaging] = useState(false);
     const [tagging, setTagging] = useState<AutomationRow | null>(null);
+    const [deleting, setDeleting] = useState<AutomationRow | null>(null);
 
     const folders = data?.folders ?? [];
     const folderName = useMemo(
@@ -155,6 +165,35 @@ export function AutomationsList({
         );
     };
 
+    const runNow = async (row: AutomationRow) => {
+        const answer = await runNowAction(row.id).catch(() => ({
+            ok: false as const,
+            error: t("errors.generic")
+        }));
+        toast.show({ title: answer.ok ? t("editor.runStarted") : answer.error });
+    };
+
+    /** Gone from the list at once, and back where it was when the server says no. */
+    const remove = async (row: AutomationRow) => {
+        setDeleting(null);
+        replace((current) => ({
+            ...current,
+            rows: current.rows.filter((entry) => entry.id !== row.id)
+        }));
+        const answer = await deleteAutomationAction(row.id).catch(() => ({
+            ok: false as const,
+            error: t("errors.generic")
+        }));
+        if (answer.ok) return void toast.show({ title: t("editor.deleted") });
+        replace((current) => ({
+            ...current,
+            rows: current.rows.some((entry) => entry.id === row.id)
+                ? current.rows
+                : [...current.rows, row].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        }));
+        toast.show({ title: answer.error ?? t("errors.generic") });
+    };
+
     const filterOptions = [
         { value: ALL, label: t("folders.all") },
         { value: NONE, label: t("folders.none") },
@@ -179,7 +218,8 @@ export function AutomationsList({
                         {t("folders.manage")}
                     </Button>
                 ) : null}
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    {actions}
                     {mayCreate ? (
                         <Button onClick={() => setCreating(true)}>
                             <Plus aria-hidden="true" />
@@ -324,8 +364,7 @@ export function AutomationsList({
                                     aria-label={t("list.switchLabel", { name: row.name })}
                                 />
                             </span>
-                            {data.canEdit ? (
-                                <DropdownMenu>
+                            <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button
                                             variant="ghost"
@@ -337,6 +376,32 @@ export function AutomationsList({
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                        {data.canEdit ? (
+                                            <DropdownMenuItem
+                                                disabled={!row.runnable}
+                                                title={
+                                                    row.runnable
+                                                        ? undefined
+                                                        : !row.published
+                                                          ? t("errors.notPublished")
+                                                          : !row.enabled
+                                                            ? t("list.runOff")
+                                                            : t("editor.noManual")
+                                                }
+                                                onSelect={() => void runNow(row)}
+                                            >
+                                                <Play aria-hidden="true" />
+                                                {t("editor.runNow")}
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        <DropdownMenuItem asChild>
+                                            <a href={`/automations/runs?automation=${row.id}`}>
+                                                <History aria-hidden="true" />
+                                                {t("list.runs")}
+                                            </a>
+                                        </DropdownMenuItem>
+                                        {data.canEdit ? <DropdownMenuSeparator /> : null}
+                                        {data.canEdit ? (
                                         <DropdownMenuSub>
                                             <DropdownMenuSubTrigger>
                                                 <FolderInput aria-hidden="true" />
@@ -369,18 +434,42 @@ export function AutomationsList({
                                                 </DropdownMenuItem>
                                             </DropdownMenuSubContent>
                                         </DropdownMenuSub>
-                                        <DropdownMenuItem onSelect={() => setTagging(row)}>
-                                            <Tags aria-hidden="true" />
-                                            {t("tags.edit")}
-                                        </DropdownMenuItem>
+                                        ) : null}
+                                        {data.canEdit ? (
+                                            <DropdownMenuItem onSelect={() => setTagging(row)}>
+                                                <Tags aria-hidden="true" />
+                                                {t("tags.edit")}
+                                            </DropdownMenuItem>
+                                        ) : null}
+                                        {data.canEdit ? <DropdownMenuSeparator /> : null}
+                                        {data.canEdit ? (
+                                            <DropdownMenuItem
+                                                className="text-danger focus:text-danger"
+                                                onSelect={() => setDeleting(row)}
+                                            >
+                                                <Trash2 aria-hidden="true" />
+                                                {t("editor.delete")}
+                                            </DropdownMenuItem>
+                                        ) : null}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
-                            ) : null}
                         </li>
                     ))}
                 </ul>
             )}
+            {after}
             {creating ? <CreateDialog onClose={() => setCreating(false)} /> : null}
+            {deleting ? (
+                <ConfirmDeleteDialog
+                    open
+                    onOpenChange={(open) => !open && setDeleting(null)}
+                    name={deleting.name}
+                    kind={t("title")}
+                    requireTyping={false}
+                    confirmLabel={t("editor.delete")}
+                    onConfirm={() => void remove(deleting)}
+                />
+            ) : null}
             {managing && data ? (
                 <FoldersDialog
                     folders={folders}

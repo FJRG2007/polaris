@@ -13,7 +13,9 @@
         "never": "Sin ejecutar",
         "lastRun": "Última vez {when}",
         "switchLabel": "Ejecutar {name} al dispararse",
-        "notPublished": "Publícalo antes de activarlo"
+        "notPublished": "Publícalo antes de activarlo",
+        "runs": "Historial",
+        "runOff": "Actívalo primero"
     },
     "modes": {
         "single": "De uno en uno",
@@ -699,5 +701,9 @@
         "homeRun": "Lugares: ejecutar otro",
         "missing": "Necesita una app que aquí no está instalada: no se puede cambiar ni ejecutar.",
         "install": "Instalar la app"
+    },
+    "filter": {
+        "label": "Filtros",
+        "remove": "Quitar filtro {name}"
     }
 }

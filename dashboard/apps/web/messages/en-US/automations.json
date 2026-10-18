@@ -13,7 +13,9 @@
         "never": "Never run",
         "lastRun": "Last run {when}",
         "switchLabel": "Run {name} when triggered",
-        "notPublished": "Publish it first to switch it on"
+        "notPublished": "Publish it first to switch it on",
+        "runs": "Run history",
+        "runOff": "Switch it on first"
     },
     "modes": {
         "single": "One at a time",
@@ -699,5 +701,9 @@
         "homeRun": "Places: run another",
         "missing": "Needs an app that is not installed here, so it cannot be changed or run.",
         "install": "Install the app"
+    },
+    "filter": {
+        "label": "Filters",
+        "remove": "Remove filter {name}"
     }
 }
