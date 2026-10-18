@@ -105,7 +105,9 @@ export async function createAccountVaultAction(input: unknown): Promise<{ error?
     const user = await requirePermission("vault.use");
     const parsed = core.vaultSetupSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable")
+        };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
         return { error: await vaultRefusal("errors.wrongPolarisPassword") };
@@ -142,7 +144,9 @@ export async function changeMasterPasswordAction(input: unknown): Promise<{ erro
     const user = await requirePermission("vault.use");
     const parsed = core.vaultPasswordChangeSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.invalidRequest") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.invalidRequest")
+        };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
         return { error: await vaultRefusal("errors.wrongPolarisPassword") };
@@ -231,7 +235,9 @@ export async function saveItemAction(
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted")
+        };
     }
     if (!itemId) {
         if (parsed.data.organizationId && collectionIds.length === 0) {
@@ -384,7 +390,9 @@ export async function createSendAction(
     const user = await requirePermission("vault.use");
     const parsed = core.sendSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted")
+        };
     }
     const send = await sends.createSend(user.id, parsed.data);
     revalidatePath("/vault/sends");
@@ -419,7 +427,8 @@ export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
 
 export async function deleteSendAction(sendId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    if (!(await sends.deleteSend(user.id, sendId))) return { error: await vaultRefusal("errors.sendNotYours") };
+    if (!(await sends.deleteSend(user.id, sendId)))
+        return { error: await vaultRefusal("errors.sendNotYours") };
     revalidatePath("/vault/sends");
     return {};
 }

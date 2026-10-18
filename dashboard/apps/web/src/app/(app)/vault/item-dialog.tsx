@@ -329,9 +329,7 @@ export function ItemDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{draft.id ? t("item.editTitle") : t("item.newTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("item.description")}
-                    </DialogDescription>
+                    <DialogDescription>{t("item.description")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
@@ -663,7 +661,9 @@ export function ItemDialog({
                                                 moment. */}
                                             {core.uriProblem(entry.uri, entry.match) ? (
                                                 <span className="text-xs text-danger">
-                                                    {problem(core.uriProblem(entry.uri, entry.match))}
+                                                    {problem(
+                                                        core.uriProblem(entry.uri, entry.match)
+                                                    )}
                                                 </span>
                                             ) : null}
                                             {/* The rule is only worth a line once
@@ -914,8 +914,7 @@ export function ItemDialog({
                                                     })()}
                                                     autoComplete="off"
                                                 />
-                                                {field === "email" &&
-                                                accountEmails.length > 1 ? (
+                                                {field === "email" && accountEmails.length > 1 ? (
                                                     <Select
                                                         value={
                                                             accountEmails.includes(
