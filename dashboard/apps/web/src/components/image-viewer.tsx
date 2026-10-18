@@ -119,11 +119,14 @@ export function ImageViewer({
                 event.preventDefault();
                 onClose();
             }
-            if (shortcutPressed(event, "viewer.previousFile")) {
+            const inMenu =
+                event.defaultPrevented ||
+                (event.target instanceof Element && event.target.closest("[role='menu']") !== null);
+            if (!inMenu && shortcutPressed(event, "viewer.previousFile")) {
                 event.preventDefault();
                 go(-1);
             }
-            if (shortcutPressed(event, "viewer.nextFile")) {
+            if (!inMenu && shortcutPressed(event, "viewer.nextFile")) {
                 event.preventDefault();
                 go(1);
             }
@@ -281,7 +284,7 @@ export function ImageViewer({
                         aria-label={t("viewer.previous")}
                         title={t("viewer.previous")}
                         onClick={() => go(-1)}
-                        className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                        className="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
                     >
                         <ChevronLeft className="size-5 shrink-0" aria-hidden="true" />
                     </button>
@@ -290,7 +293,7 @@ export function ImageViewer({
                         aria-label={t("viewer.next")}
                         title={t("viewer.next")}
                         onClick={() => go(1)}
-                        className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                        className="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
                     >
                         <ChevronRight className="size-5 shrink-0" aria-hidden="true" />
                     </button>

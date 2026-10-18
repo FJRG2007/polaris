@@ -91,23 +91,28 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
     const locale = useLocale();
     const app = useLocalizedApp(appId);
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
+    const [gallery, setGallery] = useState<ViewedImage[]>([]);
     if (!app) return null;
     const from = appProvenance(app);
     const shots = appScreenshots(app.id, locale);
     const image = app.template?.image;
     const version = imageVersion(image);
-    // The screenshots as the viewer pages through them, in the reader's theme:
-    // the page picks by CSS, and the viewer opens after the page is drawn, so
-    // the class on the document is already the answer.
-    const light =
-        typeof document !== "undefined" &&
-        (document.documentElement.classList.contains("light") ||
-            (document.documentElement.classList.contains("system") &&
-                window.matchMedia("(prefers-color-scheme: light)").matches));
-    const gallery: ViewedImage[] = shots.map((shot, index) => ({
-        url: shot[light ? "light" : "dark"].desktop,
-        name: t("detail.screenshotAlt", { name: app.name, index: index + 1 })
-    }));
+    // The screenshots as the viewer pages through them, in the reader's theme
+    // at the moment one is opened: the page picks by CSS, so the class on the
+    // document then is the answer, and a theme switched later is read afresh.
+    const open = (index: number) => {
+        const root = document.documentElement;
+        const light =
+            root.classList.contains("light") ||
+            (root.classList.contains("system") &&
+                window.matchMedia("(prefers-color-scheme: light)").matches);
+        const now: ViewedImage[] = shots.map((shot, at) => ({
+            url: shot[light ? "light" : "dark"].desktop,
+            name: t("detail.screenshotAlt", { name: app.name, index: at + 1 })
+        }));
+        setGallery(now);
+        setViewing(now[index] ?? null);
+    };
 
     return (
         <div className="flex min-w-0 flex-col gap-6">
@@ -150,7 +155,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                                     <button
                                         type="button"
                                         aria-label={t("detail.openScreenshot", { name: alt })}
-                                        onClick={() => setViewing(gallery[index] ?? null)}
+                                        onClick={() => open(index)}
                                         className="block w-full cursor-zoom-in rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                     {(["dark", "light"] as const).map((theme) => (
