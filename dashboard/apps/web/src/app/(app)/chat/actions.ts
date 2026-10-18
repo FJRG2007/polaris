@@ -854,9 +854,33 @@ const groupOptionsSchema = z
     .object({
         membersMayEdit: z.boolean().optional(),
         membersMayInvite: z.boolean().optional(),
-        membersMayMention: z.boolean().optional()
+        membersMayMention: z.boolean().optional(),
+        newcomersReadHistory: z.boolean().optional()
     })
     .strict();
+
+/** Whether people who join later read earlier history, for a space or a channel. */
+const newcomerHistorySchema = z.discriminatedUnion("scope", [
+    z
+        .object({ scope: z.literal("space"), spaceId: z.string().uuid(), value: z.boolean() })
+        .strict(),
+    z
+        .object({
+            scope: z.literal("channel"),
+            channelId: z.string().uuid(),
+            value: z.enum(["inherit", "on", "off"])
+        })
+        .strict()
+]);
+
+export async function setNewcomerHistoryAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = newcomerHistorySchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
+    const result = await guard(() => chat.setNewcomerHistory(me, parsed.data));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : {};
+}
 
 export async function setGroupOptionsAction(
     channelId: string,

@@ -88,6 +88,8 @@ function optionsOf(ids: readonly string[]): OptionRow[] {
 }
 
 const store = {
+    // Nobody here joined too late to read.
+    chatChannel: { findMany: async () => [] },
     chatMessage: {
         findUnique: async ({ where }: { where: { id: string } }) => {
             const message = messages.find((row) => row.id === where.id);

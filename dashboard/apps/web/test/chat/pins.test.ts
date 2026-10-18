@@ -30,7 +30,8 @@ vi.mock("@polaris/db", () => ({
             },
             findMany: async () => []
         },
-        chatChannel: { findUnique: async () => db.channel },
+        // Nobody here joined too late to read: the history lookup finds no closed room.
+        chatChannel: { findUnique: async () => db.channel, findMany: async () => [] },
         user: { findMany: async () => [] }
     }
 }));
