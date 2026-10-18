@@ -1082,7 +1082,10 @@ export function DeployCanvas({
                                                 if (
                                                     canManage &&
                                                     !removing &&
-                                                    shortcutPressed(event.nativeEvent, "general.delete")
+                                                    shortcutPressed(
+                                                        event.nativeEvent,
+                                                        "general.delete"
+                                                    )
                                                 ) {
                                                     event.preventDefault();
                                                     setDeleteTarget({

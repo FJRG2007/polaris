@@ -158,21 +158,21 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                                         onClick={() => open(index)}
                                         className="block w-full cursor-zoom-in rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                    {(["dark", "light"] as const).map((theme) => (
-                                        <picture key={theme} className={styles[theme]}>
-                                            <source
-                                                media="(max-width: 640px)"
-                                                srcSet={shot[theme].mobile}
-                                            />
-                                            {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
-                                            <img
-                                                src={shot[theme].desktop}
-                                                alt={alt}
-                                                loading={index === 0 ? "eager" : "lazy"}
-                                                className="border-border w-full rounded-md border"
-                                            />
-                                        </picture>
-                                    ))}
+                                        {(["dark", "light"] as const).map((theme) => (
+                                            <picture key={theme} className={styles[theme]}>
+                                                <source
+                                                    media="(max-width: 640px)"
+                                                    srcSet={shot[theme].mobile}
+                                                />
+                                                {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
+                                                <img
+                                                    src={shot[theme].desktop}
+                                                    alt={alt}
+                                                    loading={index === 0 ? "eager" : "lazy"}
+                                                    className="border-border w-full rounded-md border"
+                                                />
+                                            </picture>
+                                        ))}
                                     </button>
                                 </figure>
                             );
