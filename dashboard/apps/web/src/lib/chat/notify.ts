@@ -139,11 +139,15 @@ export async function readerTeams(userId: string): Promise<ReadonlySet<string>> 
  *
  * @param teamIds - The reader's teams, from `readerTeams`. Empty means a `@team`
  *   names nobody, which is the right answer when nothing looked them up.
+ * @param author - The reader wrote it. Naming yourself is not being named, but
+ *   `@everyone`, `@here` and your own team reach the one who sent them as much
+ *   as anybody else, so only the reference to the reader by name is dropped.
  */
 export function mentionsReader(
     body: string,
     userId: string,
-    teamIds: ReadonlySet<string> = NO_TEAMS
+    teamIds: ReadonlySet<string> = NO_TEAMS,
+    author = false
 ): boolean {
     const written = body.includes("@");
     const addressed = body.includes("polaris:");
@@ -153,7 +157,7 @@ export function mentionsReader(
     const me = userId.toLowerCase();
     return extractReferences(body).some((reference) =>
         reference.kind === "user"
-            ? reference.id.toLowerCase() === me
+            ? !author && reference.id.toLowerCase() === me
             : reference.kind === "team" && teamIds.has(reference.id.toLowerCase())
     );
 }
