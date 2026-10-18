@@ -82,7 +82,8 @@ export function PlayersTable({
     readonly minWidth?: string;
 }) {
     const t = useGameText("games");
-    const hasToolbar = onSearch !== undefined || (filters && filters.length > 0) || toolbar !== undefined;
+    const hasToolbar =
+        onSearch !== undefined || (filters && filters.length > 0) || toolbar !== undefined;
 
     return (
         <div className="flex flex-col gap-2">
@@ -106,7 +107,10 @@ export function PlayersTable({
                             aria-label={t("playersTable.filterPlayers")}
                             value={filter ?? filters[0]?.value ?? ""}
                             onValueChange={onFilter}
-                            options={filters.map((entry) => ({ value: entry.value, label: entry.label }))}
+                            options={filters.map((entry) => ({
+                                value: entry.value,
+                                label: entry.label
+                            }))}
                         />
                     )}
                     {toolbar}
@@ -130,7 +134,10 @@ export function PlayersTable({
                                 </th>
                             )}
                             {columns.map((column) => (
-                                <th key={column.label} className={cn("px-3 py-2 font-medium", column.className)}>
+                                <th
+                                    key={column.label}
+                                    className={cn("px-3 py-2 font-medium", column.className)}
+                                >
                                     {column.label}
                                 </th>
                             ))}
