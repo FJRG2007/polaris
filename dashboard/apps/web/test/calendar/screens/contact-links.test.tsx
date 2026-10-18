@@ -78,12 +78,12 @@ describe("an address in an event's text", () => {
             within(menu)
                 .getAllByRole("menuitem")
                 .map((item) => item.textContent)
-        ).toEqual(["Send email", "Copy email address"]);
+        ).toEqual(["Send emailEnter", "Copy email addressCtrl+C"]);
         expect(
-            within(menu).getByRole("menuitem", { name: "Send email" }).getAttribute("href")
+            within(menu).getByRole("menuitem", { name: /^Send email/ }).getAttribute("href")
         ).toBe("/mail/compose?url=mailto%3Aana%2540example.test");
         await act(async () => {
-            fireEvent.click(within(menu).getByRole("menuitem", { name: "Copy email address" }));
+            fireEvent.click(within(menu).getByRole("menuitem", { name: /^Copy email address/ }));
         });
         expect(writeText).toHaveBeenCalledWith("ana@example.test");
         expect(notify).toHaveBeenCalledWith("Email address copied");
@@ -93,7 +93,7 @@ describe("an address in an event's text", () => {
         renderWith(<Linkified text={TEXT} />);
         rightClick(screen.getByRole("link", { name: "ana@example.test" }));
         await act(async () => {
-            fireEvent.click(screen.getByRole("menuitem", { name: "Copy email address" }));
+            fireEvent.click(screen.getByRole("menuitem", { name: /^Copy email address/ }));
         });
         expect(screen.getByRole("status").textContent).toBe("Email address copied");
     });
@@ -104,7 +104,7 @@ describe("an address in an event's text", () => {
         renderWith(<Linkified text={TEXT} />, { compose: false, notify });
         rightClick(screen.getByRole("link", { name: "ana@example.test" }));
         await act(async () => {
-            fireEvent.click(screen.getByRole("menuitem", { name: "Copy email address" }));
+            fireEvent.click(screen.getByRole("menuitem", { name: /^Copy email address/ }));
         });
         expect(notify).toHaveBeenCalledWith("Couldn't copy. Select the text and copy it instead.");
     });
@@ -124,11 +124,11 @@ describe("a web link in an event's text", () => {
         renderWith(<Linkified text={TEXT} />, { compose: true, notify });
         rightClick(screen.getByRole("link", { name: "https://meet.example.test/abc" }));
         const menu = screen.getByRole("menu", { name: "Actions for this link" });
-        const open = within(menu).getByRole("menuitem", { name: "Open link" });
+        const open = within(menu).getByRole("menuitem", { name: /^Open link/ });
         expect(open.getAttribute("href")).toBe("https://meet.example.test/abc");
         expect(open.getAttribute("rel")).toBe("noopener noreferrer");
         await act(async () => {
-            fireEvent.click(within(menu).getByRole("menuitem", { name: "Copy link" }));
+            fireEvent.click(within(menu).getByRole("menuitem", { name: /^Copy link/ }));
         });
         expect(writeText).toHaveBeenCalledWith("https://meet.example.test/abc");
         expect(notify).toHaveBeenCalledWith("Link copied");
