@@ -394,3 +394,71 @@ describe("outcomes an app node asks for", () => {
         expect(step(runId, "c1")).toMatchObject({ status: "refused", error: "appMissing" });
     });
 });
+
+describe("startAppAutomation", () => {
+    it("makes an unpublished draft on the owner's shelf, carrying the app's origin", async () => {
+        const id = await bridge.startAppAutomation({
+            name: "From a template",
+            ownerId: OWNER,
+            origin: "fixture",
+            originRef: "place-1",
+            graph: CHECKED
+        });
+        const automation = fake().tables.automation!.find((row) => row.id === id)!;
+        expect(automation).toMatchObject({
+            userId: OWNER,
+            name: "From a template",
+            origin: "fixture",
+            originRef: "place-1"
+        });
+        expect(automation.publishedVersionId ?? null).toBeNull();
+        expect((automation.draft as core.AutomationGraph).nodes.map((entry) => entry.id)).toEqual([
+            "t1",
+            "c1",
+            "s1"
+        ]);
+        expect(fake().tables.automationVersion ?? []).toHaveLength(0);
+        expect(fake().tables.automationTrigger ?? []).toHaveLength(0);
+    });
+
+    it("starts with a manual trigger when there is no graph to lay out", async () => {
+        const id = await bridge.startAppAutomation({
+            name: "Blank",
+            ownerId: OWNER,
+            origin: "fixture",
+            originRef: null,
+            graph: null
+        });
+        const draft = fake().tables.automation!.find((row) => row.id === id)!
+            .draft as core.AutomationGraph;
+        expect(draft.nodes.map((entry) => entry.type)).toEqual(["core.manual"]);
+    });
+
+    it("refuses with a typed limit once the owner's shelf is full", async () => {
+        vi.spyOn(fake().prisma.automation, "count").mockResolvedValueOnce(
+            core.AUTOMATION_LIMITS.perShelf
+        );
+        await expect(
+            bridge.startAppAutomation({
+                name: "One too many",
+                ownerId: OWNER,
+                origin: "fixture",
+                originRef: null,
+                graph: null
+            })
+        ).rejects.toMatchObject({ name: "AutomationAccessError", code: "limit" });
+        expect(fake().tables.automation ?? []).toHaveLength(0);
+    });
+
+    it("refuses a name that is blank", async () => {
+        await expect(
+            bridge.startAppAutomation({
+                name: "  ",
+                ownerId: OWNER,
+                origin: "fixture",
+                originRef: null,
+                graph: null
+            })
+        ).rejects.toThrow();
+    });
+});

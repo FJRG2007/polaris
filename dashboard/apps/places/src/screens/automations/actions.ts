@@ -29,6 +29,7 @@ import * as auto from "../../lib/automation-kinds";
 import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
 import { moveAutomationNow } from "../../lib/automation-move";
+import { draftGraph } from "../../lib/automation-convert";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import type { FloorView, RoomView } from "../../lib/room-kinds";
@@ -241,6 +242,66 @@ export async function saveAutomationAction(
     if (!saved) return { automation: saved };
     const movedTo = await moveAutomationNow(saved.id).catch(() => null);
     return { automation: movedTo ? { ...saved, movedTo } : saved };
+}
+
+const startInput = z.object({
+    name: z.string().trim().min(1).max(auto.LIMITS.name),
+    placeId: z.string().min(1).max(64),
+    definition: z.unknown()
+});
+
+/**
+ * A new automation, made in the central editor from the start: a template or a
+ * blank one laid out as a draft there, so every trigger, condition and step -
+ * a web request, a webhook, another automation - is offered before the first
+ * save. Nothing runs until it is published there.
+ */
+export async function startAutomationAction(
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const t = await placesT();
+    const parsed = startInput.safeParse(input);
+    if (!parsed.success) return { error: t("automations.errors.name") };
+    const result = await guard(async () => {
+        const place = await places.getPlace(install.id, parsed.data.placeId);
+        if (!place) return { refused: "automations.errors.placeGone" } as const;
+        const graph = draftGraph(place.id, parsed.data.definition);
+        if (!graph) return { refused: "automations.errors.template" } as const;
+        const id = await host.automations
+            .startAppAutomation({
+                name: parsed.data.name,
+                ownerId: user.id,
+                origin: "home",
+                originRef: place.id,
+                graph
+            })
+            .catch((caught: unknown) => {
+                if (atShelfLimit(caught)) return null;
+                throw caught;
+            });
+        if (!id) return { refused: "automations.errors.limit" } as const;
+        await recordAudit({
+            actorId: user.id,
+            action: "places.automation.create",
+            targetType: "automation",
+            targetId: id,
+            metadata: { name: parsed.data.name }
+        });
+        return { id };
+    });
+    if (result.error) return { error: result.error };
+    if (!result.value) return { error: t("refusals.failed") };
+    if (result.value.refused) return { error: t(result.value.refused) };
+    return { id: result.value.id };
+}
+
+function atShelfLimit(caught: unknown): boolean {
+    return (
+        caught instanceof Error &&
+        caught.name === "AutomationAccessError" &&
+        (caught as { code?: unknown }).code === "limit"
+    );
 }
 
 export async function setAutomationEnabledAction(

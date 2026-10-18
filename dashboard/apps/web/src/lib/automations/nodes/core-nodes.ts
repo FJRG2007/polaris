@@ -103,6 +103,18 @@ const answerNode: ServerNode<{ outputs: Pairs }> = {
     }
 };
 
+const setNode: ServerNode<{ values: Pairs }> = {
+    type: "core.set",
+    meta: core.CORE_NODE_META["core.set"],
+    config: C["core.set"],
+    run: async (config, context) => {
+        const values = pairValues(config.values, context);
+        if (core.byteLength(JSON.stringify(values)) > core.AUTOMATION_LIMITS.stepDataBytes)
+            throw new StepError("valuesTooLarge");
+        return { output: { values } };
+    }
+};
+
 type AnnounceConfig = ReturnType<(typeof C)["core.announce"]["parse"]>;
 
 const announceNode: ServerNode<AnnounceConfig> = {
@@ -213,5 +225,6 @@ export const CORE_SERVER_NODES: readonly ServerNode[] = [
     declared("core.waitCondition"),
     notifyNode as ServerNode,
     answerNode as ServerNode,
+    setNode as ServerNode,
     announceNode as ServerNode
 ];

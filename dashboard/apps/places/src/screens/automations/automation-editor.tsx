@@ -52,7 +52,6 @@ import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
 const { runAction } = hostUi.runAction;
-const { useDisplayFormat } = hostUi.displayFormat;
 
 /** An automation while it is being edited: the input the server takes. */
 export type Draft = auto.AutomationInput;
@@ -282,24 +281,16 @@ export function startingDraft(
 
 export function AutomationEditor({
     automationId,
-    template,
-    deviceId,
-    placeId,
     canManage,
     canControl,
     initialTab
 }: {
-    automationId: string | null;
-    template: string | null;
-    deviceId: string | null;
-    /** For a new one: the place to make it at, when not the one being looked at. */
-    placeId?: string | null;
+    automationId: string;
     canManage: boolean;
     canControl: boolean;
     initialTab: Tab;
 }) {
     const t = usePlacesT();
-    const format = useDisplayFormat();
     const router = useRouter();
     const [loaded, setLoaded] = useState<{
         automation: auto.AutomationView | null;
@@ -327,7 +318,7 @@ export function AutomationEditor({
     const [saving, setSaving] = useState(false);
     const inFlight = useRef({ save: false, run: false });
     const [running, setRunning] = useState(false);
-    const [tab, setTab] = useState<Tab>(automationId ? initialTab : "flow");
+    const [tab, setTab] = useState<Tab>(initialTab);
     const [refreshKey, setRefreshKey] = useState(0);
     const [layout, chooseLayout] = flow.useFlowLayout(LAYOUT_KEY);
     const readOnly = !canManage;
@@ -336,40 +327,29 @@ export function AutomationEditor({
         let cancelled = false;
         void (async () => {
             const result = await runAction(
-                () => actions.getAutomationAction(automationId, placeId),
+                () => actions.getAutomationAction(automationId),
                 setError
             );
             if (cancelled || !result) return;
-            if (result.error || !result.context) {
+            if (result.error || !result.context || !result.automation) {
                 setError(result.error ?? t("refusals.failed"));
                 return;
             }
             const context = result.context;
-            const next: Draft = result.automation
-                ? {
-                      name: result.automation.name,
-                      enabled: result.automation.enabled,
-                      placeId: result.automation.placeId,
-                      definition: result.automation.definition
-                  }
-                : startingDraft(
-                      template,
-                      context.devices.find((device) => device.id === deviceId),
-                      context.placeId,
-                      auto.readerZone(format.preferences.timeZone),
-                      t
-                  );
-            setLoaded({ automation: result.automation ?? null, runs: result.runs ?? [], context });
+            const next: Draft = {
+                name: result.automation.name,
+                enabled: result.automation.enabled,
+                placeId: result.automation.placeId,
+                definition: result.automation.definition
+            };
+            setLoaded({ automation: result.automation, runs: result.runs ?? [], context });
             history.reset(next);
-            // A template is a start, not something already saved: it is dirty
-            // from the first moment so Save is there to press.
-            setSaved(result.automation ? JSON.stringify(auto.normalizeAutomationInput(next)) : "");
+            setSaved(JSON.stringify(auto.normalizeAutomationInput(next)));
         })();
         return () => {
             cancelled = true;
         };
-        // Loaded once per automation; the reader's zone and words at that moment
-        // are what a template starts from.
+        // Loaded once per automation.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [automationId]);
 
@@ -486,12 +466,11 @@ export function AutomationEditor({
         setNotice(t("automations.editor.saved"));
         // Moved on save: from here on it is edited where it now runs.
         if (result.automation.movedTo) router.replace(auto.automationHref(result.automation));
-        else if (!automationId) router.replace(auto.automationHref(result.automation));
         return true;
     };
 
     const runNow = async () => {
-        if (!automationId || inFlight.current.run) return;
+        if (inFlight.current.run) return;
         inFlight.current.run = true;
         setRunning(true);
         setError("");
@@ -719,7 +698,7 @@ export function AutomationEditor({
                     ]}
                 />
             )}
-            {automationId && loaded && (
+            {loaded && (
                 <SegmentedControl<Tab>
                     size="sm"
                     value={tab}
@@ -1076,7 +1055,7 @@ export function AutomationEditor({
             />
             <blocks.UnsavedChangesDialog
                 open={leave.pending !== null}
-                isNew={!automationId}
+                isNew={false}
                 strings={leaveStrings}
                 saving={saving}
                 onStay={leave.stay}
@@ -1199,26 +1178,22 @@ export function AutomationEditor({
                             </label>
                             {!readOnly && (
                                 <>
-                                    {automationId && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={running || dirty || !draft.enabled}
-                                            title={
-                                                dirty
-                                                    ? t("automations.editor.saveFirst")
-                                                    : undefined
-                                            }
-                                            onClick={() => void runNow()}
-                                        >
-                                            {running ? (
-                                                <Loader2 className="size-4 animate-spin" />
-                                            ) : (
-                                                <Play className="size-4 shrink-0" />
-                                            )}
-                                            {t("automations.list.run")}
-                                        </Button>
-                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={running || dirty || !draft.enabled}
+                                        title={
+                                            dirty ? t("automations.editor.saveFirst") : undefined
+                                        }
+                                        onClick={() => void runNow()}
+                                    >
+                                        {running ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <Play className="size-4 shrink-0" />
+                                        )}
+                                        {t("automations.list.run")}
+                                    </Button>
                                     <Button
                                         size="sm"
                                         aria-disabled={blocked || saving || undefined}

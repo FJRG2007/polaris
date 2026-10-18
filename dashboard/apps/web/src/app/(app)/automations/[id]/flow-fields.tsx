@@ -35,6 +35,7 @@ export const FLOW_FIELD_TYPES = new Set([
     "core.waitEvent",
     "core.run",
     "core.answer",
+    "core.set",
     "core.announce",
     "core.try",
     "core.waitCondition"
@@ -1009,6 +1010,17 @@ export function FlowNodeFields({
                         label={t("flow.outputs")}
                         value={config.outputs ?? []}
                         onChange={(outputs) => set({ outputs })}
+                    />
+                </div>
+            );
+        case "core.set":
+            return (
+                <div className="space-y-2">
+                    {hint(t("nodeHints.set"))}
+                    <Pairs
+                        label={t("flow.values")}
+                        value={config.values ?? []}
+                        onChange={(values) => set({ values })}
                     />
                 </div>
             );

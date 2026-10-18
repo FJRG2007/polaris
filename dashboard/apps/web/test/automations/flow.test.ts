@@ -1471,3 +1471,37 @@ describe("automation.finished", () => {
         ).toEqual(["failed", "failed"]);
     });
 });
+
+describe("Set values", () => {
+    it("works named values out once, typed, for later steps to read", async () => {
+        const automation = await seed(
+            [
+                node("v", "core.set", {
+                    values: [
+                        { name: "who", value: "{{trigger.name}}" },
+                        { name: "count", value: "{{trigger.n}}" },
+                        { name: "line", value: "{{trigger.name}} x{{trigger.n}}" }
+                    ]
+                }),
+                say("a", "{{steps.v.values.line}} / {{steps.v.values.who}}")
+            ],
+            [
+                ["t1", "next", "v"],
+                ["v", "next", "a"]
+            ]
+        );
+        const started = await fire(automation, "k1", { name: "Ana", n: 3 });
+        await engine.advanceRun(started.id);
+        expect(titles()).toEqual(["Ana x3 / Ana"]);
+        expect(step(started.id, "v")).toMatchObject({
+            output: { values: { who: "Ana", count: 3, line: "Ana x3" } }
+        });
+    });
+
+    it("is a node the graph accepts with its names checked", () => {
+        const config = core.CORE_NODE_CONFIGS["core.set"];
+        expect(config.safeParse({ values: [{ name: "ok_1", value: "x" }] }).success).toBe(true);
+        expect(config.safeParse({ values: [{ name: "1bad", value: "x" }] }).success).toBe(false);
+        expect(core.nodeRole("core.set")).toBe("action");
+    });
+});

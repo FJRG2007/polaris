@@ -1,7 +1,7 @@
 /**
  * One automation: its flow to read and change, and the log of what it did.
  *
- * `/places/devices/automations/new` is a new one, started from a template when
+ * `/places/devices/automations/new` starts a new one in the central editor, from a template when
  * the address names one (`?template=autoOff&device=<id>`), at the place it
  * names (`&place=<id>`) or else the one being looked at.
  */
@@ -12,6 +12,7 @@ import { movedTo } from "../../../../../lib/automation-move";
 import { TEMPLATES } from "../../../../../lib/automation-kinds";
 import { requireHomeUser } from "../../../../../lib/access";
 import { AutomationEditor } from "../../../../../screens/automations/automation-editor";
+import { AutomationStarter } from "../../../../../screens/automations/automation-starter";
 
 export const dynamic = "force-dynamic";
 
@@ -43,20 +44,25 @@ export default async function AutomationPage({
     return (
         <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-4">
             <h1 className="sr-only">{t("pages.automations.title")}</h1>
-            <AutomationEditor
-                key={automationId ?? "new"}
-                automationId={automationId}
-                template={
-                    template && (TEMPLATES as readonly string[]).includes(template)
-                        ? template
-                        : null
-                }
-                deviceId={one(query.device)}
-                placeId={one(query.place)}
-                canManage={canManage}
-                canControl={canControl}
-                initialTab={one(query.tab) === "runs" ? "runs" : "flow"}
-            />
+            {automationId ? (
+                <AutomationEditor
+                    key={automationId}
+                    automationId={automationId}
+                    canManage={canManage}
+                    canControl={canControl}
+                    initialTab={one(query.tab) === "runs" ? "runs" : "flow"}
+                />
+            ) : (
+                <AutomationStarter
+                    template={
+                        template && (TEMPLATES as readonly string[]).includes(template)
+                            ? template
+                            : null
+                    }
+                    deviceId={one(query.device)}
+                    placeId={one(query.place)}
+                />
+            )}
         </div>
     );
 }

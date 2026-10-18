@@ -19,29 +19,12 @@ import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
 import { callCycle } from "./calls";
 import { graphProblems } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
+import { AutomationAccessError } from "./access-error";
+
+export { AutomationAccessError };
 
 const L = core.AUTOMATION_LIMITS;
 const OTHERS_LISTED = 1000;
-
-/** A refusal the screens put into words by its code. */
-export class AutomationAccessError extends Error {
-    constructor(
-        readonly code:
-            | "notFound"
-            | "forbidden"
-            | "limit"
-            | "invalid"
-            | "notPublished"
-            | "noManualTrigger"
-            | "secretMissing"
-            | "noTrigger"
-            | "triggerGone"
-            | "tooLarge"
-    ) {
-        super(code);
-        this.name = "AutomationAccessError";
-    }
-}
 
 export function shelfWhere(shelf: Shelf) {
     return shelf.orgId ? { orgId: shelf.orgId } : { userId: shelf.userId, orgId: null };
@@ -329,6 +312,22 @@ export async function createAutomation(
         select: { id: true }
     });
     return row.id;
+}
+
+/**
+ * The address a webhook trigger answers on, for one the editor holds that is
+ * not saved yet or was given a new address since: the screen shows it from the
+ * moment the trigger is added rather than after a save. Derived as on publish;
+ * it starts working once a version with that node and rotation is published.
+ */
+export async function hookAddress(
+    actor: RunActor,
+    automationId: string,
+    nodeId: string,
+    rotation: number
+): Promise<string> {
+    const row = await load(actor, automationId, true);
+    return hookPath(row.id, nodeId, rotation);
 }
 
 /** Secrets the graph names must be the automation's own shelf's. */

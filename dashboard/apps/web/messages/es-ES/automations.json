@@ -130,7 +130,8 @@
         "answer": "Responder",
         "announce": "Anunciar",
         "try": "Intentar",
-        "waitCondition": "Esperar una condición"
+        "waitCondition": "Esperar una condición",
+        "set": "Fijar valores"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -276,7 +277,8 @@
         "callerEnded": "Terminó la automatización que la llamó",
         "answerTooLarge": "La respuesta era muy grande",
         "announceLimited": "Demasiados anuncios",
-        "announceFailed": "El anuncio no se envió"
+        "announceFailed": "El anuncio no se envió",
+        "valuesTooLarge": "Valores demasiado grandes"
     },
     "secrets": {
         "title": "Secretos",
@@ -598,7 +600,8 @@
         "answer": "Devuelve valores a la automatización que llamó.",
         "announce": "Avisa a otras automatizaciones de que pasó algo.",
         "try": "Ejecuta los pasos de dentro y elige qué sigue a un fallo.",
-        "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo."
+        "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo.",
+        "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -692,7 +695,8 @@
         "eventNameReserved": "Los nombres que empiezan por {prefix} son de Polaris.",
         "useFinished": "Usarlo",
         "outcomes": "Solo si termina como",
-        "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}."
+        "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}.",
+        "values": "Valores"
     },
     "appNodes": {
         "homeTime": "Lugares: a una hora",

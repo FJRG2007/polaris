@@ -17,6 +17,7 @@ import * as core from "@polaris/core";
 import { fireTrigger } from "./combine";
 import { armVersion } from "./triggers";
 import { graphProblems } from "./node-registry";
+import { AutomationAccessError } from "./access-error";
 import { advanceRun, loadGraph, resumeDueWaits, RECHECK_PREFIX } from "./engine";
 
 const L = core.AUTOMATION_LIMITS;
@@ -253,6 +254,55 @@ export async function importLegacyAutomation(input: z.input<typeof importInput>)
     });
     if (published?.publishedVersionId) await armVersion(id, published.publishedVersionId, graph);
     return id;
+}
+
+const startInput = z.object({
+    name: z.string().trim().min(1).max(L.nameLength),
+    /** Whose personal shelf holds it; the screen that starts it has checked their rights. */
+    ownerId: z.string().uuid(),
+    origin: appId,
+    originRef: z.string().max(120).nullable(),
+    graph: z.unknown()
+});
+
+/**
+ * A new automation an app's screen starts, made straight in the central editor
+ * so every trigger, condition and step is there before the first save. A draft:
+ * nothing is published or armed until its owner publishes it. A graph that is
+ * not one at all starts empty with a manual trigger, as a new one does here.
+ */
+export async function startAppAutomation(input: z.input<typeof startInput>): Promise<string> {
+    const given = startInput.parse(input);
+    const count = await prisma.automation.count({
+        where: { orgId: null, userId: given.ownerId }
+    });
+    if (count >= L.perShelf) throw new AutomationAccessError("limit");
+    const parsed = core.automationGraphSchema.safeParse(given.graph);
+    const graph = parsed.success && parsed.data.nodes.length > 0 ? parsed.data : core.emptyGraph();
+    if (!parsed.success || parsed.data.nodes.length === 0) {
+        if (parsed.success) graph.timeZone = parsed.data.timeZone;
+        graph.nodes.push({
+            id: core.automationNodeId(),
+            type: "core.manual",
+            typeVersion: 1,
+            config: {}
+        });
+    }
+    const row = await prisma.automation.create({
+        data: {
+            userId: given.ownerId,
+            name: given.name,
+            description: "",
+            draft: graph as object,
+            mode: core.DEFAULT_AUTOMATION_MODE,
+            maxRuns: core.DEFAULT_MAX_RUNS,
+            rateLimit: core.DEFAULT_RATE_LIMIT,
+            origin: given.origin,
+            originRef: given.originRef
+        },
+        select: { id: true }
+    });
+    return row.id;
 }
 
 /** The central automation a moved row became, by its `legacyRef`. */

@@ -2028,6 +2028,8 @@
             "sameTime": "The start and the end are the same time.",
             "name": "Give it a name.",
             "place": "That place is no longer here.",
+            "template": "That template could not be opened. Start a blank one instead.",
+            "limit": "You have as many automations as you can. Delete one to start another.",
             "deviceGone": "That device is no longer at this place.",
             "attribute": "That device has nothing like that to watch.",
             "notSensor": "Choose a sensor, an air conditioner or an air purifier.",
@@ -2475,6 +2477,11 @@
         "battery": {
             "low": "Low",
             "ok": "Fine"
+        },
+        "start": {
+            "title": "Start an automation",
+            "hint": "Name it, then build it with every trigger and step: devices, web requests, webhooks and more. Nothing runs until you publish it.",
+            "create": "Create"
         }
     },
     "overview": {

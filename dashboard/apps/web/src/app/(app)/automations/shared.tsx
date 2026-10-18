@@ -30,6 +30,7 @@ import {
     Radio,
     Repeat,
     Reply,
+    Variable,
     Split,
     Sunrise,
     Timer,
@@ -211,6 +212,7 @@ const RUN_ERRORS = [
     "callFailed",
     "callerEnded",
     "answerTooLarge",
+    "valuesTooLarge",
     "announceLimited",
     "announceFailed"
 ] as const;
@@ -250,6 +252,7 @@ const NODE_KEYS = {
     "core.waitEvent": "waitEvent",
     "core.run": "run",
     "core.answer": "answer",
+    "core.set": "set",
     "core.announce": "announce",
     "core.try": "try",
     "core.waitCondition": "waitCondition"
@@ -307,6 +310,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "core.waitEvent": Ear,
     "core.run": Workflow,
     "core.answer": Reply,
+    "core.set": Variable,
     "core.announce": Megaphone,
     "core.try": LifeBuoy,
     "core.waitCondition": Timer

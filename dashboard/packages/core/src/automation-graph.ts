@@ -709,6 +709,8 @@ export const CORE_NODE_CONFIGS = {
         wait: z.boolean().default(true)
     }),
     "core.answer": z.object({ outputs: valuePairs }),
+    /** Named values worked out once, read by later steps as {{steps.<id>.values.<name>}}. */
+    "core.set": z.object({ values: valuePairs }),
     "core.announce": z.object({
         name: eventName.refine(
             (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
@@ -761,6 +763,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     // The child run's firing key is unique per step, so starting it again finds the same run.
     "core.run": { role: "action", ports: [], idempotent: true },
     "core.answer": { role: "action", ports: [], idempotent: true },
+    "core.set": { role: "action", ports: [], idempotent: true },
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.try": {
