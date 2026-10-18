@@ -177,7 +177,8 @@ async function senderIsFraud(address: string, domain: string): Promise<Reputatio
 async function domainIsFraud(domain: string): Promise<ReputationFinding | null> {
     const said = `The domain it came from, ${domain}, is known for defrauding people`;
     const known = await knownReputation("domain", domain, DYMO, DOMAIN_RULES);
-    if (known) return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
+    if (known)
+        return known.allow ? null : { id: "domain_fraud", score: WEIGHTS.fraud, reason: said };
 
     const apiKey = await getIntegrationSecret(DYMO);
     if (!apiKey) return null;

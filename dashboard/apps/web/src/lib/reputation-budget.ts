@@ -18,7 +18,9 @@
 export const BUDGETED_PROVIDERS = ["virustotal", "dymo"] as const;
 export type BudgetedProvider = (typeof BUDGETED_PROVIDERS)[number];
 
-export const LOOKUP_BUDGET: Readonly<Record<BudgetedProvider, { perMinute: number; perDay: number }>> = {
+export const LOOKUP_BUDGET: Readonly<
+    Record<BudgetedProvider, { perMinute: number; perDay: number }>
+> = {
     virustotal: { perMinute: 4, perDay: 500 },
     dymo: { perMinute: 30, perDay: 2000 }
 };
