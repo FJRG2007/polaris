@@ -49,6 +49,8 @@ export const MOST_ROCKETS = 6;
 /** How long a rocket climbs before it bursts, in game ticks: well clear of
  *  anybody under it, a burst hurting only within a few blocks. */
 const ROCKET_LIFE = 30;
+/** How long the arena is held after the rockets, so they burst over it. */
+export const ROCKET_HOLD_MS = ROCKET_LIFE * 50 + 500;
 
 /** The tag whoever is in it carries: a stage's (spleef, TNT run) or an arena's. */
 export function inTag(run: stored.EventRun): string {

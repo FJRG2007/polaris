@@ -410,6 +410,9 @@ export const SEASON_TRIM: Readonly<
     }
 };
 
+/** A lantern, bare: what stands on or hangs from another block. */
+const hangs = (id: string) => id === LANTERN || id === SOUL_LANTERN;
+
 /**
  * Every block the trim can be, bare, in the order they come down: a lantern
  * first, before whatever it stands on or hangs from.
@@ -422,10 +425,7 @@ export const TRIM_BLOCKS: readonly string[] = [
                 typeof one === "string" ? [one] : [one.soul, ...(one.before ? [one.before] : [])]
             )
             .map(bareId)
-            .sort(
-                (left, right) =>
-                    Number(right.endsWith("lantern")) - Number(left.endsWith("lantern"))
-            )
+            .sort((left, right) => Number(hangs(right)) - Number(hangs(left)))
     )
 ];
 
@@ -461,8 +461,7 @@ export function trimFills<T extends { readonly block: string }>(
 export function trimIds(blocks: readonly string[]): { first: string[]; last: string[] } {
     const used = new Set(blocks.map(bareId));
     const ids = TRIM_BLOCKS.filter((id) => used.has(id));
-    const attached = (id: string) => id.endsWith("lantern");
-    return { first: ids.filter(attached), last: ids.filter((id) => !attached(id)) };
+    return { first: ids.filter(hangs), last: ids.filter((id) => !hangs(id)) };
 }
 
 /** Four corners of a rectangle, at one height. */

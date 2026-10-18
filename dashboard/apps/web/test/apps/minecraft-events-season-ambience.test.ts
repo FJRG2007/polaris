@@ -169,8 +169,8 @@ describe("the season's trim", () => {
             const trim = decor.trimIds(dressed);
             const listed = new Set([...trim.first, ...one.blocks, ...trim.last]);
             for (const block of dressed) expect(listed.has(decor.bareId(block))).toBe(true);
-            for (const id of trim.first) expect(id.endsWith("lantern")).toBe(true);
-            for (const id of trim.last) expect(id.endsWith("lantern")).toBe(false);
+            for (const id of trim.first) expect(id).toMatch(/^minecraft:(soul_)?lantern$/);
+            for (const id of trim.last) expect(id).not.toMatch(/^minecraft:(soul_)?lantern$/);
         }
     });
 

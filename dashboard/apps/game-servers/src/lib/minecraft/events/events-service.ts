@@ -4766,7 +4766,10 @@ async function finish(
             // The season's fireworks over the arena while it still stands and
             // everybody is in it; nothing out of season.
             const cheer = ambience.winLines(run, placed[0]?.name ?? null, language);
-            if (cheer.length > 0) await server.sayAll(cheer).catch(() => undefined);
+            if (cheer.length > 0) {
+                await server.sayAll(cheer).catch(() => undefined);
+                await pace.pause(ambience.ROCKET_HOLD_MS);
+            }
             // The kit off and their own things back first; only then the prizes.
             await bringBack(server);
             const online = new Set(
