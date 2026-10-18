@@ -103,7 +103,7 @@ describe("the shared picker in place of a file input", () => {
         expect(await screen.findByText("Fetching the file")).toBeTruthy();
         expect(onClose).not.toHaveBeenCalled();
         release(
-            new Response(new Blob(["png"], { type: "image/png" }), {
+            new Response("png", {
                 headers: { "content-type": "image/png", "x-polaris-filename": "Skin.png" }
             })
         );
