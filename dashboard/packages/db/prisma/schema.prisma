@@ -10303,9 +10303,10 @@ model Friendship {
     // pending | accepted
     status      String    @default("pending")
     // What the asker wrote with the request, shown to the person asked while it
-    // waits. Lives only as long as the request does: accepting clears it, and
-    // turning down, withdrawing or blocking delete the row it is on.
-    note        String?   @db.VarChar(300)
+    // waits; at most 300 characters, held by friendNoteSchema. Lives only as
+    // long as the request does: accepting clears it, and turning down,
+    // withdrawing or blocking delete the row it is on.
+    note        String?
     createdAt   DateTime  @default(now())
     respondedAt DateTime?
 
