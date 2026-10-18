@@ -38,7 +38,8 @@ const snapshot: ClockSnapshot = {
             enabled: true,
             zone: "America/New_York",
             nextFireAt: "2026-10-05T11:00:00.000Z",
-            snoozed: false
+            snoozed: false,
+            stoppedDue: null
         },
         {
             id: "alarm-2",
@@ -50,7 +51,8 @@ const snapshot: ClockSnapshot = {
             enabled: false,
             zone: "America/New_York",
             nextFireAt: null,
-            snoozed: false
+            snoozed: false,
+            stoppedDue: null
         }
     ],
     timers: [
@@ -62,7 +64,8 @@ const snapshot: ClockSnapshot = {
             endsAt: null,
             remainingMs: 4 * 60_000 + 30_000,
             firedAt: null,
-            pomodoro: null
+            pomodoro: null,
+            stoppedDue: null
         },
         {
             id: "timer-2",
@@ -72,6 +75,7 @@ const snapshot: ClockSnapshot = {
             endsAt: null,
             remainingMs: 12 * 60_000,
             firedAt: null,
+            stoppedDue: null,
             pomodoro: {
                 focus: 25,
                 short: 5,
