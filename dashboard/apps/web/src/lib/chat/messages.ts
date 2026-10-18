@@ -39,6 +39,7 @@ import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdow
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
+import { checkLinksLater, flaggedLinksFor, type FlaggedLink } from "./link-safety";
 import {
     ChatAccessError,
     ChatRuleError,
@@ -155,6 +156,10 @@ export interface ChatMessageView {
      *  that waited for a background job to finish and then for something else to
      *  wake the screen was a card that never appeared. */
     readonly previewPending: boolean;
+    /** The links in it that a reputation service flagged, normalized with
+     *  `core.normalizeLink`. Empty when none were, or none were checked: the
+     *  screen warns on what is here and never calls a link safe. */
+    readonly flaggedLinks: readonly FlaggedLink[];
     /**
      * How far this message got, for the ticks under it.
      *
@@ -558,6 +563,7 @@ export async function send(
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
 
     unfurlLater(input.body);
+    checkLinksLater(id);
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
@@ -792,6 +798,7 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
 
     // An edit can put a link in a message that did not have one.
     unfurlLater(input.body);
+    checkLinksLater(input.messageId);
 }
 
 /**
@@ -1710,7 +1717,13 @@ export async function decorateMessages(
         .filter((row) => row.kind === "poll" && row.deletedAt === null)
         .map((row) => row.id);
 
-    const [authors, reactions, files, stars, quoted, previews, polls] = await Promise.all([
+    // Only the messages with an address in them can have a flagged link, which
+    // on most pages is none - and then this asks nothing.
+    const linkedIds = rows
+        .filter((row) => row.deletedAt === null && row.body.includes("://"))
+        .map((row) => row.id);
+
+    const [authors, reactions, files, stars, quoted, previews, polls, flags] = await Promise.all([
         authorIds.length || noticeIds.length
             ? prisma.user.findMany({
                   where: { id: { in: [...new Set([...authorIds, ...noticeIds])] } },
@@ -1748,7 +1761,8 @@ export async function decorateMessages(
               })
             : Promise.resolve([]),
         knownPreviews([...links.values()]),
-        pollsFor(actor.id, pollIds)
+        pollsFor(actor.id, pollIds),
+        flaggedLinksFor(linkedIds)
     ]);
 
     // The quoted messages have authors of their own, and they are usually
@@ -1922,6 +1936,7 @@ export async function decorateMessages(
             link: links.get(row.id) ?? null,
             preview: previewOf(row, links, previews),
             previewPending: pendingOf(row, links, previews),
+            flaggedLinks: flags.get(row.id) ?? [],
             receipt: receiptFor(row, actor, receipts),
             createdAt: row.createdAt.toISOString()
         };

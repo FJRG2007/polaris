@@ -69,6 +69,7 @@ export function draftMessage(facts: {
         link: null,
         preview: null,
         previewPending: false,
+        flaggedLinks: [],
         // Nothing has happened to it yet, not even leaving. The first tick
         // arrives with the message the reload brings back.
         receipt: null,

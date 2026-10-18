@@ -26,9 +26,7 @@ const VERDICT = z.object({
  *  else on purpose - the service adds fields, and a stricter schema here would
  *  turn a new one into a lookup that answers nothing. */
 const DOMAIN_ANALYSIS = z.object({
-    domain: z
-        .object({ valid: z.boolean().optional(), fraud: z.boolean().optional() })
-        .optional()
+    domain: z.object({ valid: z.boolean().optional(), fraud: z.boolean().optional() }).optional()
 });
 
 /** Verify an IP; `allow` is false when it matches any of the `deny` conditions. */
@@ -88,4 +86,17 @@ export async function verifyDomain(apiKey: string, domain: string): Promise<{ fr
     const client = new DymoAPI({ apiKey });
     const answer = DOMAIN_ANALYSIS.parse(await client.isValidDataRaw({ domain }));
     return { fraud: answer.domain?.fraud === true };
+}
+
+/**
+ * Whether a web address is one Dymo knows to be fraudulent.
+ *
+ * Asks only for the base verdict, with no plugins: each plugin is a further
+ * check the account is billed for, and the question chat asks is the narrow one
+ * of whether the page is a known scam.
+ */
+export async function verifyUrl(apiKey: string, url: string): Promise<{ fraud: boolean }> {
+    const client = new DymoAPI({ apiKey });
+    const result = await client.isValidDataRaw({ url });
+    return { fraud: result.url?.fraud === true };
 }

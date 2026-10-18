@@ -808,12 +808,7 @@ export function chatSearchIsEmpty(input: ChatSearchInput): boolean {
  * only quoting.
  */
 export function firstLink(body: string): string | null {
-    const prose = body
-        .replace(/```[\s\S]*?```/g, " ")
-        .replace(/~~~[\s\S]*?~~~/g, " ")
-        .replace(/`[^`]*`/g, " ");
-
-    const match = /https?:\/\/[^\s<>"')\]]+/i.exec(prose);
+    const match = /https?:\/\/[^\s<>"')\]]+/i.exec(withoutCode(body));
     if (!match) return null;
 
     // Trailing punctuation belongs to the sentence, not the address: "see
@@ -821,6 +816,75 @@ export function firstLink(body: string): string | null {
     const address = match[0].replace(/[.,;:!?]+$/, "");
     if (address.length > MAX_LINK_LENGTH) return null;
     return address;
+}
+
+/** The message with its code taken out, which is where an address appears that
+ *  nobody meant as a link. */
+function withoutCode(body: string): string {
+    return body
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/~~~[\s\S]*?~~~/g, " ")
+        .replace(/`[^`]*`/g, " ");
+}
+
+/**
+ * Every web address in a message, in the order written, each once and at most
+ * `limit` of them.
+ *
+ * The same reading as `firstLink` - code taken out, the sentence's punctuation
+ * left behind - for a caller that needs all of them rather than the one a card is
+ * drawn for: a link checked for safety is checked wherever it sits in the
+ * message, not only when it comes first. An address too long to be a link is
+ * skipped rather than ending the search.
+ */
+export function linksIn(body: string, limit: number): string[] {
+    const found: string[] = [];
+    for (const match of withoutCode(body).matchAll(/https?:\/\/[^\s<>"')\]]+/gi)) {
+        if (found.length >= limit) break;
+        const address = match[0].replace(/[.,;:!?]+$/, "");
+        if (address.length > MAX_LINK_LENGTH || found.includes(address)) continue;
+        found.push(address);
+    }
+    return found;
+}
+
+/** Query parameters that only say where a click came from. Two shares of one
+ *  page that differ only in these are the same page to anybody judging it. */
+const TRACKING_PARAM = /^(utm_[a-z]+|fbclid|gclid|dclid|msclkid|mc_eid|igshid)$/i;
+
+/**
+ * A link in the one form a verdict about it is filed under, or null when it is
+ * not a web address.
+ *
+ * The host is lower case, and the default port, the fragment, a trailing dot on
+ * the host and the click-tracking parameters are dropped: none of them change
+ * which page is served. Credentials written into the address are dropped too,
+ * and not for the cache's sake - this form is what is sent to an outside
+ * service, and a password pasted by mistake must not travel with it. The path
+ * and the rest of the query are kept as written, because they can be the
+ * difference between a document and a phishing page on the same host.
+ *
+ * Shared by the server that checks a link and the screen that warns about it,
+ * so both agree on which link a warning belongs to.
+ */
+export function normalizeLink(address: string): string | null {
+    let url: URL;
+    try {
+        url = new URL(address.trim());
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    url.hostname = url.hostname.replace(/\.+$/, "");
+    if (!url.hostname) return null;
+    for (const key of [...url.searchParams.keys()]) {
+        if (TRACKING_PARAM.test(key)) url.searchParams.delete(key);
+    }
+    const normalized = url.toString();
+    return normalized.length > MAX_LINK_LENGTH ? null : normalized;
 }
 
 /** The longest address Polaris will look at. Past this it is a payload rather

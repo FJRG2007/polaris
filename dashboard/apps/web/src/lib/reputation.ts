@@ -28,7 +28,7 @@
 import { prisma } from "@polaris/db";
 
 /** What can be asked about. */
-export const REPUTATION_KINDS = ["ip", "domain", "email"] as const;
+export const REPUTATION_KINDS = ["ip", "domain", "email", "url"] as const;
 export type ReputationKind = (typeof REPUTATION_KINDS)[number];
 
 /**
@@ -45,7 +45,10 @@ export type ReputationKind = (typeof REPUTATION_KINDS)[number];
 const TTL_MS: Readonly<Record<ReputationKind, number>> = {
     ip: 24 * 60 * 60 * 1000,
     domain: 15 * 24 * 60 * 60 * 1000,
-    email: 15 * 24 * 60 * 60 * 1000
+    email: 15 * 24 * 60 * 60 * 1000,
+    // One page rather than a whole site: it is taken down or cleaned up on its
+    // own schedule, so it is asked about more often than the domain it is on.
+    url: 3 * 24 * 60 * 60 * 1000
 };
 
 /** A flagged verdict is held for less than a clean one, so something that was
@@ -53,7 +56,8 @@ const TTL_MS: Readonly<Record<ReputationKind, number>> = {
 const FLAGGED_TTL_MS: Readonly<Record<ReputationKind, number>> = {
     ip: 6 * 60 * 60 * 1000,
     domain: 3 * 24 * 60 * 60 * 1000,
-    email: 3 * 24 * 60 * 60 * 1000
+    email: 3 * 24 * 60 * 60 * 1000,
+    url: 24 * 60 * 60 * 1000
 };
 
 /** Past this an answer is history nobody reads, and the subject will have been
@@ -74,6 +78,9 @@ export interface Verdict {
  * `someone@example.com` are one question and get one answer.
  */
 export function normalizeSubject(kind: ReputationKind, value: string): string {
+    // A web address arrives already in its one form (`core.normalizeLink`), and
+    // its path is case-sensitive, so lowering it would merge two pages.
+    if (kind === "url") return value.trim();
     const cleaned = value.trim().toLowerCase();
     if (kind !== "email") return cleaned;
     const at = cleaned.lastIndexOf("@");
@@ -163,7 +170,7 @@ export async function forgetReputation(
 /** What the cache holds, for the screen that has to say so. */
 export async function reputationCounts(): Promise<Record<ReputationKind, number>> {
     const rows = await prisma.subjectReputation.groupBy({ by: ["kind"], _count: { kind: true } });
-    const counts = { ip: 0, domain: 0, email: 0 };
+    const counts = { ip: 0, domain: 0, email: 0, url: 0 };
     for (const row of rows) {
         if (row.kind in counts) counts[row.kind as ReputationKind] = row._count.kind;
     }

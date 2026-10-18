@@ -21,6 +21,7 @@ import { confineCustomEmoji } from "./custom-emoji";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { unfurlLater } from "./messages";
+import { checkLinksLater } from "./link-safety";
 import { publishChatChange } from "./live";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { ChatAccessError, requireChannel, type ChatActor } from "./access";
@@ -186,6 +187,7 @@ export async function postThroughWebhook(
 
     publishChatChange({ channelId: webhook.channelId, kind: "posted", actorId: "" });
     unfurlLater(input.content);
+    checkLinksLater(id);
     return id;
 }
 
