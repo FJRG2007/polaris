@@ -1938,9 +1938,12 @@ export function toPillarsPace(preset: EventPreset): EventPreset {
         minutes: preset.minutes === OLD_PILLARS_MINUTES ? DEFAULT_MINUTES.pillars : preset.minutes,
         options: {
             ...options,
-            interval: options.interval === OLD_PILLARS_INTERVAL ? PILLARS_INTERVAL : options.interval,
+            interval:
+                options.interval === OLD_PILLARS_INTERVAL ? PILLARS_INTERVAL : options.interval,
             voidAfter:
-                options.voidAfter === OLD_PILLARS_VOID_AFTER ? PILLARS_VOID_AFTER : options.voidAfter
+                options.voidAfter === OLD_PILLARS_VOID_AFTER
+                    ? PILLARS_VOID_AFTER
+                    : options.voidAfter
         }
     } as EventPreset;
 }

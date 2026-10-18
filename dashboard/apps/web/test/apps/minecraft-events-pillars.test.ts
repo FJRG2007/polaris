@@ -104,8 +104,7 @@ describe("the pillars' ring", () => {
         expect(box.y2 - box.y1 + 1).toBeLessThanOrEqual(49);
         expect(arena.slices(box)).toHaveLength(5);
         expect(
-            arena.teardown({ box, blocks: [...pi.ARENA_BLOCKS], proved: box })
-                .length
+            arena.teardown({ box, blocks: [...pi.ARENA_BLOCKS], proved: box }).length
         ).toBeLessThan(120);
     });
 
@@ -709,8 +708,12 @@ describe("a pillars game played", () => {
             game: { ...pi.stateOf(null), out: [{ name: "Ben", at: 1, why: "fell" as const }] }
         };
         const lines = game.resultLines(run, "es", new Set());
-        expect(lines.some((line) => line.includes("title Ana title") && line.includes("Gana Ana"))).toBe(true);
-        expect(lines.some((line) => line.includes("title Ben title") && line.includes("Gana Ana"))).toBe(true);
+        expect(
+            lines.some((line) => line.includes("title Ana title") && line.includes("Gana Ana"))
+        ).toBe(true);
+        expect(
+            lines.some((line) => line.includes("title Ben title") && line.includes("Gana Ana"))
+        ).toBe(true);
         expect(lines.some((line) => line.includes("particle minecraft:firework"))).toBe(true);
         expect(game.resultLines(run, "es", new Set(["ana"]))).toEqual([]);
     });

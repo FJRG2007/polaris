@@ -84,7 +84,9 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                 pillarMessages.goSubtitle(ctx.language)
             )
         );
-    out.push(`execute as ${IN_GAME} at @s run playsound ${commands.SOUNDS.start} master @s ~ ~ ~ 1 1 0`);
+    out.push(
+        `execute as ${IN_GAME} at @s run playsound ${commands.SOUNDS.start} master @s ~ ~ ~ 1 1 0`
+    );
     // Survival only with a marker to tell the kit from anything else
     // (`arena.killBrokenDrops`), so nothing unmarked is carried home.
     if (run.marker) {

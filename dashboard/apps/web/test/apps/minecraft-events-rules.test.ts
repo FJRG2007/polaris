@@ -1449,7 +1449,11 @@ describe("a pillars game's pace", () => {
     type Pillars = catalog.EventPreset & { options: catalog.EventOptions<"pillars"> };
     const pillars = (interval: number, voidAfter: number, minutes: number) => {
         const preset = catalog.newPreset("pillars", "pillars") as Pillars;
-        return { ...preset, minutes, options: { ...preset.options, interval, voidAfter } } as Pillars;
+        return {
+            ...preset,
+            minutes,
+            options: { ...preset.options, interval, voidAfter }
+        } as Pillars;
     };
     const read = (preset: Pillars, defaults: number) =>
         catalog
