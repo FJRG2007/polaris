@@ -116,10 +116,7 @@ describe("what a search may reach", () => {
     it("finds nothing in a conversation the reader is not in", async () => {
         // The whole point. Naming somebody else's channel is a request that
         // narrows to the empty set, never a way into it.
-        const hits = await searchMessages(
-            actor,
-            query({ term: "x", channelId: THEIRS })
-        );
+        const hits = await searchMessages(actor, query({ term: "x", channelId: THEIRS }));
         expect(hits).toEqual([]);
         expect(asked).toBeNull();
     });

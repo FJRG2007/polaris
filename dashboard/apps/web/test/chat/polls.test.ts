@@ -163,9 +163,7 @@ const ADA = { id: "ada" };
 const GRACE = { id: "grace" };
 
 /** One poll in one channel, with as many answers as it is given. */
-function seed(
-    options: Partial<PollRow> & { answers?: number; authorId?: string } = {}
-): PollRow {
+function seed(options: Partial<PollRow> & { answers?: number; authorId?: string } = {}): PollRow {
     const answers = options.answers ?? 2;
     const poll: PollRow = {
         messageId: "m1",
@@ -261,9 +259,7 @@ describe("when a poll is over", () => {
     });
 
     it("is over the moment somebody ends it, whatever the clock says", () => {
-        expect(
-            pollIsClosed({ closesAt: pollClosesAt(336, NOW), closedAt: NOW }, NOW)
-        ).toBe(true);
+        expect(pollIsClosed({ closesAt: pollClosesAt(336, NOW), closedAt: NOW }, NOW)).toBe(true);
     });
 
     it("keeps a hidden poll hidden until then, and never a shown one", () => {
