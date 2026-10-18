@@ -38,7 +38,7 @@ export default async function OverviewPage() {
     ]);
 
     return (
-        <Messages namespaces={["home"]}>
+        <Messages namespaces={["home", "tasks"]}>
             <OverviewGrid
                 name={user.name}
                 isAdmin={user.isAdmin}

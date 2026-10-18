@@ -2480,7 +2480,7 @@
         "statusLabel": "Devices at a glance",
         "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
         "controlsLabel": "Quick controls",
-        "controlsHint": "Turn the devices you pick on or off, and set an air conditioner's temperature.",
+        "controlsHint": "Switch, lock and set the devices you pick: power, mode and temperature.",
         "room": "Room",
         "target": "Set to",
         "mode": "Mode",
@@ -2493,7 +2493,9 @@
         "setTo": "Set to",
         "offline": "Offline",
         "watchOnly": "Set to be watched, not operated",
-        "noControl": "You cannot operate this from here"
+        "noControl": "You cannot operate this from here",
+        "unlatch": "Open door",
+        "unlatchConfirm": "Open now?"
     },
     "nukiLocal": {
         "title": "Connect your Nuki locks locally",

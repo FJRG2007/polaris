@@ -108,6 +108,17 @@ describe("what a card shows", () => {
         expect(ac?.controls).toEqual([
             { kind: "toggle", id: "power", label: "Power", on: true, disabled: null },
             {
+                kind: "choice",
+                id: "mode",
+                label: "Mode",
+                value: "cool",
+                options: [
+                    { value: "cool", label: "Cool" },
+                    { value: "heat", label: "Heat" }
+                ],
+                disabled: null
+            },
+            {
                 kind: "number",
                 id: "target",
                 label: "Set to",
@@ -121,9 +132,22 @@ describe("what a card shows", () => {
         ]);
     });
 
-    it("draws no controls on a glance card", async () => {
+    it("draws only the main switch on a glance card", async () => {
         const view = await cards.readDevices(["ac"], "status");
-        expect(view.items[0]?.controls).toEqual([]);
+        expect(view.items[0]?.controls).toEqual([
+            { kind: "toggle", id: "power", label: "Power", on: true, disabled: null }
+        ]);
+    });
+
+    it("reads a press on a mode, a lock or an opener as the device action it is", () => {
+        expect(cards.pressAsAction("mode", "heat", "climate")).toEqual({
+            action: "set-mode",
+            command: { action: "set-mode", mode: "heat" }
+        });
+        expect(cards.pressAsAction("mode", "warp", "climate")).toBeNull();
+        expect(cards.pressAsAction("lock", true)).toEqual({ action: "lock" });
+        expect(cards.pressAsAction("unlatch", true)).toEqual({ action: "unlatch" });
+        expect(cards.pressAsAction("unlatch", false)).toBeNull();
     });
 
     it("says why a device that is not answering cannot be switched", async () => {

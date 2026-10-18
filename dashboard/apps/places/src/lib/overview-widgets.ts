@@ -41,6 +41,13 @@ const DEVICES_PATH = "/places/devices";
  *  temperature. Their ids are what a press names. */
 export const POWER = "power";
 export const TARGET = "target";
+/** An air conditioner's or purifier's mode, and the one-press actions a lock,
+ *  an opener and an appliance have. */
+export const MODE = "mode";
+export const LOCK = "lock";
+export const UNLOCK = "unlock";
+export const UNLATCH = "unlatch";
+export const STOP = "stop";
 
 /** The two kinds' names, in the reader's language. */
 export async function describeCard(mode: DeviceCardMode): Promise<{ label: string; hint: string }> {
@@ -55,7 +62,10 @@ export function hasQuickControl(device: kinds.DeviceView): boolean {
     const actions = kinds.actionsFor(device.kind);
     return (
         (actions.includes("turn-on") && actions.includes("turn-off")) ||
-        (actions.includes("set-temperature") && Boolean(device.climate))
+        (actions.includes("set-temperature") && Boolean(device.climate)) ||
+        actions.includes("lock") ||
+        actions.includes("unlatch") ||
+        (actions.includes("stop") && Boolean(device.appliance?.stoppable))
     );
 }
 
@@ -163,14 +173,73 @@ export function deviceItem(
           : !words.mayOperate
             ? t("overview.noControl")
             : null;
+    // The device's own main control is on both kinds of card, the way a tile
+    // on a home dashboard switches what it shows: power for anything with an on
+    // and an off, the bolt for a lock, stopping for an appliance that can be.
+    // The settings behind it - temperature, mode, opening the door - are the
+    // quick-controls card's.
     const controls: Control[] = [];
+    if (actions.includes("turn-on") && actions.includes("turn-off")) {
+        controls.push({
+            kind: "toggle",
+            id: POWER,
+            label: t("overview.power"),
+            on: device.state === "on",
+            disabled: blocked
+        });
+    }
+    if (actions.includes("lock")) {
+        const locked = device.state === "locked";
+        controls.push({
+            kind: "action",
+            id: locked ? UNLOCK : LOCK,
+            label: t(locked ? "devices.actions.unlock" : "devices.actions.lock"),
+            disabled: blocked ?? (device.state === "moving" ? t("devices.states.moving") : null)
+        });
+    }
+    if (actions.includes("stop") && device.appliance?.stoppable) {
+        controls.push({
+            kind: "action",
+            id: STOP,
+            label: t("devices.actions.stop"),
+            disabled: blocked
+        });
+    }
     if (mode === "controls") {
-        if (actions.includes("turn-on") && actions.includes("turn-off")) {
+        // Opening a door is never one brush of a finger away: it asks for a
+        // second press on the same button.
+        if (actions.includes("unlatch")) {
             controls.push({
-                kind: "toggle",
-                id: POWER,
-                label: t("overview.power"),
-                on: device.state === "on",
+                kind: "action",
+                id: UNLATCH,
+                label: t("overview.unlatch"),
+                confirm: t("overview.unlatchConfirm"),
+                disabled: blocked
+            });
+        }
+        if (actions.includes("set-mode") && climate && climate.modes.length > 1) {
+            controls.push({
+                kind: "choice",
+                id: MODE,
+                label: t("overview.mode"),
+                value: climate.mode,
+                options: climate.modes.map((value) => ({
+                    value,
+                    label: t(`devices.climate.modes.${value}`)
+                })),
+                disabled: blocked
+            });
+        }
+        if (actions.includes("set-mode") && air && air.modes.length > 1) {
+            controls.push({
+                kind: "choice",
+                id: MODE,
+                label: t("overview.mode"),
+                value: air.mode,
+                options: air.modes.map((value) => ({
+                    value,
+                    label: t(`devices.air.modes.${value}`)
+                })),
                 disabled: blocked
             });
         }
@@ -243,7 +312,8 @@ export async function readDevices(
  *  control this card does not draw. */
 export function pressAsAction(
     control: string,
-    value: boolean | number
+    value: boolean | number | string,
+    kind = ""
 ): { action: kinds.DeviceAction; command?: kinds.DeviceCommand } | null {
     if (control === POWER && typeof value === "boolean") {
         return { action: value ? "turn-on" : "turn-off" };
@@ -251,18 +321,36 @@ export function pressAsAction(
     if (control === TARGET && typeof value === "number" && Number.isFinite(value)) {
         return { action: "set-temperature", command: { action: "set-temperature", target: value } };
     }
+    if (
+        value === true &&
+        (control === LOCK || control === UNLOCK || control === UNLATCH || control === STOP)
+    ) {
+        return { action: control };
+    }
+    if (control === MODE && typeof value === "string") {
+        // Read as the device's own kind's mode; the service checks it against the
+        // modes that unit has before anything is sent.
+        const command = kinds.commandFor(kind, { action: "set-mode", mode: value });
+        return command ? { action: "set-mode", command: command.command } : null;
+    }
     return null;
 }
 
 /** Press it, through the devices screen's own action and every check it makes. */
 export async function operate(
     targets: readonly string[],
-    input: { item: string; control: string; value: boolean | number }
+    input: { item: string; control: string; value: boolean | number | string }
 ): Promise<{ error?: string }> {
     const t = await placesT();
     if (!targets.includes(input.item)) return { error: t("refusals.deviceCannot") };
-    const press = pressAsAction(input.control, input.value);
-    if (!press) return { error: t("refusals.deviceCannot") };
+    // The device's kind decides which presses it has at all - a lock's bolt on an
+    // air conditioner is refused here, before the devices screen is asked - and
+    // what a mode may be.
+    const device = (await reachable())?.devices.find((one) => one.id === input.item);
+    if (!device) return { error: t("refusals.deviceCannot") };
+    const press = pressAsAction(input.control, input.value, device.kind);
+    if (!press || !kinds.actionsFor(device.kind).includes(press.action))
+        return { error: t("refusals.deviceCannot") };
     const { operateDeviceAction } = await import("../screens/actions");
     const answer = await operateDeviceAction(input.item, press.action, press.command);
     return answer.error ? { error: answer.error } : {};

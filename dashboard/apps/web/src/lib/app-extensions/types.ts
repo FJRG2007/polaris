@@ -50,6 +50,9 @@ export interface GameServerSummary {
     readonly serverName: string | null;
     readonly running: boolean;
     readonly slots: number | null;
+    /** Who was on it at the last reading, when that reading is recent; null when
+     *  nobody could tell. Absent from an app that does not read it. */
+    readonly online?: number | null;
 }
 
 /** One event coming up, as the Overview card lists it. */
@@ -485,6 +488,25 @@ export type AppWidgetControl =
           readonly step: number;
           readonly unit: string;
           readonly disabled?: string | null;
+      }
+    | {
+          /** One of a few named settings, such as an air conditioner's mode. */
+          readonly kind: "choice";
+          readonly id: string;
+          readonly label: string;
+          readonly value: string | null;
+          readonly options: readonly { readonly value: string; readonly label: string }[];
+          readonly disabled?: string | null;
+      }
+    | {
+          /** A button that does one thing, such as locking a door. `confirm` is
+           *  what the button says on a second press it waits for, for an action
+           *  nobody should set off by brushing it. */
+          readonly kind: "action";
+          readonly id: string;
+          readonly label: string;
+          readonly confirm?: string;
+          readonly disabled?: string | null;
       };
 
 /** One target as a card draws it. */
@@ -509,5 +531,6 @@ export interface AppWidgetView {
 export interface AppWidgetInput {
     readonly item: string;
     readonly control: string;
-    readonly value: boolean | number;
+    /** A toggle's on, a number's value, a choice's option; an action sends true. */
+    readonly value: boolean | number | string;
 }

@@ -30,6 +30,7 @@ import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
 import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
 import { useAppFavorites } from "@/components/use-app-favorites";
+import { useLastPlaces } from "@/lib/last-place";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
@@ -276,12 +277,16 @@ function RailLink({
     // this answers is "is anybody waiting for me".
     const appId = APP_BY_HREF[item.href] ?? "";
     const unread = railCount({ href: item.href, appId, inApp, waiting, admin });
+    // An app in the list of apps opens where it was left, exactly as the
+    // launcher opens it; an app's own screens are addresses, not apps.
+    const places = useLastPlaces(!inApp && appId ? [{ id: appId, href: item.href }] : []);
+    const href = (!inApp && places[appId]) || item.href;
     // The active row is the one place the rail spends colour: a faint accent fill
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
     return (
         <Link
-            href={item.href}
+            href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
                 "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",

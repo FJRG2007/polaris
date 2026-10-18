@@ -103,7 +103,7 @@ export const placesExtension: AppExtension = {
                 ? {
                       act: async (
                           targets: readonly string[],
-                          input: { item: string; control: string; value: boolean | number }
+                          input: { item: string; control: string; value: boolean | number | string }
                       ) => (await overviewCards()).operate(targets, input)
                   }
                 : {})

@@ -2480,7 +2480,7 @@
         "statusLabel": "Estado de dispositivos",
         "statusHint": "Cómo están los dispositivos que elijas: temperaturas, calidad del aire, lecturas y baterías.",
         "controlsLabel": "Controles rápidos",
-        "controlsHint": "Enciende o apaga los dispositivos que elijas y fija la temperatura de un aire acondicionado.",
+        "controlsHint": "Enciende, cierra y ajusta lo que elijas: encendido, modo y temperatura.",
         "room": "Sala",
         "target": "Fijado a",
         "mode": "Modo",
@@ -2493,7 +2493,9 @@
         "setTo": "Fijar a",
         "offline": "Sin red",
         "watchOnly": "Solo para vigilar, no para manejar",
-        "noControl": "No puedes manejarlo desde aquí"
+        "noControl": "No puedes manejarlo desde aquí",
+        "unlatch": "Abrir puerta",
+        "unlatchConfirm": "¿Abrir ya?"
     },
     "nukiLocal": {
         "title": "Conecta tus cerraduras Nuki en local",

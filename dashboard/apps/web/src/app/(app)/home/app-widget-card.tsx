@@ -11,8 +11,17 @@
  */
 
 import Link from "next/link";
-import { Minus, Plus } from "lucide-react";
-import { Badge, Switch, cn } from "@polaris/ui";
+import { useEffect, useState } from "react";
+import { Check, ChevronDown, Minus, Plus } from "lucide-react";
+import {
+    Badge,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Switch,
+    cn
+} from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AppWidgetReadout } from "@/lib/overview/app-widgets";
 import { WidgetEmpty, WidgetRowsSkeleton, WidgetUnavailable } from "./widget-card";
@@ -176,6 +185,12 @@ function Control({
             </label>
         );
     }
+    if (control.kind === "choice") {
+        return <ChoiceControl item={item} control={control} blocked={blocked} onAct={onAct} />;
+    }
+    if (control.kind === "action") {
+        return <ActionControl item={item} control={control} blocked={blocked} onAct={onAct} />;
+    }
     const value = control.value;
     const step = (direction: 1 | -1) => {
         const from = value ?? (direction > 0 ? control.min : control.max);
@@ -215,6 +230,113 @@ function Control({
     );
 }
 
+/** How long a button that asks for a second press waits for it. */
+const CONFIRM_MS = 4_000;
+
+/** One of a few named settings, picked from a menu - never a native select,
+ *  which cannot be styled to the page and closes on its own in some browsers. */
+function ChoiceControl({
+    item,
+    control,
+    blocked,
+    onAct
+}: {
+    item: AppWidgetItem;
+    control: Extract<AppWidgetControl, { kind: "choice" }>;
+    blocked: boolean;
+    onAct: (input: AppWidgetInput) => void;
+}) {
+    const current = control.options.find((option) => option.value === control.value);
+    const why = control.disabled ?? undefined;
+    return (
+        <div className="flex min-w-0 items-center gap-1.5 text-xs" title={why}>
+            <span className="shrink-0 text-muted-foreground">{control.label}</span>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild disabled={blocked}>
+                    <button
+                        type="button"
+                        aria-label={`${control.label} - ${item.title}`}
+                        className="flex h-7 min-w-0 items-center gap-1 rounded-md border border-border px-2 text-sm font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+                    >
+                        <span className="truncate" title={current?.label}>
+                            {current?.label ?? "-"}
+                        </span>
+                        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-36">
+                    {control.options.map((option) => (
+                        <DropdownMenuItem
+                            key={option.value}
+                            onSelect={() => {
+                                if (option.value === control.value) return;
+                                onAct({ item: item.id, control: control.id, value: option.value });
+                            }}
+                            className={cn(option.value === control.value && "text-primary")}
+                        >
+                            <Check
+                                className={cn(
+                                    "size-4 shrink-0",
+                                    option.value !== control.value && "invisible"
+                                )}
+                                aria-hidden="true"
+                            />
+                            {option.label}
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    );
+}
+
+/** A button that does one thing. One that asks for a second press says so on
+ *  itself, and goes back to its own word if the second press does not come. */
+function ActionControl({
+    item,
+    control,
+    blocked,
+    onAct
+}: {
+    item: AppWidgetItem;
+    control: Extract<AppWidgetControl, { kind: "action" }>;
+    blocked: boolean;
+    onAct: (input: AppWidgetInput) => void;
+}) {
+    const [armed, setArmed] = useState(false);
+    useEffect(() => {
+        if (!armed) return;
+        const timer = window.setTimeout(() => setArmed(false), CONFIRM_MS);
+        return () => window.clearTimeout(timer);
+    }, [armed]);
+    const why = control.disabled ?? undefined;
+    const label = armed && control.confirm ? control.confirm : control.label;
+    return (
+        <button
+            type="button"
+            disabled={blocked}
+            title={why}
+            aria-label={`${label} - ${item.title}`}
+            onClick={() => {
+                if (control.confirm && !armed) {
+                    setArmed(true);
+                    return;
+                }
+                setArmed(false);
+                onAct({ item: item.id, control: control.id, value: true });
+            }}
+            className={cn(
+                "h-7 max-w-full truncate rounded-md border px-2.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
+                armed
+                    ? "border-warning bg-warning/10 text-warning"
+                    : "border-border hover:bg-muted"
+            )}
+        >
+            {label}
+        </button>
+    );
+}
+
 /** The view with one control already set to what was pressed - drawn while
  *  the app is asked, and replaced by its answer. */
 export function withPressed(readout: AppWidgetReadout, input: AppWidgetInput): AppWidgetReadout {
@@ -232,7 +354,11 @@ export function withPressed(readout: AppWidgetReadout, input: AppWidgetInput): A
                                   ? control
                                   : control.kind === "toggle"
                                     ? { ...control, on: Boolean(input.value) }
-                                    : { ...control, value: Number(input.value) }
+                                    : control.kind === "number"
+                                      ? { ...control, value: Number(input.value) }
+                                      : control.kind === "choice"
+                                        ? { ...control, value: String(input.value) }
+                                        : control
                           )
                       }
             )

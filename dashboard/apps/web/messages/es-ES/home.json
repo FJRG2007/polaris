@@ -159,7 +159,9 @@
         "count": "<big>{running}</big><rest> de {total, plural, one {# servidor en marcha} other {# servidores en marcha}}</rest>",
         "slots": "{count} plazas",
         "up": "En marcha",
-        "stopped": "Parado"
+        "stopped": "Parado",
+        "playersTitle": "{online} de {max} jugadores dentro",
+        "onlineTitle": "{online, plural, one {# jugador} other {# jugadores}} dentro"
     },
     "calendar": {
         "unavailable": "No se pudieron leer tus calendarios ahora.",

@@ -11,12 +11,16 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { useEffect, useState } from "react";
+import { cn, useToast } from "@polaris/ui";
+import { updateTaskAction } from "../../tasks/actions";
+import { StatusDot, StatusPicker } from "../../tasks/pickers";
 import { formatBytes } from "@polaris/core";
 import { GameLogo } from "@/components/game-logo";
 import { findGame } from "@/lib/apps/games-catalog";
 import { PriorityMark } from "@/components/priority-mark";
 import { RelativeTime } from "@/components/relative-time";
+import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     StateDot,
@@ -393,13 +397,7 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
                         icon={<GameMark game={server.game} running={server.running} />}
                         label={server.name}
                         detail={server.detail || null}
-                        trailing={
-                            server.slots === null ? undefined : (
-                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                                    {t("games.slots", { count: server.slots })}
-                                </span>
-                            )
-                        }
+                        trailing={<GamePlayers server={server} />}
                     />
                 ))}
             </WidgetList>
@@ -407,9 +405,51 @@ export function GamesWidget({ data }: { data: Loaded<OverviewGames> }) {
     );
 }
 
+/**
+ * Who is on a server against how many it holds, "1/20", in the reader's own
+ * short form for big numbers ("1.2K/5K"). From the activity sweep's last
+ * reading, so a server that is up but has not been read lately says what it
+ * holds rather than a guess at who is on it.
+ */
+function GamePlayers({ server }: { server: OverviewGames["servers"][number] }) {
+    const t = useTranslations("home");
+    const format = useDisplayFormat();
+    const short = (value: number) =>
+        format.number(value, { notation: "compact", maximumFractionDigits: 1 });
+    if (server.running && server.online !== null) {
+        const title =
+            server.slots === null
+                ? t("games.onlineTitle", { online: server.online })
+                : t("games.playersTitle", { online: server.online, max: server.slots });
+        return (
+            <span
+                className="shrink-0 text-xs tabular-nums text-muted-foreground"
+                title={title}
+                aria-label={title}
+            >
+                <span className={cn(server.online > 0 && "font-medium text-foreground")}>
+                    {short(server.online)}
+                </span>
+                {server.slots === null ? null : `/${short(server.slots)}`}
+            </span>
+        );
+    }
+    if (server.slots === null) return null;
+    return (
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            {t("games.slots", { count: server.slots })}
+        </span>
+    );
+}
+
 /** The work assigned to somebody, most pressing first. */
 export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
     const t = useTranslations("home");
+    const tp = useTranslations("tasks");
+    const toast = useToast();
+    // A status picked here, shown at once and taken back if Tasks refuses it.
+    const [moved, setMoved] = useState<Record<string, string>>({});
+    useEffect(() => setMoved({}), [data]);
     if (data === undefined) return <WidgetRowsSkeleton />;
     if (data === null) return <WidgetUnavailable>{t("tasks.unavailable")}</WidgetUnavailable>;
     if (data.assigned === 0) return <WidgetEmpty>{t("tasks.empty")}</WidgetEmpty>;
@@ -440,27 +480,76 @@ export function TasksWidget({ data }: { data: Loaded<OverviewTasks> }) {
                 ) : null}
             </p>
             <WidgetList>
-                {data.rows.map((task) => (
-                    <WidgetRow
-                        key={task.id}
-                        href={task.href}
-                        icon={<PriorityMark priority={task.priority} className="mt-0.5" />}
-                        label={task.name}
-                        detail={`${task.reference} - ${task.list}`}
-                        trailing={
-                            task.dueDate ? (
-                                <span
-                                    className={cn(
-                                        "shrink-0 text-xs",
-                                        task.overdue ? "text-danger" : "text-muted-foreground"
-                                    )}
-                                >
-                                    <RelativeTime iso={task.dueDate} />
-                                </span>
-                            ) : null
-                        }
-                    />
-                ))}
+                {data.rows.map((task) => {
+                    const statuses = data.statuses?.[task.spaceId] ?? [];
+                    const statusId = moved[task.id] ?? task.statusId;
+                    const status = statuses.find((one) => one.id === statusId);
+                    const name = status?.name ?? tp("groups.noStatus");
+                    const change = (next: string) => {
+                        if (next === statusId) return;
+                        const before = moved[task.id];
+                        setMoved((current) => ({ ...current, [task.id]: next }));
+                        const undo = () =>
+                            setMoved((current) => {
+                                const rest = { ...current };
+                                if (before === undefined) delete rest[task.id];
+                                else rest[task.id] = before;
+                                return rest;
+                            });
+                        void updateTaskAction({ taskId: task.id, statusId: next }).then(
+                            (answer) => {
+                                if (!answer.error) return;
+                                undo();
+                                toast.show({ title: answer.error });
+                            },
+                            () => {
+                                undo();
+                                toast.show({ title: t("errors.changeNotSaved") });
+                            }
+                        );
+                    };
+                    return (
+                        <WidgetRow
+                            key={task.id}
+                            href={task.href}
+                            icon={<PriorityMark priority={task.priority} className="mt-0.5" />}
+                            label={task.name}
+                            detail={`${task.reference} - ${task.list}`}
+                            trailing={
+                                task.dueDate ? (
+                                    <span
+                                        className={cn(
+                                            "shrink-0 text-xs",
+                                            task.overdue ? "text-danger" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        <RelativeTime iso={task.dueDate} />
+                                    </span>
+                                ) : null
+                            }
+                            action={
+                                statuses.length > 0 ? (
+                                    <StatusPicker
+                                        statuses={statuses}
+                                        value={statusId}
+                                        spaceId={task.spaceId}
+                                        onChange={change}
+                                        trigger={
+                                            <button
+                                                type="button"
+                                                title={tp("pickers.statusNamed", { name })}
+                                                aria-label={tp("pickers.statusNamed", { name })}
+                                                className="grid size-7 shrink-0 place-items-center rounded-md transition-colors hover:bg-muted data-[state=open]:bg-muted"
+                                            >
+                                                <StatusDot color={status?.color ?? "#64748b"} />
+                                            </button>
+                                        }
+                                    />
+                                ) : null
+                            }
+                        />
+                    );
+                })}
             </WidgetList>
         </div>
     );

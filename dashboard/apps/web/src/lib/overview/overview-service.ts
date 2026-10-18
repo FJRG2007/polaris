@@ -25,6 +25,7 @@ import { listUserActivity } from "@/lib/audit-service";
 import { listUserSessions } from "@/lib/session-directory";
 import { listRecentAlarmEvents } from "@/lib/watch-service";
 import type { MyWorkTask } from "@/lib/tasks/report-service";
+import type { StatusView } from "@/lib/tasks/space-service";
 import type { MetricSubjectType } from "@/lib/metrics-shared";
 import { gameServerSummaries, upcomingEventsFor } from "@/lib/app-extensions/registry";
 import type { UpcomingEvent } from "@/lib/app-extensions/types";
@@ -88,6 +89,9 @@ export interface OverviewTasks {
     /** The work itself, most pressing first. Counts alone say how much there is
      *  and nothing about what it is, which is not a reason to open anything. */
     rows: MyWorkTask[];
+    /** Each listed task's space's statuses, by space, for moving a task on from
+     *  the card with the same states Tasks offers. */
+    statuses: Record<string, StatusView[]>;
 }
 
 export interface OverviewStorageEntry {
@@ -126,6 +130,8 @@ export interface OverviewGameServer {
     running: boolean;
     /** How many players it was built for, null when the install never said. */
     slots: number | null;
+    /** Who is on it at the last reading, null when nobody could tell. */
+    online: number | null;
     href: string;
 }
 
@@ -313,6 +319,7 @@ async function gameServers(userId: string): Promise<OverviewGames> {
             .join(" - "),
         running: server.running,
         slots: server.slots,
+        online: server.online ?? null,
         href: `${INSTALLED_BASE}/${server.id}`
     }));
     return {
@@ -460,7 +467,27 @@ async function assignedWork(user: SessionUser): Promise<OverviewTasks> {
         myWorkCounts(user.id, scope),
         myUrgentTasks(user.id, scope, CARD_ROWS)
     ]);
-    return { ...counts, rows };
+    // One read for every space the rows are in, rather than one per space.
+    const spaceIds = [...new Set(rows.map((row) => row.spaceId))];
+    const found =
+        spaceIds.length === 0
+            ? []
+            : await prisma.taskStatus.findMany({
+                  where: { spaceId: { in: spaceIds } },
+                  select: { id: true, spaceId: true, name: true, type: true, color: true, order: true },
+                  orderBy: [{ order: "asc" }, { createdAt: "asc" }]
+              });
+    const statuses: Record<string, StatusView[]> = {};
+    for (const status of found) {
+        (statuses[status.spaceId] ??= []).push({
+            id: status.id,
+            name: status.name,
+            type: status.type as StatusView["type"],
+            color: status.color,
+            order: status.order
+        });
+    }
+    return { ...counts, rows, statuses };
 }
 
 /**

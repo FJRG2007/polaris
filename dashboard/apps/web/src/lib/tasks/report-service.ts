@@ -228,6 +228,10 @@ export interface MyWorkTask {
     overdue: boolean;
     /** The list it sits in, for the second line. */
     list: string;
+    /** Where it lives and what it is at, so a card can move it on without
+     *  opening it - against the statuses of its own space. */
+    spaceId: string;
+    statusId: string | null;
     href: string;
 }
 
@@ -261,6 +265,8 @@ export async function myUrgentTasks(
         number: true,
         priority: true,
         dueDate: true,
+        spaceId: true,
+        statusId: true,
         list: { select: { name: true } },
         space: { select: { prefix: true } }
     } as const;
@@ -293,6 +299,8 @@ export async function myUrgentTasks(
             dueDate: task.dueDate ? task.dueDate.toISOString() : null,
             overdue: Boolean(task.dueDate && task.dueDate < startOfToday),
             list: task.list.name,
+            spaceId: task.spaceId,
+            statusId: task.statusId,
             href: `/tasks/t/${task.id}`
         }))
         .sort(

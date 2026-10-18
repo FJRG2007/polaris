@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/components/relative-time", () => ({ RelativeTime: ({ iso }: { iso: string }) => iso }));
+vi.mock("@/app/(app)/tasks/actions", () => ({ updateTaskAction: async () => ({}) }));
 
 const { ServicesWidget, TasksWidget } = await import("@/app/(app)/home/widgets/infrastructure");
 
