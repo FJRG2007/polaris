@@ -30,23 +30,28 @@ concurrency:
 
 jobs:
   tag:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Tag the version if it has no release yet
+      - name: Tag the version and start its release if it has none yet
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(node -p "require('./dashboard/apps/extension/package.json').version")"
           tag="extension-v${version}"
-          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "${tag} already exists; nothing to release."
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "${tag} is already released; nothing to do."
             exit 0
           fi
-          git tag "${tag}" "${GITHUB_SHA}"
-          git push origin "refs/tags/${tag}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} exists without a release; starting it again."
+          else
+            git tag "${tag}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${tag}"
+          fi
           gh workflow run extension.yml --ref "${tag}"
-          echo "Tagged ${tag} and started its release."
+          echo "Started the release of ${tag}."
