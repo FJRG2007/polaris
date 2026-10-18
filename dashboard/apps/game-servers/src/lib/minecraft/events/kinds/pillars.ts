@@ -117,7 +117,12 @@ export const DROPS: readonly Drop[] = [
     { id: "minecraft:splash_potion", count: 1, potion: "minecraft:swiftness", weights: both(1, 2) },
     { id: "minecraft:splash_potion", count: 1, potion: "minecraft:leaping", weights: both(1, 2) },
     { id: "minecraft:splash_potion", count: 1, potion: "minecraft:healing", weights: both(1, 1) },
-    { id: "minecraft:splash_potion", count: 1, potion: "minecraft:slow_falling", weights: both(1, 2) },
+    {
+        id: "minecraft:splash_potion",
+        count: 1,
+        potion: "minecraft:slow_falling",
+        weights: both(1, 2)
+    },
     { id: "minecraft:splash_potion", count: 1, potion: "minecraft:harming", weights: both(0, 2) },
     // Food.
     { id: "minecraft:bread", count: 3, weights: both(3, 1) },
@@ -498,7 +503,14 @@ export function quickLines(
         `x=${x1},y=${y1},z=${z1},dx=${x2 - x1},dy=${y2 - y1},dz=${z2 - z1}`;
     const bottom = Math.max(play.y1, floor);
     const outside = [
-        volume(box.x1 - far, box.y1 - far * 2, box.z1 - far, box.x2 + far, bottom - 1, box.z2 + far),
+        volume(
+            box.x1 - far,
+            box.y1 - far * 2,
+            box.z1 - far,
+            box.x2 + far,
+            bottom - 1,
+            box.z2 + far
+        ),
         volume(box.x1 - far, bottom, box.z1 - far, play.x1 - 1, box.y2 + far, box.z2 + far),
         volume(play.x2 + 1, bottom, box.z1 - far, box.x2 + far, box.y2 + far, box.z2 + far),
         volume(play.x1, bottom, box.z1 - far, play.x2, box.y2 + far, play.z1 - 1),

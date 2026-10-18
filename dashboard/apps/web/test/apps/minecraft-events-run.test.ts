@@ -13306,7 +13306,10 @@ describe("Pillars", () => {
     const kind = () => import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/pillars");
     const names = ["Ana", "Ben", "Cy"];
     /** Where the ring stands for a run, as the arena worked it out. */
-    const placedOf = async (run: { place: { x: number; y: number; z: number } | null }, count = 3) => {
+    const placedOf = async (
+        run: { place: { x: number; y: number; z: number } | null },
+        count = 3
+    ) => {
         const pi = await kind();
         const layout = pi.layoutFor(count, true);
         return {

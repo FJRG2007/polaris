@@ -260,7 +260,10 @@ export function packFiles(): ReadonlyMap<string, string> {
     for (const folder of ["loot_tables", "loot_table"])
         for (const [name, table] of Object.entries(pillars.LOOT_TABLES))
             if (folder === "loot_tables" || name.endsWith("_components"))
-                files.set(`data/polaris/${folder}/pillars/${name}.json`, `${JSON.stringify(table)}\n`);
+                files.set(
+                    `data/polaris/${folder}/pillars/${name}.json`,
+                    `${JSON.stringify(table)}\n`
+                );
     for (const folder of ["functions", "function"]) {
         files.set(`data/minecraft/tags/${folder}/tick.json`, tick);
         for (const [game, functions] of GAMES)

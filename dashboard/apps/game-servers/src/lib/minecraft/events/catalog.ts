@@ -1772,7 +1772,8 @@ export function migratePreset(entry: unknown): unknown {
  */
 function everyShape(entry: object): object {
     const options = (entry as { options?: unknown }).options;
-    if (typeof options !== "object" || options === null || "shapesRevision" in options) return entry;
+    if (typeof options !== "object" || options === null || "shapesRevision" in options)
+        return entry;
     const shapes = (options as { shapes?: unknown }).shapes;
     const old =
         shapes === undefined ||
@@ -2617,9 +2618,7 @@ export function needsVersion(preset: EventPreset): readonly number[] | null {
 /** Played in an arena until one player is left: ranked by the order they went
  *  out in, so anybody who took part at all is ranked. */
 export function lastStanding(preset: EventPreset): boolean {
-    return (
-        preset.kind === "hot-potato" || preset.kind === "sky-wars" || preset.kind === "pillars"
-    );
+    return preset.kind === "hot-potato" || preset.kind === "sky-wars" || preset.kind === "pillars";
 }
 
 /**

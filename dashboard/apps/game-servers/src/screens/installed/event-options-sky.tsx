@@ -83,12 +83,11 @@ const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameK
         rich: "editor.labels.skyWarsLoot.rich"
     };
 
-const POOL_LABELS: Readonly<Record<(typeof catalog.PILLAR_POOLS)[number], GameKey<"minecraft">>> =
-    {
-        balanced: "editor.labels.pillarPool.balanced",
-        blocks: "editor.labels.pillarPool.blocks",
-        chaos: "editor.labels.pillarPool.chaos"
-    };
+const POOL_LABELS: Readonly<Record<(typeof catalog.PILLAR_POOLS)[number], GameKey<"minecraft">>> = {
+    balanced: "editor.labels.pillarPool.balanced",
+    blocks: "editor.labels.pillarPool.blocks",
+    chaos: "editor.labels.pillarPool.chaos"
+};
 
 /** A whole number from `min` to `max`, with the schema's complaint about it. */
 export function NumberField({

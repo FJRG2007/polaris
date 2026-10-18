@@ -78,7 +78,9 @@ describe("the pillars' ring", () => {
         }
         expect(fills.some((one) => one.block === "minecraft:smooth_stone")).toBe(true);
         expect(
-            pi.arenaFills(pi.layoutFor(4, false), at).some((one) => one.block === "minecraft:smooth_stone")
+            pi
+                .arenaFills(pi.layoutFor(4, false), at)
+                .some((one) => one.block === "minecraft:smooth_stone")
         ).toBe(false);
     });
 
@@ -93,9 +95,9 @@ describe("the pillars' items", () => {
     it("draws only blocks in the blocks pool, and the wild stuff only in chaos", () => {
         const ids = (pool: pi.Pool) => new Set(pi.poolOf(pool).map((one) => one.drop.id));
         const blocks = ids("blocks");
-        expect([...blocks].every((id) => pi.ARENA_BLOCKS.includes(id) || id === "minecraft:ladder")).toBe(
-            true
-        );
+        expect(
+            [...blocks].every((id) => pi.ARENA_BLOCKS.includes(id) || id === "minecraft:ladder")
+        ).toBe(true);
         for (const wild of ["minecraft:tnt", "minecraft:flint_and_steel"]) {
             expect(ids("chaos").has(wild)).toBe(true);
             expect(ids("balanced").has(wild)).toBe(false);
@@ -128,7 +130,11 @@ describe("the pillars' items", () => {
             const total = entries.reduce((sum, one) => sum + one.weight, 0);
             return (
                 entries
-                    .filter((one) => pi.ARENA_BLOCKS.includes(one.drop.id) || one.drop.id === "minecraft:ladder")
+                    .filter(
+                        (one) =>
+                            pi.ARENA_BLOCKS.includes(one.drop.id) ||
+                            one.drop.id === "minecraft:ladder"
+                    )
                     .reduce((sum, one) => sum + one.weight, 0) / total
             );
         };
@@ -153,7 +159,9 @@ describe("the pillars' items", () => {
         expect(table.pools).toHaveLength(1);
         expect(table.pools[0]!.rolls).toBe(1);
         for (const entry of table.pools[0]!.entries)
-            expect(entry.functions.some((one) => one.function === "minecraft:set_custom_data")).toBe(true);
+            expect(
+                entry.functions.some((one) => one.function === "minecraft:set_custom_data")
+            ).toBe(true);
     });
 
     it("takes back every item it can hand out, and leaves nothing unmarked behind", () => {
@@ -189,12 +197,18 @@ describe("the pillars' drops", () => {
         );
         for (const [path, content] of files) {
             if (!/\/loot_tables?\/pillars\//.test(path)) continue;
-            const name = path.split("/").at(-1)!.replace(/\.json$/, "");
+            const name = path
+                .split("/")
+                .at(-1)!
+                .replace(/\.json$/, "");
             expect(JSON.parse(content)).toEqual(pi.LOOT_TABLES[name]);
         }
         for (const folder of ["functions", "function"]) {
             const read = (name: string) =>
-                files.get(`data/polaris/${folder}/pillars/${name}.mcfunction`)!.trimEnd().split("\n");
+                files
+                    .get(`data/polaris/${folder}/pillars/${name}.mcfunction`)!
+                    .trimEnd()
+                    .split("\n");
             expect(files.get(`data/minecraft/tags/${folder}/tick.json`)).toContain(
                 "polaris:pillars/tick"
             );
@@ -236,7 +250,11 @@ describe("the pillars' drops", () => {
         }
         const allowed = {
             // 1.20.5 on: `set_nbt` became `set_custom_data`.
-            components: ["minecraft:set_count", "minecraft:set_custom_data", "minecraft:set_potion"],
+            components: [
+                "minecraft:set_count",
+                "minecraft:set_custom_data",
+                "minecraft:set_potion"
+            ],
             // 1.17 to 1.20.4: `set_potion` is only 1.18 on, so the potion goes in the data.
             tag: ["minecraft:set_count", "minecraft:set_nbt"]
         };
@@ -251,7 +269,9 @@ describe("the pillars' drops", () => {
             /_(sword|axe|pickaxe|helmet|chestplate)$|^minecraft:(bow|fishing_rod|shield|shears|flint_and_steel|splash_potion)$/;
         for (const pool of pi.POOLS)
             for (const era of ["components", "tag"] as const) {
-                const table = pi.lootTable(pool, era) as { pools: { rolls: number; entries: Entry[] }[] };
+                const table = pi.lootTable(pool, era) as {
+                    pools: { rolls: number; entries: Entry[] }[];
+                };
                 expect(Object.keys(table)).toEqual(["pools"]);
                 expect(table.pools).toHaveLength(1);
                 expect(Object.keys(table.pools[0]!).sort()).toEqual(["entries", "rolls"]);
@@ -262,25 +282,41 @@ describe("the pillars' drops", () => {
                 );
                 for (const [index, entry] of entries.entries()) {
                     const drop = pi.poolOf(pool)[index]!.drop;
-                    expect(Object.keys(entry).sort()).toEqual(["functions", "name", "type", "weight"]);
+                    expect(Object.keys(entry).sort()).toEqual([
+                        "functions",
+                        "name",
+                        "type",
+                        "weight"
+                    ]);
                     expect(entry.type).toBe("minecraft:item");
                     expect(entry.name).toMatch(/^minecraft:[a-z_]+$/);
                     expect(Number.isInteger(entry.weight) && entry.weight > 0).toBe(true);
                     for (const one of entry.functions) expect(allowed[era]).toContain(one.function);
                     // Never more than a stack, and one of anything that does not stack.
                     expect(drop.count).toBeLessThanOrEqual(single.test(drop.id) ? 1 : 16);
-                    const count = entry.functions.find((one) => one.function === "minecraft:set_count");
-                    if (drop.count > 1) expect(count).toEqual({ function: "minecraft:set_count", count: drop.count });
+                    const count = entry.functions.find(
+                        (one) => one.function === "minecraft:set_count"
+                    );
+                    if (drop.count > 1)
+                        expect(count).toEqual({
+                            function: "minecraft:set_count",
+                            count: drop.count
+                        });
                     else expect(count).toBeUndefined();
                     if (era === "components") {
                         expect(entry.functions).toContainEqual({
                             function: "minecraft:set_custom_data",
                             tag: "{polaris_event:1b}"
                         });
-                        const potion = entry.functions.find((one) => one.function === "minecraft:set_potion");
+                        const potion = entry.functions.find(
+                            (one) => one.function === "minecraft:set_potion"
+                        );
                         if (drop.potion) {
                             expect(potions).toContain(drop.potion);
-                            expect(potion).toEqual({ function: "minecraft:set_potion", id: drop.potion });
+                            expect(potion).toEqual({
+                                function: "minecraft:set_potion",
+                                id: drop.potion
+                            });
                         } else expect(potion).toBeUndefined();
                     } else
                         expect(entry.functions).toContainEqual({
@@ -312,14 +348,21 @@ describe("the pillars' drops", () => {
     it("falls back to one marked give per player, in one batch, the same draw after a restart", () => {
         const lines = pi.dropLines("run-1", 3, ["Ana", "Ben", "Cy"], "balanced", "components");
         expect(lines).toHaveLength(3);
-        expect(lines).toEqual(pi.dropLines("run-1", 3, ["Ana", "Ben", "Cy"], "balanced", "components"));
+        expect(lines).toEqual(
+            pi.dropLines("run-1", 3, ["Ana", "Ben", "Cy"], "balanced", "components")
+        );
         for (const line of lines) {
-            expect(line).toMatch(/^give (Ana|Ben|Cy) minecraft:[a-z_]+\[minecraft:custom_data=\{polaris_event:1b\}/);
+            expect(line).toMatch(
+                /^give (Ana|Ben|Cy) minecraft:[a-z_]+\[minecraft:custom_data=\{polaris_event:1b\}/
+            );
             expect(commandBytes(line)).toBeLessThan(COMMAND_BYTES_MAX);
         }
         const old = pi.dropLines("run-1", 3, ["Ana"], "blocks", "tag")[0]!;
         expect(old).toMatch(/^give Ana minecraft:[a-z_]+\{polaris_event:1b\} \d+$/);
-        const potion = pi.itemOf(pi.DROPS.find((one) => one.potion === "minecraft:leaping")!, "tag");
+        const potion = pi.itemOf(
+            pi.DROPS.find((one) => one.potion === "minecraft:leaping")!,
+            "tag"
+        );
         expect(potion).toBe('minecraft:splash_potion{polaris_event:1b,Potion:"minecraft:leaping"}');
     });
 
@@ -353,8 +396,16 @@ describe("the rising void", () => {
         expect(lines[0]).toBe(`tag @a[tag=${pi.IN_TAG},name=!Ana,name=!Ben] remove ${pi.IN_TAG}`);
         expect(lines[1]).toContain(`dy=${play.y1 + 10 - 1 - (box.y1 - 128)}`);
         expect(lines[1]).toContain(`add ${pi.VOID_TAG}`);
-        expect(pi.quickLines(layout, at, box, play.y1, ["Ana"]).some((line) => line.includes(pi.VOID_TAG))).toBe(false);
-        expect(lines.some((line) => line.includes(`tp @a[tag=${pi.IN_TAG},tag=!${pi.OUT_TAG},tag=${pi.GONE_TAG}]`))).toBe(true);
+        expect(
+            pi
+                .quickLines(layout, at, box, play.y1, ["Ana"])
+                .some((line) => line.includes(pi.VOID_TAG))
+        ).toBe(false);
+        expect(
+            lines.some((line) =>
+                line.includes(`tp @a[tag=${pi.IN_TAG},tag=!${pi.OUT_TAG},tag=${pi.GONE_TAG}]`)
+            )
+        ).toBe(true);
         // Only marked items are ever taken.
         expect(lines.some((line) => line.startsWith("clear "))).toBe(false);
     });
@@ -382,7 +433,11 @@ function entrant(name: string, side: number) {
 
 const PLACE = { x: 0, y: 64, z: 0 };
 
-function runOf(players: readonly string[], options: Partial<catalog.EventOptions<"pillars">> = {}, id = "run-1") {
+function runOf(
+    players: readonly string[],
+    options: Partial<catalog.EventOptions<"pillars">> = {},
+    id = "run-1"
+) {
     const preset = catalog.newPreset("pillars", "pillars");
     const run = stored.runSchema.parse({
         id,
@@ -410,17 +465,23 @@ function contextFor(run: stored.EventRun) {
     let positions = new Map<string, { x: number; y: number; z: number }>();
     let died = new Map<string, number>();
     const tagged = new Map<string, string[]>();
-    const taggedAs = (line: string) => [...tagged.keys()].find((tag) => line === arena.readTagged(tag));
+    const taggedAs = (line: string) =>
+        [...tagged.keys()].find((tag) => line === arena.readTagged(tag));
     const ctx = {
         server: {
             say: async (lines: string[]) =>
                 lines[0] === commands.IN_OVERWORLD
                     ? [...positions].map(([name, spot]) => where(name, spot)).join("")
                     : taggedAs(lines[0]!)
-                      ? tagged.get(taggedAs(lines[0]!)!)!.map((name) => where(name, positions.get(name)!)).join("")
+                      ? tagged
+                            .get(taggedAs(lines[0]!)!)!
+                            .map((name) => where(name, positions.get(name)!))
+                            .join("")
                       : lines[0]!.includes("pe_died")
-                      ? [...died].map(([name, count]) => `${name} has ${count} [pe_died]`).join("\n")
-                      : "",
+                        ? [...died]
+                              .map(([name, count]) => `${name} has ${count} [pe_died]`)
+                              .join("\n")
+                        : "",
             sayAll: async () => {}
         },
         language: "en",
@@ -464,9 +525,18 @@ describe("a pillars game played", () => {
         expect(catalog.lastStanding(preset)).toBe(true);
         expect(catalog.needsPvp(preset)).toBe(true);
         expect(catalog.presetSchema.safeParse(preset).success).toBe(true);
-        expect(preset.options).toMatchObject({ pool: "balanced", interval: 7, voidAfter: 4, middle: true, twists: true });
+        expect(preset.options).toMatchObject({
+            pool: "balanced",
+            interval: 7,
+            voidAfter: 4,
+            middle: true,
+            twists: true
+        });
         expect(
-            catalog.presetSchema.safeParse({ ...preset, options: { ...preset.options, interval: 1 } }).success
+            catalog.presetSchema.safeParse({
+                ...preset,
+                options: { ...preset.options, interval: 1 }
+            }).success
         ).toBe(false);
         expect(game.kit(runOf(["Ana"]))).toEqual([...pi.KIT_IDS]);
     });
@@ -474,12 +544,18 @@ describe("a pillars game played", () => {
     it("switches the pack's drops on at Go where the pack is on, and not where it is not", async () => {
         const run = runOf(["Ana", "Ben"], { pool: "blocks", interval: 5 });
         packOn = true;
-        const on = await game.goLines(contextFor(run).ctx, { marker: "components", itemCommand: true });
+        const on = await game.goLines(contextFor(run).ctx, {
+            marker: "components",
+            itemCommand: true
+        });
         expect(on).toContain("gamemode survival Ana");
         expect(on).toContain(`tag Ana add ${pi.IN_TAG}`);
         expect(on).toEqual(expect.arrayContaining(pi.armLines(5, "blocks", "components")));
         packOn = false;
-        const off = await game.goLines(contextFor(run).ctx, { marker: "components", itemCommand: true });
+        const off = await game.goLines(contextFor(run).ctx, {
+            marker: "components",
+            itemCommand: true
+        });
         expect(off.some((line) => line.includes(pi.OBJECTIVE))).toBe(false);
     });
 
@@ -526,9 +602,19 @@ describe("a pillars game played", () => {
             ["Cy", "died"]
         ]);
         expect(lines).toContain(arena.clearMarked("Ben", "minecraft:tnt", "components"));
-        expect(lines.filter((line) => line.startsWith("clear ")).every((line) => line.includes("polaris_event:1b"))).toBe(true);
+        expect(
+            lines
+                .filter((line) => line.startsWith("clear "))
+                .every((line) => line.includes("polaris_event:1b"))
+        ).toBe(true);
         expect(lines).toContain(`tag Ben add ${pi.OUT_TAG}`);
-        expect(game.results(world.run)).toEqual(new Map([["Ana", 3], ["Ben", 1], ["Cy", 1]]));
+        expect(game.results(world.run)).toEqual(
+            new Map([
+                ["Ana", 3],
+                ["Ben", 1],
+                ["Cy", 1]
+            ])
+        );
         expect(game.resultLines(world.run, "en", new Set()).join("")).toContain("Ana");
         // A winner kept off the podium is never cheered.
         expect(game.resultLines(world.run, "en", new Set(["ana"]))).toEqual([]);
@@ -542,7 +628,9 @@ describe("a pillars game played", () => {
         world.at(60_000 + pi.RISE_MS * 10);
         const lines: string[] = [];
         expect(await game.tick(world.ctx, lines)).toBeNull();
-        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([["Ben", "void"]]);
+        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([
+            ["Ben", "void"]
+        ]);
         expect(pi.stateOf(world.run.game).rising).toBe(true);
         const risingLines = lines.filter((line) => line.includes("void is rising"));
         expect(risingLines).toHaveLength(1);
@@ -554,13 +642,19 @@ describe("a pillars game played", () => {
     it("says the void swallowed whoever the quick look caught under it, already moved to the gallery", async () => {
         const run = runOf(["Ana", "Ben", "Cy"], { twists: false, voidAfter: 1 });
         const world = contextFor(run);
-        world.place({ Ana: spot(0), Ben: pi.gallerySpot(layout, { ...PLACE, y: top }, 0), Cy: spot(2) });
+        world.place({
+            Ana: spot(0),
+            Ben: pi.gallerySpot(layout, { ...PLACE, y: top }, 0),
+            Cy: spot(2)
+        });
         world.tag(pi.GONE_TAG, ["Ben"]);
         world.tag(pi.VOID_TAG, ["Ben"]);
         world.at(60_000 + pi.RISE_MS * 10);
         const lines: string[] = [];
         await game.tick(world.ctx, lines);
-        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([["Ben", "void"]]);
+        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([
+            ["Ben", "void"]
+        ]);
         expect(lines).toContain(`tag Ben remove ${pi.VOID_TAG}`);
     });
 
@@ -572,7 +666,9 @@ describe("a pillars game played", () => {
             world.at(now);
             await game.tick(world.ctx, []);
         }
-        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([["Ben", "gone"]]);
+        expect(pi.stateOf(world.run.game).out.map((one) => [one.name, one.why])).toEqual([
+            ["Ben", "gone"]
+        ]);
         world.place({ Ana: spot(0), Ben: spot(1), Cy: spot(2) });
         world.at(3_000);
         const back: string[] = [];
@@ -602,7 +698,9 @@ describe("a pillars game played", () => {
     it("tears its pack switch and tags down at the end", () => {
         const run = runOf(["Ana"]);
         expect(game.endLines!(run)).toEqual(expect.arrayContaining([...pi.STOP_LINES]));
-        expect(game.closeLines!(run.arena!.box)).toEqual(expect.arrayContaining([...pi.STOP_LINES]));
+        expect(game.closeLines!(run.arena!.box)).toEqual(
+            expect.arrayContaining([...pi.STOP_LINES])
+        );
     });
 
     it("reads in both languages", () => {
@@ -613,7 +711,9 @@ describe("a pillars game played", () => {
         for (const twist of pi.TWISTS) {
             const en = said.twistLine(twist, "en");
             const es = said.twistLine(twist, "es");
-            expect(es.length).toBeLessThanOrEqual(en.length + Math.max(3, Math.ceil(en.length * 0.25)));
+            expect(es.length).toBeLessThanOrEqual(
+                en.length + Math.max(3, Math.ceil(en.length * 0.25))
+            );
         }
         expect(said.bar(3, "1:00", true, "es")).toContain("vacío");
     });
