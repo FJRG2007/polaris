@@ -1,4 +1,5 @@
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { channelMentions } from "@/components/rich-text/markdown";
 
 /**
  * A message on screen before the server has seen it.
@@ -50,10 +51,12 @@ export function draftMessage(facts: {
         // Nobody blocks themselves, and the menu that would offer it does not
         // appear on your own row.
         blocked: false,
-        // Naming yourself is not being named. The server keeps to the same rule,
-        // so this is what comes back a moment from now as well rather than a
-        // guess that gets corrected on screen.
-        mentionsYou: false,
+        // Naming yourself is not being named, but `@everyone` and `@here` reach
+        // the one who sent them too. The server keeps to the same rule, so this
+        // is what comes back a moment from now as well rather than a guess that
+        // gets corrected on screen. A team is left to the server, which knows
+        // who is on it.
+        mentionsYou: channelMentions(facts.body).size > 0,
         // Resolved by the server on the reload a moment from now. A draft that
         // guessed would draw a card and then replace it with a different one.
         references: [],

@@ -1820,8 +1820,10 @@ export async function decorateMessages(
      * what makes the message findable once somebody does scroll back to it, and
      * the reader who muted the room is exactly who will be scrolling.
      *
-     * Not the reader's own messages: naming yourself is not being named, and a
-     * deleted one has no body left to be named in.
+     * The reader's own messages only for what reaches everybody it names -
+     * `@everyone`, `@here`, a team they are on - since the one who sent it is in
+     * that room too; naming yourself is not being named. A deleted one has no
+     * body left to be named in.
      */
     const worthParsing = rows.some(
         (row) => row.body.includes("@") || row.body.includes("polaris:")
@@ -1832,8 +1834,7 @@ export async function decorateMessages(
             .filter(
                 (row) =>
                     row.deletedAt === null &&
-                    row.authorId !== actor.id &&
-                    mentionsReader(row.body, actor.id, teams)
+                    mentionsReader(row.body, actor.id, teams, row.authorId === actor.id)
             )
             .map((row) => row.id)
     );
