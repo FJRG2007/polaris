@@ -69,7 +69,8 @@ export type PlayerDialog =
     | "location"
     | "history"
     | "access"
-    | "experience";
+    | "experience"
+    | "importInventory";
 
 /**
  * Changing what experience a player has.

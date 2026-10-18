@@ -177,6 +177,8 @@ interface ServerReading {
     levels: Readonly<Record<string, number>>;
     /** Since when each player on has not moved, turned or fought, by name. */
     idle: Readonly<Record<string, number>>;
+    /** The game mode each player on was last read in, by name. */
+    modes: Readonly<Record<string, string>>;
     /** The level each player was last seen on, for the rows of players who are
      *  not on right now. */
     lastLevels: Readonly<Record<string, RememberedLevel>>;
@@ -258,6 +260,7 @@ export function MinecraftPanel({
         timeouts: [],
         levels: {},
         idle: {},
+        modes: {},
         lastLevels: game?.lastLevels ?? {},
         pending: []
     });
@@ -299,6 +302,7 @@ export function MinecraftPanel({
                 timeouts?: PlayerTimeout[];
                 levels?: Record<string, number>;
                 idle?: Record<string, number> | null;
+                modes?: Record<string, string> | null;
                 lastLevels?: Record<string, RememberedLevel>;
                 pending?: QueuedAction[];
                 now?: string;
@@ -373,6 +377,7 @@ export function MinecraftPanel({
                     // blink empty on a read the server was too busy to answer.
                     levels: data.levels ?? (wantsRoster ? current.levels : {}),
                     idle: data.idle ?? (wantsRoster ? current.idle : {}),
+                    modes: data.modes ?? (wantsRoster ? current.modes : {}),
                     lastLevels: data.lastLevels ?? current.lastLevels,
                     now: data.now ? Date.parse(data.now) : current.now
                 })
@@ -683,6 +688,7 @@ export function MinecraftPanel({
                         timeouts={reading.timeouts}
                         levels={reading.levels}
                         idle={reading.idle}
+                        modes={reading.modes}
                         lastLevels={reading.lastLevels}
                         pending={reading.pending}
                         passwords={loginOn ? (login.state?.players ?? []) : null}

@@ -15,11 +15,10 @@
 
 import Link from "next/link";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { useRowSelection } from "./use-row-selection";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Badge, Button, Card, CardBody, Checkbox, Input, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Checkbox, Input, cn, useRowSelection } from "@polaris/ui";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Ban, Inbox, Lock, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { DeleteDropPointDialog, type DropPointTarget } from "./delete-drop-point-dialog";

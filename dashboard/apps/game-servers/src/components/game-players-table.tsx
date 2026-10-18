@@ -19,13 +19,21 @@
 
 import { Search } from "lucide-react";
 import { useGameText } from "../screens/game-text";
-import type { ReactNode } from "react";
-import { Button, Input, Select, cn } from "@polaris/ui";
+import type { KeyboardEvent, ReactNode } from "react";
+import { Button, Checkbox, Input, Select, cn } from "@polaris/ui";
 
 export interface PlayersTableColumn {
     readonly label: string;
     /** Extra classes, for the columns that are detail and fold away on a phone. */
     readonly className?: string;
+}
+
+/** The box at the head of a table whose rows can be chosen. */
+export interface PlayersTableSelection {
+    readonly all: boolean;
+    readonly some: boolean;
+    readonly onToggleAll: () => void;
+    readonly label: string;
 }
 
 export interface PlayersFilter {
@@ -45,6 +53,9 @@ export function PlayersTable({
     filters,
     onFilter,
     toolbar,
+    selection,
+    selectionBar,
+    onKeyDown,
     minWidth = "40rem"
 }: {
     readonly columns: readonly PlayersTableColumn[];
@@ -62,6 +73,12 @@ export function PlayersTable({
     readonly onFilter?: (value: string) => void;
     /** Anything else that belongs beside the search box - a switch, a button. */
     readonly toolbar?: ReactNode;
+    /** When rows can be chosen: a column of boxes, headed by one for all. */
+    readonly selection?: PlayersTableSelection;
+    /** What to do with the chosen rows, drawn above the table while any are. */
+    readonly selectionBar?: ReactNode;
+    /** Keys heard anywhere in the table - choosing all, letting go. */
+    readonly onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
     readonly minWidth?: string;
 }) {
     const t = useGameText("games");
@@ -96,10 +113,22 @@ export function PlayersTable({
                 </div>
             )}
 
-            <div className="overflow-x-auto rounded-lg border border-border">
+            {selectionBar}
+
+            <div className="overflow-x-auto rounded-lg border border-border" onKeyDown={onKeyDown}>
                 <table className="w-full text-sm" style={{ minWidth }}>
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
+                            {selection && (
+                                <th className="w-10 px-3 py-2">
+                                    <Checkbox
+                                        aria-label={selection.label}
+                                        checked={selection.all}
+                                        indeterminate={selection.some}
+                                        onChange={selection.onToggleAll}
+                                    />
+                                </th>
+                            )}
                             {columns.map((column) => (
                                 <th key={column.label} className={cn("px-3 py-2 font-medium", column.className)}>
                                     {column.label}
@@ -114,7 +143,7 @@ export function PlayersTable({
                         {isEmpty ? (
                             <tr>
                                 <td
-                                    colSpan={columns.length + 1}
+                                    colSpan={columns.length + (selection ? 2 : 1)}
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
                                     {empty}

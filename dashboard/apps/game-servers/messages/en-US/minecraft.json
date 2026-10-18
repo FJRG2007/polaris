@@ -505,7 +505,9 @@
             "resetPassword": "Reset password",
             "gameMode": "Game mode",
             "kill": "Kill",
-            "skin": "Skin"
+            "skin": "Skin",
+            "exportInventory": "Export inventory",
+            "importInventory": "Import inventory"
         },
         "modes": {
             "survival": "Survival",
@@ -519,7 +521,30 @@
         "whitelistOff": "Whitelist off",
         "allBanned": "Every blocked address was already banned here",
         "bannedCount": "Banned {count, plural, one {# address} other {# addresses}}",
-        "notSignedInThere": "{player}'s Polaris account is not signed in from this address. Opening Polaris on that connection lets them in, or allow it here for good."
+        "notSignedInThere": "{player}'s Polaris account is not signed in from this address. Opening Polaris on that connection lets them in, or allow it here for good.",
+        "selection": {
+            "label": "Selected players",
+            "selectAll": "Select all players",
+            "selectNamed": "Select {name}",
+            "count": "{count, plural, one {# selected} other {# selected}}",
+            "clear": "Clear selection",
+            "actions": "Actions",
+            "exportInventories": "Export inventories",
+            "op": "Make operator",
+            "deop": "Remove operator",
+            "whitelistAdd": "Whitelist",
+            "whitelistRemove": "Unwhitelist",
+            "kick": "Kick",
+            "ban": "Ban",
+            "pardon": "Pardon",
+            "remove": "Remove",
+            "kickTitle": "{count, plural, one {Kick # player?} other {Kick # players?}}",
+            "kickBody": "They are thrown off the server and can join again.",
+            "banTitle": "{count, plural, one {Ban # player?} other {Ban # players?}}",
+            "banBody": "They cannot join again until they are pardoned.",
+            "removeTitle": "{count, plural, one {Remove # player?} other {Remove # players?}}",
+            "removeBody": "The addresses they may join from are forgotten."
+        }
     },
     "xray": {
         "everythingRecordedAgainstThemIs": "Everything recorded against them is forgotten, as if it never happened.",

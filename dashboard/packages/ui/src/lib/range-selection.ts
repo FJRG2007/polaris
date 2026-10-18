@@ -72,5 +72,10 @@ export function useRangeSelection<T>(
         [order, chosen, onChange]
     );
 
-    return { press, onKeyDown };
+    /** Make `id` the item a Shift press stretches from, without choosing it. */
+    const reanchor = useCallback((id: T) => {
+        anchor.current = id;
+    }, []);
+
+    return { press, onKeyDown, reanchor };
 }
