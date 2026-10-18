@@ -66,6 +66,38 @@ describe("the margin", () => {
         );
     });
 
+    it("opens on the evening before when the margin pulls a midnight start back", () => {
+        const midnight: core.PresenceScheduleRule = { ...rule(15), startMinute: 0, endMinute: 9 * 60 };
+        const account = { presence: "auto", presenceUntil: null, presenceSetAt: null };
+        let checked = 0;
+        for (let day = 1; day <= 60; day++) {
+            const noon = new Date(Date.UTC(2026, 9, day, 12));
+            const next = core.weeklyWindow(midnight, ZONE, noon, -1)!;
+            if (next.openedAt.getUTCDate() !== noon.getUTCDate()) continue;
+            checked++;
+            const inside = new Date(next.openedAt.getTime() + 1);
+            expect(core.openWindow([midnight], ZONE, inside)?.openedAt.getTime()).toBe(next.openedAt.getTime());
+            expect(core.presenceInForce(account, [midnight], ZONE, inside).scheduled).toBe(true);
+            expect(core.nextPresenceChange(account, [midnight], ZONE, noon)?.getTime()).toBe(next.openedAt.getTime());
+            const before = new Date(next.openedAt.getTime() - 1);
+            expect(core.presenceInForce(account, [midnight], ZONE, before).scheduled).toBe(false);
+        }
+        expect(checked).toBeGreaterThan(0);
+    });
+
+    it("stays open past midnight when the margin pushes a late close into the next day", () => {
+        const late: core.PresenceScheduleRule = { ...rule(60), startMinute: 23 * 60 + 50, endMinute: 23 * 60 + 40 };
+        let checked = 0;
+        for (let day = 1; day <= 60; day++) {
+            const window = core.weeklyWindow(late, ZONE, new Date(Date.UTC(2026, 9, day, 12)), 0)!;
+            if (window.closesAt.getUTCDate() === new Date(Date.UTC(2026, 9, day + 1)).getUTCDate()) continue;
+            checked++;
+            const inside = new Date(window.closesAt.getTime() - 1);
+            expect(core.openWindow([late], ZONE, inside)).not.toBeNull();
+        }
+        expect(checked).toBeGreaterThan(0);
+    });
+
     it("is accepted up to the cap and defaults to exact", () => {
         const base = { presence: "busy", days: 1, startMinute: 60, endMinute: 120, enabled: true };
         expect(core.presenceScheduleSchema.parse(base).marginMinutes).toBe(0);

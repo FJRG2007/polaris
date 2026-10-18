@@ -255,7 +255,9 @@ export interface OpenWindow {
  *
  * Both the day this moment falls on and the day before it are considered, and
  * the second is not an edge case: a window that crosses midnight is open at one
- * in the morning because of a rule that names *yesterday*.
+ * in the morning because of a rule that names *yesterday*. A margin can push an
+ * edge across midnight as well, so the day after and the day before that are
+ * looked at too.
  *
  * Where two overlap the one that opened most recently wins. Somebody with "away
  * all Friday" and "do not disturb from four" on the same afternoon meant the
@@ -270,7 +272,7 @@ export function openWindow(
     let best: OpenWindow | null = null;
     for (const rule of rules) {
         if (!rule.enabled) continue;
-        for (const startedDaysAgo of [0, 1]) {
+        for (const startedDaysAgo of [-1, 0, 1, 2]) {
             const window = windowAround(rule, timeZone, now, startedDaysAgo);
             if (!window) continue;
             if (now < window.openedAt || now >= window.closesAt) continue;

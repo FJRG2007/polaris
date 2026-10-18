@@ -291,7 +291,7 @@ export function ActivitySharingCard({
                                                             )
                                                         }))
                                                     }
-                                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                                    className="grid size-11 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 sm:size-7"
                                                 >
                                                     <X className="size-3.5 shrink-0" />
                                                 </button>

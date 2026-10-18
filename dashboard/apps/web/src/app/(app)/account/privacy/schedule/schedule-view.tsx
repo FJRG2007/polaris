@@ -71,7 +71,7 @@ const MARGINS = [0, 5, 10, 15, 30, 60] as const;
  */
 function nextEdge(rule: core.PresenceScheduleRule, timeZone: string, now: Date): Date | null {
     let soonest: Date | null = null;
-    for (let startedDaysAgo = 1; startedDaysAgo >= -7; startedDaysAgo--) {
+    for (let startedDaysAgo = 2; startedDaysAgo >= -7; startedDaysAgo--) {
         const window = core.weeklyWindow(rule, timeZone, now, startedDaysAgo);
         if (!window) continue;
         for (const edge of [window.openedAt, window.closesAt]) {
