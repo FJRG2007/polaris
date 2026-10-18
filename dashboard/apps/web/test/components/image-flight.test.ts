@@ -12,7 +12,10 @@ import { flight, visibleBox, type Box } from "@/components/image-flight";
 const viewport = { width: 1000, height: 800 };
 
 /** An element whose box is whatever the test says, on the page or not. */
-function placed(rect: { left: number; top: number; width: number; height: number }, connected = true) {
+function placed(
+    rect: { left: number; top: number; width: number; height: number },
+    connected = true
+) {
     return {
         isConnected: connected,
         getBoundingClientRect: () => ({
@@ -109,7 +112,9 @@ describe("visibleBox", () => {
 
     it("has nothing to fly to when the thumbnail is hidden or has no size", () => {
         expect(visibleBox(placed({ left: 10, top: 20, width: 0, height: 0 }), viewport)).toBeNull();
-        expect(visibleBox(placed({ left: 10, top: 20, width: 30, height: 0.5 }), viewport)).toBeNull();
+        expect(
+            visibleBox(placed({ left: 10, top: 20, width: 30, height: 0.5 }), viewport)
+        ).toBeNull();
     });
 
     it("has nothing to fly to when the thumbnail is scrolled off any edge", () => {

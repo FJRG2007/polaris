@@ -172,9 +172,18 @@ function SummaryStrip({ overview, failed }: { overview: BackupOverview | null; f
     const missing = failed ? "-" : null;
     return (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat label={t("summary.protected")} value={summary ? String(summary.protectedCount) : missing} />
-            <Stat label={t("summary.copies")} value={summary ? String(summary.copyCount) : missing} />
-            <Stat label={t("summary.stored")} value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing} />
+            <Stat
+                label={t("summary.protected")}
+                value={summary ? String(summary.protectedCount) : missing}
+            />
+            <Stat
+                label={t("summary.copies")}
+                value={summary ? String(summary.copyCount) : missing}
+            />
+            <Stat
+                label={t("summary.stored")}
+                value={summary ? formatBytes(BigInt(summary.storedBytes)) : missing}
+            />
             <Stat
                 label={t("summary.failed")}
                 value={summary ? String(summary.failedRecently) : missing}
@@ -369,10 +378,16 @@ function ProtectedTable({
                                 <th className="px-3 py-2 font-medium">{t("table.columns.name")}</th>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.type")}</th>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.plan")}</th>
-                                <th className="px-3 py-2 font-medium">{t("table.columns.lastCopy")}</th>
+                                <th className="px-3 py-2 font-medium">
+                                    {t("table.columns.lastCopy")}
+                                </th>
                                 <th className="px-3 py-2 font-medium">{t("table.columns.next")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{t("summary.copies")}</th>
-                                <th className="px-3 py-2 text-right font-medium">{t("table.columns.size")}</th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                    {t("summary.copies")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-medium">
+                                    {t("table.columns.size")}
+                                </th>
                                 <th className="px-3 py-2 font-medium">{t("tabs.destinations")}</th>
                                 <th className="px-3 py-2" />
                             </tr>
@@ -380,7 +395,10 @@ function ProtectedTable({
                         <tbody>
                             {rows === null ? (
                                 Array.from({ length: 5 }, (_, index) => (
-                                    <tr key={index} className="border-b border-border last:border-0">
+                                    <tr
+                                        key={index}
+                                        className="border-b border-border last:border-0"
+                                    >
                                         <td colSpan={9} className="px-3 py-2.5">
                                             <Skeleton className="h-5 w-full" />
                                         </td>
@@ -388,7 +406,10 @@ function ProtectedTable({
                                 ))
                             ) : rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-10 text-center text-sm text-muted-foreground">
+                                    <td
+                                        colSpan={9}
+                                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                                    >
                                         {query || kind ? t("table.noMatch") : t("table.empty")}
                                     </td>
                                 </tr>
@@ -494,21 +515,31 @@ function ResourceLine({
                     }}
                 >
                     <td className="px-3 py-2.5">
-                        <Link href={`/apps/backups/${row.id}`} className="font-medium hover:underline">
+                        <Link
+                            href={`/apps/backups/${row.id}`}
+                            className="font-medium hover:underline"
+                        >
                             {row.name}
                         </Link>
                         {row.lastStatus === "failed" || row.lastStatus === "partial" ? (
-                            <p className="truncate text-xs text-danger" title={row.lastError ?? undefined}>
+                            <p
+                                className="truncate text-xs text-danger"
+                                title={row.lastError ?? undefined}
+                            >
                                 {row.lastError ?? t("table.lastFailed")}
                             </p>
                         ) : null}
                     </td>
-                    <td className="px-3 py-2.5 text-muted-foreground">{kindLabel(t, row.kind, row.kindLabel)}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                        {kindLabel(t, row.kind, row.kindLabel)}
+                    </td>
                     <td className="px-3 py-2.5">
                         {row.planName ? (
                             <span className="text-muted-foreground">{row.planName}</span>
                         ) : (
-                            <span className="text-xs text-muted-foreground">{t("table.onDemand")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("table.onDemand")}
+                            </span>
                         )}
                     </td>
                     <td className="px-3 py-2.5 text-muted-foreground">
@@ -531,7 +562,9 @@ function ResourceLine({
                         {formatBytes(BigInt(row.sizeBytes))}
                     </td>
                     <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                        {row.destinations.length > 0 ? row.destinations.join(", ") : t("table.default")}
+                        {row.destinations.length > 0
+                            ? row.destinations.join(", ")
+                            : t("table.default")}
                     </td>
                     <td className="px-3 py-2.5">
                         <div className="flex items-center justify-end gap-1">
@@ -561,7 +594,11 @@ function ResourceLine({
                                 disabled={busy}
                                 onClick={onTogglePause}
                             >
-                                {paused ? <Play className="size-4" /> : <Pause className="size-4" />}
+                                {paused ? (
+                                    <Play className="size-4" />
+                                ) : (
+                                    <Pause className="size-4" />
+                                )}
                             </Button>
                         </div>
                     </td>

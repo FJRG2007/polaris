@@ -259,7 +259,10 @@ export function ImageViewer({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 bg-background/95"
             />
-            <div data-viewer-chrome="" className="relative flex shrink-0 items-center gap-2 px-3 py-2">
+            <div
+                data-viewer-chrome=""
+                className="relative flex shrink-0 items-center gap-2 px-3 py-2"
+            >
                 <span className="min-w-0 flex-1 truncate text-sm font-medium" title={image.name}>
                     {image.name}
                 </span>

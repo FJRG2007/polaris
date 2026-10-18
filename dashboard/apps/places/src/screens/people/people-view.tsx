@@ -237,7 +237,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                             <Input
                                                 ref={nameField}
                                                 value={draft}
-                                                aria-label={t("people.nameFor", { name: person.name })}
+                                                aria-label={t("people.nameFor", {
+                                                    name: person.name
+                                                })}
                                                 className="h-7 text-[0.8125rem]"
                                                 onChange={(event) => setDraft(event.target.value)}
                                                 onBlur={() => commitRename(person)}
@@ -267,10 +269,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">
                                         {person.faces > 0 && person.faces < 3 ? (
-                                            <Badge
-                                                variant="warning"
-                                                title={t("people.fewHint")}
-                                            >
+                                            <Badge variant="warning" title={t("people.fewHint")}>
                                                 {t("people.addMore")}
                                             </Badge>
                                         ) : null}
@@ -278,7 +277,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                             {t("people.tellMe")}
                                             <Switch
                                                 checked={person.notify}
-                                                aria-label={t("people.reportWhen", { name: person.name })}
+                                                aria-label={t("people.reportWhen", {
+                                                    name: person.name
+                                                })}
                                                 onChange={(value) => {
                                                     setPeople((current) =>
                                                         (current ?? []).map((item) =>
@@ -299,7 +300,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={t("people.addPhotoOf", { name: person.name })}
+                                                    aria-label={t("people.addPhotoOf", {
+                                                        name: person.name
+                                                    })}
                                                     title={t("people.addPhoto")}
                                                     disabled={!ready || uploading === person.id}
                                                     onClick={() => pickPhoto(person)}
@@ -313,7 +316,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={t("people.forgetName", { name: person.name })}
+                                                    aria-label={t("people.forgetName", {
+                                                        name: person.name
+                                                    })}
                                                     title={t("people.forget")}
                                                     onClick={() => setRemoving(person)}
                                                 >
@@ -390,7 +395,9 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                     title={t("people.forgetTitle")}
                     question={t.rich("people.forgetQuestion", {
                         name: removing.name,
-                        em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
+                        em: (chunks) => (
+                            <span className="font-medium text-foreground">{chunks}</span>
+                        )
                     })}
                     requireTyping={false}
                     description={t("people.forgetBody")}

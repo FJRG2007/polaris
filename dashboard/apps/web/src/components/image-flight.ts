@@ -116,7 +116,10 @@ export function shrinkOut(
         { duration: CLOSE_MS, easing: EASE, fill: "forwards" }
     );
     return new Promise((resolve) => {
-        flying.finished.then(() => resolve(), () => resolve());
+        flying.finished.then(
+            () => resolve(),
+            () => resolve()
+        );
         setTimeout(resolve, CLOSE_MS + GIVE_UP_MS);
     });
 }
