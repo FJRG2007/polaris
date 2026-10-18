@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import type { ConnectionSummary } from "./types";
 import { useFormChanged } from "@/lib/use-form-changed";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { type ConnectionProviderSlug, type StorageProviderKind } from "@polaris/core";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
@@ -144,6 +145,7 @@ const PROVIDER_ORDER: StorageProviderKind[] = [
  */
 function LinkedAccountField({ field }: { field: FieldDef }) {
     const t = useTranslations("drive");
+    const connectionsLink = useConnectionsHref(field.provider);
     const [accounts, setAccounts] = useState<LinkedAccountOption[] | null>(null);
     const [chosen, setChosen] = useState("");
 
@@ -171,7 +173,7 @@ function LinkedAccountField({ field }: { field: FieldDef }) {
                     link: (chunks) => (
                         <Link
                             key="link"
-                            href="/account/connections"
+                            href={connectionsLink}
                             className="text-primary hover:underline"
                         >
                             {chunks}

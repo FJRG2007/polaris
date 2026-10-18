@@ -529,6 +529,18 @@
         }
     },
     "connections": {
+        "hub": {
+            "back": "Back to where you were",
+            "search": "Search services",
+            "categories": "Categories",
+            "connectedCount": "Connected",
+            "noMatch": "No service matches \"{query}\".",
+            "category": {
+                "all": "All",
+                "general": "General",
+                "developer": "Developers"
+            }
+        },
         "page": {
             "title": "Connected accounts",
             "intro": "The outside accounts Polaris acts with on your behalf. Only yours, and only what you link."

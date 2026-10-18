@@ -25,6 +25,7 @@ import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
@@ -120,6 +121,7 @@ export function ElsewhereView({
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
+    const connectionsLink = useConnectionsHref();
     const format = useDisplayFormat();
     const [services, setServices] = useState(initial);
     const [adding, setAdding] = useState(false);
@@ -229,9 +231,7 @@ export function ElsewhereView({
                     description={t("elsewhere.noAccountHint")}
                     action={
                         <Button size="sm" asChild>
-                            <Link href="/account/connections">
-                                {t("elsewhere.connectedAccounts")}
-                            </Link>
+                            <Link href={connectionsLink}>{t("elsewhere.connectedAccounts")}</Link>
                         </Button>
                     }
                 />

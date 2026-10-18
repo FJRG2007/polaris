@@ -237,3 +237,88 @@ describe("where a link is sent", () => {
         expect(sent.redirectUri).toBe(`${REGISTERED}/api/connections/google/callback`);
     });
 });
+
+describe("the way back to the app that sent somebody to Connected accounts", () => {
+    const held = (response: Response) =>
+        JSON.parse(
+            decodeURIComponent(
+                (response.headers.get("set-cookie") ?? "")
+                    .split("polaris_connection_state=")[1]!
+                    .split(";")[0]!
+            )
+        );
+    const callback = (query: string, cookie: string) =>
+        new Request(`${REGISTERED}/api/connections/github/callback?${query}`, {
+            headers: {
+                host: "polaris.example.com",
+                cookie: `polaris_connection_state=${encodeURIComponent(cookie)}`
+            }
+        });
+
+    it("holds `?return=` in the state cookie and brings it back on the connections list", async () => {
+        const started = await startConnectionLink(
+            arriving(
+                "/api/connections/github/link?return=%2Fapps%2Fservers%2Fhost-1",
+                "polaris.example.com"
+            ),
+            "github"
+        );
+        const state = held(started);
+        expect(state.target).toBe("/apps/servers/host-1");
+
+        const finished = await finishConnectionCallback(
+            callback(`code=code-1&state=${state.state}`, JSON.stringify(state)),
+            "github"
+        );
+        const location = new URL(finished.headers.get("location") ?? "", REGISTERED);
+        expect(location.pathname).toBe("/account/connections");
+        expect(location.searchParams.get("provider")).toBe("github");
+        expect(location.searchParams.get("connection")).toBe("linked");
+        expect(location.searchParams.get("return")).toBe("/apps/servers/host-1");
+    });
+
+    it("keeps the way back when the trip is cancelled at the provider", async () => {
+        const finished = await finishConnectionCallback(
+            callback(
+                "error=access_denied",
+                JSON.stringify({
+                    provider: "github",
+                    mode: "link",
+                    state: "state-1",
+                    target: "/apps/servers/host-1"
+                })
+            ),
+            "github"
+        );
+        const location = new URL(finished.headers.get("location") ?? "", REGISTERED);
+        expect(location.searchParams.get("connection")).toBe("cancelled");
+        expect(location.searchParams.get("return")).toBe("/apps/servers/host-1");
+    });
+
+    it("drops a way back that would leave this deployment, at the start and on the way back", async () => {
+        const started = await startConnectionLink(
+            arriving(
+                "/api/connections/github/link?return=https%3A%2F%2Fevil.example",
+                "polaris.example.com"
+            ),
+            "github"
+        );
+        expect(held(started).target).toBeUndefined();
+
+        const finished = await finishConnectionCallback(
+            callback(
+                "code=code-1&state=state-1",
+                JSON.stringify({
+                    provider: "github",
+                    mode: "link",
+                    state: "state-1",
+                    target: "//evil.example"
+                })
+            ),
+            "github"
+        );
+        const location = new URL(finished.headers.get("location") ?? "", REGISTERED);
+        expect(location.origin).toBe(REGISTERED);
+        expect(location.searchParams.get("return")).toBeNull();
+    });
+});

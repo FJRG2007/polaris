@@ -79,7 +79,7 @@ describe("the connections page", () => {
         failureReason = "invalid_client";
         canConfigure = false;
 
-        renderToStaticMarkup(await ConnectionsPage());
+        renderToStaticMarkup(await ConnectionsPage({}));
 
         const card = spotifyCard(capturedProviders.calls[0] as unknown[]);
         expect(card.lastFailure).toBeUndefined();
@@ -90,7 +90,7 @@ describe("the connections page", () => {
         failureReason = "invalid_client";
         canConfigure = true;
 
-        renderToStaticMarkup(await ConnectionsPage());
+        renderToStaticMarkup(await ConnectionsPage({}));
 
         const card = spotifyCard(capturedProviders.calls[0] as unknown[]);
         expect(card.lastFailure).toBe("invalid_client");
@@ -100,7 +100,7 @@ describe("the connections page", () => {
         failureReason = undefined;
         canConfigure = true;
 
-        renderToStaticMarkup(await ConnectionsPage());
+        renderToStaticMarkup(await ConnectionsPage({}));
 
         const card = spotifyCard(capturedProviders.calls[0] as unknown[]);
         expect(card.lastFailure).toBeUndefined();

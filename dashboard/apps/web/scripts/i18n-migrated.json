@@ -2043,6 +2043,7 @@
         "web/src/app/(app)/automations/[id]/references.tsx",
         "web/src/app/(app)/automations/runs/[runId]/page.tsx",
         "web/src/app/(app)/automations/runs/[runId]/run-detail.tsx",
-        "web/src/components/message-toasts.tsx"
+        "web/src/components/message-toasts.tsx",
+        "web/src/components/listen-along-button.tsx"
     ]
 }

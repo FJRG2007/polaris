@@ -28,7 +28,8 @@ const saved = vi.fn();
 let playing: core.ActivityView[] = [];
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ push: () => undefined, refresh: () => undefined })
+    useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
+    usePathname: () => "/account/privacy"
 }));
 vi.mock("@/app/(app)/account/privacy/actions", () => ({
     saveActivitySettingsAction: async (next: core.ActivitySettings) => {

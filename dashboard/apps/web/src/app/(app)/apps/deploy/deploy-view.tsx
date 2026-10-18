@@ -18,6 +18,7 @@ import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
@@ -1337,6 +1338,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     // Null until the picker's first read answers, so the "not connected" notice
     // does not flash before anybody has been asked.
     const t = useTranslations("deploy");
+    const connectionsLink = useConnectionsHref("github");
     const [connected, setConnected] = useState<boolean | null>(null);
     const [choice, setChoice] = useState<RepoChoice | null>(null);
     const [name, setName] = useState("");
@@ -1439,7 +1441,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                         link: (chunks) => (
                             <a
                                 key="link"
-                                href="/account/connections"
+                                href={connectionsLink}
                                 className="text-primary hover:underline"
                             >
                                 {chunks}

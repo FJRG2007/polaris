@@ -27,6 +27,7 @@ import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { Button, Card, CardBody, Input, Switch } from "@polaris/ui";
 
@@ -58,6 +59,7 @@ export function ActivitySharingCard({
     userId: string;
 }) {
     const t = useTranslations("accountPrivacy");
+    const connectionsLink = useConnectionsHref("spotify");
     const [saved, setSaved] = useState(settings);
     const [pending, setPending] = useState<readonly { id: number; change: Change }[]>([]);
     const [error, setError] = useState("");
@@ -158,7 +160,7 @@ export function ActivitySharingCard({
                                                 link: (chunks) => (
                                                     <Link
                                                         key="link"
-                                                        href="/account/connections"
+                                                        href={connectionsLink}
                                                         className="underline decoration-dotted underline-offset-2 hover:text-foreground"
                                                     >
                                                         {chunks}

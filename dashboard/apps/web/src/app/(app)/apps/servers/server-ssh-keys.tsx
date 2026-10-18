@@ -15,6 +15,7 @@ import { addServerKeysSchema } from "@polaris/core";
 import { sshKeyIssueKey } from "./ssh-key-words";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
 import { Download, Github, KeyRound, Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { AuthorizedKey, GithubKeyAccount, ServerKeysView } from "@/lib/server-ssh-keys";
 import {
@@ -494,6 +495,7 @@ function GithubDialog(props: {
     onAdded: (count: number) => void;
 }) {
     const t = useTranslations("servers");
+    const connectionsLink = useConnectionsHref("github");
     const [state, setState] = useState<{ linked: boolean; accounts: GithubKeyAccount[] } | null>(
         null
     );
@@ -558,7 +560,7 @@ function GithubDialog(props: {
                 ) : !state.linked ? (
                     <p className="text-sm text-muted-foreground">
                         {t("sshKeys.githubNotLinked")}{" "}
-                        <Link href="/account/connections" className="underline">
+                        <Link href={connectionsLink} className="underline">
                             {t("sshKeys.githubLink")}
                         </Link>
                     </p>

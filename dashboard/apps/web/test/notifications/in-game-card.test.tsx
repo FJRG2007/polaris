@@ -12,7 +12,8 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh: vi.fn(), push: vi.fn() })
+    useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+    usePathname: () => "/account/notifications"
 }));
 
 vi.mock("@/app/(app)/account/notifications/actions", () => ({
@@ -21,20 +22,23 @@ vi.mock("@/app/(app)/account/notifications/actions", () => ({
     setMessagesInGameAction: vi.fn()
 }));
 
-const { NotificationSettingsView } =
-    await import("@/app/(app)/account/notifications/notification-settings-view");
+const { NotificationSettingsView } = await import(
+    "@/app/(app)/account/notifications/notification-settings-view"
+);
 const { IN_GAME_NOT_READY } = await import("@/lib/chat/in-game-choice");
 
 function card(ready: boolean): string {
     const markup = renderToStaticMarkup(
-        withMessages(<NotificationSettingsView
-            rules={[]}
-            destinations={[]}
-            senders={[]}
-            deliveries={[]}
-            messagesInGame="auto"
-            inGameReady={ready}
-        />)
+        withMessages(
+            <NotificationSettingsView
+                rules={[]}
+                destinations={[]}
+                senders={[]}
+                deliveries={[]}
+                messagesInGame="auto"
+                inGameReady={ready}
+            />
+        )
     );
     const start = markup.indexOf("Messages in Minecraft");
     expect(start).toBeGreaterThan(-1);
@@ -47,13 +51,13 @@ describe("the Messages in Minecraft card", () => {
         const group = markup.slice(markup.indexOf("Which Chat messages to show in Minecraft"));
         expect(group.match(/disabled=""/g)?.length).toBeGreaterThanOrEqual(3);
         expect(markup).toContain(IN_GAME_NOT_READY.slice(0, 40));
-        expect(markup).toContain('href="/account/connections"');
+        expect(markup).toContain('href="/account/connections?return=%2Faccount%2Fnotifications"');
     });
 
     it("offers the three choices once it does", () => {
         const markup = card(true);
         expect(markup).not.toContain(IN_GAME_NOT_READY.slice(0, 40));
-        expect(markup).not.toContain('href="/account/connections"');
+        expect(markup).not.toContain('href="/account/connections');
         expect(markup).toContain("Direct messages and groups of up to");
     });
 });
