@@ -14,6 +14,8 @@ import { findApp } from "@/lib/apps/catalog";
 import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as blocker from "@/lib/dns-blocker/service";
+import * as insights from "@/lib/dns-blocker/insights";
+import * as queryLog from "@/lib/dns-blocker/query-log";
 import { getTranslations } from "@/lib/i18n/request";
 import { installApp } from "@/lib/apps/install-service";
 import { DNS_BLOCKER_APP } from "@/lib/dns-blocker/settings";
@@ -128,6 +130,49 @@ export async function turnOffDnsBlockerAction(): Promise<Result> {
             targetId: DNS_BLOCKER_APP
         });
         refresh();
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Today's numbers and the newest lookups that match the filter. */
+export async function dnsInsightsAction(
+    input: unknown,
+    fresh?: unknown
+): Promise<Result<{ insights: insights.DnsInsights }>> {
+    await requireAdmin();
+    try {
+        return {
+            insights: await insights.dnsInsights(
+                queryLog.queryFilterSchema.parse(input),
+                z.boolean().default(false).parse(fresh)
+            )
+        };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Let every lookup through for the given minutes. */
+export async function pauseDnsBlockingAction(input: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        const { minutes } = queryLog.pauseSchema.parse(input);
+        await insights.pauseBlocking(minutes);
+        await recordAudit({ actorId: user.id, action: "dnsBlocker.pause", metadata: { minutes } });
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** End a pause early. */
+export async function resumeDnsBlockingAction(): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        await insights.resumeBlocking();
+        await recordAudit({ actorId: user.id, action: "dnsBlocker.resume" });
         return {};
     } catch (error) {
         return failed(error);

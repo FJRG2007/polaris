@@ -43,7 +43,14 @@ const DNS_PORT = 53;
 
 /** Why something the operator asked for was not done, as a key the screen says
  *  in their language (`dnsBlocker` `errors.<code>`). */
-export type DnsRefusalCode = "notInstalled" | "tooLarge" | "noAddress" | "portTaken" | "notApplied";
+export type DnsRefusalCode =
+    | "notInstalled"
+    | "tooLarge"
+    | "noAddress"
+    | "portTaken"
+    | "notApplied"
+    | "notRunning"
+    | "notAnswering";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -98,7 +105,7 @@ async function appRow(): Promise<{ id: string; config: string | null } | null> {
     });
 }
 
-async function engineRow(): Promise<EngineRow | null> {
+export async function engineRow(): Promise<EngineRow | null> {
     return prisma.installedApp.findFirst({
         where: { catalogId: DNS_ENGINE_APP, status: { not: "removed" } },
         select: { id: true, ownerId: true, applicationId: true, status: true },
@@ -118,6 +125,21 @@ export function encodedConfig(settings: DnsSettings): string {
     const encoded = encodeBlockyConfig(settings);
     if (encoded.length > ENV_VALUE_MAX) throw new DnsBlockerRefusal("tooLarge");
     return encoded;
+}
+
+/** Whether the engine was last given the configuration the stored settings
+ *  render to now. False for an engine deployed before a change to what is
+ *  rendered, which keeps running the old one until it is applied again. */
+export async function engineConfigCurrent(engine: EngineRow): Promise<boolean> {
+    if (!engine.applicationId) return false;
+    const [settings, stored] = await Promise.all([
+        readSettings(),
+        prisma.envVar.findFirst({
+            where: { scopeType: "application", scopeId: engine.applicationId, key: DNS_CONFIG_ENV },
+            select: { value: true }
+        })
+    ]);
+    return stored?.value === encodeBlockyConfig(settings);
 }
 
 /** The settings as stored, whole whatever was stored. */
