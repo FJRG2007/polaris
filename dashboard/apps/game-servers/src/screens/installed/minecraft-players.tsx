@@ -467,8 +467,20 @@ export function MinecraftPlayers({
 
     /** Several into one game mode, fifty names to a command. */
     async function setGamemodeMany(names: readonly string[], mode: string): Promise<void> {
-        for (let at = 0; at < names.length; at += GAMEMODE_BATCH)
-            await setGamemode(names.slice(at, at + GAMEMODE_BATCH), mode);
+        setError(null);
+        let failure: string | undefined;
+        for (let at = 0; at < names.length; at += GAMEMODE_BATCH) {
+            const answer = await actions
+                .setGamemodeAction({
+                    installedAppId,
+                    players: names.slice(at, at + GAMEMODE_BATCH),
+                    mode
+                })
+                .catch(() => ({ error: t("errors.checkTheDetailsAndTry") }));
+            failure ??= answer.error;
+        }
+        if (failure) setError(failure);
+        onChanged();
     }
 
     /** Take away the access of everybody chosen who has any. */
@@ -482,9 +494,17 @@ export function MinecraftPlayers({
         });
         if (!agreed) return;
         run(async () => {
+            const removed: string[] = [];
             for (const name of names) {
                 const result = await actions.revokePlayerAccessAction(installedAppId, name);
-                if (result.error) return result;
+                if (result.error) {
+                    if (removed.length > 0) {
+                        selection.forget(removed);
+                        onChanged();
+                    }
+                    return result;
+                }
+                removed.push(name);
             }
             selection.forget(names);
             return {};
@@ -514,6 +534,7 @@ export function MinecraftPlayers({
     /** Keys heard anywhere in the table. Never while typing in a field. */
     function onTableKey(event: KeyboardEvent<HTMLDivElement>): void {
         const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
         if (target.closest("input:not([type=checkbox]), textarea, [contenteditable=true]")) return;
         if (event.key === "Delete" && removable.length > 0 && !pending) {
             event.preventDefault();
@@ -527,6 +548,7 @@ export function MinecraftPlayers({
      *  plain one chooses that row alone - unless it landed on a control. */
     function pressRow(name: string, event: MouseEvent<HTMLTableRowElement>): void {
         const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
         if (target.closest("button, a, input, label, [role=menuitem]")) return;
         if (!selection.pressRow(name, event)) selection.pressOnly(name);
     }
