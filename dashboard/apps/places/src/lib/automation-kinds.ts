@@ -178,7 +178,7 @@ export const STEP_DEVICE_ACTIONS = [...kinds.DEVICE_ACTIONS, TOGGLE] as const;
 export type StepDeviceAction = (typeof STEP_DEVICE_ACTIONS)[number];
 
 export function stepActionsFor(kind: string): readonly StepDeviceAction[] {
-    const own = kinds.actionsFor(kind);
+    const own = kinds.actionsFor(kind).filter((action) => !kinds.LIGHT_ACTIONS.includes(action));
     return own.includes("turn-on") && own.includes("turn-off") ? [...own, TOGGLE] : own;
 }
 

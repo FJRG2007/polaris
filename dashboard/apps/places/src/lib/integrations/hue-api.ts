@@ -374,11 +374,13 @@ export async function readBridge(bridge: HueBridge): Promise<{
     };
 }
 
-/** What a light is set to beyond on and off, as a CLIP v2 light update body. */
-export type HueLightUpdate =
+/** What a light is set to beyond on and off, as a CLIP v2 light update body.
+ *  It switches the light on as well, the way Home Assistant's `light.turn_on` does. */
+export type HueLightUpdate = { readonly on: { readonly on: true } } & (
     | { readonly dimming: { readonly brightness: number } }
     | { readonly color_temperature: { readonly mirek: number } }
-    | { readonly color: { readonly xy: { readonly x: number; readonly y: number } } };
+    | { readonly color: { readonly xy: { readonly x: number; readonly y: number } } }
+);
 
 /** Dim, warm or colour one light service. */
 export async function updateLight(

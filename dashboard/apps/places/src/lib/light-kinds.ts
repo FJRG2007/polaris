@@ -72,13 +72,13 @@ export function lightCommandIssue(
             return settings.brightness ? null : "That light does not dim";
         case "set-color-temp": {
             const range = settings.temperature;
-            if (!range) return "That light has no colour temperature to change";
+            if (!range) return "That light has no color temperature to change";
             return command.kelvin >= range.min && command.kelvin <= range.max
                 ? null
-                : "That colour temperature is not one this light accepts";
+                : "That color temperature is not one this light accepts";
         }
         case "set-color":
-            return settings.color ? null : "That light has no colour to change";
+            return settings.color ? null : "That light has no color to change";
     }
 }
 

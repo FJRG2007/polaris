@@ -40,25 +40,27 @@ function SettlingSlider({
 }) {
     const [shown, setShown] = useState<number | null>(value);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pending = useRef<number | null>(null);
     const commit = useRef(onCommit);
     commit.current = onCommit;
     // A later sync wins over a drag that has already been sent.
     useEffect(() => {
         if (!timer.current) setShown(value);
     }, [value]);
-    useEffect(
-        () => () => {
-            if (timer.current) clearTimeout(timer.current);
-        },
-        []
-    );
+    const flush = () => {
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = null;
+        const next = pending.current;
+        pending.current = null;
+        if (next !== null) commit.current(next);
+    };
+    // Leaving with a drag gathered sends it rather than dropping it.
+    useEffect(() => () => flush(), []);
     const change = (next: number) => {
         setShown(next);
+        pending.current = next;
         if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => {
-            timer.current = null;
-            commit.current(next);
-        }, SETTLE_MS);
+        timer.current = setTimeout(flush, SETTLE_MS);
     };
     return (
         <label className="flex min-w-0 flex-col gap-1">

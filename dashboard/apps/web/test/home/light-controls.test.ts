@@ -10,7 +10,10 @@ vi.mock("@polaris-app/places/src/lib/access", () => ({
     homeInstall: async () => ({ id: "install-1", ownerId: "owner", name: "Home" })
 }));
 
+import { placesCatalogs } from "@polaris-app/places/messages";
 import * as kinds from "@polaris-app/places/src/lib/device-kinds";
+import { placesRefusalText } from "@polaris-app/places/src/lib/refusal-text";
+import { stepActionsFor } from "@polaris-app/places/src/lib/automation-kinds";
 import type { HueLight } from "@polaris-app/places/src/lib/integrations/hue-api";
 import { deviceItem, pressAsAction } from "@polaris-app/places/src/lib/overview-widgets";
 import { hueLightSettings, hueLightUpdate } from "@polaris-app/places/src/lib/drivers/hue-light";
@@ -48,11 +51,11 @@ describe("light rules", () => {
         };
         expect(kinds.commandIssue(plain, { action: "set-brightness", level: 40 })).toBeNull();
         expect(kinds.commandIssue(plain, { action: "set-color-temp", kelvin: 3000 })).toMatch(
-            /colour temperature/
+            /color temperature/
         );
         expect(
             kinds.commandIssue(plain, { action: "set-color", hue: 10, saturation: 100 })
-        ).toMatch(/colour/);
+        ).toMatch(/color/);
         const full = { kind: "light", climate: null, air: null, light: FULL };
         expect(kinds.commandIssue(full, { action: "set-color-temp", kelvin: 9000 })).toMatch(
             /not one/
@@ -60,6 +63,27 @@ describe("light rules", () => {
         expect(
             kinds.commandIssue({ ...full, light: null }, { action: "set-brightness", level: 40 })
         ).toMatch(/not said/);
+    });
+
+    it("refuses in the reader's language", () => {
+        const es = placesCatalogs.translator("es-ES", "places");
+        const none = { brightness: null, temperature: null, color: null };
+        const refusals = [
+            kinds.lightCommandIssue(null, { action: "set-brightness", level: 40 }),
+            kinds.lightCommandIssue(none, { action: "set-brightness", level: 40 }),
+            kinds.lightCommandIssue(none, { action: "set-color-temp", kelvin: 3000 }),
+            kinds.lightCommandIssue(FULL, { action: "set-color-temp", kelvin: 9000 }),
+            kinds.lightCommandIssue(none, { action: "set-color", hue: 10, saturation: 100 })
+        ];
+        for (const refusal of refusals) {
+            expect(refusal).toBeTruthy();
+            expect(placesRefusalText(es, refusal!)).not.toBe(refusal);
+        }
+    });
+
+    it("keeps the sliders out of automation steps until the rule builder sets them", () => {
+        expect(stepActionsFor("light")).toEqual(["turn-on", "turn-off", "toggle"]);
+        expect(kinds.isSwitchable("light")).toBe(true);
     });
 
     it("never takes zero as a brightness: off is its own action", () => {
@@ -169,15 +193,17 @@ describe("Hue lights", () => {
         });
     });
 
-    it("sends dimming, mirek and xy", () => {
+    it("sends dimming, mirek and xy, switching the light on", () => {
         expect(hueLightUpdate({ action: "set-brightness", level: 30 })).toEqual({
+            on: { on: true },
             dimming: { brightness: 30 }
         });
         expect(hueLightUpdate({ action: "set-color-temp", kelvin: 2500 })).toEqual({
+            on: { on: true },
             color_temperature: { mirek: 400 }
         });
         const red = hueLightUpdate({ action: "set-color", hue: 0, saturation: 100 });
-        expect(red).toEqual({ color: { xy: { x: 0.6401, y: 0.33 } } });
+        expect(red).toEqual({ on: { on: true }, color: { xy: { x: 0.6401, y: 0.33 } } });
     });
 });
 
@@ -200,21 +226,21 @@ describe("Shelly lights", () => {
 
     it("sends Light.Set on Gen2 and the documented query on Gen1", () => {
         expect(shellyLightCall("light:0", { action: "set-brightness", level: 40 })).toEqual({
-            rpc: { id: 0, brightness: 40 }
+            rpc: { id: 0, on: true, brightness: 40 }
         });
         expect(
             shellyLightCall("light:0", { action: "set-color", hue: 0, saturation: 100 })
         ).toBeNull();
         expect(shellyLightCall("white/2", { action: "set-brightness", level: 10 })).toEqual({
-            path: "/white/2?brightness=10"
+            path: "/white/2?turn=on&brightness=10"
         });
         expect(shellyLightCall("color/0", { action: "set-brightness", level: 70 })).toEqual({
-            path: "/color/0?gain=70"
+            path: "/color/0?turn=on&gain=70"
         });
         expect(
             shellyLightCall("color/0", { action: "set-color", hue: 120, saturation: 100 })
         ).toEqual({
-            path: "/color/0?red=0&green=255&blue=0"
+            path: "/color/0?turn=on&red=0&green=255&blue=0"
         });
         expect(shellyLightCall("relay/0", { action: "set-brightness", level: 10 })).toBeNull();
     });

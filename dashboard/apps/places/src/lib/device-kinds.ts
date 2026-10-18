@@ -289,7 +289,11 @@ export const DEVICE_ACTIONS = [
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
 
 /** The actions a light takes from its sliders rather than from a button. */
-const LIGHT_ACTIONS: readonly DeviceAction[] = ["set-brightness", "set-color-temp", "set-color"];
+export const LIGHT_ACTIONS: readonly DeviceAction[] = [
+    "set-brightness",
+    "set-color-temp",
+    "set-color"
+];
 
 export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     lock: en("devices.actions.lock"),
@@ -323,8 +327,8 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     "set-option": "change a setting",
     "set-humidity": "change humidity",
     "set-brightness": "change brightness",
-    "set-color-temp": "change colour temperature",
-    "set-color": "change colour",
+    "set-color-temp": "change color temperature",
+    "set-color": "change color",
     stop: "stop"
 };
 

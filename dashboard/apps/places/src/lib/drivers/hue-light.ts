@@ -37,16 +37,17 @@ export function hueLightSettings(light: hue.HueLight): LightSettings | null {
     };
 }
 
-/** The light update body a command is. */
+/** The light update body a command is. Setting a light switches it on. */
 export function hueLightUpdate(command: LightCommand): hue.HueLightUpdate {
+    const on = { on: true } as const;
     switch (command.action) {
         case "set-brightness":
-            return { dimming: { brightness: Math.round(command.level) } };
+            return { on, dimming: { brightness: Math.round(command.level) } };
         case "set-color-temp":
-            return { color_temperature: { mirek: kelvinToMireds(command.kelvin) } };
+            return { on, color_temperature: { mirek: kelvinToMireds(command.kelvin) } };
         case "set-color": {
             const [x, y] = hsToXy(command.hue, command.saturation);
-            return { color: { xy: { x, y } } };
+            return { on, color: { xy: { x, y } } };
         }
     }
 }

@@ -38,7 +38,7 @@ export function shellyLightSettings(
 }
 
 /** The call a command is on a channel: RPC params on Gen2+, a path on Gen1.
- *  Null for what the channel cannot take. */
+ *  Setting a channel switches it on. Null for what the channel cannot take. */
 export function shellyLightCall(
     channel: string,
     command: LightCommand
@@ -46,7 +46,7 @@ export function shellyLightCall(
     const rpc = /^light:(\d+)$/.exec(channel);
     if (rpc) {
         return command.action === "set-brightness"
-            ? { rpc: { id: Number(rpc[1]), brightness: Math.round(command.level) } }
+            ? { rpc: { id: Number(rpc[1]), on: true, brightness: Math.round(command.level) } }
             : null;
     }
     const gen1 = /^(light|white|color)\/(\d+)$/.exec(channel);
@@ -54,11 +54,11 @@ export function shellyLightCall(
     const base = `/${gen1[1]}/${gen1[2]}`;
     if (command.action === "set-brightness") {
         const field = gen1[1] === "color" ? "gain" : "brightness";
-        return { path: `${base}?${field}=${Math.round(command.level)}` };
+        return { path: `${base}?turn=on&${field}=${Math.round(command.level)}` };
     }
     if (command.action === "set-color" && gen1[1] === "color") {
         const [red, green, blue] = hsToRgb(command.hue, command.saturation);
-        return { path: `${base}?red=${red}&green=${green}&blue=${blue}` };
+        return { path: `${base}?turn=on&red=${red}&green=${green}&blue=${blue}` };
     }
     return null;
 }

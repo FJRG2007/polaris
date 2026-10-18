@@ -519,7 +519,7 @@
         "tuyaKeys": "Tuya refused the keys. They may have been revoked, or the project may not cover these devices.",
         "tuyaRefused": "Tuya refused the request.",
         "reconnect": "{name} has to be connected again",
-        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} appliance {kitchen appliance} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} stop {stop} other {do that}}",
+        "kindCannot": "A {kind, select, lock {lock} opener {door opener} switch {switch} outlet {socket} light {light} climate {air conditioner} air {air purifier} appliance {kitchen appliance} other {sensor}} cannot be told to {action, select, lock {lock} unlock {unlock} unlatch {open} turnOn {turn on} turnOff {turn off} setMode {change mode} setTemperature {change temperature} setFan {change fan speed} setOption {change a setting} setHumidity {change humidity} setBrightness {change brightness} setColorTemp {change color temperature} setColor {change color} stop {stop} other {do that}}",
         "watchOnly": "{name} is set to be watched, not operated",
         "notConnected": "{name} is not connected to anything",
         "notAnswering": "{name} was not answering when it was last checked",
@@ -626,6 +626,11 @@
         "greeNoPair": "The air conditioner answered but would not pair. Switch it off at the wall for a minute and try again.",
         "airNoHumidity": "That device does not humidify",
         "airHumidity": "That humidity is not one this device accepts",
+        "lightUnknown": "That light has not said what it can be set to yet",
+        "lightNoDimming": "That light does not dim",
+        "lightNoTemperature": "That light has no color temperature to change",
+        "lightTemperature": "That color temperature is not one this light accepts",
+        "lightNoColor": "That light has no color to change",
         "philipsQuiet": "The air purifier did not answer.",
         "philipsLocalOff": "This model's firmware does not allow local control. It answers on your network but not to the local protocol Polaris uses. Try connecting it with a Philips Air+ account instead.",
         "philipsGarbled": "The air purifier answered in a way Polaris could not read.",
@@ -1402,8 +1407,8 @@
             "set-option": "Setting",
             "set-humidity": "Humidity",
             "set-brightness": "Brightness",
-            "set-color-temp": "Colour temperature",
-            "set-color": "Colour",
+            "set-color-temp": "Color temperature",
+            "set-color": "Color",
             "stop": "Stop"
         },
         "via": {
@@ -1433,8 +1438,8 @@
             "set-option": "Setting changed",
             "set-humidity": "Humidity set",
             "set-brightness": "Brightness set",
-            "set-color-temp": "Colour temperature set",
-            "set-color": "Colour set",
+            "set-color-temp": "Color temperature set",
+            "set-color": "Color set",
             "stop": "Stopped"
         },
         "kindStates": {
@@ -2515,7 +2520,7 @@
         "humidityTarget": "Humidity target",
         "brightness": "Brightness",
         "warmth": "Warmth",
-        "color": "Colour",
+        "color": "Color",
         "colors": {
             "red": "Red",
             "orange": "Orange",
