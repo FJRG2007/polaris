@@ -24,6 +24,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { findPeople } from "@/lib/people-search";
+import { FRIEND_NOTE_MAX, friendNoteSchema } from "@/lib/friend-note";
 import { publishChatChange } from "@/lib/chat/live";
 import { announceActivity } from "@/lib/presence-activity/live";
 import { saveActivitySettings } from "@/lib/presence-activity/settings";
@@ -127,9 +128,18 @@ export async function searchPeopleAction(
     return { results: found.people, withheld: 0 };
 }
 
-export async function requestFriendAction(userId: string): Promise<{ error?: string }> {
+/** The note, or the sentence that says it is too long. */
+async function readNote(raw: unknown): Promise<{ note: string | null } | { error: string }> {
+    const parsed = friendNoteSchema.safeParse(raw);
+    if (parsed.success) return { note: parsed.data };
+    return { error: (await getTranslations("account"))("friends.noteTooLong", { max: FRIEND_NOTE_MAX }) };
+}
+
+export async function requestFriendAction(userId: string, note?: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
-    return guard(() => requestFriend(user.id, String(userId)));
+    const read = await readNote(note);
+    if ("error" in read) return read;
+    return guard(() => requestFriend(user.id, String(userId), read.note));
 }
 
 /**
@@ -141,10 +151,13 @@ export async function requestFriendAction(userId: string): Promise<{ error?: str
  * for.
  */
 export async function requestFriendByUsernameAction(
-    username: string
+    username: string,
+    note?: unknown
 ): Promise<{ said: string; error?: string }> {
     const user = await requireUser();
-    const result = await guard(() => requestFriendByUsername(user.id, String(username ?? "")));
+    const read = await readNote(note);
+    if ("error" in read) return { said: "", error: read.error };
+    const result = await guard(() => requestFriendByUsername(user.id, String(username ?? ""), read.note));
     if (result.error) return { said: "", error: result.error };
     return { said: (await getTranslations("accountPrivacy"))("friends.asked") };
 }

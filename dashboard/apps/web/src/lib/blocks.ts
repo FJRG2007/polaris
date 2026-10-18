@@ -82,6 +82,10 @@ export async function block(userId: string, otherId: string): Promise<void> {
         update: {},
         create: { blockerId: userId, blockedId: otherId }
     });
+    // A request waiting between them is a notification with the other's name
+    // on it. Reached at call time: the friends service imports this module.
+    const { endPendingRequests } = await import("@/lib/friends-service");
+    await endPendingRequests(userId, otherId);
 }
 
 /** Let them through again. Also idempotent, and for the same reason. */

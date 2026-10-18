@@ -38,6 +38,8 @@ export interface FriendRequestView {
      *  offers Accept or Cancel. */
     readonly outgoing: boolean;
     readonly askedAt: string;
+    /** What the asker wrote with it, if anything. */
+    readonly note: string | null;
 }
 
 /** Said where a block is what refuses, in both directions and naming neither.
@@ -182,6 +184,7 @@ export async function listRequests(userId: string): Promise<FriendRequestView[]>
         select: {
             id: true,
             createdAt: true,
+            note: true,
             requesterId: true,
             requester: { select: { id: true, name: true, email: true, username: true } },
             addressee: { select: { id: true, name: true, email: true, username: true } }
@@ -195,7 +198,8 @@ export async function listRequests(userId: string): Promise<FriendRequestView[]>
         id: row.id,
         person: people[index]!,
         outgoing: row.requesterId === userId,
-        askedAt: row.createdAt.toISOString()
+        askedAt: row.createdAt.toISOString(),
+        note: row.note
     }));
 }
 
@@ -207,7 +211,11 @@ export async function listRequests(userId: string): Promise<FriendRequestView[]>
  * same moment is not an error state, and leaving both requests open would leave
  * each waiting for the other.
  */
-export async function requestFriend(userId: string, otherId: string): Promise<void> {
+export async function requestFriend(
+    userId: string,
+    otherId: string,
+    note: string | null = null
+): Promise<void> {
     if (userId === otherId) throw new FriendError("You are already yourself");
 
     const other = await prisma.user.findUnique({ where: { id: otherId }, select: { id: true } });
@@ -251,8 +259,10 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
         if (existing.requesterId === userId) return;
         await prisma.friendship.update({
             where: { id: existing.id },
-            data: { status: "accepted", respondedAt: new Date() }
+            data: { status: "accepted", respondedAt: new Date(), note: null }
         });
+        // Their request is answered, so its alert has nothing left to ask.
+        await dropFriendNotices(userId, otherId, { requestOnly: true });
         // The same thing accepting from the friends screen does: two people who
         // have agreed to be friends have already said the smaller thing
         // following says - see `respondToRequest`, where the reasoning lives.
@@ -265,7 +275,7 @@ export async function requestFriend(userId: string, otherId: string): Promise<vo
         return;
     }
 
-    await prisma.friendship.create({ data: { requesterId: userId, addresseeId: otherId } });
+    await prisma.friendship.create({ data: { requesterId: userId, addresseeId: otherId, note } });
     await announce(otherId, userId, "asked");
 }
 
@@ -327,7 +337,11 @@ async function announce(
  * Exact, and case-insensitively so, since usernames are stored lowercase and
  * somebody typing one from a note may capitalise it.
  */
-export async function requestFriendByUsername(userId: string, username: string): Promise<void> {
+export async function requestFriendByUsername(
+    userId: string,
+    username: string,
+    note: string | null = null
+): Promise<void> {
     const handle = username.trim().replace(/^@/, "").toLowerCase();
     if (!handle) return;
 
@@ -344,7 +358,7 @@ export async function requestFriendByUsername(userId: string, username: string):
     // you - the two facts this whole function is written to withhold.
     if (await blockedEitherWay(userId, other.id)) return;
 
-    await requestFriend(userId, other.id);
+    await requestFriend(userId, other.id, note);
 }
 
 /**
@@ -375,13 +389,19 @@ export async function respondToRequest(
     }
 
     if (!accept) {
-        await prisma.friendship.delete({ where: { id: requestId } });
+        // The row goes, and the note on it with it; so does the alert that
+        // asked the other one to answer, which now points at nothing.
+        await prisma.friendship.deleteMany({ where: { id: requestId, status: "pending" } });
+        await dropFriendNotices(request.addresseeId, request.requesterId, { requestOnly: true });
         return;
     }
+    // The note was written to be read before answering; once answered it is
+    // nobody's business to keep.
     await prisma.friendship.update({
         where: { id: requestId },
-        data: { status: "accepted", respondedAt: new Date() }
+        data: { status: "accepted", respondedAt: new Date(), note: null }
     });
+    await dropFriendNotices(userId, request.requesterId, { requestOnly: true });
 
     /**
      * Friends follow each other.
@@ -508,6 +528,128 @@ export async function removeFriend(userId: string, otherId: string): Promise<voi
             ]
         }
     });
+    // "So-and-so accepted" in either bell is news that is no longer true.
+    await Promise.all([dropFriendNotices(userId, otherId), dropFriendNotices(otherId, userId)]);
+}
+
+/**
+ * End whatever request is waiting between two people, in either direction.
+ *
+ * For a block: a request is a notification with somebody's name on it, which is
+ * exactly what a block is for, and one left open could still be accepted from
+ * the friends screen. A friendship already made is left alone - that is the
+ * friends list's decision, not the block's.
+ */
+export async function endPendingRequests(userId: string, otherId: string): Promise<void> {
+    await prisma.friendship.deleteMany({
+        where: {
+            status: "pending",
+            OR: [
+                { requesterId: userId, addresseeId: otherId },
+                { requesterId: otherId, addresseeId: userId }
+            ]
+        }
+    });
+    await Promise.all([
+        dropFriendNotices(userId, otherId, { requestOnly: true }),
+        dropFriendNotices(otherId, userId, { requestOnly: true })
+    ]);
+}
+
+/** The most friend alerts about one person one bell is read for. One request
+ *  and one acceptance is the normal case; this only bounds a strange one. */
+const NOTICES_ABOUT_ONE = 50;
+
+/**
+ * Delete the friend alerts in one account's bell about one person.
+ *
+ * `requestOnly` limits it to the "wants to be added" alert, which is the one an
+ * answered or withdrawn request leaves pointing at nothing. Best effort: a bell
+ * that kept a stale line is not worth failing the answer over.
+ */
+async function dropFriendNotices(
+    userId: string,
+    personId: string,
+    options: { requestOnly?: boolean } = {}
+): Promise<void> {
+    try {
+        const rows = await prisma.notification.findMany({
+            where: {
+                userId,
+                type: "account.friend",
+                ...(options.requestOnly ? { actionRequired: true } : {}),
+                metadata: { contains: personId }
+            },
+            select: { id: true, metadata: true },
+            take: NOTICES_ABOUT_ONE
+        });
+        const ids = rows.filter((row) => notificationIsAbout(row.metadata, personId)).map((row) => row.id);
+        if (ids.length > 0) await prisma.notification.deleteMany({ where: { id: { in: ids }, userId } });
+    } catch (caught) {
+        console.error("polaris: could not tidy friend alerts:", caught);
+    }
+}
+
+/** How many request alerts one sweep pass reads. */
+const SWEEP_PAGE = 200;
+
+/** Where the last pass stopped. Per process and lost on restart, which only
+ *  means the next pass starts from the oldest again. */
+let sweepCursor: string | null = null;
+
+/**
+ * Drop "wants to be added" alerts whose request has ended.
+ *
+ * The answer paths delete their own alert now; this is for the ones written
+ * before they did, and for any a failed tidy left behind. A page at a time in id
+ * order, moving on each pass, so a table of millions is walked in bounded steps
+ * and a page of still-open requests is never read twice in a row.
+ */
+export async function sweepEndedFriendRequestNotices(): Promise<{ removed: number }> {
+    const rows = await prisma.notification.findMany({
+        where: {
+            type: "account.friend",
+            actionRequired: true,
+            ...(sweepCursor ? { id: { gt: sweepCursor } } : {})
+        },
+        orderBy: { id: "asc" },
+        take: SWEEP_PAGE,
+        select: { id: true, userId: true, metadata: true }
+    });
+    sweepCursor = rows.length === SWEEP_PAGE ? rows.at(-1)!.id : null;
+    if (rows.length === 0) return { removed: 0 };
+
+    const named = rows.flatMap((row) => {
+        const personId = personIdOf(row.metadata);
+        // An alert that names nobody cannot be matched to a request; it is left
+        // alone rather than guessed at.
+        return personId ? [{ id: row.id, userId: row.userId, personId }] : [];
+    });
+    if (named.length === 0) return { removed: 0 };
+    const open = await prisma.friendship.findMany({
+        where: {
+            status: "pending",
+            OR: named.map((row) => ({ requesterId: row.personId, addresseeId: row.userId }))
+        },
+        select: { requesterId: true, addresseeId: true }
+    });
+    const waiting = new Set(open.map((row) => `${row.addresseeId}:${row.requesterId}`));
+    const ended = named.filter((row) => !waiting.has(`${row.userId}:${row.personId}`)).map((row) => row.id);
+    if (ended.length === 0) return { removed: 0 };
+    const gone = await prisma.notification.deleteMany({ where: { id: { in: ended } } });
+    return { removed: gone.count };
+}
+
+/** The person a stored friend alert is about, or null when it names nobody. */
+function personIdOf(metadata: string | null): string | null {
+    if (!metadata) return null;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        const id = parsed && typeof parsed === "object" ? (parsed as { personId?: unknown }).personId : null;
+        return typeof id === "string" ? id : null;
+    } catch {
+        return null;
+    }
 }
 
 /**

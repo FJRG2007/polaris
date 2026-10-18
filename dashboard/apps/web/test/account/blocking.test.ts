@@ -79,7 +79,8 @@ vi.mock("@/lib/rich-text/mention-service", () => ({
 }));
 
 vi.mock("@/lib/friends-service", () => ({
-    friendIds: async () => new Set<string>()
+    friendIds: async () => new Set<string>(),
+    endPendingRequests: async () => undefined
 }));
 
 vi.mock("@/lib/privacy-service", () => ({

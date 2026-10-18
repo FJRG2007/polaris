@@ -34,6 +34,7 @@ import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
+import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
 import { probeAllDomains } from "@/lib/watch/health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { tickDeployAutomations } from "@/lib/deploy/automations";
@@ -409,6 +410,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepEmptyGroups
+    },
+    {
+        key: "friend-request-notices",
+        // "Wants to be added" alerts whose request was answered, withdrawn or
+        // ended by a block before those paths tidied their own. Hourly, a page
+        // per pass: nothing is waiting on it.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: sweepEndedFriendRequestNotices
     },
     {
         key: "service-crons",

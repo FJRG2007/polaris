@@ -832,7 +832,12 @@
         "add": "Add somebody",
         "askTitle": "Ask by exact username",
         "ask": "Ask",
-        "hint": "Somebody who keeps themselves out of the search can still be asked, if they have given you their exact username."
+        "hint": "Somebody who keeps themselves out of the search can still be asked, if they have given you their exact username.",
+        "addNote": "Add a note",
+        "noteLabel": "Note",
+        "notePlaceholder": "Say where you know each other from (optional)",
+        "noteCount": "{count}/{max}",
+        "noteTooLong": "Up to {max} characters"
     },
     "scan": {
         "page": {
