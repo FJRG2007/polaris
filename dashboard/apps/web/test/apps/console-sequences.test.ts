@@ -49,7 +49,10 @@ const MINECRAFT = {
     ownerId: "owner",
     install: { id: "install", catalogId: "minecraft", applicationId: "app" }
 };
-const ARK = { ownerId: "owner", install: { id: "install", catalogId: "ark", applicationId: "app" } };
+const ARK = {
+    ownerId: "owner",
+    install: { id: "install", catalogId: "ark", applicationId: "app" }
+};
 
 describe("keeping a sequence", () => {
     it("normalizes the text the same way on both sides", () => {

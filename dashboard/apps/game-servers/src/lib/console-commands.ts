@@ -132,9 +132,7 @@ export function savedCommandProblem(command: string): string | null {
     if (command.length > MAX_SAVED_SEQUENCE) {
         return gameMessage("games", "lib.sequenceTooLong", { max: MAX_SAVED_SEQUENCE });
     }
-    const waitWithVariable = command
-        .split("\n")
-        .findIndex((line) => /^\/?wait\s.*\{/i.test(line));
+    const waitWithVariable = command.split("\n").findIndex((line) => /^\/?wait\s.*\{/i.test(line));
     if (waitWithVariable >= 0) {
         return gameMessage("games", "lib.waitVariable", { line: waitWithVariable + 1 });
     }

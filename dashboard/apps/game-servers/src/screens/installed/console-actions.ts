@@ -45,11 +45,7 @@ import {
     type ConsoleSchedule,
     type ScheduleRepeat
 } from "../../lib/console-schedule";
-import {
-    keptCommandSteps,
-    keptRunProblem,
-    runKeptCommand
-} from "../../lib/console-run-service";
+import { keptCommandSteps, keptRunProblem, runKeptCommand } from "../../lib/console-run-service";
 import {
     MAX_SAVED_LABEL,
     MAX_SAVED_SEQUENCE,

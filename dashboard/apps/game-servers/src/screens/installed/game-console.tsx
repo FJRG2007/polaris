@@ -426,9 +426,7 @@ export function GameConsole({
             return;
         }
         setReplies((current) =>
-            [...current, { command: entry.label, output: why, failed: true }].slice(
-                -KEPT_REPLIES
-            )
+            [...current, { command: entry.label, output: why, failed: true }].slice(-KEPT_REPLIES)
         );
     }, []);
 
@@ -965,9 +963,7 @@ export function GameConsole({
                                 <Button
                                     variant="outline"
                                     disabled={
-                                        pending ||
-                                        !parsedBatch ||
-                                        parsedBatch.problem !== null
+                                        pending || !parsedBatch || parsedBatch.problem !== null
                                     }
                                     onClick={() => {
                                         const block = normalizeCommandText(batch);
