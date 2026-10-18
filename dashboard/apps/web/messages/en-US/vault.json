@@ -45,7 +45,9 @@
             "move": "Move",
             "share": "Share by link",
             "deleteForGood": "Delete for good",
-            "trash": "Move to trash"
+            "trash": "Move to trash",
+            "defaultIdentity": "Use for sign-up forms",
+            "notDefaultIdentity": "Stop using for sign-ups"
         },
         "inTrash": "In the trash",
         "unstar": "Unstar",
@@ -93,7 +95,11 @@
         "hide": "Hide",
         "hideNamed": "Hide the {label}",
         "showNamed": "Show the {label}",
-        "copyNamed": "Copy the {label}"
+        "copyNamed": "Copy the {label}",
+        "defaultIdentity": "Default for sign-ups",
+        "defaultIdentityFailed": "Could not change the default identity",
+        "defaultIdentityNamed": "Use {name} for sign-up forms",
+        "notDefaultIdentityNamed": "Stop using {name} for sign-up forms"
     },
     "authorize": {
         "title": "Let a client in",
@@ -198,7 +204,10 @@
         "hints": {
             "title": "Mr, Ms, Dr",
             "address2": "Optional"
-        }
+        },
+        "fromAccount": "Fill in from my account",
+        "fromAccountFailed": "Could not read your account. Try again.",
+        "pickEmail": "Or pick one of your addresses"
     },
     "item": {
         "expiry": {

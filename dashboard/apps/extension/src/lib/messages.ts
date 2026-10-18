@@ -16,6 +16,40 @@ import type { UpdateNotice } from "@/lib/update";
 import type { ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
 
+/** The id of the identity made from the signed-in account, offered when the
+ *  open shelf holds no identity of its own. */
+export const ACCOUNT_IDENTITY = "account";
+
+/** One identity in the sign-up menu: enough to choose it, nothing more. */
+export interface IdentityCard {
+    readonly id: string;
+    readonly name: string;
+    /** The email it carries, or the name when it has none. */
+    readonly detail: string;
+    /** The one this person fills sign-ups with in its vault. */
+    readonly isDefault: boolean;
+    /** Which vault it is in, as named in plain text, or null for their own. */
+    readonly vault: string | null;
+}
+
+/** The parts of an identity a sign-up form can ask for. Empty where unset. */
+export interface IdentityValues {
+    readonly title: string;
+    readonly firstName: string;
+    readonly middleName: string;
+    readonly lastName: string;
+    readonly company: string;
+    readonly email: string;
+    readonly phone: string;
+    readonly username: string;
+    readonly address1: string;
+    readonly address2: string;
+    readonly city: string;
+    readonly state: string;
+    readonly postalCode: string;
+    readonly country: string;
+}
+
 /** One decrypted login, reduced to what a list needs to draw it. */
 export interface ItemSummary {
     readonly id: string;
@@ -262,11 +296,16 @@ export type Request =
      */
     | { readonly kind: "menuTarget"; readonly password: boolean }
     /**
-     * The signed-in person's own name and email, to type into a sign-up on a site
-     * with nothing saved for it. Asked when the menu opens there, so a page is
-     * never handed them unless somebody is about to choose them.
+     * The identities a sign-up on this page can be filled with: those of the
+     * open shelf, its default first. Names and one line each - the addresses,
+     * phones and the rest stay in the worker until one is picked.
      */
-    | { readonly kind: "myDetails" }
+    | { readonly kind: "identities" }
+    /**
+     * Everything one identity holds, to type into the sign-up in front of
+     * somebody who has just picked it from the list above.
+     */
+    | { readonly kind: "identity"; readonly id: string }
     /** Whether the tab in front of somebody is one they have shut this out of. */
     | { readonly kind: "blocked" }
     /**
@@ -425,8 +464,10 @@ export type Reply =
     | { readonly ok: true; readonly count: number | null }
     /** What the worker is holding for this tab, and what to say about it. */
     | { readonly ok: true; readonly offer: OfferedCapture }
-    /** The person this extension is signed in as, for a sign-up form. */
-    | { readonly ok: true; readonly details: ExtensionAccount }
+    /** The identities a sign-up can be filled with, best first. */
+    | { readonly ok: true; readonly identities: readonly IdentityCard[] }
+    /** One identity, open, for the form somebody picked it for. */
+    | { readonly ok: true; readonly identity: IdentityValues }
     /**
      * A request to be let in by Polaris: where it stands, and what to show while
      * it is in flight.
@@ -478,6 +519,10 @@ export type Reply =
  *   right-click menu can fit the box; it reads nothing and answers nothing.
  * - `breach`, `captured`, `saveCaptured` and `dismissCapture` carry values the
  *   page already has, because somebody typed them into it.
+ * - `identities` and `identity` fill a sign-up with somebody's own details.
+ *   The list is a name and one line per identity; the whole of one crosses
+ *   only for the id just picked from that list, and neither answers while the
+ *   vault is locked or the site is switched off.
  *
  * What is deliberately absent: `items` (the whole vault), `copy` (any field of
  * any item, including a password, as a string), `status`, `unlock`, `save`,
@@ -493,7 +538,8 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     "secondStepCode",
     "continueSignIn",
     "openUnlock",
-    "myDetails",
+    "identities",
+    "identity",
     "menuTarget",
     "breach",
     "captured",
