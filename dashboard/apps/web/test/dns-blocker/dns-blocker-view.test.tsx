@@ -13,13 +13,36 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 let answer: { error: string } | { status: DnsBlockerStatus };
 const turnOnDnsBlockerAction = vi.fn(async () => ({}));
+const dnsInsightsAction = vi.fn(async (..._args: unknown[]): Promise<unknown> => insights());
 
 vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     dnsBlockerStatusAction: async () => answer,
     saveDnsSettingsAction: async () => ({}),
     turnOffDnsBlockerAction: async () => ({}),
-    turnOnDnsBlockerAction
+    turnOnDnsBlockerAction,
+    dnsInsightsAction,
+    pauseDnsBlockingAction: async () => ({}),
+    resumeDnsBlockingAction: async () => ({})
 }));
+
+function insights(logOff = false, domain = "example.com") {
+    return {
+        insights: {
+            stats: {
+                queries: 1,
+                blocked: 0,
+                blockedPercent: 0,
+                topDomains: [{ name: domain, count: 1 }],
+                topBlocked: [],
+                topClients: [{ name: "10.0.0.2", count: 1 }],
+                clients: ["10.0.0.2"]
+            },
+            rows: [],
+            pause: { enabled: true, secondsLeft: null },
+            logOff
+        }
+    };
+}
 
 const { DnsBlockerView } = await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-view");
 
@@ -42,6 +65,8 @@ async function shown(): Promise<string[]> {
 afterEach(() => {
     cleanup();
     turnOnDnsBlockerAction.mockClear();
+    dnsInsightsAction.mockReset();
+    dnsInsightsAction.mockImplementation(async () => insights());
 });
 
 describe("DnsBlockerView status", () => {
@@ -74,5 +99,51 @@ describe("DnsBlockerView status", () => {
         answer = { error: "The check did not answer." };
         expect(await shown()).toEqual(["Try again"]);
         expect(screen.getByRole("alert").textContent).toBe("The check did not answer.");
+    });
+});
+
+describe("DnsBlockerView today", () => {
+    it.each(["off", "portTaken", "starting", "portHeld", "conflict"] as const)(
+        "is not shown while %s",
+        async (state) => {
+            standing(state);
+            await shown();
+            expect(screen.queryByText("Today")).toBeNull();
+            expect(dnsInsightsAction).not.toHaveBeenCalled();
+        }
+    );
+
+    it("is shown while blocking", async () => {
+        standing("blocking");
+        await shown();
+        await waitFor(() => expect(screen.getAllByText("example.com").length).toBeGreaterThan(0));
+    });
+
+    it("offers to apply the settings when the server records no lookups", async () => {
+        standing("blocking");
+        dnsInsightsAction.mockImplementation(async () => insights(true));
+        await shown();
+        const apply = await screen.findByRole("button", { name: "Apply" });
+        fireEvent.click(apply);
+        await waitFor(() => expect(turnOnDnsBlockerAction).toHaveBeenCalledTimes(1));
+    });
+
+    it("keeps the newest answer when an older one arrives last", async () => {
+        standing("blocking");
+        let releaseFirst: (value: unknown) => void = () => undefined;
+        dnsInsightsAction
+            .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
+            .mockImplementation(async () => insights(false, "newest.example"));
+        await shown();
+        await waitFor(() => expect(dnsInsightsAction).toHaveBeenCalledTimes(1));
+        fireEvent.change(screen.getByRole("textbox", { name: "Search a domain" }), {
+            target: { value: "newest" }
+        });
+        await waitFor(() =>
+            expect(screen.getAllByText("newest.example").length).toBeGreaterThan(0)
+        );
+        releaseFirst(insights(false, "stale.example"));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(screen.queryByText("stale.example")).toBeNull();
     });
 });

@@ -10,7 +10,7 @@
  */
 
 import { Loader2, Pause, Play, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
     Badge,
     Button,
@@ -25,11 +25,16 @@ import {
 import type { DnsInsights } from "@/lib/dns-blocker/insights";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NameCount, QueryFilter } from "@/lib/dns-blocker/query-log";
-import { dnsInsightsAction, pauseDnsBlockingAction, resumeDnsBlockingAction } from "./actions";
+import {
+    dnsInsightsAction,
+    pauseDnsBlockingAction,
+    resumeDnsBlockingAction,
+    turnOnDnsBlockerAction
+} from "./actions";
 
 const PAUSES = [5, 15, 30, 60] as const;
 
-export function DnsInsightsCard() {
+export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
     const t = useTranslations("dnsBlocker");
     const [filter, setFilter] = useState<QueryFilter>({ search: "", outcome: "all", client: "" });
     const [typed, setTyped] = useState("");
@@ -38,10 +43,14 @@ export function DnsInsightsCard() {
     const [minutes, setMinutes] = useState("15");
     const [loading, setLoading] = useState(true);
     const [pending, startTransition] = useTransition();
+    const [applying, startApplying] = useTransition();
+    const latest = useRef(0);
 
-    const load = useCallback(async (next: QueryFilter) => {
+    const load = useCallback(async (next: QueryFilter, fresh = false) => {
+        const request = ++latest.current;
         setLoading(true);
-        const result = await dnsInsightsAction(next);
+        const result = await dnsInsightsAction(next, fresh);
+        if (request !== latest.current) return;
         setLoading(false);
         if (result.error !== undefined) {
             setError(result.error);
@@ -73,7 +82,15 @@ export function DnsInsightsCard() {
                     ? await resumeDnsBlockingAction()
                     : await pauseDnsBlockingAction({ minutes: Number(minutes) });
             if (result.error !== undefined) setError(result.error);
-            await load(filter);
+            await load(filter, true);
+        });
+
+    const applySettings = () =>
+        startApplying(async () => {
+            const result = await turnOnDnsBlockerAction();
+            if (result.error !== undefined) setError(result.error);
+            onApplied();
+            await load(filter, true);
         });
 
     const stats = data?.stats;
@@ -127,7 +144,7 @@ export function DnsInsightsCard() {
                         aria-label={t("insights.refresh")}
                         title={t("insights.refresh")}
                         disabled={loading}
-                        onClick={() => void load(filter)}
+                        onClick={() => void load(filter, true)}
                     >
                         <RefreshCw className={`size-4 shrink-0 ${loading ? "animate-spin" : ""}`} />
                     </Button>
@@ -135,92 +152,120 @@ export function DnsInsightsCard() {
             </CardHeader>
             <CardBody className="flex flex-col gap-5">
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <Figure label={t("insights.queries")} value={stats?.queries.toLocaleString()} />
-                    <Figure label={t("insights.blocked")} value={stats?.blocked.toLocaleString()} />
-                    <Figure
-                        label={t("insights.blockedPercent")}
-                        value={stats ? `${stats.blockedPercent}%` : undefined}
-                    />
-                </div>
-                {stats && stats.queries === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>
+                {data?.logOff ? (
+                    <div className="flex flex-col gap-2 rounded-md bg-muted/40 p-3 sm:flex-row sm:items-center">
+                        <p className="min-w-0 flex-1 text-sm">{t("insights.logOff")}</p>
+                        <Button
+                            variant="secondary"
+                            className="shrink-0"
+                            disabled={applying}
+                            onClick={applySettings}
+                        >
+                            {applying ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            {t("insights.apply")}
+                        </Button>
+                    </div>
                 ) : null}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <TopList
-                        title={t("insights.topDomains")}
-                        items={stats?.topDomains}
-                        empty={t("insights.none")}
-                        hint={t("insights.filterDomain")}
-                        onPick={(name) => setTyped(name)}
-                    />
-                    <TopList
-                        title={t("insights.topBlocked")}
-                        items={stats?.topBlocked}
-                        empty={t("insights.none")}
-                        hint={t("insights.filterDomain")}
-                        onPick={(name) => setTyped(name)}
-                    />
-                    <TopList
-                        title={t("insights.topClients")}
-                        items={stats?.topClients}
-                        empty={t("insights.none")}
-                        hint={t("insights.filterClient")}
-                        onPick={(name) => setFilter((current) => ({ ...current, client: name }))}
-                    />
-                </div>
-                <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-medium">{t("insights.log")}</h3>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                            className="min-w-0 flex-1"
-                            value={typed}
-                            placeholder={t("insights.search")}
-                            aria-label={t("insights.search")}
-                            onChange={(event) => setTyped(event.target.value)}
+                {!data && !loading ? null : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <Figure
+                            label={t("insights.queries")}
+                            value={stats?.queries.toLocaleString()}
                         />
-                        <Select
-                            className="w-full sm:w-36"
-                            value={filter.outcome}
-                            aria-label={t("insights.outcome")}
-                            onValueChange={(value) =>
-                                setFilter((current) => ({
-                                    ...current,
-                                    outcome: value as QueryFilter["outcome"]
-                                }))
-                            }
-                            options={[
-                                { value: "all", label: t("insights.all") },
-                                { value: "blocked", label: t("insights.blockedOnly") },
-                                { value: "allowed", label: t("insights.allowedOnly") }
-                            ]}
+                        <Figure
+                            label={t("insights.blocked")}
+                            value={stats?.blocked.toLocaleString()}
                         />
-                        <Select
-                            className="w-full sm:w-44"
-                            value={filter.client || "*"}
-                            aria-label={t("insights.client")}
-                            onValueChange={(value) =>
-                                setFilter((current) => ({
-                                    ...current,
-                                    client: value === "*" ? "" : value
-                                }))
-                            }
-                            options={[
-                                { value: "*", label: t("insights.allClients") },
-                                ...(stats?.clients ?? []).map((client) => ({
-                                    value: client,
-                                    label: client
-                                }))
-                            ]}
+                        <Figure
+                            label={t("insights.blockedPercent")}
+                            value={stats ? `${stats.blockedPercent}%` : undefined}
                         />
                     </div>
-                    <QueryRows
-                        data={data}
-                        t={t}
-                        onClient={(client) => setFilter((current) => ({ ...current, client }))}
-                        onDomain={setTyped}
-                    />
-                </div>
+                )}
+                {stats && stats.queries === 0 && !data?.logOff ? (
+                    <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>
+                ) : null}
+                {!data && !loading ? null : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <TopList
+                            title={t("insights.topDomains")}
+                            items={stats?.topDomains}
+                            empty={t("insights.none")}
+                            hint={t("insights.filterDomain")}
+                            onPick={(name) => setTyped(name)}
+                        />
+                        <TopList
+                            title={t("insights.topBlocked")}
+                            items={stats?.topBlocked}
+                            empty={t("insights.none")}
+                            hint={t("insights.filterDomain")}
+                            onPick={(name) => setTyped(name)}
+                        />
+                        <TopList
+                            title={t("insights.topClients")}
+                            items={stats?.topClients}
+                            empty={t("insights.none")}
+                            hint={t("insights.filterClient")}
+                            onPick={(name) =>
+                                setFilter((current) => ({ ...current, client: name }))
+                            }
+                        />
+                    </div>
+                )}
+                {!data && !loading ? null : (
+                    <div className="flex flex-col gap-3">
+                        <h3 className="text-sm font-medium">{t("insights.log")}</h3>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                                className="min-w-0 flex-1"
+                                value={typed}
+                                placeholder={t("insights.search")}
+                                aria-label={t("insights.search")}
+                                onChange={(event) => setTyped(event.target.value)}
+                            />
+                            <Select
+                                className="w-full sm:w-36"
+                                value={filter.outcome}
+                                aria-label={t("insights.outcome")}
+                                onValueChange={(value) =>
+                                    setFilter((current) => ({
+                                        ...current,
+                                        outcome: value as QueryFilter["outcome"]
+                                    }))
+                                }
+                                options={[
+                                    { value: "all", label: t("insights.all") },
+                                    { value: "blocked", label: t("insights.blockedOnly") },
+                                    { value: "allowed", label: t("insights.allowedOnly") }
+                                ]}
+                            />
+                            <Select
+                                className="w-full sm:w-44"
+                                value={filter.client || "*"}
+                                aria-label={t("insights.client")}
+                                onValueChange={(value) =>
+                                    setFilter((current) => ({
+                                        ...current,
+                                        client: value === "*" ? "" : value
+                                    }))
+                                }
+                                options={[
+                                    { value: "*", label: t("insights.allClients") },
+                                    ...(stats?.clients ?? []).map((client) => ({
+                                        value: client,
+                                        label: client
+                                    }))
+                                ]}
+                            />
+                        </div>
+                        <QueryRows
+                            data={data}
+                            t={t}
+                            onClient={(client) => setFilter((current) => ({ ...current, client }))}
+                            onDomain={setTyped}
+                        />
+                    </div>
+                )}
             </CardBody>
         </Card>
     );

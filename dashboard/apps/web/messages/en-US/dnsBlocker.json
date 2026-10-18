@@ -141,7 +141,8 @@
         "notApplied": "Your settings are saved, but the DNS server did not start with them. See the status above and try again.",
         "invalid": "Some values are not valid. Fix the marked fields and save again.",
         "generic": "That did not work. Try again in a moment.",
-        "notRunning": "The DNS server is not running. Turn blocking on first."
+        "notRunning": "The DNS server is not running. Turn blocking on first.",
+        "notAnswering": "The DNS server did not answer. Wait a moment and try again."
     },
     "insights": {
         "title": "Today",
@@ -176,6 +177,8 @@
         "noMatches": "No lookups match this filter.",
         "filterClient": "Show only this device",
         "filterDomain": "Search this domain",
-        "showing": "Newest {count} shown"
+        "showing": "Newest {count} shown",
+        "logOff": "The DNS server is running settings from before the query log, so lookups are not recorded yet. Apply them to start recording.",
+        "apply": "Apply"
     }
 }

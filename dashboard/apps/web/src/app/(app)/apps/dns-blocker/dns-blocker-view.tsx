@@ -36,6 +36,7 @@ import {
     turnOffDnsBlockerAction,
     turnOnDnsBlockerAction
 } from "./actions";
+import { DnsInsightsCard } from "./dns-insights";
 
 /** One rule or resolver per line, blank lines ignored. */
 function lines(text: string): string[] {
@@ -294,6 +295,7 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                     ) : null}
                 </CardBody>
             </Card>
+            {state === "blocking" ? <DnsInsightsCard onApplied={recheck} /> : null}
 
             <Card>
                 <CardHeader>

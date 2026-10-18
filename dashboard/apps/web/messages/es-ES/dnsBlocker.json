@@ -141,7 +141,8 @@
         "notApplied": "Tus ajustes están guardados, pero el servidor DNS no arrancó con ellos. Mira el estado de arriba y vuelve a intentarlo.",
         "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
         "generic": "No ha funcionado. Inténtalo de nuevo en un momento.",
-        "notRunning": "El servidor DNS no está en marcha. Activa primero el bloqueo."
+        "notRunning": "El servidor DNS no está en marcha. Activa primero el bloqueo.",
+        "notAnswering": "El servidor DNS no ha respondido. Espera un momento y vuelve a intentarlo."
     },
     "insights": {
         "title": "Hoy",
@@ -176,6 +177,8 @@
         "noMatches": "Ninguna consulta coincide.",
         "filterClient": "Solo este equipo",
         "filterDomain": "Buscar este dominio",
-        "showing": "Últimas {count}"
+        "showing": "Últimas {count}",
+        "logOff": "El servidor DNS usa una configuración anterior al registro de consultas, así que aún no se guardan. Aplícala para empezar a registrarlas.",
+        "apply": "Aplicar"
     }
 }

@@ -49,7 +49,8 @@ export type DnsRefusalCode =
     | "noAddress"
     | "portTaken"
     | "notApplied"
-    | "notRunning";
+    | "notRunning"
+    | "notAnswering";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -74,13 +75,7 @@ export class DnsBlockerRefusal extends Error {
  * - `noAddress`: this machine has no address on the network Polaris knows of.
  */
 export type DnsBlockerState =
-    | "off"
-    | "portTaken"
-    | "starting"
-    | "portHeld"
-    | "conflict"
-    | "blocking"
-    | "noAddress";
+    "off" | "portTaken" | "starting" | "portHeld" | "conflict" | "blocking" | "noAddress";
 
 export interface DnsBlockerStatus {
     readonly state: DnsBlockerState;
@@ -124,6 +119,21 @@ export function encodedConfig(settings: DnsSettings): string {
     const encoded = encodeBlockyConfig(settings);
     if (encoded.length > ENV_VALUE_MAX) throw new DnsBlockerRefusal("tooLarge");
     return encoded;
+}
+
+/** Whether the engine was last given the configuration the stored settings
+ *  render to now. False for an engine deployed before a change to what is
+ *  rendered, which keeps running the old one until it is applied again. */
+export async function engineConfigCurrent(engine: EngineRow): Promise<boolean> {
+    if (!engine.applicationId) return false;
+    const [settings, stored] = await Promise.all([
+        readSettings(),
+        prisma.envVar.findFirst({
+            where: { scopeType: "application", scopeId: engine.applicationId, key: DNS_CONFIG_ENV },
+            select: { value: true }
+        })
+    ]);
+    return stored?.value === encodeBlockyConfig(settings);
 }
 
 /** The settings as stored, whole whatever was stored. */

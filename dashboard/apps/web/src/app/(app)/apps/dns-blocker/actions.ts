@@ -137,10 +137,18 @@ export async function turnOffDnsBlockerAction(): Promise<Result> {
 }
 
 /** Today's numbers and the newest lookups that match the filter. */
-export async function dnsInsightsAction(input: unknown): Promise<Result<{ insights: insights.DnsInsights }>> {
+export async function dnsInsightsAction(
+    input: unknown,
+    fresh?: unknown
+): Promise<Result<{ insights: insights.DnsInsights }>> {
     await requireAdmin();
     try {
-        return { insights: await insights.dnsInsights(queryLog.queryFilterSchema.parse(input)) };
+        return {
+            insights: await insights.dnsInsights(
+                queryLog.queryFilterSchema.parse(input),
+                z.boolean().default(false).parse(fresh)
+            )
+        };
     } catch (error) {
         return failed(error);
     }
