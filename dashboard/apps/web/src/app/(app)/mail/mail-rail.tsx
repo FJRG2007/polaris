@@ -49,6 +49,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    ShortcutHint,
+    shortcutPressed,
     useToast
 } from "@polaris/ui";
 import {
@@ -269,7 +271,34 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                         <li key={folder.id}>
                                             <ContextMenu>
                                                 <ContextMenuTrigger asChild>
-                                                    <div>
+                                                    <div
+                                                        // F2 and Delete on the
+                                                        // focused folder, as the
+                                                        // menu says; handled here
+                                                        // so Mail's own Delete
+                                                        // (trash) does not also
+                                                        // fire.
+                                                        onKeyDown={(event) => {
+                                                            if (folder.role !== "none") return;
+                                                            if (
+                                                                shortcutPressed(
+                                                                    event.nativeEvent,
+                                                                    "general.rename"
+                                                                )
+                                                            ) {
+                                                                event.preventDefault();
+                                                                setRenaming(folder);
+                                                            } else if (
+                                                                shortcutPressed(
+                                                                    event.nativeEvent,
+                                                                    "general.delete"
+                                                                )
+                                                            ) {
+                                                                event.preventDefault();
+                                                                setDeleting(folder);
+                                                            }
+                                                        }}
+                                                    >
                                                         <RailLink
                                                             href={`/mail/f/${folder.id}`}
                                                             label={folder.name}
@@ -355,12 +384,14 @@ export function MailRail({ onNavigate }: { onNavigate?: () => void }) {
                                                                 onSelect={() => setRenaming(folder)}
                                                             >
                                                                 {t("rail.rename")}
+                                                                <ShortcutHint id="general.rename" />
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 className="text-danger"
                                                                 onSelect={() => setDeleting(folder)}
                                                             >
                                                                 {t("rail.delete")}
+                                                                <ShortcutHint id="general.delete" />
                                                             </ContextMenuItem>
                                                         </>
                                                     ) : null}

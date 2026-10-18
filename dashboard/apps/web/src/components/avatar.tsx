@@ -18,7 +18,7 @@
 import { initials, initialsInk, tintFor } from "@polaris/core";
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
-import { useState, useCallback, type CSSProperties } from "react";
+import { useState, useCallback, useRef, type CSSProperties } from "react";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
@@ -268,6 +268,8 @@ export function Avatar({
     // must not offer to open them.
     const [real, setReal] = useState(false);
     const [opened, setOpened] = useState(false);
+    // The face that was pressed, for the photo to grow out of and back into.
+    const openedFrom = useRef<HTMLElement | null>(null);
     const mayOpen = usePhotoOpenable(openable ? person.id : null);
     const opens = photoOpens({ openable, hasPhoto: real, allowed: mayOpen, source });
     const shape = square ? "rounded-md" : "rounded-full";
@@ -367,6 +369,7 @@ export function Avatar({
                 // of two.
                 event.preventDefault();
                 event.stopPropagation();
+                openedFrom.current = event.currentTarget;
                 setOpened(true);
             }}
         >
@@ -410,6 +413,7 @@ export function Avatar({
                   <ImageViewer
                       image={{ url: source, name: person.name }}
                       onClose={() => setOpened(false)}
+                      origin={() => openedFrom.current}
                   />,
                   document.body
               )

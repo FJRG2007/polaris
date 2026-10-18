@@ -29,7 +29,7 @@ import {
     useOneClickInstall
 } from "../marketplace-view";
 import styles from "./screenshots.module.css";
-import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
+import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
@@ -183,6 +183,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                         gallery={gallery}
                         onNavigate={setViewing}
                         onClose={() => setViewing(null)}
+                        origin={thumbnailOf}
                     />
                 </section>
             )}

@@ -159,7 +159,7 @@ function isWatchable(contentType: string): boolean {
     return base === "video/mp4" || base === "video/webm" || base === "video/ogg";
 }
 import { useDisplayFormat } from "@/components/display-format";
-import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
+import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
 import {
     cn,
     DropdownMenu,
@@ -489,6 +489,7 @@ export function MessageList({
                 <ImageViewer
                     image={viewing}
                     onClose={() => setViewing(null)}
+                    origin={thumbnailOf}
                     // Absent inside a thread, where forwarding is left to the
                     // channel: the viewer draws no Forward item rather than one
                     // that does nothing.

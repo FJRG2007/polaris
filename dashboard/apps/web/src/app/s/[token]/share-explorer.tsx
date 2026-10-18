@@ -87,6 +87,7 @@ import {
     DialogTitle,
     Input,
     Skeleton,
+    ShortcutHint,
     cn,
     shortcutPressed
 } from "@polaris/ui";
@@ -605,6 +606,15 @@ export function ShareExplorer({
         lastIndex.current = index;
     }
 
+    /** Right button on an entry outside the selection makes it the selection, as
+     *  Explorer and Drive do - so the keys the menu shows act on what was
+     *  pointed at, not on something selected earlier. */
+    function rowContextMenu(index: number, entry: DriveEntry) {
+        if (selected.has(entry.path)) return;
+        setSelected(new Set([entry.path]));
+        lastIndex.current = index;
+    }
+
     function toggleAll() {
         setSelected(allSelected ? new Set() : new Set(visible.map((entry) => entry.path)));
     }
@@ -705,6 +715,7 @@ export function ShareExplorer({
             <ContextMenuItem onSelect={() => openEntry(entry)}>
                 {entry.kind === "dir" ? <Folder className="size-4" /> : <Eye className="size-4" />}
                 {td("filesView.menu.open")}
+                <ShortcutHint id="drive.open" />
             </ContextMenuItem>
             {allowDownload ? (
                 <ContextMenuItem onSelect={() => downloadSelection([entry])}>
@@ -718,6 +729,7 @@ export function ShareExplorer({
                 <ContextMenuItem onSelect={() => startRename(entry)}>
                     <Pencil className="size-4" />
                     {td("filesView.menu.rename")}
+                    <ShortcutHint id="general.rename" />
                 </ContextMenuItem>
             ) : null}
             <ContextMenuItem onSelect={() => void navigator.clipboard.writeText(entry.name)}>
@@ -735,6 +747,7 @@ export function ShareExplorer({
                     >
                         <Trash2 className="size-4" />
                         {td("filesView.menu.delete")}
+                        <ShortcutHint id="drive.delete" />
                     </ContextMenuItem>
                 </>
             ) : null}
@@ -1119,13 +1132,17 @@ export function ShareExplorer({
                               : td("filesView.empty.folderEmpty")}
                     </p>
                 ) : viewMode === "grid" ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    <div
+                        onKeyDown={onListKeyDown}
+                        className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
+                    >
                         {visible.map((entry, index) => (
                             <ContextMenu key={entry.path}>
                                 <ContextMenuTrigger asChild>
                                     <button
                                         type="button"
                                         onClick={(event) => rowClick(event, index, entry)}
+                                        onContextMenu={() => rowContextMenu(index, entry)}
                                         onDoubleClick={() => openEntry(entry)}
                                         className={cn(
                                             "group flex flex-col items-center gap-2 rounded-lg border p-3 text-center transition-colors",
@@ -1190,6 +1207,9 @@ export function ShareExplorer({
                                                     data-share-row
                                                     onClick={(event) =>
                                                         rowClick(event, row.index, entry)
+                                                    }
+                                                    onContextMenu={() =>
+                                                        rowContextMenu(row.index, entry)
                                                     }
                                                     onDoubleClick={() => openEntry(entry)}
                                                     style={{

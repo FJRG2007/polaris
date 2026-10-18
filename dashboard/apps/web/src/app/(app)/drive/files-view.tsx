@@ -19,12 +19,14 @@ import { FolderTree } from "./folder-tree";
 import { ListingError } from "./listing-error";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import { formatBytes } from "@polaris/core";
 import { searchItems } from "@polaris/core/search-text";
 import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
+import * as flying from "@/components/image-flight";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -500,6 +502,9 @@ export function FilesView({
     // focus when the field appears; it claims focus once the menu has gone.
     const renameField = useDeferredFocus<HTMLInputElement>(renaming !== null);
     const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+    // Where the open picture grew from, measured before the listing was hidden.
+    const [viewerFrom, setViewerFrom] = useState<flying.Box | null>(null);
+    const preview = useRef<HTMLDivElement>(null);
     const [showHidden, setShowHidden] = useState(false);
     const [viewMode, setViewMode] = useState<"list" | "grid">("list");
     // Breadcrumb segment currently under a drag, highlighted as a move target.
@@ -643,6 +648,7 @@ export function FilesView({
         // The preview takes over the listing area and the details panel beside it
         // describes what is open, so the file has to be the selected one.
         setSelected(new Set([entry.path]));
+        setViewerFrom(flying.visibleBox(thumbnailFor(entry.path), flying.viewportSize()));
         setViewerTarget({
             connectionId,
             path: entry.path,
@@ -650,6 +656,24 @@ export function FilesView({
             size: entry.size,
             modifiedAt: entry.modifiedAt
         });
+    }
+
+    /** Back to the listing. A picture shrinks into its thumbnail on the way,
+     *  as a copy, because the real one goes with the preview. */
+    function closeViewer() {
+        const picture = preview.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
+        const path = viewerTarget?.path;
+        if (!path || !flying.canFly(picture) || picture.offsetWidth < 1) {
+            setViewerTarget(null);
+            return;
+        }
+        const at = flying.boxOf(picture);
+        const copy = flying.pictureCopy(picture.currentSrc || picture.src, at);
+        // The listing has to be back on the page before its thumbnail can be
+        // measured.
+        flushSync(() => setViewerTarget(null));
+        const into = flying.visibleBox(thumbnailFor(path), flying.viewportSize());
+        void flying.shrinkOut(copy, at, into).then(() => copy.remove());
     }
 
     /** Share the file the preview is showing. */
@@ -1740,7 +1764,7 @@ export function FilesView({
                 <div className="flex min-w-0 flex-1 flex-col lg:pr-72">
                     <div className="mb-3 flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                            <Button size="sm" variant="ghost" onClick={() => setViewerTarget(null)}>
+                            <Button size="sm" variant="ghost" onClick={closeViewer}>
                                 <ChevronLeft className="size-4" />
                                 {t("filesView.viewer.back")}
                             </Button>
@@ -1777,8 +1801,11 @@ export function FilesView({
                             </Button>
                         </div>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border bg-surface/40">
-                        <FilePreview target={viewerTarget} onSaved={onSaved} />
+                    <div
+                        ref={preview}
+                        className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border bg-surface/40"
+                    >
+                        <FilePreview target={viewerTarget} onSaved={onSaved} from={viewerFrom} />
                     </div>
                 </div>
             ) : null}
@@ -3539,6 +3566,18 @@ function GridIcon({
             {icon}
         </EntryThumbnail>
     );
+}
+
+/** A file's picture on screen right now - its tile in the grid or the one in the
+ *  details panel - for its preview to grow out of and shrink back into. Drive's
+ *  thumbnails have their own address, so it is found by path, not by picture. */
+function thumbnailFor(path: string): Element | null {
+    for (const holder of document.querySelectorAll("[data-drive-thumbnail]")) {
+        if (holder.getAttribute("data-drive-thumbnail") !== path) continue;
+        const picture = holder.querySelector("img:not(.hidden)");
+        if (flying.visibleBox(picture, flying.viewportSize())) return picture;
+    }
+    return null;
 }
 
 /** The icon for an entry: a user-set one, else the folder mark or the file type's. */

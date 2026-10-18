@@ -90,10 +90,13 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
+    MenuShortcut,
     PageHeader,
     Select,
     Skeleton,
-    rowClickIntent
+    ShortcutHint,
+    rowClickIntent,
+    shortcutPressed
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -815,6 +818,14 @@ function ServerRow({
                     // `row-open`. The name is still the link a keyboard reaches.
                     onClick={(event) => openFromRow(event.nativeEvent)}
                     onAuxClick={(event) => openFromRow(event.nativeEvent)}
+                    // Delete on the row's name (or any of its buttons) asks, as the
+                    // menu's own item does; Enter on the name is the link opening.
+                    onKeyDown={(event) => {
+                        if (!canRemove || pending) return;
+                        if (!shortcutPressed(event.nativeEvent, "general.delete")) return;
+                        event.preventDefault();
+                        onDelete();
+                    }}
                 >
                     <td className="px-3 py-2">
                         {/* The game's own mark beside the name, because a table of
@@ -953,6 +964,7 @@ function ServerRow({
                 <ContextMenuItem asChild>
                     <Link href={href}>
                         <ExternalLink className="size-4" /> {t("list.open")}
+                        <MenuShortcut keys="Enter" />
                     </Link>
                 </ContextMenuItem>
                 {files &&
@@ -1045,6 +1057,7 @@ function ServerRow({
                         <ContextMenuSeparator />
                         <ContextMenuItem variant="danger" disabled={pending} onSelect={onDelete}>
                             <Trash2 className="size-4" /> {t("list.delete")}
+                            <ShortcutHint id="general.delete" />
                         </ContextMenuItem>
                     </>
                 )}

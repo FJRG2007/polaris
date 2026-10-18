@@ -28,8 +28,9 @@
 
 import { useAppUrl } from "@/components/app-url";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { imageItems, type ActionableImage } from "@/components/image-actions";
+import * as flying from "@/components/image-flight";
 import { MoreHorizontal, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     ContextMenu,
@@ -62,17 +63,47 @@ const DRAG_SLOP = 4;
  *  needs, so it is the shared shape rather than a second one beside it. */
 export type ViewedImage = ActionableImage;
 
+/** Where a picture flies in from and back to: its thumbnail on the page. */
+export type ImageOrigin = (image: ViewedImage) => Element | null;
+
+/** The page's own copy of a picture, found by its address, outside any viewer. */
+export function thumbnailOf(image: ViewedImage): Element | null {
+    if (typeof document === "undefined") return null;
+    const wanted = new URL(image.url, document.baseURI).href;
+    for (const img of document.querySelectorAll("img")) {
+        if (img.closest("[data-image-viewer]")) continue;
+        if (img.src === wanted || img.currentSrc === wanted) return img;
+    }
+    return null;
+}
+
+/** The layers that fade while the picture flies: backdrop, toolbar, arrows. */
+function fadeChrome(root: HTMLElement | null, from: number, to: number, duration: number): void {
+    for (const layer of root?.querySelectorAll<HTMLElement>("[data-viewer-chrome]") ?? []) {
+        if (typeof layer.animate !== "function") return;
+        layer.animate([{ opacity: from }, { opacity: to }], {
+            duration,
+            easing: flying.EASE,
+            fill: "forwards"
+        });
+    }
+}
+
 export function ImageViewer({
     image,
     onClose,
     onForward,
     onReport,
     gallery,
-    onNavigate
+    onNavigate,
+    origin = thumbnailOf
 }: {
     /** The picture being looked at, or null for none. */
     image: ViewedImage | null;
     onClose: () => void;
+    /** The thumbnail each picture grows out of and shrinks back into. With none
+     *  on screen it fades and scales in place instead. */
+    origin?: ImageOrigin;
     /** The pictures it is one of, in order, for the arrows and the arrow keys -
      *  a set of screenshots is looked through, not opened one by one. */
     gallery?: readonly ViewedImage[];
@@ -91,6 +122,71 @@ export function ImageViewer({
     /** Where a press started and whether it started off the picture, so a press
      *  on the dark around it can close and a drag across it cannot. */
     const press = useRef<ViewerPress | null>(null);
+    const root = useRef<HTMLDivElement | null>(null);
+    const picture = useRef<HTMLImageElement | null>(null);
+    // Whether this opening has flown in yet, and whether it is on its way out.
+    // Moving to the next picture is not an opening, so it does not fly.
+    const flown = useRef(false);
+    const closing = useRef(false);
+    const shown = image !== null;
+
+    useLayoutEffect(() => {
+        if (!shown) return;
+        flown.current = false;
+        closing.current = false;
+        if (!flying.reducedMotion()) fadeChrome(root.current, 0, 1, flying.OPEN_MS);
+    }, [shown]);
+
+    /** Grow the picture out of its thumbnail, once it has a size to grow to. */
+    const flyIn = useCallback(() => {
+        const element = picture.current;
+        if (!image || !element || flown.current || closing.current) return;
+        if (element.offsetWidth < 1) return;
+        flown.current = true;
+        if (!flying.canFly(element)) return;
+        flying.growIn(
+            element,
+            flying.boxOf(element),
+            flying.visibleBox(origin(image), flying.viewportSize())
+        );
+    }, [image, origin]);
+
+    useLayoutEffect(() => {
+        if (picture.current?.complete) flyIn();
+    }, [flyIn]);
+
+    /** Shrink back into the thumbnail - the current picture's, while it is on
+     *  screen - and only then let the caller take the viewer away. */
+    const close = useCallback(() => {
+        const element = picture.current;
+        if (closing.current) return;
+        if (!image || !flying.canFly(element)) {
+            onClose();
+            return;
+        }
+        closing.current = true;
+        // The box as laid out: the pan moves its centre, the zoom only scales
+        // about it.
+        const rect = element.getBoundingClientRect();
+        const width = element.offsetWidth;
+        const height = element.offsetHeight;
+        const laidOut = {
+            x: rect.left + rect.width / 2 - at.x - width / 2,
+            y: rect.top + rect.height / 2 - at.y - height / 2,
+            width,
+            height
+        };
+        const now = getComputedStyle(element).transform;
+        fadeChrome(root.current, 1, 0, flying.CLOSE_MS);
+        void flying
+            .shrinkOut(
+                element,
+                laidOut,
+                flying.visibleBox(origin(image), flying.viewportSize()),
+                now && now !== "none" ? now : "none"
+            )
+            .then(onClose);
+    }, [image, onClose, origin, at.x, at.y]);
 
     // Back to fit whenever a different picture is opened: reopening one at three
     // times the size, panned into a corner, is the last picture's state wearing
@@ -117,7 +213,7 @@ export function ImageViewer({
         const onKey = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 event.preventDefault();
-                onClose();
+                close();
             }
             const inMenu =
                 event.defaultPrevented ||
@@ -135,7 +231,7 @@ export function ImageViewer({
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [image, onClose, go]);
+    }, [image, close, go]);
 
     const say = useCallback((words: string) => {
         setSaid(words);
@@ -153,9 +249,20 @@ export function ImageViewer({
             data-state="open"
             aria-modal="true"
             aria-label={image.name}
-            className="fixed inset-0 z-50 flex flex-col bg-background/95"
+            data-image-viewer=""
+            ref={root}
+            className="fixed inset-0 z-50 flex flex-col"
         >
-            <div className="flex shrink-0 items-center gap-2 px-3 py-2">
+            {/* Its own layer, so it fades while the picture flies. */}
+            <div
+                data-viewer-chrome=""
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-background/95"
+            />
+            <div
+                data-viewer-chrome=""
+                className="relative flex shrink-0 items-center gap-2 px-3 py-2"
+            >
                 <span className="min-w-0 flex-1 truncate text-sm font-medium" title={image.name}>
                     {image.name}
                 </span>
@@ -204,7 +311,7 @@ export function ImageViewer({
                 <button
                     type="button"
                     aria-label={t("viewer.close")}
-                    onClick={onClose}
+                    onClick={close}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <X className="size-4" />
@@ -214,7 +321,7 @@ export function ImageViewer({
             <ContextMenu>
                 <ContextMenuTrigger asChild>
                     <div
-                        className="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+                        className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
                         onWheel={(event) => {
                             setZoom((current) =>
                                 clamp(current * Math.exp(-event.deltaY * WHEEL_STEP))
@@ -251,7 +358,7 @@ export function ImageViewer({
                             const from = press.current;
                             dragging.current = null;
                             press.current = null;
-                            if (closesOnRelease(from, event)) onClose();
+                            if (closesOnRelease(from, event)) close();
                         }}
                         onPointerCancel={() => {
                             dragging.current = null;
@@ -260,6 +367,8 @@ export function ImageViewer({
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
                         <img
+                            ref={picture}
+                            onLoad={flyIn}
                             src={image.url}
                             alt={image.name}
                             draggable={false}
@@ -281,6 +390,7 @@ export function ImageViewer({
                 <>
                     <button
                         type="button"
+                        data-viewer-chrome=""
                         aria-label={t("viewer.previous")}
                         title={t("viewer.previous")}
                         onClick={() => go(-1)}
@@ -290,6 +400,7 @@ export function ImageViewer({
                     </button>
                     <button
                         type="button"
+                        data-viewer-chrome=""
                         aria-label={t("viewer.next")}
                         title={t("viewer.next")}
                         onClick={() => go(1)}
