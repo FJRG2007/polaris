@@ -26,6 +26,7 @@ import { askBackground, type ItemSummary, type Request, type VaultStatus } from 
 // draws six buttons.
 import { generatePassword } from "@polaris/core/password-generator";
 import {
+    CLIPBOARD_CLEAR_MS,
     GENERATOR_DEFAULTS,
     GENERATOR_KEY,
     readGeneratorOptions,
@@ -56,7 +57,7 @@ import {
  * nobody is left to perform. Moving it somewhere that outlives the popup means
  * the worker, and a worker has no document to write a clipboard from.
  */
-const CLEAR_AFTER_MS = 30_000;
+const CLEAR_AFTER_MS = CLIPBOARD_CLEAR_MS;
 
 /**
  * Which copy was just acknowledged, for the check mark that replaces the copy

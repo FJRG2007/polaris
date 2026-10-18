@@ -1432,7 +1432,12 @@ async function capture(
     // is already saved anywhere, and a shelf-filtered answer would offer to save a
     // second copy of an item that is sitting in an organization's vault.
     const offer = offerFor(
-        { username: submitted.username.trim() || earlier, password: submitted.password },
+        {
+            username: submitted.username.trim() || earlier,
+            password: submitted.password,
+            // Strictly a yes: this arrives from a page.
+            newAccount: submitted.newAccount === true
+        },
         await forUrl(page.url)
     );
     if (earlier !== "") await FIRST_STEP.setValue(null);
@@ -2172,7 +2177,18 @@ function typeIntoPage(
     ]);
     const notALogin = /search|captcha|find|query|coupon|voucher|discount|promo/i;
     const identifier =
-        /user|login|email|correo|usuario|e-?mail|account|cuenta|identifiant|benutzer|nome|phone|telefono|mobile/i;
+        /user|login|log.?on|sign.?in|email|correo|usuario|e-?mail|account|cuenta|identifiant|identifier|utilisateur|benutzer|nutzer|anmelde|nome|phone|telefono|mobile|\buid\b|nick|handle|member|customer.?(?:id|number)|client.?(?:id|number)/i;
+    // The one token of `autocomplete` that names the field: `username webauthn`
+    // is a username box, and compared whole it read as something else.
+    const qualifiers = /^(?:section-.*|shipping|billing|home|work|mobile|fax|pager|webauthn|on)$/;
+    const tokenOf = (field: HTMLInputElement): string => {
+        const words = (field.getAttribute("autocomplete") ?? "")
+            .trim()
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((word) => !qualifiers.test(word));
+        return words[words.length - 1] ?? "";
+    };
     const oneTimeWords =
         /one.?time|\b[th]?otp|2fa|two.?factor|two.?step|2.?step|authenticat|verification code|verify code|security code|login code|sign.?in code|c[oó]digo de verificaci[oó]n|c[oó]digo de seguridad|verificaci[oó]n en dos|dos pasos|\bmfa\b|passcode/i;
     const codeWord = /\bcode\b|c[oó]digo|\btoken\b/i;
@@ -2208,16 +2224,42 @@ function typeIntoPage(
         return getComputedStyle(field).visibility !== "hidden";
     };
 
-    const inputs = [...document.querySelectorAll("input")].filter(usable);
+    // Inside shadow roots as well as the document - a design system's text field
+    // keeps its input in one - in the order a reader meets them. Chrome hands an
+    // extension the closed ones too.
+    const dom = (
+        globalThis as {
+            chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } };
+        }
+    ).chrome?.dom;
+    const opener = dom?.openOrClosedShadowRoot;
+    const all: HTMLInputElement[] = [];
+    const visit = (root: Document | ShadowRoot): void => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const element = node as Element;
+            if (element instanceof HTMLInputElement) all.push(element);
+            let shadow: ShadowRoot | null = element.shadowRoot;
+            if (!shadow && opener && element.localName.includes("-")) {
+                try {
+                    shadow = opener.call(dom, element);
+                } catch {
+                    shadow = null;
+                }
+            }
+            if (shadow) visit(shadow);
+        }
+    };
+    visit(document);
+    const inputs = all.filter(usable);
     // The password first, because `type="password"` is not a guess. The name that
     // goes with it is then looked for in the same form, or among the fields
     // BEFORE it when there is no form - which is the order a login form is
     // written in, and why the search box at the top of the page is not mistaken
     // for the username.
     const pass =
-        inputs.find(
-            (field) => field.type === "password" && field.autocomplete !== "new-password"
-        ) ?? null;
+        inputs.find((field) => field.type === "password" && tokenOf(field) !== "new-password") ??
+        null;
     const candidates = pass
         ? inputs.filter((field) =>
               pass.form ? field.form === pass.form : inputs.indexOf(field) < inputs.indexOf(pass)
@@ -2225,7 +2267,7 @@ function typeIntoPage(
         : inputs;
 
     const named = (field: HTMLInputElement): boolean => {
-        const token = field.autocomplete?.toLowerCase() ?? "";
+        const token = tokenOf(field);
         if (token === "username" || token === "email") return true;
         if (token !== "off" && token !== "") return false;
         if (!["text", "email", "tel", "number"].includes(field.type)) return false;
@@ -2237,7 +2279,7 @@ function typeIntoPage(
     // The code box, found before the name so "login code" is not read as a
     // username for saying "login".
     const isCode = (field: HTMLInputElement): boolean => {
-        const token = field.autocomplete?.toLowerCase() ?? "";
+        const token = tokenOf(field);
         if (token === "one-time-code") return true;
         if (token !== "" && token !== "off") return false;
         if (!codeTypes.includes(field.type)) return false;
@@ -2251,7 +2293,33 @@ function typeIntoPage(
         return length !== 1 && (short || digits);
     };
     const single = inputs.find(isCode) ?? null;
-    const user = candidates.find((field) => field !== single && named(field)) ?? null;
+    // A username box that says nothing a rule recognises is still the last plain
+    // text box before the password - the same fallback `readForm` settles on.
+    const plain = (field: HTMLInputElement): boolean => {
+        const token = tokenOf(field);
+        if (token !== "" && token !== "off") return false;
+        if (!["text", "email", "tel"].includes(field.type)) return false;
+        const words = describe(field);
+        return (
+            !notALogin.test(words) &&
+            !/company|empresa|address|direcci[oó]n|city|ciudad|zip|postal|country|pa[ií]s|name|nombre|apellido/i.test(
+                words
+            )
+        );
+    };
+    const user =
+        candidates.find((field) => field !== single && named(field)) ??
+        (pass
+            ? ([...candidates]
+                  .filter(
+                      (field) =>
+                          field !== single &&
+                          inputs.indexOf(field) < inputs.indexOf(pass) &&
+                          field.type !== "password"
+                  )
+                  .reverse()
+                  .find(plain) ?? null)
+            : null);
 
     // Or a row of one-character boxes, one per digit, in one form.
     let codeBoxes: HTMLInputElement[] = single ? [single] : [];

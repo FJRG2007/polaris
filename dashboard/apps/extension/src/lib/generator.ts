@@ -23,6 +23,9 @@ import {
  *  choosing them again on every browser start would be a chore. */
 export const GENERATOR_KEY = "local:generator.options";
 
+/** How long a password copied from the generator stays on the clipboard. */
+export const CLIPBOARD_CLEAR_MS = 30_000;
+
 /** The choices the popup offers. The minimums are the core's defaults and are
  *  not offered: one of each is what the forms that ask for them ask for. */
 export interface GeneratorOptions {

@@ -46,8 +46,17 @@ import {
     readGeneratorOptions,
     type GeneratorOptions
 } from "@/lib/generator";
-import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
+import { readForm, type PageFields } from "@/lib/fields";
 import { enterSendsLogin } from "@/lib/enter-submit";
+import {
+    describeInput,
+    frameOffset,
+    isInput,
+    scanInputs,
+    upFrom,
+    type ShadowOpener
+} from "@/lib/page-scan";
+import { CLIPBOARD_CLEAR_MS } from "@/lib/generator";
 import {
     askBackground,
     speakRepliesIn,
@@ -65,6 +74,38 @@ const SETTLE_MS = 400;
 /** How long after the last keystroke a password is asked about. Long enough that
  *  typing one does not make a request per character. */
 const BREACH_AFTER_MS = 800;
+
+/** How long after a button press a login box disappearing is read as the
+ *  login being sent. A sign-in that posts with `fetch` and swaps the page for
+ *  what comes back fires no submit and no navigation; the boxes going away is
+ *  all there is to see. Without a press just before it, a box going away is
+ *  somebody changing their mind. */
+const GONE_AFTER_PRESS_MS = 10_000;
+
+/** When the clipboard holding a password copied from a page is to be emptied:
+ *  a time, never the value, in storage a page's script can read, so the next
+ *  page this runs on finishes the job if this one is gone by then. */
+const CLIPBOARD_CLEAR_KEY = "local:inline.clipboardClearAt";
+/** How long past its deadline a clipboard is still worth emptying: a browser
+ *  that refuses every write without a press would otherwise be asked forever. */
+const CLIPBOARD_GIVE_UP_MS = 10 * 60_000;
+
+/** The closed shadow roots Chrome hands an extension; nothing elsewhere. */
+const opener: ShadowOpener | undefined = (() => {
+    const dom = (
+        globalThis as {
+            chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } };
+        }
+    ).chrome?.dom;
+    const open = dom?.openOrClosedShadowRoot;
+    return open ? (element: Element) => open.call(dom, element) : undefined;
+})();
+
+/** The element an event really happened on: inside a shadow root, the event
+ *  seen at the document names the root's host instead. */
+function origin(event: Event): EventTarget | null {
+    return event.composedPath()[0] ?? event.target;
+}
 
 /** The mark's size, and the room it needs at the right edge of a field. */
 const MARK = 18;
@@ -111,7 +152,8 @@ async function start(): Promise<void> {
     // A login submitted on the page before this one. Asked for first, because the
     // navigation that submitting caused is what loaded this script, and the offer
     // is the whole reason anybody typed anything.
-    void offerHeld();
+    void offerHeld(() => recapture());
+    void finishClearing();
 
     const marks = new Map<Role, { field: HTMLInputElement; host: HTMLElement }>();
     let open = false;
@@ -133,10 +175,67 @@ async function start(): Promise<void> {
         inputs: []
     };
 
-    const look = (): void => {
-        const inputs = [...document.querySelectorAll("input")];
-        seen = { fields: readForm(inputs.map(describe)), inputs };
+    // The page keeps moving: a field can be replaced, revealed, or scrolled.
+    // One look per burst rather than one per mutation, because a login page
+    // renders hundreds of them at once - and scrolling only moves what is
+    // already there, so it never goes looking again.
+    //
+    // Revealed counts as much as added. A sign-in that has its password box in
+    // the page from the start and shows it on the next step changes a style or
+    // a class and adds nothing, and watching for new nodes alone slept straight
+    // through the step it was waiting for. And the look is taken a fixed time
+    // after the first change rather than after the last: a page with a spinner
+    // or a clock on it never stops changing, and a wait for quiet on one of
+    // those never ends.
+    let settling: number | null = null;
+    const again = (): void => {
+        if (settling !== null) return;
+        settling = window.setTimeout(() => {
+            settling = null;
+            refresh();
+        }, SETTLE_MS);
     };
+    const observer = new MutationObserver((records) => {
+        if (!onlyOurs(records)) again();
+    });
+    const WATCH: MutationObserverInit = {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden", "aria-hidden", "disabled", "type"]
+    };
+
+    /** A shadow root or a frame met for the first time: watched for changes,
+     *  which the observer on the document never sees inside either, and listened
+     *  to for what does not cross into the document - a submit never leaves a
+     *  shadow root, and nothing at all leaves a frame. */
+    const trees = new WeakSet<Node>();
+    const watchTree = (tree: Document | ShadowRoot): void => {
+        if (trees.has(tree)) return;
+        trees.add(tree);
+        observer.observe(tree, WATCH);
+        tree.addEventListener("submit", submitted, true);
+        if (tree.nodeType === Node.DOCUMENT_NODE) listenIn(tree as Document);
+    };
+
+    const frames = new WeakSet<HTMLIFrameElement>();
+    const watchFrame = (frame: HTMLIFrameElement): void => {
+        if (frames.has(frame)) return;
+        frames.add(frame);
+        frame.addEventListener("load", again);
+    };
+
+    const look = (): void => {
+        const scan = scanInputs(document, opener);
+        seen = { fields: readForm(scan.inputs.map(describeInput)), inputs: scan.inputs };
+        for (const tree of scan.trees) watchTree(tree);
+        for (const frame of scan.frames) watchFrame(frame);
+    };
+
+    /** A box on the top page itself. A login is filled by the worker into the top
+     *  page only, so a box inside a frame is offered nothing that needs it. */
+    const onTop = (box: HTMLInputElement | null): HTMLInputElement | null =>
+        box && box.ownerDocument === document ? box : null;
 
     const at = (index: number | null): HTMLInputElement | null =>
         index === null ? null : (seen.inputs[index] ?? null);
@@ -146,11 +245,12 @@ async function start(): Promise<void> {
     const place = (): void => {
         for (const { field, host } of marks.values()) {
             const box = field.getBoundingClientRect();
+            const shift = frameOffset(field);
             // Fixed rather than absolute: a field inside a scrolling panel moves
             // without the document scrolling, and `position: absolute` would leave
             // the mark behind on the page.
-            host.style.top = `${box.top + (box.height - MARK) / 2}px`;
-            host.style.left = `${box.right - MARK - 6}px`;
+            host.style.top = `${shift.y + box.top + (box.height - MARK) / 2}px`;
+            host.style.left = `${shift.x + box.right - MARK - 6}px`;
             host.style.display = box.width < 60 || box.height < 16 ? "none" : "block";
         }
     };
@@ -160,10 +260,11 @@ async function start(): Promise<void> {
     const refresh = (): void => {
         look();
         const { fields } = seen;
+        noticeGone();
         // The login mark sits on the name where there is one and on the password
         // otherwise, because that is where somebody's eye already is.
         const wanted: Record<Role, HTMLInputElement | null> = {
-            login: at(fields.username) ?? at(fields.password),
+            login: onTop(at(fields.username) ?? at(fields.password)),
             generate: at(fields.newPassword),
             code: at(fields.oneTimeCode)
         };
@@ -198,7 +299,7 @@ async function start(): Promise<void> {
      */
     const passwordAsked = new WeakSet<HTMLInputElement>();
     const claimPassword = (): void => {
-        const box = at(seen.fields.password);
+        const box = onTop(at(seen.fields.password));
         if (!box || passwordAsked.has(box) || box.value !== "") return;
         passwordAsked.add(box);
         // The fill puts the cursor in the box as it types, and the list must not
@@ -227,7 +328,13 @@ async function start(): Promise<void> {
             .map((index) => at(index))
             .filter((box): box is HTMLInputElement => box !== null);
         const [first] = boxes;
-        if (!first || claimed.has(first) || boxes.some((box) => box.value !== "")) return;
+        if (
+            !onTop(first ?? null) ||
+            !first ||
+            claimed.has(first) ||
+            boxes.some((box) => box.value !== "")
+        )
+            return;
         claimed.add(first);
         const fresh = boxes.filter((box) => !offeredOn.has(box));
         for (const box of fresh) offeredOn.add(box);
@@ -259,6 +366,7 @@ async function start(): Promise<void> {
                     // otherwise have to paste into from a password they cannot see.
                     const confirm = at(seen.fields.confirmPassword);
                     if (confirm && confirm !== field) put(confirm, value);
+                    keep(value);
                 });
                 return;
             }
@@ -340,8 +448,8 @@ async function start(): Promise<void> {
     document.addEventListener(
         "focusin",
         (event) => {
-            const field = event.target;
-            if (!(field instanceof HTMLInputElement) || offeredOn.has(field)) return;
+            const field = origin(event);
+            if (!isInput(field) || offeredOn.has(field)) return;
             for (const role of ["login", "code"] as const) {
                 const held = marks.get(role);
                 // The login is offered on the password box as well as the one the
@@ -396,6 +504,7 @@ async function start(): Promise<void> {
                         put(passwordBox, value);
                         const confirm = at(fields.confirmPassword);
                         if (confirm && confirm !== passwordBox) put(confirm, value);
+                        keep(value);
                     })
                 )
             );
@@ -416,37 +525,13 @@ async function start(): Promise<void> {
         into(at(fields.familyName), rest.join(" "));
     };
 
-    refresh();
-    // The page keeps moving: a field can be replaced, revealed, or scrolled.
-    // One look per burst rather than one per mutation, because a login page
-    // renders hundreds of them at once - and scrolling only moves what is
-    // already there, so it never goes looking again.
-    //
-    // Revealed counts as much as added. A sign-in that has its password box in
-    // the page from the start and shows it on the next step changes a style or
-    // a class and adds nothing, and watching for new nodes alone slept straight
-    // through the step it was waiting for. And the look is taken a fixed time
-    // after the first change rather than after the last: a page with a spinner
-    // or a clock on it never stops changing, and a wait for quiet on one of
-    // those never ends.
-    let settling: number | null = null;
-    const again = (): void => {
-        if (settling !== null) return;
-        settling = window.setTimeout(() => {
-            settling = null;
-            refresh();
-        }, SETTLE_MS);
-    };
-    new MutationObserver((records) => {
-        if (!onlyOurs(records)) again();
-    }).observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ["style", "class", "hidden", "aria-hidden", "disabled", "type"]
-    });
+    observer.observe(document.documentElement, WATCH);
     window.addEventListener("scroll", place, { passive: true, capture: true });
     window.addEventListener("resize", place, { passive: true });
+    // A single-page app moving on changes the address without loading anything,
+    // which is often the only sign a sign-in went through.
+    window.addEventListener("popstate", again);
+    window.addEventListener("hashchange", again);
 
     /**
      * Hand the worker what was just typed, at the moment the form goes.
@@ -458,6 +543,23 @@ async function start(): Promise<void> {
      * The password that counts is the new one where the form has one - somebody
      * signing up or changing theirs - and the existing one otherwise.
      */
+    /** The last pair handed over, so a form reported by its button, its submit
+     *  and its disappearance is offered once rather than three times. */
+    let sent = "";
+    const send = (username: string, password: string, newAccount: boolean): void => {
+        const key = `${username}\u0000${password}`;
+        if (key === sent) return;
+        sent = key;
+        void askBackground({ kind: "captured", username, password, newAccount }).then((reply) => {
+            // Drawn here as well as on the next load, because a sign-in that
+            // never navigates - which is most of them now - has no next load.
+            if (reply.ok && "offer" in reply) bar(reply.offer, () => recapture());
+        });
+    };
+
+    /** Whether the form in front of somebody is making an account. */
+    const makingAccount = (): boolean => seen.fields.purpose === "signup";
+
     const submitted = (): void => {
         const { fields } = seen;
         const password = at(fields.newPassword) ?? at(fields.password);
@@ -470,16 +572,85 @@ async function start(): Promise<void> {
             return;
         }
         if (password.value === "") return;
-        void askBackground({
+        typed = null;
+        send(username, password.value, makingAccount());
+    };
+
+    /**
+     * A password generated on the page, offered for saving the moment it is used.
+     *
+     * Held by the worker for the tab, like a submitted login - so it is still on
+     * offer on the page the form lands on, and the form submitting later only
+     * brings the username up to date. Under the username already typed: the
+     * worker decides between a new login and the existing one for this site and
+     * that username.
+     */
+    const keep = (value: string): void => {
+        send(at(seen.fields.username)?.value ?? "", value, seen.fields.purpose !== "change");
+    };
+
+    /** Before saving from the bar: what the form says now, which may have a
+     *  username typed after the password was generated. */
+    const recapture = async (): Promise<void> => {
+        if (sent === "") return;
+        const password = at(seen.fields.newPassword) ?? at(seen.fields.password);
+        if (!password || password.value === "" || !password.isConnected) return;
+        const username = at(seen.fields.username)?.value ?? "";
+        const key = `${username}\u0000${password.value}`;
+        if (key === sent) return;
+        sent = key;
+        await askBackground({
             kind: "captured",
             username,
-            password: password.value
-        }).then((reply) => {
-            // Drawn here as well as on the next load, because a sign-in that never
-            // navigates - which is most of them now - has no next load.
-            if (reply.ok && "offer" in reply) bar(reply.offer);
+            password: password.value,
+            newAccount: makingAccount()
         });
     };
+
+    /**
+     * The login somebody has typed so far, kept for the moment the form goes
+     * without saying so: a sign-in posted with `fetch` that swaps the boxes for
+     * what came back, or moves the address on, fires no submit at all.
+     */
+    let typed: { username: string; password: string; newAccount: boolean } | null = null;
+    let pressedAt = 0;
+    const remember = (event: Event): void => {
+        const box = origin(event);
+        const { fields } = seen;
+        const password = at(fields.newPassword) ?? at(fields.password);
+        const user = at(fields.username);
+        if (!password || (box !== password && box !== user)) return;
+        if (password.value === "") return;
+        typed = {
+            username: user?.value ?? typed?.username ?? "",
+            password: password.value,
+            newAccount: makingAccount()
+        };
+    };
+
+    /** The boxes gone, or the address moved on, right after a press: the login
+     *  was sent. Called on every look. */
+    const noticeGone = (): void => {
+        if (!typed) return;
+        const held = typed;
+        const still = [at(seen.fields.newPassword), at(seen.fields.password)].some(
+            (box) => box !== null && box.isConnected && box.value === held.password
+        );
+        if (still) return;
+        if (Date.now() - pressedAt > GONE_AFTER_PRESS_MS) return;
+        typed = null;
+        send(held.username, held.password, held.newAccount);
+    };
+
+    // The page going away right after a press - `location.assign` once a script
+    // has posted the login - is the last moment to hand it over.
+    window.addEventListener("pagehide", () => {
+        if (typed && Date.now() - pressedAt <= GONE_AFTER_PRESS_MS) {
+            const held = typed;
+            typed = null;
+            send(held.username, held.password, held.newAccount);
+        }
+    });
 
     // A real form going, and a button pressed on a page that submits by script.
     // Both, because either one alone misses about half the web.
@@ -505,33 +676,50 @@ async function start(): Promise<void> {
         },
         true
     );
-    document.addEventListener(
-        "click",
-        (event) => {
-            const pressed = (event.target as Element | null)?.closest?.(
-                "button, input[type=submit], input[type=button], [role=button]"
-            );
-            if (!pressed || !looksLikeSubmit(pressed)) return;
-            const box =
-                at(seen.fields.newPassword) ?? at(seen.fields.password) ?? at(seen.fields.username);
-            // Only a press that belongs with the login's boxes: a cookie banner's
-            // button is not somebody signing in.
-            if (!box || !sharesForm(pressed, box)) return;
-            submitted();
-        },
-        true
-    );
+    const onClick = (event: Event): void => {
+        const target = origin(event) as Element | null;
+        const pressed = target?.closest?.(PRESSABLE);
+        if (!pressed || !looksLikeSubmit(pressed) || !mayBeSubmit(pressed, target)) return;
+        const box =
+            at(seen.fields.newPassword) ?? at(seen.fields.password) ?? at(seen.fields.username);
+        if (!box) return;
+        // Remembered either way: a press the boxes then disappear after is a
+        // login sent from a button this could not tie to them.
+        pressedAt = Date.now();
+        // Only a press that belongs with the login's boxes: a cookie banner's
+        // button is not somebody signing in.
+        if (pressed.nodeName === "A" || !pressed.matches(BUTTON) || !sharesForm(pressed, box))
+            return;
+        submitted();
+    };
     // Enter in a login box that no form submits, which neither of the two
     // above ever sees.
-    document.addEventListener(
-        "keydown",
-        (event) => {
-            const { fields } = seen;
-            const boxes = [fields.newPassword, fields.password, fields.username].map(at);
-            if (enterSendsLogin(event, boxes)) submitted();
-        },
-        true
-    );
+    const onKey = (event: KeyboardEvent): void => {
+        const { fields } = seen;
+        const boxes = [fields.newPassword, fields.password, fields.username].map(at);
+        const sending = {
+            key: event.key,
+            isComposing: event.isComposing,
+            repeat: event.repeat,
+            target: origin(event)
+        };
+        if (sending.key === "Enter" && boxes.includes(sending.target as HTMLInputElement))
+            pressedAt = Date.now();
+        if (enterSendsLogin(sending, boxes)) submitted();
+    };
+
+    /** Every listener a document needs: the top page's, and each same-origin
+     *  frame's, since no event leaves a frame. */
+    function listenIn(doc: Document): void {
+        doc.addEventListener("click", onClick, true);
+        doc.addEventListener("keydown", onKey, true);
+        doc.addEventListener("input", remember, true);
+        if (doc !== document)
+            doc.addEventListener("scroll", place, { passive: true, capture: true });
+    }
+    listenIn(document);
+
+    refresh();
 }
 
 /**
@@ -558,6 +746,29 @@ const NEIGHBOURHOOD = 4;
 const NOT_A_SUBMIT =
     /show|hide|reveal|toggle|mostrar|ocultar|cancel|cancela|back|atr[aá]s|close|cerrar|forgot|olvid|help|ayuda/i;
 
+/** What submits a form: the only presses read as the login being sent. */
+const BUTTON = "button, input[type=submit], input[type=button], input[type=image], [role=button]";
+
+/** What a page submits from by script as well: a press on one of these only
+ *  arms the wait for the boxes to go. */
+const PRESSABLE = `${BUTTON}, a, [onclick], [tabindex]`;
+
+/** What is pressed to type into or to tick, never to send. */
+const CONTROL =
+    "input, select, textarea, label, [contenteditable]:not([contenteditable=false]), " +
+    "[role=checkbox], [role=radio], [role=switch], [role=textbox], [role=combobox], " +
+    "[role=searchbox], [role=listbox], [role=option], [role=tab], [role=slider], [role=spinbutton]";
+
+/** Whether a press is on something that could send a form at all: not a box,
+ *  a checkbox or a link that leaves for another page. */
+function mayBeSubmit(pressed: Element, target: Element | null): boolean {
+    const control = target?.closest?.(CONTROL);
+    if (control && pressed.contains(control) && !control.matches(BUTTON)) return false;
+    if (pressed.nodeName !== "A") return true;
+    const href = (pressed.getAttribute("href") ?? "").trim().toLowerCase();
+    return href === "" || href.startsWith("#") || href.startsWith("javascript:");
+}
+
 /** Whether pressing this could plausibly be somebody submitting the form. */
 function looksLikeSubmit(pressed: Element): boolean {
     // A button that holds a state is a switch, not a submit.
@@ -576,50 +787,17 @@ function looksLikeSubmit(pressed: Element): boolean {
 
 function sharesForm(pressed: Element, field: HTMLInputElement): boolean {
     if (field.form) return pressed.closest("form") === field.form;
-    let around: Element | null = field;
+    // Up through shadow roots as well: a component's button and its input are
+    // often in different ones.
+    const above = new Set<Node>();
+    for (let node: Node | null = pressed; node; node = upFrom(node)) above.add(node);
+    let around: Node | null = field;
     for (let step = 0; step < NEIGHBOURHOOD && around; step += 1) {
-        around = around.parentElement;
-        if (around?.contains(pressed)) return true;
+        around = upFrom(around);
+        if (around && around.nodeType !== Node.DOCUMENT_FRAGMENT_NODE && above.has(around))
+            return true;
     }
     return false;
-}
-
-/** One input, as the rules read it. Everything the DOM knows, flattened. */
-function describe(field: HTMLInputElement): FieldFacts {
-    const box = field.getBoundingClientRect();
-    return {
-        type: (field.type || "text").toLowerCase(),
-        autocomplete: (field.autocomplete || "").toLowerCase(),
-        words: [
-            field.name,
-            field.id,
-            field.placeholder,
-            field.title,
-            field.getAttribute("aria-label") ?? "",
-            field.labels?.[0]?.textContent ?? ""
-        ]
-            .join(" ")
-            // `login_code` and `loginCode` are two words, and the rules match
-            // words: `\bcode\b` never matches either as written.
-            .replace(/([a-z])([A-Z])/g, "$1 $2")
-            .replace(/_/g, " ")
-            .toLowerCase(),
-        // The DOM answers -1 for a box with no limit.
-        maxLength: field.maxLength > 0 ? field.maxLength : null,
-        inputMode: (field.inputMode || "").toLowerCase(),
-        // The same test `typeIntoPage` puts a box to, including a box parked off
-        // the page, which is a step the site has not shown yet.
-        usable:
-            !field.disabled &&
-            !field.readOnly &&
-            field.getAttribute("aria-hidden") !== "true" &&
-            box.width >= 2 &&
-            box.height >= 2 &&
-            box.right + window.scrollX > 0 &&
-            box.bottom + window.scrollY > 0 &&
-            getComputedStyle(field).visibility !== "hidden",
-        form: field.form
-    };
 }
 
 /**
@@ -631,7 +809,12 @@ function describe(field: HTMLInputElement): FieldFacts {
  * submit. The same reasoning, and the same lines, as `typeIntoPage` in the worker.
  */
 function put(field: HTMLInputElement, value: string): void {
-    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    // The setter of the box's own window: a box inside a frame belongs to that
+    // frame's copy of `HTMLInputElement`.
+    const kind =
+        (field.ownerDocument.defaultView as (Window & typeof globalThis) | null)
+            ?.HTMLInputElement ?? HTMLInputElement;
+    const descriptor = Object.getOwnPropertyDescriptor(kind.prototype, "value");
     field.focus();
     descriptor?.set?.call(field, value);
     field.dispatchEvent(new Event("input", { bubbles: true }));
@@ -727,11 +910,12 @@ function floating(field: HTMLInputElement): {
 } {
     const host = ourHost();
     const box = field.getBoundingClientRect();
+    const shift = frameOffset(field);
     host.style.cssText = `
         position: fixed;
         z-index: 2147483647;
-        top: ${box.bottom + 4}px;
-        left: ${box.left}px;
+        top: ${shift.y + box.bottom + 4}px;
+        left: ${shift.x + box.left}px;
         width: ${Math.max(240, Math.min(340, box.width))}px;
     `;
     const shadow = host.attachShadow({ mode: "closed" });
@@ -924,6 +1108,29 @@ function offerGenerated(
     };
     draw();
 
+    // What copying did, said under the buttons: a copy with no answer is one
+    // somebody presses three times to be sure.
+    const said = document.createElement("p");
+    said.setAttribute("role", "status");
+    said.style.cssText = "margin:0;padding:0 12px 10px;font-size:12px;color:hsl(222 10% 66%);";
+
+    const copy = action(t("generator.copy"), () => {
+        if (!value) return;
+        const copied = value;
+        void copyText(copied, panel).then((done) => {
+            if (!done) {
+                said.textContent = t("popup.clipboard.refused");
+                return;
+            }
+            copy.textContent = t("generator.copied");
+            said.textContent = t("inline.copiedClears", {
+                seconds: CLIPBOARD_CLEAR_MS / 1000
+            });
+            clearClipboardLater();
+        });
+    });
+    copy.title = t("generator.copyPassword");
+
     row.append(
         action(
             t("generator.use"),
@@ -934,12 +1141,97 @@ function offerGenerated(
             },
             true
         ),
+        copy,
         action(t("inline.again"), () => {
             value = generatePassword(options);
+            copy.textContent = t("generator.copy");
+            said.textContent = "";
             draw();
         })
     );
-    panel.append(shown, row);
+    panel.append(shown, row, said);
+}
+
+/**
+ * Put a password on the clipboard from a press inside our panel.
+ *
+ * The clipboard API first; where the page's own policy refuses it, the older
+ * copy command, from a box inside our closed shadow root - never one in the
+ * page, where the page's scripts could read the password out of it.
+ */
+async function copyText(value: string, inside: HTMLElement): Promise<boolean> {
+    try {
+        await navigator.clipboard.writeText(value);
+        return true;
+    } catch {
+        const box = document.createElement("textarea");
+        box.value = value;
+        box.setAttribute("readonly", "");
+        box.style.cssText = "position:fixed;opacity:0;pointer-events:none;";
+        inside.append(box);
+        box.select();
+        try {
+            return document.execCommand("copy");
+        } catch {
+            return false;
+        } finally {
+            box.remove();
+        }
+    }
+}
+
+/** The timer emptying the clipboard on this page, if one is waiting. */
+let clearing: number | null = null;
+
+/**
+ * Empty the clipboard a while after a password was copied to it, the way a
+ * password manager does - and from the next page this runs on when this one is
+ * gone first, which is the ordinary case after a sign-up.
+ */
+function clearClipboardLater(): void {
+    const due = Date.now() + CLIPBOARD_CLEAR_MS;
+    void storage.setItem(CLIPBOARD_CLEAR_KEY, due).catch(() => undefined);
+    armClearing(due);
+}
+
+function armClearing(due: number): void {
+    if (clearing !== null) window.clearTimeout(clearing);
+    clearing = window.setTimeout(() => void emptyClipboard(due), Math.max(0, due - Date.now()));
+}
+
+/** Empty it now - or once this page has the focus, which writing to the
+ *  clipboard needs - and forget the deadline it was for. */
+async function emptyClipboard(due: number): Promise<void> {
+    clearing = null;
+    try {
+        await navigator.clipboard.writeText("");
+    } catch {
+        if (Date.now() - due > CLIPBOARD_GIVE_UP_MS) await forgetClearing(due);
+        else window.addEventListener("focus", () => void emptyClipboard(due), { once: true });
+        return;
+    }
+    await forgetClearing(due);
+}
+
+async function forgetClearing(due: number): Promise<void> {
+    try {
+        if ((await storage.getItem<number>(CLIPBOARD_CLEAR_KEY)) === due)
+            await storage.removeItem(CLIPBOARD_CLEAR_KEY);
+    } catch {
+        // A deadline left behind empties an already empty clipboard once more.
+    }
+}
+
+/** A deadline a page before this one left unfinished. */
+async function finishClearing(): Promise<void> {
+    try {
+        const due = await storage.getItem<number>(CLIPBOARD_CLEAR_KEY);
+        if (typeof due !== "number") return;
+        if (Date.now() - due > CLIPBOARD_GIVE_UP_MS) await forgetClearing(due);
+        else armClearing(due);
+    } catch {
+        // Storage that will not answer has nothing to finish.
+    }
 }
 
 /**
@@ -985,12 +1277,13 @@ function watchForBreaches(field: HTMLInputElement | null): void {
 /** The line under a password box that has turned up in a breach. */
 function note(field: HTMLInputElement, count: number): HTMLElement {
     const box = field.getBoundingClientRect();
+    const shift = frameOffset(field);
     const host = ourHost();
     host.style.cssText = `
         position: fixed;
         z-index: 2147483645;
-        top: ${box.bottom + 4}px;
-        left: ${box.left}px;
+        top: ${shift.y + box.bottom + 4}px;
+        left: ${shift.x + box.left}px;
         width: ${Math.max(240, Math.min(360, box.width))}px;
     `;
     const shadow = host.attachShadow({ mode: "closed" });
@@ -1014,9 +1307,9 @@ function note(field: HTMLInputElement, count: number): HTMLElement {
 }
 
 /** Whatever the worker is still holding for this page, drawn if there is any. */
-async function offerHeld(): Promise<void> {
+async function offerHeld(before?: () => Promise<void>): Promise<void> {
     const reply = await askBackground({ kind: "pendingCapture" });
-    if (reply.ok && "offer" in reply) bar(reply.offer);
+    if (reply.ok && "offer" in reply) bar(reply.offer, before);
 }
 
 /** The bar in the corner is drawn once at a time, however many forms a page has. */
@@ -1033,7 +1326,7 @@ let barHost: HTMLElement | null = null;
  * Nothing about the login crosses back to say yes. The worker has been holding
  * the values since the form went, and this sends a word.
  */
-function bar(offer: OfferedCapture): void {
+function bar(offer: OfferedCapture, before?: () => Promise<void>): void {
     if (offer.kind === "none") return;
     barHost?.remove();
 
@@ -1087,19 +1380,24 @@ function bar(offer: OfferedCapture): void {
         action(
             offer.kind === "update" ? t("inline.update") : t("popup.save"),
             () => {
-                void askBackground({ kind: "saveCaptured" }).then((reply) => {
-                    if (reply.ok) {
-                        close();
-                        return;
-                    }
-                    // The one place a refusal is worth showing: somebody pressed a
-                    // button and nothing happened otherwise. It keeps a way out -
-                    // a bar that says why it failed and cannot be closed is worse
-                    // than the failure.
-                    title.textContent = "error" in reply ? reply.error : t("errors.notSaved");
-                    who.remove();
-                    row.replaceChildren(action(t("generator.close"), close));
-                });
+                // What the form says now goes in, not what it said when the bar
+                // appeared: a username typed after a password was generated.
+                void (before?.() ?? Promise.resolve())
+                    .catch(() => undefined)
+                    .then(() => askBackground({ kind: "saveCaptured" }))
+                    .then((reply) => {
+                        if (reply.ok) {
+                            close();
+                            return;
+                        }
+                        // The one place a refusal is worth showing: somebody pressed a
+                        // button and nothing happened otherwise. It keeps a way out -
+                        // a bar that says why it failed and cannot be closed is worse
+                        // than the failure.
+                        title.textContent = "error" in reply ? reply.error : t("errors.notSaved");
+                        who.remove();
+                        row.replaceChildren(action(t("generator.close"), close));
+                    });
             },
             true
         ),

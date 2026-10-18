@@ -265,6 +265,7 @@
         "saveThis": "¿Guardar este acceso en Polaris?",
         "update": "Actualizar",
         "notNow": "Ahora no",
+        "copiedClears": "Copiado. El portapapeles se vacía en {seconds} segundos.",
         "neverHere": "Aquí nunca"
     },
     "servers": {

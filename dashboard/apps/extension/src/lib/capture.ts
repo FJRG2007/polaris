@@ -31,6 +31,10 @@ export interface SavedLogin {
 export interface Submitted {
     readonly username: string;
     readonly password: string;
+    /** The form is making an account: a password generated on a sign-up, or
+     *  submitted from one. Without a username that is a new login, never the
+     *  one other login this site has saved. */
+    readonly newAccount?: boolean;
 }
 
 /** What, if anything, to offer for it. */
@@ -65,10 +69,15 @@ export function offerFor(submitted: Submitted, saved: readonly SavedLogin[]): Ca
     if (password === "") return NOTHING;
 
     const username = submitted.username.trim();
+    // A new account with no name typed yet: whatever else this site has saved
+    // belongs to another account, so it is a new item, not an update to that one.
+    if (submitted.newAccount && username === "") {
+        return saved.some((item) => item.password === password)
+            ? NOTHING
+            : { kind: "save", username: null, password };
+    }
     const candidates =
-        username === ""
-            ? [...saved]
-            : saved.filter((item) => same(item.username, username));
+        username === "" ? [...saved] : saved.filter((item) => same(item.username, username));
 
     // Already exactly what is stored. Nothing has changed, so there is nothing to
     // say - and this is the case that keeps the bar rare enough to be read.

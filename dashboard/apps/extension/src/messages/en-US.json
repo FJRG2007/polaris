@@ -265,6 +265,7 @@
         "saveThis": "Save this login in Polaris?",
         "update": "Update",
         "notNow": "Not now",
+        "copiedClears": "Copied. The clipboard is cleared in {seconds} seconds.",
         "neverHere": "Never here"
     },
     "servers": {
