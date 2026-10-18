@@ -17,6 +17,7 @@ interface Row {
     requesterId: string;
     addresseeId: string;
     status: string;
+    note?: string | null;
 }
 
 let rows: Row[] = [];
@@ -73,8 +74,43 @@ vi.mock("@/lib/chat/chat-service", () => ({
     }
 }));
 
+/** The bell, as far as friend alerts go. */
+interface Notice {
+    id: string;
+    userId: string;
+    type: string;
+    actionRequired: boolean;
+    metadata: string | null;
+}
+let notices: Notice[] = [];
+
+function noticeMatches(row: Notice, where: Record<string, unknown>): boolean {
+    if (where.userId !== undefined && row.userId !== where.userId) return false;
+    if (where.type !== undefined && row.type !== where.type) return false;
+    if (where.actionRequired !== undefined && row.actionRequired !== where.actionRequired)
+        return false;
+    const contains = (where.metadata as { contains?: string } | undefined)?.contains;
+    if (contains !== undefined && !(row.metadata ?? "").includes(contains)) return false;
+    const id = where.id as { gt?: string; in?: string[] } | undefined;
+    if (id?.gt !== undefined && !(row.id > id.gt)) return false;
+    if (id?.in !== undefined && !id.in.includes(row.id)) return false;
+    return true;
+}
+
 vi.mock("@polaris/db", () => ({
     prisma: {
+        notification: {
+            findMany: async ({ where, take }: { where: Record<string, unknown>; take?: number }) =>
+                notices
+                    .filter((row) => noticeMatches(row, where))
+                    .sort((a, b) => a.id.localeCompare(b.id))
+                    .slice(0, take ?? Infinity),
+            deleteMany: async ({ where }: { where: Record<string, unknown> }) => {
+                const going = notices.filter((row) => noticeMatches(row, where));
+                notices = notices.filter((row) => !going.includes(row));
+                return { count: going.length };
+            }
+        },
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findFirst: async () => null },
         user: { findUnique: async () => ({ id: "grace" }) },
@@ -85,7 +121,11 @@ vi.mock("@polaris/db", () => ({
                 rows.filter((row) => match(row, where)),
             findUnique: async ({ where }: { where: { id: string } }) =>
                 rows.find((row) => row.id === where.id) ?? null,
-            create: async ({ data }: { data: { requesterId: string; addresseeId: string } }) => {
+            create: async ({
+                data
+            }: {
+                data: { requesterId: string; addresseeId: string; note?: string | null };
+            }) => {
                 created.push(data);
                 rows.push({ id: `new-${created.length}`, ...data, status: "pending" });
                 return {};
@@ -95,10 +135,11 @@ vi.mock("@polaris/db", () => ({
                 data
             }: {
                 where: { id: string };
-                data: { status: string };
+                data: { status: string; note?: string | null };
             }) => {
                 const row = rows.find((entry) => entry.id === where.id);
                 if (row) row.status = data.status;
+                if (row && data.note !== undefined) row.note = data.note;
                 return {};
             },
             delete: async ({ where }: { where: { id: string } }) => {
@@ -117,9 +158,13 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const friends = await import("@/lib/friends-service");
+const { FRIEND_NOTE_MAX, friendNoteSchema, normalizeFriendNote } = await import(
+    "@/lib/friend-note"
+);
 
 beforeEach(() => {
     rows = [];
+    notices = [];
     created = [];
     deleted = [];
     followed.length = 0;
@@ -217,7 +262,7 @@ describe("the conversation a friendship is owed", () => {
 describe("asking", () => {
     it("stores a request", async () => {
         await friends.requestFriend("ada", "grace");
-        expect(created).toEqual([{ requesterId: "ada", addresseeId: "grace" }]);
+        expect(created).toEqual([{ requesterId: "ada", addresseeId: "grace", note: null }]);
         expect(rows[0]?.status).toBe("pending");
     });
 
@@ -333,5 +378,111 @@ describe("stopping", () => {
         await friends.removeFriend("ada", "grace");
         expect(deleted).toEqual(["r1"]);
         expect(await friends.areFriends("ada", "grace")).toBe(false);
+    });
+});
+
+/** A "wants to be added" alert in somebody's bell about somebody. */
+function asked(id: string, userId: string, personId: string, actionRequired = true): Notice {
+    return {
+        id,
+        userId,
+        type: "account.friend",
+        actionRequired,
+        metadata: JSON.stringify({ personId })
+    };
+}
+
+describe("the note on a request", () => {
+    it("is stored with the request and read back with it", async () => {
+        await friends.requestFriend("ada", "grace", "We met at the meetup");
+        expect(created).toEqual([
+            { requesterId: "ada", addresseeId: "grace", note: "We met at the meetup" }
+        ]);
+    });
+
+    it("is cleared when the request is accepted, and the request alert goes", async () => {
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
+        notices = [asked("n1", "ada", "grace"), asked("n2", "ada", "alan")];
+        await friends.respondToRequest("ada", "r1", true);
+        expect(rows[0]?.note).toBeNull();
+        expect(notices.map((row) => row.id)).toEqual(["n2"]);
+    });
+
+    it("is cleared on the other path into a friendship too", async () => {
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
+        notices = [asked("n1", "ada", "grace")];
+        await friends.requestFriend("ada", "grace");
+        expect(rows[0]?.note).toBeNull();
+        expect(notices).toEqual([]);
+    });
+
+    it("goes with the row when turned down or withdrawn, and so does the alert", async () => {
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending", note: "hi" }
+        ];
+        notices = [asked("n1", "ada", "grace")];
+        await friends.respondToRequest("grace", "r1", false);
+        expect(rows).toEqual([]);
+        expect(notices).toEqual([]);
+    });
+});
+
+describe("what a friendship leaves behind", () => {
+    it("drops the friend alerts in both bells when it ends", async () => {
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "accepted" }];
+        notices = [
+            asked("n1", "grace", "ada", false),
+            asked("n2", "ada", "grace", false),
+            asked("n3", "ada", "alan", false)
+        ];
+        await friends.removeFriend("ada", "grace");
+        expect(notices.map((row) => row.id)).toEqual(["n3"]);
+    });
+
+    it("ends a waiting request on a block and leaves a friendship alone", async () => {
+        rows = [
+            { id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" },
+            { id: "r2", requesterId: "alan", addresseeId: "ada", status: "accepted" }
+        ];
+        notices = [asked("n1", "ada", "grace")];
+        await friends.endPendingRequests("ada", "grace");
+        await friends.endPendingRequests("ada", "alan");
+        expect(rows.map((row) => row.id)).toEqual(["r2"]);
+        expect(notices).toEqual([]);
+    });
+
+    it("sweeps request alerts whose request is gone and keeps the open ones", async () => {
+        rows = [{ id: "r1", requesterId: "grace", addresseeId: "ada", status: "pending" }];
+        notices = [
+            asked("n1", "ada", "grace"),
+            asked("n2", "ada", "alan"),
+            asked("n3", "ada", "alan", false),
+            {
+                id: "n4",
+                userId: "ada",
+                type: "account.friend",
+                actionRequired: true,
+                metadata: null
+            }
+        ];
+        expect(await friends.sweepEndedFriendRequestNotices()).toEqual({ removed: 1 });
+        expect(notices.map((row) => row.id)).toEqual(["n1", "n3", "n4"]);
+    });
+});
+
+describe("the note's own rule", () => {
+    it("is trimmed, loses control characters and folds blank lines", () => {
+        expect(normalizeFriendNote("  hi\u0007 there\r\n\n\n\nbye  ")).toBe("hi there\n\nbye");
+    });
+
+    it("turns empty into no note and refuses one past the limit", () => {
+        expect(friendNoteSchema.parse("   ")).toBeNull();
+        expect(friendNoteSchema.parse(undefined)).toBeNull();
+        expect(friendNoteSchema.safeParse("x".repeat(FRIEND_NOTE_MAX + 1)).success).toBe(false);
+        expect(friendNoteSchema.parse(" ok ")).toBe("ok");
     });
 });

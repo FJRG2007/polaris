@@ -832,7 +832,12 @@
         "add": "Añadir persona",
         "askTitle": "Pedir por usuario exacto",
         "ask": "Pedir",
-        "hint": "A alguien que no aparece en la búsqueda se le puede pedir igualmente si te ha dado su nombre de usuario exacto."
+        "hint": "A alguien que no aparece en la búsqueda se le puede pedir igualmente si te ha dado su nombre de usuario exacto.",
+        "addNote": "Añadir nota",
+        "noteLabel": "Nota",
+        "notePlaceholder": "Di de qué os conocéis (opcional)",
+        "noteCount": "{count}/{max}",
+        "noteTooLong": "Hasta {max} caracteres"
     },
     "scan": {
         "page": {

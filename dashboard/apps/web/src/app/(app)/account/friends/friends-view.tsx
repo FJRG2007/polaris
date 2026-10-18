@@ -25,9 +25,10 @@ import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PersonName, PersonRow } from "@/components/person-name";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Textarea } from "@polaris/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Loader2, Search, UserMinus, UserPlus, X } from "lucide-react";
+import { FRIEND_NOTE_MAX, normalizeFriendNote } from "@/lib/friend-note";
+import { Loader2, MessageSquarePlus, Search, UserMinus, UserPlus, X } from "lucide-react";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import type { FriendCursor, FriendRequestView, FriendView } from "@/lib/friends-service";
 import {
@@ -120,8 +121,9 @@ function FriendsCard({
         setError("");
         const result = await runAction(run, setError);
         setBusy(false);
-        if (result?.error) return;
+        if (!result || result.error) return false;
         await reload();
+        return true;
     };
 
     /**
@@ -173,10 +175,7 @@ function FriendsCard({
     return (
         <Card>
             <CardBody className="flex flex-col gap-4 p-4">
-                <AddFriend
-                    exclude={people.map((friend) => friend.id)}
-                    onAsk={(run) => void act(run)}
-                />
+                <AddFriend exclude={people.map((friend) => friend.id)} onAsk={act} />
 
                 {waiting.length > 0 && (
                     <ul className="flex flex-col gap-1">
@@ -196,8 +195,18 @@ function FriendsCard({
                                         />
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
-                                        {request.outgoing ? t("friends.youAsked") : t("friends.wantsAdding")}
+                                        {request.outgoing
+                                            ? t("friends.youAsked")
+                                            : t("friends.wantsAdding")}
                                     </span>
+                                    {request.note ? (
+                                        <span
+                                            className="mt-1 block whitespace-pre-wrap break-words rounded bg-muted px-2 py-1 text-xs"
+                                            aria-label={t("friends.noteLabel")}
+                                        >
+                                            {request.note}
+                                        </span>
+                                    ) : null}
                                 </span>
                                 {!request.outgoing && (
                                     <Button
@@ -215,7 +224,11 @@ function FriendsCard({
                                     size="xs"
                                     variant="ghost"
                                     disabled={busy}
-                                    aria-label={request.outgoing ? t("friends.withdraw") : t("friends.turnDown")}
+                                    aria-label={
+                                        request.outgoing
+                                            ? t("friends.withdraw")
+                                            : t("friends.turnDown")
+                                    }
                                     onClick={() =>
                                         void act(() => respondToRequestAction(request.id, false))
                                     }
@@ -228,9 +241,7 @@ function FriendsCard({
                 )}
 
                 {people.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                        {t("friends.empty")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("friends.empty")}</p>
                 ) : (
                     <>
                         <ul className="flex flex-col gap-1">
@@ -243,7 +254,10 @@ function FriendsCard({
                                 >
                                     <Avatar openable person={friend} size={24} />
                                     <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-sm" title={friend.name}>
+                                        <span
+                                            className="block truncate text-sm"
+                                            title={friend.name}
+                                        >
                                             <PersonName id={friend.id} name={friend.name} />
                                         </span>
                                         <span className="block truncate text-xs text-muted-foreground">
@@ -263,8 +277,17 @@ function FriendsCard({
                                 </PersonRow>
                             ))}
                         </ul>
-                        <MoreWhenSeen enabled={cursor !== null} loading={loading} onReach={loadMore}>
-                            <Button size="sm" variant="ghost" onClick={() => void loadMore()} disabled={loading}>
+                        <MoreWhenSeen
+                            enabled={cursor !== null}
+                            loading={loading}
+                            onReach={loadMore}
+                        >
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void loadMore()}
+                                disabled={loading}
+                            >
                                 {loading ? <Loader2 className="size-4 animate-spin" /> : null}
                                 {t("friends.showMore")}
                             </Button>
@@ -328,11 +351,7 @@ function MoreWhenSeen({
     if (!enabled) return null;
     return (
         <div ref={foot} className="flex justify-center py-1">
-            {loading ? (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            ) : (
-                children
-            )}
+            {loading ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : children}
         </div>
     );
 }
@@ -357,10 +376,20 @@ function AddFriend({
     onAsk
 }: {
     exclude: readonly string[];
-    onAsk: (run: () => Promise<{ error?: string }>) => void;
+    onAsk: (run: () => Promise<{ error?: string }>) => Promise<boolean>;
 }) {
     const t = useTranslations("account");
     const [query, setQuery] = useState("");
+    // The note goes with whichever request is sent next, and is cleared once it
+    // has gone - the same words are rarely right for two people.
+    const [writing, setWriting] = useState(false);
+    const [note, setNote] = useState("");
+    const noteLength = normalizeFriendNote(note).length;
+    const noteTooLong = noteLength > FRIEND_NOTE_MAX;
+    const sent = () => {
+        setNote("");
+        setWriting(false);
+    };
     const [found, setFound] = useState<readonly { id: string; name: string }[]>([]);
     const [looking, setLooking] = useState(false);
     const [said, setSaid] = useState("");
@@ -388,11 +417,13 @@ function AddFriend({
 
     const askByHandle = async () => {
         const handle = query.trim();
-        if (!handle) return;
-        const result = await runAction(() => requestFriendByUsernameAction(handle), setSaid);
+        if (!handle || noteTooLong) return;
+        const result = await runAction(() => requestFriendByUsernameAction(handle, note), setSaid);
+        if (result?.error) setSaid(result.error);
         if (result?.said) {
             setSaid(result.said);
             setQuery("");
+            sent();
         }
     };
 
@@ -421,14 +452,45 @@ function AddFriend({
                     )}
                 </div>
                 <Button
+                    size="icon"
+                    variant={writing ? "secondary" : "ghost"}
+                    aria-label={t("friends.addNote")}
+                    title={t("friends.addNote")}
+                    aria-pressed={writing}
+                    onClick={() => setWriting((open) => !open)}
+                >
+                    <MessageSquarePlus className="size-4 shrink-0" />
+                </Button>
+                <Button
                     variant="secondary"
-                    disabled={!query.trim()}
+                    disabled={!query.trim() || noteTooLong}
                     onClick={() => void askByHandle()}
                     title={t("friends.askTitle")}
                 >
                     {t("friends.ask")}
                 </Button>
             </div>
+
+            {writing && (
+                <div className="flex flex-col gap-1">
+                    <Textarea
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        rows={3}
+                        aria-label={t("friends.noteLabel")}
+                        aria-invalid={noteTooLong || undefined}
+                        placeholder={t("friends.notePlaceholder")}
+                    />
+                    <span
+                        className={`self-end text-xs tabular-nums ${noteTooLong ? "text-danger" : "text-muted-foreground"}`}
+                        aria-live="polite"
+                    >
+                        {noteTooLong
+                            ? t("friends.noteTooLong", { max: FRIEND_NOTE_MAX })
+                            : t("friends.noteCount", { count: noteLength, max: FRIEND_NOTE_MAX })}
+                    </span>
+                </div>
+            )}
 
             {offered.length > 0 && (
                 <ul className="flex flex-col">
@@ -438,10 +500,13 @@ function AddFriend({
                                 as="button"
                                 personId={person.id}
                                 type="button"
-                                onClick={() => {
+                                disabled={noteTooLong}
+                                onClick={async () => {
+                                    const words = note;
                                     setQuery("");
                                     setSaid("");
-                                    onAsk(() => requestFriendAction(person.id));
+                                    if (await onAsk(() => requestFriendAction(person.id, words)))
+                                        sent();
                                 }}
                                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                             >
@@ -456,10 +521,7 @@ function AddFriend({
                 </ul>
             )}
 
-            <span className="text-xs text-muted-foreground">
-                {said ||
-                    t("friends.hint")}
-            </span>
+            <span className="text-xs text-muted-foreground">{said || t("friends.hint")}</span>
         </div>
     );
 }

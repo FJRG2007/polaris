@@ -3747,6 +3747,9 @@ model Notification {
     // one query in Polaris that scans every notification ever written, on a
     // schedule.
     @@index([createdAt])
+    // The friend-request sweep walks the open requests' alerts by kind, a page
+    // at a time, to drop the ones whose request has ended.
+    @@index([type, actionRequired, id])
 }
 
 // Somewhere an alert can be sent besides the bell and the account's mailbox: a
@@ -10299,6 +10302,11 @@ model Friendship {
     addresseeId String    @db.Uuid
     // pending | accepted
     status      String    @default("pending")
+    // What the asker wrote with the request, shown to the person asked while it
+    // waits; at most 300 characters, held by friendNoteSchema. Lives only as
+    // long as the request does: accepting clears it, and turning down,
+    // withdrawing or blocking delete the row it is on.
+    note        String?
     createdAt   DateTime  @default(now())
     respondedAt DateTime?
 

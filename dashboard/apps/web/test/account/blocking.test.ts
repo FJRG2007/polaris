@@ -78,8 +78,11 @@ vi.mock("@/lib/rich-text/mention-service", () => ({
     like: (term: string) => ({ contains: term })
 }));
 
+const endPendingRequests = vi.fn(async (_userId: string, _otherId: string) => undefined);
+
 vi.mock("@/lib/friends-service", () => ({
-    friendIds: async () => new Set<string>()
+    friendIds: async () => new Set<string>(),
+    endPendingRequests
 }));
 
 vi.mock("@/lib/privacy-service", () => ({
@@ -175,6 +178,13 @@ describe("setting one", () => {
         await blocking.block("ada", "grace");
         await blocking.block("ada", "grace");
         expect(blocks).toHaveLength(1);
+    });
+
+    it("holds even when the request between them could not be tidied", async () => {
+        endPendingRequests.mockRejectedValueOnce(new Error("database went away"));
+        vi.spyOn(console, "error").mockImplementationOnce(() => undefined);
+        await expect(blocking.block("ada", "grace")).resolves.toBeUndefined();
+        expect(await blocking.blockedBy("ada", ["grace"])).toEqual(new Set(["grace"]));
     });
 
     it("refuses to block yourself", async () => {
