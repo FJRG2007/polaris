@@ -95,3 +95,31 @@ describe("what to offer for a submitted login", () => {
         expect(offer.kind === "save" && offer.password).toBe(" s3cret ");
     });
 });
+
+describe("a password generated for a new account", () => {
+    it("is a new login while no username is typed, whatever else the site has", () => {
+        const offer = offerFor({ username: "", password: "Gen-1", newAccount: true }, [saved()]);
+        expect(offer).toEqual({ kind: "save", username: null, password: "Gen-1" });
+    });
+
+    it("updates the login saved for that site and username", () => {
+        const offer = offerFor(
+            { username: "ana@example.com", password: "Gen-1", newAccount: true },
+            [saved(), saved({ id: "2", username: "luis@example.com" })]
+        );
+        expect(offer).toMatchObject({ kind: "update", id: "1", password: "Gen-1" });
+    });
+
+    it("is a new login under a username the site has not seen", () => {
+        const offer = offerFor(
+            { username: "nuevo@example.com", password: "Gen-1", newAccount: true },
+            [saved()]
+        );
+        expect(offer).toEqual({ kind: "save", username: "nuevo@example.com", password: "Gen-1" });
+    });
+
+    it("says nothing once it is already saved", () => {
+        const offer = offerFor({ username: "", password: "old", newAccount: true }, [saved()]);
+        expect(offer.kind).toBe("none");
+    });
+});

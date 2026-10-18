@@ -39,6 +39,10 @@ export interface FieldFacts {
     readonly maxLength?: number | null;
     /** The `inputmode` attribute, lowercased, or an empty string. */
     readonly inputMode?: string;
+    /** What the form around the field says it does: its submit buttons' text,
+     *  and its id, name and action, lowercased. Never the links beside it - a
+     *  sign-in form saying "No account? Sign up" is still a sign-in form. */
+    readonly formWords?: string;
 }
 
 /** The types a login is never typed into. */
@@ -61,7 +65,41 @@ const NOT_A_LOGIN = /search|captcha|find|query|coupon|voucher|discount|promo/i;
 
 /** Words a username box tends to carry, in the languages this is likely to meet. */
 const IDENTIFIER =
-    /user|login|email|correo|usuario|e-?mail|account|cuenta|identifiant|benutzer|nome|phone|telefono|mobile/i;
+    /user|login|log.?on|sign.?in|email|correo|usuario|e-?mail|account|cuenta|identifiant|identifier|utilisateur|benutzer|nutzer|anmelde|nome|phone|telefono|mobile|\buid\b|nick|handle|member|customer.?(?:id|number)|client.?(?:id|number)/i;
+
+/** What a form whose button says this is for: making an account. */
+const SIGNUP_FORM =
+    /sign.?up|register|registr|create (?:an |my |your )?account|join (?:now|us|free)|get started|crear (?:una |mi |tu )?cuenta|darse de alta|date de alta|unirse|[uú]nete/i;
+
+/** What a form whose button says this is for: signing in, which outranks the
+ *  words above on a form that offers both. */
+const SIGNIN_FORM =
+    /sign.?in|log.?in|log.?on|iniciar sesi[oó]n|inicia sesi[oó]n|entrar|acceder|anmelden|connexion|se connecter/i;
+
+/** Boxes that sit before a password and are still not its username. */
+const NOT_A_USERNAME = /company|empresa|address|direcci[oó]n|city|ciudad|zip|postal|country|pa[ií]s/i;
+
+/** The `autocomplete` words that qualify a field rather than name it. */
+const QUALIFIERS = /^(?:section-.*|shipping|billing|home|work|mobile|fax|pager|webauthn|on)$/;
+
+/**
+ * The one token of an `autocomplete` attribute that says what the field is.
+ *
+ * The attribute is a list: `username webauthn` is a username box that also
+ * offers passkeys, which is how a growing share of sign-ins now write it, and
+ * `section-login current-password` is a password in a named group. Compared as
+ * written, either is "something else", and the box is skipped as if the page had
+ * said it was not a login.
+ */
+export function autocompleteToken(raw: string): string {
+    const words = raw.trim().toLowerCase().split(/\s+/).filter((word) => !QUALIFIERS.test(word));
+    return words[words.length - 1] ?? "";
+}
+
+/** The field's own token, read as above. */
+function tokenOf(field: FieldFacts): string {
+    return autocompleteToken(field.autocomplete);
+}
 
 /** Words that mean "the password you already have" - the box a sign-in fills. */
 const CURRENT_WORDS = /current|old password|existing|actual|antigua|antiguo|vieja|viejo/i;
@@ -187,7 +225,15 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
         first === undefined
             ? []
             : passwords.filter((index) => fields[index]?.form === fields[first]?.form);
-    const roles = settleRoles(group.map((index) => roleOf(fields[index])));
+    // A lone password nobody labelled, in a form whose button says "Create
+    // account", is one being invented: read as the current one, the sign-up got
+    // the login menu and no generator.
+    const said = first === undefined ? "" : (fields[first]?.formWords ?? "");
+    const signupForm = SIGNUP_FORM.test(said) && !SIGNIN_FORM.test(said);
+    const roles = settleRoles(
+        group.map((index) => roleOf(fields[index])),
+        signupForm
+    );
     const roleAt = (role: PasswordRole): number | null => {
         const where = roles.indexOf(role);
         return where === -1 ? null : (group[where] ?? null);
@@ -217,8 +263,19 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
     // The code box first, so a box labelled "login code" is not then read as the
     // username because it says "login".
     const single = usable.find((index) => isOneTimeCode(fields[index]));
-    const username =
+    const named =
         candidates.find((index) => index !== single && isUsername(fields[index])) ?? null;
+    // A sign-in whose username box says nothing a rule recognises - `j_id7`, a
+    // bare "ID" - is still the box right before the password: the last plain text
+    // box ahead of it in the same form, which is where every manager settles it.
+    const username =
+        named ??
+        (current !== null && newPassword === null
+            ? (candidates
+                  .filter((index) => index < current && index !== single)
+                  .reverse()
+                  .find((index) => mightBeUsername(fields[index])) ?? null)
+            : null);
     const oneTimeCodeBoxes =
         single !== undefined
             ? [single]
@@ -272,7 +329,7 @@ const FULL_WORDS = /full.?name|nombre completo|(?:^|\s)name(?:\s|$)/i;
  *  page's own token first, then the words it carries. */
 function nameKind(field: FieldFacts | undefined): NameKind | null {
     if (!field || field.type !== "text") return null;
-    const token = field.autocomplete;
+    const token = tokenOf(field);
     if (token === "name") return "full";
     if (token === "given-name") return "given";
     if (token === "family-name") return "family";
@@ -325,7 +382,7 @@ function splitCode(
 /** What one password box says about itself, before its neighbours are counted. */
 function roleOf(field: FieldFacts | undefined): PasswordRole {
     if (!field) return "unknown";
-    const token = field.autocomplete;
+    const token = tokenOf(field);
     if (token === "current-password") return "current";
     if (token === "new-password") return CONFIRM_WORDS.test(field.words) ? "confirm" : "new";
     if (CURRENT_WORDS.test(field.words)) return "current";
@@ -344,10 +401,10 @@ function roleOf(field: FieldFacts | undefined): PasswordRole {
  * box after it is the confirmation, which is the order these are written in
  * everywhere - and a role already filled is not filled twice.
  */
-function settleRoles(said: readonly PasswordRole[]): PasswordRole[] {
+function settleRoles(said: readonly PasswordRole[], signupForm = false): PasswordRole[] {
     if (said.length === 0) return [];
     if (said.every((role) => role === "unknown")) {
-        if (said.length === 1) return ["current"];
+        if (said.length === 1) return [signupForm ? "new" : "current"];
         if (said.length === 2) return ["new", "confirm"];
         return said.map((_, index) => BY_COUNT[index] ?? "unknown");
     }
@@ -373,7 +430,7 @@ function settleRoles(said: readonly PasswordRole[]): PasswordRole[] {
 /** Whether this box is the one a username goes in. */
 export function isUsername(field: FieldFacts | undefined): boolean {
     if (!field) return false;
-    const token = field.autocomplete;
+    const token = tokenOf(field);
     // The page said so itself, which outranks every guess below it.
     if (token === "username" || token === "email") return true;
     // And a page that named it something else entirely has been believed.
@@ -383,11 +440,23 @@ export function isUsername(field: FieldFacts | undefined): boolean {
     return IDENTIFIER.test(field.words) || field.type === "email";
 }
 
+/** Whether a box nobody labelled could be the username, by elimination: a plain
+ *  text box that is not a search, a code, a name or an address. */
+function mightBeUsername(field: FieldFacts | undefined): boolean {
+    if (!field) return false;
+    const token = tokenOf(field);
+    if (token !== "" && token !== "off") return false;
+    if (!["text", "email", "tel"].includes(field.type)) return false;
+    if (NOT_A_LOGIN.test(field.words) || NOT_A_USERNAME.test(field.words)) return false;
+    return !isOneTimeCode(field) && nameKind(field) === null;
+}
+
 /** Whether this box is where an authenticator's code is typed. */
 export function isOneTimeCode(field: FieldFacts | undefined): boolean {
     if (!field) return false;
-    if (field.autocomplete === "one-time-code") return true;
-    if (field.autocomplete !== "" && field.autocomplete !== "off") return false;
+    const token = tokenOf(field);
+    if (token === "one-time-code") return true;
+    if (token !== "" && token !== "off") return false;
     if (!CODE_TYPES.has(field.type)) return false;
     if (NOT_A_LOGIN.test(field.words) || NOT_A_ONE_TIME_CODE.test(field.words)) return false;
     if (ONE_TIME_WORDS.test(field.words)) return true;

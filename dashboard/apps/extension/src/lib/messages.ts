@@ -287,7 +287,13 @@ export type Request =
      * for the tab until somebody answers the bar, so a submission that navigates
      * is still offerable on the page that lands.
      */
-    | { readonly kind: "captured"; readonly username: string; readonly password: string }
+    | {
+          readonly kind: "captured";
+          readonly username: string;
+          readonly password: string;
+          /** Typed or generated on a form that makes an account. */
+          readonly newAccount?: boolean;
+      }
     /** What is still waiting to be offered for this tab, if anything. Asked on
      *  every load, because that is how an offer survives the navigation that
      *  submitting the form caused. */
