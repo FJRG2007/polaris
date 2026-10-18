@@ -26,6 +26,8 @@ import { verifyAccountPassword } from "@polaris/auth";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import * as accessLog from "@/lib/vault/access-log";
 import type { ItemUseEntry } from "@/lib/vault/item-uses";
+import { accountIdentity, type AccountIdentity } from "@/lib/vault/account-identity";
+import { z } from "zod";
 
 /** What the vault screen needs before it can draw anything. */
 export interface VaultState {
@@ -103,7 +105,9 @@ export async function createAccountVaultAction(input: unknown): Promise<{ error?
     const user = await requirePermission("vault.use");
     const parsed = core.vaultSetupSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable")
+        };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
         return { error: await vaultRefusal("errors.wrongPolarisPassword") };
@@ -140,7 +144,9 @@ export async function changeMasterPasswordAction(input: unknown): Promise<{ erro
     const user = await requirePermission("vault.use");
     const parsed = core.vaultPasswordChangeSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.invalidRequest") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.invalidRequest")
+        };
     }
     if (!(await accountPasswordOk(user.id, parsed.data.accountPassword))) {
         return { error: await vaultRefusal("errors.wrongPolarisPassword") };
@@ -229,7 +235,9 @@ export async function saveItemAction(
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted")
+        };
     }
     if (!itemId) {
         if (parsed.data.organizationId && collectionIds.length === 0) {
@@ -258,6 +266,32 @@ export async function setItemFavoriteAction(itemId: string, favorite: boolean): 
     const user = await requirePermission("vault.use");
     await ciphers.setFavorite(user.id, itemId, favorite);
     revalidatePath("/vault");
+}
+
+const defaultIdentitySchema = z.object({ itemId: z.string().uuid(), isDefault: z.boolean() });
+
+/**
+ * Make an identity the one sign-up forms are filled with in the vault it sits
+ * in, or stop it being that. Per person, like a star.
+ */
+export async function setDefaultIdentityAction(
+    itemId: string,
+    isDefault: boolean
+): Promise<{ error?: string }> {
+    const user = await requirePermission("vault.use");
+    const parsed = defaultIdentitySchema.safeParse({ itemId, isDefault });
+    if (!parsed.success) return { error: await vaultRefusal("errors.invalidRequest") };
+    if (!(await ciphers.setDefaultIdentity(user.id, parsed.data.itemId, parsed.data.isDefault))) {
+        return { error: await vaultRefusal("errors.itemNotYours") };
+    }
+    revalidatePath("/vault");
+    return {};
+}
+
+/** What this account already says about its owner, to start an identity from. */
+export async function accountIdentityAction(): Promise<AccountIdentity | null> {
+    const user = await requirePermission("vault.use");
+    return accountIdentity(user.id);
 }
 
 /** Send an item to the trash, or take it out for good. */
@@ -356,7 +390,9 @@ export async function createSendAction(
     const user = await requirePermission("vault.use");
     const parsed = core.sendSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.sendNotEncrypted")
+        };
     }
     const send = await sends.createSend(user.id, parsed.data);
     revalidatePath("/vault/sends");
@@ -391,7 +427,8 @@ export async function itemUsesAction(itemId: string): Promise<ItemUseEntry[]> {
 
 export async function deleteSendAction(sendId: string): Promise<{ error?: string }> {
     const user = await requirePermission("vault.use");
-    if (!(await sends.deleteSend(user.id, sendId))) return { error: await vaultRefusal("errors.sendNotYours") };
+    if (!(await sends.deleteSend(user.id, sendId)))
+        return { error: await vaultRefusal("errors.sendNotYours") };
     revalidatePath("/vault/sends");
     return {};
 }

@@ -175,7 +175,87 @@ export interface PageFields extends FoundFields {
     readonly fullName: number | null;
     readonly givenName: number | null;
     readonly familyName: number | null;
+    /** The rest of what a sign-up asks about somebody, each its own box or null.
+     *  Never the username box above, a password, a code or a name. */
+    readonly profile: Readonly<Record<ProfilePart, number | null>>;
+    /** What the username box above is asking for, where it says: an email, a
+     *  phone number, or a handle. Null for a box that says nothing a rule
+     *  recognises, which on a sign-up is most often an email. */
+    readonly usernameAsks: "email" | "phone" | "username" | null;
     readonly purpose: FormPurpose;
+}
+
+/** The parts of an identity a page can ask for beyond somebody's name. */
+export const PROFILE_PARTS = [
+    "email",
+    "phone",
+    "username",
+    "company",
+    "address1",
+    "address2",
+    "city",
+    "state",
+    "postalCode",
+    "country"
+] as const;
+
+export type ProfilePart = (typeof PROFILE_PARTS)[number];
+
+/** The `autocomplete` tokens that name each part, as the HTML standard spells
+ *  them. A page that wrote one has said what the box is; nothing below argues. */
+const PROFILE_TOKENS: Readonly<Record<string, ProfilePart>> = {
+    email: "email",
+    tel: "phone",
+    "tel-national": "phone",
+    username: "username",
+    organization: "company",
+    "street-address": "address1",
+    "address-line1": "address1",
+    "address-line2": "address2",
+    "address-level2": "city",
+    "address-level1": "state",
+    "postal-code": "postalCode",
+    country: "country",
+    "country-name": "country"
+};
+
+/** The words each part tends to carry, in the order they are tried: the second
+ *  address line before the first, because "address line 2" says "address". */
+const PROFILE_WORDS: readonly (readonly [ProfilePart, RegExp])[] = [
+    ["email", /e-?mail|correo/i],
+    ["phone", /phone|tel[eé]fono|tel|m[oó]vil|mobile|celular/i],
+    ["postalCode", /zip|postal|post.?code|cp/i],
+    ["address2", /address.?(?:line)?.?2|apt|apartment|suite|piso|puerta|bloque/i],
+    ["address1", /address|street|direcci[oó]n|calle|domicilio/i],
+    ["city", /city|town|ciudad|localidad|municipio|poblaci[oó]n/i],
+    ["state", /state|province|county|region|provincia|estado|regi[oó]n/i],
+    ["country", /country|pa[ií]s/i],
+    ["company", /company|empresa|organi[sz]ation|organizaci[oó]n|business name/i],
+    ["username", /user.?name|usuario|nick|handle|alias/i]
+];
+
+/** No box for any part, which is a page before anything has been read. */
+export function emptyProfile(): Record<ProfilePart, number | null> {
+    return Object.fromEntries(PROFILE_PARTS.map((part) => [part, null])) as Record<
+        ProfilePart,
+        number | null
+    >;
+}
+
+/** The types a part of an identity is typed into. */
+const PROFILE_TYPES = new Set(["text", "email", "tel", "search", "number", "url"]);
+
+/** Which part of an identity a box asks for, or null. The page's own token
+ *  first, then the box's type, then the words it carries. */
+export function profilePart(field: FieldFacts | undefined): ProfilePart | null {
+    if (!field || !PROFILE_TYPES.has(field.type)) return null;
+    const token = tokenOf(field);
+    if (token !== "" && token !== "off") return PROFILE_TOKENS[token] ?? null;
+    if (NOT_A_LOGIN.test(field.words)) return null;
+    if (field.type === "email") return "email";
+    if (field.type === "tel") return "phone";
+    for (const [part, words] of PROFILE_WORDS) if (words.test(field.words)) return part;
+    return null;
 }
 
 /** What one password box on the page turned out to be. */
@@ -305,6 +385,25 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
                 nameKind(fields[index]) === kind
         ) ?? null;
 
+    // The rest of a sign-up, each part in the first free box that asks for it.
+    const taken = new Set<number>(
+        [username, current, newPassword, confirmPassword, ...oneTimeCodeBoxes].filter(
+            (index): index is number => index !== null
+        )
+    );
+    const names = (["full", "given", "family"] as const).map(nameBox);
+    for (const index of names) if (index !== null) taken.add(index);
+    const profile = emptyProfile();
+    for (const index of usable) {
+        if (taken.has(index)) continue;
+        const part = profilePart(fields[index]);
+        if (part === null || profile[part] !== null) continue;
+        profile[part] = index;
+    }
+    const asked = username === null ? null : profilePart(fields[username]);
+    const usernameAsks =
+        asked === "email" || asked === "phone" || asked === "username" ? asked : null;
+
     return {
         username,
         password: current,
@@ -312,9 +411,11 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
         confirmPassword,
         oneTimeCode,
         oneTimeCodeBoxes,
-        fullName: nameBox("full"),
-        givenName: nameBox("given"),
-        familyName: nameBox("family"),
+        fullName: names[0] ?? null,
+        givenName: names[1] ?? null,
+        familyName: names[2] ?? null,
+        profile,
+        usernameAsks,
         purpose
     };
 }

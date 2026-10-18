@@ -7,6 +7,7 @@ import * as accounts from "@/lib/accounts";
 import { breachCount } from "@/lib/breach";
 import type { WordKey } from "@/lib/words";
 import { searchLogins } from "@/lib/search";
+import * as identity from "@/lib/identity";
 import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
@@ -1292,6 +1293,57 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
         organizationId:
             typeof cipher["organizationId"] === "string" ? cipher["organizationId"] : null
     };
+}
+
+/** The identity type, as the wire numbers it. */
+const CIPHER_IDENTITY = 4;
+
+/** One identity, opened whole. Only ever for the sign-up menu, which shows a
+ *  name and a line of each and hands the rest to a page only once picked. */
+async function readIdentity(
+    cipher: Record<string, unknown>
+): Promise<identity.OpenIdentity | null> {
+    if (Number(cipher["type"]) !== CIPHER_IDENTITY || cipher["deletedDate"]) return null;
+    const key = keyFor(cipher);
+    const id = cipher["id"];
+    if (!key || typeof id !== "string") return null;
+    const held = (cipher["identity"] ?? {}) as Record<string, unknown>;
+    const say = async (value: unknown): Promise<string> =>
+        typeof value === "string" && value !== "" ? ((await decrypt(value, key)) ?? "") : "";
+    const values = identity.blankIdentity();
+    for (const field of identity.IDENTITY_KEYS) values[field] = (await say(held[field])).trim();
+    return {
+        id,
+        name: (await say(cipher["name"])) || "Untitled",
+        organizationId:
+            typeof cipher["organizationId"] === "string" ? cipher["organizationId"] : null,
+        isDefault: cipher["defaultIdentity"] === true,
+        values
+    };
+}
+
+/** The identities the open shelf shows, decrypted, best first. */
+async function shelfIdentities(): Promise<identity.OpenIdentity[]> {
+    const [held, opened, shelf, orgs] = await Promise.all([
+        CIPHERS.getValue(),
+        vault(),
+        LINK_SHELF.getValue(),
+        LINK_ORGS.getValue()
+    ]);
+    if (!held || !opened) return [];
+    const found: identity.OpenIdentity[] = [];
+    for (const cipher of held.ciphers) {
+        const one = await readIdentity(cipher);
+        if (one) found.push(one);
+    }
+    return identity.shelfIdentities(found, shelf, orgs);
+}
+
+/** The account this extension is signed in as, as an identity to fill with. */
+async function ownIdentity(): Promise<messages.IdentityValues | null> {
+    const account = await readAccount();
+    const email = account?.email ?? (await EMAIL.getValue());
+    return identity.accountIdentity({ name: account?.name ?? null, email: email ?? null });
 }
 
 /** Every login this account can open, decrypted. */
@@ -3366,14 +3418,43 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 if (!(await vault())) await askToUnlock();
                 return { ok: true };
 
-            case "myDetails": {
+            case "identities":
+            case "identity": {
+                // Somebody's own details, so held to what a fill is: an open
+                // vault, and a page whose site has not been switched off.
                 if (!(await vault())) return { ok: false, error: await say("errors.unlockFirst") };
-                if (page && (await blockedHere(page.url)).blocked) {
+                if (!page || (await blockedHere(page.url)).blocked) {
                     return { ok: false, error: await say("errors.offForSite") };
                 }
-                const account = await readAccount();
-                const email = account?.email ?? (await EMAIL.getValue());
-                return { ok: true, details: { name: account?.name ?? null, email: email ?? null } };
+                const found = await shelfIdentities();
+                if (request.kind === "identities") {
+                    if (found.length > 0) {
+                        const names = await vaultNames();
+                        return {
+                            ok: true,
+                            identities: found.map((one) => identity.cardOf(one, names))
+                        };
+                    }
+                    // A shelf with no identity still has somebody signed in.
+                    const own = await ownIdentity();
+                    return {
+                        ok: true,
+                        identities: own
+                            ? [identity.accountCard(own, await say("inline.accountIdentity"))]
+                            : []
+                    };
+                }
+                // Only one the menu could have offered: on the open shelf, or the
+                // account's own when that shelf has none.
+                const values =
+                    request.id === messages.ACCOUNT_IDENTITY
+                        ? found.length === 0
+                            ? await ownIdentity()
+                            : null
+                        : (found.find((one) => one.id === request.id)?.values ?? null);
+                return values
+                    ? { ok: true, identity: values }
+                    : { ok: false, error: await say("errors.identityGone") };
             }
 
             case "menuTarget":

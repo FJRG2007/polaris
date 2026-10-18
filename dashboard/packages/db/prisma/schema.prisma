@@ -3068,13 +3068,14 @@ model VaultAccount {
     user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
     ciphers        VaultCipher[]
     folders        VaultFolder[]
-    favorites      VaultFavorite[]
-    sends          VaultSend[]
-    devices        VaultDevice[]
-    refreshTokens  VaultRefreshToken[]
-    memberships    VaultOrgUser[]
-    emergencyGiven VaultEmergencyAccess[] @relation("VaultEmergencyGrantor")
-    emergencyHeld  VaultEmergencyAccess[] @relation("VaultEmergencyGrantee")
+    favorites        VaultFavorite[]
+    identityDefaults VaultIdentityDefault[]
+    sends            VaultSend[]
+    devices          VaultDevice[]
+    refreshTokens    VaultRefreshToken[]
+    memberships      VaultOrgUser[]
+    emergencyGiven   VaultEmergencyAccess[] @relation("VaultEmergencyGrantor")
+    emergencyHeld    VaultEmergencyAccess[] @relation("VaultEmergencyGrantee")
 }
 
 // One item: a login, a note, a card, an identity, an SSH key.
@@ -3101,12 +3102,13 @@ model VaultCipher {
     // is not a delete until it is emptied.
     deletedDate    DateTime?
 
-    vault        VaultAccount?           @relation(fields: [userId], references: [userId], onDelete: Cascade)
-    organization VaultOrganization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    folder       VaultFolder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
-    collections  VaultCollectionCipher[]
-    attachments  VaultAttachment[]
-    favorites    VaultFavorite[]
+    vault            VaultAccount?           @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    organization     VaultOrganization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    folder           VaultFolder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
+    collections      VaultCollectionCipher[]
+    attachments      VaultAttachment[]
+    favorites        VaultFavorite[]
+    identityDefaults VaultIdentityDefault[]
 
     @@index([userId])
     @@index([organizationId])
@@ -3144,6 +3146,29 @@ model VaultFavorite {
     @@index([cipherId])
 }
 
+// The identity one person fills sign-up forms with, one per vault: their own
+// (a null vault) and each organization or second vault they are in.
+//
+// Per person for the same reason as a star: an organization's identity is one
+// row everybody in it sees, and picking it is one member's choice. A row whose
+// item has since moved to another vault is ignored when read, not trusted.
+// Postgres counts two nulls as different, so the personal row is kept to one by
+// a partial unique index the migration adds beside the one below.
+model VaultIdentityDefault {
+    id                  String  @id @default(uuid(7)) @db.Uuid
+    userId              String  @db.Uuid
+    vaultOrganizationId String? @db.Uuid
+    cipherId            String  @db.Uuid
+
+    vault        VaultAccount       @relation(fields: [userId], references: [userId], onDelete: Cascade)
+    organization VaultOrganization? @relation(fields: [vaultOrganizationId], references: [id], onDelete: Cascade)
+    cipher       VaultCipher        @relation(fields: [cipherId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, vaultOrganizationId])
+    @@index([vaultOrganizationId])
+    @@index([cipherId])
+}
+
 // A vault beyond the one every account starts with: a second vault of somebody's
 // own, or an organization's.
 //
@@ -3174,11 +3199,12 @@ model VaultOrganization {
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    organization Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    owner        User?             @relation("VaultOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-    members      VaultOrgUser[]
-    collections  VaultCollection[]
-    ciphers      VaultCipher[]
+    organization     Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    owner            User?                  @relation("VaultOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+    members          VaultOrgUser[]
+    collections      VaultCollection[]
+    ciphers          VaultCipher[]
+    identityDefaults VaultIdentityDefault[]
 
     @@index([ownerUserId])
 }

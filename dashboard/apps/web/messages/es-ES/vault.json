@@ -45,7 +45,9 @@
             "move": "Mover",
             "share": "Compartir enlace",
             "deleteForGood": "Borrar para siempre",
-            "trash": "A la papelera"
+            "trash": "A la papelera",
+            "defaultIdentity": "Usar al registrarte",
+            "notDefaultIdentity": "Dejar de usar al registrarte"
         },
         "inTrash": "En la papelera",
         "unstar": "Desmarcar",
@@ -93,7 +95,11 @@
         "hide": "Ocultar",
         "hideNamed": "Ocultar: {label}",
         "showNamed": "Mostrar: {label}",
-        "copyNamed": "Copiar: {label}"
+        "copyNamed": "Copiar: {label}",
+        "defaultIdentity": "Para registrarte",
+        "defaultIdentityFailed": "No se pudo cambiar la identidad",
+        "defaultIdentityNamed": "Usar {name} al registrarte",
+        "notDefaultIdentityNamed": "Dejar de usar {name} al registrarte"
     },
     "authorize": {
         "title": "Autorizar cliente",
@@ -198,7 +204,10 @@
         "hints": {
             "title": "Sr, Sra, Dr",
             "address2": "Opcional"
-        }
+        },
+        "fromAccount": "Rellenar con mi cuenta",
+        "fromAccountFailed": "No se pudo leer tu cuenta. Reintenta.",
+        "pickEmail": "O elige uno de tus correos"
     },
     "item": {
         "expiry": {

@@ -322,3 +322,94 @@ describe("whether a box is for a username", () => {
         expect(isUsername(undefined)).toBe(false);
     });
 });
+
+describe("the rest of a sign-up", () => {
+    it("reads each part from the page's own autocomplete token", () => {
+        const form = readForm([
+            field({ autocomplete: "email", type: "email" }),
+            field({ autocomplete: "given-name" }),
+            field({ autocomplete: "family-name" }),
+            field({ autocomplete: "shipping tel", type: "tel" }),
+            field({ autocomplete: "organization" }),
+            field({ autocomplete: "address-line1" }),
+            field({ autocomplete: "address-line2" }),
+            field({ autocomplete: "address-level2" }),
+            field({ autocomplete: "address-level1" }),
+            field({ autocomplete: "postal-code" }),
+            field({ autocomplete: "country-name" }),
+            field({ type: "password", autocomplete: "new-password" })
+        ]);
+        expect(form).toMatchObject({
+            username: 0,
+            usernameAsks: "email",
+            givenName: 1,
+            familyName: 2
+        });
+        expect(form.profile).toEqual({
+            email: null,
+            phone: 3,
+            username: null,
+            company: 4,
+            address1: 5,
+            address2: 6,
+            city: 7,
+            state: 8,
+            postalCode: 9,
+            country: 10
+        });
+    });
+
+    it("falls back to the words a box carries, in English and Spanish", () => {
+        const form = readForm([
+            field({ words: "nombre de usuario" }),
+            field({ words: "correo electrónico" }),
+            field({ words: "teléfono móvil" }),
+            field({ words: "empresa" }),
+            field({ words: "dirección" }),
+            field({ words: "piso, puerta" }),
+            field({ words: "ciudad" }),
+            field({ words: "provincia" }),
+            field({ words: "código postal" }),
+            field({ words: "país" }),
+            field({ type: "password", words: "contraseña" }),
+            field({ type: "password", words: "repite la contraseña" })
+        ]);
+        expect(form).toMatchObject({ username: 0, usernameAsks: "username", purpose: "signup" });
+        expect(form.profile).toMatchObject({
+            email: 1,
+            phone: 2,
+            company: 3,
+            address1: 4,
+            address2: 5,
+            city: 6,
+            state: 7,
+            postalCode: 8,
+            country: 9
+        });
+    });
+
+    it("never offers the username, a code, a name or a search box as a part", () => {
+        const form = readForm([
+            field({ words: "search addresses" }),
+            field({ words: "full name" }),
+            field({ type: "email", words: "email" }),
+            field({ type: "password", autocomplete: "new-password" })
+        ]);
+        expect(form.fullName).toBe(1);
+        expect(form.username).toBe(2);
+        expect(Object.values(form.profile).every((index) => index === null)).toBe(true);
+    });
+
+    it("believes a token that names something else", () => {
+        const form = readForm([field({ autocomplete: "cc-number", words: "phone" })]);
+        expect(form.profile.phone).toBeNull();
+    });
+
+    it("says a phone sign-in box asks for a phone", () => {
+        const form = readForm([
+            field({ type: "tel", words: "mobile number" }),
+            field({ type: "password" })
+        ]);
+        expect(form).toMatchObject({ username: 0, usernameAsks: "phone" });
+    });
+});

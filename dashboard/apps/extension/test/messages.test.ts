@@ -88,7 +88,8 @@ describe("what a page may ask the worker for", () => {
                 "secondStepCode",
                 "continueSignIn",
                 "openUnlock",
-                "myDetails",
+                "identities",
+                "identity",
                 "menuTarget",
                 "saveCaptured",
                 "totpNow"
