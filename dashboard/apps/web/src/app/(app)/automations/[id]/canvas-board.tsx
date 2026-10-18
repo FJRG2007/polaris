@@ -515,7 +515,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
         if (target.closest("[data-node-id]")) return;
         const edgeKey = target.closest("[data-edge-key]")?.getAttribute("data-edge-key");
         const noteId = target.closest("[data-note-id]")?.getAttribute("data-note-id");
-        if (edgeKey) {
+        if (edgeKey && !readOnly) {
             onSelect({ nodes: new Set(), notes: new Set(), edge: edgeKey });
             setMenuTarget({ kind: "edge", key: edgeKey });
         } else if (noteId) {

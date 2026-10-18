@@ -365,43 +365,43 @@ export function AutomationsList({
                                 />
                             </span>
                             <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label={t("folders.rowMenu", { name: row.name })}
-                                            title={t("folders.rowMenuShort")}
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label={t("folders.rowMenu", { name: row.name })}
+                                        title={t("folders.rowMenuShort")}
+                                    >
+                                        <MoreHorizontal aria-hidden="true" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    {data.canEdit ? (
+                                        <DropdownMenuItem
+                                            disabled={!row.runnable}
+                                            title={
+                                                row.runnable
+                                                    ? undefined
+                                                    : !row.published
+                                                      ? t("errors.notPublished")
+                                                      : !row.enabled
+                                                        ? t("list.runOff")
+                                                        : t("editor.noManual")
+                                            }
+                                            onSelect={() => void runNow(row)}
                                         >
-                                            <MoreHorizontal aria-hidden="true" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        {data.canEdit ? (
-                                            <DropdownMenuItem
-                                                disabled={!row.runnable}
-                                                title={
-                                                    row.runnable
-                                                        ? undefined
-                                                        : !row.published
-                                                          ? t("errors.notPublished")
-                                                          : !row.enabled
-                                                            ? t("list.runOff")
-                                                            : t("editor.noManual")
-                                                }
-                                                onSelect={() => void runNow(row)}
-                                            >
-                                                <Play aria-hidden="true" />
-                                                {t("editor.runNow")}
-                                            </DropdownMenuItem>
-                                        ) : null}
-                                        <DropdownMenuItem asChild>
-                                            <a href={`/automations/runs?automation=${row.id}`}>
-                                                <History aria-hidden="true" />
-                                                {t("list.runs")}
-                                            </a>
+                                            <Play aria-hidden="true" />
+                                            {t("editor.runNow")}
                                         </DropdownMenuItem>
-                                        {data.canEdit ? <DropdownMenuSeparator /> : null}
-                                        {data.canEdit ? (
+                                    ) : null}
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/automations/runs?automation=${row.id}`}>
+                                            <History aria-hidden="true" />
+                                            {t("list.runs")}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    {data.canEdit ? <DropdownMenuSeparator /> : null}
+                                    {data.canEdit ? (
                                         <DropdownMenuSub>
                                             <DropdownMenuSubTrigger>
                                                 <FolderInput aria-hidden="true" />
@@ -434,25 +434,25 @@ export function AutomationsList({
                                                 </DropdownMenuItem>
                                             </DropdownMenuSubContent>
                                         </DropdownMenuSub>
-                                        ) : null}
-                                        {data.canEdit ? (
-                                            <DropdownMenuItem onSelect={() => setTagging(row)}>
-                                                <Tags aria-hidden="true" />
-                                                {t("tags.edit")}
-                                            </DropdownMenuItem>
-                                        ) : null}
-                                        {data.canEdit ? <DropdownMenuSeparator /> : null}
-                                        {data.canEdit ? (
-                                            <DropdownMenuItem
-                                                className="text-danger focus:text-danger"
-                                                onSelect={() => setDeleting(row)}
-                                            >
-                                                <Trash2 aria-hidden="true" />
-                                                {t("editor.delete")}
-                                            </DropdownMenuItem>
-                                        ) : null}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                    ) : null}
+                                    {data.canEdit ? (
+                                        <DropdownMenuItem onSelect={() => setTagging(row)}>
+                                            <Tags aria-hidden="true" />
+                                            {t("tags.edit")}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                    {data.canEdit ? <DropdownMenuSeparator /> : null}
+                                    {data.canEdit ? (
+                                        <DropdownMenuItem
+                                            className="text-danger focus:text-danger"
+                                            onSelect={() => setDeleting(row)}
+                                        >
+                                            <Trash2 aria-hidden="true" />
+                                            {t("editor.delete")}
+                                        </DropdownMenuItem>
+                                    ) : null}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </li>
                     ))}
                 </ul>

@@ -132,4 +132,14 @@ describe("the canvas right-click menus", () => {
         expect(items.queryByRole("menuitem", { name: /^Paste/ })).toBeNull();
         expect(items.getByRole("menuitem", { name: /^Fit to view/ })).toBeTruthy();
     });
+
+    it("opens the view's own items on a read-only connection, never an empty menu", async () => {
+        const { container } = render(<Harness start={twoNodes()} readOnly />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.contextMenu(container.querySelector("[data-edge-key]")!);
+        const items = await menu();
+        expect(items.queryByRole("menuitem", { name: /^Delete connection/ })).toBeNull();
+        expect(items.getByRole("menuitem", { name: /^Fit to view/ })).toBeTruthy();
+    });
 });

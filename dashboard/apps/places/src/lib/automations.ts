@@ -115,14 +115,17 @@ async function requireAutomation(installedAppId: string, id: string): Promise<Ro
     return row;
 }
 
-/** The automations of one place, oldest first: the order they were written in
- *  is the order somebody remembers them in. */
+/** The automations of one place, or of several, oldest first: the order they
+ *  were written in is the order somebody remembers them in. */
 export async function listAutomations(
     installedAppId: string,
-    placeId: string
+    placeId: string | readonly string[]
 ): Promise<auto.AutomationView[]> {
     const rows = await prisma.placeAutomation.findMany({
-        where: { installedAppId, placeId },
+        where: {
+            installedAppId,
+            placeId: typeof placeId === "string" ? placeId : { in: [...placeId] }
+        },
         orderBy: { createdAt: "asc" },
         select: FIELDS
     });

@@ -68,19 +68,17 @@ export async function listAutomationsAction(scope?: unknown): Promise<{
                       ? [asked.data.placeId]
                       : []
                   : [current.id];
-        const each = await Promise.all(
-            ids.map((id) =>
-                Promise.all([
-                    automations.listAutomations(install.id, id),
-                    devices.listDevices(install.id, id),
-                    rooms.listRooms(install.id, id)
-                ])
-            )
-        );
+        const list = ids.length > 0 ? await automations.listAutomations(install.id, ids) : [];
+        const [found, roomList] = list.some((automation) => !automation.movedTo)
+            ? await Promise.all([
+                  devices.listDevices(install.id, ids.length === 1 ? ids[0] : null),
+                  rooms.listRooms(install.id, ids)
+              ])
+            : [[], []];
         return {
-            list: each.flatMap(([list]) => list),
-            found: each.flatMap(([, found]) => found),
-            roomList: each.flatMap(([, , roomList]) => roomList),
+            list,
+            found,
+            roomList,
             placeId: ids.length === 1 ? ids[0] : undefined
         };
     });
