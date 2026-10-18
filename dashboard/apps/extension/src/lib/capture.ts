@@ -77,9 +77,7 @@ export function offerFor(submitted: Submitted, saved: readonly SavedLogin[]): Ca
             : { kind: "save", username: null, password };
     }
     const candidates =
-        username === ""
-            ? [...saved]
-            : saved.filter((item) => same(item.username, username));
+        username === "" ? [...saved] : saved.filter((item) => same(item.username, username));
 
     // Already exactly what is stored. Nothing has changed, so there is nothing to
     // say - and this is the case that keeps the bar rare enough to be read.

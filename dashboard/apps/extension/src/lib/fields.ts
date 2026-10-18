@@ -77,7 +77,8 @@ const SIGNIN_FORM =
     /sign.?in|log.?in|log.?on|iniciar sesi[oó]n|inicia sesi[oó]n|entrar|acceder|anmelden|connexion|se connecter/i;
 
 /** Boxes that sit before a password and are still not its username. */
-const NOT_A_USERNAME = /company|empresa|address|direcci[oó]n|city|ciudad|zip|postal|country|pa[ií]s/i;
+const NOT_A_USERNAME =
+    /company|empresa|address|direcci[oó]n|city|ciudad|zip|postal|country|pa[ií]s/i;
 
 /** The `autocomplete` words that qualify a field rather than name it. */
 const QUALIFIERS = /^(?:section-.*|shipping|billing|home|work|mobile|fax|pager|webauthn|on)$/;
@@ -92,7 +93,11 @@ const QUALIFIERS = /^(?:section-.*|shipping|billing|home|work|mobile|fax|pager|w
  * said it was not a login.
  */
 export function autocompleteToken(raw: string): string {
-    const words = raw.trim().toLowerCase().split(/\s+/).filter((word) => !QUALIFIERS.test(word));
+    const words = raw
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((word) => !QUALIFIERS.test(word));
     return words[words.length - 1] ?? "";
 }
 
@@ -263,8 +268,7 @@ export function readForm(fields: readonly FieldFacts[]): PageFields {
     // The code box first, so a box labelled "login code" is not then read as the
     // username because it says "login".
     const single = usable.find((index) => isOneTimeCode(fields[index]));
-    const named =
-        candidates.find((index) => index !== single && isUsername(fields[index])) ?? null;
+    const named = candidates.find((index) => index !== single && isUsername(fields[index])) ?? null;
     // A sign-in whose username box says nothing a rule recognises - `j_id7`, a
     // bare "ID" - is still the box right before the password: the last plain text
     // box ahead of it in the same form, which is where every manager settles it.

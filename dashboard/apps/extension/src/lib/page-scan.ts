@@ -130,7 +130,9 @@ export function formOf(field: HTMLInputElement): Element | null {
 /** The element a shadow root hangs from, which is where a walk up continues. */
 function hostOf(element: Element): Element | null {
     const root = element.getRootNode();
-    return root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? ((root as ShadowRoot).host ?? null) : null;
+    return root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+        ? ((root as ShadowRoot).host ?? null)
+        : null;
 }
 
 /** One step up, crossing out of a shadow root into the element it hangs from. */
@@ -168,12 +170,7 @@ function formWords(field: HTMLInputElement): string {
                 button.getAttribute("aria-label") ?? ""
             ].join(" ")
         );
-    return [
-        ...buttons,
-        form.id,
-        form.getAttribute("name") ?? "",
-        form.getAttribute("action") ?? ""
-    ]
+    return [...buttons, form.id, form.getAttribute("name") ?? "", form.getAttribute("action") ?? ""]
         .join(" ")
         .replace(/\s+/g, " ")
         .toLowerCase();

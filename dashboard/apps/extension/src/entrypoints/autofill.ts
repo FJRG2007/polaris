@@ -328,7 +328,12 @@ async function start(): Promise<void> {
             .map((index) => at(index))
             .filter((box): box is HTMLInputElement => box !== null);
         const [first] = boxes;
-        if (!onTop(first ?? null) || !first || claimed.has(first) || boxes.some((box) => box.value !== ""))
+        if (
+            !onTop(first ?? null) ||
+            !first ||
+            claimed.has(first) ||
+            boxes.some((box) => box.value !== "")
+        )
             return;
         claimed.add(first);
         const fresh = boxes.filter((box) => !offeredOn.has(box));
@@ -545,13 +550,11 @@ async function start(): Promise<void> {
         const key = `${username}\u0000${password}`;
         if (key === sent) return;
         sent = key;
-        void askBackground({ kind: "captured", username, password, newAccount }).then(
-            (reply) => {
-                // Drawn here as well as on the next load, because a sign-in that
-                // never navigates - which is most of them now - has no next load.
-                if (reply.ok && "offer" in reply) bar(reply.offer, () => recapture());
-            }
-        );
+        void askBackground({ kind: "captured", username, password, newAccount }).then((reply) => {
+            // Drawn here as well as on the next load, because a sign-in that
+            // never navigates - which is most of them now - has no next load.
+            if (reply.ok && "offer" in reply) bar(reply.offer, () => recapture());
+        });
     };
 
     /** Whether the form in front of somebody is making an account. */
@@ -1383,18 +1386,18 @@ function bar(offer: OfferedCapture, before?: () => Promise<void>): void {
                     .catch(() => undefined)
                     .then(() => askBackground({ kind: "saveCaptured" }))
                     .then((reply) => {
-                    if (reply.ok) {
-                        close();
-                        return;
-                    }
-                    // The one place a refusal is worth showing: somebody pressed a
-                    // button and nothing happened otherwise. It keeps a way out -
-                    // a bar that says why it failed and cannot be closed is worse
-                    // than the failure.
-                    title.textContent = "error" in reply ? reply.error : t("errors.notSaved");
-                    who.remove();
-                    row.replaceChildren(action(t("generator.close"), close));
-                });
+                        if (reply.ok) {
+                            close();
+                            return;
+                        }
+                        // The one place a refusal is worth showing: somebody pressed a
+                        // button and nothing happened otherwise. It keeps a way out -
+                        // a bar that says why it failed and cannot be closed is worse
+                        // than the failure.
+                        title.textContent = "error" in reply ? reply.error : t("errors.notSaved");
+                        who.remove();
+                        row.replaceChildren(action(t("generator.close"), close));
+                    });
             },
             true
         ),

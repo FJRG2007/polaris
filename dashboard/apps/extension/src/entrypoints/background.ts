@@ -2227,7 +2227,11 @@ function typeIntoPage(
     // Inside shadow roots as well as the document - a design system's text field
     // keeps its input in one - in the order a reader meets them. Chrome hands an
     // extension the closed ones too.
-    const dom = (globalThis as { chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } } }).chrome?.dom;
+    const dom = (
+        globalThis as {
+            chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } };
+        }
+    ).chrome?.dom;
     const opener = dom?.openOrClosedShadowRoot;
     const all: HTMLInputElement[] = [];
     const visit = (root: Document | ShadowRoot): void => {
@@ -2254,9 +2258,8 @@ function typeIntoPage(
     // written in, and why the search box at the top of the page is not mistaken
     // for the username.
     const pass =
-        inputs.find(
-            (field) => field.type === "password" && tokenOf(field) !== "new-password"
-        ) ?? null;
+        inputs.find((field) => field.type === "password" && tokenOf(field) !== "new-password") ??
+        null;
     const candidates = pass
         ? inputs.filter((field) =>
               pass.form ? field.form === pass.form : inputs.indexOf(field) < inputs.indexOf(pass)
