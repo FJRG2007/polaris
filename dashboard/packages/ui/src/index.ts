@@ -9,6 +9,7 @@ export { cn } from "./lib/cn";
 export { applePlatform, formatShortcut } from "./lib/shortcut";
 export { KeyNamesProvider, useKeyNames } from "./lib/key-names";
 export { keepFocusOnClose } from "./lib/menu-focus";
+export { rowClickIntent } from "./lib/row-open";
 export { useDeferredFocus } from "./lib/use-deferred-focus";
 export {
     allChosen,

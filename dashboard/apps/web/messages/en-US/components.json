@@ -519,7 +519,10 @@
         "zoomOut": "Zoom out",
         "zoomIn": "Zoom in",
         "more": "More for this picture",
-        "close": "Close"
+        "close": "Close",
+        "previous": "Previous picture",
+        "next": "Next picture",
+        "position": "{index} of {count}"
     },
     "mutual": {
         "friends": "{count, plural, one {# friend in common} other {# friends in common}}",

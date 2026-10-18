@@ -74,7 +74,10 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
-    useBoardGestures
+    useBoardGestures,
+    MenuShortcut,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 
 const NODE_W = 280;
@@ -1075,6 +1078,21 @@ export function DeployCanvas({
                                             }
                                             onKeyDown={(event) => {
                                                 if (event.target !== event.currentTarget) return;
+                                                // Delete asks, as the menu's own item does.
+                                                if (
+                                                    canManage &&
+                                                    !removing &&
+                                                    shortcutPressed(event.nativeEvent, "general.delete")
+                                                ) {
+                                                    event.preventDefault();
+                                                    setDeleteTarget({
+                                                        id: node.id,
+                                                        name: node.name,
+                                                        kind: app ? "service" : "database",
+                                                        hostedCount: node.hostedCount ?? 0
+                                                    });
+                                                    return;
+                                                }
                                                 if (event.key !== "Enter" && event.key !== " ")
                                                     return;
                                                 event.preventDefault();
@@ -1183,6 +1201,7 @@ export function DeployCanvas({
                                                                 >
                                                                     <ScrollText className="size-4" />{" "}
                                                                     {t("canvas.openService")}
+                                                                    <MenuShortcut keys="Enter" />
                                                                 </ContextMenuItem>
                                                                 <ContextMenuItem
                                                                     onSelect={() => duplicate(app)}
@@ -1204,6 +1223,7 @@ export function DeployCanvas({
                                                             >
                                                                 <Settings2 className="size-4" />{" "}
                                                                 {t("view.manage")}
+                                                                <MenuShortcut keys="Enter" />
                                                             </ContextMenuItem>
                                                         )}
                                                         <ContextMenuSeparator />
@@ -1226,6 +1246,7 @@ export function DeployCanvas({
                                                             {removing
                                                                 ? t("view.removalPending")
                                                                 : t("canvas.delete")}
+                                                            <ShortcutHint id="general.delete" />
                                                         </ContextMenuItem>
                                                     </ContextMenuContent>
                                                 </ContextMenu>

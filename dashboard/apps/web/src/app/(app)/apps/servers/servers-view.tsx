@@ -63,7 +63,8 @@ import {
     keepFocusOnClose,
     useDeferredFocus,
     ShortcutHint,
-    shortcutPressed
+    shortcutPressed,
+    rowClickIntent
 } from "@polaris/ui";
 
 /** How often reachability is re-checked. A server going down is worth noticing
@@ -110,6 +111,20 @@ export function ServersView({
     const remotes = servers.filter((server) => server.kind === "host");
 
     const nameOf = (server: ServerRow): string => renamed[server.id] ?? server.name;
+
+    function openRow(event: MouseEvent, id: string): void {
+        const href = `/apps/servers/${id}`;
+        const intent = rowClickIntent({
+            target: event.target instanceof Element ? event.target : null,
+            button: event.button,
+            metaKey: event.metaKey,
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            selection: window.getSelection()?.toString() ?? ""
+        });
+        if (intent === "open") router.push(href);
+        else if (intent === "new-tab") window.open(href, "_blank", "noopener");
+    }
 
     // F2 renames and Delete asks to remove, on the row pointed at or else the one
     // selected. Listened for on the document, so pointing is enough - but never
@@ -266,9 +281,30 @@ export function ServersView({
                                                     hovered.current = null;
                                             }}
                                             onFocus={() => setSelected(server.id)}
-                                            onClick={() => setSelected(server.id)}
+                                            // The whole row opens the server, as a game
+                                            // server's row does - not only its name,
+                                            // which stays the link a keyboard reaches.
+                                            // Its own buttons and menus keep their clicks.
+                                            onClick={(event) => {
+                                                setSelected(server.id);
+                                                if (renaming !== server.id)
+                                                    openRow(event.nativeEvent, server.id);
+                                            }}
+                                            onAuxClick={(event) => {
+                                                if (renaming !== server.id)
+                                                    openRow(event.nativeEvent, server.id);
+                                            }}
+                                            onKeyDown={(event) => {
+                                                if (
+                                                    event.key === "Enter" &&
+                                                    event.target === event.currentTarget
+                                                ) {
+                                                    event.preventDefault();
+                                                    router.push(`/apps/servers/${server.id}`);
+                                                }
+                                            }}
                                             className={cn(
-                                                "border-t border-border outline-none hover:bg-card-hover focus-visible:bg-card-hover",
+                                                "cursor-pointer border-t border-border outline-none hover:bg-card-hover focus-visible:bg-card-hover",
                                                 selected === server.id && "bg-muted"
                                             )}
                                         >

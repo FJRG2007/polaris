@@ -30,7 +30,7 @@ import { useAppUrl } from "@/components/app-url";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageItems, type ActionableImage } from "@/components/image-actions";
-import { MoreHorizontal, X, ZoomIn, ZoomOut } from "lucide-react";
+import { MoreHorizontal, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     ContextMenu,
     ContextMenuContent,
@@ -66,11 +66,17 @@ export function ImageViewer({
     image,
     onClose,
     onForward,
-    onReport
+    onReport,
+    gallery,
+    onNavigate
 }: {
     /** The picture being looked at, or null for none. */
     image: ViewedImage | null;
     onClose: () => void;
+    /** The pictures it is one of, in order, for the arrows and the arrow keys -
+     *  a set of screenshots is looked through, not opened one by one. */
+    gallery?: readonly ViewedImage[];
+    onNavigate?: (image: ViewedImage) => void;
     /** Send it on. The conversation picker is the caller's - it already has one
      *  for forwarding a message, and a picture is a message. */
     onForward?: (messageId: string) => void;
@@ -95,6 +101,17 @@ export function ImageViewer({
         setSaid("");
     }, [image?.url]);
 
+    const position = image && gallery ? gallery.findIndex((one) => one.url === image.url) : -1;
+    const browsable = Boolean(onNavigate && gallery && gallery.length > 1 && position >= 0);
+    const go = useCallback(
+        (by: -1 | 1) => {
+            if (!browsable || !gallery || !onNavigate) return;
+            // Round the ends, the way every gallery does: past the last is the first.
+            onNavigate(gallery[(position + by + gallery.length) % gallery.length]!);
+        },
+        [browsable, gallery, onNavigate, position]
+    );
+
     useEffect(() => {
         if (!image) return;
         const onKey = (event: KeyboardEvent) => {
@@ -102,12 +119,20 @@ export function ImageViewer({
                 event.preventDefault();
                 onClose();
             }
+            if (shortcutPressed(event, "viewer.previousFile")) {
+                event.preventDefault();
+                go(-1);
+            }
+            if (shortcutPressed(event, "viewer.nextFile")) {
+                event.preventDefault();
+                go(1);
+            }
             if (shortcutPressed(event, "viewer.zoomIn")) setZoom((current) => step(current, 1));
             if (shortcutPressed(event, "viewer.zoomOut")) setZoom((current) => step(current, -1));
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [image, onClose]);
+    }, [image, onClose, go]);
 
     const say = useCallback((words: string) => {
         setSaid(words);
@@ -132,6 +157,11 @@ export function ImageViewer({
                     {image.name}
                 </span>
                 {said && <span className="shrink-0 text-xs text-muted-foreground">{said}</span>}
+                {browsable && gallery ? (
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {t("viewer.position", { index: position + 1, count: gallery.length })}
+                    </span>
+                ) : null}
 
                 <button
                     type="button"
@@ -244,6 +274,28 @@ export function ImageViewer({
                     {items(ContextMenuItem, ContextMenuSeparator)}
                 </ContextMenuContent>
             </ContextMenu>
+            {browsable ? (
+                <>
+                    <button
+                        type="button"
+                        aria-label={t("viewer.previous")}
+                        title={t("viewer.previous")}
+                        onClick={() => go(-1)}
+                        className="absolute left-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                    >
+                        <ChevronLeft className="size-5 shrink-0" aria-hidden="true" />
+                    </button>
+                    <button
+                        type="button"
+                        aria-label={t("viewer.next")}
+                        title={t("viewer.next")}
+                        onClick={() => go(1)}
+                        className="absolute right-3 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition-colors hover:bg-muted"
+                    >
+                        <ChevronRight className="size-5 shrink-0" aria-hidden="true" />
+                    </button>
+                </>
+            ) : null}
         </div>
     );
 }

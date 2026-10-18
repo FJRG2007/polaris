@@ -86,6 +86,14 @@
         "deleteData": "Borrar también sus datos",
         "deleteDataWarning": "{name} se elimina con todo lo que contiene: sus volúmenes, ajustes y lo que se creó en ella. No se puede deshacer.",
         "confirmDelete": "Desinstalar y eliminar datos",
-        "uninstallFailed": "No se pudo desinstalar la app. Inténtalo de nuevo."
+        "uninstallFailed": "No se pudo desinstalar la app. Inténtalo de nuevo.",
+        "openScreenshot": "Abrir {name}",
+        "games": "Juegos que lleva",
+        "gameSummaries": {
+            "minecraft": "Java para PC, Bedrock para móviles y consolas, o un mundo para ambos.",
+            "ark": "Una isla de supervivencia con dinosaurios para PC, en el mapa que elijas.",
+            "hytale": "Tu propio mundo de Hytale, con los archivos de servidor de tu cuenta.",
+            "fivem": "Grand Theft Auto V en tu propio servidor, con los recursos que elijas."
+        }
     }
 }

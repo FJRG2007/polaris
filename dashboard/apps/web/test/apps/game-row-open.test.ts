@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { rowClickIntent } from "@polaris-app/game-servers/src/lib/row-open";
+import { rowClickIntent } from "@polaris/ui";
 
 /** A target that is, or is not, inside one of the row's own controls. */
 const target = (insideControl: boolean) => ({ closest: () => (insideControl ? {} : null) });

@@ -86,6 +86,14 @@
         "deleteData": "Also delete its data",
         "deleteDataWarning": "{name} is removed with everything in it: its volumes, settings and what was made in it. This cannot be undone.",
         "confirmDelete": "Uninstall and delete data",
-        "uninstallFailed": "Could not uninstall the app. Try again."
+        "uninstallFailed": "Could not uninstall the app. Try again.",
+        "openScreenshot": "Open {name}",
+        "games": "Games it runs",
+        "gameSummaries": {
+            "minecraft": "Java for PC, Bedrock for phones and consoles, or one world both can join.",
+            "ark": "A dinosaur survival island for PC players, on the map you choose.",
+            "hytale": "A Hytale world of your own, run from the server files on your account.",
+            "fivem": "Grand Theft Auto V on a server of your own, running the resources you choose."
+        }
     }
 }
