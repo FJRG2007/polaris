@@ -77,6 +77,8 @@ export function nodeSubtitle(t: T, node: core.GraphNode): string | null {
         return `${String(config.method ?? "")} ${config.urlSecretId ? t("fields.urlFromSecret") : String(config.url ?? "")}`.trim();
     if (node.type === "core.notify" || node.type === "core.chat")
         return typeof config.title === "string" && config.title ? config.title : null;
+    if (node.type === "core.message")
+        return typeof config.body === "string" && config.body ? config.body : null;
     if (node.type === "core.schedule" && config.kind === "cron")
         return String(config.expression ?? "");
     return null;

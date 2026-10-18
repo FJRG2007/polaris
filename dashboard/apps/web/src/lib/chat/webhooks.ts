@@ -24,7 +24,21 @@ import { unfurlLater } from "./messages";
 import { checkLinksLater } from "./link-safety";
 import { publishChatChange } from "./live";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { ChatAccessError, requireChannel, type ChatActor } from "./access";
+import { rateLimit, type RateLimitResult } from "@/lib/rate-limit-service";
+import {
+    ChatAccessError,
+    channelAccess,
+    reachableSpaceIds,
+    requireChannel,
+    type ChatActor
+} from "./access";
+
+/** Messages one webhook may post per window, whoever is posting through it.
+ *  Discord's own is about this. */
+const PER_WEBHOOK = 30;
+const WINDOW_MS = 60_000;
+/** The most webhooks an automation step offers to choose from. */
+const MAX_CHOICES = 200;
 
 /** One webhook, as the channel's settings list it. Never carries the secret. */
 export interface ChatWebhookView {
@@ -136,6 +150,107 @@ export async function webhookFor(
 }
 
 /**
+ * Whether a webhook may post one more message now, under its per-minute limit.
+ * The address and an automation draw from the same allowance, so neither can
+ * be used to get round the other.
+ */
+export async function webhookPostAllowed(webhookId: string): Promise<RateLimitResult> {
+    return rateLimit(`chat-webhook:${webhookId}`, PER_WEBHOOK, WINDOW_MS);
+}
+
+/** A webhook an automation can post through, as its step lists it. */
+export interface ChatWebhookChoice {
+    readonly id: string;
+    readonly name: string;
+    readonly channelId: string;
+    readonly channelName: string;
+    readonly spaceName: string;
+    /**
+     * Which secret the webhook had when it was chosen. Resetting the secret
+     * takes the address back from everybody who held it, and a step chosen
+     * before the reset is one of them: it stops posting until it is chosen
+     * again. Derived from the stored hash, so it gives nothing away.
+     */
+    readonly stamp: string;
+}
+
+/**
+ * The webhooks on every channel the actor runs, for an automation step to post
+ * through. The same standing as managing them in the channel's settings, so an
+ * automation never posts where its owner could not have made the webhook.
+ * Direct messages and groups have no webhooks, so they are never offered.
+ */
+export async function webhooksToPostThrough(
+    actor: ChatActor
+): Promise<readonly ChatWebhookChoice[]> {
+    const spaces = await reachableSpaceIds(actor);
+    if (spaces.size === 0) return [];
+    const rows = await prisma.chatWebhook.findMany({
+        where: {
+            channel: {
+                spaceId: { in: [...spaces] },
+                archived: false,
+                space: { archived: false }
+            }
+        },
+        orderBy: { createdAt: "asc" },
+        take: MAX_CHOICES,
+        select: {
+            id: true,
+            name: true,
+            tokenHash: true,
+            channel: { select: { id: true, name: true, space: { select: { name: true } } } }
+        }
+    });
+    const channels = [...new Set(rows.map((row) => row.channel.id))];
+    const managed = new Set<string>();
+    await Promise.all(
+        channels.map(async (channelId) => {
+            const access = await channelAccess(actor, channelId);
+            if (access?.spaceId && access.mayAdminister) managed.add(channelId);
+        })
+    );
+    return rows
+        .filter((row) => managed.has(row.channel.id))
+        .map((row) => ({
+            id: row.id,
+            name: row.name,
+            channelId: row.channel.id,
+            channelName: row.channel.name,
+            spaceName: row.channel.space?.name ?? "",
+            stamp: stampOf(row.tokenHash)
+        }));
+}
+
+/** Why an automation may not post through the webhook it chose. */
+export type WebhookUnavailable = "gone" | "reset" | "forbidden";
+
+/**
+ * The webhook an automation step chose, when the actor may still post through
+ * it: it still exists, its secret has not been reset since it was chosen, and
+ * the actor still runs its channel. Asked when the step is saved and again on
+ * every run.
+ */
+export async function webhookToPostThrough(
+    actor: ChatActor,
+    webhookId: string,
+    stamp: string
+): Promise<
+    | { ok: true; webhook: { id: string; channelId: string; name: string } }
+    | { ok: false; reason: WebhookUnavailable }
+> {
+    const row = await prisma.chatWebhook.findUnique({
+        where: { id: webhookId },
+        select: { id: true, channelId: true, name: true, tokenHash: true }
+    });
+    if (!row) return { ok: false, reason: "gone" };
+    if (stampOf(row.tokenHash) !== stamp) return { ok: false, reason: "reset" };
+    const access = await channelAccess(actor, row.channelId);
+    if (!access?.spaceId || !access.mayAdminister) return { ok: false, reason: "forbidden" };
+    return { ok: true, webhook: { id: row.id, channelId: row.channelId, name: row.name } };
+}
+
+/**
  * Post a message through a webhook.
  *
  * The channel's own rules still hold where they are about the room rather than
@@ -226,6 +341,11 @@ async function ownedWebhook(actor: ChatActor, webhookId: string): Promise<{ id: 
 /** 48 URL-safe characters: 288 bits, the same order as an API key. */
 function newToken(): string {
     return randomBytes(36).toString("base64url");
+}
+
+/** A short fingerprint of a stored hash, for telling one secret from the next. */
+function stampOf(tokenHash: string): string {
+    return createHash("sha256").update(`automation:${tokenHash}`).digest("hex").slice(0, 16);
 }
 
 function hashOf(token: string): string {

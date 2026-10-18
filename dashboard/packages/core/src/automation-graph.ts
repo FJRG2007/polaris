@@ -711,6 +711,16 @@ export const CORE_NODE_CONFIGS = {
     "core.answer": z.object({ outputs: valuePairs }),
     /** Named values worked out once, read by later steps as {{steps.<id>.values.<name>}}. */
     "core.set": z.object({ values: valuePairs }),
+    /**
+     * A message posted into a space channel through one of its webhooks, under
+     * the webhook's name - never as a person, and never into a direct message or
+     * a group. `stamp` is which secret the webhook had when it was chosen.
+     */
+    "core.message": z.object({
+        webhookId: z.string().uuid(),
+        stamp: z.string().regex(/^[0-9a-f]{16}$/),
+        body: text(AUTOMATION_LIMITS.textLength).min(1)
+    }),
     "core.announce": z.object({
         name: eventName.refine(
             (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
@@ -764,6 +774,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.run": { role: "action", ports: [], idempotent: true },
     "core.answer": { role: "action", ports: [], idempotent: true },
     "core.set": { role: "action", ports: [], idempotent: true },
+    "core.message": { role: "action", ports: [], idempotent: false },
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.try": {

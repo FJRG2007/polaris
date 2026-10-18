@@ -12,6 +12,7 @@ export class AutomationAccessError extends Error {
             | "noTrigger"
             | "triggerGone"
             | "tooLarge"
+            | "webhookUnavailable"
     ) {
         super(code);
         this.name = "AutomationAccessError";

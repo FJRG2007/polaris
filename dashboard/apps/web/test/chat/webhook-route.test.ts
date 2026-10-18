@@ -20,6 +20,10 @@ const HOOK = { id: "0190a000-0000-7000-8000-0000000000h1", channelId: "c1", name
 
 vi.mock("@/lib/chat/webhooks", () => ({
     webhookFor: async () => (state.known ? HOOK : null),
+    webhookPostAllowed: async (id: string) => {
+        const { rateLimit } = await import("@/lib/rate-limit-service");
+        return rateLimit(`chat-webhook:${id}`, 30, 60_000);
+    },
     postThroughWebhook: async (_hook: unknown, input: { content: string; username?: string }) => {
         if (state.refuse) {
             const { ChatAccessError } = await import("@/lib/chat/access");

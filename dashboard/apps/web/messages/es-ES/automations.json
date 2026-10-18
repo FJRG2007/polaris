@@ -131,7 +131,8 @@
         "announce": "Anunciar",
         "try": "Intentar",
         "waitCondition": "Esperar una condición",
-        "set": "Fijar valores"
+        "set": "Fijar valores",
+        "message": "Publicar en un canal"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -189,7 +190,18 @@
         "levelInfo": "Info",
         "levelSuccess": "Éxito",
         "levelWarning": "Aviso",
-        "levelDanger": "Peligro"
+        "levelDanger": "Peligro",
+        "webhook": "Webhook del canal",
+        "webhookPick": "Elige un webhook",
+        "webhookLoading": "Cargando webhooks...",
+        "webhookOption": "{name} en #{channel} ({space})",
+        "webhookNone": "Tus canales no tienen webhooks. Crea uno en los ajustes del canal, en Integraciones.",
+        "webhookOpenChat": "Abrir chat",
+        "webhookGone": "Este webhook se borró o ya no llevas su canal. Elige otro.",
+        "webhookReset": "Este webhook tiene un secreto nuevo y el paso dejó de publicar.",
+        "webhookUseNew": "Seguir publicando",
+        "webhookPostsAs": "Publica como {name}, marcado como bot.",
+        "webhookManage": "Ver webhooks"
     },
     "operators": {
         "eq": "igual a",
@@ -278,7 +290,13 @@
         "answerTooLarge": "La respuesta era muy grande",
         "announceLimited": "Demasiados anuncios",
         "announceFailed": "El anuncio no se envió",
-        "valuesTooLarge": "Valores demasiado grandes"
+        "valuesTooLarge": "Valores demasiado grandes",
+        "messageEmpty": "El mensaje quedó vacío",
+        "messageRefused": "El canal no aceptó el mensaje",
+        "webhookGone": "El webhook del chat se borró",
+        "webhookReset": "El webhook tiene un secreto nuevo",
+        "webhookForbidden": "Su dueño ya no lleva ese canal",
+        "webhookLimited": "El webhook publicó mucho este minuto"
     },
     "secrets": {
         "title": "Secretos",
@@ -319,6 +337,7 @@
         "notPublished": "Publícalo antes.",
         "noManualTrigger": "Añade antes un disparador A mano.",
         "secretMissing": "Un paso usa un secreto de otro espacio.",
+        "webhookUnavailable": "Un paso de chat usa un webhook que no puedes usar. Elígelo de nuevo.",
         "generic": "No funcionó. Inténtalo otra vez.",
         "nameRequired": "Ponle un nombre.",
         "valueRequired": "Escribe el valor.",
@@ -601,7 +620,8 @@
         "announce": "Avisa a otras automatizaciones de que pasó algo.",
         "try": "Ejecuta los pasos de dentro y elige qué sigue a un fallo.",
         "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo.",
-        "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso."
+        "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
+        "message": "Publica en un canal mediante su webhook, como bot."
     },
     "flow": {
         "conditionGroup": "Condiciones",
