@@ -4,10 +4,12 @@
  * Whether this account shows what it is doing, from where, which games never,
  * and which programs beyond the desktop app's own list count as one.
  *
- * Who sees it is not here: that is the "What you are playing or listening to"
- * row above, in the same vocabulary as every other "who". This card is only the
- * what - one switch for all of it, one per source, one per game, and the list
- * of programs this account calls a game on its own (`OwnGames` below).
+ * Two sections, the way Discord splits the same answers: "Activity status" (one
+ * switch for all of it, one per source) and "Registered games" (what is being
+ * played now, every game seen or added with when it was last played, a switch
+ * to hide each, and the form to add one). Who sees it is not here: that is the
+ * "What you are playing or listening to" row on the privacy page, in the same
+ * vocabulary as every other "who", and the first section links to it.
  *
  * Every switch saves as it is flipped, drawn at once and put back if the save
  * is refused: these are on/off answers with nothing to review, and a Save button
@@ -16,7 +18,11 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { Plus, X } from "lucide-react";
+import { Gamepad2, Plus, X } from "lucide-react";
+import { GameLogo } from "@/components/game-logo";
+import { IntegrationLogo } from "@/components/logos";
+import { RelativeTime } from "@/components/relative-time";
+import { usePresence } from "@/components/presence-store";
 import { useRef, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { saveActivitySettingsAction } from "./actions";
@@ -40,13 +46,16 @@ function same(a: core.ActivitySettings, b: core.ActivitySettings): boolean {
 export function ActivitySharingCard({
     settings,
     seenGames,
-    spotify
+    spotify,
+    userId
 }: {
     settings: core.ActivitySettings;
     /** Games the desktop app has seen, newest first. */
     seenGames: readonly core.SeenGame[];
     /** Whether this account has a Spotify linked, or could link one here. */
     spotify: SpotifyReadiness;
+    /** This account, whose own presence says what is being played right now. */
+    userId: string;
 }) {
     const t = useTranslations("accountPrivacy");
     const [saved, setSaved] = useState(settings);
@@ -56,6 +65,7 @@ export function ActivitySharingCard({
     const queue = useRef<Promise<void>>(Promise.resolve());
     const nextId = useRef(0);
     const bridge = useDesktopBridge();
+    const presence = usePresence(userId);
     const draft = pending.reduce((state, entry) => entry.change(state), saved);
 
     /** Draw it now, save it after any earlier switch, and drop only this one if the save is refused. */
@@ -91,166 +101,282 @@ export function ActivitySharingCard({
     for (const key of draft.hiddenGames) if (!games.has(key)) games.set(key, key);
 
     const off = !draft.share;
+    const added = new Set(draft.customGames.map((game) => game.executable));
+    const seenAt = new Map(seenGames.map((game) => [game.key, game.seenAt]));
+    // Discord's panel above the list: the game being played right now, from the
+    // same presence everybody else sees, or that there is none.
+    const playing = presence?.activity?.find(
+        (activity) => activity.source === "game" || activity.source === "minecraft"
+    );
 
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-3 p-3">
-                <div>
-                    <h2 className="text-sm font-medium">{t("activity.title")}</h2>
-                    <p className="text-[0.6875rem] leading-snug text-foreground-subtle">{t("activity.description")}</p>
-                </div>
+        <>
+            <Card>
+                <CardBody className="flex flex-col gap-3 p-3">
+                    <div>
+                        <h2 className="text-sm font-medium">{t("activity.status.title")}</h2>
+                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                            {t.rich("activity.status.who", {
+                                link: (chunks) => (
+                                    <Link
+                                        key="link"
+                                        href="/account/privacy"
+                                        className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                    >
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
+                        </p>
+                    </div>
 
-                <label className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
-                    <span className="min-w-0 flex-1">
-                        <span className="block text-[0.8125rem]">{t("activity.share")}</span>
-                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                            {t("activity.shareHint")}
-                        </span>
-                    </span>
-                    <Switch
-                        checked={draft.share}
-                        onChange={(share) => commit((state) => ({ ...state, share }))}
-                        aria-label={t("activity.share")}
-                    />
-                </label>
-
-                <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
-                    <li className="flex items-center gap-3 px-3 py-2">
+                    <label className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
                         <span className="min-w-0 flex-1">
-                            {/* i18n-ignore: a service's own name */}
-                            <span className="block text-[0.8125rem]">Spotify</span>
+                            <span className="block text-[0.8125rem]">{t("activity.share")}</span>
                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                {spotify === "linked"
-                                    ? t("activity.spotify.linked")
-                                    : spotify === "unlinked"
-                                      ? t.rich("activity.spotify.unlinked", {
-                                            link: (chunks) => (
-                                                <Link
-                                                    key="link"
-                                                    href="/account/connections"
-                                                    className="underline decoration-dotted underline-offset-2 hover:text-foreground"
-                                                >
-                                                    {chunks}
-                                                </Link>
-                                            )
-                                        })
-                                      : t("activity.spotify.unavailable")}
+                                {t("activity.shareHint")}
                             </span>
                         </span>
                         <Switch
-                            checked={!off && draft.spotify}
-                            disabled={off}
-                            onChange={(on) => commit((state) => ({ ...state, spotify: on }))}
-                            // i18n-ignore: a service's own name
-                            aria-label="Spotify"
+                            checked={draft.share}
+                            onChange={(share) => commit((state) => ({ ...state, share }))}
+                            aria-label={t("activity.share")}
                         />
-                    </li>
-                    {SOURCES.map((source) => (
-                        <li key={source} className="flex items-center gap-3 px-3 py-2">
+                    </label>
+
+                    <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
+                        <li className="flex items-center gap-3 px-3 py-2">
+                            <IntegrationLogo slug="spotify" className="size-5 shrink-0" />
                             <span className="min-w-0 flex-1">
-                                <span className="block text-[0.8125rem]">{t(`activity.sources.${source}.label` as const)}</span>
+                                {/* i18n-ignore: a service's own name */}
+                                <span className="block text-[0.8125rem]">Spotify</span>
                                 <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
-                                    {t(`activity.sources.${source}.hint` as const)}
+                                    {spotify === "linked"
+                                        ? t("activity.spotify.linked")
+                                        : spotify === "unlinked"
+                                          ? t.rich("activity.spotify.unlinked", {
+                                                link: (chunks) => (
+                                                    <Link
+                                                        key="link"
+                                                        href="/account/connections"
+                                                        className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+                                                    >
+                                                        {chunks}
+                                                    </Link>
+                                                )
+                                            })
+                                          : t("activity.spotify.unavailable")}
                                 </span>
                             </span>
                             <Switch
-                                checked={!off && draft[source]}
+                                checked={!off && draft.spotify}
                                 disabled={off}
-                                onChange={(on) =>
-                                    commit((state) => ({ ...state, [source]: on }))
-                                }
-                                aria-label={t(`activity.sources.${source}.label` as const)}
+                                onChange={(on) => commit((state) => ({ ...state, spotify: on }))}
+                                // i18n-ignore: a service's own name
+                                aria-label="Spotify"
                             />
                         </li>
-                    ))}
-                </ul>
+                        {SOURCES.map((source) => (
+                            <li key={source} className="flex items-center gap-3 px-3 py-2">
+                                {source === "minecraft" ? (
+                                    <IntegrationLogo slug="minecraft" className="size-5 shrink-0" />
+                                ) : (
+                                    <Gamepad2
+                                        aria-hidden="true"
+                                        className="size-5 shrink-0 text-muted-foreground"
+                                    />
+                                )}
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[0.8125rem]">
+                                        {t(`activity.sources.${source}.label` as const)}
+                                    </span>
+                                    <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                                        {t(`activity.sources.${source}.hint` as const)}
+                                    </span>
+                                </span>
+                                <Switch
+                                    checked={!off && draft[source]}
+                                    disabled={off}
+                                    onChange={(on) =>
+                                        commit((state) => ({ ...state, [source]: on }))
+                                    }
+                                    aria-label={t(`activity.sources.${source}.label` as const)}
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                </CardBody>
+            </Card>
 
-                <section className="flex flex-col gap-1.5">
-                    <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                        {t("activity.games")}
-                    </h3>
-                    {games.size === 0 ? (
-                        <p className="rounded-md border border-dashed border-border px-3 py-3 text-[0.6875rem] text-muted-foreground">
-                            {t("activity.noGames")}
+            <Card>
+                <CardBody className="flex flex-col gap-3 p-3">
+                    <div>
+                        <h2 className="text-sm font-medium">{t("activity.registered.title")}</h2>
+                        <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                            {t("activity.registered.description")}
                         </p>
-                    ) : (
-                        <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
-                            {[...games].map(([key, name]) => {
-                                const hidden = draft.hiddenGames.includes(key);
-                                return (
-                                    <li key={key} className="flex items-center gap-3 px-3 py-2">
-                                        <span className="min-w-0 flex-1">
-                                            <span
-                                                className="block truncate text-[0.8125rem]"
-                                                title={name}
-                                            >
-                                                {name}
+                    </div>
+
+                    {!off && draft.games ? (
+                        <div className="flex items-center gap-3 rounded-md border border-dashed border-border px-3 py-2">
+                            <GameMark
+                                name={playing?.name ?? null}
+                                gameId={playing?.gameId ?? null}
+                            />
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[0.6875rem] uppercase tracking-[0.04em] text-foreground-subtle">
+                                    {playing
+                                        ? t("activity.registered.nowPlaying")
+                                        : t("activity.registered.noneDetected")}
+                                </span>
+                                <span
+                                    className="block truncate text-[0.8125rem]"
+                                    title={playing?.name}
+                                >
+                                    {playing ? playing.name : t("activity.registered.addHint")}
+                                </span>
+                            </span>
+                        </div>
+                    ) : null}
+
+                    <section className="flex flex-col gap-1.5">
+                        <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                            {t("activity.registered.added")}
+                        </h3>
+                        {games.size === 0 ? (
+                            <p className="rounded-md border border-dashed border-border px-3 py-3 text-[0.6875rem] text-muted-foreground">
+                                {t("activity.noGames")}
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
+                                {[...games].map(([key, name]) => {
+                                    const hidden = draft.hiddenGames.includes(key);
+                                    const seen = seenAt.get(key);
+                                    const own = added.has(key);
+                                    return (
+                                        <li key={key} className="flex items-center gap-3 px-3 py-2">
+                                            <GameMark name={name} gameId={null} />
+                                            <span className="min-w-0 flex-1">
+                                                <span
+                                                    className="block truncate text-[0.8125rem]"
+                                                    title={name}
+                                                >
+                                                    {name}
+                                                </span>
+                                                <span
+                                                    className="block truncate text-[0.6875rem] text-foreground-subtle"
+                                                    title={key}
+                                                >
+                                                    {hidden
+                                                        ? t("activity.neverShown")
+                                                        : seen
+                                                          ? t.rich(
+                                                                "activity.registered.lastPlayed",
+                                                                {
+                                                                    when: () => (
+                                                                        <RelativeTime
+                                                                            key="when"
+                                                                            iso={seen}
+                                                                        />
+                                                                    )
+                                                                }
+                                                            )
+                                                          : own
+                                                            ? t("activity.registered.addedByYou")
+                                                            : key}
+                                                </span>
                                             </span>
-                                            <span
-                                                className="block truncate text-[0.6875rem] text-foreground-subtle"
-                                                title={key}
-                                            >
-                                                {hidden ? t("activity.neverShown") : key}
-                                            </span>
-                                        </span>
-                                        <Switch
-                                            checked={!hidden}
-                                            disabled={off || !draft.games}
-                                            onChange={(shown) =>
-                                                commit((state) => ({
-                                                    ...state,
-                                                    hiddenGames: shown
-                                                        ? state.hiddenGames.filter(
-                                                              (entry) => entry !== key
-                                                          )
-                                                        : state.hiddenGames.includes(key)
-                                                          ? state.hiddenGames
-                                                          : [...state.hiddenGames, key]
-                                                }))
-                                            }
-                                            aria-label={t("activity.showGame", { name })}
-                                        />
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                                            <Switch
+                                                checked={!hidden}
+                                                disabled={off || !draft.games}
+                                                onChange={(shown) =>
+                                                    commit((state) => ({
+                                                        ...state,
+                                                        hiddenGames: shown
+                                                            ? state.hiddenGames.filter(
+                                                                  (entry) => entry !== key
+                                                              )
+                                                            : state.hiddenGames.includes(key)
+                                                              ? state.hiddenGames
+                                                              : [...state.hiddenGames, key]
+                                                    }))
+                                                }
+                                                aria-label={t("activity.showGame", { name })}
+                                            />
+                                            {own ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={off || !draft.games}
+                                                    aria-label={t("ownGames.remove", { name })}
+                                                    title={t("ownGames.remove", { name })}
+                                                    onClick={() =>
+                                                        commit((state) => ({
+                                                            ...state,
+                                                            customGames: state.customGames.filter(
+                                                                (entry) => entry.executable !== key
+                                                            )
+                                                        }))
+                                                    }
+                                                    className="grid size-11 shrink-0 place-items-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50 sm:size-7"
+                                                >
+                                                    <X className="size-3.5 shrink-0" />
+                                                </button>
+                                            ) : null}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+
+                    <OwnGames
+                        games={draft.customGames}
+                        disabled={off || !draft.games}
+                        runningPrograms={
+                            bridge?.runningPrograms ? () => bridge.runningPrograms!() : null
+                        }
+                        onAdd={(game) =>
+                            commit((state) => ({
+                                ...state,
+                                customGames: [
+                                    ...state.customGames.filter(
+                                        (entry) => entry.executable !== game.executable
+                                    ),
+                                    game
+                                ]
+                            }))
+                        }
+                    />
+
+                    {error && (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
                     )}
-                </section>
+                </CardBody>
+            </Card>
+        </>
+    );
+}
 
-                <OwnGames
-                    games={draft.customGames}
-                    disabled={off || !draft.games}
-                    runningPrograms={
-                        bridge?.runningPrograms ? () => bridge.runningPrograms!() : null
-                    }
-                    onAdd={(game) =>
-                        commit((state) => ({
-                            ...state,
-                            customGames: [
-                                ...state.customGames.filter(
-                                    (entry) => entry.executable !== game.executable
-                                ),
-                                game
-                            ]
-                        }))
-                    }
-                    onRemove={(executable) =>
-                        commit((state) => ({
-                            ...state,
-                            customGames: state.customGames.filter(
-                                (entry) => entry.executable !== executable
-                            )
-                        }))
-                    }
-                />
-
-                {error && (
-                    <p role="alert" className="text-sm text-danger">
-                        {error}
-                    </p>
-                )}
-            </CardBody>
-        </Card>
+/**
+ * A game's own mark when it is one of the catalog's - by the id an activity
+ * carries, or by its name - and the generic pad for every other game, rather
+ * than a logo drawn to look like somebody's.
+ */
+function GameMark({ name, gameId }: { name: string | null; gameId: string | null }) {
+    const lowered = name?.trim().toLowerCase();
+    const game =
+        (gameId ? core.findGame(gameId) : undefined) ??
+        (lowered
+            ? core.GAMES.find(
+                  (entry) => entry.id === lowered || entry.name.toLowerCase() === lowered
+              )
+            : undefined);
+    return game ? (
+        <GameLogo game={game} className="size-5" />
+    ) : (
+        <Gamepad2 aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
     );
 }
 
@@ -266,15 +392,13 @@ function OwnGames({
     games,
     disabled,
     runningPrograms,
-    onAdd,
-    onRemove
+    onAdd
 }: {
     games: readonly core.CustomGame[];
     disabled: boolean;
     /** Lists what is running, inside the desktop app; null in a browser. */
     runningPrograms: (() => Promise<readonly string[]>) | null;
     onAdd: (game: core.CustomGame) => void;
-    onRemove: (executable: string) => void;
 }) {
     const t = useTranslations("accountPrivacy");
     const [program, setProgram] = useState("");
@@ -312,36 +436,9 @@ function OwnGames({
             <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                 {t("ownGames.title")}
             </h3>
-            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">{t("ownGames.description")}</p>
-            {games.length > 0 && (
-                <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
-                    {games.map((game) => (
-                        <li key={game.executable} className="flex items-center gap-3 px-3 py-2">
-                            <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[0.8125rem]" title={game.name}>
-                                    {game.name}
-                                </span>
-                                <span
-                                    className="block truncate text-[0.6875rem] text-foreground-subtle"
-                                    title={game.executable}
-                                >
-                                    {game.executable}
-                                </span>
-                            </span>
-                            <button
-                                type="button"
-                                disabled={disabled}
-                                aria-label={t("ownGames.remove", { name: game.name })}
-                                title={t("ownGames.remove", { name: game.name })}
-                                onClick={() => onRemove(game.executable)}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                            >
-                                <X className="size-3.5 shrink-0" />
-                            </button>
-                        </li>
-                    ))}
-                </ul>
-            )}
+            <p className="text-[0.6875rem] leading-snug text-foreground-subtle">
+                {t("ownGames.description")}
+            </p>
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-[10rem] flex-1 flex-col gap-1 text-[0.6875rem] text-muted-foreground">
                     {t("ownGames.program")}

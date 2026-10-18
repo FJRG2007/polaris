@@ -10196,6 +10196,10 @@ model PresenceSchedule {
     // Off keeps the window without applying it, which is what somebody wants for
     // the week they are on holiday and is not what deleting it means.
     enabled     Boolean  @default(true)
+    // Up to this many minutes either side of each end, a different amount every
+    // day (seeded by the schedule and the date), so the change does not land on
+    // the same minute daily. 0 is exact.
+    marginMinutes Int    @default(0)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 

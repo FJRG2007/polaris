@@ -4,17 +4,13 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Gamepad2 } from "lucide-react";
 import { listBlocked } from "@/lib/blocks";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { PrivacyView } from "./privacy-view";
 import { BlockedCard } from "./blocked-card";
-import { listConnections } from "@/lib/connections/store";
-import { connectionLinkAvailable } from "@/lib/connections/oauth";
-import { activitySettingsOf } from "@/lib/presence-activity/settings";
-import { ActivitySharingCard } from "./activity-sharing-card";
 import { listsFor, namePeople, privacyFor } from "@/lib/privacy-service";
 
 export const dynamic = "force-dynamic";
@@ -22,15 +18,10 @@ export const dynamic = "force-dynamic";
 export default async function PrivacyPage() {
     const session = await requireUser();
     const t = await getTranslations("accountPrivacy");
-    const [settings, lists, blocked, activity, spotifyLinks, spotifyOffered] = await Promise.all([
+    const [settings, lists, blocked] = await Promise.all([
         privacyFor(session.id),
         listsFor(session.id),
-        listBlocked(session.id),
-        activitySettingsOf(session.id),
-        listConnections(session.id, "spotify"),
-        connectionLinkAvailable("spotify", { admin: session.isAdmin, userId: session.id }).catch(
-            () => false
-        )
+        listBlocked(session.id)
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
@@ -43,15 +34,22 @@ export default async function PrivacyPage() {
                 <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
             <PrivacyView settings={settings} lists={lists} people={people} />
-            {/* What is shared, beside the audience row above that decides who
-                sees it. */}
-            <ActivitySharingCard
-                settings={activity.settings}
-                seenGames={activity.seenGames}
-                spotify={
-                    spotifyLinks.length > 0 ? "linked" : spotifyOffered ? "unlinked" : "unavailable"
-                }
-            />
+            {/* What is shared beside your name has its own page: sources,
+                detected games and your own, which outgrew a card here. */}
+            <Card>
+                <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+                    <Gamepad2 className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-[14rem] flex-1">
+                        <span className="block text-[0.8125rem]">{t("activity.page.title")}</span>
+                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                            {t("activity.page.summary")}
+                        </span>
+                    </span>
+                    <Button size="sm" variant="secondary" asChild>
+                        <Link href="/account/privacy/activity">{t("schedule.open")}</Link>
+                    </Button>
+                </CardBody>
+            </Card>
             {/* The same question by the clock rather than by audience, which is
                 why it is on this screen and not beside the display preferences.
                 A link rather than the thing itself: it is a list that grows, and

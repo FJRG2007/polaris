@@ -1550,6 +1550,28 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: PRIVACY_GROUP
         },
         {
+            label: "Activity sharing", // i18n-ignore
+            href: "/account/privacy/activity",
+            icon: Gamepad2,
+            keywords: [
+                "activity",
+                "activity status",
+                "activity privacy",
+                "privacy",
+                "playing",
+                "now playing",
+                "listening",
+                "spotify",
+                "music",
+                "games",
+                "registered games",
+                "detected games",
+                "minecraft",
+                "rich presence"
+            ],
+            group: PRIVACY_GROUP
+        },
+        {
             label: "Status schedule", // i18n-ignore
             href: "/account/privacy/schedule",
             icon: CalendarClock,
