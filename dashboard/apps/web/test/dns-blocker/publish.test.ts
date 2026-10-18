@@ -52,6 +52,14 @@ describe("isPortTaken", () => {
         expect(isPortTaken("listen udp4 0.0.0.0:53: bind: address already in use")).toBe(true);
         expect(isPortTaken("manifest unknown")).toBe(false);
     });
+
+    it("does not call an address the machine no longer has a taken port", () => {
+        expect(
+            isPortTaken(
+                "driver failed programming external connectivity on endpoint dns: Error starting userland proxy: listen tcp4 192.168.1.20:53: bind: cannot assign requested address"
+            )
+        ).toBe(false);
+    });
 });
 
 describe("compose rendering of a bound port", () => {

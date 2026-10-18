@@ -199,11 +199,18 @@ function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-/** Write the configuration onto the engine and deploy it again. A failed deploy
- *  is logged and marked on the engine, where the status reads it as `portHeld`,
+/** Write the configuration onto the engine and deploy it again, its ports bound
+ *  to this machine's current address when there is one. A failed deploy is
+ *  logged and marked on the engine, where the status reads it as `portHeld`,
  *  and refused so the press that asked for it is not answered with success. */
-async function apply(engine: EngineRow, encoded: string, actorId: string): Promise<void> {
+async function apply(
+    engine: EngineRow,
+    encoded: string,
+    actorId: string,
+    address: string | null
+): Promise<void> {
     if (!engine.applicationId) return;
+    if (address) await bindEngineTo(engine, address);
     await setEnvVar("application", engine.applicationId, engine.ownerId, {
         key: DNS_CONFIG_ENV,
         value: encoded,
@@ -232,7 +239,7 @@ export async function saveSettings(input: unknown, actorId: string): Promise<Dns
     const encoded = encodedConfig(settings);
     await patchInstallConfig(row.id, { [CONFIG_KEY]: settings });
     const engine = await engineRow();
-    if (engine) await apply(engine, encoded, actorId);
+    if (engine) await apply(engine, encoded, actorId, await getHostLanIp().catch(() => null));
     return settings;
 }
 
@@ -285,8 +292,7 @@ export async function turnOn(actorId: string): Promise<void> {
     if (engine) {
         // A running engine holds port 53 itself; only a failed one is checked.
         if (await lastDeployFailed(engine)) await checkPort(address);
-        await bindEngineTo(engine, address);
-        await apply(engine, encoded, actorId);
+        await apply(engine, encoded, actorId, address);
         return;
     }
     await checkPort(address);
