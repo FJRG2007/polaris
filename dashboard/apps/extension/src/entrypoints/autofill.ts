@@ -86,6 +86,9 @@ const GONE_AFTER_PRESS_MS = 10_000;
  *  a time, never the value, in storage a page's script can read, so the next
  *  page this runs on finishes the job if this one is gone by then. */
 const CLIPBOARD_CLEAR_KEY = "local:inline.clipboardClearAt";
+/** How long past its deadline a clipboard is still worth emptying: a browser
+ *  that refuses every write without a press would otherwise be asked forever. */
+const CLIPBOARD_GIVE_UP_MS = 10 * 60_000;
 
 /** The closed shadow roots Chrome hands an extension; nothing elsewhere. */
 const opener: ShadowOpener | undefined = (() => {
@@ -215,10 +218,18 @@ async function start(): Promise<void> {
         if (tree.nodeType === Node.DOCUMENT_NODE) listenIn(tree as Document);
     };
 
+    const frames = new WeakSet<HTMLIFrameElement>();
+    const watchFrame = (frame: HTMLIFrameElement): void => {
+        if (frames.has(frame)) return;
+        frames.add(frame);
+        frame.addEventListener("load", again);
+    };
+
     const look = (): void => {
         const scan = scanInputs(document, opener);
         seen = { fields: readForm(scan.inputs.map(describeInput)), inputs: scan.inputs };
         for (const tree of scan.trees) watchTree(tree);
+        for (const frame of scan.frames) watchFrame(frame);
     };
 
     /** A box on the top page itself. A login is filled by the worker into the top
@@ -578,6 +589,7 @@ async function start(): Promise<void> {
     /** Before saving from the bar: what the form says now, which may have a
      *  username typed after the password was generated. */
     const recapture = async (): Promise<void> => {
+        if (sent === "") return;
         const password = at(seen.fields.newPassword) ?? at(seen.fields.password);
         if (!password || password.value === "" || !password.isConnected) return;
         const username = at(seen.fields.username)?.value ?? "";
@@ -597,8 +609,7 @@ async function start(): Promise<void> {
      * without saying so: a sign-in posted with `fetch` that swaps the boxes for
      * what came back, or moves the address on, fires no submit at all.
      */
-    let typed: { username: string; password: string; newAccount: boolean; href: string } | null =
-        null;
+    let typed: { username: string; password: string; newAccount: boolean } | null = null;
     let pressedAt = 0;
     const remember = (event: Event): void => {
         const box = origin(event);
@@ -610,8 +621,7 @@ async function start(): Promise<void> {
         typed = {
             username: user?.value ?? typed?.username ?? "",
             password: password.value,
-            newAccount: makingAccount(),
-            href: location.href
+            newAccount: makingAccount()
         };
     };
 
@@ -624,8 +634,7 @@ async function start(): Promise<void> {
             (box) => box !== null && box.isConnected && box.value === held.password
         );
         if (still) return;
-        const moved = location.href !== held.href;
-        if (!moved && Date.now() - pressedAt > GONE_AFTER_PRESS_MS) return;
+        if (Date.now() - pressedAt > GONE_AFTER_PRESS_MS) return;
         typed = null;
         send(held.username, held.password, held.newAccount);
     };
@@ -666,10 +675,8 @@ async function start(): Promise<void> {
     );
     const onClick = (event: Event): void => {
         const target = origin(event) as Element | null;
-        const pressed = target?.closest?.(
-            "button, input[type=submit], input[type=button], input[type=image], [role=button], a, [onclick], [tabindex]"
-        );
-        if (!pressed || !looksLikeSubmit(pressed)) return;
+        const pressed = target?.closest?.(PRESSABLE);
+        if (!pressed || !looksLikeSubmit(pressed) || !mayBeSubmit(pressed, target)) return;
         const box =
             at(seen.fields.newPassword) ?? at(seen.fields.password) ?? at(seen.fields.username);
         if (!box) return;
@@ -678,7 +685,8 @@ async function start(): Promise<void> {
         pressedAt = Date.now();
         // Only a press that belongs with the login's boxes: a cookie banner's
         // button is not somebody signing in.
-        if (pressed.nodeName === "A" || !sharesForm(pressed, box)) return;
+        if (pressed.nodeName === "A" || !pressed.matches(BUTTON) || !sharesForm(pressed, box))
+            return;
         submitted();
     };
     // Enter in a login box that no form submits, which neither of the two
@@ -703,6 +711,8 @@ async function start(): Promise<void> {
         doc.addEventListener("click", onClick, true);
         doc.addEventListener("keydown", onKey, true);
         doc.addEventListener("input", remember, true);
+        if (doc !== document)
+            doc.addEventListener("scroll", place, { passive: true, capture: true });
     }
     listenIn(document);
 
@@ -732,6 +742,29 @@ const NEIGHBOURHOOD = 4;
  */
 const NOT_A_SUBMIT =
     /show|hide|reveal|toggle|mostrar|ocultar|cancel|cancela|back|atr[aá]s|close|cerrar|forgot|olvid|help|ayuda/i;
+
+/** What submits a form: the only presses read as the login being sent. */
+const BUTTON = "button, input[type=submit], input[type=button], input[type=image], [role=button]";
+
+/** What a page submits from by script as well: a press on one of these only
+ *  arms the wait for the boxes to go. */
+const PRESSABLE = `${BUTTON}, a, [onclick], [tabindex]`;
+
+/** What is pressed to type into or to tick, never to send. */
+const CONTROL =
+    "input, select, textarea, label, [contenteditable]:not([contenteditable=false]), " +
+    "[role=checkbox], [role=radio], [role=switch], [role=textbox], [role=combobox], " +
+    "[role=searchbox], [role=listbox], [role=option], [role=tab], [role=slider], [role=spinbutton]";
+
+/** Whether a press is on something that could send a form at all: not a box,
+ *  a checkbox or a link that leaves for another page. */
+function mayBeSubmit(pressed: Element, target: Element | null): boolean {
+    const control = target?.closest?.(CONTROL);
+    if (control && pressed.contains(control) && !control.matches(BUTTON)) return false;
+    if (pressed.nodeName !== "A") return true;
+    const href = (pressed.getAttribute("href") ?? "").trim().toLowerCase();
+    return href === "" || href.startsWith("#") || href.startsWith("javascript:");
+}
 
 /** Whether pressing this could plausibly be somebody submitting the form. */
 function looksLikeSubmit(pressed: Element): boolean {
@@ -1170,9 +1203,14 @@ async function emptyClipboard(due: number): Promise<void> {
     try {
         await navigator.clipboard.writeText("");
     } catch {
-        window.addEventListener("focus", () => void emptyClipboard(due), { once: true });
+        if (Date.now() - due > CLIPBOARD_GIVE_UP_MS) await forgetClearing(due);
+        else window.addEventListener("focus", () => void emptyClipboard(due), { once: true });
         return;
     }
+    await forgetClearing(due);
+}
+
+async function forgetClearing(due: number): Promise<void> {
     try {
         if ((await storage.getItem<number>(CLIPBOARD_CLEAR_KEY)) === due)
             await storage.removeItem(CLIPBOARD_CLEAR_KEY);
@@ -1185,7 +1223,9 @@ async function emptyClipboard(due: number): Promise<void> {
 async function finishClearing(): Promise<void> {
     try {
         const due = await storage.getItem<number>(CLIPBOARD_CLEAR_KEY);
-        if (typeof due === "number") armClearing(due);
+        if (typeof due !== "number") return;
+        if (Date.now() - due > CLIPBOARD_GIVE_UP_MS) await forgetClearing(due);
+        else armClearing(due);
     } catch {
         // Storage that will not answer has nothing to finish.
     }

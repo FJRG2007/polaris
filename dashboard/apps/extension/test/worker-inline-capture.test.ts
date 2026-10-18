@@ -138,4 +138,51 @@ describe("a login sent without a submit event", () => {
             newAccount: false
         });
     });
+
+    it("is not sent by clicking into a box or ticking a box in the form", async () => {
+        // Past the wait an earlier test's press opened.
+        await vi.advanceTimersByTimeAsync(11_000);
+        document.body.innerHTML = `
+            <div id="app"><form>
+                <input type="text" name="login" tabindex="1">
+                <input type="password" name="password" tabindex="2">
+                <div role="checkbox" tabindex="0" aria-checked="false">Remember me</div>
+                <button type="submit">Sign in</button>
+            </form></div>`;
+        await settle();
+        const user = document.querySelector<HTMLInputElement>("input[name=login]")!;
+        type(user, "marta");
+        type(document.querySelector<HTMLInputElement>("input[name=password]")!, "partial");
+        user.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+        document
+            .querySelector("[role=checkbox]")!
+            .dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+        expect(captured()).toHaveLength(0);
+
+        // Neither press is one the boxes going away is read after.
+        document.getElementById("app")!.innerHTML = "<p>Elsewhere</p>";
+        await settle();
+        expect(captured()).toHaveLength(0);
+    });
+
+    it("is not sent by leaving the page with nothing pressed", async () => {
+        await vi.advanceTimersByTimeAsync(11_000);
+        document.body.innerHTML = `
+            <div id="app"><form>
+                <input type="text" name="login">
+                <input type="password" name="password">
+            </form></div>
+            <nav><a href="/pricing">Pricing</a></nav>`;
+        await settle();
+        type(document.querySelector<HTMLInputElement>("input[name=login]")!, "pablo");
+        type(document.querySelector<HTMLInputElement>("input[name=password]")!, "typo-pass");
+        const link = document.querySelector("a")!;
+        link.addEventListener("click", (event) => event.preventDefault());
+        link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        history.pushState(null, "", "/pricing");
+        document.getElementById("app")!.innerHTML = "<p>Pricing</p>";
+        window.dispatchEvent(new PopStateEvent("popstate"));
+        await settle();
+        expect(captured()).toHaveLength(0);
+    });
 });

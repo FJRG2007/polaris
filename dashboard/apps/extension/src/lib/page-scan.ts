@@ -30,6 +30,9 @@ export interface Scan {
      *  them for changes and listen for their submits - a `submit` event does not
      *  cross a shadow boundary, and nothing crosses a frame's. */
     readonly trees: (ShadowRoot | Document)[];
+    /** Every frame met, loaded or not: its document is replaced when it loads,
+     *  and nothing in the page around it changes to say so. */
+    readonly frames: HTMLIFrameElement[];
 }
 
 /** Whether a node is an input, in any frame: `instanceof` is false for an
@@ -43,6 +46,7 @@ export function isInput(node: unknown): node is HTMLInputElement {
 export function scanInputs(doc: Document, opener?: ShadowOpener): Scan {
     const inputs: HTMLInputElement[] = [];
     const trees: (ShadowRoot | Document)[] = [];
+    const frames: HTMLIFrameElement[] = [];
 
     const visit = (root: Document | ShadowRoot): void => {
         const walker = (root.ownerDocument ?? (root as Document)).createTreeWalker(
@@ -60,6 +64,7 @@ export function scanInputs(doc: Document, opener?: ShadowOpener): Scan {
                 visit(shadow);
             }
             if (element.nodeName === "IFRAME" || element.nodeName === "FRAME") {
+                frames.push(element as HTMLIFrameElement);
                 const inner = frameDocument(element as HTMLIFrameElement);
                 if (inner) {
                     trees.push(inner);
@@ -69,7 +74,7 @@ export function scanInputs(doc: Document, opener?: ShadowOpener): Scan {
         }
     };
     visit(doc);
-    return { inputs, trees };
+    return { inputs, trees, frames };
 }
 
 /** A closed root, or null where the browser refuses to say. */
@@ -215,8 +220,8 @@ export function describeInput(field: HTMLInputElement): FieldFacts {
         maxLength: field.maxLength > 0 ? field.maxLength : null,
         inputMode: (field.inputMode || "").toLowerCase(),
         usable: usable(field),
-        // The panel stands in for a form where the page wrote none, so two boxes
-        // in the same component are one form to the rules.
+        // The form as the page wrote it: boxes with none are grouped by the
+        // rules' own fallbacks, and the panel only feeds `formWords`.
         form: field.form ?? null,
         formWords: formWords(field)
     };

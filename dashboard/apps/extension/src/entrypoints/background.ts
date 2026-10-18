@@ -2227,7 +2227,8 @@ function typeIntoPage(
     // Inside shadow roots as well as the document - a design system's text field
     // keeps its input in one - in the order a reader meets them. Chrome hands an
     // extension the closed ones too.
-    const opener = (globalThis as { chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } } }).chrome?.dom?.openOrClosedShadowRoot;
+    const dom = (globalThis as { chrome?: { dom?: { openOrClosedShadowRoot?: (element: Element) => ShadowRoot | null } } }).chrome?.dom;
+    const opener = dom?.openOrClosedShadowRoot;
     const all: HTMLInputElement[] = [];
     const visit = (root: Document | ShadowRoot): void => {
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
@@ -2237,7 +2238,7 @@ function typeIntoPage(
             let shadow: ShadowRoot | null = element.shadowRoot;
             if (!shadow && opener && element.localName.includes("-")) {
                 try {
-                    shadow = opener(element);
+                    shadow = opener.call(dom, element);
                 } catch {
                     shadow = null;
                 }
