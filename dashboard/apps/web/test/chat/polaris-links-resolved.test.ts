@@ -75,9 +75,7 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatChannel: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
-                JSON.stringify(where).includes("newcomerHistory")
-                    ? []
-                    : channels.filter((channel) => where.id.in.includes(channel.id))
+                channels.filter((channel) => where.id.in.includes(channel.id))
         },
         chatMessage: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>

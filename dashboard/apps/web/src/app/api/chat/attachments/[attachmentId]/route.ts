@@ -21,7 +21,6 @@ import { apiPermission } from "@/lib/api-session";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 import { channelAccess } from "@/lib/chat/access";
-import * as history from "@/lib/chat/history-visibility";
 import { rangeHeaders, streamStored } from "@/lib/chat/streamed-file";
 import {
     channelOfAttachment,
@@ -59,10 +58,7 @@ export async function GET(
         console.warn(`chat: attachment ${attachmentId} has no row`);
         return new Response(null, { status: 404 });
     }
-    if (
-        !(await channelAccess({ id: user.id }, channelId)) ||
-        !(await history.attachmentReadable({ id: user.id }, channelId, attachmentId))
-    ) {
+    if (!(await channelAccess({ id: user.id }, channelId))) {
         console.warn(`chat: ${user.id} may not read attachment ${attachmentId}`);
         return new Response(null, { status: 404 });
     }

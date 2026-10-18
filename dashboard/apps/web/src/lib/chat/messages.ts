@@ -54,7 +54,6 @@ import {
 import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
-import * as history from "./history-visibility";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -272,7 +271,6 @@ export async function readChannel(
     const access = await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
     await markDelivered(actor, access);
-    const floor = await history.readableSince(actor, channelId);
 
     const cursor = before
         ? await prisma.chatMessage.findFirst({
@@ -285,8 +283,7 @@ export async function readChannel(
         where: {
             channelId,
             parentId: null,
-            ...(cursor ? { createdAt: { lt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor)]
+            ...(cursor ? { createdAt: { lt: cursor.createdAt } } : {})
         },
         orderBy: { createdAt: "desc" },
         take: PAGE + 1,
@@ -318,20 +315,12 @@ export async function readThread(
     if (!root) return [];
     await requireChannel(actor, root.channelId);
     await requireAgeCleared(actor, root.channelId);
-    const floor = await history.readableSince(actor, root.channelId);
 
     // A reply passed in place of the root opens the thread it is in, which is
     // what somebody clicking a reply in a search result means.
     const rootId = root.parentId ?? root.id;
-    if (floor) {
-        const head = await prisma.chatMessage.findUnique({
-            where: { id: rootId },
-            select: { createdAt: true }
-        });
-        if (!head || !history.isReadable(floor, head.createdAt)) return [];
-    }
     const rows = await prisma.chatMessage.findMany({
-        where: { OR: [{ id: rootId }, { parentId: rootId }], AND: [history.sinceClause(floor)] },
+        where: { OR: [{ id: rootId }, { parentId: rootId }] },
         orderBy: { createdAt: "asc" },
         select: MESSAGE_SELECT
     });
@@ -363,14 +352,12 @@ export async function readSince(
           })
         : null;
     if (afterId && !cursor) return { messages: [], newerThan: afterId };
-    const floor = await history.readableSince(actor, channelId);
 
     const rows = await prisma.chatMessage.findMany({
         where: {
             channelId,
             parentId: null,
-            ...(cursor ? { createdAt: { gt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor)]
+            ...(cursor ? { createdAt: { gt: cursor.createdAt } } : {})
         },
         orderBy: { createdAt: "asc" },
         take: PAGE + 1,
@@ -404,12 +391,7 @@ export async function readChanged(
     const ids = [...new Set(messageIds)].slice(0, MAX_REREAD);
     if (ids.length === 0) return [];
     const rows = await prisma.chatMessage.findMany({
-        where: {
-            channelId,
-            parentId: null,
-            id: { in: ids },
-            AND: [history.sinceClause(await history.readableSince(actor, channelId))]
-        },
+        where: { channelId, parentId: null, id: { in: ids } },
         orderBy: { createdAt: "asc" },
         select: MESSAGE_SELECT
     });
@@ -506,12 +488,9 @@ export async function send(
             // A forward is the one case where the two differ on purpose: it
             // carries a message out of where it was said. The reader is proved
             // against the source before it moves.
-            if (original.channelId === input.channelId) {
-                await history.requireReadable(actor, original.channelId, quote.messageId);
-                quoted = quote.messageId;
-            } else if (quote.forwarded) {
+            if (original.channelId === input.channelId) quoted = quote.messageId;
+            else if (quote.forwarded) {
                 await requireChannel(actor, original.channelId);
-                await history.requireReadable(actor, original.channelId, quote.messageId);
                 quoted = quote.messageId;
             }
         }
@@ -757,7 +736,6 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     const editable = await requirePostable(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, input.messageId);
     if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
     // Held to the space's emoji like a send is, or an edit would be the way in.
     input = { ...input, body: await confineCustomEmoji(input.body, editable.spaceId) };
@@ -862,7 +840,6 @@ export async function linkPreviewFor(
     });
     if (!message || message.deletedAt) return null;
     await requireChannel(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, messageId);
     await requireAgeCleared(actor, message.channelId);
 
     const link = core.firstLink(message.body);
@@ -928,7 +905,6 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
     });
     if (!found) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, found.channelId);
-    await history.requireReadable(actor, found.channelId, messageId);
     await requireAgeCleared(actor, found.channelId);
 
     const [row, channel] = await Promise.all([
@@ -958,7 +934,6 @@ export async function editHistory(actor: ChatActor, messageId: string): Promise<
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, messageId);
     await requireAgeCleared(actor, message.channelId);
 
     const rules = await rulesForChannel(message.channelId);
@@ -1104,7 +1079,6 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     const access = await requirePostable(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, input.messageId);
 
     // A space's own emoji is one reaction whatever it was called when it was
     // pressed, so a custom one is found by its id rather than by its text - a
@@ -1492,7 +1466,6 @@ export async function deliveryOf(
     });
     if (!row) return null;
     await requireChannel(actor, row.channelId);
-    await history.requireReadable(actor, row.channelId, messageId);
     if (row.authorId !== actor.id || row.deletedAt) return null;
 
     const state = await receiptStateIn(actor, row.channelId);
@@ -1529,7 +1502,6 @@ export async function forward(actor: ChatActor, input: core.ChatForwardInput): P
     });
     if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireAgeCleared(actor, original.channelId);
-    await history.requireReadable(actor, original.channelId, input.messageId);
     if (
         original.authorId &&
         !(await maySee(original.authorId, "forwarding", { id: actor.id, isAdmin: false }))
@@ -1559,7 +1531,6 @@ export async function star(actor: ChatActor, messageId: string): Promise<boolean
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
-    await history.requireReadable(actor, message.channelId, messageId);
 
     const existing = await prisma.chatStar.findUnique({
         where: { messageId_userId: { messageId, userId: actor.id } },
@@ -1786,14 +1757,7 @@ export async function decorateMessages(
         quotedIds.length
             ? prisma.chatMessage.findMany({
                   where: { id: { in: quotedIds } },
-                  select: {
-                      id: true,
-                      channelId: true,
-                      authorId: true,
-                      body: true,
-                      deletedAt: true,
-                      createdAt: true
-                  }
+                  select: { id: true, channelId: true, authorId: true, body: true, deletedAt: true }
               })
             : Promise.resolve([]),
         knownPreviews([...links.values()]),
@@ -1844,15 +1808,6 @@ export async function decorateMessages(
             author.id,
             called.get(author.id) ?? author.name
         ])
-    );
-    const quoteFloors = await history.historyFloors(
-        actor.id,
-        quoted.map((row) => row.channelId)
-    );
-    const quoteHidden = new Set(
-        quoted
-            .filter((row) => !history.isReadable(quoteFloors.get(row.channelId), row.createdAt))
-            .map((row) => row.id)
     );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
     const quotedElsewhere = rows.some((row) => {
@@ -1964,7 +1919,7 @@ export async function decorateMessages(
                 ),
             attachments: onMessageFiles.get(row.id) ?? [],
             poll: polls.get(row.id) ?? null,
-            quote: quoteViewOf(row, quotes, names, quoteReachable, quoteHidden),
+            quote: quoteViewOf(row, quotes, names, quoteReachable),
             starred: kept.has(row.id),
             blocked: row.authorId !== null && shut.has(row.authorId),
             mentionsYou: mentioned.has(row.id),
@@ -2101,12 +2056,10 @@ function quoteViewOf(
         }
     >,
     names: ReadonlyMap<string, string>,
-    reachable: ReadonlySet<string>,
-    hidden: ReadonlySet<string>
+    reachable: ReadonlySet<string>
 ): ChatQuoteView | null {
     if (!row.replyToId) return null;
-    const original =
-        row.forwarded || !hidden.has(row.replyToId) ? quotes.get(row.replyToId) : undefined;
+    const original = quotes.get(row.replyToId);
     // The column survives the message it pointed at being deleted, so the
     // absence is said rather than swallowed: an answer with no visible question
     // is worse than one that admits the question is gone.
@@ -2123,8 +2076,7 @@ function quoteViewOf(
     return {
         id: original.id,
         channelId:
-            (original.channelId === row.channelId || reachable.has(original.channelId)) &&
-            !hidden.has(original.id)
+            original.channelId === row.channelId || reachable.has(original.channelId)
                 ? original.channelId
                 : null,
         authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,

@@ -1,16 +1,27 @@
 "use client";
 
 /**
- * Today on the Ad blocker: how many lookups, how many blocked, who asks most,
- * the query log, and pausing blocking for a while.
+ * What the Ad blocker has been doing over a range: the totals, lookups over
+ * time permitted against blocked, the busiest devices over time, query types,
+ * who answered, the top names and devices, and the query log with a live view
+ * and allow or block on every row. Pausing blocking lives here too.
  *
- * The card's chrome and filters paint at once; only the numbers and the rows
- * wait for the engine. A domain or device in a row is a button that filters the
- * log by it, which is what a reader reaches for next.
+ * The card's chrome and filters paint at once; each region that waits on the
+ * engine has its own skeleton. A domain or device anywhere is a button that
+ * filters the log by it, which is what a reader reaches for next.
  */
 
-import { Loader2, Pause, Play, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+    Ban,
+    ChevronLeft,
+    ChevronRight,
+    Loader2,
+    Pause,
+    Play,
+    RefreshCw,
+    ShieldCheck
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -19,32 +30,128 @@ import {
     CardHeader,
     CardTitle,
     Input,
+    MultiSeriesChart,
+    SegmentedControl,
     Select,
-    Skeleton
+    Skeleton,
+    Switch,
+    SERIES_COLORS,
+    type ChartSeries
 } from "@polaris/ui";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import type { DnsInsights } from "@/lib/dns-blocker/insights";
+import type { DnsSettings } from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NameCount, QueryFilter } from "@/lib/dns-blocker/query-log";
+import {
+    DNS_RANGE_IDS,
+    rangeDays,
+    type ClientSeries,
+    type DnsRange,
+    type EngineMetrics,
+    type NameCount,
+    type QueryFilter,
+    type QueryRow,
+    type QueryTimeline
+} from "@/lib/dns-blocker/query-log";
 import {
     dnsInsightsAction,
+    dnsListsAction,
+    refreshDnsListsAction,
+    dnsTailAction,
     pauseDnsBlockingAction,
     resumeDnsBlockingAction,
+    ruleFromLogAction,
     turnOnDnsBlockerAction
 } from "./actions";
 
-const PAUSES = [5, 15, 30, 60] as const;
+type Translate = ReturnType<typeof useTranslations<"dnsBlocker">>;
 
-export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
+/** Pause presets in seconds; 0 is until resumed. */
+const PAUSES = [10, 30, 300, 900, 3600, 0] as const;
+const LIVE_EVERY_MS = 3000;
+const ALLOWED_COLOR = "hsl(var(--primary))";
+const BLOCKED_COLOR = "hsl(var(--danger))";
+
+const EMPTY_FILTER: QueryFilter = {
+    search: "",
+    outcome: "all",
+    client: "",
+    type: "",
+    range: "24h",
+    page: 0
+};
+
+function pauseLabel(t: Translate, seconds: number): string {
+    if (seconds === 0) return t("insights.untilResumed");
+    if (seconds < 60) return t("insights.seconds", { count: seconds });
+    if (seconds === 3600) return t("insights.hour");
+    return t("insights.minutes", { count: seconds / 60 });
+}
+
+function viaLabel(t: Translate, via: string): string {
+    if (["cache", "local", "blocked", "other"].includes(via))
+        return t(`insights.via.${via}` as NamespaceKey<"dnsBlocker">);
+    return via;
+}
+
+function listLabel(t: Translate, list: string): string {
+    if (list === "polaris") return t("insights.ownList");
+    const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
+    return t.has(key) ? t(key) : list;
+}
+
+function points(counts: readonly number[], timeline: QueryTimeline) {
+    return counts.map((v, index) => ({
+        t: timeline.from + index * timeline.bucketMs,
+        v
+    }));
+}
+
+export function DnsInsightsCard({
+    onApplied,
+    onRules,
+    logDays,
+    refreshHours
+}: {
+    onApplied: () => void;
+    onRules: (settings: DnsSettings) => void;
+    logDays: number;
+    refreshHours: number;
+}) {
     const t = useTranslations("dnsBlocker");
-    const [filter, setFilter] = useState<QueryFilter>({ search: "", outcome: "all", client: "" });
+    const [filter, setFilter] = useState<QueryFilter>(EMPTY_FILTER);
     const [typed, setTyped] = useState("");
     const [data, setData] = useState<DnsInsights | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [minutes, setMinutes] = useState("15");
+    const [notice, setNotice] = useState<string | null>(null);
+    const [pauseFor, setPauseFor] = useState("300");
     const [loading, setLoading] = useState(true);
+    const [live, setLive] = useState(false);
+    const [tail, setTail] = useState<QueryRow[] | null>(null);
+    const [ruling, setRuling] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [applying, startApplying] = useTransition();
     const latest = useRef(0);
+    // undefined while asked; null when the engine predates its metrics.
+    const [metrics, setMetrics] = useState<EngineMetrics | null | undefined>(undefined);
+    const [refreshingLists, startRefreshingLists] = useTransition();
+
+    const loadMetrics = useCallback(async () => {
+        const result = await dnsListsAction();
+        setMetrics(result.error !== undefined ? null : result.metrics);
+    }, []);
+
+    useEffect(() => {
+        void loadMetrics();
+    }, [loadMetrics]);
+
+    const refreshLists = () =>
+        startRefreshingLists(async () => {
+            const result = await refreshDnsListsAction();
+            if (result.error !== undefined) setError(result.error);
+            else setNotice(t("insights.listsRefreshing"));
+            await loadMetrics();
+        });
 
     const load = useCallback(async (next: QueryFilter, fresh = false) => {
         const request = ++latest.current;
@@ -66,21 +173,46 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
 
     useEffect(() => {
         const timer = setTimeout(() => {
+            const search = typed.trim().toLowerCase();
             setFilter((current) =>
-                current.search === typed.trim().toLowerCase()
-                    ? current
-                    : { ...current, search: typed.trim().toLowerCase() }
+                current.search === search ? current : { ...current, search, page: 0 }
             );
         }, 300);
         return () => clearTimeout(timer);
     }, [typed]);
+
+    // The live view: the end of today's file every few seconds, while shown.
+    useEffect(() => {
+        if (!live) {
+            setTail(null);
+            return;
+        }
+        let stopped = false;
+        const read = async () => {
+            const result = await dnsTailAction(filter);
+            if (stopped) return;
+            if (result.error !== undefined) setError(result.error);
+            else setTail(result.rows);
+        };
+        void read();
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void read();
+        }, LIVE_EVERY_MS);
+        return () => {
+            stopped = true;
+            clearInterval(timer);
+        };
+    }, [live, filter]);
+
+    const refine = (patch: Partial<QueryFilter>) =>
+        setFilter((current) => ({ ...current, page: 0, ...patch }));
 
     const togglePause = () =>
         startTransition(async () => {
             const result =
                 data?.pause.enabled === false
                     ? await resumeDnsBlockingAction()
-                    : await pauseDnsBlockingAction({ minutes: Number(minutes) });
+                    : await pauseDnsBlockingAction({ seconds: Number(pauseFor) });
             if (result.error !== undefined) setError(result.error);
             await load(filter, true);
         });
@@ -93,38 +225,56 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
             await load(filter, true);
         });
 
+    const rule = (domain: string, list: "allow" | "deny") => {
+        setRuling(domain);
+        setNotice(null);
+        void ruleFromLogAction({ domain, list }).then((result) => {
+            setRuling(null);
+            if (result.error !== undefined) {
+                setError(result.error);
+                return;
+            }
+            setError(null);
+            setNotice(
+                list === "allow"
+                    ? t("insights.nowAllowed", { domain })
+                    : t("insights.nowBlocked", { domain })
+            );
+            onRules(result.settings);
+            onApplied();
+        });
+    };
+
     const stats = data?.stats;
     const pause = data?.pause;
-    const pauseLabel = !pause
+    const pauseState = !pause
         ? null
         : pause.enabled
           ? t("insights.active")
           : pause.secondsLeft
             ? t("insights.pausedFor", { minutes: Math.ceil(pause.secondsLeft / 60) })
             : t("insights.paused");
+    const ready = Boolean(data) || loading;
 
     return (
         <Card>
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
                     <CardTitle className="truncate">{t("insights.title")}</CardTitle>
-                    {pauseLabel ? (
-                        <Badge variant={pause?.enabled ? "success" : "warning"}>{pauseLabel}</Badge>
+                    {pauseState ? (
+                        <Badge variant={pause?.enabled ? "success" : "warning"}>{pauseState}</Badge>
                     ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {pause?.enabled === false ? null : (
                         <Select
-                            className="w-28"
-                            value={minutes}
+                            className="w-36"
+                            value={pauseFor}
                             aria-label={t("insights.pauseFor")}
-                            onValueChange={setMinutes}
-                            options={PAUSES.map((value) => ({
-                                value: String(value),
-                                label:
-                                    value === 60
-                                        ? t("insights.hour")
-                                        : t("insights.minutes", { count: value })
+                            onValueChange={setPauseFor}
+                            options={PAUSES.map((seconds) => ({
+                                value: String(seconds),
+                                label: pauseLabel(t, seconds)
                             }))}
                         />
                     )}
@@ -151,10 +301,33 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-5">
-                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                <div className="flex flex-wrap items-center gap-3">
+                    <SegmentedControl<DnsRange>
+                        size="sm"
+                        aria-label={t("insights.range")}
+                        value={filter.range}
+                        onValueChange={(range) => refine({ range })}
+                        options={DNS_RANGE_IDS.map((range) => ({
+                            value: range,
+                            label: t(`insights.ranges.${range}` as NamespaceKey<"dnsBlocker">),
+                            disabled: rangeDays(range) > Math.max(1, logDays),
+                            title:
+                                rangeDays(range) > Math.max(1, logDays)
+                                    ? t("insights.rangeKept", { days: logDays })
+                                    : undefined
+                        }))}
+                    />
+                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                        {t("insights.kept", { days: logDays })}
+                    </p>
+                </div>
+                {error ? <p className="text-sm text-danger-ink">{error}</p> : null}
+                {notice ? <p className="text-sm text-success-ink">{notice}</p> : null}
                 {data?.logOff ? (
-                    <div className="flex flex-col gap-2 rounded-md bg-muted/40 p-3 sm:flex-row sm:items-center">
-                        <p className="min-w-0 flex-1 text-sm">{t("insights.logOff")}</p>
+                    <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 sm:flex-row sm:items-center">
+                        <p className="min-w-0 flex-1 text-sm text-warning-ink">
+                            {t("insights.logOff")}
+                        </p>
                         <Button
                             variant="secondary"
                             className="shrink-0"
@@ -166,8 +339,8 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
                         </Button>
                     </div>
                 ) : null}
-                {!data && !loading ? null : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {!ready ? null : (
+                    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Figure
                             label={t("insights.queries")}
                             value={stats?.queries.toLocaleString()}
@@ -180,44 +353,140 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
                             label={t("insights.blockedPercent")}
                             value={stats ? `${stats.blockedPercent}%` : undefined}
                         />
+                        <Figure
+                            label={t("insights.listed")}
+                            value={
+                                metrics === undefined
+                                    ? undefined
+                                    : metrics
+                                      ? metrics.listed.toLocaleString()
+                                      : "-"
+                            }
+                            hint={metrics === null ? t("insights.metricsOff") : undefined}
+                        />
                     </div>
                 )}
                 {stats && stats.queries === 0 && !data?.logOff ? (
                     <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>
                 ) : null}
-                {!data && !loading ? null : (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {!ready ? null : (
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                        <ChartBlock
+                            title={t("insights.overTime")}
+                            series={
+                                stats
+                                    ? [
+                                          {
+                                              key: "allowed",
+                                              label: t("insights.permitted"),
+                                              color: ALLOWED_COLOR,
+                                              points: points(stats.timeline.allowed, stats.timeline)
+                                          },
+                                          {
+                                              key: "blocked",
+                                              label: t("insights.blocked"),
+                                              color: BLOCKED_COLOR,
+                                              points: points(stats.timeline.blocked, stats.timeline)
+                                          }
+                                      ]
+                                    : null
+                            }
+                            timeline={stats?.timeline}
+                        />
+                        <ChartBlock
+                            title={t("insights.clientActivity")}
+                            series={
+                                stats
+                                    ? stats.clientSeries.map((series: ClientSeries) => ({
+                                          key: series.client,
+                                          label: series.name || series.client,
+                                          points: points(series.counts, stats.timeline)
+                                      }))
+                                    : null
+                            }
+                            timeline={stats?.timeline}
+                            empty={t("insights.none")}
+                        />
+                    </div>
+                )}
+                {!ready ? null : (
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                        <ShareList
+                            title={t("insights.queryTypes")}
+                            items={stats?.queryTypes}
+                            total={stats?.queries ?? 0}
+                            empty={t("insights.none")}
+                            label={(name) => name}
+                            hint={t("insights.filterType")}
+                            onPick={(type) => refine({ type: type === "?" ? "" : type })}
+                        />
+                        <ShareList
+                            title={t("insights.upstreams")}
+                            items={stats?.destinations}
+                            total={stats?.queries ?? 0}
+                            empty={t("insights.none")}
+                            label={(name) => viaLabel(t, name)}
+                        />
+                        <ShareList
+                            title={t("insights.blockedBy")}
+                            items={stats?.blockedBy}
+                            total={stats?.blocked ?? 0}
+                            empty={t("insights.none")}
+                            label={(name) => listLabel(t, name)}
+                            danger
+                        />
+                    </div>
+                )}
+                {!ready ? null : (
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <TopList
-                            title={t("insights.topDomains")}
-                            items={stats?.topDomains}
+                            title={t("insights.topPermitted")}
+                            items={stats?.topPermitted}
                             empty={t("insights.none")}
                             hint={t("insights.filterDomain")}
-                            onPick={(name) => setTyped(name)}
+                            onPick={setTyped}
                         />
                         <TopList
                             title={t("insights.topBlocked")}
                             items={stats?.topBlocked}
                             empty={t("insights.none")}
                             hint={t("insights.filterDomain")}
-                            onPick={(name) => setTyped(name)}
+                            onPick={setTyped}
                         />
                         <TopList
                             title={t("insights.topClients")}
                             items={stats?.topClients}
+                            names={stats?.clients}
                             empty={t("insights.none")}
                             hint={t("insights.filterClient")}
-                            onPick={(name) =>
-                                setFilter((current) => ({ ...current, client: name }))
-                            }
+                            onPick={(client) => refine({ client })}
+                        />
+                        <TopList
+                            title={t("insights.topBlockedClients")}
+                            items={stats?.topBlockedClients}
+                            names={stats?.clients}
+                            empty={t("insights.none")}
+                            hint={t("insights.filterClient")}
+                            onPick={(client) => refine({ client, outcome: "blocked" })}
                         />
                     </div>
                 )}
-                {!data && !loading ? null : (
+                {!ready ? null : (
                     <div className="flex flex-col gap-3">
-                        <h3 className="text-sm font-medium">{t("insights.log")}</h3>
-                        <div className="flex flex-col gap-2 sm:flex-row">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-sm font-medium">{t("insights.log")}</h3>
+                            <label className="flex items-center gap-2 text-sm">
+                                <Switch
+                                    checked={live}
+                                    onChange={setLive}
+                                    aria-label={t("insights.live")}
+                                />
+                                <span>{t("insights.live")}</span>
+                            </label>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                             <Input
-                                className="min-w-0 flex-1"
+                                className="min-w-0 sm:flex-1"
                                 value={typed}
                                 placeholder={t("insights.search")}
                                 aria-label={t("insights.search")}
@@ -228,10 +497,7 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
                                 value={filter.outcome}
                                 aria-label={t("insights.outcome")}
                                 onValueChange={(value) =>
-                                    setFilter((current) => ({
-                                        ...current,
-                                        outcome: value as QueryFilter["outcome"]
-                                    }))
+                                    refine({ outcome: value as QueryFilter["outcome"] })
                                 }
                                 options={[
                                     { value: "all", label: t("insights.all") },
@@ -244,36 +510,175 @@ export function DnsInsightsCard({ onApplied }: { onApplied: () => void }) {
                                 value={filter.client || "*"}
                                 aria-label={t("insights.client")}
                                 onValueChange={(value) =>
-                                    setFilter((current) => ({
-                                        ...current,
-                                        client: value === "*" ? "" : value
-                                    }))
+                                    refine({ client: value === "*" ? "" : value })
                                 }
                                 options={[
                                     { value: "*", label: t("insights.allClients") },
                                     ...(stats?.clients ?? []).map((client) => ({
-                                        value: client,
-                                        label: client
+                                        value: client.address,
+                                        label: client.name
+                                            ? `${client.name} (${client.address})`
+                                            : client.address
                                     }))
+                                ]}
+                            />
+                            <Select
+                                className="w-full sm:w-32"
+                                value={filter.type || "*"}
+                                aria-label={t("insights.type")}
+                                onValueChange={(value) =>
+                                    refine({ type: value === "*" ? "" : value })
+                                }
+                                options={[
+                                    { value: "*", label: t("insights.allTypes") },
+                                    ...(stats?.queryTypes ?? [])
+                                        .filter((item) => item.name !== "?")
+                                        .map((item) => ({ value: item.name, label: item.name }))
                                 ]}
                             />
                         </div>
                         <QueryRows
-                            data={data}
+                            rows={live ? tail : (data?.log.rows ?? null)}
                             t={t}
-                            onClient={(client) => setFilter((current) => ({ ...current, client }))}
+                            ruling={ruling}
+                            onRule={rule}
+                            onClient={(client) => refine({ client })}
                             onDomain={setTyped}
                         />
+                        {live ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("insights.liveHint")}
+                            </p>
+                        ) : data ? (
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="min-w-0 truncate text-xs text-muted-foreground">
+                                    {t("insights.pageOf", { page: data.log.page + 1 })}
+                                </p>
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={t("insights.newer")}
+                                        title={t("insights.newer")}
+                                        disabled={filter.page === 0 || loading}
+                                        onClick={() =>
+                                            setFilter((current) => ({
+                                                ...current,
+                                                page: Math.max(0, current.page - 1)
+                                            }))
+                                        }
+                                    >
+                                        <ChevronLeft className="size-4 shrink-0" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={t("insights.older")}
+                                        title={t("insights.older")}
+                                        disabled={!data.log.hasMore || loading}
+                                        onClick={() =>
+                                            setFilter((current) => ({
+                                                ...current,
+                                                page: current.page + 1
+                                            }))
+                                        }
+                                    >
+                                        <ChevronRight className="size-4 shrink-0" />
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 )}
+                <ListsSection
+                    t={t}
+                    metrics={metrics}
+                    refreshHours={refreshHours}
+                    refreshing={refreshingLists}
+                    onRefresh={refreshLists}
+                />
             </CardBody>
         </Card>
     );
 }
 
-function Figure({ label, value }: { label: string; value: string | undefined }) {
+function ListsSection({
+    t,
+    metrics,
+    refreshHours,
+    refreshing,
+    onRefresh
+}: {
+    t: Translate;
+    metrics: EngineMetrics | null | undefined;
+    refreshHours: number;
+    refreshing: boolean;
+    onRefresh: () => void;
+}) {
     return (
-        <div className="flex min-w-0 flex-col gap-1 rounded-md bg-muted/40 p-3">
+        <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-col">
+                    <h3 className="text-sm font-medium">{t("insights.lists")}</h3>
+                    <p className="text-xs text-muted-foreground">
+                        {t("insights.listsSchedule", { hours: refreshHours })}
+                        {metrics?.lastRefresh
+                            ? ` ${t("insights.listsLoaded", { when: new Date(metrics.lastRefresh).toLocaleString() })}`
+                            : ""}
+                    </p>
+                </div>
+                <Button variant="secondary" disabled={refreshing || !metrics} onClick={onRefresh}>
+                    {refreshing ? (
+                        <Loader2 className="size-4 shrink-0 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4 shrink-0" />
+                    )}
+                    {t("insights.listsRefresh")}
+                </Button>
+            </div>
+            {metrics === undefined ? (
+                <Skeleton className="h-16 w-full" />
+            ) : metrics === null ? (
+                <p className="text-sm text-muted-foreground">{t("insights.metricsOff")}</p>
+            ) : (
+                <>
+                    <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                        {metrics.lists.map((list) => (
+                            <li key={list.name} className="flex min-w-0 items-center gap-2 text-sm">
+                                <span className="min-w-0 flex-1 truncate">
+                                    {listLabel(t, list.name)}
+                                </span>
+                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                    {t("insights.domains", { count: list.count.toLocaleString() })}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    {metrics.failedDownloads > 0 ? (
+                        <p className="rounded-md border border-warning-edge bg-warning-soft p-2 text-xs text-warning-ink">
+                            {t("insights.listsFailed", { count: metrics.failedDownloads })}
+                        </p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                        {t("insights.listsPerCategory")}
+                    </p>
+                </>
+            )}
+        </div>
+    );
+}
+
+export function Figure({
+    label,
+    value,
+    hint
+}: {
+    label: string;
+    value: string | undefined;
+    hint?: string;
+}) {
+    return (
+        <div className="flex min-w-0 flex-col gap-1 rounded-md bg-muted p-3" title={hint}>
             <span className="truncate text-xs text-muted-foreground" title={label}>
                 {label}
             </span>
@@ -288,18 +693,77 @@ function Figure({ label, value }: { label: string; value: string | undefined }) 
     );
 }
 
-function TopList({
+function ChartBlock({
+    title,
+    series,
+    timeline,
+    empty
+}: {
+    title: string;
+    series: (ChartSeries & { color?: string })[] | null;
+    timeline: QueryTimeline | undefined;
+    empty?: string;
+}) {
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                <h3 className="truncate text-sm font-medium" title={title}>
+                    {title}
+                </h3>
+                {series && series.length > 0 ? (
+                    <ul className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        {series.map((line, index) => (
+                            <li key={line.key} className="flex min-w-0 items-center gap-1.5">
+                                <span
+                                    className="size-2 shrink-0 rounded-full"
+                                    style={{
+                                        background:
+                                            line.color ??
+                                            SERIES_COLORS[index % SERIES_COLORS.length]
+                                    }}
+                                />
+                                <span className="max-w-[12rem] truncate" title={line.label}>
+                                    {line.label}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : null}
+            </div>
+            {!series || !timeline ? (
+                <Skeleton className="h-[132px] w-full" />
+            ) : series.length === 0 && empty ? (
+                <p className="text-sm text-muted-foreground">{empty}</p>
+            ) : (
+                <MultiSeriesChart
+                    label={title}
+                    series={series}
+                    from={timeline.from}
+                    to={timeline.from + (timeline.allowed.length - 1) * timeline.bucketMs}
+                />
+            )}
+        </div>
+    );
+}
+
+function ShareList({
     title,
     items,
+    total,
     empty,
+    label,
     hint,
-    onPick
+    onPick,
+    danger = false
 }: {
     title: string;
     items: readonly NameCount[] | undefined;
+    total: number;
     empty: string;
-    hint: string;
-    onPick: (name: string) => void;
+    label: (name: string) => string;
+    hint?: string;
+    onPick?: (name: string) => void;
+    danger?: boolean;
 }) {
     return (
         <div className="flex min-w-0 flex-col gap-2">
@@ -309,22 +773,91 @@ function TopList({
             ) : items.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{empty}</p>
             ) : (
+                <ul className="flex flex-col gap-2">
+                    {items.map((item) => {
+                        const share = total > 0 ? (item.count / total) * 100 : 0;
+                        const name = label(item.name);
+                        return (
+                            <li key={item.name} className="flex min-w-0 flex-col gap-1 text-sm">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    {onPick ? (
+                                        <button
+                                            type="button"
+                                            title={hint}
+                                            className="min-w-0 flex-1 truncate text-left hover:underline"
+                                            onClick={() => onPick(item.name)}
+                                        >
+                                            {name}
+                                        </button>
+                                    ) : (
+                                        <span className="min-w-0 flex-1 truncate" title={name}>
+                                            {name}
+                                        </span>
+                                    )}
+                                    <span className="shrink-0 tabular-nums text-muted-foreground">
+                                        {share < 0.1 && share > 0 ? "<0.1" : share.toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                    <div
+                                        className={`h-full rounded-full ${danger ? "bg-danger" : "bg-primary"}`}
+                                        style={{ width: `${Math.max(share, 1)}%` }}
+                                    />
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+function TopList({
+    title,
+    items,
+    names,
+    empty,
+    hint,
+    onPick
+}: {
+    title: string;
+    items: readonly NameCount[] | undefined;
+    names?: readonly { address: string; name: string }[];
+    empty: string;
+    hint: string;
+    onPick: (name: string) => void;
+}) {
+    const nameOf = (address: string) =>
+        names?.find((client) => client.address === address)?.name ?? "";
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            <h3 className="text-sm font-medium">{title}</h3>
+            {!items ? (
+                <Skeleton className="h-24 w-full" />
+            ) : items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{empty}</p>
+            ) : (
                 <ul className="flex flex-col gap-1">
-                    {items.map((item) => (
-                        <li key={item.name} className="flex min-w-0 items-center gap-2 text-sm">
-                            <button
-                                type="button"
-                                title={hint}
-                                className="min-w-0 flex-1 truncate text-left hover:underline"
-                                onClick={() => onPick(item.name)}
-                            >
-                                {item.name}
-                            </button>
-                            <span className="shrink-0 tabular-nums text-muted-foreground">
-                                {item.count.toLocaleString()}
-                            </span>
-                        </li>
-                    ))}
+                    {items.map((item) => {
+                        const name = nameOf(item.name);
+                        const shown = name ? `${name} (${item.name})` : item.name;
+                        return (
+                            <li key={item.name} className="flex min-w-0 items-center gap-2 text-sm">
+                                <button
+                                    type="button"
+                                    title={`${shown} - ${hint}`}
+                                    className="min-w-0 flex-1 truncate text-left hover:underline"
+                                    onClick={() => onPick(item.name)}
+                                >
+                                    {shown}
+                                </button>
+                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                    {item.count.toLocaleString()}
+                                </span>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
         </div>
@@ -332,44 +865,62 @@ function TopList({
 }
 
 function QueryRows({
-    data,
+    rows,
     t,
+    ruling,
+    onRule,
     onClient,
     onDomain
 }: {
-    data: DnsInsights | null;
-    t: ReturnType<typeof useTranslations<"dnsBlocker">>;
+    rows: readonly QueryRow[] | null;
+    t: Translate;
+    ruling: string | null;
+    onRule: (domain: string, list: "allow" | "deny") => void;
     onClient: (client: string) => void;
     onDomain: (domain: string) => void;
 }) {
-    if (!data) return <Skeleton className="h-40 w-full" />;
-    if (data.rows.length === 0)
+    if (!rows) return <Skeleton className="h-40 w-full" />;
+    if (rows.length === 0)
         return <p className="text-sm text-muted-foreground">{t("insights.noMatches")}</p>;
     return (
-        <div className="flex flex-col gap-1">
-            <p className="text-xs text-muted-foreground">
-                {t("insights.showing", { count: data.rows.length })}
-            </p>
-            <div className="max-h-96 overflow-auto overscroll-contain rounded-md border border-border">
-                <table className="w-full table-fixed text-sm">
-                    <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
-                        <tr>
-                            <th className="w-40 p-2 font-medium">{t("insights.time")}</th>
-                            <th className="p-2 font-medium">{t("insights.domain")}</th>
-                            <th className="hidden w-16 p-2 font-medium sm:table-cell">
-                                {t("insights.type")}
-                            </th>
-                            <th className="hidden w-36 p-2 font-medium md:table-cell">
-                                {t("insights.client")}
-                            </th>
-                            <th className="w-28 p-2 font-medium">{t("insights.outcome")}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {data.rows.map((row, index) => (
-                            <tr key={`${row.time}-${index}`} className="border-t border-border">
-                                <td className="truncate p-2 tabular-nums text-muted-foreground">
-                                    {row.time}
+        <div className="max-h-[28rem] overflow-auto overscroll-contain rounded-md border border-border">
+            <table className="w-full table-fixed text-sm">
+                <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                    <tr>
+                        <th className="w-36 p-2 font-medium">{t("insights.time")}</th>
+                        <th className="p-2 font-medium">{t("insights.domain")}</th>
+                        <th className="hidden w-16 p-2 font-medium sm:table-cell">
+                            {t("insights.type")}
+                        </th>
+                        <th className="hidden w-40 p-2 font-medium md:table-cell">
+                            {t("insights.client")}
+                        </th>
+                        <th className="hidden w-44 p-2 font-medium lg:table-cell">
+                            {t("insights.answeredBy")}
+                        </th>
+                        <th className="w-24 p-2 font-medium">{t("insights.outcome")}</th>
+                        <th className="w-12 p-2">
+                            <span className="sr-only">{t("insights.actions")}</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row, index) => {
+                        const at = Number.isNaN(row.at)
+                            ? row.time
+                            : new Date(row.at).toLocaleString();
+                        const blocked = row.outcome === "blocked";
+                        const action = blocked ? t("insights.allowName") : t("insights.blockName");
+                        return (
+                            <tr
+                                key={`${row.time}-${row.domain}-${index}`}
+                                className="border-t border-border"
+                            >
+                                <td
+                                    className="truncate p-2 tabular-nums text-muted-foreground"
+                                    title={at}
+                                >
+                                    {at}
                                 </td>
                                 <td className="p-2">
                                     <button
@@ -387,27 +938,63 @@ function QueryRows({
                                 <td className="hidden p-2 md:table-cell">
                                     <button
                                         type="button"
-                                        title={t("insights.filterClient")}
+                                        title={`${row.clientName ? `${row.clientName} (${row.client})` : row.client} - ${t("insights.filterClient")}`}
                                         className="block w-full truncate text-left hover:underline"
                                         onClick={() => onClient(row.client)}
                                     >
-                                        {row.client}
+                                        {row.clientName || row.client}
                                     </button>
                                 </td>
+                                <td
+                                    className="hidden truncate p-2 text-muted-foreground lg:table-cell"
+                                    title={row.reason}
+                                >
+                                    {blocked && row.list
+                                        ? row.list === "polaris"
+                                            ? t("insights.ownList")
+                                            : row.list
+                                        : row.via === "blocked"
+                                          ? row.reason
+                                          : row.via === "cache" ||
+                                              row.via === "local" ||
+                                              row.via === "other"
+                                            ? t(
+                                                  `insights.via.${row.via}` as NamespaceKey<"dnsBlocker">
+                                              )
+                                            : row.via}
+                                </td>
                                 <td className="p-2">
-                                    <Badge
-                                        variant={row.outcome === "blocked" ? "danger" : "neutral"}
-                                    >
-                                        {row.outcome === "blocked"
+                                    <Badge variant={blocked ? "danger" : "neutral"}>
+                                        {blocked
                                             ? t("insights.blockedOnly")
                                             : t("insights.allowedOnly")}
                                     </Badge>
                                 </td>
+                                <td className="p-1 text-right">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        aria-label={`${action}: ${row.domain}`}
+                                        title={action}
+                                        disabled={ruling !== null}
+                                        onClick={() =>
+                                            onRule(row.domain, blocked ? "allow" : "deny")
+                                        }
+                                    >
+                                        {ruling === row.domain ? (
+                                            <Loader2 className="size-4 shrink-0 animate-spin" />
+                                        ) : blocked ? (
+                                            <ShieldCheck className="size-4 shrink-0" />
+                                        ) : (
+                                            <Ban className="size-4 shrink-0" />
+                                        )}
+                                    </Button>
+                                </td>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        );
+                    })}
+                </tbody>
+            </table>
         </div>
     );
 }

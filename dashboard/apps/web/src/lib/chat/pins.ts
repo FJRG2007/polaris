@@ -20,7 +20,6 @@ import { publishChatChange } from "./live";
 import { decorateMessages, MESSAGE_SELECT, type ChatMessageView } from "./messages";
 import { MAX_PINS, pinExpiry, type PinInput } from "./pin-rules";
 import { requireAgeCleared } from "./age-gate";
-import * as history from "./history-visibility";
 
 export { MAX_PINS, PIN_DURATIONS, pinExpiry, pinInputSchema } from "./pin-rules";
 export type { PinDuration, PinInput } from "./pin-rules";
@@ -73,20 +72,10 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
             parentId: true,
             deletedAt: true,
             pinnedAt: true,
-            pinExpiresAt: true,
-            createdAt: true
+            pinExpiresAt: true
         }
     });
     if (!message || message.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
-    // Pinning a message from before this reader joined would show it to them.
-    if (
-        !history.isReadable(
-            await history.readableSince(actor, message.channelId),
-            message.createdAt
-        )
-    ) {
-        throw new ChatAccessError();
-    }
     // A line Polaris wrote, or a reply inside a thread, is not something the
     // room pins: the bar above the conversation jumps to it, and a thread reply
     // is not in the conversation.
@@ -143,10 +132,7 @@ export async function pinsIn(actor: ChatActor, channelId: string): Promise<ChatP
     await requireChannel(actor, channelId);
     await requireAgeCleared(actor, channelId);
     const rows = await prisma.chatMessage.findMany({
-        where: {
-            ...pinnedWhere(channelId, new Date()),
-            AND: [history.sinceClause(await history.readableSince(actor, channelId))]
-        },
+        where: pinnedWhere(channelId, new Date()),
         orderBy: { pinnedAt: "desc" },
         take: MAX_PINS,
         select: { ...MESSAGE_SELECT, pinnedAt: true, pinnedById: true, pinExpiresAt: true }

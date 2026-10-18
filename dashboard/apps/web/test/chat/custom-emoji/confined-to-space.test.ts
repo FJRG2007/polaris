@@ -69,8 +69,6 @@ vi.mock("@polaris/db", () => {
     const client = {
         userBlock: { findMany: async () => [] },
         chatChannel: {
-            // Nobody here joined too late to read: the history-visibility lookup finds no closed room.
-            findMany: async () => [],
             findUnique: async () => ({
                 id: "channel-1",
                 spaceId: channelSpace,

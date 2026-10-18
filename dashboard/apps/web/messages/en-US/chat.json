@@ -1012,15 +1012,7 @@
         "madeBy": "Made by {name}",
         "rename": "Rename",
         "webhookActions": "Actions for {name}",
-        "esc": "Esc",
-        "newcomerHistory": "Earlier messages for new members",
-        "newcomerHistoryHint": "When hidden, people who join later only see new messages.",
-        "newcomerHistoryInherit": "Server default ({state})",
-        "newcomerHistoryOn": "Shown",
-        "newcomerHistoryOff": "Hidden",
-        "newcomerHistoryDefault": "Server default: new members see earlier messages",
-        "newcomerHistoryDefaultHint": "Applies to every channel that uses the server default.",
-        "newcomerHistoryDefaultLocked": "Only server admins can change the default."
+        "esc": "Esc"
     },
     "callMenus": {
         "volume": "Volume",
@@ -1207,9 +1199,7 @@
         "handItOver": "Hand it over",
         "cancel": "Cancel",
         "makeOwner": "Make owner",
-        "close": "Close",
-        "newcomersReadHistory": "People added later see earlier messages",
-        "newcomersReadHistoryHint": "When off, they only see messages sent after they join."
+        "close": "Close"
     },
     "newDirect": {
         "newMessage": "New message",

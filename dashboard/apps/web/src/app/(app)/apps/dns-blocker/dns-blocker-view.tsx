@@ -67,6 +67,9 @@ const STARTING_CHECKS = 15;
 /** States in which a DNS server of ours exists. */
 const ENGINE_STATES: readonly DnsBlockerState[] = ["blocking", "starting", "portHeld", "conflict"];
 
+/** Addresses, a range and a name pattern, as typed into a group. */
+const GROUP_CLIENTS_EXAMPLE = "192.168.1.20\n192.168.1.64/26\nkids-*"; // i18n-ignore example values
+
 export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
     const t = useTranslations("dnsBlocker");
     const [status, setStatus] = useState<DnsBlockerStatus | null>(null);
@@ -90,6 +93,30 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
     const [listCategory, setListCategory] = useState<dns.DnsCategory>("ads");
     const [recordName, setRecordName] = useState("");
     const [recordAddress, setRecordAddress] = useState("");
+    const [aliases, setAliases] = useState(initial.aliases);
+    const [aliasName, setAliasName] = useState("");
+    const [aliasTarget, setAliasTarget] = useState("");
+    const [clientGroups, setClientGroups] = useState(initial.clientGroups);
+    const [groupName, setGroupName] = useState("");
+    const [groupClients, setGroupClients] = useState("");
+    const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
+    const [logDays, setLogDays] = useState(String(initial.logDays));
+    const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
+
+    /** A rule set from the query log: the lists as saved, without touching
+     *  a list somebody is editing here. */
+    const adoptRules = useCallback(
+        (next: dns.DnsSettings) => {
+            setAllowText((current) =>
+                current === saved.allow.join("\n") ? next.allow.join("\n") : current
+            );
+            setDenyText((current) =>
+                current === saved.deny.join("\n") ? next.deny.join("\n") : current
+            );
+            setSaved((current) => ({ ...current, allow: next.allow, deny: next.deny }));
+        },
+        [saved]
+    );
 
     const [startingChecks, setStartingChecks] = useState(0);
 
@@ -131,6 +158,13 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
     const hours = Number(refreshHours);
     const hoursValid = Number.isInteger(hours) && hours >= 1 && hours <= 168;
     const customEmpty = upstream === "custom" && lines(upstreamText).length === 0;
+    const days = Number(logDays);
+    const daysValid = Number.isInteger(days) && days >= 1 && days <= dns.DNS_LIMITS.logDays;
+    const namesFromValid = dns.dnsSettingsSchema.shape.namesFrom.safeParse(namesFrom).success;
+    const recordNames = new Set(records.map((record) => record.name));
+    const aliasClash = aliases
+        .filter((alias) => recordNames.has(alias.name))
+        .map((alias) => alias.name);
 
     const draft: dns.DnsSettings = useMemo(
         () => ({
@@ -141,9 +175,26 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
             upstream,
             customUpstreams: upstream === "custom" ? lines(upstreamText) : [],
             records,
-            refreshHours: hours
+            refreshHours: hours,
+            aliases,
+            clientGroups,
+            logDays: days,
+            namesFrom: namesFrom.trim()
         }),
-        [sources, customLists, allowText, denyText, upstream, upstreamText, records, hours]
+        [
+            sources,
+            customLists,
+            allowText,
+            denyText,
+            upstream,
+            upstreamText,
+            records,
+            hours,
+            aliases,
+            clientGroups,
+            days,
+            namesFrom
+        ]
     );
     const dirty =
         JSON.stringify(draft) !==
@@ -158,11 +209,21 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
         badDeny.length === 0 &&
         badUpstreams.length === 0 &&
         hoursValid &&
+        daysValid &&
+        namesFromValid &&
+        aliasClash.length === 0 &&
         !customEmpty &&
         !tooMany;
 
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const newRecord = dns.dnsRecordSchema.safeParse({ name: recordName, address: recordAddress });
+    const newAlias = dns.dnsAliasSchema.safeParse({ name: aliasName, target: aliasTarget });
+    const badGroupClients = rejected(groupClients, dns.normalizeDnsClient);
+    const newGroup = dns.dnsClientGroupSchema.safeParse({
+        name: groupName,
+        clients: lines(groupClients),
+        categories: groupCategories
+    });
 
     function save(): void {
         setNotice(null);
@@ -295,7 +356,14 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                     ) : null}
                 </CardBody>
             </Card>
-            {state === "blocking" ? <DnsInsightsCard onApplied={recheck} /> : null}
+            {state === "blocking" ? (
+                <DnsInsightsCard
+                    onApplied={recheck}
+                    onRules={adoptRules}
+                    logDays={saved.logDays}
+                    refreshHours={saved.refreshHours}
+                />
+            ) : null}
 
             <Card>
                 <CardHeader>
@@ -588,6 +656,231 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                 </CardBody>
             </Card>
 
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("aliases.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("aliases.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-2">
+                    {aliases.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("aliases.empty")}</p>
+                    ) : null}
+                    {aliases.map((alias, index) => (
+                        <div
+                            key={`${alias.name}-${alias.target}-${index}`}
+                            className="flex min-w-0 items-center gap-2 text-sm"
+                        >
+                            <span className="min-w-0 flex-1 truncate" title={alias.name}>
+                                {alias.name}
+                            </span>
+                            <code className="min-w-0 truncate text-xs" title={alias.target}>
+                                {alias.target}
+                            </code>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={t("aliases.remove")}
+                                title={t("aliases.remove")}
+                                onClick={() =>
+                                    setAliases((current) => current.filter((_, at) => at !== index))
+                                }
+                            >
+                                <Trash2 />
+                            </Button>
+                        </div>
+                    ))}
+                    {aliasClash.length > 0 ? (
+                        <p className="text-xs text-danger-ink">
+                            {t("validation.aliasClash", { names: aliasClash.join(", ") })}
+                        </p>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                            className="min-w-0 flex-1"
+                            value={aliasName}
+                            placeholder="media.home"
+                            aria-label={t("aliases.name")}
+                            aria-invalid={
+                                aliasName.trim() !== "" &&
+                                !newAlias.success &&
+                                newAlias.error.issues.some((issue) => issue.path[0] === "name")
+                            }
+                            onChange={(event) => setAliasName(event.target.value)}
+                        />
+                        <Input
+                            className="min-w-0 flex-1"
+                            value={aliasTarget}
+                            placeholder="nas.home"
+                            aria-label={t("aliases.target")}
+                            aria-invalid={
+                                aliasTarget.trim() !== "" &&
+                                !newAlias.success &&
+                                newAlias.error.issues.some((issue) => issue.path[0] === "target")
+                            }
+                            onChange={(event) => setAliasTarget(event.target.value)}
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!newAlias.success || aliases.length >= dns.DNS_LIMITS.records}
+                            onClick={() => {
+                                if (!newAlias.success) return;
+                                setAliases((current) => [...current, newAlias.data]);
+                                setAliasName("");
+                                setAliasTarget("");
+                            }}
+                        >
+                            <Plus />
+                            {t("aliases.add")}
+                        </Button>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("groups.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("groups.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {clientGroups.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("groups.empty")}</p>
+                    ) : null}
+                    {clientGroups.map((group, index) => (
+                        <div
+                            key={`${group.name}-${index}`}
+                            className="flex min-w-0 items-start gap-2 rounded-md bg-muted p-2 text-sm"
+                        >
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <span className="truncate font-medium" title={group.name}>
+                                    {group.name}
+                                </span>
+                                <span
+                                    className="truncate text-xs text-muted-foreground"
+                                    title={group.clients.join(", ")}
+                                >
+                                    {group.clients.join(", ")}
+                                </span>
+                                <span className="truncate text-xs">
+                                    {group.categories.length === 0
+                                        ? t("groups.nothing")
+                                        : group.categories
+                                              .map((category) => t(`categories.${category}`))
+                                              .join(", ")}
+                                </span>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                aria-label={t("groups.remove")}
+                                title={t("groups.remove")}
+                                onClick={() =>
+                                    setClientGroups((current) =>
+                                        current.filter((_, at) => at !== index)
+                                    )
+                                }
+                            >
+                                <Trash2 />
+                            </Button>
+                        </div>
+                    ))}
+                    <div className="flex flex-col gap-2">
+                        <Input
+                            value={groupName}
+                            placeholder={t("groups.namePlaceholder")}
+                            aria-label={t("groups.name")}
+                            onChange={(event) => setGroupName(event.target.value)}
+                        />
+                        <RuleField
+                            label={t("groups.clients")}
+                            value={groupClients}
+                            onChange={setGroupClients}
+                            bad={badGroupClients}
+                            badText={t("validation.invalidClient")}
+                            placeholder={GROUP_CLIENTS_EXAMPLE}
+                        />
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                            {dns.DNS_CATEGORIES.map((category) => (
+                                <label key={category} className="flex items-center gap-2 text-sm">
+                                    <Switch
+                                        checked={groupCategories.includes(category)}
+                                        onChange={(on: boolean) =>
+                                            setGroupCategories((current) =>
+                                                on
+                                                    ? [...current, category]
+                                                    : current.filter((item) => item !== category)
+                                            )
+                                        }
+                                    />
+                                    <span>{t(`categories.${category}`)}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                    !newGroup.success ||
+                                    clientGroups.length >= dns.DNS_LIMITS.clientGroups
+                                }
+                                onClick={() => {
+                                    if (!newGroup.success) return;
+                                    setClientGroups((current) => [...current, newGroup.data]);
+                                    setGroupName("");
+                                    setGroupClients("");
+                                    setGroupCategories([]);
+                                }}
+                            >
+                                <Plus />
+                                {t("groups.add")}
+                            </Button>
+                        </div>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("history.title")}</CardTitle>
+                </CardHeader>
+                <CardBody className="flex flex-wrap gap-4">
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span>{t("history.days")}</span>
+                        <Input
+                            className="w-28"
+                            type="number"
+                            min={1}
+                            max={dns.DNS_LIMITS.logDays}
+                            value={logDays}
+                            aria-invalid={!daysValid}
+                            onChange={(event) => setLogDays(event.target.value)}
+                        />
+                        {!daysValid ? (
+                            <span className="text-xs text-danger-ink">
+                                {t("validation.logDays", { max: dns.DNS_LIMITS.logDays })}
+                            </span>
+                        ) : null}
+                    </label>
+                    <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+                        <span>{t("history.namesFrom")}</span>
+                        <Input
+                            className="w-full sm:w-48"
+                            value={namesFrom}
+                            placeholder="192.168.1.1"
+                            aria-invalid={!namesFromValid}
+                            onChange={(event) => setNamesFrom(event.target.value)}
+                        />
+                        <span
+                            className={`text-xs ${namesFromValid ? "text-muted-foreground" : "text-danger-ink"}`}
+                        >
+                            {namesFromValid
+                                ? t("history.namesFromHint")
+                                : t("validation.invalidAddress")}
+                        </span>
+                    </label>
+                </CardBody>
+            </Card>
             <Card>
                 <CardBody className="flex flex-wrap items-end justify-between gap-3">
                     <label className="flex flex-col gap-1 text-sm">

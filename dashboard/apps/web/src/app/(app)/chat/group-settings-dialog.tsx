@@ -35,7 +35,6 @@ import {
 interface GroupOptions {
     membersMayEdit?: boolean;
     membersMayInvite?: boolean;
-    newcomersReadHistory?: boolean;
     membersMayMention?: boolean;
 }
 
@@ -69,18 +68,12 @@ export function GroupSettingsDialog({
     const [pending, setPending] = useState<GroupOptions>({});
     useEffect(
         () => setPending({}),
-        [
-            channel.membersMayEdit,
-            channel.membersMayInvite,
-            channel.membersMayMention,
-            channel.newcomerHistory
-        ]
+        [channel.membersMayEdit, channel.membersMayInvite, channel.membersMayMention]
     );
     const shown = {
         membersMayEdit: pending.membersMayEdit ?? channel.membersMayEdit,
         membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite,
-        membersMayMention: pending.membersMayMention ?? channel.membersMayMention,
-        newcomersReadHistory: pending.newcomersReadHistory ?? channel.newcomerHistory !== "off"
+        membersMayMention: pending.membersMayMention ?? channel.membersMayMention
     };
 
     const setSwitch = async (change: GroupOptions) => {
@@ -140,9 +133,7 @@ export function GroupSettingsDialog({
 
                     <label className="flex items-start justify-between gap-3">
                         <span className="flex min-w-0 flex-col">
-                            <span className="text-sm font-medium">
-                                {t("groupSettings.letAnybodyAddPeople")}
-                            </span>
+                            <span className="text-sm font-medium">{t("groupSettings.letAnybodyAddPeople")}</span>
                             <span className="text-xs text-muted-foreground">
                                 {t("groupSettings.offOnlyYouCanAdd")}
                             </span>
@@ -174,29 +165,8 @@ export function GroupSettingsDialog({
                         />
                     </label>
 
-                    <label className="flex items-start justify-between gap-3">
-                        <span className="flex min-w-0 flex-col">
-                            <span className="text-sm font-medium">
-                                {t("groupSettings.newcomersReadHistory")}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                {t("groupSettings.newcomersReadHistoryHint")}
-                            </span>
-                        </span>
-                        <Switch
-                            checked={shown.newcomersReadHistory}
-                            disabled={busy}
-                            onChange={(next: boolean) =>
-                                void setSwitch({ newcomersReadHistory: next })
-                            }
-                            aria-label={t("groupSettings.newcomersReadHistory")}
-                        />
-                    </label>
-
                     <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium">
-                            {t("groupSettings.handTheGroupOver")}
-                        </span>
+                        <span className="text-sm font-medium">{t("groupSettings.handTheGroupOver")}</span>
                         <span className="text-xs text-muted-foreground">
                             {t("groupSettings.theyRunItFromThen")}
                         </span>

@@ -25,9 +25,6 @@ const THEIRS = "33333333-3333-4333-8333-333333333333";
 
 let reachable = new Set<string>([MINE, ALSO_MINE]);
 
-/** When the reader joined MINE, if it hides history from people who join later. */
-let joinedMine: Date | null = null;
-
 vi.mock("@/lib/chat/access", () => ({
     reachableChannelIds: async () => reachable
 }));
@@ -46,22 +43,9 @@ vi.mock("@polaris/db", () => ({
             }
         },
         chatChannel: {
-            findMany: async (query: { where: Record<string, unknown> }) =>
-                JSON.stringify(query.where).includes("newcomerHistory")
-                    ? joinedMine
-                        ? [
-                              {
-                                  id: MINE,
-                                  kind: "text",
-                                  spaceId: "space-1",
-                                  private: true,
-                                  newcomerHistory: "off",
-                                  members: [{ createdAt: joinedMine }],
-                                  space: { newcomerHistory: true, members: [] }
-                              }
-                          ]
-                        : []
-                    : [{ id: MINE, name: "release", spaceId: "space-1" }]
+            findMany: async () => [
+                { id: MINE, name: "release", spaceId: "space-1" }
+            ]
         }
     }
 }));
@@ -79,27 +63,6 @@ function query(partial: Partial<core.ChatSearchInput> = {}): core.ChatSearchInpu
 beforeEach(() => {
     asked = null;
     reachable = new Set([MINE, ALSO_MINE]);
-    joinedMine = null;
-});
-
-describe("what somebody who joined later finds", () => {
-    it("is only what was said since they joined, where earlier history is hidden", async () => {
-        joinedMine = new Date("2026-10-10T00:00:00Z");
-        await searchMessages(actor, query({ term: "release" }));
-        expect(asked?.where.AND).toEqual([
-            {
-                OR: [
-                    { channelId: { notIn: [MINE] } },
-                    { channelId: MINE, createdAt: { gte: joinedMine } }
-                ]
-            }
-        ]);
-    });
-
-    it("is everything they can reach, where it is shown", async () => {
-        await searchMessages(actor, query({ term: "release" }));
-        expect(asked?.where.AND).toEqual([{}]);
-    });
 });
 
 describe("what a search may reach", () => {
@@ -116,7 +79,10 @@ describe("what a search may reach", () => {
     it("finds nothing in a conversation the reader is not in", async () => {
         // The whole point. Naming somebody else's channel is a request that
         // narrows to the empty set, never a way into it.
-        const hits = await searchMessages(actor, query({ term: "x", channelId: THEIRS }));
+        const hits = await searchMessages(
+            actor,
+            query({ term: "x", channelId: THEIRS })
+        );
         expect(hits).toEqual([]);
         expect(asked).toBeNull();
     });

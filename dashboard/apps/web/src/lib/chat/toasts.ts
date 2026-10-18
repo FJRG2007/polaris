@@ -35,7 +35,6 @@ import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
 import { mentionsReader, notifyLevels, readerTeams } from "./notify";
-import * as history from "./history-visibility";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
@@ -318,16 +317,14 @@ export async function messageToasts(
  * is already showing it, and the other tabs of the same person do not need
  * telling.
  */
-async function recentIn(userId: string, channelIds: readonly string[], since: Date, take: number) {
-    const floors = await history.historyFloors(userId, channelIds);
+function recentIn(userId: string, channelIds: readonly string[], since: Date, take: number) {
     return prisma.chatMessage.findMany({
         where: {
             channelId: { in: [...channelIds] },
             deletedAt: null,
             createdAt: { gte: since },
             authorId: { not: userId },
-            ...ageClearedWhere(userId),
-            AND: [history.readableWhere(floors)]
+            ...ageClearedWhere(userId)
         },
         orderBy: { createdAt: "desc" },
         take,

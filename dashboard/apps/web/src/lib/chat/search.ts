@@ -19,7 +19,6 @@ import * as core from "@polaris/core";
 import { reachableChannelIds } from "./access";
 import { ageClearedWhere } from "./age-gate";
 import { decorateMessages, type ChatMessageView } from "./messages";
-import * as history from "./history-visibility";
 
 /** One result, with enough about where it was said to be worth clicking. */
 export interface ChatSearchHit {
@@ -46,7 +45,6 @@ export async function searchMessages(
             : []
         : [...reachable];
     if (within.length === 0) return [];
-    const floors = await history.historyFloors(actor.id, within);
 
     const rows = await prisma.chatMessage.findMany({
         where: {
@@ -62,9 +60,7 @@ export async function searchMessages(
             ...(input.term ? { body: { contains: input.term, mode: "insensitive" as const } } : {}),
             ...(input.authorId ? { authorId: input.authorId } : {}),
             ...attachmentClause(input.has),
-            ...dayClause(input.after, input.before),
-            // Nothing from before this reader joined where that is hidden.
-            AND: [history.readableWhere(floors)]
+            ...dayClause(input.after, input.before)
         },
         orderBy: { createdAt: "desc" },
         take: core.CHAT_SEARCH_LIMIT,

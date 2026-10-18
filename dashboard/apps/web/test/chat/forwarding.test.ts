@@ -99,8 +99,6 @@ vi.mock("@polaris/db", () => {
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
         chatChannel: {
-            // Nobody here joined too late to read: the history-visibility lookup finds no closed room.
-            findMany: async () => [],
             findUnique: async () => ({
                 id: "channel-2",
                 spaceId: null,

@@ -25,6 +25,8 @@ import { boundSource, dnsPublishSpec } from "./publish";
 import { getHostLanIp } from "@/lib/host-address";
 import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
+import { createVolume } from "@/lib/deploy-volume-service";
+import { QUERY_LOG_DIR } from "./query-log";
 import { DNS_CHECK_NAME, encodeBlockyConfig } from "./render";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
@@ -199,6 +201,26 @@ function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * The engine's query log on a volume of its own, so the history survives the
+ * redeploy every saved setting is. An engine installed before this had none;
+ * it gets one the next time it deploys. Idempotent.
+ */
+async function ensureLogVolume(engine: EngineRow): Promise<void> {
+    if (!engine.applicationId) return;
+    const held = await prisma.volume.findFirst({
+        where: { applicationId: engine.applicationId, mountPath: QUERY_LOG_DIR },
+        select: { id: true }
+    });
+    if (held) return;
+    await createVolume(engine.ownerId, {
+        applicationId: engine.applicationId,
+        name: "query-log",
+        mountPath: QUERY_LOG_DIR,
+        kind: "volume"
+    });
+}
+
 /** Write the configuration onto the engine and deploy it again, its ports bound
  *  to this machine's current address when there is one. A failed deploy is
  *  logged and marked on the engine, where the status reads it as `portHeld`,
@@ -211,6 +233,10 @@ async function apply(
 ): Promise<void> {
     if (!engine.applicationId) return;
     if (address) await bindEngineTo(engine, address);
+    await ensureLogVolume(engine).catch((error: unknown) =>
+        // History is worth keeping, never worth a resolver that does not start.
+        console.error("polaris: could not give the ad blocker's log a volume:", error)
+    );
     await setEnvVar("application", engine.applicationId, engine.ownerId, {
         key: DNS_CONFIG_ENV,
         value: encoded,

@@ -363,6 +363,9 @@ export interface ChartSeries {
     key: string;
     label: string;
     points: TimePoint[];
+    /** A colour that means something (blocked in danger, say); the next of
+     *  SERIES_COLORS otherwise. */
+    color?: string;
 }
 
 /**
@@ -513,7 +516,7 @@ export function MultiSeriesChart({
                                 key={line.key}
                                 d={pathOf(line.points)}
                                 fill="none"
-                                stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
+                                stroke={line.color ?? SERIES_COLORS[index % SERIES_COLORS.length]}
                                 strokeWidth={1.75}
                                 strokeLinejoin="round"
                                 strokeLinecap="round"
@@ -540,6 +543,7 @@ export function MultiSeriesChart({
                                                 className="size-2 shrink-0 rounded-full"
                                                 style={{
                                                     background:
+                                                        line.color ??
                                                         SERIES_COLORS[index % SERIES_COLORS.length]
                                                 }}
                                             />

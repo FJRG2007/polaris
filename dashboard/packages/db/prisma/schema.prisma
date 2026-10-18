@@ -8819,9 +8819,6 @@ model ChatSpace {
     // Whether a member may play a sound from another space they belong to in
     // this space's calls. Discord's "Use External Sounds".
     soundboardExternal Boolean @default(true)
-    /// Whether somebody who joins later reads what was said before they did.
-    /// The default for every channel that does not say otherwise.
-    newcomerHistory Boolean @default(true)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -9210,9 +9207,6 @@ model ChatChannel {
     // Whether the soundboard may be used in this conversation's calls. Only read
     // for a space's channel; the space's own switch is asked first.
     soundboard    Boolean   @default(true)
-    /// Earlier history for people who join later: "inherit" (the space's
-    /// default; for a group, shown), "on" or "off". Never read for a 1:1 DM.
-    newcomerHistory String  @default("inherit")
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?

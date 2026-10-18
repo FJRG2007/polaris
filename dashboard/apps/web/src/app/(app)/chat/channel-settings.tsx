@@ -33,7 +33,6 @@ import { ShareDialog } from "@/components/access/share-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { InvitesSection, WebhooksSection } from "./channel-settings-links";
-import { NewcomerHistorySetting } from "./newcomer-history-setting";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
 import {
     ArrowLeft,
@@ -566,8 +565,6 @@ function Overview({
                     }))}
                 />
             </Field>
-
-            <NewcomerHistorySetting channel={channel} />
 
             <Field label={t("channelSettings.content")} hint={t(MODE_HINT_KEYS[draft.contentMode])}>
                 <Select

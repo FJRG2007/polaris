@@ -22,6 +22,10 @@ vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     turnOnDnsBlockerAction,
     dnsInsightsAction,
     pauseDnsBlockingAction: async () => ({}),
+    dnsListsAction: async () => ({ metrics: null }),
+    dnsTailAction: async () => ({ rows: [] }),
+    refreshDnsListsAction: async () => ({}),
+    ruleFromLogAction: async () => ({}),
     resumeDnsBlockingAction: async () => ({})
 }));
 
@@ -32,12 +36,18 @@ function insights(logOff = false, domain = "example.com") {
                 queries: 1,
                 blocked: 0,
                 blockedPercent: 0,
-                topDomains: [{ name: domain, count: 1 }],
+                timeline: { from: 0, bucketMs: 600_000, allowed: [1, 0], blocked: [0, 0] },
+                clientSeries: [],
+                queryTypes: [{ name: "A", count: 1 }],
+                destinations: [{ name: "cache", count: 1 }],
+                blockedBy: [],
+                topPermitted: [{ name: domain, count: 1 }],
                 topBlocked: [],
                 topClients: [{ name: "10.0.0.2", count: 1 }],
-                clients: ["10.0.0.2"]
+                topBlockedClients: [],
+                clients: [{ address: "10.0.0.2", name: "" }]
             },
-            rows: [],
+            log: { rows: [], page: 0, hasMore: false },
             pause: { enabled: true, secondsLeft: null },
             logOff
         }
@@ -108,7 +118,7 @@ describe("DnsBlockerView today", () => {
         async (state) => {
             standing(state);
             await shown();
-            expect(screen.queryByText("Today")).toBeNull();
+            expect(screen.queryByText("Activity")).toBeNull();
             expect(dnsInsightsAction).not.toHaveBeenCalled();
         }
     );
