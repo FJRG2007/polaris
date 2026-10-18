@@ -1212,6 +1212,8 @@
         "web/src/components/dns/dns-zone-editor.tsx",
         "web/src/components/domain-security/domain-security-panel.tsx",
         "web/src/components/favorite-apps.tsx",
+        "web/src/components/file-picker/as-files.ts",
+        "web/src/components/file-picker/choose-files-dialog.tsx",
         "web/src/components/mcp-scope-checklist.tsx",
         "web/src/lib/backups/refusal-text.ts",
         "web/src/lib/backups/service.ts",

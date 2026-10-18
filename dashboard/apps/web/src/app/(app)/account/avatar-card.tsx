@@ -37,7 +37,8 @@
 
 import { BLANK_AVATAR_ETAG } from "@/lib/avatar-blank";
 import { Avatar, OrgAvatar } from "@/components/avatar";
-import { useRef, useState, type ReactNode } from "react";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
+import { useState, type ReactNode } from "react";
 import { ProfileBanner } from "@/components/profile-banner";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -113,7 +114,7 @@ interface Picture {
  */
 export function usePicture(endpoint: string, pictureUrl: string, shape: CropShape): Picture {
     const t = useTranslations("account");
-    const input = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
     const [chosen, setChosen] = useState<Blob | null>(null);
     const [sending, setSending] = useState(false);
     const [opening, setOpening] = useState(false);
@@ -198,38 +199,36 @@ export function usePicture(endpoint: string, pictureUrl: string, shape: CropShap
         busy: sending || opening,
         sending,
         error,
-        choose: () => input.current?.click(),
+        choose: () => setPicking(true),
         reframe: () => void reframe(),
         remove: () => void run(() => fetch(endpoint, { method: "DELETE" })),
         // Both are rendered wherever the handle is. The dialog puts itself on
         // top of the page from there, so where that is does not matter.
         field: (
             <>
-                <input
-                    ref={input}
-                    type="file"
-                    accept={CROP_ACCEPTED}
-                    className="hidden"
-                    onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        // Cleared first, so picking the same file twice after a
-                        // failure still counts as a change.
-                        event.target.value = "";
-                        if (!file) return;
-                        // A moving picture does not go through the cropper.
-                        // Framing happens on a canvas, and a canvas holds one
-                        // frame: an animated banner put through it would arrive
-                        // as its first frame, still, with nothing on screen
-                        // saying why. So it is sent as it is - the band is
-                        // already the shape of a banner, and the face is already
-                        // cut to a circle by the page rather than by the bytes.
-                        if (animated(file.type)) {
-                            void upload(file);
-                            return;
-                        }
-                        setChosen(file);
-                    }}
-                />
+                {picking ? (
+                    <ChooseFilesDialog
+                        accept={CROP_ACCEPTED}
+                        onClose={() => setPicking(false)}
+                        onFailed={setError}
+                        onFiles={(files) => {
+                            const file = files[0];
+                            if (!file) return;
+                            // A moving picture does not go through the cropper.
+                            // Framing happens on a canvas, and a canvas holds one
+                            // frame: an animated banner put through it would arrive
+                            // as its first frame, still, with nothing on screen
+                            // saying why. So it is sent as it is - the band is
+                            // already the shape of a banner, and the face is already
+                            // cut to a circle by the page rather than by the bytes.
+                            if (animated(file.type)) {
+                                void upload(file);
+                                return;
+                            }
+                            setChosen(file);
+                        }}
+                    />
+                ) : null}
                 {chosen ? (
                     <ImageCropDialog
                         file={chosen}

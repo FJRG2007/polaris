@@ -22,6 +22,7 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { Avatar } from "@/components/avatar";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 import { useChat } from "@/app/(app)/chat/chat-context";
 import { MessageTime } from "@/components/message-time";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -72,7 +73,8 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [deletePending, setDeletePending] = useState(false);
     const [dragging, setDragging] = useState(false);
-    const chooser = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
+    const [pickError, setPickError] = useState<string | null>(null);
 
     // The previews are object URLs, which outlive the page unless let go.
     const previews = useRef(new Set<string>());
@@ -174,7 +176,7 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
 
     /** Put files in the tray and send every one that passes the checks here,
      *  one after another. */
-    const stage = (files: FileList | null) => {
+    const stage = (files: FileList | readonly File[] | null) => {
         if (!files || files.length === 0) return;
         const names = new Set<string>([
             ...(emoji ?? []).map((one) => one.name.toLowerCase()),
@@ -322,7 +324,10 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                         type="button"
                                         size="sm"
                                         disabled={full}
-                                        onClick={() => chooser.current?.click()}
+                                        onClick={() => {
+                                            setPickError(null);
+                                            setPicking(true);
+                                        }}
                                     >
                                         <Upload className="size-3.5" />
                                         {t("spaceEmoji.upload")}
@@ -332,19 +337,20 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                             {t("spaceEmoji.full")}
                                         </p>
                                     )}
-                                    <input
-                                        ref={chooser}
-                                        type="file"
-                                        multiple
-                                        accept={core.CUSTOM_EMOJI_ACCEPT}
-                                        className="sr-only"
-                                        tabIndex={-1}
-                                        aria-hidden
-                                        onChange={(event) => {
-                                            stage(event.target.files);
-                                            event.target.value = "";
-                                        }}
-                                    />
+                                    {pickError && (
+                                        <p className="text-xs text-danger" role="alert">
+                                            {pickError}
+                                        </p>
+                                    )}
+                                    {picking && (
+                                        <ChooseFilesDialog
+                                            multiple
+                                            accept={core.CUSTOM_EMOJI_ACCEPT}
+                                            onClose={() => setPicking(false)}
+                                            onFailed={setPickError}
+                                            onFiles={stage}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         ) : list !== null ? (

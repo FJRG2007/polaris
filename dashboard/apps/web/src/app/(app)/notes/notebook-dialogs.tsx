@@ -18,6 +18,7 @@ import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
 import { Import, Loader2, Trash2, Users } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 import type { ShelfPerson, ShelfTeam } from "@/lib/notes/shelf-service";
 import {
     Button,
@@ -67,7 +68,10 @@ export function NewNotebookDialog({
     // the picker entirely.
     useEffect(() => {
         if (!open) return;
-        void actions.noteSpaceOwnersAction().then(setOrgs).catch(() => setOrgs([]));
+        void actions
+            .noteSpaceOwnersAction()
+            .then(setOrgs)
+            .catch(() => setOrgs([]));
     }, [open]);
 
     useEffect(() => {
@@ -101,9 +105,7 @@ export function NewNotebookDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("notebook.newTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("notebook.newDescription")}
-                    </DialogDescription>
+                    <DialogDescription>{t("notebook.newDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
@@ -146,7 +148,9 @@ export function NewNotebookDialog({
                                 { value: "private", label: t("notebook.private") },
                                 {
                                     value: "internal",
-                                    label: orgId ? t("notebook.everybodyOrg") : t("notebook.everybodyHere")
+                                    label: orgId
+                                        ? t("notebook.everybodyOrg")
+                                        : t("notebook.everybodyHere")
                                 }
                             ]}
                         />
@@ -247,9 +251,7 @@ export function NotebookPeopleDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("notebook.peopleTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("notebook.peopleDescription")}
-                    </DialogDescription>
+                    <DialogDescription>{t("notebook.peopleDescription")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
@@ -299,7 +301,10 @@ export function NotebookPeopleDialog({
                                 personId={person.userId}
                                 className="-mx-1.5 flex items-center gap-2 rounded-md px-1.5 py-0.5"
                             >
-                                <span className="min-w-0 flex-1 truncate text-sm" title={person.email}>
+                                <span
+                                    className="min-w-0 flex-1 truncate text-sm"
+                                    title={person.email}
+                                >
                                     <PersonName id={person.userId} name={person.name}>
                                         {person.owner && (
                                             <span className="ml-1 text-xs text-muted-foreground">
@@ -309,7 +314,9 @@ export function NotebookPeopleDialog({
                                     </PersonName>
                                 </span>
                                 {person.owner ? (
-                                    <span className="text-xs text-muted-foreground">{t("notebook.runsIt")}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("notebook.runsIt")}
+                                    </span>
                                 ) : (
                                     <>
                                         <Select
@@ -328,7 +335,9 @@ export function NotebookPeopleDialog({
                                         />
                                         <button
                                             type="button"
-                                            aria-label={t("notebook.takeOffNamed", { name: person.name })}
+                                            aria-label={t("notebook.takeOffNamed", {
+                                                name: person.name
+                                            })}
                                             title={t("notebook.takeOff")}
                                             onClick={() =>
                                                 void act(() =>
@@ -380,7 +389,9 @@ export function NotebookPeopleDialog({
                                             {grant && (
                                                 <button
                                                     type="button"
-                                                    aria-label={t("notebook.takeOffNamed", { name: team.name })}
+                                                    aria-label={t("notebook.takeOffNamed", {
+                                                        name: team.name
+                                                    })}
                                                     title={t("notebook.takeOff")}
                                                     onClick={() =>
                                                         void act(() =>
@@ -433,13 +444,17 @@ export function ImportNotesDialog({
 }) {
     const t = useTranslations("notes");
     const router = useRouter();
-    const [files, setFiles] = useState<FileList | null>(null);
+    const [files, setFiles] = useState<readonly File[] | null>(null);
+    const [picking, setPicking] = useState(false);
     const [keepFolders, setKeepFolders] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const [done, setDone] = useState<{ notes: number; folders: number; links: number; skipped: number } | null>(
-        null
-    );
+    const [done, setDone] = useState<{
+        notes: number;
+        folders: number;
+        links: number;
+        skipped: number;
+    } | null>(null);
 
     useEffect(() => {
         if (target) {
@@ -457,7 +472,7 @@ export function ImportNotesDialog({
         if (target.spaceId) form.set("spaceId", target.spaceId);
         if (target.folderId) form.set("folderId", target.folderId);
         form.set("keepFolders", keepFolders ? "true" : "false");
-        for (const file of Array.from(files)) form.append("files", file);
+        for (const file of files) form.append("files", file);
 
         const result = await runAction(() => actions.importNotesAction(form), setError);
         setBusy(false);
@@ -485,7 +500,9 @@ export function ImportNotesDialog({
 
                 {done ? (
                     <div className="flex flex-col gap-1 text-sm">
-                        <p>{t("notebook.imported", { notes: done.notes, folders: done.folders })}</p>
+                        <p>
+                            {t("notebook.imported", { notes: done.notes, folders: done.folders })}
+                        </p>
                         {done.links > 0 && (
                             <p className="text-muted-foreground">
                                 {t("notebook.linked", { count: done.links })}
@@ -499,14 +516,35 @@ export function ImportNotesDialog({
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        <input
-                            type="file"
-                            multiple
-                            accept=".md,.markdown,.mdx,.txt,.zip"
-                            aria-label={t("notebook.filesLabel")}
-                            onChange={(event) => setFiles(event.target.files)}
-                            className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-field file:px-3 file:py-1.5 file:text-sm"
-                        />
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setPicking(true)}
+                            >
+                                <Import className="size-3.5" />
+                                {t("notebook.chooseFiles")}
+                            </Button>
+                            {files && files.length > 0 && (
+                                <span
+                                    className="min-w-0 truncate text-xs text-muted-foreground"
+                                    title={files.map((file) => file.name).join(", ")}
+                                >
+                                    {files.map((file) => file.name).join(", ")}
+                                </span>
+                            )}
+                        </div>
+                        {picking && (
+                            <ChooseFilesDialog
+                                multiple
+                                accept=".md,.markdown,.mdx,.txt,.zip"
+                                title={t("notebook.filesLabel")}
+                                onClose={() => setPicking(false)}
+                                onFailed={setError}
+                                onFiles={setFiles}
+                            />
+                        )}
                         <label className="flex items-center gap-2 text-sm">
                             <input
                                 type="checkbox"
@@ -515,9 +553,7 @@ export function ImportNotesDialog({
                             />
                             {t("notebook.keepFolders")}
                         </label>
-                        <p className="text-xs text-muted-foreground">
-                            {t("notebook.wikiLinks")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("notebook.wikiLinks")}</p>
                     </div>
                 )}
 
@@ -537,7 +573,11 @@ export function ImportNotesDialog({
                             disabled={busy || !files || files.length === 0}
                             onClick={() => void run()}
                         >
-                            {busy ? <Loader2 className="size-4 animate-spin" /> : <Import className="size-4" />}
+                            {busy ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Import className="size-4" />
+                            )}
                             {t("notebook.bringIn")}
                         </Button>
                     )}

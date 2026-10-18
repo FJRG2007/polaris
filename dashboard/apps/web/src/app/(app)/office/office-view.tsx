@@ -124,6 +124,7 @@ export function OfficeView({
     description
 }: OfficeViewProps) {
     const t = useTranslations("office");
+    const tFiles = useTranslations("components");
     const router = useRouter();
     const toast = useToast();
     const on = useShelfScope();
@@ -253,7 +254,9 @@ export function OfficeView({
             if (picked.length === 0) return;
             setReading(true);
             try {
-                const { files, failed } = await asFiles(picked);
+                const { files, failed } = await asFiles(picked, {
+                    unreachable: tFiles("files.fetchFailed")
+                });
                 for (const said of failed) toast.show({ title: said });
 
                 const opened: { id: string; kind: core.OfficeKind }[] = [];
@@ -300,7 +303,7 @@ export function OfficeView({
                 setReading(false);
             }
         },
-        [load, on, router, toast, t]
+        [load, on, router, toast, t, tFiles]
     );
 
     /**

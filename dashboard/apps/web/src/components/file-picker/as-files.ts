@@ -20,6 +20,8 @@ export interface KeptPick {
 }
 
 /**
+ * @param unreachable - What to say about a pick that could not be fetched and
+ *   came back without a reason of its own, in the reader's language.
  * @param keepDrive - Leave the picks that are already on a storage alone, and
  *   hand back where they are instead of their bytes. For a screen that can send
  *   a reference: fetching a file out of Polaris so the browser can upload it
@@ -28,7 +30,7 @@ export interface KeptPick {
  */
 export async function asFiles(
     picked: readonly PickedFile[],
-    keepDrive = false
+    { unreachable, keepDrive = false }: { unreachable: string; keepDrive?: boolean }
 ): Promise<{ files: File[]; kept: KeptPick[]; failed: string[] }> {
     const files: File[] = [];
     const kept: KeptPick[] = [];
@@ -56,7 +58,7 @@ export async function asFiles(
             const answer = await fetch(url);
             if (!answer.ok) {
                 const body = (await answer.json().catch(() => null)) as { error?: string } | null;
-                failed.push(body?.error ?? "That file could not be fetched.");
+                failed.push(body?.error || unreachable);
                 continue;
             }
             const named = answer.headers.get("x-polaris-filename") ?? "";
@@ -64,7 +66,7 @@ export async function asFiles(
             const bytes = await answer.blob();
             files.push(new File([bytes], name, { type: bytes.type || "application/octet-stream" }));
         } catch {
-            failed.push("That file could not be fetched.");
+            failed.push(unreachable);
         }
     }
     return { files, kept, failed };

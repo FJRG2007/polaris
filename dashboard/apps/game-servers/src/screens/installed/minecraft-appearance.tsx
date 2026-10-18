@@ -21,10 +21,14 @@ import { useGameText } from "../game-text";
 import * as mc from "../../lib/minecraft/motd";
 import { Button, Card, CardBody, Input } from "@polaris/ui";
 import { AlignCenter, AlignLeft, Check, ImageUp, Loader2, RotateCw, Save } from "lucide-react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { FormattedTextField } from "../../components/formatted-text-field";
 import { McLine } from "../../components/mc-text";
-import { renameGameServerAction, setServerIconAction, updateServerSettingsAction } from "./minecraft-actions";
+import {
+    renameGameServerAction,
+    setServerIconAction,
+    updateServerSettingsAction
+} from "./minecraft-actions";
 import { hostUi } from "@polaris/app-host/client";
 
 const { useConfirm } = hostUi.confirmDialog;
@@ -103,7 +107,10 @@ function NameCard({
                         onClick={() => {
                             setError(null);
                             startTransition(async () => {
-                                const result = await renameGameServerAction(installedAppId, trimmed);
+                                const result = await renameGameServerAction(
+                                    installedAppId,
+                                    trimmed
+                                );
                                 if (result.error) {
                                     setError(result.error);
                                     return;
@@ -112,7 +119,11 @@ function NameCard({
                             });
                         }}
                     >
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{" "}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Check className="size-4" />
+                        )}{" "}
                         {t("appearance.rename")}
                     </Button>
                 </div>
@@ -236,8 +247,16 @@ function MotdCard({
                         {/* The image writes server.properties at boot, so saving
                             alone is a real choice and not half an action: it keeps
                             the text and leaves whoever is playing alone. */}
-                        <Button variant="secondary" onClick={() => void save(false)} disabled={pending || !changed}>
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                        <Button
+                            variant="secondary"
+                            onClick={() => void save(false)}
+                            disabled={pending || !changed}
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Save className="size-4" />
+                            )}
                             {t("appearance.save")}
                         </Button>
                         <Button onClick={() => void save(true)} disabled={pending || !changed}>
@@ -312,7 +331,7 @@ function IconCard({
     // is worth saying rather than showing an empty square that reads as "gone".
     const [unreadable, setUnreadable] = useState(false);
     const [pending, startTransition] = useTransition();
-    const picker = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
 
     // The one the server is carrying, busted by when it was set so a new upload
     // shows at once and an unchanged one is not fetched again.
@@ -375,10 +394,14 @@ function IconCard({
                         <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() => picker.current?.click()}
+                            onClick={() => setPicking(true)}
                             disabled={pending}
                         >
-                            {pending ? <Loader2 className="size-4 animate-spin" /> : <ImageUp className="size-4" />}
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <ImageUp className="size-4" />
+                            )}
                             {t("appearance.chooseAnImage")}
                         </Button>
                         <span className="text-xs text-muted-foreground">
@@ -393,17 +416,15 @@ function IconCard({
                     </div>
                 </div>
 
-                <input
-                    ref={picker}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                        choose(event.target.files?.[0]);
-                        // So picking the same file twice still fires a change.
-                        event.target.value = "";
-                    }}
-                />
+                {picking ? (
+                    <hostUi.filePicker.ChooseFilesDialog
+                        accept="image/*"
+                        title={t("appearance.chooseAnImage")}
+                        onClose={() => setPicking(false)}
+                        onFailed={setError}
+                        onFiles={(files: File[]) => choose(files[0])}
+                    />
+                ) : null}
 
                 {error && <p className="text-xs text-danger">{error}</p>}
             </CardBody>

@@ -19,9 +19,15 @@
 
 import { Button } from "@polaris/ui";
 import { Loader2, Trash2, Upload } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
-import { CROP_ACCEPTED, ImageCropDialog, TILE_CROP, type CropShape } from "@/components/image-cropper";
+import { useState, type ReactNode } from "react";
+import {
+    CROP_ACCEPTED,
+    ImageCropDialog,
+    TILE_CROP,
+    type CropShape
+} from "@/components/image-cropper";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ChooseFilesDialog } from "@/components/file-picker/choose-files-dialog";
 
 export function PictureField({
     endpoint,
@@ -44,7 +50,7 @@ export function PictureField({
     onDone: () => void;
 }) {
     const t = useTranslations("components");
-    const input = useRef<HTMLInputElement>(null);
+    const [picking, setPicking] = useState(false);
     const [chosen, setChosen] = useState<File | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -76,24 +82,11 @@ export function PictureField({
             <div className="flex items-center gap-3">
                 {preview}
                 <div className="flex flex-wrap items-center gap-2">
-                    <input
-                        ref={input}
-                        type="file"
-                        accept={CROP_ACCEPTED}
-                        className="hidden"
-                        onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            // Cleared first, so picking the same file again
-                            // after a failure still counts as a change.
-                            event.target.value = "";
-                            if (file) setChosen(file);
-                        }}
-                    />
                     <Button
                         size="sm"
                         variant="secondary"
                         disabled={busy}
-                        onClick={() => input.current?.click()}
+                        onClick={() => setPicking(true)}
                     >
                         {busy ? (
                             <Loader2 className="size-4 animate-spin" />
@@ -119,6 +112,14 @@ export function PictureField({
                     {error}
                 </p>
             )}
+            {picking ? (
+                <ChooseFilesDialog
+                    accept={CROP_ACCEPTED}
+                    onClose={() => setPicking(false)}
+                    onFailed={setError}
+                    onFiles={(files) => setChosen(files[0] ?? null)}
+                />
+            ) : null}
             {chosen ? (
                 <ImageCropDialog
                     file={chosen}

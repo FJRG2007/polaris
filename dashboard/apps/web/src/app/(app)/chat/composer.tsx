@@ -300,6 +300,7 @@ export function Composer({
     emoji?: { readonly custom: PickerCustomEmoji | null } | null;
 }) {
     const t = useTranslations("chat");
+    const tFiles = useTranslations("components");
     const [body, setBody] = useState("");
     const [files, setFiles] = useState<readonly File[]>([]);
     /** Picks that are staying where they are. Held apart from `files` because
@@ -766,7 +767,14 @@ export function Composer({
      * this composer already knows how to stage.
      */
     const takePicked = async (picked: readonly PickedFile[]): Promise<void> => {
-        const { files: got, kept: staying, failed } = await asFiles(picked, canShareFromDrive);
+        const {
+            files: got,
+            kept: staying,
+            failed
+        } = await asFiles(picked, {
+            unreachable: tFiles("files.fetchFailed"),
+            keepDrive: canShareFromDrive
+        });
         if (failed.length > 0) setRefused(failed[0] ?? "");
         if (got.length > 0) stage(got);
         if (staying.length > 0) keep(staying);

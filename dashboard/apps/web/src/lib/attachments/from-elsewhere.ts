@@ -13,6 +13,7 @@
  * the ceilings live.
  */
 
+import { mimeForName } from "@/lib/mime";
 import { normalizeRelPath } from "@polaris/core";
 import { requireDriveDriver } from "@/lib/drive-authz";
 import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
@@ -162,7 +163,9 @@ export async function fileFromDrive(
         throw new AttachRefused("That file could not be attached.");
     }
 
-    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(() => null);
+    const driver = await requireDriveDriver(userId, connectionId, path, "download").catch(
+        () => null
+    );
     if (!driver) throw new AttachRefused("That file is not yours to attach.");
 
     try {
@@ -171,7 +174,8 @@ export async function fileFromDrive(
         if (Number(stat.size) > maxBytes) throw new AttachRefused(tooBig());
         const bytes = await collect(await driver.readStream(path), maxBytes);
         if (!bytes) throw new AttachRefused(tooBig());
-        return { name: path.split("/").at(-1) || "attachment", type: "", bytes };
+        const name = path.split("/").at(-1) || "attachment";
+        return { name, type: mimeForName(name) ?? "", bytes };
     } finally {
         // The driver holds a pooled session and every exit has to give it back,
         // including the ones that threw.
@@ -199,9 +203,14 @@ export async function fileFromAddress(address: string, maxBytes: number): Promis
     const bytes = await readCapped(response, maxBytes);
     if (!bytes) throw new AttachRefused(tooBig());
 
+    const name = nameFrom(response, target);
+    const declared = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
     return {
-        name: nameFrom(response, target),
-        type: (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "",
+        name,
+        type:
+            declared && declared !== "application/octet-stream"
+                ? declared
+                : (mimeForName(name) ?? declared),
         bytes
     };
 }
@@ -217,12 +226,16 @@ function nameFrom(response: { headers: Headers }, target: URL): string {
     const named = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)?.[1];
     if (named) {
         try {
-            return decodeURIComponent(named.replace(/"$/, "")).split(/[\\/]/).at(-1) || "attachment";
+            return (
+                decodeURIComponent(named.replace(/"$/, "")).split(/[\\/]/).at(-1) || "attachment"
+            );
         } catch {
             return named.replace(/"$/, "");
         }
     }
-    return decodeURIComponent(target.pathname.split("/").filter(Boolean).at(-1) ?? "") || "attachment";
+    return (
+        decodeURIComponent(target.pathname.split("/").filter(Boolean).at(-1) ?? "") || "attachment"
+    );
 }
 
 /**
@@ -240,7 +253,9 @@ async function collect(stream: unknown, cap: number): Promise<Uint8Array | null>
     const chunks: Buffer[] = [];
     let size = 0;
     const add = (chunk: unknown): boolean => {
-        const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as ArrayBufferLike as never);
+        const piece = Buffer.isBuffer(chunk)
+            ? chunk
+            : Buffer.from(chunk as ArrayBufferLike as never);
         size += piece.length;
         if (size > cap) return false;
         chunks.push(piece);

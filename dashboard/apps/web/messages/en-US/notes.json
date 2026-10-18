@@ -69,6 +69,7 @@
         "linked": "{count, plural, one {One note's links} other {# notes' links}} now point at the notes they name.",
         "skipped": "{count, plural, one {One file was} other {# files were}} left alone: only Markdown and plain text are read.",
         "filesLabel": "The files to bring in",
+        "chooseFiles": "Choose files",
         "keepFolders": "Keep the folders the files are in",
         "wikiLinks": "Links written as [[another note]] are connected once everything is in.",
         "bringIn": "Bring them in"

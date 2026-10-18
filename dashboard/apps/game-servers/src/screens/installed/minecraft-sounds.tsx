@@ -20,7 +20,7 @@ import { SoundSettingsEditor } from "./sounds-moments";
 import { restartGameNowAction } from "./restart-actions";
 import { SoundEditDialog, SoundPlayDialog } from "./sound-dialogs";
 import { EncodeError, toGameSound } from "../../lib/minecraft/sound-encode";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { LiveSounds, SoundEntry } from "../../lib/minecraft/sounds-service";
 import type { LiveSoundState } from "../../lib/minecraft/sounds-live";
 import { LiveSoundPlayers } from "./sounds-live-players";
@@ -125,9 +125,8 @@ export function MinecraftSounds({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
     const preview = usePreview();
-    const fileInput = useRef<HTMLInputElement>(null);
-    const replaceInput = useRef<HTMLInputElement>(null);
-    const replacing = useRef<SoundEntry | null>(null);
+    /** The picker, open to add sounds or to replace the file of one. */
+    const [picking, setPicking] = useState<"add" | SoundEntry | null>(null);
 
     const reload = useCallback(async () => {
         const answer = await actions.soundsAction(installedAppId);
@@ -601,36 +600,24 @@ export function MinecraftSounds({
                                 type="button"
                                 size="sm"
                                 disabled={working || !heard || sounds.length >= MAX_SOUNDS}
-                                onClick={() => fileInput.current?.click()}
+                                onClick={() => setPicking("add")}
                             >
                                 <Upload className="size-4" /> {t("sounds.library.upload")}
                             </Button>
                         ) : null}
-                        <input
-                            ref={fileInput}
-                            type="file"
-                            multiple
-                            accept={ACCEPTED_FILES}
-                            className="hidden"
-                            onChange={(event) => {
-                                const files = [...(event.target.files ?? [])];
-                                event.target.value = "";
-                                void upload(files);
-                            }}
-                        />
-                        <input
-                            ref={replaceInput}
-                            type="file"
-                            accept={ACCEPTED_FILES}
-                            className="hidden"
-                            onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
-                                const entry = replacing.current;
-                                replacing.current = null;
-                                if (file && entry) void replaceFile(entry, file);
-                            }}
-                        />
+                        {picking ? (
+                            <hostUi.filePicker.ChooseFilesDialog
+                                multiple={picking === "add"}
+                                accept={ACCEPTED_FILES}
+                                onClose={() => setPicking(null)}
+                                onFailed={setError}
+                                onFiles={(files: File[]) => {
+                                    const file = files[0];
+                                    if (picking === "add") void upload(files);
+                                    else if (file) void replaceFile(picking, file);
+                                }}
+                            />
+                        ) : null}
                     </div>
 
                     {busy ? <p className="text-xs text-muted-foreground">{busy}</p> : null}
@@ -778,8 +765,7 @@ export function MinecraftSounds({
                                                         <DropdownMenuItem
                                                             disabled={working}
                                                             onSelect={() => {
-                                                                replacing.current = entry;
-                                                                replaceInput.current?.click();
+                                                                setPicking(entry);
                                                             }}
                                                         >
                                                             <Replace className="size-4" />{" "}
