@@ -1012,7 +1012,15 @@
         "madeBy": "Creado por {name}",
         "rename": "Renombrar",
         "webhookActions": "Acciones de {name}",
-        "esc": "Esc"
+        "esc": "Esc",
+        "newcomerHistory": "Mensajes anteriores para nuevos miembros",
+        "newcomerHistoryHint": "Si se ocultan, quien entre después solo ve los nuevos.",
+        "newcomerHistoryInherit": "Por defecto ({state})",
+        "newcomerHistoryOn": "Visibles",
+        "newcomerHistoryOff": "Ocultos",
+        "newcomerHistoryDefault": "Por defecto: los nuevos ven los mensajes anteriores",
+        "newcomerHistoryDefaultHint": "Se aplica a los canales que usan el valor del servidor.",
+        "newcomerHistoryDefaultLocked": "Solo los admins del servidor cambian esto."
     },
     "callMenus": {
         "volume": "Volumen",
@@ -1199,7 +1207,9 @@
         "handItOver": "Ceder",
         "cancel": "Cancelar",
         "makeOwner": "Hacer dueño",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "newcomersReadHistory": "Quien entre después ve los mensajes anteriores",
+        "newcomersReadHistoryHint": "Si se desactiva, solo ve lo enviado tras unirse."
     },
     "newDirect": {
         "newMessage": "Nuevo mensaje",

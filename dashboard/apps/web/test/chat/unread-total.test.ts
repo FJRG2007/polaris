@@ -79,7 +79,11 @@ vi.mock("@polaris/db", () => ({
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
         chatChannelMember: { findMany: async () => members },
-        chatChannel: { findMany: async () => channels },
+        chatChannel: {
+            // Nobody here joined too late to read: the history-visibility lookup finds no closed room.
+            findMany: async (query?: { where?: unknown }) =>
+                JSON.stringify(query?.where ?? {}).includes("newcomerHistory") ? [] : channels
+        },
         chatSpace: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 spaces.filter((space) => where.id.in.includes(space.id))

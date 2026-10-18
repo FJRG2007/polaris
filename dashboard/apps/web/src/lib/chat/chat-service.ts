@@ -42,6 +42,7 @@ import {
     type ChatActor,
     type ChatErrorText
 } from "./access";
+import * as history from "./history-visibility";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -125,6 +126,13 @@ export interface ChatChannelView {
     readonly membersMayEdit: boolean;
     /** Whether the owner has let the rest of the group add people to it. */
     readonly membersMayInvite: boolean;
+    /** Whether people who join later read earlier history: "inherit", "on" or
+     *  "off" as stored, and the space default an "inherit" follows (null
+     *  outside a space). */
+    readonly newcomerHistory: string;
+    readonly spaceNewcomerHistory: boolean | null;
+    /** Whether this reader may change that default for the whole space. */
+    readonly mayManageSpaceDefault: boolean;
     /** Whether this reader may add people here. Only decides what the screen
      *  offers; adding asks the same question again. */
     readonly mayInvite: boolean;
@@ -307,6 +315,40 @@ export async function updateSpace(
             ...(input.archived !== undefined ? { archived: input.archived } : {})
         }
     });
+}
+
+/**
+ * Whether people who join later read earlier history: a space's default, or one
+ * channel's choice. Only whoever runs that scope - a space admin for the
+ * default, a channel admin for a channel. A group is its owner's, through
+ * `setGroupOptions`; a 1:1 conversation has nobody who joins later.
+ */
+export async function setNewcomerHistory(
+    actor: ChatActor,
+    input:
+        | { readonly scope: "space"; readonly spaceId: string; readonly value: boolean }
+        | {
+              readonly scope: "channel";
+              readonly channelId: string;
+              readonly value: history.NewcomerHistory;
+          }
+): Promise<void> {
+    if (input.scope === "space") {
+        await requireSpace(actor, input.spaceId, "admin");
+        await prisma.chatSpace.update({
+            where: { id: input.spaceId },
+            data: { newcomerHistory: input.value }
+        });
+        publishChatChange({ channelId: input.spaceId, kind: "channels", actorId: actor.id });
+        return;
+    }
+    const access = await requireChannel(actor, input.channelId);
+    if (!access.spaceId || !access.mayAdminister) throw new ChatAccessError();
+    await prisma.chatChannel.update({
+        where: { id: input.channelId },
+        data: { newcomerHistory: input.value }
+    });
+    publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });
 }
 
 /** Only the owner. An admin can run a space; ending it is a different question,
@@ -737,8 +779,9 @@ export async function listChannels(
             topic: true,
             private: true,
             archived: true,
-            space: { select: { archived: true } },
+            space: { select: { archived: true, newcomerHistory: true } },
             lastMessageAt: true,
+            newcomerHistory: true,
             ownerId: true,
             createdById: true,
             membersMayEdit: true,
@@ -873,6 +916,9 @@ export async function listChannels(
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             membersMayInvite: channel.membersMayInvite,
+            newcomerHistory: channel.newcomerHistory,
+            spaceNewcomerHistory: channel.space?.newcomerHistory ?? null,
+            mayManageSpaceDefault: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
             membersMayMention: channel.membersMayMention,
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
@@ -1319,10 +1365,16 @@ export async function renameGroup(
 export async function setGroupOptions(
     actor: ChatActor,
     channelId: string,
-    options: { membersMayEdit?: boolean; membersMayInvite?: boolean; membersMayMention?: boolean }
+    options: {
+        membersMayEdit?: boolean;
+        membersMayInvite?: boolean;
+        membersMayMention?: boolean;
+        newcomersReadHistory?: boolean;
+    }
 ): Promise<void> {
     await requireGroupOwner(actor, channelId);
     if (
+        options.newcomersReadHistory === undefined &&
         options.membersMayEdit === undefined &&
         options.membersMayInvite === undefined &&
         options.membersMayMention === undefined
@@ -1340,6 +1392,9 @@ export async function setGroupOptions(
                 : {}),
             ...(options.membersMayMention !== undefined
                 ? { membersMayMention: options.membersMayMention }
+                : {}),
+            ...(options.newcomersReadHistory !== undefined
+                ? { newcomerHistory: options.newcomersReadHistory ? "on" : "off" }
                 : {})
         }
     });
@@ -2206,7 +2261,15 @@ async function unreadCounts(
     // into a room this reader is in must not light their badge: the whole of
     // blocking somebody is not being made to look, and a number that says three
     // messages are waiting is Polaris asking them to look.
-    const ignored = [actor.id, ...(await blockedIds(actor.id))];
+    const [blocked, floors] = await Promise.all([
+        blockedIds(actor.id),
+        // History from before this reader joined is not theirs to catch up on.
+        history.historyFloors(
+            actor.id,
+            channels.map((channel) => channel.id)
+        )
+    ]);
+    const ignored = [actor.id, ...blocked];
 
     const unseen: string[] = [];
     const since: Prisma.ChatMessageWhereInput[] = [];
@@ -2228,7 +2291,8 @@ async function unreadCounts(
             // A thread reply is unread inside the thread, not in the channel:
             // counting both would double every conversation that has one.
             parentId: null,
-            OR: [...(unseen.length > 0 ? [{ channelId: { in: unseen } }] : []), ...since]
+            OR: [...(unseen.length > 0 ? [{ channelId: { in: unseen } }] : []), ...since],
+            AND: [history.readableWhere(floors)]
         },
         _count: { _all: true }
     });

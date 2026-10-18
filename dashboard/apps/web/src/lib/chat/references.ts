@@ -33,6 +33,7 @@ import { reachableChannelIds, type ChatActor } from "./access";
 import { extractReferences } from "@/components/rich-text/markdown";
 import { appBaseUrl } from "@/lib/domain-service";
 import { scopeTaskWhere, visibleScope } from "@/lib/tasks/access";
+import * as history from "./history-visibility";
 
 /** How much of a quoted message the card carries. A line: a card that repeats a
  *  paragraph is the paragraph twice, once in a box. */
@@ -191,7 +192,7 @@ export async function resolveChatReferences(
 
     // The messages first, because the conversations they live in have to be
     // proved reachable too and may not be named anywhere else in the page.
-    const messages = messageIds.length
+    const found = messageIds.length
         ? await prisma.chatMessage.findMany({
               where: { id: { in: messageIds }, ...ageClearedWhere(actor.id) },
               select: {
@@ -206,6 +207,15 @@ export async function resolveChatReferences(
               }
           })
         : [];
+    // A reference to something said before this reader joined, where that is
+    // hidden, resolves as if it were not there.
+    const floors = await history.historyFloors(
+        actor.id,
+        found.map((row) => row.channelId)
+    );
+    const messages = found.filter((row) =>
+        history.isReadable(floors.get(row.channelId), row.createdAt)
+    );
 
     const reachable = await reachableChannelIds(actor);
     const named = [...new Set([...channelIds, ...messages.map((row) => row.channelId)])].filter(
