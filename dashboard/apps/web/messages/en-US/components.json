@@ -79,7 +79,9 @@
             "eightHours": "8 hours",
             "day": "24 hours",
             "forever": "Until I unmute"
-        }
+        },
+        "direct": "Direct message",
+        "count": "{count} messages"
     },
     "mailUnread": {
         "title": "New mail",

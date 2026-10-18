@@ -19,7 +19,9 @@
  *
  * One note per conversation, replaced rather than stacked: ten messages in one
  * room is one note that keeps changing, which is what every messenger does and
- * what stops a busy channel from filling the screen.
+ * what stops a busy channel from filling the screen. It is drawn as a phone draws
+ * a conversation's notice (`conversation` on the toast): who and where, the last
+ * few lines said there, and how many messages it stands for.
  *
  * Either can be answered where it is (`replyFromNoticeAction`): the conversation
  * is read up to the message announced and the answer goes to it, so the note,
@@ -40,7 +42,7 @@ import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { usePathname } from "next/navigation";
 import { playCallSound } from "@/lib/call-sounds";
-import { useToast, type Toast } from "@polaris/ui";
+import { useToast, type Toast, type ToastLine } from "@polaris/ui";
 import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
 import { ToastPicture } from "@/components/toast-picture";
@@ -74,6 +76,9 @@ import {
 /** How long the words wait for more of them before being fetched. A burst of
  *  five messages is one request, not five. */
 const SETTLE_MS = 400;
+
+/** How many lines a conversation's note keeps; it draws the last few. */
+const KEPT_LINES = 3;
 
 /** The tag of the notice announcing a conversation. */
 const TAG = "message:";
@@ -206,6 +211,15 @@ export function MessageToasts() {
     /** Conversations whose card is sending an answer, kept through the read
      *  that answer causes so the card can say whether it went. */
     const replying = useRef(new Set<string>());
+    /**
+     * What each conversation's note has said since it was raised: its latest
+     * lines and how many messages it stands for. Cleared when the note goes or
+     * the conversation is read, so the next one starts again from one. One
+     * entry per note on screen, so it is bounded by the stack.
+     */
+    const groups = useRef(
+        new Map<string, { lines: Array<ToastLine & { author: string }>; count: number }>()
+    );
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     // The session scope, which is this account's id: it keys the claims that
     // settle which tab of a device acts, and tells this reader's read frame
@@ -249,10 +263,39 @@ export function MessageToasts() {
                 ? t("messageToasts.messageChannel", { channel: message.conversation })
                 : t("messageToasts.replyTo", { author: message.authorName });
             if (alert.toast) {
+                const group = groups.current.get(message.channelId) ?? { lines: [], count: 0 };
+                if (!group.lines.some((line) => line.id === message.messageId)) {
+                    group.lines = [
+                        ...group.lines,
+                        { id: message.messageId, author: message.authorName, text: message.excerpt }
+                    ].slice(-KEPT_LINES);
+                    group.count += 1;
+                }
+                groups.current.set(message.channelId, group);
+                // Who said each line is only worth a word where more than one
+                // person is talking; otherwise the sender above says it.
+                const named =
+                    !message.direct && new Set(group.lines.map((line) => line.author)).size > 1;
                 const note: Toast = {
                     key: `${TAG}${message.channelId}`,
                     title: who,
                     body: message.excerpt,
+                    conversation: {
+                        sender: message.authorName,
+                        where: message.inChannel
+                            ? `#${message.conversation}`
+                            : message.direct
+                              ? t("messageToasts.direct")
+                              : message.conversation,
+                        lines: group.lines.map((line) => ({
+                            id: line.id,
+                            text: line.text,
+                            author: named ? line.author : undefined
+                        })),
+                        count: group.count,
+                        countLabel: t("messageToasts.count", { count: group.count })
+                    },
+                    onGone: () => groups.current.delete(message.channelId),
                     // Bounded both ways and never stretched: a tall photo is shown
                     // whole at a smaller size rather than cropped or squashed.
                     media: message.media ? (
@@ -260,7 +303,7 @@ export function MessageToasts() {
                     ) : undefined,
                     icon: (
                         <Avatar
-                            size={28}
+                            size={36}
                             person={{
                                 id: message.authorId ?? message.channelId,
                                 name: message.authorName
@@ -286,7 +329,7 @@ export function MessageToasts() {
                             label: message.direct
                                 ? t("messageToasts.mutePerson", { author: message.authorName })
                                 : t("messageToasts.muteChannel"),
-                            icon: <BellOff className="size-3.5" />,
+                            icon: <BellOff className="size-4" />,
                             choices: NOTE_MUTES.map((mute) => ({
                                 label: t(mute.key),
                                 run: () => muteFromNotice(t, message.channelId, mute.minutes)
@@ -294,7 +337,7 @@ export function MessageToasts() {
                         },
                         {
                             label: t("messageToasts.markRead"),
-                            icon: <CheckCheck className="size-3.5" />,
+                            icon: <CheckCheck className="size-4" />,
                             run: async () =>
                                 (await runNoticeAction(
                                     markReadAction(t, message.channelId, message.messageId)
@@ -360,6 +403,7 @@ export function MessageToasts() {
                     if (frame.unread) return;
                     pending.current.delete(frame.channelId);
                     announced.current.delete(frame.channelId);
+                    groups.current.delete(frame.channelId);
                     caughtUp.current.add(frame.channelId);
                     closeDesktopNotice(`${TAG}${frame.channelId}`);
                     if (!replying.current.has(frame.channelId))
