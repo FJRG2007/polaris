@@ -26,7 +26,7 @@ import {
 import * as vars from "../../lib/console-vars";
 import * as plan from "../../lib/console-schedule";
 import { useGameText, useSchemaText } from "../game-text";
-import type { SavedCommand } from "../../lib/console-commands";
+import { commandPreview, type SavedCommand } from "../../lib/console-commands";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import { PlayerPicker } from "./player-picker";
 
@@ -226,7 +226,7 @@ export function RunCommandDialog({
                         className="min-w-0 truncate font-mono text-xs"
                         title={entry.command}
                     >
-                        {entry.command}
+                        {commandPreview(entry.command)}
                     </DialogDescription>
                 </DialogHeader>
                 <form

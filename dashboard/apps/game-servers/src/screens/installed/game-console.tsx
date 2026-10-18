@@ -41,7 +41,12 @@ import {
     type QueueStep
 } from "../../lib/console-queue";
 import * as consoleActions from "./console-actions";
-import { placeholderRange, type SavedCommand } from "../../lib/console-commands";
+import {
+    isSequence,
+    normalizeCommandText,
+    placeholderRange,
+    type SavedCommand
+} from "../../lib/console-commands";
 import { hasVariables, needsAsking } from "../../lib/console-vars";
 import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
@@ -410,10 +415,47 @@ export function GameConsole({
         [installedAppId, refresh, remember]
     );
 
+    /** Say a kept command could not be run, where it was pressed from. */
+    const refuseKept = useCallback((entry: SavedCommand, why: string, inDialog: boolean) => {
+        if (inDialog) {
+            setAskError(why);
+            return;
+        }
+        setReplies((current) =>
+            [...current, { command: entry.label, output: why, failed: true }].slice(
+                -KEPT_REPLIES
+            )
+        );
+    }, []);
+
+    /** A kept sequence with variables: the server fills every line in, and the
+     *  console runs the steps it hands back the way it runs "Run several", so
+     *  its pauses can be watched and stopped. */
+    const runKeptSequence = useCallback(
+        (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
+            startTransition(async () => {
+                const result = await consoleActions
+                    .keptStepsAction({ installedAppId, id: entry.id, ...choice })
+                    .catch(() => ({ error: t("console.theServerDidNotAnswer"), steps: undefined }));
+                if (result.error || !result.steps) {
+                    refuseKept(entry, result.error ?? t("console.theServerDidNotAnswer"), inDialog);
+                    return;
+                }
+                setAsking(null);
+                void runQueue(result.steps);
+            });
+        },
+        [installedAppId, refuseKept, runQueue, t]
+    );
+
     /** A kept command with variables, filled in and sent by the server. */
     const runKept = useCallback(
         (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
             setAskError("");
+            if (isSequence(entry.command)) {
+                runKeptSequence(entry, choice, inDialog);
+                return;
+            }
             startTransition(async () => {
                 const result = await consoleActions
                     .runKeptCommandAction({ installedAppId, id: entry.id, ...choice })
@@ -455,7 +497,7 @@ export function GameConsole({
                 void refresh();
             });
         },
-        [installedAppId, refresh, t]
+        [installedAppId, refresh, t, runKeptSequence]
     );
 
     /** Pressing a kept command. One that asks for something opens the dialog that
@@ -470,10 +512,20 @@ export function GameConsole({
                 setAsking({ entry, mode: "run" });
             } else if (hasVariables(entry.command, edition, declared)) {
                 runKept(entry, { values: {}, target: null }, false);
+            } else if (isSequence(entry.command)) {
+                // A sequence with a blank opens in "Run several", the box a
+                // block of lines is filled in; one without runs as that would.
+                if (placeholderRange(entry.command)) {
+                    setBatch(entry.command);
+                    return;
+                }
+                const parsed = parseQueue(entry.command, MAX_CONSOLE_LINE);
+                if (parsed.problem) refuseKept(entry, schemaText(parsed.problem), false);
+                else void runQueue(parsed.steps);
             } else if (placeholderRange(entry.command)) load(entry.command);
             else submit(entry.command);
         },
-        [edition, load, runKept, submit]
+        [edition, load, refuseKept, runKept, runQueue, schemaText, submit]
     );
 
     function schedule(entry: SavedCommand, choice: ScheduleChoice): void {
@@ -694,7 +746,11 @@ export function GameConsole({
                                 setAskError("");
                                 setAsking({ entry, mode: "schedule" });
                             }}
-                            onLoad={(entry) => load(entry.command)}
+                            onLoad={(entry) =>
+                                isSequence(entry.command)
+                                    ? setBatch(entry.command)
+                                    : load(entry.command)
+                            }
                             onDuplicate={(entry) => {
                                 setKeepError("");
                                 setKeeping(
@@ -908,6 +964,23 @@ export function GameConsole({
                             <DialogFooter>
                                 <Button variant="ghost" onClick={() => setBatch(null)}>
                                     {t("console.cancel")}
+                                </Button>
+                                {/* The same block, kept as one command that runs it. */}
+                                <Button
+                                    variant="outline"
+                                    disabled={
+                                        pending ||
+                                        !parsedBatch ||
+                                        parsedBatch.problem !== null
+                                    }
+                                    onClick={() => {
+                                        const block = normalizeCommandText(batch);
+                                        setBatch(null);
+                                        setKeepError("");
+                                        setKeeping({ label: "", command: block, variables: [] });
+                                    }}
+                                >
+                                    <Plus className="size-4" /> {t("console.keepThese")}
                                 </Button>
                                 <Button
                                     disabled={

@@ -45,13 +45,22 @@ import {
     type ConsoleSchedule,
     type ScheduleRepeat
 } from "../../lib/console-schedule";
-import { keptRunProblem, runKeptCommand } from "../../lib/console-run-service";
 import {
-    MAX_SAVED_COMMAND,
+    keptCommandSteps,
+    keptRunProblem,
+    runKeptCommand
+} from "../../lib/console-run-service";
+import {
     MAX_SAVED_LABEL,
+    MAX_SAVED_SEQUENCE,
+    hasPauses,
+    normalizeCommandText,
     normalizeSavedCommand,
+    savedCommandProblem,
     type SavedCommand
 } from "../../lib/console-commands";
+import type { QueueStep } from "../../lib/console-queue";
+import { gameMessage } from "../../lib/game-message";
 import { host } from "@polaris/app-host";
 
 const { recordAudit } = host.auditService;
@@ -62,7 +71,17 @@ const saveSchema = z.object({
     /** Absent for a new one; present when an existing one is being rewritten. */
     id: z.string().uuid().optional(),
     label: z.string().trim().max(MAX_SAVED_LABEL).optional(),
-    command: z.string().trim().min(1).max(MAX_SAVED_COMMAND),
+    /** One line, or a sequence of them; every line trimmed and the empty ones
+     *  dropped before it is checked. The raw text may carry the blank lines it
+     *  loses, hence the looser ceiling on what is read. */
+    command: z
+        .string()
+        .max(MAX_SAVED_SEQUENCE * 2)
+        .transform(normalizeCommandText)
+        .superRefine((command, context) => {
+            const problem = savedCommandProblem(command);
+            if (problem) context.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+        }),
     variables: z
         .array(
             z.object({
@@ -262,6 +281,29 @@ export async function runKeptCommandAction(
     }
 }
 
+/**
+ * A kept sequence, its variables filled in by the server, handed back for the
+ * console to run: each command then goes through the console's own send, with
+ * its permission and audit line, and its pauses are kept where they can be
+ * watched and stopped. Sends nothing itself.
+ */
+export async function keptStepsAction(
+    input: RunKeptCommandInput
+): Promise<{ steps?: QueueStep[]; error?: string }> {
+    try {
+        const resolved = await keptRun(input);
+        if ("error" in resolved) return { error: resolved.error };
+        return { steps: await keptCommandSteps(resolved.access, resolved.run) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe")
+        };
+    }
+}
+
 const repeatSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("once") }).strict(),
     z.object({ kind: z.literal("every"), minutes: z.number().int() }).strict(),
@@ -310,6 +352,10 @@ export async function scheduleKeptCommandAction(
     try {
         const resolved = await keptRun(input);
         if ("error" in resolved) return { error: resolved.error };
+        // The sweep runs a schedule in one go; a pause is only kept by the console.
+        if (hasPauses(resolved.entry.command)) {
+            return { error: await messageText(gameMessage("games", "lib.pausesOnlyLive")) };
+        }
         const schedule: ConsoleSchedule = {
             id: randomUUID(),
             commandId: resolved.entry.id,

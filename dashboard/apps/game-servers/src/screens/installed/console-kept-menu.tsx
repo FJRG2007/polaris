@@ -19,6 +19,7 @@ import {
     CalendarClock,
     ChevronDown,
     Copy,
+    ListOrdered,
     MoreHorizontal,
     Trash2
 } from "lucide-react";
@@ -37,7 +38,14 @@ import {
     menuSearchMatches
 } from "@polaris/ui";
 import { useGameText } from "../game-text";
-import { MAX_SAVED_LABEL, type SavedCommand } from "../../lib/console-commands";
+import {
+    MAX_SAVED_LABEL,
+    commandPreview,
+    hasPauses,
+    isSequence,
+    keptCommandCount,
+    type SavedCommand
+} from "../../lib/console-commands";
 import type { KeepDraft } from "./console-keep-dialog";
 
 /** The kept commands left after typing, in the order they were kept. Matched on
@@ -131,9 +139,19 @@ export function KeptCommandsMenu({
                                 title={entry.command}
                                 className="min-w-0 flex-1 flex-col items-start gap-0"
                             >
-                                <span className="w-full truncate">{entry.label}</span>
+                                <span className="flex w-full min-w-0 items-center gap-1.5">
+                                    <span className="min-w-0 truncate">{entry.label}</span>
+                                    {isSequence(entry.command) && (
+                                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
+                                            <ListOrdered className="size-3" />
+                                            {t("console.keptCount", {
+                                                count: keptCommandCount(entry.command)
+                                            })}
+                                        </span>
+                                    )}
+                                </span>
                                 <span className="w-full truncate font-mono text-[0.6875rem] text-muted-foreground">
-                                    {entry.command}
+                                    {commandPreview(entry.command)}
                                 </span>
                             </DropdownMenuItem>
                             <DropdownMenuSub>
@@ -151,15 +169,31 @@ export function KeptCommandsMenu({
                                         className="truncate font-mono normal-case tracking-normal"
                                         title={entry.command}
                                     >
-                                        {entry.command}
+                                        {commandPreview(entry.command)}
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onSelect={() => onEdit(entry)}>
                                         {t("console.edit")}
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => onSchedule(entry)}>
-                                        <CalendarClock /> {t("consoleSchedule.scheduleIt")}
-                                    </DropdownMenuItem>
+                                    {/* The sweep runs a schedule in one go; a pause is
+                                        only kept by the console. */}
+                                    {hasPauses(entry.command) ? (
+                                        <DropdownMenuItem
+                                            disabled
+                                            className="flex-col items-start gap-0"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <CalendarClock /> {t("consoleSchedule.scheduleIt")}
+                                            </span>
+                                            <span className="text-[0.6875rem] text-muted-foreground">
+                                                {t("console.pausesNoSchedule")}
+                                            </span>
+                                        </DropdownMenuItem>
+                                    ) : (
+                                        <DropdownMenuItem onSelect={() => onSchedule(entry)}>
+                                            <CalendarClock /> {t("consoleSchedule.scheduleIt")}
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuItem onSelect={() => onLoad(entry)}>
                                         {t("console.putItInTheBox")}
                                     </DropdownMenuItem>

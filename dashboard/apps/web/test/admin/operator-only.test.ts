@@ -104,9 +104,10 @@ describe("game servers", () => {
         // Hands straight to `invitePlayer`, whose first line asks for
         // games.manage on the server named.
         "invitePlayerAccountAction",
-        // Both hand straight to `keptRun`, whose first read asks for
+        // All three hand straight to `keptRun`, whose first read asks for
         // games.console on the server named.
         "runKeptCommandAction",
+        "keptStepsAction",
         "scheduleKeptCommandAction"
     ]);
 

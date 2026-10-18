@@ -16,10 +16,18 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { gameOfServer } from "@polaris/core";
 import { gameMessage } from "./game-message";
+import { isSequence } from "./console-commands";
 import { liveContext } from "./minecraft/live-values";
 import { runConsoleCommand } from "./games-operations";
 import { editionOf, shownPlayers } from "./minecraft/service";
-import { commandLines, commandUses, type CustomVariable, type RunTarget } from "./console-vars";
+import { MAX_CONSOLE_LINE, parseQueue, type QueueStep } from "./console-queue";
+import {
+    commandLines,
+    commandUses,
+    commandVariables,
+    type CustomVariable,
+    type RunTarget
+} from "./console-vars";
 import {
     CONSOLE_SCHEDULES_KEY,
     advance,
@@ -63,20 +71,42 @@ export function keptRunProblem(server: RunServer, run: KeptRun): string | null {
         : null;
 }
 
-/** The lines one run sends, with every variable filled in. Throws a carried
- *  message when there is nobody to write a per-player line for. */
-export async function keptCommandLines(server: RunServer, run: KeptRun): Promise<string[]> {
+/**
+ * The steps one run takes, with every variable filled in: a single command is
+ * one step, or one per player when it is written per player; a sequence is its
+ * steps in order, each command filled the same way and each pause kept.
+ *
+ * A sequence is read as one text for its variables, so `{x=100}` on its first
+ * line is asked once and fills `{x}` on every line after it. Throws a carried
+ * message when there is nobody to write a per-player line for.
+ */
+export async function keptCommandSteps(server: RunServer, run: KeptRun): Promise<QueueStep[]> {
     const edition = editionFor(server);
+    const read = commandVariables(run.command, run.variables);
     const uses = commandUses(run.command, edition, run.variables);
-    const fill = { edition, custom: run.variables, values: run.values, server: {} };
-    if (!uses.catalogue) return commandLines(run.command, fill, []);
+    const parsed = isSequence(read.command)
+        ? parseQueue(read.command, MAX_CONSOLE_LINE)
+        : { steps: [{ kind: "command", line: read.command } as const], problem: null };
+    if (parsed.problem) throw new Error(parsed.problem);
+    const steps: readonly QueueStep[] = parsed.steps;
+    const fill = { edition, custom: read.custom, values: run.values, server: {} };
+    const each = (fillWith: typeof fill, players: Parameters<typeof commandLines>[2]) =>
+        steps.flatMap((step): QueueStep[] =>
+            step.kind === "wait"
+                ? [step]
+                : commandLines(step.line, fillWith, players).map((line) => ({
+                      kind: "command",
+                      line
+                  }))
+        );
+    if (!uses.catalogue) return each(fill, []);
 
     const problem = keptRunProblem(server, run);
     if (problem) throw new Error(problem);
     const players = await shownPlayers(server.ownerId, server.install.id).catch(() => null);
     const context = await liveContext(server.install.id, [run.command], players, null);
     const filled = { ...fill, server: context.values };
-    if (!uses.perPlayer) return commandLines(run.command, filled, []);
+    if (!uses.perPlayer) return each(filled, []);
 
     const accounts = new Map(
         (context.recipients ?? []).map((recipient) => [recipient.name.toLowerCase(), recipient])
@@ -84,11 +114,21 @@ export async function keptCommandLines(server: RunServer, run: KeptRun): Promise
     const names =
         run.target && "player" in run.target ? [run.target.player] : [...(players?.players ?? [])];
     if (names.length === 0) throw new Error(gameMessage("games", "consoleVars.errors.nobodyOn"));
-    return commandLines(
-        run.command,
+    return each(
         filled,
         names.map((name) => ({ name, values: accounts.get(name.toLowerCase())?.values ?? {} }))
     );
+}
+
+/** The lines one run sends, with every variable filled in. Throws a carried
+ *  message for a run that pauses: a pause only runs from the console, where it
+ *  can be watched and stopped, never inside a request or the minute sweep. */
+export async function keptCommandLines(server: RunServer, run: KeptRun): Promise<string[]> {
+    const steps = await keptCommandSteps(server, run);
+    if (steps.some((step) => step.kind === "wait")) {
+        throw new Error(gameMessage("games", "lib.pausesOnlyLive"));
+    }
+    return steps.flatMap((step) => (step.kind === "command" ? [step.line] : []));
 }
 
 /** Send every line of a run and answer what the server said to each. A line the
