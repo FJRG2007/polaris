@@ -111,6 +111,15 @@ describe("the other ways a deploy gives up", () => {
         ).toContain("already using a port");
     });
 
+    it("does not send anyone looking for a program when the address itself is gone", () => {
+        const said = deployFailureReason(
+            "driver failed programming external connectivity on endpoint web: Error starting userland proxy: listen tcp4 192.168.1.20:53: bind: cannot assign requested address",
+            STEP
+        );
+        expect(said).toContain("no longer has");
+        expect(said).not.toContain("already using a port");
+    });
+
     it("calls out an image built for another processor", () => {
         expect(deployFailureReason("exec format error", STEP)).toContain("processor");
     });

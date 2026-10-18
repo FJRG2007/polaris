@@ -6,6 +6,7 @@
  * `DeploySpec` (serde, deny_unknown_fields) field-for-field.
  */
 
+import { isIP } from "node:net";
 import { traefikLabels } from "./traefik.js";
 import type {
     AppDeployPlan,
@@ -20,6 +21,23 @@ export interface ComposeSpecPort {
     /** Transport to publish. Defaults to TCP; a Bedrock game server is the case
      *  that is UDP, and publishing it as TCP means nothing can reach it. */
     readonly protocol?: "tcp" | "udp";
+    /** The one host address to bind. Absent means every interface. A DNS server
+     *  binds the LAN address only, so it does not collide with the machine's own
+     *  resolver listening on a loopback address of port 53. */
+    readonly hostIp?: string;
+}
+
+/**
+ * The host-address part of a published port: empty for every interface, the
+ * address and a colon otherwise, an IPv6 one bracketed so compose does not read
+ * its colons as the separators between host and container ports. Anything that is
+ * not an address binds every interface rather than reaching the file.
+ */
+export function publishedBind(hostIp: string | undefined): string {
+    if (!hostIp) return "";
+    if (isIP(hostIp) === 4) return `${hostIp}:`;
+    if (isIP(hostIp) === 6) return `[${hostIp}]:`;
+    return "";
 }
 
 export interface ComposeSpecVolume {
@@ -272,14 +290,16 @@ export function appComposeSpec(
                                   container: plan.expose.container,
                                   ...(plan.expose.protocol
                                       ? { protocol: plan.expose.protocol }
-                                      : {})
+                                      : {}),
+                                  ...(plan.expose.hostIp ? { hostIp: plan.expose.hostIp } : {})
                               }
                           ]
                         : []),
                     ...(plan.extraPorts ?? []).map((port) => ({
                         host: port.host,
                         container: port.container,
-                        ...(port.protocol ? { protocol: port.protocol } : {})
+                        ...(port.protocol ? { protocol: port.protocol } : {}),
+                        ...(port.hostIp ? { hostIp: port.hostIp } : {})
                     }))
                 ],
                 volumes: plan.volumes.map((volume) => ({
@@ -716,7 +736,9 @@ export function renderComposeYaml(
             lines.push("    ports:");
             for (const port of service.ports) {
                 const suffix = port.protocol === "udp" ? "/udp" : "";
-                lines.push(`      - ${yamlQuote(`${port.host}:${port.container}${suffix}`)}`);
+                lines.push(
+                    `      - ${yamlQuote(`${publishedBind(port.hostIp)}${port.host}:${port.container}${suffix}`)}`
+                );
             }
         }
         if (service.volumes.length > 0) {

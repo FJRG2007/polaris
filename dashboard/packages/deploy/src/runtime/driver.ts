@@ -105,6 +105,8 @@ export interface AppDeployPlan {
         readonly host: number;
         readonly container: number;
         readonly protocol?: "tcp" | "udp";
+        /** The one host address to publish on; absent means every interface. */
+        readonly hostIp?: string;
     };
     /**
      * Keep the service off every interface of the host: its port is not published at
@@ -140,6 +142,8 @@ export interface AppDeployPlan {
         readonly host: number;
         readonly container: number;
         readonly protocol?: "tcp" | "udp";
+        /** The one host address to publish on; absent means every interface. */
+        readonly hostIp?: string;
     }[];
     /** True when `expose.container` is a fallback guess (the user did not pin a
      *  port), so the runtime may refine it from the image's own exposed port. */

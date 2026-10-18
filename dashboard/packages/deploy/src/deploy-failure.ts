@@ -45,6 +45,20 @@ interface Meaning {
     readonly says: string;
 }
 
+// A port published on an address the machine no longer has, which Docker also
+// starts with "failed programming external connectivity" - nothing holds it.
+const ADDRESS_GONE = "cannot assign requested address";
+
+// Docker's own words for a port already taken. The daemon's "failed programming
+// external connectivity" is how a published port it could not bind starts, the
+// reason itself often cut off after it.
+const PORT_TAKEN_SIGNS = [
+    "address already in use",
+    "port is already allocated",
+    "bind for",
+    "failed programming external connectivity"
+];
+
 /**
  * In order: the first that matches wins, so the specific ones come before the
  * general. Every entry is a message seen in the wild.
@@ -110,9 +124,13 @@ const MEANINGS: readonly Meaning[] = [
         says: "the registry could not be reached from that machine."
     },
     {
+        signs: [ADDRESS_GONE],
+        says: "a port is published on an address that machine no longer has - its network address has changed."
+    },
+    {
         // Docker's own words for a port already taken, which reads as a compose
         // problem and is somebody else's container.
-        signs: ["address already in use", "port is already allocated", "bind for"],
+        signs: PORT_TAKEN_SIGNS,
         says: "something on that machine is already using a port this needs."
     },
     {
@@ -120,6 +138,13 @@ const MEANINGS: readonly Meaning[] = [
         says: "that image was not built for this machine's processor."
     }
 ];
+
+/** Whether this failure was a port somebody else already holds. */
+export function isPortTaken(raw: string): boolean {
+    const lowered = raw.toLowerCase();
+    if (lowered.includes(ADDRESS_GONE)) return false;
+    return PORT_TAKEN_SIGNS.some((sign) => lowered.includes(sign));
+}
 
 /**
  * Turn what the runtime said into a sentence, keeping the original.

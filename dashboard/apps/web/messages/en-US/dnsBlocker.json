@@ -33,7 +33,7 @@
         },
         "portHeld": {
             "label": "Could not start",
-            "body": "The DNS server could not start at {address}. Most often port 53 on this machine is held by a service that only answers the machine itself; it can also be a download that failed. Nothing on your network changed. Try again."
+            "body": "The DNS server could not start at {address}. Another program on this machine may be using port 53, or a download failed. Nothing on your network changed. Try again."
         },
         "conflict": {
             "label": "Not answering",
@@ -138,6 +138,7 @@
         "tooLarge": "These rules are too long to apply. Remove some of your own rules and save again.",
         "noAddress": "This machine has no address on your network yet. Check again in a minute.",
         "portTaken": "Another DNS server already answers on port 53 here. Turn it off, then retry.",
+        "portBusy": "Another program on this machine already uses port 53, so the DNS server cannot start. Stop it, then retry.",
         "notApplied": "Your settings are saved, but the DNS server did not start with them. See the status above and try again.",
         "invalid": "Some values are not valid. Fix the marked fields and save again.",
         "generic": "That did not work. Try again in a moment.",

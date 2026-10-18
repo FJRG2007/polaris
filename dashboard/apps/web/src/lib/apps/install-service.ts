@@ -150,6 +150,8 @@ export interface InstallPorts {
     /** Further doors into the same service. A Java Minecraft server that Bedrock
      *  clients join answers on a UDP port too. */
     readonly extra?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[];
+    /** The one host address all of them bind, when not every interface. */
+    readonly hostIp?: string;
 }
 
 /**
@@ -271,7 +273,8 @@ export async function installApp(
             imageRef: image,
             ...(containerPort ? { port: containerPort } : {}),
             ...(hostPort ? { hostPort, hostProtocol: protocol } : {}),
-            ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {})
+            ...(extraPorts && extraPorts.length > 0 ? { extraPorts } : {}),
+            ...(ports?.hostIp ? { hostIp: ports.hostIp } : {})
         },
         // A catalog app is reached on the machine's own address - a game server
         // by the port its clients type - so its port is published.
