@@ -62,6 +62,9 @@ import {
 
 const STATE_COOKIE = "polaris_connection_state";
 const CONNECTIONS_SCREEN = "/account/connections";
+
+/** The query parameter an app names its own screen in, to be sent back to it. */
+export const RETURN_PARAM = "return";
 /** Where a link started from the Mail app comes back to. */
 const MAIL_SCREEN = "/mail/settings/accounts";
 /** Where a link started from the Calendar app comes back to. */
@@ -170,6 +173,20 @@ function mailReturn(
     return held.edit ? { edit: held.edit } : { connect: "1" };
 }
 
+/**
+ * The screen a link trip should offer to go back to, as a `return` parameter on
+ * the connections list. An app that sends somebody to Connected accounts passes
+ * `?return=` with its own path; the list then offers the way back once they are
+ * done. Held in the state cookie between the two halves, and only ever a
+ * same-origin path (`safeTarget`), so it is never a way off this deployment.
+ */
+function returnParam(
+    held: Pick<FlowState, "mode" | "target"> | null
+): Record<string, string> | undefined {
+    if (!held?.target || held.mode === "signin" || held.mode === "mail") return undefined;
+    return { [RETURN_PARAM]: held.target };
+}
+
 function backToConnections(
     origin: string,
     provider: string,
@@ -237,7 +254,7 @@ async function begin(
     if (!client) {
         return mode === "signin"
             ? endSignIn(origin, provider, "unavailable")
-            : endLink(origin, provider, "unavailable");
+            : endLink(origin, provider, "unavailable", undefined, returnParam({ mode, target }));
     }
 
     /**
@@ -363,6 +380,8 @@ function beginSteam(origin: string, mode: ConnectionMode, target?: string): Resp
 export async function startConnectionLink(request: Request, provider: string): Promise<Response> {
     const user = await requireUser();
     const url = new URL(request.url);
+    // The app that sent somebody here, to be offered the way back to it.
+    const returnTo = safeTarget(url.searchParams.get(RETURN_PARAM));
     // Refused here and not only on the card that offers it: the card is a link, and
     // a link is something anybody can type. Administrators pass while the service is
     // unproven because somebody has to be the first one through it.
@@ -371,16 +390,23 @@ export async function startConnectionLink(request: Request, provider: string): P
         !(await connectionLinkAvailable(provider, { admin: user.isAdmin, userId: user.id }))
     ) {
         return NextResponse.redirect(
-            backToConnections(await connectionFlowOrigin(), provider, "unavailable")
+            backToConnections(
+                await connectionFlowOrigin(),
+                provider,
+                "unavailable",
+                undefined,
+                returnTo ? { [RETURN_PARAM]: returnTo } : undefined
+            )
         );
     }
     const scope = url.searchParams.get("scope");
     if (scope === "calendar" && linksCalendars(provider))
-        return begin(request, provider, "calendar");
+        return begin(request, provider, "calendar", returnTo);
     // Google Drive for Office: reading the Docs, Sheets and Slides somebody has.
-    if (scope === "office" && provider === "google") return begin(request, provider, "office");
+    if (scope === "office" && provider === "google")
+        return begin(request, provider, "office", returnTo);
     if (scope !== "mail") {
-        return begin(request, provider, scope === "storage" ? "storage" : "link");
+        return begin(request, provider, scope === "storage" ? "storage" : "link", returnTo);
     }
     // Validated rather than carried as typed: what this becomes is a value in a
     // cookie, a hint on somebody else's consent screen, and the thing the
@@ -451,7 +477,7 @@ export async function finishConnectionCallback(
     // arrived with no cookie at all: it lands on the screen it was started from,
     // which for a link is the one that says what went wrong.
     const screen = screenFor(held?.mode);
-    const back = mailReturn(held);
+    const back = mailReturn(held) ?? returnParam(held);
     if (!code) return endLink(origin, provider, "cancelled", screen, back);
     if (!valid) return endLink(origin, provider, "state_error", screen, back);
     return finishLink(
@@ -478,7 +504,7 @@ export async function finishConnectionCallback(
  */
 async function finishSteam(url: URL, origin: string, held: FlowState | null): Promise<Response> {
     if (url.searchParams.get("openid.mode") === "cancel")
-        return endLink(origin, STEAM_PROVIDER, "cancelled");
+        return endLink(origin, STEAM_PROVIDER, "cancelled", undefined, returnParam(held));
     const state = url.searchParams.get("state");
     if (
         !held ||
@@ -487,11 +513,11 @@ async function finishSteam(url: URL, origin: string, held: FlowState | null): Pr
         !state ||
         held.state !== state
     ) {
-        return endLink(origin, STEAM_PROVIDER, "state_error");
+        return endLink(origin, STEAM_PROVIDER, "state_error", undefined, returnParam(held));
     }
     const user = await requireUser();
     const steamId = await verifySteamReturn(url.searchParams).catch(() => null);
-    if (!steamId) return endLink(origin, STEAM_PROVIDER, "error");
+    if (!steamId) return endLink(origin, STEAM_PROVIDER, "error", undefined, returnParam(held));
 
     try {
         // The name is a nicety and Steam may not be willing to give it - no key,
@@ -508,12 +534,12 @@ async function finishSteam(url: URL, origin: string, held: FlowState | null): Pr
             // and Polaris asks Steam for nothing else on their behalf.
             credential: null
         });
-        return endLink(origin, STEAM_PROVIDER, "linked");
+        return endLink(origin, STEAM_PROVIDER, "linked", undefined, returnParam(held));
     } catch (caught) {
         if (caught instanceof ConnectionClaimedError)
-            return endLink(origin, STEAM_PROVIDER, "taken");
-        if (caught instanceof ConnectionLimitError) return endLink(origin, STEAM_PROVIDER, "limit");
-        return endLink(origin, STEAM_PROVIDER, "error");
+            return endLink(origin, STEAM_PROVIDER, "taken", undefined, returnParam(held));
+        if (caught instanceof ConnectionLimitError) return endLink(origin, STEAM_PROVIDER, "limit", undefined, returnParam(held));
+        return endLink(origin, STEAM_PROVIDER, "error", undefined, returnParam(held));
     }
 }
 

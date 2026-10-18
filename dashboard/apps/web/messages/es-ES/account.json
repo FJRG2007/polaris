@@ -529,6 +529,18 @@
         }
     },
     "connections": {
+        "hub": {
+            "back": "Volver a donde estabas",
+            "search": "Buscar servicios",
+            "categories": "Categorías",
+            "connectedCount": "Conectadas",
+            "noMatch": "Ningún servicio es \"{query}\".",
+            "category": {
+                "all": "Todo",
+                "general": "General",
+                "developer": "Desarrollo"
+            }
+        },
         "page": {
             "title": "Cuentas conectadas",
             "intro": "Las cuentas externas con las que Polaris actúa en tu nombre. Solo las tuyas, y solo lo que vincules."

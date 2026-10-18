@@ -23,7 +23,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function ConnectionsPage() {
+export default async function ConnectionsPage({
+    searchParams
+}: {
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
+} = {}) {
+    // Only what the screen reads on its first render: which service an app sent
+    // somebody here for, and the app to offer the way back to.
+    const params = (await searchParams) ?? {};
+    const initial = new URLSearchParams();
+    for (const key of ["provider", "return"]) {
+        const value = params[key];
+        if (typeof value === "string") initial.set(key, value);
+    }
     const user = await requireUser();
     const t = await getTranslations("account");
     const [linked, lastfmReady, canConfigure] = await Promise.all([
@@ -94,7 +106,7 @@ export default async function ConnectionsPage() {
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
             </div>
-            <ConnectionsView providers={providers} />
+            <ConnectionsView providers={providers} initialSearch={initial.toString()} />
         </div>
     );
 }

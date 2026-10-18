@@ -15,16 +15,28 @@ import { runAction } from "@/lib/run-action";
 import { FAILURE_RECORDED } from "@/lib/connections/outcome-params";
 import { IntegrationLogo } from "@/components/logos";
 import {
-    connectionSections,
+    CONNECTION_CATEGORIES,
     lastfmNameSchema,
     minecraftNameSchema,
     type ConnectionCategory
 } from "@polaris/core";
+import { safeRedirect } from "@/lib/safe-redirect";
+import { arrangeProviders } from "@/lib/connections/arrange";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
-import { ExternalLink, KeyRound, Loader2, Pencil, Plus, RefreshCw, Unlink } from "lucide-react";
+import {
+    ArrowLeft,
+    ExternalLink,
+    KeyRound,
+    Loader2,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Search,
+    Unlink
+} from "lucide-react";
 import {
     connectAwsAction,
     connectTokenAction,
@@ -116,11 +128,57 @@ const OUTCOMES: Record<
     error: { key: "error", bad: true }
 };
 
-export function ConnectionsView({ providers }: { providers: ConnectionProviderCard[] }) {
+/**
+ * The screen an app sent somebody here from, as `?return=` named it: only a path
+ * on this origin, and nothing when it would resolve anywhere else.
+ */
+export function readReturnTo(search: string): string | null {
+    const raw = new URLSearchParams(search).get("return");
+    if (!raw) return null;
+    const target = safeRedirect(raw);
+    return target === "/" && raw !== "/" ? null : target;
+}
+
+/** Where a card's Connect button starts the trip, carrying the way back. */
+export function linkHref(slug: string, returnTo: string | null): string {
+    const base = `/api/connections/${slug}/link`;
+    return returnTo ? `${base}?return=${encodeURIComponent(returnTo)}` : base;
+}
+
+export function ConnectionsView({
+    providers,
+    initialSearch = ""
+}: {
+    providers: ConnectionProviderCard[];
+    /** The page's query string, so the first render already knows where it came
+     *  from and which service it was sent for. */
+    initialSearch?: string;
+}) {
     const t = useTranslations("account");
     const [notice, setNotice] = useState<{ provider: string; text: string; bad: boolean } | null>(
         null
     );
+    const [query, setQuery] = useState("");
+    const [category, setCategory] = useState<ConnectionCategory | null>(null);
+    const [returnTo, setReturnTo] = useState<string | null>(() => readReturnTo(initialSearch));
+    const [focused, setFocused] = useState<string | null>(
+        () => new URLSearchParams(initialSearch).get("provider")
+    );
+
+    // `?provider=` is an app pointing at one service: that card is scrolled to
+    // and marked, so nobody has to find it among the rest.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        setReturnTo(readReturnTo(window.location.search));
+        const wanted = params.get("provider");
+        if (!wanted || !providers.some((entry) => entry.slug === wanted)) return;
+        setFocused(wanted);
+        document
+            .getElementById(`connection-${wanted}`)
+            ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, []);
+
+    const sections = arrangeProviders(providers, { query, category });
 
     // The callbacks return here with ?provider=&connection=, read once and cleared
     // so a refresh does not keep re-announcing something that happened minutes ago.
@@ -157,7 +215,64 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
     // without this screen being touched.
     return (
         <div className="flex flex-col gap-6">
-            {connectionSections(providers).map((section) => (
+            {returnTo ? (
+                <div>
+                    <Button asChild size="sm" variant="secondary">
+                        <Link href={returnTo}>
+                            <ArrowLeft className="size-4" />
+                            {t("connections.hub.back")}
+                        </Link>
+                    </Button>
+                </div>
+            ) : null}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={t("connections.hub.search")}
+                        aria-label={t("connections.hub.search")}
+                        className="pl-8"
+                    />
+                </div>
+                <div
+                    role="group"
+                    aria-label={t("connections.hub.categories")}
+                    className="flex flex-wrap gap-1"
+                >
+                    {[null, ...CONNECTION_CATEGORIES.map((entry) => entry.id)].map((id) => (
+                        <Button
+                            key={id ?? "all"}
+                            size="sm"
+                            variant={category === id ? "secondary" : "ghost"}
+                            aria-pressed={category === id}
+                            onClick={() => setCategory(id)}
+                        >
+                            {t(`connections.hub.category.${id ?? "all"}` as const)}
+                            <span
+                                className="text-xs text-muted-foreground tabular-nums"
+                                title={t("connections.hub.connectedCount")}
+                            >
+                                {
+                                    providers.filter(
+                                        (entry) =>
+                                            (id === null || entry.category === id) &&
+                                            entry.accounts.length > 0
+                                    ).length
+                                }
+                            </span>
+                        </Button>
+                    ))}
+                </div>
+            </div>
+            {sections.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    {t("connections.hub.noMatch", { query: query.trim() })}
+                </p>
+            ) : null}
+            {sections.map((section) => (
                 <section
                     key={section.id}
                     aria-labelledby={`connections-${section.id}`}
@@ -167,13 +282,15 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
                         id={`connections-${section.id}`}
                         className="text-sm font-medium text-muted-foreground"
                     >
-                        {section.label}
+                        {t(`connections.hub.category.${section.id}` as const)}
                     </h2>
                     {section.providers.map((provider) => (
                         <ProviderCard
                             key={provider.slug}
                             provider={provider}
                             notice={notice?.provider === provider.slug ? notice : null}
+                            returnTo={returnTo}
+                            focused={focused === provider.slug}
                         />
                     ))}
                 </section>
@@ -184,10 +301,14 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
 
 function ProviderCard({
     provider,
-    notice
+    notice,
+    returnTo = null,
+    focused = false
 }: {
     provider: ConnectionProviderCard;
     notice: { text: string; bad: boolean } | null;
+    returnTo?: string | null;
+    focused?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("account");
@@ -234,7 +355,11 @@ function ProviderCard({
     }
 
     return (
-        <Card>
+        <Card
+            id={`connection-${provider.slug}`}
+            data-focused={focused ? "" : undefined}
+            className={focused ? "ring-2 ring-primary/60" : undefined}
+        >
             <CardBody className="flex flex-col gap-3">
                 <div className="flex items-start gap-3">
                     <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
@@ -373,7 +498,7 @@ function ProviderCard({
                                         }
                                         disabled={pending}
                                         onClick={() =>
-                                            router.push(`/api/connections/${provider.slug}/link`)
+                                            router.push(linkHref(provider.slug, returnTo))
                                         }
                                     >
                                         <RefreshCw className="size-4" />
@@ -442,7 +567,7 @@ function ProviderCard({
                                 variant="secondary"
                                 disabled={!canAdd || pending}
                                 onClick={() =>
-                                    router.push(`/api/connections/${provider.slug}/link`)
+                                    router.push(linkHref(provider.slug, returnTo))
                                 }
                             >
                                 <Plus className="size-4" />
