@@ -1,9 +1,10 @@
 /**
  * The node types core contributes that need nothing but Polaris itself:
- * the triggers, If, Choose, At the same time, Wait, Notify, Answer and
- * Announce. HTTP and the chat presets live in `http-node.ts`; the nodes that
- * steer the run itself (Join, loops, Stop, Wait for an event, Run another
- * automation) are listed here with their config and run by the engine.
+ * the triggers, If, Choose, At the same time, Wait, Notify, Send a chat
+ * message, Answer and Announce. HTTP and the chat presets live in
+ * `http-node.ts`; the nodes that steer the run itself (Join, loops, Stop, Wait
+ * for an event, Run another automation) are listed here with their config and
+ * run by the engine.
  */
 
 import * as core from "@polaris/core";
@@ -204,6 +205,42 @@ const notifyNode: ServerNode<NotifyConfig> = {
     }
 };
 
+type MessageConfig = ReturnType<(typeof C)["core.message"]["parse"]>;
+
+/**
+ * Post into a Polaris chat conversation as the account the automation runs as.
+ *
+ * Sent through chat's own `send`, so the room is checked when the step runs,
+ * not when it was set up: somebody who has left the conversation, or been
+ * removed from it, since is refused rather than posted for.
+ */
+const messageNode: ServerNode<MessageConfig> = {
+    type: "core.message",
+    meta: core.CORE_NODE_META["core.message"],
+    config: C["core.message"],
+    run: async (config, context, io) => {
+        const chat = await import("@/lib/chat/messages");
+        const { ChatAccessError, ChatRuleError } = await import("@/lib/chat/access");
+        const body = core
+            .interpolate(config.body, context)
+            .slice(0, core.MAX_CHAT_MESSAGE)
+            .trim();
+        io.recordInput({ channelId: config.channelId, body });
+        if (!body) throw new StepError("messageEmpty");
+        try {
+            const messageId = await chat.send(
+                { id: io.actor.id },
+                { channelId: config.channelId, body }
+            );
+            return { output: { messageId } };
+        } catch (caught) {
+            if (caught instanceof ChatRuleError) throw new StepError("messageRefused");
+            if (caught instanceof ChatAccessError) throw new StepRefusal("messageForbidden");
+            throw caught;
+        }
+    }
+};
+
 export const CORE_SERVER_NODES: readonly ServerNode[] = [
     declared("core.manual"),
     declared("core.schedule"),
@@ -226,5 +263,6 @@ export const CORE_SERVER_NODES: readonly ServerNode[] = [
     notifyNode as ServerNode,
     answerNode as ServerNode,
     setNode as ServerNode,
-    announceNode as ServerNode
+    announceNode as ServerNode,
+    messageNode as ServerNode
 ];

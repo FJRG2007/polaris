@@ -484,6 +484,26 @@ describe("a new automation from the switch-off template", () => {
         expect(replaced).toEqual([]);
     });
 
+    it("starts nothing while the name is blank, and does once one is typed", async () => {
+        render(<AutomationStarter template={null} deviceId={null} placeId={null} />);
+        await painted();
+        const name = screen.getByLabelText(/Name/) as HTMLInputElement;
+        fireEvent.change(name, { target: { value: "   " } });
+        const create = screen.getByRole("button", { name: "Create" });
+        expect(create.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.click(create);
+        await painted();
+        expect(started).toHaveLength(0);
+
+        fireEvent.change(name, { target: { value: "  Evening lights  " } });
+        expect(create.getAttribute("aria-disabled")).toBeNull();
+        fireEvent.click(create);
+        await painted();
+        expect(started).toHaveLength(1);
+        expect(started[0]).toMatchObject({ name: "Evening lights" });
+        expect(replaced).toEqual(["/automations/central-1"]);
+    });
+
     it("says a wrong number under its field as it is typed", async () => {
         render(
             <AutomationEditor automationId="draft-autoOff" canManage canControl initialTab="flow" />

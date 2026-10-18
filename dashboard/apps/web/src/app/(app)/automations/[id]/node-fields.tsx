@@ -22,7 +22,7 @@ import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useEffect, useState } from "react";
-import { hookAddressAction, rotateHookAction } from "../actions";
+import { chatConversationsAction, hookAddressAction, rotateHookAction } from "../actions";
 import { RefInput, RefTextarea } from "./references";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -62,6 +62,7 @@ export const STEP_TYPES = [
     "core.waitEvent",
     "core.waitCondition",
     "core.notify",
+    "core.message",
     "core.http",
     "core.chat",
     "core.run",
@@ -84,6 +85,7 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     }),
     "core.wait": () => ({ kind: "duration", duration: { amount: 5, unit: "minutes" } }),
     "core.notify": () => ({ title: "", body: "" }),
+    "core.message": () => ({ channelId: "", body: "" }),
     "core.http": () => ({
         method: "POST",
         url: "",
@@ -463,6 +465,8 @@ export function NodeFields({
                     </Field>
                 </div>
             );
+        case "core.message":
+            return <ChatMessageFields config={config} set={set} />;
         case "core.chat":
             return (
                 <div className="space-y-3">
@@ -697,7 +701,7 @@ export function NodeFields({
  * address" on a trigger that is not saved yet only moves the rotation here;
  * the next save keeps it.
  */
-function WebhookAddress({
+export function WebhookAddress({
     detail,
     nodeId,
     rotation,
@@ -762,6 +766,70 @@ function WebhookAddress({
             >
                 {t("editor.newAddress")}
             </Button>
+        </div>
+    );
+}
+
+type Conversation = { id: string; kind: string; name: string; others: string[] };
+
+/**
+ * Where "Send a chat message" posts, and what it says.
+ *
+ * The list is the conversations the person editing is in; whether the account
+ * the automation runs as may still post there is checked again on every run.
+ */
+function ChatMessageFields({ config, set }: { config: Config; set: (change: Config) => void }) {
+    const t = useTranslations("automations");
+    const [conversations, setConversations] = useState<Conversation[] | null>(null);
+    const [error, setError] = useState("");
+    useEffect(() => {
+        let cancelled = false;
+        void chatConversationsAction().then((answer) => {
+            if (cancelled) return;
+            if (answer.ok) setConversations(answer.conversations);
+            else setError(answer.error);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+    const label = (entry: Conversation) =>
+        entry.kind === "text" || entry.kind === "voice"
+            ? `#${entry.name}`
+            : entry.name || entry.others.join(", ") || t("fields.conversationSelf");
+    const options: SelectOption[] = (conversations ?? []).map((entry) => ({
+        value: entry.id,
+        label: label(entry)
+    }));
+    const chosen = typeof config.channelId === "string" ? config.channelId : "";
+    const missing = conversations !== null && chosen !== "" && !options.some((o) => o.value === chosen);
+    return (
+        <div className="space-y-3">
+            <Field label={`${t("fields.conversation")} *`}>
+                <Select
+                    value={chosen}
+                    onValueChange={(channelId) => set({ channelId })}
+                    options={options}
+                    placeholder={t(
+                        conversations === null ? "fields.conversationLoading" : "fields.conversationPick"
+                    )}
+                    aria-label={t("fields.conversation")}
+                />
+            </Field>
+            {error && <p className="text-xs text-danger-ink">{error}</p>}
+            {conversations !== null && options.length === 0 && (
+                <p className="text-xs text-muted-foreground">{t("fields.conversationNone")}</p>
+            )}
+            {missing && (
+                <p className="text-xs text-danger-ink">{t("fields.conversationGone")}</p>
+            )}
+            <Field label={`${t("fields.body")} *`}>
+                <RefTextarea
+                    rows={3}
+                    value={config.body ?? ""}
+                    onChange={(event) => set({ body: event.target.value })}
+                />
+            </Field>
         </div>
     );
 }

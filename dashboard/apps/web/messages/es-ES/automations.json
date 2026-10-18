@@ -131,7 +131,8 @@
         "announce": "Anunciar",
         "try": "Intentar",
         "waitCondition": "Esperar una condición",
-        "set": "Fijar valores"
+        "set": "Fijar valores",
+        "message": "Mensaje en el chat"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -189,7 +190,13 @@
         "levelInfo": "Info",
         "levelSuccess": "Éxito",
         "levelWarning": "Aviso",
-        "levelDanger": "Peligro"
+        "levelDanger": "Peligro",
+        "conversation": "Conversación",
+        "conversationPick": "Elige una conversación",
+        "conversationLoading": "Cargando conversaciones...",
+        "conversationNone": "Aún no estás en ninguna conversación.",
+        "conversationGone": "Ya no estás en esta conversación. Elige otra.",
+        "conversationSelf": "Solo tú"
     },
     "operators": {
         "eq": "igual a",
@@ -278,7 +285,10 @@
         "answerTooLarge": "La respuesta era muy grande",
         "announceLimited": "Demasiados anuncios",
         "announceFailed": "El anuncio no se envió",
-        "valuesTooLarge": "Valores demasiado grandes"
+        "valuesTooLarge": "Valores demasiado grandes",
+        "messageEmpty": "El mensaje quedó vacío",
+        "messageRefused": "El chat rechazó el mensaje",
+        "messageForbidden": "Ya no puede escribir en esa conversación"
     },
     "secrets": {
         "title": "Secretos",
@@ -601,7 +611,8 @@
         "announce": "Avisa a otras automatizaciones de que pasó algo.",
         "try": "Ejecuta los pasos de dentro y elige qué sigue a un fallo.",
         "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo.",
-        "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso."
+        "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
+        "message": "Publica en una conversación tuya de Polaris."
     },
     "flow": {
         "conditionGroup": "Condiciones",

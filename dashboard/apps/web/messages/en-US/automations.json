@@ -131,7 +131,8 @@
         "announce": "Announce",
         "try": "Try block",
         "waitCondition": "Wait for a condition",
-        "set": "Set values"
+        "set": "Set values",
+        "message": "Send a chat message"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -189,7 +190,13 @@
         "levelInfo": "Info",
         "levelSuccess": "Success",
         "levelWarning": "Warning",
-        "levelDanger": "Danger"
+        "levelDanger": "Danger",
+        "conversation": "Conversation",
+        "conversationPick": "Pick a conversation",
+        "conversationLoading": "Loading conversations...",
+        "conversationNone": "You are not in any conversation yet.",
+        "conversationGone": "You are no longer in this conversation. Pick another.",
+        "conversationSelf": "Just you"
     },
     "operators": {
         "eq": "equals",
@@ -278,7 +285,10 @@
         "answerTooLarge": "The answer was too large",
         "announceLimited": "Too many announcements",
         "announceFailed": "The announcement was not sent",
-        "valuesTooLarge": "The values were too large"
+        "valuesTooLarge": "The values were too large",
+        "messageEmpty": "The message came out empty",
+        "messageRefused": "Chat did not accept the message",
+        "messageForbidden": "Can no longer post in that conversation"
     },
     "secrets": {
         "title": "Secrets",
@@ -601,7 +611,8 @@
         "announce": "Tell other automations that something happened.",
         "try": "Run the steps inside, and choose what follows a failure.",
         "waitCondition": "Pause until a condition is true, or time runs out.",
-        "set": "Work values out once. Later steps pick them from this step's values."
+        "set": "Work values out once. Later steps pick them from this step's values.",
+        "message": "Post in a Polaris conversation you are in."
     },
     "flow": {
         "conditionGroup": "Conditions",

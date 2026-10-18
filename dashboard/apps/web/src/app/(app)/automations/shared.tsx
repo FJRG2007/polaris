@@ -23,6 +23,7 @@ import {
     ListOrdered,
     Megaphone,
     Merge,
+    MessageCircle,
     MessageSquare,
     PhoneIncoming,
     Power,
@@ -213,6 +214,9 @@ const RUN_ERRORS = [
     "callerEnded",
     "answerTooLarge",
     "valuesTooLarge",
+    "messageEmpty",
+    "messageRefused",
+    "messageForbidden",
     "announceLimited",
     "announceFailed"
 ] as const;
@@ -240,6 +244,7 @@ const NODE_KEYS = {
     "core.notify": "notify",
     "core.http": "http",
     "core.chat": "chat",
+    "core.message": "message",
     "core.called": "called",
     "core.onEvent": "onEvent",
     "core.failed": "failed",
@@ -298,6 +303,7 @@ const NODE_ICONS: Record<string, LucideIcon> = {
     "core.notify": Bell,
     "core.http": Globe,
     "core.chat": MessageSquare,
+    "core.message": MessageCircle,
     "core.called": PhoneIncoming,
     "core.onEvent": Radio,
     "core.failed": TriangleAlert,

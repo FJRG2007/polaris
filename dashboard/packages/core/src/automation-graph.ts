@@ -711,6 +711,11 @@ export const CORE_NODE_CONFIGS = {
     "core.answer": z.object({ outputs: valuePairs }),
     /** Named values worked out once, read by later steps as {{steps.<id>.values.<name>}}. */
     "core.set": z.object({ values: valuePairs }),
+    /** A message posted into a Polaris chat conversation as the account the automation runs as. */
+    "core.message": z.object({
+        channelId: z.string().uuid(),
+        body: text(AUTOMATION_LIMITS.textLength).min(1)
+    }),
     "core.announce": z.object({
         name: eventName.refine(
             (value) => !value.startsWith(RESERVED_EVENT_PREFIX),
@@ -764,6 +769,7 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
     "core.run": { role: "action", ports: [], idempotent: true },
     "core.answer": { role: "action", ports: [], idempotent: true },
     "core.set": { role: "action", ports: [], idempotent: true },
+    "core.message": { role: "action", ports: [], idempotent: false },
     // The event's dedupe key is the step's idempotency key.
     "core.announce": { role: "action", ports: [], idempotent: true },
     "core.try": {
