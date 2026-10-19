@@ -8,6 +8,10 @@
 
 export const CONNECTIONS_HUB = "/account/connections";
 
+/** The hub's sections for Polaris's own apps, which `?provider=` points at. */
+export const TASK_TRACKERS_SECTION = "task-trackers";
+export const AI_KEYS_SECTION = "ai-keys";
+
 /** The query parameter an app names its own screen in, to be sent back to it. */
 export const RETURN_PARAM = "return";
 

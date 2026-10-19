@@ -1197,13 +1197,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/tasks/reports",
             icon: ChartColumn,
             keywords: ["dashboard", "workload", "metrics"]
-        },
-        {
-            label: "Connected trackers", // i18n-ignore
-            href: "/tasks/trackers",
-            needs: "tasks.manage",
-            icon: Link2,
-            keywords: ["linear", "jira", "import", "sync", "issues", "two-way"]
         }
     ],
     /**
@@ -1639,7 +1632,17 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Connected accounts", // i18n-ignore
             href: "/account/connections",
             icon: Link2,
-            keywords: ["github", "google", "link", "oauth", "repositories", "calendar"]
+            keywords: [
+                "github",
+                "google",
+                "link",
+                "oauth",
+                "repositories",
+                "calendar",
+                "linear",
+                "jira",
+                "trackers"
+            ]
         },
         {
             label: "Organizations", // i18n-ignore

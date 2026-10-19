@@ -649,6 +649,12 @@
                 "unreachable": "Spotify could not be reached. Try again in a moment."
             }
         },
+        "core": {
+            "trackers": {
+                "title": "Issue trackers",
+                "intro": "Linear and Jira, with the space and list their issues land in on your Tasks board."
+            }
+        },
         "orgHub": {
             "title": "For an organization",
             "intro": "An account connected for an organization belongs to it. Open its connections to connect one there."

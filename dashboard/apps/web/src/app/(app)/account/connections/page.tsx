@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { getTranslations } from "@/lib/i18n/request";
+import { hubCoreSections } from "./core-sections";
 import { hubAppSections, hubSearch } from "./app-sections";
 import { managedConnectionOrgs } from "@/lib/connections/org-scope";
 import { orgConnectionsHref, RETURN_PARAM } from "@/lib/connections/hub-href";
@@ -37,12 +38,13 @@ export default async function ConnectionsPage({
     const search = hubSearch((await searchParams) ?? {});
     const user = await requireUser();
     const t = await getTranslations("account");
-    const [linked, lastfmReady, canConfigure, apps, orgs] = await Promise.all([
+    const [linked, lastfmReady, canConfigure, apps, orgs, own] = await Promise.all([
         listConnections(user.id),
         lastfmApiKey().then((key) => key !== null),
         sessionCan(user, "settings.manage"),
         hubAppSections(user.id, { kind: "personal" }, search),
-        managedConnectionOrgs(user)
+        managedConnectionOrgs(user),
+        hubCoreSections(user)
     ]);
 
     const providers = await Promise.all(
@@ -110,8 +112,13 @@ export default async function ConnectionsPage({
             <ConnectionsView
                 providers={providers}
                 initialSearch={search}
-                appSections={apps.node}
-                appSectionIds={apps.ids}
+                appSections={
+                    <>
+                        {own.node}
+                        {apps.node}
+                    </>
+                }
+                appSectionIds={[...own.ids, ...apps.ids]}
             />
             {/* What somebody connects for an organization is the organization's,
                 and lives in its own hub - offered here, carrying where they came

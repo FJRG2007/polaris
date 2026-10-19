@@ -649,6 +649,12 @@
                 "unreachable": "No se pudo contactar con Spotify. Inténtalo de nuevo en un momento."
             }
         },
+        "core": {
+            "trackers": {
+                "title": "Gestores de tareas",
+                "intro": "Linear y Jira, con el espacio y la lista donde caen sus incidencias en tu tablero de Tareas."
+            }
+        },
         "orgHub": {
             "title": "Para una organización",
             "intro": "Una cuenta conectada para una organización es suya. Abre sus conexiones para conectar una allí."

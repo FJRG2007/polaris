@@ -157,6 +157,14 @@ const nextConfig = {
         // Model keys belong to the account, not to the Agents app. People
         // bookmark the screen they keep credentials on.
         { source: "/apps/agents/keys", destination: "/account/ai-keys", permanent: false },
+        // Linear and Jira are connected from Connected accounts, beside every
+        // other account. The Tasks menu and bookmarks still name the old screen;
+        // the hub shows the section only to whoever can manage tasks.
+        {
+            source: "/tasks/trackers",
+            destination: "/account/connections?provider=task-trackers&return=%2Ftasks",
+            permanent: false
+        },
         // A project's firewall is the firewall screen scoped to that project. The
         // destination refuses an id that is not the caller's with a 404, so
         // forwarding blindly says nothing about whether the project exists.

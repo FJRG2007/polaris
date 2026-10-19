@@ -6,6 +6,7 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
+import { AI_KEYS_SECTION, connectionsHref } from "@/lib/connections/hub-href";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +34,7 @@ export default async function AgentSetupPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("overview.setUp")}
-                description={t("setup.description")}
-            />
+            <PageHeader title={t("overview.setUp")} description={t("setup.description")} />
             <div className="space-y-3">
                 <Step
                     done={appReady}
@@ -49,7 +47,7 @@ export default async function AgentSetupPage() {
                     done={modelReady}
                     title={t("setup.model.title")}
                     body={t("setup.model.body")}
-                    href="/account/ai-keys"
+                    href={connectionsHref(AI_KEYS_SECTION, "/apps/agents/setup")}
                     action={t("setup.model.action")}
                 />
                 <Step
@@ -101,7 +99,9 @@ function Step({
                 <span
                     aria-hidden
                     className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border ${
-                        done ? "border-success-edge bg-success-soft text-success-ink" : "border-white/15"
+                        done
+                            ? "border-success-edge bg-success-soft text-success-ink"
+                            : "border-white/15"
                     }`}
                 >
                     {done ? <Check className="size-3.5 shrink-0" /> : null}

@@ -418,7 +418,7 @@
         "pulled": "Se trajeron {added} y se actualizaron {updated}.",
         "connect": "Conectar un gestor",
         "emptyTitle": "No hay nada conectado",
-        "emptyDescription": "Conecta Linear o Jira y sus incidencias aparecerán aquí como tareas, con su referencia. Mueve una en este tablero y también se moverá allí.",
+        "emptyDescription": "Conecta Linear o Jira y sus incidencias aparecerán como tareas en tu tablero, con su referencia. Mueve una allí y también se moverá en el gestor.",
         "summary": "{provider} en {space} / {list} - {linked} vinculadas",
         "summaryNeverPulled": "{provider} en {space} / {list} - {linked} vinculadas, nunca sincronizado",
         "twoWay": "En ambos sentidos",

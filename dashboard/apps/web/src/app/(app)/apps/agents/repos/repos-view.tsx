@@ -11,6 +11,8 @@ import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
 import { AGENT_WORKFLOW_PATH, needsWorkflowFile } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
+import { AI_KEYS_SECTION } from "@/lib/connections/hub-href";
 import { agentText, agentWord } from "@/lib/agents/words";
 
 /**
@@ -23,6 +25,7 @@ import { agentText, agentWord } from "@/lib/agents/words";
  */
 export function ReposView({ repos, providers }: { repos: AgentRepoView[]; providers: string[] }) {
     const t = useTranslations("agents");
+    const keysLink = useConnectionsHref(AI_KEYS_SECTION);
     const [adding, setAdding] = useState(false);
     const [editing, setEditing] = useState<AgentRepoView | null>(null);
     const [removing, setRemoving] = useState<AgentRepoView | null>(null);
@@ -58,9 +61,15 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr className="border-b border-white/5">
-                                    <th className="w-full max-w-0 px-4 py-2 font-medium">{t("sessions.form.repository")}</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">{t("repos.runsOn")}</th>
-                                    <th className="whitespace-nowrap px-4 py-2 font-medium">{t("repos.model")}</th>
+                                    <th className="w-full max-w-0 px-4 py-2 font-medium">
+                                        {t("sessions.form.repository")}
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        {t("repos.runsOn")}
+                                    </th>
+                                    <th className="whitespace-nowrap px-4 py-2 font-medium">
+                                        {t("repos.model")}
+                                    </th>
                                     <th className="px-4 py-2" />
                                 </tr>
                             </thead>
@@ -83,7 +92,11 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                     </Badge>
                                                 ) : null}
                                             </div>
-                                            {repo.error ? <p className="mt-1 text-xs text-danger">{agentText(t, repo.error)}</p> : null}
+                                            {repo.error ? (
+                                                <p className="mt-1 text-xs text-danger">
+                                                    {agentText(t, repo.error)}
+                                                </p>
+                                            ) : null}
                                         </td>
                                         <td
                                             className="whitespace-nowrap px-4 py-3 text-muted-foreground"
@@ -91,7 +104,9 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                         >
                                             {agentWord(t, "execution", repo.execution)}
                                             {repo.poolName ? (
-                                                <span className="ml-1 text-xs">({repo.poolName})</span>
+                                                <span className="ml-1 text-xs">
+                                                    ({repo.poolName})
+                                                </span>
                                             ) : null}
                                             {/* The two GitHub-scheduled executions need a file in the
                                                 repository, and whether it is there is the difference
@@ -118,13 +133,19 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                                                 </a>
                                             ) : null}
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{repo.model}</td>
+                                        <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                                            {repo.model}
+                                        </td>
                                         <td className="whitespace-nowrap px-4 py-3">
                                             <div className="flex items-center justify-end gap-1">
                                                 <Switch
                                                     checked={repo.enabled}
                                                     onChange={(next: boolean) => toggle(repo, next)}
-                                                    aria-label={repo.enabled ? t("repos.turnOff") : t("repos.turnOn")}
+                                                    aria-label={
+                                                        repo.enabled
+                                                            ? t("repos.turnOff")
+                                                            : t("repos.turnOn")
+                                                    }
                                                 />
                                                 <Button
                                                     variant="ghost"
@@ -158,7 +179,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                 <p className="text-sm text-muted-foreground">
                     {t.rich("repos.noProvider", {
                         link: (chunks) => (
-                            <Link href="/account/ai-keys" className="underline">
+                            <Link href={keysLink} className="underline">
                                 {chunks}
                             </Link>
                         )

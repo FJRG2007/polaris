@@ -12,6 +12,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
 import * as access from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import { syncTracker } from "@/lib/tasks/trackers/sync";
@@ -19,7 +20,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { trackerSentence } from "./tracker-sentence";
 import * as trackers from "@/lib/tasks/trackers/service";
 
-const TRACKERS_PATH = "/tasks/trackers";
+// Trackers are connected from Connected accounts; that is the screen to redraw.
+const TRACKERS_PATH = CONNECTIONS_HUB;
 
 const saveSchema = z.object({
     id: z.string().uuid().nullable().default(null),
@@ -71,7 +73,12 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     const t = await getTranslations("tasks");
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message;
-        return { error: message === "trackers.errors.nameRequired" ? t(message) : t("trackers.errors.checkForm") };
+        return {
+            error:
+                message === "trackers.errors.nameRequired"
+                    ? t(message)
+                    : t("trackers.errors.checkForm")
+        };
     }
     const value = parsed.data;
 
@@ -93,11 +100,19 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     for (const field of core.ISSUE_TRACKER_FIELDS[value.provider]) {
         if (field.secret) {
             if (!value.id && !value.secret)
-                return { error: t("trackers.errors.fieldRequired", { field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0]) }) };
+                return {
+                    error: t("trackers.errors.fieldRequired", {
+                        field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0])
+                    })
+                };
             continue;
         }
         if (!value.config[field.key]?.trim())
-            return { error: t("trackers.errors.fieldRequired", { field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0]) }) };
+            return {
+                error: t("trackers.errors.fieldRequired", {
+                    field: t(`trackers.fields.${field.key}.label` as Parameters<typeof t>[0])
+                })
+            };
     }
 
     const config = { ...value.config };
@@ -116,7 +131,12 @@ export async function saveTrackerAction(input: unknown): Promise<{ error?: strin
     try {
         await trackers.saveTracker(user.id, { ...value, spaceId, config });
     } catch (error) {
-        return { error: error instanceof Error ? trackerSentence(t, error.message) : t("trackers.errors.notSaved") };
+        return {
+            error:
+                error instanceof Error
+                    ? trackerSentence(t, error.message)
+                    : t("trackers.errors.notSaved")
+        };
     }
     revalidatePath(TRACKERS_PATH);
     return {};
@@ -127,7 +147,10 @@ export async function checkTrackerAction(
 ): Promise<{ ok: boolean; detail: string }> {
     const user = await requirePermission("tasks.manage");
     const result = await trackers.checkTracker(user.id, trackerId);
-    return { ok: result.ok, detail: trackerSentence(await getTranslations("tasks"), result.detail) };
+    return {
+        ok: result.ok,
+        detail: trackerSentence(await getTranslations("tasks"), result.detail)
+    };
 }
 
 export async function syncTrackerAction(
