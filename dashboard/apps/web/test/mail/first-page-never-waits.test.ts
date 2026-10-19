@@ -19,7 +19,10 @@ const listThreads = vi.fn(async (..._: unknown[]) => ({
 }));
 
 vi.mock("@/lib/api-session", () => ({ apiPermission: async () => ({ id: "u1" }) }));
-vi.mock("@/lib/mailbox/shelf", () => ({ mailShelfFor: async () => null }));
+vi.mock("@/lib/mailbox/shelf", () => ({
+    mailShelfFor: async () => null,
+    mailShelfOfTab: async () => null
+}));
 vi.mock("@/lib/mailbox/access", () => ({
     everyAccountId: async () => ["a1"],
     unifiedAccountIds: async () => ["a1"]

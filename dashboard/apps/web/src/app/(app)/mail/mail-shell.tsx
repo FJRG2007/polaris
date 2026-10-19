@@ -479,7 +479,10 @@ export function MailShell({
      */
     const pullRail = useCallback(() => {
         const asked = Date.now();
-        void fetch(RAIL_PATH, { cache: "no-store" })
+        // The shelf this tab drew, not the header's: that is shared by every
+        // tab, and another tab switching it must not move this rail - nor the
+        // mailbox this tab's composer starts on.
+        void fetch(`${RAIL_PATH}?shelf=${encodeURIComponent(shelf)}`, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = railSchema.safeParse(body);
@@ -489,7 +492,7 @@ export function MailShell({
                 // The rail stays as it is, which is the last thing the server
                 // actually said. The next frame asks again.
             });
-    }, []);
+    }, [shelf]);
 
     // A change was confirmed: ask for the rail now, so its numbers settle on
     // the server's as soon as the server has them rather than on the next frame.

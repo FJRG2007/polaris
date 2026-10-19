@@ -20,7 +20,7 @@
 
 import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
-import { mailShelfFor } from "@/lib/mailbox/shelf";
+import { mailShelfOfTab } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
 import { mailCursorOf } from "@/lib/mailbox/list-order";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
@@ -68,9 +68,10 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const { cursor, query, ...narrow } = parsed.data;
-    // The shelf comes from the cookie, never from the query string: the address
-    // says which list, and the switch in the header says whose.
-    const shelf = await mailShelfFor(user.id);
+    // The address says which list, and the shelf the tab is showing says whose:
+    // the header's switch is shared by every tab, so the tab names the shelf it
+    // drew and it is checked against the roster here.
+    const shelf = await mailShelfOfTab(user.id, asked.get("shelf"));
     const list = { ...EMPTY_QUERY, ...narrow, query, cursor };
     let page = await listThreads(user.id, list, shelf);
     // The end of what is held here: the sync keeps only a folder's newest

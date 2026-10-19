@@ -16,9 +16,11 @@
  * than to all of them.
  */
 
+import { z } from "zod";
 import { cache } from "react";
-import { scopeOrgIdFor } from "@/lib/workspace-scope";
+import { PERSONAL_SHELF } from "@/lib/shelf";
 import { readMailPreferences } from "@/lib/mailbox/prefs";
+import { recipientShelf, scopeOrgIdFor } from "@/lib/workspace-scope";
 
 /** Every mailbox, whichever shelf it is on. */
 export const EVERY_SHELF = "*";
@@ -38,3 +40,33 @@ export const mailShelfFor = cache(async (userId: string): Promise<MailShelf> => 
     if (preferences.mailboxes === "all") return EVERY_SHELF;
     return scopeOrgIdFor(userId);
 });
+
+/** What a tab may say it is showing: the personal shelf, every shelf, or an
+ *  organization's id. Anything else is read as saying nothing. */
+const askedShelfSchema = z.union([
+    z.literal(PERSONAL_SHELF),
+    z.literal(EVERY_SHELF),
+    z.string().uuid()
+]);
+
+/**
+ * The shelf one tab of Mail is showing, for what that tab asks for after it was
+ * drawn - its rail, its list, the contacts its composer suggests.
+ *
+ * The header's switch is a cookie, and a cookie is shared by every tab: switching
+ * shelf in one tab used to move the next rail refresh of every other tab onto
+ * that shelf, and a composer open on an organization's mailbox then started on
+ * a personal one. So a tab says which shelf it drew, and this checks it - an
+ * organization only while this person is still on its roster, and their own
+ * shelf otherwise, exactly as the cookie is checked. A tab that says nothing,
+ * or something that is not a shelf, gets the header's.
+ *
+ * Listing only: every mailbox listed is still one of this person's own rows.
+ */
+export async function mailShelfOfTab(userId: string, asked: unknown): Promise<MailShelf> {
+    const parsed = askedShelfSchema.safeParse(typeof asked === "string" ? asked.trim() : asked);
+    if (!parsed.success) return mailShelfFor(userId);
+    if (parsed.data === EVERY_SHELF) return EVERY_SHELF;
+    if (parsed.data === PERSONAL_SHELF) return null;
+    return recipientShelf(userId, { orgId: parsed.data });
+}

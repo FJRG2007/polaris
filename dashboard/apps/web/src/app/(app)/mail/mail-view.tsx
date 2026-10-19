@@ -1217,7 +1217,7 @@ export function MailView({
                   },
                   refresh: () =>
                       startBusy(async () => {
-                          await syncAllAction();
+                          await syncAllAction(shelf);
                           refresh();
                       }),
                   selectAll: () => {
@@ -1529,7 +1529,7 @@ export function MailView({
                                     disabled={busy || accounts.length === 0}
                                     onClick={() =>
                                         startBusy(async () => {
-                                            await syncAllAction();
+                                            await syncAllAction(shelf);
                                             refresh();
                                         })
                                     }

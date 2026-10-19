@@ -21,6 +21,7 @@
 import { X } from "lucide-react";
 import * as core from "@polaris/core";
 import { Input, cn } from "@polaris/ui";
+import { useMail } from "./mail-shell";
 import { suggestContactsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -40,6 +41,7 @@ export function RecipientField({
     autoFocus?: boolean;
 }) {
     const t = useTranslations("mailCompose");
+    const { shelf } = useMail();
     const [typed, setTyped] = useState("");
     const [suggestions, setSuggestions] = useState<{ address: string; name: string }[]>([]);
     const [highlight, setHighlight] = useState(0);
@@ -55,7 +57,7 @@ export function RecipientField({
         }
         const timer = setTimeout(() => {
             void (async () => {
-                const outcome = await suggestContactsAction(needle);
+                const outcome = await suggestContactsAction(needle, shelf);
                 setSuggestions(
                     outcome.suggestions.filter(
                         (one) => !value.some((held) => core.sameAddress(held.address, one.address))
@@ -65,7 +67,7 @@ export function RecipientField({
             })();
         }, SETTLE_MS);
         return () => clearTimeout(timer);
-    }, [typed, value]);
+    }, [typed, value, shelf]);
 
     function commit(entry: { address: string; name: string }): void {
         if (!looksLikeAddress(entry.address)) return;
