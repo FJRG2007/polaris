@@ -18,20 +18,14 @@
  * the message is asking - the same list, not a second menu for the same key.
  */
 
-import { cn } from "@polaris/ui";
 import { Extension } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import {
-    BLOCK_MENU_KEY,
-    POPUP_CLASS,
-    POPUP_ITEM_CLASS,
-    POPUP_LAYER_CLASS,
-    type SuggestionHandle
-} from "./suggestion";
+import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
+import { stepPickable, SuggestionList } from "./suggestion-list";
+import { BLOCK_MENU_KEY, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
 import {
     Code2,
     Heading1,
@@ -137,18 +131,21 @@ const BLOCKS: readonly (Omit<BlockCommand, "label"> & { readonly id: BlockId })[
 
 const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(function Menu(props, ref) {
     const [active, setActive] = useState(0);
+    const listId = useId();
     const items = props.items;
+    const rows = items.map((item) => ({ ...item, key: item.label }));
 
     useEffect(() => setActive(0), [items]);
 
     useImperativeHandle(ref, () => ({
         onKeyDown: ({ event }) => {
+            if (items.length === 0) return false;
             if (event.key === "ArrowDown") {
-                setActive((current) => (current + 1) % Math.max(items.length, 1));
+                setActive((current) => stepPickable(rows, current, 1));
                 return true;
             }
             if (event.key === "ArrowUp") {
-                setActive((current) => (current + items.length - 1) % Math.max(items.length, 1));
+                setActive((current) => stepPickable(rows, current, -1));
                 return true;
             }
             if (event.key === "Enter" || event.key === "Tab") {
@@ -160,40 +157,17 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
         }
     }));
 
-    if (items.length === 0) return null;
-
     return (
-        <ul className={POPUP_CLASS}>
-            {items.map((item, index) => (
-                <li key={item.label}>
-                    <button
-                        type="button"
-                        onMouseDown={(event) => {
-                            event.preventDefault();
-                            props.command(item);
-                        }}
-                        onMouseEnter={() => setActive(index)}
-                        className={cn(
-                            POPUP_ITEM_CLASS,
-                            index === active ? "bg-option-hover" : "hover:bg-option-hover/60"
-                        )}
-                    >
-                        <item.icon className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate" title={item.label}>
-                            {item.label}
-                        </span>
-                        {item.detail && (
-                            <span
-                                className="min-w-0 truncate text-xs text-muted-foreground"
-                                title={item.detail}
-                            >
-                                {item.detail}
-                            </span>
-                        )}
-                    </button>
-                </li>
-            ))}
-        </ul>
+        <SuggestionList
+            id={listId}
+            items={rows}
+            active={active}
+            onHover={setActive}
+            onPick={(index) => {
+                const item = items[index];
+                if (item) props.command(item);
+            }}
+        />
     );
 });
 
