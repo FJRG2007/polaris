@@ -33,6 +33,7 @@ datasource db {
 
 model User {
     polarThreads      PolarThread[]
+    polarAttachments  PolarAttachment[]
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
     automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
@@ -14924,4 +14925,22 @@ model PolarMessage {
     createdAt DateTime    @default(now())
 
     @@index([threadId, createdAt])
+}
+
+// A picture or file somebody gave Polar. The bytes live on the storage chat
+// uploads go to; the row records which one, so moving that setting later does
+// not lose what was already written. One person's: only its owner reads it.
+model PolarAttachment {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    name         String
+    mediaType    String
+    size         Int
+    // Null when the file is on this server rather than on a connected storage.
+    connectionId String?
+    path         String
+    createdAt    DateTime @default(now())
+
+    @@index([userId, createdAt])
 }

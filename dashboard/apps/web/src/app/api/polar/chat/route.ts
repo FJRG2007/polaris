@@ -24,6 +24,7 @@ import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { inlinePolarFiles } from "@/lib/polar/attachments";
 import { ensurePolarThread, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import { fencePageContext, modelChoiceSchema, pageContextSchema, type ModelChoice } from "@/lib/polar/shared";
@@ -108,7 +109,7 @@ export async function POST(request: Request): Promise<Response> {
     const result = streamText({
         model: resolved.model,
         system: polarSystemPrompt(user.name, fencePageContext(body.data.context)),
-        messages: await convertToModelMessages(messages),
+        messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
         tools: toolset.tools,
         toolApproval: toolset.approval,
         stopWhen: isStepCount(STEP_MAX),

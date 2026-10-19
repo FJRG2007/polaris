@@ -46,7 +46,6 @@ const CONTEXT_ITEMS = 20;
 export function cleanContextText(value: string): string {
     return (
         value
-            // eslint-disable-next-line no-control-regex
             .replace(/[\u0000-\u001f\u007f]+/g, " ")
             .replace(/`{3,}|<\/?page_context>/gi, "")
             .replace(/\s+/g, " ")
@@ -84,6 +83,33 @@ export const queuedMessageSchema = z.object({
     text: z.string().trim().min(1).max(20_000)
 });
 export type QueuedMessage = z.infer<typeof queuedMessageSchema>;
+
+/** What Polar takes as an attachment: pictures a browser may show inline, and
+ *  documents models read. SVG is not a picture here - it can carry script. */
+export const POLAR_ATTACHMENT_TYPES = [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/json"
+] as const;
+
+/** Largest single file. */
+export const POLAR_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+/** Most files one message carries. */
+export const POLAR_ATTACHMENT_MOST = 6;
+
+const ATTACHMENT_URL =
+    /^\/api\/polar\/attachments\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+/** The id in one of Polar's own file addresses, or null for any other URL. */
+export function polarAttachmentId(url: string): string | null {
+    return ATTACHMENT_URL.exec(url)?.[1] ?? null;
+}
 
 export const MAX_QUEUE = 20;
 export const queueSchema = z.array(queuedMessageSchema).max(MAX_QUEUE);
