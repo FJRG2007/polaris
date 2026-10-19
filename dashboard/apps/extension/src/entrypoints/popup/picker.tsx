@@ -59,7 +59,9 @@ export function Picker<T extends string | number>({
 
     useEffect(() => {
         if (!open || active < 0) return;
-        listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+        listRef.current
+            ?.querySelector(`[data-index="${active}"]`)
+            ?.scrollIntoView({ block: "nearest" });
     }, [open, active]);
 
     const show = (index: number) => {

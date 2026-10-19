@@ -54,7 +54,9 @@ describe("no native <select>", () => {
 
     it("scans the apps and packages", () => {
         expect(files.length).toBeGreaterThan(100);
-        expect(files.some((path) => key(path) === "apps/extension/src/entrypoints/popup/app.tsx")).toBe(true);
+        expect(
+            files.some((path) => key(path) === "apps/extension/src/entrypoints/popup/app.tsx")
+        ).toBe(true);
     });
 
     it("finds none outside the allowlist", () => {

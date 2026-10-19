@@ -39,7 +39,8 @@ export function matchIndex(options: readonly ListboxOption[], from: number, type
         const option = options[index];
         if (!option || option.disabled) continue;
         const label = option.label.toLocaleLowerCase();
-        if (label.startsWith(prefix) || (repeated && label.startsWith(prefix[0] ?? ""))) return index;
+        if (label.startsWith(prefix) || (repeated && label.startsWith(prefix[0] ?? "")))
+            return index;
     }
     return from;
 }
