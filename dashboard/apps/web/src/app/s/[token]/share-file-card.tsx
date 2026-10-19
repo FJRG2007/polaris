@@ -56,7 +56,12 @@ export function ShareFileCard({
                         <Button
                             variant="secondary"
                             onClick={() =>
-                                setViewerTarget({ path, name, size, locationLabel: t("share.sharedFile") })
+                                setViewerTarget({
+                                    path,
+                                    name,
+                                    size,
+                                    locationLabel: t("share.sharedFile")
+                                })
                             }
                         >
                             <Eye className="size-4" />
