@@ -7,6 +7,8 @@
  * remembers it, and a centred welcome while the conversation is empty.
  */
 
+import type { ReactNode } from "react";
+import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -46,10 +48,12 @@ const THREADS = [
 
 const calls: Array<{ url: string; method: string; body?: unknown }> = [];
 let threads: typeof THREADS = THREADS;
+let refuseRename = false;
 
 beforeEach(() => {
     calls.length = 0;
     threads = THREADS;
+    refuseRename = false;
     // This environment has no storage of its own; the sidebar's memory needs one.
     const stored = new Map<string, string>();
     vi.stubGlobal("localStorage", {
@@ -65,6 +69,7 @@ beforeEach(() => {
             calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
             if (url === "/api/polar/models") return Response.json({ providers: PROVIDERS, tools: {}, isAdmin: false });
             if (url === "/api/polar/threads") return Response.json({ threads });
+            if (method === "PATCH" && refuseRename) return Response.json({}, { status: 500 });
             return Response.json({ ok: true });
         })
     );
@@ -77,8 +82,25 @@ afterEach(() => {
 
 const { PolarChat } = await import("@/components/polar/polar-panel");
 
+function Wrapper({ children }: { children: ReactNode }) {
+    return (
+        <MessagesWrapper>
+            <ToastProvider>{children}</ToastProvider>
+        </MessagesWrapper>
+    );
+}
+
 function mountPage() {
-    return render(<PolarChat fullPage />, { wrapper: MessagesWrapper });
+    return render(<PolarChat fullPage />, { wrapper: Wrapper });
+}
+
+function narrowWindow() {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined
+    }));
 }
 
 function openRowMenu(title: string) {
@@ -148,6 +170,41 @@ describe("the /polar sidebar", () => {
             })
         );
         expect(screen.getByText("Renamed chat")).toBeTruthy();
+    });
+
+    it("puts only that title back and says so when a rename is refused", async () => {
+        refuseRename = true;
+        mountPage();
+        await screen.findByText("Fresh one");
+        openRowMenu("Fresh one");
+        fireEvent.click(await screen.findByText("Rename"));
+        const field = (await screen.findByLabelText("Conversation name")) as HTMLInputElement;
+        fireEvent.change(field, { target: { value: "Renamed chat" } });
+        fireEvent.keyDown(field, { key: "Enter" });
+        expect(await screen.findByText("Couldn't rename the conversation. Try again.")).toBeTruthy();
+        expect(screen.getByText("Fresh one")).toBeTruthy();
+        expect(screen.queryByText("Renamed chat")).toBeNull();
+        expect(screen.getByText("Long ago")).toBeTruthy();
+    });
+
+    it("opens the conversations in a drawer on a phone, with focus inside and Escape to close", async () => {
+        narrowWindow();
+        mountPage();
+        const menu = await screen.findByRole("button", { name: "Show conversations" });
+        expect(screen.queryByText("Fresh one")).toBeNull();
+        menu.focus();
+        fireEvent.click(menu);
+        const drawer = await screen.findByRole("dialog", { name: "Conversations" });
+        expect(within(drawer).getByText("Fresh one")).toBeTruthy();
+        await waitFor(() => expect(drawer.contains(document.activeElement)).toBe(true));
+        fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(document.activeElement).toBe(menu);
+        fireEvent.click(menu);
+        const again = await screen.findByRole("dialog", { name: "Conversations" });
+        fireEvent.click(within(again).getByRole("button", { name: "New chat" }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(document.activeElement).toBe(screen.getByLabelText("Message Polar"));
     });
 
     it("puts the sidebar away and remembers it", async () => {

@@ -32,7 +32,16 @@ import {
     type KeyboardEvent as ReactKeyboardEvent,
     type ReactNode
 } from "react";
-import { cn, CopyIcon, useCopied, useShortcutText } from "@polaris/ui";
+import {
+    cn,
+    Dialog,
+    CopyIcon,
+    useToast,
+    useCopied,
+    DialogTitle,
+    DialogContent,
+    useShortcutText
+} from "@polaris/ui";
 import {
     Cpu,
     FileText,
@@ -432,12 +441,16 @@ export function PolarChat({
     const [lastApproved, setLastApproved] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const wide = useWide();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
+    const drawerButton = useRef<HTMLButtonElement>(null);
+    const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
+    const toast = useToast();
 
     const context = useMemo(
         () =>
@@ -536,9 +549,11 @@ export function PolarChat({
     }, [choice]);
 
     // History: last known list instantly, refreshed behind it.
-    const loadThreads = useCallback(() => {
+    // `keep` puts the fresh first page over the rows already loaded, so the
+    // pages read with "Show more" stay where they are.
+    const loadThreads = useCallback((keep = false) => {
         try {
-            const cached = window.sessionStorage.getItem(THREADS_KEY);
+            const cached = keep ? null : window.sessionStorage.getItem(THREADS_KEY);
             if (cached) setThreads(JSON.parse(cached) as ThreadRow[]);
         } catch {
             // No cache.
@@ -547,8 +562,18 @@ export function PolarChat({
             .then((response) => (response.ok ? response.json() : null))
             .then((data: { threads: ThreadRow[] } | null) => {
                 if (!data) return;
-                setThreads(data.threads);
-                setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
+                if (!keep) {
+                    setThreads(data.threads);
+                    setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
+                    return;
+                }
+                setThreads((current) => {
+                    const fresh = new Set(data.threads.map((row) => row.id));
+                    return [
+                        ...data.threads,
+                        ...(current ?? []).filter((row) => !fresh.has(row.id))
+                    ];
+                });
             })
             .catch(() => undefined);
     }, []);
@@ -569,10 +594,12 @@ export function PolarChat({
     }, [threads]);
     // A finished turn moves its conversation to the top of the list, or puts a
     // new one there, so the list is read again once the turn ends.
-    const settled = !busy && chat.messages.length > 0;
+    const wasBusy = useRef(busy);
     useEffect(() => {
-        if (settled && showHistory) loadThreads();
-    }, [settled]);
+        const ended = wasBusy.current && !busy;
+        wasBusy.current = busy;
+        if (ended && showHistory) loadThreads(true);
+    }, [busy, showHistory, loadThreads]);
     // Whether the page's sidebar was put away, remembered per browser.
     useEffect(() => setCollapsed(readStored(SIDEBAR_KEY) === "hidden"), []);
     const setSidebarHidden = (hidden: boolean) => {
@@ -665,13 +692,14 @@ export function PolarChat({
         setQuote(null);
         setFiles([]);
         setEditing(null);
+        composerNext.current = drawer;
         setDrawer(false);
         setShowHistory(fullPage);
         textarea.current?.focus();
     };
 
     const renameThread = async (id: string, title: string) => {
-        const before = threads;
+        const before = threads?.find((row) => row.id === id)?.title ?? title;
         setThreads(
             (current) => current?.map((row) => (row.id === id ? { ...row, title } : row)) ?? null
         );
@@ -680,7 +708,14 @@ export function PolarChat({
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ title })
         }).catch(() => null);
-        if (!response?.ok) setThreads(before);
+        if (response?.ok) return;
+        setThreads(
+            (current) =>
+                current?.map((row) =>
+                    row.id === id && row.title === title ? { ...row, title: before } : row
+                ) ?? null
+        );
+        toast.show({ title: t("history.renameFailed") });
     };
 
     const removeThread = async (id: string) => {
@@ -738,12 +773,7 @@ export function PolarChat({
         setInput("");
         if (command === "new") return startNew();
         if (command === "page") return setWithPage(true);
-        if (command === "model") {
-            return document
-                .getElementById(fullPage ? "polar-model-page" : "polar-model")
-                ?.querySelector("button")
-                ?.click();
-        }
+        if (command === "model") return setModelOpen(true);
         if (command === "file") {
             return document
                 .getElementById(fullPage ? "polar-attach-page" : "polar-attach")
@@ -818,8 +848,8 @@ export function PolarChat({
         ? slashActive
         : firstPickable(slashItems);
     const ids = fullPage
-        ? { input: "polar-input-page", slash: "polar-slash-page", model: "polar-model-page", attach: "polar-attach-page" }
-        : { input: "polar-input", slash: "polar-slash", model: "polar-model", attach: "polar-attach" };
+        ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
+        : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
     const pickSlash = (index: number) => {
         const command = slashItems[index]?.key as Command | undefined;
         if (command) runCommand(command);
@@ -1005,13 +1035,13 @@ export function PolarChat({
                                 onFailed={setFileError}
                             />
                         </span>
-                        <span id={ids.model} className="contents">
-                            <ModelSelector
-                                providers={providers ?? []}
-                                choice={choice}
-                                onChoice={setChoice}
-                            />
-                        </span>
+                        <ModelSelector
+                            providers={providers ?? []}
+                            choice={choice}
+                            onChoice={setChoice}
+                            open={modelOpen}
+                            onOpenChange={setModelOpen}
+                        />
                     </PromptInputTools>
                     <PromptInputSubmit
                         busy={busy}
@@ -1041,29 +1071,27 @@ export function PolarChat({
                     })}
                 </aside>
             ) : null}
-            {fullPage && !wide && drawer ? (
-                <div
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label={t("history.title")}
-                    className="fixed inset-0 z-50 flex"
-                    onKeyDown={(event) => {
-                        if (event.key === "Escape") setDrawer(false);
-                    }}
-                >
-                    <div
-                        aria-hidden
-                        className="absolute inset-0 bg-black/50"
-                        onClick={() => setDrawer(false)}
-                    />
-                    <div className="relative flex w-72 max-w-[85vw] flex-col bg-card shadow-popover">
+            {fullPage && !wide ? (
+                <Dialog open={drawer} onOpenChange={setDrawer}>
+                    <DialogContent
+                        showClose={false}
+                        aria-describedby={undefined}
+                        onCloseAutoFocus={(event) => {
+                            event.preventDefault();
+                            const target = composerNext.current ? textarea : drawerButton;
+                            composerNext.current = false;
+                            target.current?.focus();
+                        }}
+                        className="left-0 top-0 flex h-full max-h-none w-72 max-w-[85vw] translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none rounded-r-xl border-y-0 border-l-0 bg-card p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-left-4"
+                    >
+                        <DialogTitle className="sr-only">{t("history.title")}</DialogTitle>
                         {threadList({
                             label: t("history.close"),
                             icon: X,
                             onClick: () => setDrawer(false)
                         })}
-                    </div>
-                </div>
+                    </DialogContent>
+                </Dialog>
             ) : null}
             {!fullPage && showHistory ? (
                 <div className="absolute inset-0 z-10 flex flex-col bg-card">
@@ -1083,6 +1111,7 @@ export function PolarChat({
                 >
                     {fullPage && (!wide || collapsed) ? (
                         <MessageAction
+                            ref={drawerButton}
                             label={t("history.show")}
                             onClick={() => (wide ? setSidebarHidden(false) : setDrawer(true))}
                         >

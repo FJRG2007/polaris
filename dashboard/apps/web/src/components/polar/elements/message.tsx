@@ -13,7 +13,7 @@
  * of messages, not sibling elements already on the page.
  */
 
-import { memo, type HTMLAttributes } from "react";
+import { memo, type Ref, type HTMLAttributes } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { RichText } from "@/components/rich-text/rich-text";
@@ -74,7 +74,7 @@ export function MessageActions({ className, ...props }: HTMLAttributes<HTMLDivEl
     return <div className={cn("flex items-center gap-0.5", className)} {...props} />;
 }
 
-export type MessageActionProps = ButtonProps & { label: string };
+export type MessageActionProps = ButtonProps & { label: string; ref?: Ref<HTMLButtonElement> };
 
 /** An icon action under a message: the label is its name and its tooltip. */
 export function MessageAction({ label, children, ...props }: MessageActionProps) {

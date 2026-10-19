@@ -93,11 +93,16 @@ function Mark({ on }: { on: boolean }) {
 export function ModelSelector({
     providers,
     choice,
-    onChoice
+    onChoice,
+    open,
+    onOpenChange
 }: {
     providers: ModelSelectorProvider[];
     choice: ModelChoice | null;
     onChoice: (choice: ModelChoice) => void;
+    /** Opened from outside as well as by its own button, when given. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }) {
     const t = useTranslations("polar");
     const provider = providers.find((entry) => entry.provider === choice?.provider);
@@ -107,7 +112,13 @@ export function ModelSelector({
     const searching = query.trim().length > 0;
     const shown = useMemo(() => searchModels(providers, index, query), [providers, index, query]);
     return (
-        <DropdownMenu onOpenChange={(open) => (open ? undefined : setQuery(""))}>
+        <DropdownMenu
+            open={open}
+            onOpenChange={(next) => {
+                if (!next) setQuery("");
+                onOpenChange?.(next);
+            }}
+        >
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"

@@ -224,6 +224,89 @@ describe("the / commands", () => {
     });
 });
 
+describe("/model", () => {
+    it("opens the model menu, typed whole or picked from the list", async () => {
+        mount();
+        await ready();
+        await type("/model");
+        expect(await screen.findByPlaceholderText("Find a model")).toBeTruthy();
+        expect((screen.getByLabelText("Message Polar") as HTMLTextAreaElement).value).toBe("");
+        fireEvent.keyDown(screen.getByPlaceholderText("Find a model"), { key: "Escape" });
+        await waitFor(() => expect(screen.queryByPlaceholderText("Find a model")).toBeNull());
+        fireEvent.change(screen.getByLabelText("Message Polar"), { target: { value: "/mo" } });
+        fireEvent.mouseDown(screen.getByRole("option"));
+        expect(await screen.findByPlaceholderText("Find a model")).toBeTruthy();
+    });
+});
+
+describe("the conversation list after a turn", () => {
+    const row = (n: number) => ({
+        id: `t-${n}`,
+        title: `Chat ${n}`,
+        updatedAt: new Date(Date.UTC(2026, 9, 19) - n * 60_000).toISOString()
+    });
+    const firstPage = Array.from({ length: 50 }, (_, n) => row(n));
+    const secondPage = [row(50), row(51)];
+
+    it("keeps the pages read with Show more when the turn ends", async () => {
+        let lists = 0;
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) => {
+                if (url === "/api/polar/models") {
+                    return Response.json({ providers, tools: {}, isAdmin: false });
+                }
+                if (url === "/api/polar/threads") {
+                    lists++;
+                    return Response.json({ threads: firstPage });
+                }
+                if (url.startsWith("/api/polar/threads?cursor=")) {
+                    return Response.json({ threads: secondPage });
+                }
+                return Response.json({});
+            })
+        );
+        chat.status = "streaming";
+        chat.messages = [{ id: "u1", role: "user", parts: [{ type: "text", text: "Hi" }] }];
+        const view = render(<PolarChat fullPage />, { wrapper: MessagesWrapper });
+        await ready();
+        fireEvent.click(await screen.findByText("Show more"));
+        expect(await screen.findByText("Chat 51")).toBeTruthy();
+        const before = lists;
+        chat.status = "ready";
+        act(() => view.rerender(<PolarChat fullPage />));
+        await waitFor(() => expect(lists).toBe(before + 1));
+        await act(async () => undefined);
+        expect(screen.getByText("Chat 51")).toBeTruthy();
+        expect(screen.getByText("Chat 0")).toBeTruthy();
+    });
+
+    it("does not read the list again when a stored conversation is opened", async () => {
+        let lists = 0;
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) => {
+                if (url === "/api/polar/models") {
+                    return Response.json({ providers, tools: {}, isAdmin: false });
+                }
+                if (url === "/api/polar/threads") {
+                    lists++;
+                    return Response.json({ threads: [row(0)] });
+                }
+                return Response.json({});
+            })
+        );
+        const view = render(<PolarChat fullPage />, { wrapper: MessagesWrapper });
+        await ready();
+        await screen.findByText("Chat 0");
+        const before = lists;
+        chat.messages = [{ id: "u1", role: "user", parts: [{ type: "text", text: "Hi" }] }];
+        act(() => view.rerender(<PolarChat fullPage />));
+        await act(async () => undefined);
+        expect(lists).toBe(before);
+    });
+});
+
 describe("a message's copy button", () => {
     it("turns into a check once the text is in the clipboard", async () => {
         const writeText = vi.fn(async () => undefined);

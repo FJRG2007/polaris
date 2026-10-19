@@ -17,6 +17,7 @@
         "delete": "Eliminar",
         "more": "Ver más",
         "rename": "Renombrar",
+        "renameFailed": "No se pudo renombrar la conversación. Inténtalo de nuevo.",
         "options": "Opciones del chat",
         "name": "Nombre del chat",
         "kind": "conversación",

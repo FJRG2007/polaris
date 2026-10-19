@@ -17,6 +17,7 @@
         "delete": "Delete",
         "more": "Show more",
         "rename": "Rename",
+        "renameFailed": "Couldn't rename the conversation. Try again.",
         "options": "Conversation options",
         "name": "Conversation name",
         "kind": "conversation",
