@@ -25,7 +25,8 @@ import {
     Input
 } from "@polaris/ui";
 import type { ChannelView } from "@/lib/messaging-service";
-import { channelStateAction, connectChannelAction } from "./actions";
+import { connectChannelAction } from "./actions";
+import * as polls from "./inbox-polls";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CHANNEL_PLATFORM,
@@ -120,8 +121,9 @@ export function ConnectChannelDialog({
     useEffect(() => {
         if (phase !== "qr" || !connectedId) return;
         let active = true;
+        const controller = new AbortController();
         const poll = async () => {
-            const state = await channelStateAction(connectedId);
+            const state = await polls.channelState(connectedId, controller.signal);
             if (!active) return;
             setQrStatus(state.status);
             if (state.qr) setQr(state.qr);
@@ -133,6 +135,7 @@ export function ConnectChannelDialog({
         const timer = setInterval(() => void poll(), 2500);
         return () => {
             active = false;
+            controller.abort();
             clearInterval(timer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

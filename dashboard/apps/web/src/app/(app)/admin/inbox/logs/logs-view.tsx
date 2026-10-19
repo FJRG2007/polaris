@@ -7,7 +7,8 @@
  */
 
 import { Card, CardBody } from "@polaris/ui";
-import { listActivityAction } from "../actions";
+import * as polls from "../inbox-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { ActivityView } from "@/lib/messaging-service";
@@ -35,8 +36,10 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
     const t = useTranslations("admin");
     const [activity, setActivity] = useState(initialActivity);
 
+    const signal = useUnmountSignal();
     const load = useCallback(() => {
-        void listActivityAction()
+        void polls
+            .activity(signal())
             .then(setActivity)
             .catch(() => undefined);
     }, []);

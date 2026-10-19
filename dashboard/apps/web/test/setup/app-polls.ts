@@ -85,3 +85,13 @@ vi.mock("@/app/(app)/home/home-polls", () => ({
         0
     )
 }));
+
+vi.mock("@/app/(app)/admin/inbox/inbox-polls", () => {
+    const actions = () => import("@/app/(app)/admin/inbox/actions");
+    return {
+        conversations: forward(actions, "listConversationsAction", 0),
+        messages: forward(actions, "getMessagesAction", 1),
+        activity: forward(actions, "listActivityAction", 0),
+        channelState: forward(actions, "channelStateAction", 1)
+    };
+});

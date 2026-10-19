@@ -20,18 +20,14 @@ import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition, type ComponentType } from "react";
+import * as polls from "../inbox-polls";
 import {
     CHANNEL_STATUS_TONE,
     EMAIL_CHANNEL_MARK,
     PLATFORM_LOGO,
     platformLabel
 } from "../platform-meta";
-import {
-    channelStateAction,
-    deleteChannelAction,
-    reconnectChannelAction,
-    updateChannelAction
-} from "../actions";
+import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
 import {
     CheckCircle2,
     Loader2,
@@ -352,8 +348,9 @@ function ChannelManageDialog({
     useEffect(() => {
         if (!linking) return;
         let active = true;
+        const controller = new AbortController();
         const poll = async () => {
-            const state = await channelStateAction(channel.id);
+            const state = await polls.channelState(channel.id, controller.signal);
             if (!active) return;
             setQrStatus(state.status);
             if (state.qr) setQr(state.qr);
@@ -373,6 +370,7 @@ function ChannelManageDialog({
         const timer = setInterval(() => void poll(), 2500);
         return () => {
             active = false;
+            controller.abort();
             clearInterval(timer);
         };
         // onUpdated is a fresh closure each render; re-subscribing would reset the poll.

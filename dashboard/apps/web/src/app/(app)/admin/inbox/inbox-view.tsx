@@ -15,6 +15,8 @@ import { ConnectChannelDialog } from "./connect-channel-dialog";
 import { ChevronLeft, Loader2, MessagesSquare, Plus, Send, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import * as polls from "./inbox-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { PLATFORM_LOGO, editablePeer, humanPeerId, peerHint, platformLabel } from "./platform-meta";
 import type {
     AgentView,
@@ -43,10 +45,8 @@ import {
     assignConversationAction,
     createContactAction,
     deleteConversationAction,
-    getMessagesAction,
     listAgentsAction,
     listContactsAction,
-    listConversationsAction,
     sendMessageAction,
     startConversationAction
 } from "./actions";
@@ -80,9 +80,10 @@ export function InboxView({
             .catch(() => undefined);
     }, []);
 
+    const signal = useUnmountSignal();
     const refreshConversations = useCallback(async () => {
         try {
-            setConversations(await listConversationsAction());
+            setConversations(await polls.conversations(signal()));
         } catch {
             // Transient; the next poll retries.
         }
@@ -291,9 +292,10 @@ function Thread({
     // whatever the reader was looking at in the one before.
     useEffect(() => follow.stick(), [conversation.id, follow]);
 
+    const signal = useUnmountSignal();
     const load = useCallback(async () => {
         try {
-            setMessages(await getMessagesAction(conversation.id));
+            setMessages(await polls.messages(conversation.id, signal()));
         } catch {
             // Transient; the next poll retries.
         }
