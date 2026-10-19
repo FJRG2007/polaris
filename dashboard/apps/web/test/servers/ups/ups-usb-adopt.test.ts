@@ -19,7 +19,10 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({
                 where,
                 take
-            }: { where?: { connection?: string; deviceId?: { in: string[] } }; take?: number } = {}) =>
+            }: {
+                where?: { connection?: string; deviceId?: { in: string[] } };
+                take?: number;
+            } = {}) =>
                 rows
                     .filter(
                         (row) =>
@@ -61,12 +64,22 @@ vi.mock("@/lib/setting-store", () => ({
 
 const ups = await import("@/lib/ups/ups-service");
 
-const plugged = (...ids: string[]) => async () => ({
-    available: true,
-    devices: ids.map((id) => ({
-        device: { id, manufacturer: "APC", product: "Back-UPS", vendorId: "051d", productId: "0002", serial: id }
-    }))
-}) as never;
+const plugged =
+    (...ids: string[]) =>
+    async () =>
+        ({
+            available: true,
+            devices: ids.map((id) => ({
+                device: {
+                    id,
+                    manufacturer: "APC",
+                    product: "Back-UPS",
+                    vendorId: "051d",
+                    productId: "0002",
+                    serial: id
+                }
+            }))
+        }) as never;
 
 beforeEach(() => {
     rows.length = 0;
@@ -79,7 +92,12 @@ describe("a UPS on USB", () => {
         const [first, second] = await Promise.all([ups.adoptUsb(listUsb), ups.adoptUsb(listUsb)]);
         expect([first, second]).toEqual([1, 1]);
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ connection: "usb", machineId: LOCAL, deviceId: "usb-apc-1", name: "APC Back-UPS" });
+        expect(rows[0]).toMatchObject({
+            connection: "usb",
+            machineId: LOCAL,
+            deviceId: "usb-apc-1",
+            name: "APC Back-UPS"
+        });
         expect(await ups.adoptUsb(listUsb)).toBe(0);
     });
 
@@ -97,7 +115,12 @@ describe("a UPS on USB", () => {
         const listUsb = plugged("usb-apc-1");
         await ups.adoptUsb(listUsb);
         await ups.removeUps(rows[0]!.id);
-        await ups.createUps({ connection: "usb", name: "Desk", machineId: LOCAL, deviceId: "usb-apc-1" });
+        await ups.createUps({
+            connection: "usb",
+            name: "Desk",
+            machineId: LOCAL,
+            deviceId: "usb-apc-1"
+        });
         expect(settings.size).toBe(0);
         await ups.removeUps(rows[0]!.id);
         expect(await ups.adoptUsb(listUsb)).toBe(0);
@@ -139,7 +162,11 @@ describe("a UPS on USB", () => {
     });
 
     it("adds nothing when this edition has no daemon to ask", async () => {
-        expect(await ups.adoptUsb(async () => { throw new Error("no daemon"); })).toBe(0);
+        expect(
+            await ups.adoptUsb(async () => {
+                throw new Error("no daemon");
+            })
+        ).toBe(0);
         expect(rows).toHaveLength(0);
     });
 
