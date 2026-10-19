@@ -34,7 +34,9 @@ const STALE_BUILD_PATTERNS: readonly RegExp[] = [
  * the page - so anything that might be a real fault in the code has to reach the
  * boundary and be read, not be answered with a refresh that hides it.
  */
-export function isStaleBuildError(error: { name?: string; message?: string } | null | undefined): boolean {
+export function isStaleBuildError(
+    error: { name?: string; message?: string } | null | undefined
+): boolean {
     if (!error) return false;
     if (error.name === "ChunkLoadError") return true;
     const message = error.message ?? "";

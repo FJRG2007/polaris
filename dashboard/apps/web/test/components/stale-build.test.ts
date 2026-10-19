@@ -9,19 +9,30 @@
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { CHUNK_RECOVERY_SCRIPT, isStaleBuildError, recoverMissingChunks, reloadForNewBuild } from "@/lib/stale-build";
+import {
+    CHUNK_RECOVERY_SCRIPT,
+    isStaleBuildError,
+    recoverMissingChunks,
+    reloadForNewBuild
+} from "@/lib/stale-build";
 
 describe("recognising an old build", () => {
     it("catches a server action from a build that is gone", () => {
         // Verbatim from the browser, which is the only form that matters.
         expect(
             isStaleBuildError(
-                new Error('Server Action "60b910f57957f6a5a6e1681110456fbf2ef68f798e" was not found on the server.')
+                new Error(
+                    'Server Action "60b910f57957f6a5a6e1681110456fbf2ef68f798e" was not found on the server.'
+                )
             )
         ).toBe(true);
-        expect(isStaleBuildError(new Error("Failed to find Server Action \"abc\". This request might be from an older deployment."))).toBe(
-            true
-        );
+        expect(
+            isStaleBuildError(
+                new Error(
+                    'Failed to find Server Action "abc". This request might be from an older deployment.'
+                )
+            )
+        ).toBe(true);
     });
 
     it("catches a chunk the deploy replaced", () => {
@@ -30,7 +41,11 @@ describe("recognising an old build", () => {
         expect(isStaleBuildError(chunk)).toBe(true);
         expect(isStaleBuildError(new Error("Loading CSS chunk 12 failed"))).toBe(true);
         expect(
-            isStaleBuildError(new Error("Failed to fetch dynamically imported module: https://polaris.test/_next/x.js"))
+            isStaleBuildError(
+                new Error(
+                    "Failed to fetch dynamically imported module: https://polaris.test/_next/x.js"
+                )
+            )
         ).toBe(true);
     });
 
@@ -99,7 +114,11 @@ describe("a page whose scripts never arrived", () => {
         vi.stubGlobal("window", {
             sessionStorage: storage,
             location: { reload },
-            addEventListener: (type: string, listener: (event: { target: unknown }) => void, capture: boolean) => {
+            addEventListener: (
+                type: string,
+                listener: (event: { target: unknown }) => void,
+                capture: boolean
+            ) => {
                 // Load failures do not bubble: a listener outside the capture
                 // phase would never hear one.
                 if (type === "error" && capture === true) onError = listener;

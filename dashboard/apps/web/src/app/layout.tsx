@@ -204,7 +204,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
             </head>
             <body>
-                <I18nProvider locale={locale} messages={pickMessages(locale, ["common", "components"])}>
+                <I18nProvider
+                    locale={locale}
+                    messages={pickMessages(locale, ["common", "components"])}
+                >
                     <LocaleSync locale={locale} signedIn={session !== null} />
                     <DropGuard />
                     <ConnectionBanner />
