@@ -130,7 +130,8 @@ describe("a variable's row", () => {
         open();
         const row = (await screen.findByText("NODE_ENV")).closest("li")!;
         await userEvent.click(within(row).getByRole("button", { name: "Actions for NODE_ENV" }));
-        for (const name of ["Edit", "Make it a secret", "Share with every service", "Remove"]) {
+        // "Edit" also carries the rename shortcut's key, which joins its name.
+        for (const name of [/^Edit/, "Make it a secret", "Share with every service", "Remove"]) {
             expect(await screen.findByRole("menuitem", { name })).toBeTruthy();
         }
         await userEvent.click(screen.getByRole("menuitem", { name: "Make it a secret" }));
