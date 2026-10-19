@@ -77,6 +77,7 @@ export async function deliverAutomationNotice(notice: AutomationNotice): Promise
         const report = await dispatch.notify(input);
         if (report.inapp === "sent") delivered.push("bell");
         else missed.push({ channel: "bell", reason: `bell.${report.inapp}` });
+        delivered.push(...(report.handedOff ?? []));
     }
 
     const work: Array<Promise<void>> = [];

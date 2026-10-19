@@ -87,8 +87,7 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
         !delivery.bell &&
         !delivery.email &&
         delivery.destinations.length === 0 &&
-        delivery.chat === null &&
-        !chatOpen;
+        delivery.chat === null;
 
     const webhooks = channels?.webhooks ?? [];
     const chosenHook = delivery.chat
@@ -224,6 +223,9 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
                                 aria-label={t("delivery.chat")}
                                 disabled={disabled}
                             />
+                        ) : null}
+                        {chatOpen && !delivery.chat && webhooks.length > 0 ? (
+                            <p className="text-xs text-warning-ink">{t("delivery.chatPick")}</p>
                         ) : null}
                         {hookGone && <p className="text-xs text-danger-ink">{t("fields.webhookGone")}</p>}
                         {hookReset && chosenHook && (

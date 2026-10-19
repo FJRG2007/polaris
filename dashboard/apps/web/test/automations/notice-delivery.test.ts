@@ -7,7 +7,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dispatch = vi.hoisted(() => ({
-    notify: vi.fn(async () => ({ inapp: "sent" as string })),
+    notify: vi.fn(async () => ({
+        inapp: "sent" as string,
+        handedOff: undefined as string[] | undefined
+    })),
     emailNotice: vi.fn(async () => ({ status: "sent", detail: null as string | null })),
     deliverToDestination: vi.fn(async () => ({ status: "sent", detail: null as string | null }))
 }));
@@ -42,6 +45,16 @@ describe("an automation notice", () => {
         const result = await deliverAutomationNotice(BASE);
         expect(result).toEqual({ sent: true, delivered: ["bell"], missed: [] });
         expect(dispatch.notify).toHaveBeenCalledWith(expect.objectContaining({ bellOnly: false }));
+    });
+
+    it("counts the rule's own channels for a step saved before there was a choice", async () => {
+        dispatch.notify.mockImplementation(async () => ({ inapp: "off", handedOff: ["email"] }));
+        const result = await deliverAutomationNotice(BASE);
+        expect(result).toEqual({
+            sent: true,
+            delivered: ["email"],
+            missed: [{ channel: "bell", reason: "bell.off" }]
+        });
     });
 
     it("fails instead of reporting sent when the bell row was written already read", async () => {

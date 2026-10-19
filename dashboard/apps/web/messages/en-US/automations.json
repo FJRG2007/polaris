@@ -732,7 +732,32 @@
         "destinationOption": "{name} ({target})",
         "destinationOff": "{name} (switched off)",
         "chat": "A chat channel, through its webhook",
-        "none": "Pick at least one place to deliver it."
+        "none": "Pick at least one place to deliver it.",
+        "chatPick": "Pick the webhook to post through.",
+        "delivered": "Delivered to: {channels}.",
+        "deliveredNone": "Delivered nowhere.",
+        "missed": "{channel} missed: {reason}.",
+        "channels": {
+            "bell": "Bell",
+            "email": "Email",
+            "destination": "Destination",
+            "chat": "Chat"
+        },
+        "reasons": {
+            "bellRead": "written already read, as its page was open",
+            "bellOff": "this event is switched off on the bell",
+            "bellRefused": "the event is unknown",
+            "quietHours": "held back by quiet hours",
+            "noMailChannel": "this Polaris has no email channel",
+            "noAddress": "the account has no confirmed address",
+            "destinationGone": "it is switched off, deleted or unreadable",
+            "messageRefused": "the chat refused the message",
+            "webhookGone": "the chat webhook was deleted",
+            "webhookReset": "the chat webhook got a new secret",
+            "webhookForbidden": "its owner no longer runs that channel",
+            "webhookLimited": "the webhook posted too much this minute",
+            "failed": "sending failed"
+        }
     },
     "appNodes": {
         "homeTime": "Places: at a time",

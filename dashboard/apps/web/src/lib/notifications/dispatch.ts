@@ -82,6 +82,11 @@ export interface DeliveryOutcome {
  */
 export interface NotifyReport {
     inapp: "sent" | "read" | "off" | "refused";
+    /**
+     * The channels of the account's rule the alert was handed to in the
+     * background (never with `bellOnly`). Left out when there were none.
+     */
+    handedOff?: ReadonlyArray<"email" | "destination">;
 }
 
 /** Log one attempt. Best effort: a history row is never worth failing over. */
@@ -419,8 +424,11 @@ export async function notify(input: NotifyInput): Promise<NotifyReport> {
         console.error("polaris: queueing signed webhooks failed:", error);
     });
 
-    if (!rule.inapp) return { inapp: "off" };
-    return { inapp: watching ? "read" : "sent" };
+    const handedOff: Array<"email" | "destination"> = [];
+    if (extras.email) handedOff.push("email");
+    if (extras.destinations.length > 0) handedOff.push("destination");
+    const inapp = !rule.inapp ? "off" : watching ? "read" : "sent";
+    return handedOff.length > 0 ? { inapp, handedOff } : { inapp };
 }
 
 /**
