@@ -661,7 +661,7 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.webhook": ["id", "at", "method", "query", "headers", "body"],
     "core.if": ["matched"],
     "core.wait": ["waitedUntil"],
-    "core.notify": ["sent"],
+    "core.notify": ["sent", "delivered", "missed"],
     "core.http": ["status", "ok", "headers", "body"],
     "core.chat": ["status", "ok"],
     "core.called": ["id", "at", "inputs"],

@@ -21,7 +21,7 @@ vi.mock("@/lib/automations/runner", () => ({
     mayEditShelf: async () => access.edit
 }));
 vi.mock("@/lib/automations/secrets", () => ({ readSecretForRun: async () => "" }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
+vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => ({ inapp: "sent" }) }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("undici", () => ({ Agent: class {}, fetch: async () => new Response("{}") }));

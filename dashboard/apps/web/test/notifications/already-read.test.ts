@@ -43,7 +43,9 @@ vi.mock("../../src/lib/notifications/preferences", () => ({
     // The bell on, mail off: this is about the in-app record and nothing else.
     getNotificationPreferences: async () => ({
         "deploy.failed": { inapp: true, email: false, destinations: [] },
-        "account.security": { inapp: true, email: false, destinations: [] }
+        "account.security": { inapp: true, email: false, destinations: [] },
+        "places.automation": { inapp: true, email: false, destinations: [] },
+        "automations.message": { inapp: true, email: false, destinations: [] }
     })
 }));
 vi.mock("../../src/lib/notifications/destinations", () => ({
@@ -139,4 +141,19 @@ describe("raising an alert at somebody watching the page", () => {
         });
         expect(written().read).toBe(false);
     });
+
+    // Regression: pressing Test on a "tell somebody" step, with the automation's
+    // editor open, wrote the bell row already read - the editor is the page the
+    // message links to - so the step said sent and nothing ever showed up.
+    it.each(["places.automation", "automations.message"])(
+        "leaves %s unread for somebody in the automation's editor",
+        async (event) => {
+            const href = "/automations/01a14fd8-6e33-7fd3-ae7a-2b24c85d734b";
+            recordPresence(USER, TAB, href);
+            await notify({ userId: USER, event, title: "Automation: Door", href });
+
+            expect(written().read).toBe(false);
+            expect(deliveries.find((row) => row.kind === "inapp")?.detail).toBeNull();
+        }
+    );
 });

@@ -132,6 +132,12 @@ export interface NotificationEventInfo {
     level: NotificationLevel;
     /** Always reaches the bell, whatever the rule says. */
     critical?: boolean;
+    /**
+     * The page the alert links to does not show what it says - an automation's
+     * own message points at the automation, whose editor never prints it - so
+     * having that page open is no reason to mark it read on arrival.
+     */
+    unreadWhenViewing?: boolean;
     /** Where the rule starts before anyone changes it. */
     defaults: { inapp: boolean; email: boolean };
 }
@@ -176,6 +182,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A step in one of a project's automations asked to let you know.",
         level: "info",
         // On: nobody writes "tell me" into an automation hoping not to be told.
+        unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
     },
     {
@@ -605,6 +612,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         description: "A step in one of your automations asked to let you know.",
         level: "info",
         // On: nobody writes "tell me" into an automation hoping not to be told.
+        unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
     },
     {
@@ -805,6 +813,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Message from an automation",
         description: "A Notify step in one of your automations sent you a message.",
         level: "info",
+        unreadWhenViewing: true,
         defaults: { inapp: true, email: false }
     },
     {

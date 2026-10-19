@@ -11,7 +11,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
-vi.mock("@/app/(app)/automations/actions", () => ({ rotateHookAction: vi.fn() }));
+vi.mock("@/app/(app)/automations/actions", () => ({
+    rotateHookAction: vi.fn(),
+    noticeChannelsAction: vi.fn(async () => ({
+        ok: true,
+        mail: false,
+        canSetUpMail: false,
+        destinations: [],
+        webhooks: []
+    }))
+}));
 
 import * as core from "@polaris/core";
 import { MessagesWrapper } from "../setup/i18n";

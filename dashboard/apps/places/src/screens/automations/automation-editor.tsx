@@ -52,6 +52,7 @@ import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
 const { runAction } = hostUi.runAction;
+const { NoticeDeliveryFields } = hostUi.automationsNotice;
 
 /** An automation while it is being edited: the input the server takes. */
 export type Draft = auto.AutomationInput;
@@ -2341,6 +2342,15 @@ export function StepCard({
                         />
                     )}
                 </flow.Field>
+            )}
+            {step.kind === "notify" && (
+                <div className="min-w-0 sm:col-span-2">
+                    <NoticeDeliveryFields
+                        value={step.delivery}
+                        disabled={disabled}
+                        onChange={(delivery) => onChange({ ...step, delivery })}
+                    />
+                </div>
             )}
             {step.kind === "run" && (
                 <flow.Field

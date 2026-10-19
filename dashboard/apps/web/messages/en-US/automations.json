@@ -296,7 +296,8 @@
         "webhookGone": "The chat webhook was deleted",
         "webhookReset": "The chat webhook got a new secret",
         "webhookForbidden": "Its owner no longer runs that channel",
-        "webhookLimited": "The webhook posted too much this minute"
+        "webhookLimited": "The webhook posted too much this minute",
+        "noticeNotDelivered": "No channel delivered the message"
     },
     "secrets": {
         "title": "Secrets",
@@ -717,6 +718,21 @@
         "outcomes": "Only when it ends as",
         "outcomesAny": "None ticked takes any ending. Read it as {example}.",
         "values": "Values"
+    },
+    "delivery": {
+        "label": "Deliver to",
+        "bell": "The bell in Polaris",
+        "email": "Email to my address",
+        "emailUnavailable": "This Polaris has no email channel to send from.",
+        "emailSetUp": "Set one up",
+        "emailAskAdmin": "An administrator can set one up.",
+        "destinations": "My notification destinations",
+        "destinationsNone": "You have no phone numbers or chat hooks yet.",
+        "destinationsAdd": "Add one",
+        "destinationOption": "{name} ({target})",
+        "destinationOff": "{name} (switched off)",
+        "chat": "A chat channel, through its webhook",
+        "none": "Pick at least one place to deliver it."
     },
     "appNodes": {
         "homeTime": "Places: at a time",

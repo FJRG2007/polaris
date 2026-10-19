@@ -187,21 +187,22 @@ const notifyNode: ServerNode<NotifyConfig> = {
     meta: core.CORE_NODE_META["core.notify"],
     config: C["core.notify"],
     run: async (config, context, io) => {
-        const { notify } = await import("@/lib/notifications/dispatch");
+        const { deliverAutomationNotice } = await import("../notice");
         const title = core.interpolate(config.title, context).slice(0, 200);
         const body = core
             .interpolate(config.body, context)
             .slice(0, core.AUTOMATION_LIMITS.textLength);
         io.recordInput({ title, body });
-        await notify({
+        const output = await deliverAutomationNotice({
             userId: io.actor.id,
             event: "automations.message",
             title,
             body: body || null,
             href: `/automations/${io.automationId}`,
-            metadata: { automationId: io.automationId, runId: io.runId }
+            metadata: { automationId: io.automationId, runId: io.runId },
+            delivery: config.delivery
         });
-        return { output: { sent: true } };
+        return { output };
     }
 };
 

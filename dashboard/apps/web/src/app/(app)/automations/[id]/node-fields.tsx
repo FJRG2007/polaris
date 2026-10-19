@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { chatWebhooksAction, hookAddressAction, rotateHookAction } from "../actions";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
+import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
     ConditionEditor,
@@ -464,6 +465,10 @@ export function NodeFields({
                             onChange={(event) => set({ body: event.target.value })}
                         />
                     </Field>
+                    <NoticeDeliveryFields
+                        value={config.delivery}
+                        onChange={(delivery) => set({ delivery })}
+                    />
                 </div>
             );
         case "core.message":

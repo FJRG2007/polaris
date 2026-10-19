@@ -26,7 +26,7 @@ vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/automations/secrets", () => ({
     readSecretForRun: async () => "https://hooks.example.test/SECRET"
 }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
+vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => ({ inapp: "sent" }) }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k".repeat(64) }) }));
 vi.mock("undici", () => ({ Agent: class {}, fetch: async () => new Response("{}") }));

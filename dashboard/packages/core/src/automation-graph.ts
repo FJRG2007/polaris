@@ -656,6 +656,49 @@ export const repeatConfigSchema = z.discriminatedUnion("kind", [
 ]);
 export type RepeatConfig = z.infer<typeof repeatConfigSchema>;
 
+/**
+ * Where a "tell somebody" step delivers it: the bell, the account's own
+ * notification destinations (a phone number, a Telegram or Slack hook), email,
+ * and a chat channel through one of its webhooks - never as the person. Left
+ * out, the bell alone, which is what every step saved before this existed did.
+ *
+ * enigma: an outbound HTTP request with headers and auth is not a channel here.
+ * feat/webhooks-in-automations moves outbound webhooks into Automations; it adds
+ * itself as one more key of this object, delivered by `deliverAutomationNotice`.
+ */
+export const noticeDeliverySchema = z
+    .object({
+        bell: z.boolean().default(true),
+        email: z.boolean().default(false),
+        /** Ids of the account's own notification destinations. */
+        destinations: z.array(z.string().uuid()).max(10).default([]),
+        /** A channel webhook, and which secret it had when it was chosen. */
+        chat: z
+            .object({
+                webhookId: z.string().uuid(),
+                stamp: z.string().regex(/^[0-9a-f]{16}$/)
+            })
+            .nullable()
+            .default(null)
+    })
+    .refine(
+        (delivery) =>
+            delivery.bell ||
+            delivery.email ||
+            delivery.destinations.length > 0 ||
+            delivery.chat !== null,
+        "noticeNoChannel"
+    );
+export type NoticeDelivery = z.infer<typeof noticeDeliverySchema>;
+
+/** What a step with no delivery set does: the bell, as it always did. */
+export const DEFAULT_NOTICE_DELIVERY: NoticeDelivery = {
+    bell: true,
+    email: false,
+    destinations: [],
+    chat: null
+};
+
 /** Every node type core contributes, with the config each one takes. */
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
@@ -669,7 +712,8 @@ export const CORE_NODE_CONFIGS = {
     "core.wait": waitConfigSchema,
     "core.notify": z.object({
         title: text(200).min(1),
-        body: text(AUTOMATION_LIMITS.textLength).default("")
+        body: text(AUTOMATION_LIMITS.textLength).default(""),
+        delivery: noticeDeliverySchema.optional()
     }),
     "core.http": httpConfigSchema,
     "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) }),

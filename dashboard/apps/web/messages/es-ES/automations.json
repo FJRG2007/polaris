@@ -296,7 +296,8 @@
         "webhookGone": "El webhook del chat se borró",
         "webhookReset": "El webhook tiene un secreto nuevo",
         "webhookForbidden": "Su dueño ya no lleva ese canal",
-        "webhookLimited": "El webhook publicó mucho este minuto"
+        "webhookLimited": "El webhook publicó mucho este minuto",
+        "noticeNotDelivered": "Ningún canal entregó el mensaje"
     },
     "secrets": {
         "title": "Secretos",
@@ -717,6 +718,21 @@
         "outcomes": "Solo si termina como",
         "outcomesAny": "Sin marcar vale cualquier final. Léelo como {example}.",
         "values": "Valores"
+    },
+    "delivery": {
+        "label": "Entregar en",
+        "bell": "La campana de Polaris",
+        "email": "Correo a mi dirección",
+        "emailUnavailable": "Este Polaris no tiene canal de correo para enviar.",
+        "emailSetUp": "Crear uno",
+        "emailAskAdmin": "Un administrador puede crear uno.",
+        "destinations": "Mis destinos de avisos",
+        "destinationsNone": "Aún no tienes teléfonos ni ganchos de chat.",
+        "destinationsAdd": "Añadir uno",
+        "destinationOption": "{name} ({target})",
+        "destinationOff": "{name} (desactivado)",
+        "chat": "Un canal de chat, con su webhook",
+        "none": "Elige al menos un lugar de entrega."
     },
     "appNodes": {
         "homeTime": "Lugares: a una hora",

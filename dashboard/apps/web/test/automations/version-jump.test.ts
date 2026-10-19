@@ -25,7 +25,7 @@ vi.mock("@/lib/automations/runner", () => ({
     mayAllowLocalNetwork: async () => false
 }));
 vi.mock("@/lib/automations/secrets", () => ({ readSecretForRun: async () => "" }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
+vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => ({ inapp: "sent" }) }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));
 vi.mock("undici", () => ({ Agent: class {}, fetch: async () => new Response("{}") }));
 
