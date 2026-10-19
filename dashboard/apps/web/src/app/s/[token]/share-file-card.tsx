@@ -80,6 +80,8 @@ export function ShareFileCard({
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
                 token={token}
                 readOnly
+                // No thumbnail on the card: the picture fades in and out in place.
+                thumbnailFor={() => null}
             />
         </Card>
     );

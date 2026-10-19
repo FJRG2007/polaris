@@ -68,6 +68,21 @@ export function flight(from: Box, to: Box): { transform: string; clipPath: strin
     };
 }
 
+/**
+ * The thumbnail on screen right now that `attribute` names `id` - the element
+ * itself, or what `inner` selects inside it - for a picture to grow out of and
+ * shrink back into. Compared as a value rather than built into a selector, so
+ * an id with quotes in it finds nothing instead of breaking the query.
+ */
+export function thumbnailBy(attribute: string, id: string, inner?: string): Element | null {
+    for (const holder of document.querySelectorAll(`[${attribute}]`)) {
+        if (holder.getAttribute(attribute) !== id) continue;
+        const picture = inner ? holder.querySelector(inner) : holder;
+        if (visibleBox(picture, viewportSize())) return picture;
+    }
+    return null;
+}
+
 export function reducedMotion(): boolean {
     return (
         typeof window !== "undefined" &&
@@ -147,4 +162,35 @@ export function pictureCopy(src: string, at: Box): HTMLImageElement {
     });
     document.body.appendChild(copy);
     return copy;
+}
+
+/** A preview opened on one file, and where that file's picture grows from. */
+export interface Opening {
+    readonly key: string;
+    readonly from: Box | null;
+}
+
+/**
+ * What a preview remembers about its opening, from one render to the next.
+ *
+ * The thumbnail is measured once, as the preview opens and before it covers the
+ * page. A file stepped to after that fades in place, and so does the first one
+ * shown again, because its thumbnail is behind the preview by then. Closed,
+ * nothing is kept, so the next opening measures afresh.
+ */
+export function nextOpening(
+    opening: Opening | null,
+    key: string | null,
+    measure: () => Box | null
+): Opening | null {
+    if (key === null) return null;
+    if (opening === null) return { key, from: measure() };
+    if (opening.key !== key && opening.from) return { key: opening.key, from: null };
+    return opening;
+}
+
+/** Where the picture of `key` grows from: the opened file's thumbnail, or in
+ *  place. */
+export function openingFrom(opening: Opening | null, key: string): Box | null {
+    return opening?.key === key ? opening.from : null;
 }

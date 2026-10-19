@@ -6,8 +6,15 @@
  * are geometry, so they are checked as numbers rather than by watching.
  */
 
-import { describe, expect, it } from "vitest";
-import { flight, visibleBox, type Box } from "@/components/image-flight";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+    flight,
+    nextOpening,
+    openingFrom,
+    thumbnailBy,
+    visibleBox,
+    type Box
+} from "@/components/image-flight";
 
 const viewport = { width: 1000, height: 800 };
 
@@ -125,5 +132,75 @@ describe("visibleBox", () => {
             { left: 1000, top: 20, width: 30, height: 40 }
         ];
         for (const rect of off) expect(visibleBox(placed(rect), viewport)).toBeNull();
+    });
+});
+
+describe("nextOpening", () => {
+    const thumbnail: Box = { x: 10, y: 20, width: 40, height: 40 };
+
+    it("grows the opened file out of its thumbnail, measured once", () => {
+        const measure = vi.fn(() => thumbnail);
+        const opened = nextOpening(null, "a", measure);
+        expect(openingFrom(opened, "a")).toEqual(thumbnail);
+        expect(nextOpening(opened, "a", measure)).toBe(opened);
+        expect(measure).toHaveBeenCalledTimes(1);
+    });
+
+    it("fades a file stepped to in place, and the first one shown again", () => {
+        const opened = nextOpening(null, "a", () => thumbnail);
+        const stepped = nextOpening(opened, "b", () => thumbnail);
+        expect(openingFrom(stepped, "b")).toBeNull();
+        expect(
+            openingFrom(
+                nextOpening(stepped, "a", () => thumbnail),
+                "a"
+            )
+        ).toBeNull();
+    });
+
+    it("forgets the opening once closed, so the next one measures afresh", () => {
+        const opened = nextOpening(null, "a", () => thumbnail);
+        expect(nextOpening(opened, null, () => thumbnail)).toBeNull();
+        expect(
+            openingFrom(
+                nextOpening(null, "a", () => null),
+                "a"
+            )
+        ).toBeNull();
+    });
+});
+
+describe("thumbnailBy", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    /** A page holding share-listing icons, each named by its path. */
+    function page(icons: Array<{ path: string; element: Element }>) {
+        vi.stubGlobal("window", { innerWidth: viewport.width, innerHeight: viewport.height });
+        vi.stubGlobal("document", {
+            querySelectorAll: () =>
+                icons.map(({ path, element }) =>
+                    Object.assign(element, {
+                        getAttribute: (name: string) =>
+                            name === "data-share-thumbnail" ? path : null
+                    })
+                )
+        });
+    }
+
+    it("finds the shared file's icon a preview opened from", () => {
+        const icon = placed({ left: 10, top: 20, width: 40, height: 40 });
+        page([
+            { path: "/other.png", element: placed({ left: 0, top: 0, width: 40, height: 40 }) },
+            { path: "/cat.png", element: icon }
+        ]);
+        expect(thumbnailBy("data-share-thumbnail", "/cat.png")).toBe(icon);
+    });
+
+    it("finds nothing for a file scrolled away or not listed, so it fades in place", () => {
+        page([
+            { path: "/cat.png", element: placed({ left: 10, top: 900, width: 40, height: 40 }) }
+        ]);
+        expect(thumbnailBy("data-share-thumbnail", "/cat.png")).toBeNull();
+        expect(thumbnailBy("data-share-thumbnail", "/dog.png")).toBeNull();
     });
 });

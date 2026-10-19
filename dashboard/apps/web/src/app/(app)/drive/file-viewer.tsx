@@ -17,7 +17,7 @@
  */
 
 import { viewerKind } from "./viewer/kind";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import * as flying from "@/components/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { formatBytes } from "@polaris/core";
@@ -205,7 +205,8 @@ export function FileViewer({
     urlFor,
     token,
     readOnly = false,
-    steps
+    steps,
+    thumbnailFor
 }: {
     target: ViewerTarget | null;
     onOpenChange: (open: boolean) => void;
@@ -220,8 +221,46 @@ export function FileViewer({
     token?: string;
     /** Several files opened together - see `ViewerSteps`. Nothing is drawn for one. */
     steps?: ViewerSteps;
+    /** The thumbnail a file was opened from, while it is on the page: its picture
+     *  grows out of it and shrinks back into it. Null when there is none, which
+     *  fades the picture in place; left out, it simply appears. */
+    thumbnailFor?: (target: ViewerTarget) => Element | null;
 }) {
     const t = useTranslations("driveViewer");
+    const content = useRef<HTMLDivElement>(null);
+    const key = target ? `${target.connectionId ?? ""}:${target.path}` : null;
+    // Measured on the render that opens the viewer, before the dialog covers the
+    // thumbnail - see `nextOpening`.
+    const [opening, setOpening] = useState<flying.Opening | null>(null);
+    const next = thumbnailFor
+        ? flying.nextOpening(opening, key, () =>
+              target ? flying.visibleBox(thumbnailFor(target), flying.viewportSize()) : null
+          )
+        : null;
+    if (next !== opening) setOpening(next);
+    const from = thumbnailFor && key !== null ? flying.openingFrom(next, key) : undefined;
+
+    /** Closed: a picture shrinks back into its thumbnail on the way, as a copy,
+     *  because the real one goes with the dialog. */
+    function changeOpen(open: boolean) {
+        const picture = content.current?.querySelector<HTMLImageElement>("[data-preview-picture]");
+        if (
+            open ||
+            !target ||
+            !thumbnailFor ||
+            !flying.canFly(picture) ||
+            picture.offsetWidth < 1
+        ) {
+            onOpenChange(open);
+            return;
+        }
+        const at = flying.boxOf(picture);
+        const copy = flying.pictureCopy(picture.currentSrc || picture.src, at);
+        picture.style.visibility = "hidden";
+        const into = flying.visibleBox(thumbnailFor(target), flying.viewportSize());
+        onOpenChange(false);
+        void flying.shrinkOut(copy, at, into).then(() => copy.remove());
+    }
     const format = useDisplayFormat();
     const byteUrl = urlFor ?? driveByteUrl;
     // Whether the server has answered the last request for bytes yet, so a file
@@ -233,8 +272,9 @@ export function FileViewer({
     const canForward = stepping !== null && stepping.index < stepping.count - 1;
 
     return (
-        <Dialog open={target !== null} onOpenChange={onOpenChange}>
+        <Dialog open={target !== null} onOpenChange={changeOpen}>
             <DialogContent
+                ref={content}
                 className="flex max-h-[90vh] w-full max-w-6xl flex-col gap-0 overflow-hidden p-0"
                 onKeyDown={(event) => {
                     if (!stepping || keyBelongsToTarget(event)) return;
@@ -317,6 +357,7 @@ export function FileViewer({
                                     token={token}
                                     readOnly={readOnly}
                                     onSaved={onSaved}
+                                    from={from}
                                 />
                             ) : null}
                         </div>

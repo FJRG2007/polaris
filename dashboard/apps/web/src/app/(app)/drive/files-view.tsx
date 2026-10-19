@@ -3572,12 +3572,7 @@ function GridIcon({
  *  details panel - for its preview to grow out of and shrink back into. Drive's
  *  thumbnails have their own address, so it is found by path, not by picture. */
 function thumbnailFor(path: string): Element | null {
-    for (const holder of document.querySelectorAll("[data-drive-thumbnail]")) {
-        if (holder.getAttribute("data-drive-thumbnail") !== path) continue;
-        const picture = holder.querySelector("img:not(.hidden)");
-        if (flying.visibleBox(picture, flying.viewportSize())) return picture;
-    }
-    return null;
+    return flying.thumbnailBy("data-drive-thumbnail", path, "img:not(.hidden)");
 }
 
 /** The icon for an entry: a user-set one, else the folder mark or the file type's. */
