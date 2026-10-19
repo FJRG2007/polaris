@@ -93,7 +93,10 @@ export function ScopeSwitcher({
                         ) : (
                             <UserRound className="text-muted-foreground size-4 shrink-0" />
                         )}
-                        <span className="truncate text-sm" title={current?.name ?? personalName}>
+                        <span
+                            className="hidden truncate text-sm sm:inline"
+                            title={current?.name ?? personalName}
+                        >
                             {current?.name ?? personalName}
                         </span>
                         <ChevronsUpDown className="text-muted-foreground size-3.5 shrink-0" />

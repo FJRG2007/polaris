@@ -148,7 +148,6 @@ export function AccountMenu({
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
-    /** Whether the list of accounts on this browser is open. */
     /**
      * When this face was last pressed, for recognising the second press of a
      * double without the browser's help.
