@@ -24,6 +24,7 @@ import { fileIconFor } from "@/app/(app)/drive/file-icons";
 import { AlertCircle, Loader2, RotateCcw, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ImageViewer, type ViewedImage } from "@/components/image-viewer";
+import * as tile from "@/components/attachment-tile";
 
 export interface AttachmentData {
     id: string;
@@ -43,13 +44,9 @@ export interface AttachmentData {
     preview?: string;
 }
 
-/** The formats drawn as a picture - the same list Chat draws inline, because
- *  they are pictures and cannot carry script. An SVG is deliberately not one. */
-const PICTURES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
-
 /** Where a picture can be drawn from, or null when it is drawn as a chip. */
 export function pictureUrl(file: AttachmentData): string | null {
-    if (!PICTURES.has(file.mediaType.split(";")[0]?.trim().toLowerCase() ?? "")) return null;
+    if (!tile.isInlinePicture(file.mediaType)) return null;
     if (file.preview?.startsWith("blob:")) return file.preview;
     return polarAttachmentId(file.url) !== null ? file.url : null;
 }
@@ -121,48 +118,45 @@ export function Attachment({
     const size = file.size !== undefined ? formatBytes(file.size) : null;
 
     const remove = onRemove ? (
-        <button
-            type="button"
+        <tile.AttachmentAction
             aria-label={t("files.remove", { name })}
             title={t("files.remove", { name })}
             onClick={onRemove}
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
         >
             <X className="size-3" />
-        </button>
+        </tile.AttachmentAction>
     ) : null;
     const retry =
         file.failed && onRetry ? (
-            <button
-                type="button"
+            <tile.AttachmentAction
                 aria-label={t("files.retry", { name })}
                 title={t("files.retry", { name })}
                 onClick={onRetry}
-                className="rounded p-0.5 text-danger-ink transition-colors hover:text-foreground"
+                className="text-danger-ink hover:text-foreground"
             >
                 <RotateCcw className="size-3" />
-            </button>
+            </tile.AttachmentAction>
         ) : null;
-    const state = file.pending ? (
+    const state = onRemove ? (
         <span className="sr-only" role="status">
-            {t("files.uploading", { name, percent })}
+            {file.pending
+                ? t("files.uploading", { name })
+                : file.failed
+                  ? null
+                  : t("files.uploaded", { name })}
         </span>
     ) : null;
 
     if (picture) {
         return (
             <li className="relative" title={file.failed ?? (size ? `${name} - ${size}` : name)}>
-                <button
-                    type="button"
-                    onClick={() => onOpen?.({ url: picture, name })}
-                    aria-label={t("files.open", { name })}
-                    className={cn(
-                        "block size-20 cursor-zoom-in overflow-hidden rounded-md border",
-                        file.failed ? "border-danger" : "border-border"
-                    )}
-                >
-                    <img src={picture} alt={name} className="size-full object-cover" />
-                </button>
+                <tile.AttachmentThumbnail
+                    src={picture}
+                    name={name}
+                    label={t("files.open", { name })}
+                    onOpen={() => onOpen?.({ url: picture, name })}
+                    failed={Boolean(file.failed)}
+                />
                 {file.pending ? (
                     <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-md bg-background/60 text-xs font-medium tabular-nums">
                         <Loader2 className="size-4 motion-safe:animate-spin" />
@@ -175,10 +169,10 @@ export function Attachment({
                     </span>
                 ) : null}
                 {remove || retry ? (
-                    <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
+                    <tile.AttachmentCorner>
                         {retry}
                         {remove}
-                    </span>
+                    </tile.AttachmentCorner>
                 ) : null}
                 {state}
             </li>

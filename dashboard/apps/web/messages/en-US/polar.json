@@ -171,7 +171,8 @@
         },
         "open": "Open {name}",
         "retry": "Retry {name}",
-        "uploading": "Uploading {name}, {percent}%"
+        "uploaded": "{name} uploaded",
+        "uploading": "Uploading {name}"
     },
     "suggestions": {
         "page": "What's on this page?",

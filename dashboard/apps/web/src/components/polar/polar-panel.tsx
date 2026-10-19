@@ -1112,7 +1112,7 @@ export function PolarChat({
                         setDragging(false);
                 }}
                 onDrop={(event) => {
-                    if (noKeys) return;
+                    if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
                     event.preventDefault();
                     setDragging(false);
                     addFiles(Array.from(event.dataTransfer.files));

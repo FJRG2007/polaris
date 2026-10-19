@@ -171,7 +171,8 @@
         },
         "open": "Abrir {name}",
         "retry": "Reintentar {name}",
-        "uploading": "Subiendo {name}, {percent}%"
+        "uploaded": "Subida terminada: {name}",
+        "uploading": "Subiendo {name}"
     },
     "suggestions": {
         "page": "¿Qué hay en esta página?",

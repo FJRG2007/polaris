@@ -9,7 +9,15 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    cleanup,
+    createEvent,
+    fireEvent,
+    render,
+    screen,
+    waitFor
+} from "@testing-library/react";
 
 const chat = {
     messages: [] as Array<{ id: string; role: string; parts: Array<Record<string, unknown>> }>,
@@ -154,6 +162,28 @@ describe("attaching", () => {
         const form = box.closest("form")!;
         fireEvent.drop(form, { dataTransfer: { files: [png("dropped.png")], types: ["Files"] } });
         expect(await screen.findByRole("button", { name: "Open dropped.png" })).toBeTruthy();
+    });
+
+    it("leaves a text drag to the box, and keeps the error on screen", async () => {
+        const box = await mount();
+        paste(box, [new File(["x"], "tool.exe", { type: "application/x-msdownload" })]);
+        await screen.findByRole("alert");
+        const drop = createEvent.drop(box.closest("form")!, {
+            dataTransfer: { files: [], types: ["text/plain"] }
+        });
+        fireEvent(box.closest("form")!, drop);
+        expect(drop.defaultPrevented).toBe(false);
+        expect(screen.getByRole("alert").textContent).toContain("tool.exe");
+    });
+
+    it("announces an upload starting and finishing, not every step of it", async () => {
+        const box = await mount();
+        paste(box, [png()]);
+        const status = await screen.findByText("Uploading shot.png");
+        act(() => uploads[0]!.progress(512, 1024));
+        expect(status.textContent).toBe("Uploading shot.png");
+        await act(async () => uploads[0]!.settle(true));
+        expect(status.textContent).toBe("shot.png uploaded");
     });
 
     it("refuses a type or size it cannot take, in a sentence, without adding it", async () => {

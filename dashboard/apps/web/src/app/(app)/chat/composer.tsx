@@ -32,6 +32,7 @@ import { ClipDialog } from "./clip-dialog";
 import { MicSettings } from "./mic-settings";
 import { VideoPreview } from "@/components/video-preview";
 import { ImageViewer } from "@/components/image-viewer";
+import * as tile from "@/components/attachment-tile";
 import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
@@ -1498,7 +1499,7 @@ function StagedFile({
         // Only what the browser will actually draw. An SVG is an image and is
         // deliberately not on this list - the same rule the conversation itself
         // applies to a picture somebody uploaded.
-        if (!PREVIEWABLE.has(type) && !WATCHABLE.has(type)) return;
+        if (!tile.isInlinePicture(type) && !WATCHABLE.has(type)) return;
         const address = URL.createObjectURL(file);
         setPreview(address);
         return () => {
@@ -1508,15 +1509,13 @@ function StagedFile({
     }, [file, type]);
 
     const remove = (
-        <button
-            type="button"
+        <tile.AttachmentAction
             aria-label={t("composer.removeNamed", { name: file.name })}
             title={t("composer.remove")}
             onClick={onRemove}
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
         >
             <X className="size-3" />
-        </button>
+        </tile.AttachmentAction>
     );
 
     /**
@@ -1527,21 +1526,17 @@ function StagedFile({
      * anybody whether they want to look.
      */
     const cover = (
-        <button
-            type="button"
+        <tile.AttachmentAction
             aria-pressed={covered}
             aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
                 name: file.name
             })}
             title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
             onClick={onCover}
-            className={cn(
-                "rounded p-0.5 transition-colors",
-                covered ? "text-primary" : "text-muted-foreground hover:text-foreground"
-            )}
+            className={covered ? "text-primary" : undefined}
         >
             {covered ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
-        </button>
+        </tile.AttachmentAction>
     );
 
     if (!preview) {
@@ -1580,26 +1575,20 @@ function StagedFile({
                 // unclipped it throws the picture's colour past its own edges as
                 // a halo, which reads as a broken thumbnail rather than a covered
                 // one.
-                <button
+                <tile.AttachmentThumbnail
                     ref={thumbnail}
-                    type="button"
-                    onClick={() => setOpen(true)}
-                    aria-label={t("composer.openNamed", { name: file.name })}
-                    className="border-border block size-20 cursor-zoom-in overflow-hidden rounded-md border"
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a local blob, no loader wanted */}
-                    <img
-                        src={preview}
-                        alt={file.name}
-                        title={`${file.name} - ${readableSize(file.size)}`}
-                        className={cn("size-full object-cover", covered && "scale-110 blur-md")}
-                    />
-                </button>
+                    src={preview}
+                    name={file.name}
+                    label={t("composer.openNamed", { name: file.name })}
+                    onOpen={() => setOpen(true)}
+                    imageTitle={`${file.name} - ${readableSize(file.size)}`}
+                    imageClassName={covered ? "scale-110 blur-md" : undefined}
+                />
             )}
-            <span className="absolute -right-1.5 -top-1.5 flex items-center gap-0.5 rounded-full border border-border bg-elevated px-0.5 shadow-sm">
+            <tile.AttachmentCorner>
                 {cover}
                 {remove}
-            </span>
+            </tile.AttachmentCorner>
             {/* Nothing to forward and nothing to report: it is not on a message
                 yet, and the one person who could report it is the one looking at
                 it. */}
@@ -1611,11 +1600,6 @@ function StagedFile({
         </li>
     );
 }
-
-/** What a staged file is shown as itself, rather than as its name. The same list
- *  the conversation draws inline, for the same reason: these are the formats that
- *  are pictures and cannot carry script. */
-const PREVIEWABLE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 
 /** What is shown as a video rather than as a name. The same three the
  *  conversation plays, so what is previewed here is exactly what will play
@@ -1656,30 +1640,24 @@ function StagedFromDrive({
                 {kept.name}
             </span>
             <span className="text-muted-foreground">{readableSize(kept.size)}</span>
-            <button
-                type="button"
+            <tile.AttachmentAction
                 aria-pressed={covered}
                 aria-label={t(covered ? "composer.sendUncovered" : "composer.sendSpoiler", {
                     name: kept.name
                 })}
                 title={covered ? t("composer.sentAsASpoiler") : t("composer.sendAsASpoiler")}
                 onClick={onCover}
-                className={cn(
-                    "rounded p-0.5 transition-colors",
-                    covered ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
+                className={covered ? "text-primary" : undefined}
             >
                 {covered ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
-            </button>
-            <button
-                type="button"
+            </tile.AttachmentAction>
+            <tile.AttachmentAction
                 aria-label={t("composer.removeNamed", { name: kept.name })}
                 title={t("composer.remove")}
                 onClick={onRemove}
-                className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
             >
                 <X className="size-3" />
-            </button>
+            </tile.AttachmentAction>
         </li>
     );
 }
