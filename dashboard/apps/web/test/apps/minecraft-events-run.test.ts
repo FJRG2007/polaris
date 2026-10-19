@@ -7039,7 +7039,9 @@ describe("spleef", () => {
             / (?:setblock|fill) (-?\d+) /.exec(piece.line)!.slice(1).map(Number)
         );
         const westmost = Math.min(...pasted.map(([x]) => x!));
-        expect(net!.x1).toBe(Math.min(westmost, built.arena.center.x - built.arena.size - 1) - arenaBuilds.NET_MARGIN);
+        expect(net!.x1).toBe(
+            Math.min(westmost, built.arena.center.x - built.arena.size - 1) - arenaBuilds.NET_MARGIN
+        );
         const homeFrom = world.sent.length;
         world.at.Ben = [net!.x1 + 1, net!.y1 + 1, built.arena.center.z];
         await play(2_100);
@@ -7081,7 +7083,11 @@ describe("spleef", () => {
         const built = arenaBuilds.floorArena(entry, origin, origin.y);
         // No generated TNT floor: the build's own, pasted into air over the net.
         expect(
-            world.sent.some((line) => / fill .* minecraft:tnt keep$/.test(line) && !built.paste.some((piece) => piece.line === line))
+            world.sent.some(
+                (line) =>
+                    / fill .* minecraft:tnt keep$/.test(line) &&
+                    !built.paste.some((piece) => piece.line === line)
+            )
         ).toBe(false);
         for (const piece of built.paste) expect(world.sent).toContain(piece.line);
         await play(8_000);
