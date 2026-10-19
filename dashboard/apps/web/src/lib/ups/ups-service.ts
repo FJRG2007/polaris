@@ -226,9 +226,16 @@ function columnsFor(input: upsReading.UpsConnectionInput, stored: UpsSecret) {
 }
 
 export async function createUps(input: upsReading.UpsConnectionInput): Promise<string> {
+    if (input.connection === "usb") {
+        const key = `${input.machineId}/${input.deviceId}`;
+        return serialUsb(async () => {
+            const row = await prisma.ups.create({ data: columnsFor(input, {}) });
+            // Added by hand after being removed: watched again from now on.
+            await forgetDismissed(key);
+            return row.id;
+        });
+    }
     const row = await prisma.ups.create({ data: columnsFor(input, {}) });
-    // Added by hand after being removed: watched again from now on.
-    if (input.connection === "usb") await forgetDismissed(`${input.machineId}/${input.deviceId}`);
     if (input.connection === "snmp") await syncSnmp();
     return row.id;
 }
@@ -284,9 +291,13 @@ export async function removeUps(id: string): Promise<boolean> {
         where: { id },
         select: { connection: true, machineId: true, deviceId: true }
     });
-    // A USB UPS somebody removed is not added back by itself while it stays plugged in.
-    if (row?.connection === "usb") await rememberDismissed(`${row.machineId}/${row.deviceId}`);
-    const removed = await prisma.ups.deleteMany({ where: { id } });
+    const removed = await serialUsb(async () => {
+        const gone = await prisma.ups.deleteMany({ where: { id } });
+        // A USB UPS somebody removed is not added back by itself while it stays plugged in.
+        if (gone.count > 0 && row?.connection === "usb")
+            await rememberDismissed(`${row.machineId}/${row.deviceId}`);
+        return gone;
+    });
     if (removed.count > 0) await syncSnmp();
     return removed.count > 0;
 }
@@ -516,6 +527,15 @@ const DISMISSED_KEY = "ups.usb.dismissed";
 const DISMISSED_MOST = 200;
 const dismissedSchema = z.array(z.string().max(300)).max(DISMISSED_MOST);
 
+let usbQueue: Promise<unknown> = Promise.resolve();
+
+/** One change to the USB rows or the removed list at a time, so none reads what another is writing. */
+function serialUsb<T>(work: () => Promise<T>): Promise<T> {
+    const run = usbQueue.then(work, work);
+    usbQueue = run.catch(() => undefined);
+    return run;
+}
+
 async function readDismissed(): Promise<Set<string>> {
     const raw = await getSetting(DISMISSED_KEY);
     if (!raw) return new Set();
@@ -548,13 +568,23 @@ let adopting: Promise<number> | null = null;
  * at a time, so the watcher and an open list never add the same UPS twice.
  */
 export function adoptUsb(listUsb: UsbListing = usbListing()): Promise<number> {
-    adopting ??= (async () => {
+    adopting ??= serialUsb(async () => {
         try {
-            const discovery = await usbOffers(await listUps(), listUsb);
-            if (discovery.state !== "ok") return 0;
+            const seen = await usbOffers([], listUsb);
+            if (seen.state !== "ok" || seen.offers.length === 0) return 0;
+            const watched = await prisma.ups.findMany({
+                where: {
+                    connection: "usb",
+                    machineId: LOCAL_HOST_SUBJECT,
+                    deviceId: { in: seen.offers.map((one) => one.deviceId) }
+                },
+                select: { deviceId: true }
+            });
+            const taken = new Set(watched.map((one) => one.deviceId));
             const dismissed = await readDismissed();
             let added = 0;
-            for (const offer of discovery.offers) {
+            for (const offer of seen.offers) {
+                if (taken.has(offer.deviceId)) continue;
                 if (dismissed.has(`${offer.machineId}/${offer.deviceId}`)) continue;
                 const input = upsReading.upsConnectionSchema.safeParse({
                     connection: "usb",
@@ -570,7 +600,7 @@ export function adoptUsb(listUsb: UsbListing = usbListing()): Promise<number> {
         } finally {
             adopting = null;
         }
-    })();
+    });
     return adopting;
 }
 

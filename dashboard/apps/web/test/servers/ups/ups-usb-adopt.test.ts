@@ -16,7 +16,17 @@ vi.mock("@/lib/auth", () => ({}));
 vi.mock("@polaris/db", () => ({
     prisma: {
         ups: {
-            findMany: async () => rows,
+            findMany: async ({
+                where,
+                take
+            }: { where?: { connection?: string; deviceId?: { in: string[] } }; take?: number } = {}) =>
+                rows
+                    .filter(
+                        (row) =>
+                            (!where?.connection || row.connection === where.connection) &&
+                            (!where?.deviceId || where.deviceId.in.includes(row.deviceId as string))
+                    )
+                    .slice(0, take),
             findUnique: async ({ where }: { where: { id: string } }) =>
                 rows.find((row) => row.id === where.id) ?? null,
             create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -91,6 +101,36 @@ describe("a UPS on USB", () => {
         expect(settings.size).toBe(0);
         await ups.removeUps(rows[0]!.id);
         expect(await ups.adoptUsb(listUsb)).toBe(0);
+    });
+
+    it("is not added twice when hundreds of others are watched", async () => {
+        for (let at = 0; at < 250; at += 1)
+            rows.push({
+                id: `nut-${at}`,
+                connection: "nut",
+                createdAt: new Date(),
+                protectedMachineIds: [],
+                notifyKinds: [],
+                reportSchedule: "off",
+                variableMap: null
+            });
+        const listUsb = plugged("usb-apc-1");
+        expect(await ups.adoptUsb(listUsb)).toBe(1);
+        expect(await ups.adoptUsb(listUsb)).toBe(0);
+        expect(rows.filter((row) => row.connection === "usb")).toHaveLength(1);
+    });
+
+    it("keeps every removal when several are removed at once", async () => {
+        const listUsb = plugged("usb-apc-1", "usb-apc-2", "usb-apc-3");
+        await ups.adoptUsb(listUsb);
+        await Promise.all(rows.map((row) => row.id).map((id) => ups.removeUps(id)));
+        expect(await ups.adoptUsb(listUsb)).toBe(0);
+        expect(rows).toHaveLength(0);
+    });
+
+    it("does not count a removal that did not happen", async () => {
+        expect(await ups.removeUps("missing")).toBe(false);
+        expect(settings.size).toBe(0);
     });
 
     it("offers nothing that is added by itself", async () => {
