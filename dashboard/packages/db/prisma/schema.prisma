@@ -13460,6 +13460,20 @@ model CrmCompany {
     @@index([userId, deletedAt])
     @@index([orgId, domain])
     @@index([userId, domain])
+    @@index([orgId, deletedAt, createdAt])
+    @@index([orgId, deletedAt, updatedAt])
+    @@index([orgId, deletedAt, name])
+    @@index([orgId, deletedAt, employees])
+    @@index([orgId, deletedAt, annualRevenue])
+    @@index([orgId, deletedAt, city])
+    @@index([orgId, deletedAt, country])
+    @@index([userId, deletedAt, createdAt])
+    @@index([userId, deletedAt, updatedAt])
+    @@index([userId, deletedAt, name])
+    @@index([userId, deletedAt, employees])
+    @@index([userId, deletedAt, annualRevenue])
+    @@index([userId, deletedAt, city])
+    @@index([userId, deletedAt, country])
 }
 
 model CrmPerson {
@@ -13526,6 +13540,16 @@ model CrmPerson {
     @@index([companyId])
     @@index([orgId, email])
     @@index([userId, email])
+    @@index([orgId, deletedAt, createdAt])
+    @@index([orgId, deletedAt, updatedAt])
+    @@index([orgId, deletedAt, firstName, lastName])
+    @@index([orgId, deletedAt, jobTitle])
+    @@index([orgId, deletedAt, city])
+    @@index([userId, deletedAt, createdAt])
+    @@index([userId, deletedAt, updatedAt])
+    @@index([userId, deletedAt, firstName, lastName])
+    @@index([userId, deletedAt, jobTitle])
+    @@index([userId, deletedAt, city])
 }
 
 model CrmOpportunity {
@@ -13593,6 +13617,18 @@ model CrmOpportunity {
 
     @@index([orgId, deletedAt, stage])
     @@index([userId, deletedAt, stage])
+    @@index([orgId, deletedAt, createdAt])
+    @@index([orgId, deletedAt, updatedAt])
+    @@index([orgId, deletedAt, name])
+    @@index([orgId, deletedAt, amount])
+    @@index([orgId, deletedAt, closeDate])
+    @@index([orgId, deletedAt, stage, position])
+    @@index([userId, deletedAt, createdAt])
+    @@index([userId, deletedAt, updatedAt])
+    @@index([userId, deletedAt, name])
+    @@index([userId, deletedAt, amount])
+    @@index([userId, deletedAt, closeDate])
+    @@index([userId, deletedAt, stage, position])
     @@index([companyId])
     @@index([pointOfContactId])
 }

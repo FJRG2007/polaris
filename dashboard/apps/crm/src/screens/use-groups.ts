@@ -14,7 +14,7 @@
 import { unwrap } from "./call";
 import { useCrmT } from "./i18n";
 import * as actions from "../actions/records";
-import type { RowStore } from "./use-records";
+import { lastRead, type RowStore } from "./use-records";
 import type { ViewSort } from "../model/views";
 import { hostUi } from "@polaris/app-host/client";
 import type { ViewFilter } from "../model/filters";
@@ -164,7 +164,8 @@ export function useGroups(
                         filter: query.filter,
                         byPosition: query.byPosition,
                         group: { key: groupKey, value },
-                        offset: group.rows.length
+                        offset: group.rows.length,
+                        after: lastRead(group.rows)
                     }),
                 t("errors.loadFailed")
             )
@@ -180,7 +181,7 @@ export function useGroups(
                                     ...one.rows,
                                     ...page.records.filter((row) => !known.has(row.id))
                                 ],
-                                total: page.total
+                                total: page.total ?? one.total
                             };
                         })
                     );

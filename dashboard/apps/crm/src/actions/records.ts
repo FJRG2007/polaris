@@ -130,7 +130,8 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
             group: group.optional(),
             byPosition: z.boolean().default(false),
             deleted: z.boolean().default(false),
-            offset: z.number().int().min(0).max(1_000_000).default(0)
+            offset: z.number().int().min(0).max(1_000_000).default(0),
+            after: z.string().uuid().optional()
         })
         .safeParse(input);
     if (!parsed.success) return invalid();

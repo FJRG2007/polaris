@@ -18,7 +18,7 @@ import { dropEvents, logEvents, type NewEvent } from "./timeline";
 import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
 import { CRM_OBJECTS } from "@polaris/core";
-import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
+import { groupColumn, keysetOrder, listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
 import { filterKeys, hideValues } from "../model/roles";
 import * as access from "./access";
@@ -45,8 +45,10 @@ export const MAX_BULK = 500;
 
 export interface RecordPage {
     readonly records: CrmRecord[];
-    /** How many rows match, across every page. */
-    readonly total: number;
+    /** How many rows match, across every page - null on a page read after
+     *  another (`after`), which is not counted again: the first page's count
+     *  still holds. */
+    readonly total: number | null;
 }
 
 export interface ListOptions extends ListScope {
@@ -54,7 +56,15 @@ export interface ListOptions extends ListScope {
     /** A board's order: where its cards were put, when it has no sorts. */
     readonly byPosition?: boolean;
     readonly offset?: number;
+    /** The id of the last row already shown: the page starts right after it,
+     *  found through the index rather than by counting past `offset` rows. A
+     *  row gone since (or an order a cursor cannot follow) falls back to
+     *  `offset`. */
+    readonly after?: string;
     readonly limit?: number;
+    /** False when the caller already counted the rows (a board's columns are
+     *  counted together in one query), so the page is not counted again. */
+    readonly count?: boolean;
 }
 
 /** One page of a list. */
@@ -68,20 +78,32 @@ export async function listRecords(
     const custom = options.custom ?? (await loadFields(actor.shelf, object));
     if (options.group) requireGroupable(object, options.group.key, custom);
     const where = listWhere(object, actor, { ...options, custom });
-    const [rows, total] = await Promise.all([
+    const orderBy = listOrder(object, options.sorts ?? [], options.byPosition);
+    const read = (paging: Record<string, unknown>) =>
         table(object).findMany({
             where,
-            orderBy: listOrder(object, options.sorts ?? [], options.byPosition),
-            skip: Math.max(0, options.offset ?? 0),
+            orderBy,
+            ...paging,
             take: Math.min(Math.max(1, options.limit ?? PAGE_SIZE), PAGE_SIZE),
             select: recordSelect(object)
-        }),
-        table(object).count({ where })
-    ]);
+        }) as Promise<Record<string, unknown>[]>;
+    const byOffset = { skip: Math.max(0, options.offset ?? 0) };
+    let rows: Record<string, unknown>[];
+    let total: number | null = null;
+    if (options.after && keysetOrder(orderBy)) {
+        rows = await read({ cursor: { id: options.after }, skip: 1 });
+        // The row the page was to follow is gone (trashed, moved off the
+        // shelf): its place is unknown, so count past the rows instead.
+        if (rows.length === 0 && byOffset.skip > 0) rows = await read(byOffset);
+    } else if (options.after || options.count === false) {
+        rows = await read(byOffset);
+    } else {
+        [rows, total] = await Promise.all([read(byOffset), table(object).count({ where })]);
+    }
     return {
         records: await nameLinks(
             actor,
-            (rows as Record<string, unknown>[]).map((row) => shown(actor, object, row)),
+            rows.map((row) => shown(actor, object, row)),
             custom
         ),
         total
@@ -116,6 +138,7 @@ function requireGroupable(object: CrmObject, key: string, custom: readonly Field
 /** One group of a grouped list, or one column of a board: its first page. */
 export interface RecordGroup extends RecordPage {
     readonly value: string;
+    readonly total: number;
 }
 
 /** How many groups' pages a board reads at once. */
@@ -158,14 +181,13 @@ export async function listGroups(
         await Promise.all(
             filled.slice(start, start + GROUP_READS).map(async (at) => {
                 const value = groups[at]!.value;
-                groups[at] = {
-                    value,
-                    ...(await listRecords(actor, object, {
-                        ...options,
-                        custom,
-                        group: { key, value }
-                    }))
-                };
+                const page = await listRecords(actor, object, {
+                    ...options,
+                    custom,
+                    group: { key, value },
+                    count: false
+                });
+                groups[at] = { value, records: page.records, total: totals.get(value) ?? 0 };
             })
         );
     }

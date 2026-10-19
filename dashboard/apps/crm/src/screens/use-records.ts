@@ -59,6 +59,15 @@ interface Listing {
     readonly total: number;
 }
 
+/** The last row the server sent, for the next page to start after: a row
+ *  still being created has no place in the server's order yet. */
+export function lastRead(rows: readonly CrmRecord[]): string | undefined {
+    for (let at = rows.length - 1; at >= 0; at--) {
+        if (!rows[at]!.id.startsWith("draft:")) return rows[at]!.id;
+    }
+    return undefined;
+}
+
 export function useRecords(
     object: CrmObject,
     query: {
@@ -87,7 +96,7 @@ export function useRecords(
                         offset: 0
                     }),
                 t("errors.loadFailed")
-            ).then(({ records, total }) => ({ records, total })),
+            ).then(({ records, total }) => ({ records, total: total ?? records.length })),
         // The sorts and the filter are read through their keys: a new array
         // with the same sorts is the same read.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -147,7 +156,8 @@ export function useRecords(
                     search: query.search,
                     sorts: query.sorts,
                     filter: query.filter,
-                    offset: listed.rows.length
+                    offset: listed.rows.length,
+                    after: lastRead(listed.rows)
                 }),
             t("errors.loadFailed")
         )
@@ -158,7 +168,7 @@ export function useRecords(
                     const known = new Set(rows.map((row) => row.id));
                     return {
                         rows: [...rows, ...page.records.filter((row) => !known.has(row.id))],
-                        total: page.total
+                        total: page.total ?? previous?.total ?? listed.total
                     };
                 });
             })

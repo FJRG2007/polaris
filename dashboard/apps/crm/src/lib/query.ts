@@ -177,3 +177,16 @@ export function listOrder(
         { id: "desc" }
     ];
 }
+
+/**
+ * Whether a cursor can follow this order: every entry a plain column read in
+ * one direction. A column that may be null (sorted with its empty rows last)
+ * or a linked record's name has no single value to resume after, so a list
+ * ordered by one is paged by offset instead.
+ */
+export function keysetOrder(orderBy: readonly Record<string, unknown>[]): boolean {
+    return orderBy.every((entry) => {
+        const values = Object.values(entry);
+        return values.length === 1 && (values[0] === "asc" || values[0] === "desc");
+    });
+}

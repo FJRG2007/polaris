@@ -64,9 +64,11 @@ export function SortMenu({
                     size="sm"
                     disabled={disabled}
                     className={cn(sorts.length > 0 && "border-primary text-foreground")}
+                    title={t("sorts.button")}
+                    aria-label={t("sorts.button")}
                 >
                     <ArrowUpDown className="size-4" />
-                    {t("sorts.button")}
+                    <span className="hidden sm:inline">{t("sorts.button")}</span>
                     {sorts.length > 0 ? (
                         <span className="rounded bg-primary/10 px-1 text-[0.75rem] tabular-nums text-primary">
                             {sorts.length}

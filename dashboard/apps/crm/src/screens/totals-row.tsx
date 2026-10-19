@@ -91,7 +91,7 @@ export function TotalCell({
                     </span>
                 </>
             ) : canChange ? (
-                <span className="text-foreground-subtle opacity-0 transition-opacity group-hover/foot:opacity-100">
+                <span className="text-foreground-subtle transition-opacity md:opacity-0 md:group-hover/foot:opacity-100">
                     {t("aggregates.add")}
                 </span>
             ) : null}

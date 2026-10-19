@@ -214,7 +214,7 @@ export function ForecastScreen() {
                         <caption className="sr-only">{t("forecast.tableLabel")}</caption>
                         <thead className="text-left text-muted-foreground">
                             <tr className="border-b border-border">
-                                <th scope="col" className="px-3 py-2 font-medium">
+                                <th scope="col" className="sticky left-0 bg-card px-3 py-2 font-medium">
                                     {t("forecast.period")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -247,7 +247,7 @@ export function ForecastScreen() {
                                 />
                             ))}
                             <tr className="border-t border-border font-semibold">
-                                <th scope="row" className="px-3 py-2 text-left">
+                                <th scope="row" className="sticky left-0 bg-card px-3 py-2 text-left">
                                     {t("forecast.total")}
                                 </th>
                                 <td className="px-3 py-2 text-right tabular-nums">{due}</td>
@@ -413,7 +413,7 @@ function PeriodRow({
         <tr
             className={cn("border-b border-border last:border-0", muted && "text-muted-foreground")}
         >
-            <th scope="row" className="whitespace-nowrap px-3 py-2 text-left font-normal">
+            <th scope="row" className="sticky left-0 whitespace-nowrap bg-card px-3 py-2 text-left font-normal">
                 {name}
             </th>
             <td className="px-3 py-2 text-right tabular-nums">
