@@ -86,7 +86,7 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async () => undefined
 }));
 
-const { connectedProviders, keySourcesFor, runSecretsFor } = await import("@/lib/agents/model-keys");
+const { chatCredentialFor, connectedProviders, keySourcesFor, runSecretsFor } = await import("@/lib/agents/model-keys");
 
 beforeEach(() => {
     state.ownKeys = [];
@@ -359,5 +359,46 @@ describe("connectedProviders", () => {
         state.shared = false;
         instanceHas("groq", "gsk-theirs");
         expect(await connectedProviders()).toEqual(["groq"]);
+    });
+});
+
+describe("chatCredentialFor", () => {
+    // Polar's order: the person's own key, then the deployment's when it is
+    // shared - and a choice of who pays narrows it to that one owner.
+    it("spends the person's own key first", async () => {
+        ownHas("k1", "anthropic", "sk-mine");
+        instanceHas("anthropic", "sk-theirs");
+        const credential = await chatCredentialFor("user-1", "anthropic");
+        expect(credential).toMatchObject({ source: "own", secret: "sk-mine" });
+    });
+
+    it("falls back to the deployment's when the person has none", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({
+            source: "instance",
+            secret: "sk-theirs"
+        });
+    });
+
+    it("does not spend the deployment's once sharing is off", async () => {
+        state.shared = false;
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
+    });
+
+    it("pays with the deployment's when that is the choice, even with an own key", async () => {
+        ownHas("k1", "anthropic", "sk-mine");
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic", "instance")).toMatchObject({ source: "instance" });
+    });
+
+    it("pays only with the person's own key when that is the choice", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic", "own")).toBeNull();
+    });
+
+    it("answers null for a provider nobody holds a key for", async () => {
+        ownHas("k1", "openai", "sk-mine");
+        expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
     });
 });
