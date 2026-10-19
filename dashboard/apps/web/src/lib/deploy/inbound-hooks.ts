@@ -53,12 +53,6 @@ export interface InboundHookView {
     createdAt: string;
 }
 
-export interface RedeployableService {
-    id: string;
-    name: string;
-    project: string;
-}
-
 export const inboundHookInputSchema = z.object({
     name: z.string().trim().min(1).max(60),
     applicationId: z.string().uuid()
@@ -110,42 +104,18 @@ async function redeployAccess(
     }
 }
 
-/** The services this account may redeploy, which are the only ones offered. */
-export async function redeployableServices(userId: string): Promise<RedeployableService[]> {
-    if (!(await mayDeploy(userId))) return [];
-    const projectIds = await access.visibleProjectIds(userId);
-    const reachable = (
-        await Promise.all(
-            projectIds.map((id) => access.projectAccess(id, userId).catch(() => null))
-        )
-    ).filter(
-        (entry): entry is access.ProjectAccess =>
-            entry !== null && access.accessCan(entry, "deploy.run")
-    );
-    if (reachable.length === 0) return [];
-    const apps = await prisma.application.findMany({
-        where: { environment: { projectId: { in: reachable.map((entry) => entry.projectId) } } },
-        orderBy: { name: "asc" },
-        take: 500,
-        select: {
-            id: true,
-            name: true,
-            environmentId: true,
-            environment: { select: { projectId: true, project: { select: { name: true } } } }
-        }
-    });
-    const byProject = new Map(reachable.map((entry) => [entry.projectId, entry]));
-    return apps
-        .filter((app) => {
-            const granted = byProject.get(app.environment.projectId);
-            return granted !== undefined && access.accessInEnvironment(granted, app.environmentId);
-        })
-        .map((app) => ({ id: app.id, name: app.name, project: app.environment.project.name }));
+/** Whether the account may make a hook for this service right now. */
+export async function mayRedeploy(userId: string, applicationId: string): Promise<boolean> {
+    return (await redeployAccess(applicationId, userId)) !== null;
 }
 
-export async function listInboundHooks(userId: string): Promise<InboundHookView[]> {
+/** The account's hooks, or - given a service - only the ones that redeploy it. */
+export async function listInboundHooks(
+    userId: string,
+    applicationId?: string
+): Promise<InboundHookView[]> {
     const rows = await prisma.inboundWebhook.findMany({
-        where: { userId },
+        where: applicationId ? { userId, applicationId } : { userId },
         orderBy: { createdAt: "asc" },
         take: MAX_INBOUND_HOOKS,
         select: {
@@ -218,6 +188,24 @@ export async function setInboundHookEnabled(
         (await prisma.inboundWebhook.updateMany({ where: { id, userId }, data: { enabled } }))
             .count > 0
     );
+}
+
+/**
+ * Replace a hook's secret, keeping its URL: whoever held the old one can no
+ * longer sign for it. The new one is returned here and never again.
+ */
+export async function rotateInboundHookSecret(
+    userId: string,
+    id: string
+): Promise<{ secret: string } | { error: "rateLimited" | "notFound" }> {
+    const limited = await rateLimit(`inbound-hook:rotate:${userId}`, 10, 10 * 60_000);
+    if (!limited.ok) return { error: "rateLimited" };
+    const secret = newSigningSecret();
+    const result = await prisma.inboundWebhook.updateMany({
+        where: { id, userId },
+        data: sealed(secret)
+    });
+    return result.count > 0 ? { secret } : { error: "notFound" };
 }
 
 export async function deleteInboundHook(userId: string, id: string): Promise<boolean> {

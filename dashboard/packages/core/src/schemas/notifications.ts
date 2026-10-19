@@ -1020,3 +1020,131 @@ export function maskWebhookUrl(url: string): string {
         return "webhook";
     }
 }
+
+/** How many extra headers one signed webhook may send. */
+export const MAX_WEBHOOK_HEADERS = 20;
+
+/** RFC 7230 `token`: the only characters a header name may be made of. */
+const HEADER_TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+/** Headers the transport or Polaris's own signature owns. A receiver that needs
+ *  one of these changed is not something a header here can fix. */
+const RESERVED_WEBHOOK_HEADERS = new Set([
+    "host",
+    "content-length",
+    "content-type",
+    "transfer-encoding",
+    "connection",
+    "keep-alive",
+    "upgrade",
+    "te",
+    "trailer"
+]);
+
+/** Whether a header name is one an endpoint may not set: the transport's own,
+ *  or any `X-Polaris-*` (the signature, its timestamp, the event, the delivery). */
+export function isReservedWebhookHeader(name: string): boolean {
+    const lower = name.trim().toLowerCase();
+    return RESERVED_WEBHOOK_HEADERS.has(lower) || lower.startsWith("x-polaris-");
+}
+
+/** Codes, not sentences: the page puts each one into words. */
+export const WEBHOOK_REQUEST_ISSUES = [
+    "headerName",
+    "headerReserved",
+    "headerAuthorization",
+    "headerValue",
+    "headerDuplicate",
+    "required",
+    "username"
+] as const;
+export type WebhookRequestIssue = (typeof WEBHOOK_REQUEST_ISSUES)[number];
+
+const noLineBreak = (value: string) => !/[\r\n\0]/.test(value);
+
+/** A header value: no CR, LF or NUL anywhere - checked before it is trimmed, so
+ *  a trailing line break is refused rather than quietly cut off. */
+const headerValueSchema = z
+    .string()
+    .max(4096, "headerValue")
+    .refine(noLineBreak, "headerValue")
+    .transform((value) => value.trim())
+    .pipe(z.string().min(1, "required"));
+
+const headerNameSchema = z
+    .string()
+    .trim()
+    .min(1, "required")
+    .max(100, "headerName")
+    .regex(HEADER_TOKEN, "headerName")
+    .refine((name) => !isReservedWebhookHeader(name), "headerReserved");
+
+/**
+ * One extra header. A secret one is stored encrypted and never read back; its
+ * `value` left out keeps the one already stored.
+ */
+export const webhookHeaderInputSchema = z.object({
+    name: headerNameSchema.refine(
+        (name) => name.toLowerCase() !== "authorization",
+        "headerAuthorization"
+    ),
+    secret: z.boolean(),
+    value: headerValueSchema.optional()
+});
+
+/**
+ * How the endpoint is signed in to, beside the signature every body carries.
+ * Every credential is write-only: left out, the stored one is kept.
+ */
+export const webhookAuthInputSchema = z.discriminatedUnion("type", [
+    z.object({ type: z.literal("none") }),
+    z.object({ type: z.literal("bearer"), token: headerValueSchema.optional() }),
+    z.object({
+        type: z.literal("basic"),
+        username: z
+            .string()
+            .max(200, "username")
+            .refine((value) => noLineBreak(value) && !value.includes(":"), "username")
+            .transform((value) => value.trim())
+            .pipe(z.string().min(1, "required")),
+        password: headerValueSchema.optional()
+    }),
+    z.object({
+        type: z.literal("header"),
+        name: headerNameSchema,
+        value: headerValueSchema.optional()
+    })
+]);
+
+/** The extra headers and the sign-in of one signed webhook, as the page sends them. */
+export const webhookRequestInputSchema = z
+    .object({
+        auth: webhookAuthInputSchema,
+        headers: z.array(webhookHeaderInputSchema).max(MAX_WEBHOOK_HEADERS)
+    })
+    .superRefine((input, ctx) => {
+        const seen = new Set<string>();
+        if (input.auth.type === "header") seen.add(input.auth.name.toLowerCase());
+        if (input.auth.type === "bearer" || input.auth.type === "basic") seen.add("authorization");
+        input.headers.forEach((header, index) => {
+            const lower = header.name.toLowerCase();
+            if (seen.has(lower)) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["headers", index, "name"],
+                    message: "headerDuplicate"
+                });
+            }
+            seen.add(lower);
+            if (!header.secret && header.value === undefined) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: ["headers", index, "value"],
+                    message: "required"
+                });
+            }
+        });
+    });
+
+export type WebhookAuthInput = z.infer<typeof webhookAuthInputSchema>;
+export type WebhookRequestInput = z.infer<typeof webhookRequestInputSchema>;

@@ -545,7 +545,8 @@
             "remove": "Quitar destino",
             "log": "Entregas",
             "testSent": "Evento de prueba entregado.",
-            "testFailed": "La prueba falló: {reason}"
+            "testFailed": "La prueba falló: {reason}",
+            "request": "Cabeceras y acceso"
         },
         "form": {
             "title": "Añadir un destino",
@@ -609,34 +610,38 @@
             "unreachable": "Esa dirección no es pública, así que Polaris no puede enviarle.",
             "notFound": "Ese destino ya no existe.",
             "invalid": "Revisa el formulario: un nombre, una URL completa y al menos un evento.",
-            "notSaved": "No se guardó. Vuelve a probar."
+            "notSaved": "No se guardó. Vuelve a probar.",
+            "missingSecret": "Escribe el secreto: aún no hay uno guardado."
         },
-        "inbound": {
-            "title": "Hooks de deploy",
-            "description": "Una URL firmada que vuelve a desplegar un servicio cuando tu CI o tu registro le envía algo.",
-            "add": "Añadir hook",
-            "empty": "Aún no hay hooks de despliegue.",
-            "noServices": "No hay servicios que puedas volver a desplegar, así que no hay nada para lo que crear un hook.",
-            "service": "Servicio",
-            "servicePlaceholder": "Elige un servicio",
-            "name": "Nombre",
-            "namePlaceholder": "CI en main",
-            "url": "Dirección",
-            "redeploys": "Despliega {service}",
-            "lastUsed": "Usado {time}",
-            "neverUsed": "Sin usar aún",
-            "switchOn": "Activar",
-            "switchOff": "Desactivar",
-            "remove": "Quitar hook",
-            "removeQuestion": "¿Quitar {name}? Lo que siga enviando a su URL se rechaza desde ahora.",
-            "secretVerify": "Firma cada POST igual: X-Polaris-Timestamp (segundos unix, a menos de 5 minutos), un id único en X-Polaris-Delivery y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo.",
-            "dialogTitle": "Añadir hook de deploy",
-            "dialogDescription": "Polaris vuelve a desplegar el servicio con cada petición bien firmada, mientras puedas desplegarlo.",
+        "request": {
+            "title": "Cabeceras y acceso de {name}",
+            "description": "Van en cada petición, junto a la firma. Los secretos se guardan cifrados y no se vuelven a mostrar.",
+            "auth": "Acceso",
+            "authNone": "Ninguno",
+            "authBearer": "Token Bearer",
+            "authBasic": "Usuario y contraseña",
+            "authHeader": "Cabecera propia",
+            "token": "Token",
+            "username": "Usuario",
+            "password": "Contraseña",
+            "headerName": "Cabecera",
+            "headerValue": "Valor",
+            "secretSet": "Puesto y oculto",
+            "replace": "Cambiar",
+            "keep": "Dejar el actual",
+            "headers": "Cabeceras extra",
+            "addHeader": "Otra cabecera",
+            "noHeaders": "Sin cabeceras extra.",
+            "secret": "Secreto",
+            "removeHeader": "Quitar cabecera",
             "errors": {
-                "invalid": "Elige un servicio y ponle un nombre al hook.",
-                "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
-                "limit": "Tienes el máximo de {max} hooks de despliegue.",
-                "forbidden": "No puedes volver a desplegar ese servicio."
+                "headerName": "Solo letras, cifras y - _ . ! # $ % & ' * + ^ ` | ~.",
+                "headerReserved": "Polaris pone esta cabecera.",
+                "headerAuthorization": "Pon Authorization en Acceso.",
+                "headerValue": "No se admiten saltos de línea.",
+                "headerDuplicate": "Esa cabecera ya está puesta.",
+                "required": "Rellena esto.",
+                "username": "Sin dos puntos ni saltos."
             }
         }
     }

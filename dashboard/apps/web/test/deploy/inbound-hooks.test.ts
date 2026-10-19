@@ -14,10 +14,23 @@ const enc = new TextEncoder();
 
 let hook: { id: string; userId: string; applicationId: string; enabled: boolean } | null;
 let receipts: Array<{ id: string; hookId: string; deliveryId: string; expiresAt: Date }>;
+let stored: Uint8Array = enc.encode(SECRET);
 let hasPermission = true;
 let projectAccessOk = true;
 let rateOk = true;
 const deploy = vi.fn(async (..._args: unknown[]) => "dep-1");
+const compared = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock("node:crypto", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("node:crypto")>();
+    return {
+        ...actual,
+        timingSafeEqual: (a: NodeJS.ArrayBufferView, b: NodeJS.ArrayBufferView) => {
+            compared.count += 1;
+            return actual.timingSafeEqual(a, b);
+        }
+    };
+});
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -25,11 +38,23 @@ vi.mock("@polaris/db", () => ({
             findUnique: async () =>
                 hook && {
                     ...hook,
-                    encryptedSecret: enc.encode(SECRET),
+                    encryptedSecret: stored,
                     secretNonce: new Uint8Array([1]),
                     secretKeyId: "k"
                 },
-            update: async () => ({})
+            update: async () => ({}),
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { id: string; userId: string };
+                data: { encryptedSecret: Uint8Array };
+            }) => {
+                if (!hook || hook.id !== where.id || hook.userId !== where.userId)
+                    return { count: 0 };
+                stored = data.encryptedSecret;
+                return { count: 1 };
+            }
         },
         inboundWebhookReceipt: {
             create: async ({
@@ -61,7 +86,11 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({
-    encryptSecret: () => ({ ciphertext: new Uint8Array(), nonce: new Uint8Array(), keyId: "k" }),
+    encryptSecret: (value: string) => ({
+        ciphertext: new TextEncoder().encode(value),
+        nonce: new Uint8Array(),
+        keyId: "k"
+    }),
     decryptSecret: (blob: { ciphertext: Uint8Array }) => new TextDecoder().decode(blob.ciphertext)
 }));
 vi.mock("@polaris/auth", () => ({ userHasPermission: async () => hasPermission }));
@@ -72,22 +101,20 @@ vi.mock("@/lib/deploy-project-access", () => ({
     requireApplicationAccess: async () => {
         if (!projectAccessOk) throw new Error("Service not found");
         return { ownerId: "owner-1", projectId: "p", environmentId: "e" };
-    },
-    visibleProjectIds: async () => [],
-    projectAccess: async () => null,
-    accessCan: () => true,
-    accessInEnvironment: () => true
+    }
 }));
 vi.mock("@/lib/deploy-service", () => ({
     deployApplication: (...args: unknown[]) => deploy(...args)
 }));
 vi.mock("@/lib/notifications/outbound-hooks", () => ({
-    newSigningSecret: () => SECRET,
+    newSigningSecret: () => "whsec_rotated",
     signPayload: (secret: string, ts: number, body: string) =>
         `sha256=${createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex")}`
 }));
 
-const { receiveInbound, pruneInboundReceipts } = await import("../../src/lib/deploy/inbound-hooks");
+const { mayRedeploy, receiveInbound, pruneInboundReceipts, rotateInboundHookSecret } = await import(
+    "../../src/lib/deploy/inbound-hooks"
+);
 
 function signed(body: string, opts: { ts?: number; delivery?: string; secret?: string } = {}) {
     const ts = opts.ts ?? Math.floor(Date.now() / 1000);
@@ -104,6 +131,7 @@ function signed(body: string, opts: { ts?: number; delivery?: string; secret?: s
 
 beforeEach(() => {
     hook = { id: HOOK_ID, userId: "creator-1", applicationId: APP_ID, enabled: true };
+    stored = enc.encode(SECRET);
     receipts = [];
     hasPermission = true;
     projectAccessOk = true;
@@ -124,6 +152,17 @@ describe("the deploy-hook gateway", () => {
         expect((await receiveInbound(signed("{}", { secret: "whsec_other" }))).status).toBe(401);
         const request = signed("{}");
         expect((await receiveInbound({ ...request, body: '{"x":1}' })).status).toBe(401);
+        expect(deploy).not.toHaveBeenCalled();
+    });
+
+    it("does nothing for the URL alone, and compares in constant time", async () => {
+        const bare = { id: HOOK_ID, ip: "203.0.113.5", body: "{}" };
+        const none = { delivery: null, timestamp: null, signature: null };
+        expect((await receiveInbound({ ...bare, headers: none })).status).toBe(400);
+        const guessed = { ...signed("{}").headers, signature: `sha256=${"0".repeat(64)}` };
+        compared.count = 0;
+        expect((await receiveInbound({ ...bare, headers: guessed })).status).toBe(401);
+        expect(compared.count).toBe(1);
         expect(deploy).not.toHaveBeenCalled();
     });
 
@@ -191,5 +230,39 @@ describe("the deploy-hook gateway", () => {
         expect((await receiveInbound(signed("x".repeat(64 * 1024 + 1)))).status).toBe(413);
         rateOk = false;
         expect((await receiveInbound(signed("{}"))).status).toBe(429);
+    });
+});
+
+describe("replacing a deploy hook's secret", () => {
+    it("refuses the old secret and accepts the new one, at the same URL", async () => {
+        expect(await rotateInboundHookSecret("creator-1", HOOK_ID)).toEqual({
+            secret: "whsec_rotated"
+        });
+        expect((await receiveInbound(signed("{}", { delivery: "d-old" }))).status).toBe(401);
+        expect(
+            (await receiveInbound(signed("{}", { delivery: "d-new", secret: "whsec_rotated" })))
+                .status
+        ).toBe(202);
+    });
+
+    it("only for the account that made it, and not past the rate limit", async () => {
+        expect(await rotateInboundHookSecret("someone-else", HOOK_ID)).toEqual({
+            error: "notFound"
+        });
+        rateOk = false;
+        expect(await rotateInboundHookSecret("creator-1", HOOK_ID)).toEqual({
+            error: "rateLimited"
+        });
+    });
+});
+
+describe("whether a deploy hook may be added", () => {
+    it("asks the same permission and project access the gateway does", async () => {
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(true);
+        hasPermission = false;
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(false);
+        hasPermission = true;
+        projectAccessOk = false;
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(false);
     });
 });

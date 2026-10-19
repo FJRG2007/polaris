@@ -545,7 +545,8 @@
             "remove": "Remove endpoint",
             "log": "Delivery log",
             "testSent": "Test event delivered.",
-            "testFailed": "Test event failed: {reason}"
+            "testFailed": "Test event failed: {reason}",
+            "request": "Headers and sign-in"
         },
         "form": {
             "title": "Add an endpoint",
@@ -609,34 +610,38 @@
             "unreachable": "That address is not public, so Polaris cannot post to it.",
             "notFound": "That endpoint no longer exists.",
             "invalid": "Check the form: a name, a full URL and at least one event.",
-            "notSaved": "That did not save. Try again."
+            "notSaved": "That did not save. Try again.",
+            "missingSecret": "Type the secret: none is stored for it yet."
         },
-        "inbound": {
-            "title": "Deploy hooks",
-            "description": "A signed URL that redeploys one service when your CI or registry posts to it.",
-            "add": "Add deploy hook",
-            "empty": "No deploy hooks yet.",
-            "noServices": "There are no services you can redeploy, so there is nothing to add a hook for.",
-            "service": "Service",
-            "servicePlaceholder": "Pick a service",
-            "name": "Name",
-            "namePlaceholder": "CI on main",
-            "url": "Hook URL",
-            "redeploys": "Redeploys {service}",
-            "lastUsed": "Last used {time}",
-            "neverUsed": "Not used yet",
-            "switchOn": "Switch on",
-            "switchOff": "Switch off",
-            "remove": "Remove deploy hook",
-            "removeQuestion": "Remove {name}? Anything still posting to its URL is refused from now on.",
-            "secretVerify": "Sign each POST the same way: X-Polaris-Timestamp (unix seconds, within 5 minutes), a unique X-Polaris-Delivery id, and X-Polaris-Signature: sha256= followed by the hex HMAC-SHA256 of the timestamp, a dot and the raw body.",
-            "dialogTitle": "Add a deploy hook",
-            "dialogDescription": "Polaris redeploys the service each time a correctly signed request arrives, for as long as you may deploy it.",
+        "request": {
+            "title": "Headers and sign-in for {name}",
+            "description": "Sent with every request, beside the signature. Secrets are stored encrypted and never shown again.",
+            "auth": "Sign-in",
+            "authNone": "None",
+            "authBearer": "Bearer token",
+            "authBasic": "User and password",
+            "authHeader": "Custom header",
+            "token": "Token",
+            "username": "User",
+            "password": "Password",
+            "headerName": "Header name",
+            "headerValue": "Value",
+            "secretSet": "Set and hidden",
+            "replace": "Replace",
+            "keep": "Keep current",
+            "headers": "Extra headers",
+            "addHeader": "Add header",
+            "noHeaders": "No extra headers.",
+            "secret": "Secret",
+            "removeHeader": "Remove header",
             "errors": {
-                "invalid": "Pick a service and give the hook a name.",
-                "rateLimited": "Too many tries. Wait a few minutes and try again.",
-                "limit": "You have the maximum of {max} deploy hooks.",
-                "forbidden": "You cannot redeploy that service."
+                "headerName": "Letters, digits and - _ . ! # $ % & ' * + ^ ` | ~ only.",
+                "headerReserved": "Polaris sets this header itself.",
+                "headerAuthorization": "Set Authorization under Sign-in.",
+                "headerValue": "Line breaks are not allowed.",
+                "headerDuplicate": "This header is already set.",
+                "required": "Fill this in.",
+                "username": "No colons or line breaks."
             }
         }
     }

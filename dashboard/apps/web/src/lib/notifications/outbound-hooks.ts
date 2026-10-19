@@ -17,18 +17,24 @@
  *
  * The URL and the secret are envelope encrypted like every other credential here
  * and never read back to a client; the secret is shown once, when it is made.
+ *
+ * An endpoint may also carry extra headers and a sign-in (`outbound-request.ts`),
+ * sent before Polaris's own headers, which they can never replace.
  */
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
+import { userHasPermission } from "@polaris/auth";
 import { createHmac, randomBytes } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     MAX_OUTBOUND_WEBHOOKS,
     maskWebhookUrl,
     type NotificationLevel,
-    type OutboundWebhookInput
+    type OutboundWebhookInput,
+    type WebhookRequestInput
 } from "@polaris/core";
+import * as request from "./outbound-request";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { configuredRequest, reachable, RefusedAddressError, safeUrl } from "@/lib/safe-fetch";
 
@@ -84,6 +90,8 @@ export interface OutboundHookView {
     name: string;
     urlHint: string;
     events: string[];
+    /** The extra headers and sign-in: names and whether each secret is set. */
+    request: request.WebhookRequestView;
     enabled: boolean;
     consecutiveFailures: number;
     disabledReason: string | null;
@@ -109,13 +117,14 @@ export interface DeliveryPage {
 }
 
 /** The reasons a request here is refused, as codes the page puts into words. */
-export type HookRefusal = "limit" | "rateLimited" | "unreachable" | "notFound";
+export type HookRefusal = "limit" | "rateLimited" | "unreachable" | "notFound" | "missingSecret";
 
 const HOOK_FIELDS = {
     id: true,
     name: true,
     urlHint: true,
     events: true,
+    requestConfig: true,
     enabled: true,
     consecutiveFailures: true,
     disabledReason: true,
@@ -128,6 +137,7 @@ type HookRow = {
     name: string;
     urlHint: string;
     events: string[];
+    requestConfig: unknown;
     enabled: boolean;
     consecutiveFailures: number;
     disabledReason: string | null;
@@ -141,6 +151,7 @@ function toView(row: HookRow): OutboundHookView {
         name: row.name,
         urlHint: row.urlHint,
         events: row.events,
+        request: request.configView(request.readConfig(row.requestConfig)),
         enabled: row.enabled,
         consecutiveFailures: row.consecutiveFailures,
         disabledReason: row.disabledReason,
@@ -320,6 +331,55 @@ export async function rotateOutboundHookSecret(userId: string, id: string): Prom
     return result.count > 0 ? secret : null;
 }
 
+/**
+ * Replace an endpoint's extra headers and sign-in. A secret the page left out
+ * keeps the stored one, which is only ever decrypted here and in the sender.
+ */
+export async function setOutboundHookRequest(
+    userId: string,
+    id: string,
+    input: WebhookRequestInput
+): Promise<{ hook: OutboundHookView } | { error: HookRefusal }> {
+    const row = await prisma.outboundWebhook.findFirst({
+        where: { id, userId },
+        select: { encryptedRequest: true, requestNonce: true, requestKeyId: true }
+    });
+    if (!row) return { error: "notFound" };
+    let stored: request.RequestSecrets = { headers: {} };
+    if (row.encryptedRequest && row.requestNonce) {
+        try {
+            stored = request.readSecrets(
+                open(row.encryptedRequest, row.requestNonce, row.requestKeyId)
+            );
+        } catch {
+            // Unreadable under this key: every secret has to be typed again.
+        }
+    }
+    const merged = request.mergeRequest(input, stored);
+    if ("error" in merged) return { error: merged.error };
+    const hasSecrets =
+        merged.secrets.token !== undefined ||
+        merged.secrets.password !== undefined ||
+        merged.secrets.value !== undefined ||
+        Object.keys(merged.secrets.headers).length > 0;
+    const sealed = hasSecrets ? seal(JSON.stringify(merged.secrets)) : null;
+    const result = await prisma.outboundWebhook.updateMany({
+        where: { id, userId },
+        data: {
+            requestConfig: merged.config as unknown as object,
+            encryptedRequest: sealed?.ciphertext ?? null,
+            requestNonce: sealed?.nonce ?? null,
+            requestKeyId: sealed?.keyId ?? null
+        }
+    });
+    if (result.count === 0) return { error: "notFound" };
+    const saved = await prisma.outboundWebhook.findFirst({
+        where: { id, userId },
+        select: HOOK_FIELDS
+    });
+    return saved ? { hook: toView(saved) } : { error: "notFound" };
+}
+
 /** Remove an endpoint and its log. */
 export async function deleteOutboundHook(userId: string, id: string): Promise<boolean> {
     const result = await prisma.outboundWebhook.deleteMany({ where: { id, userId } });
@@ -346,6 +406,14 @@ export async function listOutboundDeliveries(
     return { items, nextCursor: more ? (items[items.length - 1]?.id ?? null) : null };
 }
 
+/** Whether the account may still have its endpoints posted to: the permission
+ *  the Webhooks screen asks for, or an administrator. */
+async function ownerMayUse(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (!user) return false;
+    return user.isAdmin || (await userHasPermission(userId, "automations.use"));
+}
+
 /**
  * Queue an alert for every endpoint of the account that asked for its event,
  * then try each one straight away. Never throws at the caller.
@@ -356,7 +424,7 @@ export async function queueOutboundHooks(userId: string, payload: OutboundPayloa
         take: MAX_OUTBOUND_WEBHOOKS,
         select: { id: true }
     });
-    if (hooks.length === 0) return;
+    if (hooks.length === 0 || !(await ownerMayUse(userId))) return;
     const body = JSON.stringify(payload);
     const now = new Date();
     const rows = await Promise.all(
@@ -381,19 +449,27 @@ async function post(
     secret: string,
     deliveryId: string,
     event: string,
-    body: string
+    body: string,
+    extra: Record<string, string>
 ): Promise<
     { ok: true; status: number } | { ok: false; status: number | null; error: DeliveryErrorCode }
 > {
     const timestamp = Math.floor(Date.now() / 1000);
+    // A receiver may name its own User-Agent; nothing else of Polaris's yields.
+    const agent: Record<string, string> = Object.keys(extra).some(
+        (name) => name.toLowerCase() === "user-agent"
+    )
+        ? {}
+        : { "User-Agent": "Polaris-Webhooks/1" };
     try {
         const response = await configuredRequest(
             url,
             {
                 method: "POST",
                 headers: {
+                    ...extra,
+                    ...agent,
                     "Content-Type": "application/json",
-                    "User-Agent": "Polaris-Webhooks/1",
                     "X-Polaris-Event": event,
                     "X-Polaris-Delivery": deliveryId,
                     "X-Polaris-Timestamp": String(timestamp),
@@ -456,7 +532,11 @@ export async function attemptDelivery(
                     urlKeyId: true,
                     encryptedSecret: true,
                     secretNonce: true,
-                    secretKeyId: true
+                    secretKeyId: true,
+                    requestConfig: true,
+                    encryptedRequest: true,
+                    requestNonce: true,
+                    requestKeyId: true
                 }
             }
         }
@@ -489,9 +569,17 @@ export async function attemptDelivery(
 
     let url: string;
     let secret: string;
+    let extra: Record<string, string>;
     try {
         url = open(hook.encryptedUrl, hook.urlNonce, hook.urlKeyId);
         secret = open(hook.encryptedSecret, hook.secretNonce, hook.secretKeyId);
+        const secrets =
+            hook.encryptedRequest && hook.requestNonce
+                ? request.readSecrets(
+                      open(hook.encryptedRequest, hook.requestNonce, hook.requestKeyId)
+                  )
+                : { headers: {} };
+        extra = request.requestHeaders(request.readConfig(hook.requestConfig), secrets);
     } catch {
         await prisma.outboundWebhookDelivery.update({
             where: { id: row.id },
@@ -501,7 +589,7 @@ export async function attemptDelivery(
     }
 
     const started = Date.now();
-    const result = await post(url, secret, row.id, row.event, row.payload);
+    const result = await post(url, secret, row.id, row.event, row.payload, extra);
     const durationMs = Date.now() - started;
 
     if (result.ok) {
@@ -579,7 +667,7 @@ async function countFailure(hookId: string, userId: string, name: string): Promi
             event: "webhook.disabled",
             title: t("webhooks.disabledTitle", { name }),
             body: t("webhooks.disabledBody"),
-            href: "/account/webhooks"
+            href: "/automations/webhooks"
         });
     } catch (error) {
         console.error("polaris: could not announce a switched-off webhook:", error);
