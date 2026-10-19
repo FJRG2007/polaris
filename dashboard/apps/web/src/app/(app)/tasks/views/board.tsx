@@ -61,7 +61,6 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
-    MenuShortcut,
     ContextMenuSeparator,
     ContextMenuTrigger,
     DropdownMenu,
@@ -69,8 +68,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Select,
+    ShortcutHint,
     cn,
     keepFocusOnClose,
+    shortcutPressed,
     useDeferredFocus
 } from "@polaris/ui";
 
@@ -529,8 +530,6 @@ export function TaskCard({
  * lives here: an item this board cannot do is not rendered rather than rendered
  * dead, so a column that only takes new work shows one line.
  */
-/** The key that deletes a focused column, drawn beside the menu item. */
-const DELETE_SHORTCUT = "Del"; // i18n-ignore
 
 function ColumnMenu({
     label,
@@ -614,7 +613,7 @@ function ColumnMenu({
                             {/* The key that does the same thing to the column
                                 whose header has the focus, said out loud - the
                                 way chat says it, drawn by the same component. */}
-                            <MenuShortcut>{DELETE_SHORTCUT}</MenuShortcut>
+                            <ShortcutHint id="tasks.delete" />
                         </ContextMenuItem>
                     </>
                 )}
@@ -872,7 +871,7 @@ export function BoardView(props: ViewProps) {
                                         // the menu can honestly advertise.
                                         tabIndex={0}
                                         onKeyDown={(event) => {
-                                            if (event.key !== "Delete") return;
+                                            if (!shortcutPressed(event, "tasks.delete")) return;
                                             if (event.target !== event.currentTarget) return;
                                             if (!isColumn || props.onDeleteStatus === undefined)
                                                 return;
@@ -976,6 +975,7 @@ export function BoardView(props: ViewProps) {
                                                         >
                                                             <Trash2 className="size-3.5" />
                                                             {t("board.deleteColumn")}
+                                                            <ShortcutHint id="tasks.delete" />
                                                         </DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
