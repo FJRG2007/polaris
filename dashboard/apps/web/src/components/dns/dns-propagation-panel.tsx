@@ -12,7 +12,14 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PropagationReport } from "@/lib/dns/propagation";
 import type { DnsScopeRef } from "@/app/(app)/account/domains/dns-actions";
 import * as polls from "@/app/(app)/account/domains/domains-polls";
-import { AlertTriangle, CheckCircle2, CircleSlash, Loader2, RefreshCw, XCircle } from "lucide-react";
+import {
+    AlertTriangle,
+    CheckCircle2,
+    CircleSlash,
+    Loader2,
+    RefreshCw,
+    XCircle
+} from "lucide-react";
 
 /** How long a record that has not settled waits between checks, and how many
  *  checks it gets before it stops asking on its own. */
@@ -88,8 +95,19 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
                             ? t("propagation.checkedAt", { time: format.time(report.checkedAt) })
                             : ""}
                 </span>
-                <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void check()}>
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} {t("propagation.checkNow")}
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto"
+                    disabled={busy}
+                    onClick={() => void check()}
+                >
+                    {busy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <RefreshCw className="size-4" />
+                    )}{" "}
+                    {t("propagation.checkNow")}
                 </Button>
             </div>
             {error && <p className="text-danger text-xs">{error}</p>}
@@ -99,7 +117,10 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
             {report && (
                 <ul className="flex flex-col gap-1">
                     {report.resolvers.map((resolver) => (
-                        <li key={resolver.resolver} className="flex flex-wrap items-start gap-2 text-xs">
+                        <li
+                            key={resolver.resolver}
+                            className="flex flex-wrap items-start gap-2 text-xs"
+                        >
                             {resolver.agrees === true ? (
                                 <CheckCircle2 className="text-success mt-px size-3.5 shrink-0" />
                             ) : resolver.agrees === false ? (

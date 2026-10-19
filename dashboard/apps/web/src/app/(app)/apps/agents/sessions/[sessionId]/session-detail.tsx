@@ -244,7 +244,9 @@ export function SessionDetail({ session, events, messages }: Props) {
                     {core.agentCliById(session.cli)?.label ?? session.command ?? session.cli}
                 </Badge>
                 <Badge variant="neutral" className="shrink-0">
-                    {session.place === "host" ? (session.hostName ?? t("sessions.aServer")) : t("sessions.thisBox")}
+                    {session.place === "host"
+                        ? (session.hostName ?? t("sessions.aServer"))
+                        : t("sessions.thisBox")}
                 </Badge>
                 {over ? null : (
                     <>
@@ -351,7 +353,9 @@ export function SessionDetail({ session, events, messages }: Props) {
                             cannot see, with no word on whether it will ask again,
                             is the reason this looked broken. It will not: the
                             home this runs in is kept between sessions. */}
-                        <p className="text-muted-foreground mt-3 text-xs">{t("session.signInHere")}</p>
+                        <p className="text-muted-foreground mt-3 text-xs">
+                            {t("session.signInHere")}
+                        </p>
                     </CardBody>
                 </Card>
             ) : null}
@@ -379,21 +383,27 @@ export function SessionDetail({ session, events, messages }: Props) {
                     </CardHeader>
                     <CardBody className="space-y-3">
                         {messages.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("session.nothingSaid")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("session.nothingSaid")}
+                            </p>
                         ) : (
                             messages.map((message, index) => (
                                 <div key={`${message.at}-${index}`} className="space-y-1">
                                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        {message.role === "user"
-                                            ? t("session.you")
-                                            : message.role === "agent"
-                                              ? t("sessions.form.agent")
-                                              : "Polaris" /* i18n-ignore the product's name */}
+                                        {
+                                            message.role === "user"
+                                                ? t("session.you")
+                                                : message.role === "agent"
+                                                  ? t("sessions.form.agent")
+                                                  : "Polaris" /* i18n-ignore the product's name */
+                                        }
                                     </p>
                                     <p className="whitespace-pre-wrap break-words text-sm">
                                         {/* Only Polaris's own lines are its words to translate;
                                             what a person or the agent said stays as said. */}
-                                        {message.role === "system" ? agentText(t, message.body) : message.body}
+                                        {message.role === "system"
+                                            ? agentText(t, message.body)
+                                            : message.body}
                                     </p>
                                 </div>
                             ))
@@ -428,10 +438,14 @@ export function SessionDetail({ session, events, messages }: Props) {
                                 {events.slice(-40).map((event, index) => (
                                     <li key={`${event.at}-${index}`} className="text-xs">
                                         <span className="text-muted-foreground">
-                                            {EVENT_KEYS[event.kind] ? t(EVENT_KEYS[event.kind]!) : event.kind}
+                                            {EVENT_KEYS[event.kind]
+                                                ? t(EVENT_KEYS[event.kind]!)
+                                                : event.kind}
                                         </span>
                                         {event.detail ? (
-                                            <span className="ml-1.5">{agentText(t, event.detail)}</span>
+                                            <span className="ml-1.5">
+                                                {agentText(t, event.detail)}
+                                            </span>
                                         ) : null}
                                     </li>
                                 ))}
@@ -442,7 +456,9 @@ export function SessionDetail({ session, events, messages }: Props) {
             </div>
 
             {over ? (
-                <p className="text-sm text-muted-foreground">{t("session.ended", { branch: session.branch })}</p>
+                <p className="text-sm text-muted-foreground">
+                    {t("session.ended", { branch: session.branch })}
+                </p>
             ) : (
                 <div className="space-y-2">
                     <Textarea
@@ -450,7 +466,9 @@ export function SessionDetail({ session, events, messages }: Props) {
                         onChange={(event) => setText(event.target.value)}
                         rows={3}
                         placeholder={
-                            session.state === "waiting" ? t("session.answerHere") : t("session.sendNext")
+                            session.state === "waiting"
+                                ? t("session.answerHere")
+                                : t("session.sendNext")
                         }
                         onKeyDown={(event) => {
                             // Enter sends, Shift+Enter is a newline - the shape every

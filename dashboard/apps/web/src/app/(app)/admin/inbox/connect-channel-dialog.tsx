@@ -59,9 +59,7 @@ export function ConnectChannelDialog({
     );
     const [kind, setKind] = useState<ChannelKind>(initialKind ?? "telegram");
     const [group, setGroup] = useState<PlatformGroup | null>(
-        initialKind
-            ? (platforms.find((item) => item.variants.includes(initialKind)) ?? null)
-            : null
+        initialKind ? (platforms.find((item) => item.variants.includes(initialKind)) ?? null) : null
     );
     const [name, setName] = useState(initialKind ? kinds[initialKind].name : "");
     const [token, setToken] = useState("");
@@ -229,7 +227,9 @@ export function ConnectChannelDialog({
                         </div>
                         <DialogFooter>
                             <Button variant="ghost" onClick={onClose}>
-                                {qrStatus === "connected" ? t("inbox.connect.done") : t("inbox.connect.close")}
+                                {qrStatus === "connected"
+                                    ? t("inbox.connect.done")
+                                    : t("inbox.connect.close")}
                             </Button>
                         </DialogFooter>
                     </>
@@ -237,13 +237,19 @@ export function ConnectChannelDialog({
                     <>
                         <DialogHeader>
                             <DialogTitle>{t("inbox.connect.addTitle")}</DialogTitle>
-                            <DialogDescription>{t("inbox.connect.addDescription")}</DialogDescription>
+                            <DialogDescription>
+                                {t("inbox.connect.addDescription")}
+                            </DialogDescription>
                         </DialogHeader>
                         {!bridgeReady && (
                             <p className="text-sm text-danger">
                                 {t.rich("inbox.connect.bridgeMissing", {
                                     link: (chunks) => (
-                                        <a key="link" className="underline" href="/apps/marketplace">
+                                        <a
+                                            key="link"
+                                            className="underline"
+                                            href="/apps/marketplace"
+                                        >
                                             {chunks}
                                         </a>
                                     )
@@ -387,7 +393,9 @@ export function ConnectChannelDialog({
                             )}
                             {meta.needsPhoneNumberId && (
                                 <label className="flex flex-col gap-1 text-sm">
-                                    <span className="font-medium">{t("inbox.connect.phoneNumberId")}</span>
+                                    <span className="font-medium">
+                                        {t("inbox.connect.phoneNumberId")}
+                                    </span>
                                     <Input
                                         value={phoneNumberId}
                                         onChange={(event) => setPhoneNumberId(event.target.value)}

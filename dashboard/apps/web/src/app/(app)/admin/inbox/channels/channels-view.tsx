@@ -129,7 +129,9 @@ export function ChannelsView({
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxChannels.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("inboxChannels.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("inboxChannels.intro")}</p>
                 </div>
                 <Button asChild>
@@ -183,7 +185,11 @@ export function ChannelsView({
                                 ]
                                     .filter(Boolean)
                                     .join(" - ")}
-                                ready={channel.status === "connected" ? t("inboxChannels.connected") : null}
+                                ready={
+                                    channel.status === "connected"
+                                        ? t("inboxChannels.connected")
+                                        : null
+                                }
                                 onManage={() => setManaging(channel)}
                             />
                         );
@@ -466,7 +472,10 @@ function ChannelManageDialog({
                             {t.rich("inboxChannels.manage.status", {
                                 status: t("inboxChannels.status", { status: channel.status }),
                                 tone: (chunks) => (
-                                    <span key="tone" className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                    <span
+                                        key="tone"
+                                        className={cn(CHANNEL_STATUS_TONE[channel.status])}
+                                    >
                                         {chunks}
                                     </span>
                                 )
@@ -486,7 +495,9 @@ function ChannelManageDialog({
                             ) : (
                                 <RefreshCw className="size-4" />
                             )}
-                            {isWeb ? t("inboxChannels.manage.relink") : t("inboxChannels.manage.reconnect")}
+                            {isWeb
+                                ? t("inboxChannels.manage.relink")
+                                : t("inboxChannels.manage.reconnect")}
                         </Button>
                     </div>
 

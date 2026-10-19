@@ -215,9 +215,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
             {status === "ready" || status === "down" ? <HealthSection serverId={serverId} /> : null}
 
             <section className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-                <p className="max-w-xl text-xs text-muted-foreground">
-                    {t("overview.removeHint")}
-                </p>
+                <p className="max-w-xl text-xs text-muted-foreground">{t("overview.removeHint")}</p>
                 <Button
                     size="sm"
                     variant="outline"
@@ -322,7 +320,9 @@ function HealthSection({ serverId }: { serverId: string }) {
                         </dd>
                         {health.certificate.expiresAt ? (
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {t("health.expires", { when: format.date(health.certificate.expiresAt) })}
+                                {t("health.expires", {
+                                    when: format.date(health.certificate.expiresAt)
+                                })}
                             </p>
                         ) : null}
                         {health.certificate.note ? (
@@ -341,9 +341,7 @@ function HealthSection({ serverId }: { serverId: string }) {
             {health ? (
                 <div className="flex flex-col gap-2 rounded-md border border-border p-3">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-xs text-muted-foreground">
-                            {t("health.leavesFrom")}
-                        </h3>
+                        <h3 className="text-xs text-muted-foreground">{t("health.leavesFrom")}</h3>
                         <VerdictBadge verdict={health.reverse.verdict} />
                         {health.reverse.address ? <Mono>{health.reverse.address}</Mono> : null}
                     </div>
@@ -355,9 +353,13 @@ function HealthSection({ serverId }: { serverId: string }) {
                                     {at === 0 ? t("health.reverse") : t("health.greeting")}
                                 </span>
                             </p>
-                            <p className="text-xs text-muted-foreground">{mailNoteText(t, check.note)}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {mailNoteText(t, check.note)}
+                            </p>
                             {check.instruction ? (
-                                <p className="text-xs text-foreground">{mailNoteText(t, check.instruction)}</p>
+                                <p className="text-xs text-foreground">
+                                    {mailNoteText(t, check.instruction)}
+                                </p>
                             ) : null}
                         </div>
                     ))}
@@ -366,15 +368,13 @@ function HealthSection({ serverId }: { serverId: string }) {
             {ports ? (
                 <div className="flex flex-col gap-2">
                     <p className="text-xs text-muted-foreground">
-                        {ports.address ? (
-                            t.rich(ports.at ? "health.knockedAt" : "health.knocked", {
-                                address: ports.address,
-                                when: ports.at ? format.dateTime(ports.at) : "",
-                                mono: (chunks) => <Mono key="address">{chunks}</Mono>
-                            })
-                        ) : (
-                            mailNoteText(t, ports.note)
-                        )}
+                        {ports.address
+                            ? t.rich(ports.at ? "health.knockedAt" : "health.knocked", {
+                                  address: ports.address,
+                                  when: ports.at ? format.dateTime(ports.at) : "",
+                                  mono: (chunks) => <Mono key="address">{chunks}</Mono>
+                              })
+                            : mailNoteText(t, ports.note)}
                     </p>
                     {ports.results.length > 0 ? (
                         <div className="overflow-x-auto">
@@ -382,8 +382,12 @@ function HealthSection({ serverId }: { serverId: string }) {
                                 <thead>
                                     <tr className="text-left">
                                         <th className="py-1.5 pr-3">{t("health.columns.port")}</th>
-                                        <th className="py-1.5 pr-3">{t("health.columns.usedFor")}</th>
-                                        <th className="py-1.5 pr-3">{t("health.columns.result")}</th>
+                                        <th className="py-1.5 pr-3">
+                                            {t("health.columns.usedFor")}
+                                        </th>
+                                        <th className="py-1.5 pr-3">
+                                            {t("health.columns.result")}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
