@@ -17,9 +17,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 const DASHBOARD = join(__dirname, "..", "..", "..", "..");
 
 /** Files allowed a native select, by path from `dashboard/`, and why. */
-const ALLOWED: Record<string, string> = {
-    "apps/cloud-servers/src/screens/cloud-servers-screen.tsx": "replaced in feat/connections-every-app"
-};
+const ALLOWED: Record<string, string> = {};
 
 /** Every non-test source file under a directory. */
 function sources(dir: string): string[] {
@@ -71,6 +69,8 @@ describe("no native <select>", () => {
         for (const [path, reason] of Object.entries(ALLOWED)) {
             expect(reason.trim()).not.toBe("");
             expect(existsSync(join(DASHBOARD, path)), `${path} no longer exists`).toBe(true);
+            const source = code(readFileSync(join(DASHBOARD, path), "utf8"));
+            expect(/<select/.test(source), `${path} no longer has a native select`).toBe(true);
         }
     });
 

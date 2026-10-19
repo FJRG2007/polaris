@@ -1816,6 +1816,8 @@
         "extension/src/entrypoints/popup/shell.tsx",
         "extension/src/entrypoints/popup/generator.tsx",
         "extension/src/entrypoints/popup/words.tsx",
+        "extension/src/entrypoints/popup/picker.tsx",
+        "security-scans/src/screens/security-view.tsx",
         "extension/src/lib/context-menu.ts",
         "extension/src/lib/lock.ts",
         "extension/src/lib/save.ts",
