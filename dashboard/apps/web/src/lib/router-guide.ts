@@ -14,7 +14,12 @@
  * ISP set, which is why the label on the router is always the first answer.
  */
 
-import { inBlock, DEFAULT_PORT_BLOCKS, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
+import {
+    inBlock,
+    DEFAULT_PORT_BLOCKS,
+    type PortBlocks,
+    type PortPolicy
+} from "@/lib/apps/port-block";
 
 export type RouterBrand =
     | "zte"
@@ -263,7 +268,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         nameLimit: 16,
         forwardEnable:
             "The rule is created switched off. Set it to on in the list of rules once it is saved, or the ports stay closed behind a rule that looks right.",
-        remotePath: "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
+        remotePath:
+            "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
         caution:
             "ZTE firmware supplied by an ISP reserves 80, 443, 21 and 7547 for its own management and refuses to forward them. If the form rejects the rule, the ports cannot be opened on this router - publish Polaris through a tunnel instead, under Advanced below."
     },
@@ -295,7 +301,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
-        remotePath: "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
+        remotePath:
+            "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
         caution: null
     },
     {
@@ -379,7 +386,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             ],
             save: "Apply"
         },
-        forwardPath: "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
+        forwardPath:
+            "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
         forwardFields: null,
         forwardSave: null,
         combinedProtocol: null,
@@ -441,7 +449,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // whatever is set here (NETGEAR community moderator, community.netgear.com
         // /discussions/home-wifi-routers-nighthawk/changing-dns-in-router-settings/1543576).
         topics: ["forward", "dns"],
-        forwardSource: "https://kb.netgear.com/24290/How-do-I-add-a-custom-port-forwarding-service-on-my-NETGEAR-router",
+        forwardSource:
+            "https://kb.netgear.com/24290/How-do-I-add-a-custom-port-forwarding-service-on-my-NETGEAR-router",
         dns: {
             mode: "relay",
             lan: {
@@ -471,7 +480,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             ],
             save: "Add"
         },
-        forwardPath: "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
+        forwardPath:
+            "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
         forwardFields: null,
         forwardSave: null,
         combinedProtocol: null,
@@ -651,12 +661,19 @@ export const FORWARD_RULES: readonly RouterForwardRule[] = [
  * range that does not contain it opens nothing for it.
  */
 export function gameForwardRules(
-    servers: readonly { name: string; ports: readonly { port: number; protocol: "tcp" | "udp" }[] }[],
+    servers: readonly {
+        name: string;
+        ports: readonly { port: number; protocol: "tcp" | "udp" }[];
+    }[],
     policy: PortPolicy = "per-port",
     blocks: PortBlocks = DEFAULT_PORT_BLOCKS
 ): RouterForwardRule[] {
     const named = (server: { name: string }, port: number, protocol: string): RouterForwardRule => {
-        const slug = server.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+        const slug =
+            server.name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "") || "server";
         return { name: `game-${slug}-${port}`, protocol, port };
     };
     if (policy === "per-port") {
@@ -671,7 +688,8 @@ export function gameForwardRules(
     // opening nothing is behind.
     for (const protocol of ["tcp", "udp"] as const) {
         const block = blocks[protocol];
-        if (!servers.some((server) => server.ports.some((port) => port.protocol === protocol))) continue;
+        if (!servers.some((server) => server.ports.some((port) => port.protocol === protocol)))
+            continue;
         rules.push({
             name: `polaris-games-${protocol}`,
             protocol: protocol.toUpperCase(),
@@ -714,7 +732,8 @@ export function mergeProtocolRules(
     const last = Math.max(...rules.map((rule) => rule.endPort ?? rule.port));
     const covered = new Set<number>();
     for (const rule of rules) {
-        for (let port = rule.port; port <= (rule.endPort ?? rule.port); port += 1) covered.add(port);
+        for (let port = rule.port; port <= (rule.endPort ?? rule.port); port += 1)
+            covered.add(port);
     }
     if (covered.size !== last - first + 1) return rules;
     return [
@@ -736,7 +755,8 @@ function sharedName(rules: readonly RouterForwardRule[]): string {
     let shared = first ?? "";
     for (const name of rest) {
         let index = 0;
-        while (index < shared.length && index < name.length && shared[index] === name[index]) index += 1;
+        while (index < shared.length && index < name.length && shared[index] === name[index])
+            index += 1;
         shared = shared.slice(0, index);
     }
     const trimmed = shared.replace(/[-_]+$/, "");
@@ -775,7 +795,10 @@ function shortenName(name: string, limit: number): string {
     const cut = short.lastIndexOf("-");
     const tail = cut > 0 ? short.slice(cut) : "";
     if (tail.length >= limit) return short.slice(0, limit);
-    return `${short.slice(0, cut).slice(0, limit - tail.length).replace(/-+$/, "")}${tail}`;
+    return `${short
+        .slice(0, cut)
+        .slice(0, limit - tail.length)
+        .replace(/-+$/, "")}${tail}`;
 }
 
 /** A name no other rule in the set has taken, numbered when trimming collided. */

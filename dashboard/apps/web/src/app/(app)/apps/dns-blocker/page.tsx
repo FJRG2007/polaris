@@ -29,11 +29,18 @@ export default async function DnsBlockerPage() {
             throw error;
         })
     ]);
-    const brands = routerBrandsFor("dns").map((entry) => ({ value: entry.id, label: routerGuideIn(tAdmin, entry).label }));
+    const brands = routerBrandsFor("dns").map((entry) => ({
+        value: entry.id,
+        label: routerGuideIn(tAdmin, entry).label
+    }));
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col">
             <PageHeader title={t("page.title")} description={t("page.description")} />
-            {settings ? <DnsBlockerView initial={settings} brands={brands} /> : <DnsBlockerInstallState />}
+            {settings ? (
+                <DnsBlockerView initial={settings} brands={brands} />
+            ) : (
+                <DnsBlockerInstallState />
+            )}
         </div>
     );
 }

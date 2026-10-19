@@ -49,7 +49,8 @@ export function dnsUse(clients: readonly string[], address: string | null): DnsU
     const devices = clients.filter((client) => !LOOPBACK.has(client) && client !== address);
     if (devices.length === 0) return { kind: "none" };
     const router = likelyGateway(address);
-    if (router && devices.length === 1 && devices[0] === router) return { kind: "routerOnly", router };
+    if (router && devices.length === 1 && devices[0] === router)
+        return { kind: "routerOnly", router };
     return { kind: "devices", devices };
 }
 
@@ -76,7 +77,9 @@ function Value({ text }: { text: string }) {
 function readBrand(): RouterBrand | null {
     try {
         const saved = window.localStorage.getItem(BRAND_KEY);
-        return routerBrandsFor("dns").some((entry) => entry.id === saved) ? (saved as RouterBrand) : null;
+        return routerBrandsFor("dns").some((entry) => entry.id === saved)
+            ? (saved as RouterBrand)
+            : null;
     } catch {
         return null;
     }
@@ -135,7 +138,9 @@ export function RouterDnsGuide({
 
             <RouterDnsSteps brand={brand} address={address} />
 
-            {blocking ? <DnsUseCheck address={address} relay={guide.dns?.mode === "relay"} /> : null}
+            {blocking ? (
+                <DnsUseCheck address={address} relay={guide.dns?.mode === "relay"} />
+            ) : null}
         </div>
     );
 }
@@ -150,7 +155,8 @@ export function RouterDnsSteps({ brand, address }: { brand: RouterBrand; address
     const note = `routerGuide.notes.${brand}` as NamespaceKey<"dnsBlocker">;
 
     const valueFor = (setting: RouterDnsSetting): ReactNode => {
-        if (setting.value === "dhcpOption6") return address ? <Value text={`6,${address}`} /> : `6,${shown}`;
+        if (setting.value === "dhcpOption6")
+            return address ? <Value text={`6,${address}`} /> : `6,${shown}`;
         if (setting.value === "addressV6") return t("routerGuide.ipv6Address");
         return address ? <Value text={address} /> : shown;
     };
@@ -158,60 +164,63 @@ export function RouterDnsSteps({ brand, address }: { brand: RouterBrand; address
         setting.save ? <> {t.rich("routerGuide.save", { button: setting.save, b: bold })}</> : null;
 
     return dns === null ? (
-                <ol className="flex list-decimal flex-col gap-1 pl-5">
-                    <li>{t("router.step1")}</li>
-                    <li>{t("router.step2", { address: address ?? "-" })}</li>
-                    <li>{t("router.step3")}</li>
-                    <li>{t("router.step4")}</li>
-                </ol>
-            ) : (
-                <>
-                    <ol className="flex list-decimal flex-col gap-2 pl-5">
-                        <li>{t("routerGuide.signIn")}</li>
-                        <li>
-                            {t.rich(dns.mode === "relay" ? "routerGuide.relay" : "routerGuide.lan", {
-                                path: dns.lan.path,
-                                field: dns.lan.field,
-                                b: bold
-                            })}{" "}
-                            {valueFor(dns.lan)}
-                            {saving(dns.lan)}
-                        </li>
-                        {dns.ipv6 ? (
-                            <li>
-                                {t.rich("routerGuide.ipv6", {
-                                    path: dns.ipv6.path,
-                                    field: dns.ipv6.field,
-                                    b: bold
-                                })}{" "}
-                                {valueFor(dns.ipv6)}
-                                {saving(dns.ipv6)}
-                            </li>
-                        ) : null}
-                        {dns.conflict ? (
-                            <li>
-                                {t.rich("routerGuide.conflict", {
-                                    path: dns.conflict.path,
-                                    field: dns.conflict.field,
-                                    b: bold
-                                })}
-                            </li>
-                        ) : null}
-                        <li>{t("router.step3")}</li>
-                        <li>{t("router.step4")}</li>
-                    </ol>
-                    {dns.mode === "relay" ? <p className="text-muted-foreground">{t("routerGuide.relayNote")}</p> : null}
-                    {t.has(note) ? <p className="text-muted-foreground">{t(note)}</p> : null}
-                    <a
-                        href={dns.lan.source}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                        {t("routerGuide.source", { brand: guide.label })} <ExternalLink className="size-3" />
-                    </a>
-                </>
-            );
+        <ol className="flex list-decimal flex-col gap-1 pl-5">
+            <li>{t("router.step1")}</li>
+            <li>{t("router.step2", { address: address ?? "-" })}</li>
+            <li>{t("router.step3")}</li>
+            <li>{t("router.step4")}</li>
+        </ol>
+    ) : (
+        <>
+            <ol className="flex list-decimal flex-col gap-2 pl-5">
+                <li>{t("routerGuide.signIn")}</li>
+                <li>
+                    {t.rich(dns.mode === "relay" ? "routerGuide.relay" : "routerGuide.lan", {
+                        path: dns.lan.path,
+                        field: dns.lan.field,
+                        b: bold
+                    })}{" "}
+                    {valueFor(dns.lan)}
+                    {saving(dns.lan)}
+                </li>
+                {dns.ipv6 ? (
+                    <li>
+                        {t.rich("routerGuide.ipv6", {
+                            path: dns.ipv6.path,
+                            field: dns.ipv6.field,
+                            b: bold
+                        })}{" "}
+                        {valueFor(dns.ipv6)}
+                        {saving(dns.ipv6)}
+                    </li>
+                ) : null}
+                {dns.conflict ? (
+                    <li>
+                        {t.rich("routerGuide.conflict", {
+                            path: dns.conflict.path,
+                            field: dns.conflict.field,
+                            b: bold
+                        })}
+                    </li>
+                ) : null}
+                <li>{t("router.step3")}</li>
+                <li>{t("router.step4")}</li>
+            </ol>
+            {dns.mode === "relay" ? (
+                <p className="text-muted-foreground">{t("routerGuide.relayNote")}</p>
+            ) : null}
+            {t.has(note) ? <p className="text-muted-foreground">{t(note)}</p> : null}
+            <a
+                href={dns.lan.source}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+                {t("routerGuide.source", { brand: guide.label })}{" "}
+                <ExternalLink className="size-3" />
+            </a>
+        </>
+    );
 }
 
 /** Whether devices are actually asking the blocker, from the last 24 hours of query log. */
@@ -259,19 +268,33 @@ function DnsUseCheck({ address, relay }: { address: string | null; relay: boolea
     } else if (!use) {
         body = <Skeleton className="h-10 w-full" />;
     } else if (logOff) {
-        body = <p className="rounded-md bg-warning-soft px-3 py-2 text-warning">{t("routerGuide.check.logOff")}</p>;
+        body = (
+            <p className="rounded-md bg-warning-soft px-3 py-2 text-warning">
+                {t("routerGuide.check.logOff")}
+            </p>
+        );
     } else if (use.kind === "none") {
-        body = <p className="rounded-md bg-warning-soft px-3 py-2 text-warning">{t("routerGuide.check.none")}</p>;
+        body = (
+            <p className="rounded-md bg-warning-soft px-3 py-2 text-warning">
+                {t("routerGuide.check.none")}
+            </p>
+        );
     } else if (use.kind === "routerOnly") {
         body = (
-            <p className={`rounded-md px-3 py-2 ${relay ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>
-                {t(relay ? "routerGuide.check.relayed" : "routerGuide.check.routerOnly", { router: use.router })}
+            <p
+                className={`rounded-md px-3 py-2 ${relay ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}
+            >
+                {t(relay ? "routerGuide.check.relayed" : "routerGuide.check.routerOnly", {
+                    router: use.router
+                })}
             </p>
         );
     } else {
         body = (
             <div className="flex flex-col gap-2 rounded-md bg-success-soft px-3 py-2">
-                <p className="text-success">{t("routerGuide.check.devices", { count: use.devices.length })}</p>
+                <p className="text-success">
+                    {t("routerGuide.check.devices", { count: use.devices.length })}
+                </p>
                 <ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto overscroll-contain">
                     {use.devices.map((device) => (
                         <li key={device}>
