@@ -5,14 +5,14 @@
  * draws it.
  *
  * The rail draws the names under each room and the members column draws a line
- * under each name, and both are the same answer: one server action that is
- * answered only for the rooms the reader can reach (`voicePresenceAction`
+ * under each name, and both are the same answer: one route that is answered
+ * only for the rooms the reader can reach (`/api/chat/voice-presence`
  * intersects the ids with the same `reachableChannelIds` the server uses
  * everywhere else), followed live by the "call" frames the chat stream already
- * carries.
+ * carries. A route, not an action - see `chat-polls`.
  */
 
-import * as actions from "./actions";
+import { fetchVoicePresence } from "./chat-polls";
 import { useChatStream } from "./use-chat-stream";
 import { useCallback, useEffect, useState } from "react";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -45,10 +45,9 @@ export function useVoiceRooms(
             setInRoom({});
             return;
         }
-        void actions
-            .voicePresenceAction(asked.split(","))
-            .then((result) => setInRoom(result.inRoom))
-            .catch(() => undefined);
+        void fetchVoicePresence(asked.split(",")).then((found) => {
+            if (found) setInRoom(found);
+        });
     }, [asked]);
 
     // Somebody walking into a room, leaving it or muting is announced, so what

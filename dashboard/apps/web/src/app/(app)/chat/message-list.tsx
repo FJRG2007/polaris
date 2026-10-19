@@ -22,6 +22,7 @@ import { InviteCards } from "./invite-card";
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
+import { fetchVoicePresence } from "./chat-polls";
 import { VoiceNote } from "./voice-note";
 import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
@@ -414,8 +415,8 @@ export function MessageList({
             return;
         }
         let live = true;
-        void actions.voicePresenceAction(asked.split(",")).then((result) => {
-            if (live) setInVoice(new Map(Object.entries(result.inRoom)));
+        void fetchVoicePresence(asked.split(",")).then((found) => {
+            if (live && found) setInVoice(new Map(Object.entries(found)));
         });
         return () => {
             live = false;
