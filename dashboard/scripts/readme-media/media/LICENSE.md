@@ -9,6 +9,8 @@ organization, named by the fixture id that carries them (`fixtures/chat.ts`,
   recording the team shares.
 - `*.svg` are the space's custom emoji, and the marks of the invented spaces and
   of the Northwind organization (served as their pictures), all drawn for this
-  repository. None of them is, or imitates, a real brand.
+  repository. None of them is, or imitates, a real brand. The `0269` ones are
+  the stills of the invented cabin's cameras (`fixtures/places.ts`), drawn for
+  this repository too: no real place is in them.
 
 All of them are part of this repository and under its license.

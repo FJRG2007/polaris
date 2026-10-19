@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360"><defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d3d9"/><stop offset="1" stop-color="#aab6bd"/></linearGradient></defs><rect width="640" height="360" fill="url(#s)"/>
+<rect x="0" y="0" width="640" height="250" fill="#d8cfc4"/>
+<rect x="0" y="0" width="640" height="250" fill="#000" fill-opacity=".04"/>
+<rect x="250" y="40" width="140" height="210" rx="4" fill="#5b3b2a"/>
+<rect x="262" y="54" width="116" height="84" rx="3" fill="#6b4632"/>
+<rect x="262" y="148" width="116" height="90" rx="3" fill="#6b4632"/>
+<circle cx="372" cy="150" r="5" fill="#d9b45a"/>
+<rect x="80" y="60" width="110" height="120" rx="3" fill="#8fb3c4"/><rect x="80" y="117" width="110" height="5" fill="#d8cfc4"/><rect x="132" y="60" width="5" height="120" fill="#d8cfc4"/>
+<rect x="450" y="60" width="110" height="120" rx="3" fill="#8fb3c4"/><rect x="450" y="117" width="110" height="5" fill="#d8cfc4"/><rect x="502" y="60" width="5" height="120" fill="#d8cfc4"/>
+<rect x="0" y="250" width="640" height="110" fill="#9a9187"/>
+<rect x="240" y="262" width="160" height="50" rx="4" fill="#6f5a45"/>
+<rect x="410" y="268" width="62" height="44" rx="2" fill="#b98b55"/><rect x="410" y="284" width="62" height="6" fill="#d9b884"/>
+<rect x="60" y="300" width="70" height="40" rx="6" fill="#4e7a4a"/><rect x="520" y="300" width="70" height="40" rx="6" fill="#4e7a4a"/><rect x="12" y="12" width="176" height="22" rx="3" fill="#000" fill-opacity=".45"/><text x="20" y="28" font-family="monospace" font-size="13" fill="#fff">2026-03-18 11:24:00</text></svg>

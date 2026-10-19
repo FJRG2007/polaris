@@ -1,6 +1,7 @@
 /**
- * Calls, in the three places one is held: the stand-up voice room, a meeting
- * of its own with cameras on, and a call in a group chat being recorded.
+ * Calls, in the four places one is held: the stand-up voice room, a meeting
+ * of its own with cameras on, a call in a group chat being recorded, and a
+ * call in a direct message, face to face.
  */
 
 import { TEAM, VIEWER } from "../fixtures/people";
@@ -8,11 +9,12 @@ import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
 import { ChatScreen, chatActions } from "./chat";
 import { MeetingRoom } from "@/app/(app)/chat/meetings/[meetingId]/meeting-room";
-import { GROUP_ID } from "../fixtures/chat";
+import { ANA_DM_ID, GROUP_ID } from "../fixtures/chat";
 import {
     PLANNING_ID,
     VOICE_CHANNEL_ID,
     callHold,
+    directShape,
     groupShape,
     meetingLines,
     meetingSummary,
@@ -64,4 +66,12 @@ export const callGroup = defineScene({
         if (!card) throw new Error(`no card titled "${title}"`);
         card.click();
     }
+});
+
+export const callDirect = defineScene({
+    id: "call-direct",
+    path: `/chat/c/${ANA_DM_ID}`,
+    params: { channelId: ANA_DM_ID },
+    actions: (ctx) => chatActions(ctx, ANA_DM_ID),
+    render: (ctx) => <ChatScreen channelId={ANA_DM_ID} hold={callHold(ctx, directShape(ctx))} />
 });

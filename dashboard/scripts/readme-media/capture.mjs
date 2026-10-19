@@ -49,7 +49,9 @@ const MEDIA_ROUTES = [
     /^\/api\/chat\/emoji\/([\w-]+)$/,
     /^\/api\/chat\/links\/([\w-]+)\/image$/,
     /^\/api\/avatar\/org\/([\w-]+)$/,
-    /^\/api\/avatar\/chat\/space\/([\w-]+)$/
+    /^\/api\/avatar\/chat\/space\/([\w-]+)$/,
+    // A Places camera's still, which `fixtures/places.ts` names by the camera.
+    /^\/api\/home\/cameras\/([\w-]+)\/snapshot$/
 ];
 /** Where a fixture camera (`fixtures/call.ts`) fetches the person it films. Not
  *  a route of the app: only the harness's own canvas asks for it. */
@@ -341,7 +343,9 @@ async function run() {
                 await page.waitForTimeout(120);
                 if (check) continue;
                 shots.push(
-                    await (await picture(page, scene, viewport))
+                    await (
+                        await picture(page, scene, viewport)
+                    )
                         .resize(VIEWPORTS[viewport].width)
                         .png()
                         .toBuffer()

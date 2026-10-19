@@ -57,6 +57,26 @@ página con todas sus funciones. Las versiones para móvil están en
       <br><sub><a href="docs/features/calls.es.md"><b>Llamadas</b></a>: canales de voz, reuniones y llamadas en cualquier chat</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-direct-light-es-desktop.webp">
+        <img src="docs/assets/media/call-direct-dark-es-desktop.webp" alt="Una videollamada en un mensaje directo">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.es.md"><b>Llamada directa</b></a>: cara a cara desde cualquier mensaje directo</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-group-light-es-desktop.webp">
+        <img src="docs/assets/media/call-group-dark-es-desktop.webp" alt="Una llamada de grupo con una pantalla compartida, grabándose">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.es.md"><b>Llamada de grupo</b></a>: cámaras, una pantalla compartida y una grabación</sub>
+    </td>
+  </tr>
 </table>
 
 ### Trabajo
@@ -162,6 +182,13 @@ página con todas sus funciones. Las versiones para móvil están en
       </a>
       <br><sub><a href="docs/features/game-servers.es.md"><b>Servidores de juegos</b></a>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
     </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-es-desktop.webp">
+        <img src="docs/assets/media/places-dark-es-desktop.webp" alt="Lugares: las cámaras de un lugar junto a las cerraduras, luces y clima de cada estancia">
+      </picture>
+      <br><sub><b>Lugares</b>: cámaras y control de dispositivos de cada lugar</sub>
+    </td>
   </tr>
 </table>
 
@@ -195,6 +222,15 @@ página con todas sus funciones. Las versiones para móvil están en
         <img src="docs/assets/media/soundboard-dark-es-desktop.webp" alt="La botonera en una llamada: los sonidos de Polaris y los del espacio">
       </picture>
       <br><sub>La botonera en una llamada: los sonidos de Polaris y los del espacio</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/settings.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-users-light-es-desktop.webp">
+        <img src="docs/assets/media/settings-users-dark-es-desktop.webp" alt="Personas: cada cuenta con sus roles, límites e invitaciones">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/settings.es.md"><b>Personas y acceso</b></a>: quién entra, sus roles y qué le limita</sub>
     </td>
   </tr>
 </table>

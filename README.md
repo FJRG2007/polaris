@@ -66,6 +66,26 @@ the full feature list. Mobile versions are in
       <br><sub><a href="docs/features/calls.md"><b>Calls</b></a>: voice channels, meetings and calls in any chat</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-direct-light-en-desktop.webp">
+        <img src="docs/assets/media/call-direct-dark-en-desktop.webp" alt="A video call in a direct message">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.md"><b>Direct call</b></a>: face to face from any direct message</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-group-light-en-desktop.webp">
+        <img src="docs/assets/media/call-group-dark-en-desktop.webp" alt="A group call with a shared screen, being recorded">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.md"><b>Group call</b></a>: cameras, a shared screen and a recording</sub>
+    </td>
+  </tr>
 </table>
 
 ### Work
@@ -171,6 +191,13 @@ the full feature list. Mobile versions are in
       </a>
       <br><sub><a href="docs/features/game-servers.md"><b>Game servers</b></a>: Minecraft, ARK and FiveM on your own machines</sub>
     </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-en-desktop.webp">
+        <img src="docs/assets/media/places-dark-en-desktop.webp" alt="Places: a place's cameras beside each room's locks, lights and climate">
+      </picture>
+      <br><sub><b>Places</b>: cameras and device controls for each place</sub>
+    </td>
   </tr>
 </table>
 
@@ -204,6 +231,15 @@ the full feature list. Mobile versions are in
         <img src="docs/assets/media/soundboard-dark-en-desktop.webp" alt="The soundboard in a call: Polaris's own sounds and the space's">
       </picture>
       <br><sub>The soundboard in a call: Polaris's own sounds and the space's</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/settings.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-users-light-en-desktop.webp">
+        <img src="docs/assets/media/settings-users-dark-en-desktop.webp" alt="People: every account with its roles, limits and invitations">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/settings.md"><b>People and access</b></a>: who is in, their roles and what limits them</sub>
     </td>
   </tr>
 </table>

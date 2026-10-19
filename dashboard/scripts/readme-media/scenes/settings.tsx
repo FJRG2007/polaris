@@ -12,7 +12,16 @@ import { SeasonalAdminCard } from "@/app/(app)/admin/settings/seasonal-card";
 import { RolesAdmin } from "@/app/(app)/admin/roles/roles-admin";
 import { DEFAULT_ROLES, PERMISSIONS, expandPermissions, type Permission } from "@polaris/core";
 import type { RoleView } from "@/lib/role-service";
-import { DEPLOYMENT, quietUpdateLog, settingsOverview, updateStatus } from "../fixtures/settings";
+import { UsersAdmin } from "@/app/(app)/admin/users/users-admin";
+import {
+    DEPLOYMENT,
+    ROLE_OPTIONS,
+    directory,
+    pendingInvites,
+    quietUpdateLog,
+    settingsOverview,
+    updateStatus
+} from "../fixtures/settings";
 
 export const settings = defineScene({
     id: "settings",
@@ -194,4 +203,32 @@ export const settingsRoles = defineScene({
         card.style.scrollMarginTop = "4.5rem";
         card.scrollIntoView({ block: "start" });
     }
+});
+
+/** Who is in: every account with its roles and access - admins, a support role,
+ *  a guest limited to one country, one suspended - and the invitations waiting. */
+export const settingsUsers = defineScene({
+    id: "settings-users",
+    path: "/admin/users",
+    actions: (ctx) => ({ listUserDirectoryAction: () => directory(ctx) }),
+    // The page `/admin/users` draws, with what it would have read.
+    render: (ctx) => (
+        <Chrome>
+            <div className="mx-auto flex w-full max-w-5xl flex-col">
+                <PageHeader
+                    title={label(ctx.locale, "admin.users.page.title")}
+                    description={label(ctx.locale, "admin.users.page.description")}
+                />
+                <UsersAdmin
+                    first={directory(ctx)}
+                    invites={pendingInvites(ctx)}
+                    recoveries={[]}
+                    groups={[]}
+                    roles={ROLE_OPTIONS}
+                    canSendMail
+                    viewerId={VIEWER.id}
+                />
+            </div>
+        </Chrome>
+    )
 });

@@ -17,7 +17,7 @@ import type { CallRecording } from "@/app/(app)/chat/call-recorder";
 import type { CallState, PeerState } from "@/app/(app)/chat/call-state";
 import type { MeetingSummary } from "@/lib/chat/meetings";
 import type { MeetingLine } from "@/lib/chat/meeting-chat";
-import { GROUP_ID, VOICE_ID } from "./chat";
+import { ANA_DM_ID, GROUP_ID, VOICE_ID } from "./chat";
 
 export const VOICE_CHANNEL_ID = VOICE_ID;
 export const MEETING_ID = id("meeting", 2);
@@ -25,6 +25,8 @@ export const MEETING_ID = id("meeting", 2);
 export const PLANNING_ID = id("meeting", 3);
 /** The call in the group chat with Lena, Grace and Mateo. */
 export const GROUP_CALL_ID = id("meeting", 4);
+/** The call in the direct messages with Ana: two people, both on camera. */
+export const DIRECT_CALL_ID = id("meeting", 5);
 
 /** The seat each person sits in, which is what the room keys everything by. */
 const seat = (n: number) => id("meeting-seat", n);
@@ -192,6 +194,17 @@ export function groupShape(ctx: SceneContext): CallShape {
         speaking: [CREW.grace.id],
         screens: [TEAM.lena.id],
         recording: true
+    };
+}
+
+export function directShape(ctx: SceneContext): CallShape {
+    return {
+        meetingId: DIRECT_CALL_ID,
+        channelId: ANA_DM_ID,
+        title: ctx.say("Call", "Llamada"),
+        people: [VIEWER, TEAM.ana],
+        cameras: [VIEWER.id, TEAM.ana.id],
+        speaking: [TEAM.ana.id]
     };
 }
 
