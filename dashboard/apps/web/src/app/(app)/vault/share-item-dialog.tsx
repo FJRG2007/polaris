@@ -183,10 +183,11 @@ export function ShareItemDialog({
                             {t("share.copyNow")}
                         </p>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={link} className="font-mono text-xs" />
+                            <Input readOnly value={link} className="min-w-0 flex-1 font-mono text-xs" />
                             <Button
                                 type="button"
                                 size="icon"
+                                className="shrink-0"
                                 variant="secondary"
                                 title={t("share.copyLink")}
                                 aria-label={t("share.copyLink")}

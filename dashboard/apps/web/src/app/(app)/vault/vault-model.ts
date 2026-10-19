@@ -58,6 +58,61 @@ export interface VaultItem {
     fields: { name: string; value: string; type: number }[];
 }
 
+/**
+ * The kind an item is shown as. Bitwarden's types, plus one of Polaris's own: an
+ * API key, which is stored as a secure note with a marker field (see
+ * `API_KEY_FIELDS` in `@polaris/core`). Never sent to the server - `encryptItem`
+ * writes it as the note it is.
+ */
+export const ITEM_API_KEY = core.ITEM_API_KEY;
+
+/** Every kind the item editor and the type filter offer, in that order. */
+export const ITEM_KINDS: readonly number[] = [...core.CIPHER_TYPES, ITEM_API_KEY];
+
+/** What kind an item is on screen: its cipher type, or `ITEM_API_KEY`. */
+export function itemKind(item: Pick<VaultItem, "type" | "fields">): number {
+    return core.isApiKeyItem(item) ? ITEM_API_KEY : item.type;
+}
+
+/** A login's email, which lives in a custom field apart from the username. */
+export function loginEmail(item: Pick<VaultItem, "type" | "fields">): string {
+    return item.type === core.CIPHER_LOGIN ? core.fieldValue(item.fields, core.EMAIL_FIELD) : "";
+}
+
+/**
+ * The custom fields a screen draws as its own boxes rather than as name and
+ * value: the conventions every item may carry, the email on a login, and the
+ * parts of an API key. Only on the kind they belong to - an "Email" field on a
+ * card is still just a custom field.
+ */
+export function managedFieldNames(item: Pick<VaultItem, "type" | "fields">): Set<string> {
+    const names = new Set<string>([core.RECOVERY_CODES_FIELD, core.BANK_FIELD, core.ICON_FIELD]);
+    if (item.type === core.CIPHER_LOGIN) names.add(core.EMAIL_FIELD);
+    // The editor holds an API key as `ITEM_API_KEY` until it is saved.
+    if (item.type === ITEM_API_KEY || core.isApiKeyItem(item)) {
+        for (const name of core.API_KEY_FIELDS) names.add(name);
+    }
+    return names;
+}
+
+/** Whether an item matches what was typed in the search box: its name, the
+ *  username and email, the websites, an API key's endpoint, and the notes. */
+export function matchesSearch(item: VaultItem, needle: string): boolean {
+    const wanted = needle.trim().toLowerCase();
+    if (!wanted) return true;
+    return [
+        item.name,
+        item.login.username,
+        loginEmail(item),
+        ...item.login.uris.map((entry) => entry.uri),
+        core.isApiKeyItem(item) ? core.fieldValue(item.fields, core.API_ENDPOINT_FIELD) : "",
+        item.notes
+    ]
+        .join(" ")
+        .toLowerCase()
+        .includes(wanted);
+}
+
 /** One folder, open. */
 export interface VaultFolder {
     id: string;
@@ -201,8 +256,10 @@ export async function encryptItem(
     item: VaultItem,
     key: crypto.SymmetricKey
 ): Promise<Record<string, unknown>> {
+    // An API key is a secure note to every client but this one.
+    const type = item.type === ITEM_API_KEY ? core.CIPHER_SECURE_NOTE : item.type;
     const body: Record<string, unknown> = {
-        type: item.type,
+        type,
         name: (await seal(item.name || "Untitled", key)) ?? "",
         notes: await seal(item.notes, key),
         favorite: item.favorite,
@@ -221,7 +278,7 @@ export async function encryptItem(
         ...(item.revisionDate ? { lastKnownRevisionDate: item.revisionDate } : {})
     };
 
-    if (item.type === core.CIPHER_LOGIN) {
+    if (type === core.CIPHER_LOGIN) {
         body.login = {
             username: await seal(item.login.username, key),
             password: await seal(item.login.password, key),
@@ -239,7 +296,7 @@ export async function encryptItem(
                     })
             )
         };
-    } else if (item.type === core.CIPHER_CARD) {
+    } else if (type === core.CIPHER_CARD) {
         body.card = {
             cardholderName: await seal(item.card.cardholderName, key),
             brand: await seal(item.card.brand, key),
@@ -248,13 +305,13 @@ export async function encryptItem(
             expYear: await seal(item.card.expYear, key),
             code: await seal(item.card.code, key)
         };
-    } else if (item.type === core.CIPHER_IDENTITY) {
+    } else if (type === core.CIPHER_IDENTITY) {
         const identity: Record<string, string | null> = {};
         for (const field of IDENTITY_FIELDS) {
             identity[field] = await seal(item.identity[field] ?? "", key);
         }
         body.identity = identity;
-    } else if (item.type === core.CIPHER_SSH_KEY) {
+    } else if (type === core.CIPHER_SSH_KEY) {
         body.sshKey = {
             privateKey: await seal(item.sshKey.privateKey, key),
             publicKey: await seal(item.sshKey.publicKey, key),

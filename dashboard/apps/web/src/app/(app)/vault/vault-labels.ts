@@ -14,12 +14,13 @@ import { validationMessage } from "@/components/i18n/validation-message";
 
 type VaultT = NamespaceTranslator<"vault">;
 
-const TYPE_KEYS: Record<core.CipherType, NamespaceKey<"vault">> = {
+const TYPE_KEYS: Readonly<Record<number, NamespaceKey<"vault">>> = {
     [core.CIPHER_LOGIN]: "labels.types.login",
     [core.CIPHER_SECURE_NOTE]: "labels.types.note",
     [core.CIPHER_CARD]: "labels.types.card",
     [core.CIPHER_IDENTITY]: "labels.types.identity",
-    [core.CIPHER_SSH_KEY]: "labels.types.sshKey"
+    [core.CIPHER_SSH_KEY]: "labels.types.sshKey",
+    [core.ITEM_API_KEY]: "labels.types.apiKey"
 };
 
 const MATCH_KEYS: Record<core.UriMatch, NamespaceKey<"vault">> = {
@@ -77,7 +78,7 @@ export function importRefusalText(t: VaultT, message: string): string {
 
 /** What a kind of item is called, or nothing for a type this does not know. */
 export function cipherTypeLabel(t: VaultT, type: number): string {
-    const key = TYPE_KEYS[type as core.CipherType];
+    const key = TYPE_KEYS[type];
     return key ? t(key) : "";
 }
 

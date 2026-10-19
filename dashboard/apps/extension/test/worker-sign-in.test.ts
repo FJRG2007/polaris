@@ -255,7 +255,7 @@ describe("a sign-in that asks for the password on its next page", () => {
         const next = await ask({ kind: "continueSignIn" }, { tabId: TAB, url: `${SITE}/password` });
 
         expect(next.ok).toBe(true);
-        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true]);
+        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true, null]);
     });
 
     it("fills it once, not on every password box that turns up after", async () => {
@@ -320,7 +320,7 @@ describe("a sign-in that asks for the password on its next page", () => {
         const next = await asking!;
 
         expect(next.ok).toBe(true);
-        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true]);
+        expect(typed.at(-1)).toEqual(["someone", "hunter2", null, true, null]);
     });
 
     it("keeps another tab's waiting step through a fill here", async () => {

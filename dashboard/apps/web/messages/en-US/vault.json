@@ -47,7 +47,9 @@
             "deleteForGood": "Delete for good",
             "trash": "Move to trash",
             "defaultIdentity": "Use for sign-up forms",
-            "notDefaultIdentity": "Stop using for sign-ups"
+            "notDefaultIdentity": "Stop using for sign-ups",
+            "copyApiKey": "Copy API key",
+            "copySecret": "Copy secret"
         },
         "inTrash": "In the trash",
         "unstar": "Unstar",
@@ -71,7 +73,8 @@
             "key": "Key",
             "more": "More",
             "notes": "Notes",
-            "uses": "Who has used this"
+            "uses": "Who has used this",
+            "apiKey": "API key"
         },
         "fields": {
             "email": "Email",
@@ -83,7 +86,10 @@
             "expires": "Expires",
             "securityCode": "Security code",
             "publicKey": "Public key",
-            "privateKey": "Private key"
+            "privateKey": "Private key",
+            "apiKey": "API key",
+            "apiSecret": "Secret",
+            "endpoint": "Base URL"
         },
         "cardExpired": "This card expired.",
         "cardExpiring": "This card expires soon.",
@@ -273,7 +279,12 @@
         "keepHidden": "Keep hidden",
         "toggleHidden": "Toggle whether this field is stored hidden",
         "removeField": "Remove this field",
-        "expiryPlaceholder": "MM/YY"
+        "expiryPlaceholder": "MM/YY",
+        "email": "Email",
+        "emailPlaceholder": "name@example.com",
+        "apiKey": "API key",
+        "apiSecret": "Secret",
+        "endpoint": "Base URL"
     },
     "labels": {
         "types": {
@@ -281,7 +292,8 @@
             "note": "Note",
             "card": "Card",
             "identity": "Identity",
-            "sshKey": "SSH key"
+            "sshKey": "SSH key",
+            "apiKey": "API key"
         },
         "uriMatch": {
             "domain": "The site and anything under it",

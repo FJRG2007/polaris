@@ -158,10 +158,11 @@ export function SendsView() {
                             {t("sends.copyNow")}
                         </p>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={link} className="font-mono text-xs" />
+                            <Input readOnly value={link} className="min-w-0 flex-1 font-mono text-xs" />
                             <Button
                                 type="button"
                                 size="icon"
+                                className="shrink-0"
                                 variant="secondary"
                                 title={t("sends.copyLink")}
                                 aria-label={t("sends.copyLink")}
@@ -192,8 +193,8 @@ export function SendsView() {
                             {t("sends.text")}
                             <Textarea name="text" rows={4} className="font-mono text-xs" />
                         </label>
-                        <div className="grid grid-cols-3 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("sends.lasts")}
                                 <Select
                                     name="days"
@@ -203,7 +204,7 @@ export function SendsView() {
                                     aria-label={t("sends.lastsLabel")}
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("sends.maxViews")}
                                 <Input
                                     name="maxViews"
@@ -212,7 +213,7 @@ export function SendsView() {
                                     placeholder={t("sends.unlimited")}
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("app.fields.password")}
                                 <Input
                                     name="password"

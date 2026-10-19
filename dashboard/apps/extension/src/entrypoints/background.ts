@@ -17,7 +17,7 @@ import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
 import { offerFor, type CaptureOffer } from "@/lib/capture";
 import { generatePassword } from "@polaris/core/password-generator";
-import { hostOf, readUriMatch, type UriMatch } from "@polaris/core";
+import { EMAIL_FIELD, hostOf, readUriMatch, type UriMatch } from "@polaris/core";
 import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
@@ -1227,6 +1227,9 @@ interface Login {
     readonly id: string;
     readonly name: string;
     readonly username: string | null;
+    /** The login's email, apart from its username: the custom field Polaris
+     *  keeps it in (`EMAIL_FIELD`), or null. */
+    readonly email: string | null;
     readonly password: string | null;
     readonly totp: string | null;
     readonly uris: readonly { uri: string; match: UriMatch | null }[];
@@ -1281,10 +1284,20 @@ async function readLogin(cipher: Record<string, unknown>): Promise<Login | null>
         if (uri) uris.push({ uri, match: readUriMatch(entry["match"]) });
     }
 
+    // The email is a custom field, and every field name is encrypted: the one
+    // that opens to `EMAIL_FIELD` is it.
+    let email: string | null = null;
+    for (const field of (cipher["fields"] as Record<string, unknown>[] | null | undefined) ?? []) {
+        if ((await say(field["name"])) !== EMAIL_FIELD) continue;
+        email = await say(field["value"]);
+        break;
+    }
+
     return {
         id,
         name: (await say(cipher["name"])) ?? "Untitled",
         username: await say(login["username"]),
+        email,
         password: await say(login["password"]),
         totp: await say(login["totp"]),
         uris,
@@ -1584,7 +1597,7 @@ function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.
     return {
         id: login.id,
         name: login.name,
-        username: login.username,
+        username: login.username ?? login.email,
         host: displayHost(login.uris),
         totp: login.totp !== null,
         // Null for this account's own vault, and null too for a shared one whose
@@ -2213,7 +2226,8 @@ function typeIntoPage(
     username: string | null,
     password: string | null,
     code: string | null,
-    submit = false
+    submit = false,
+    email: string | null = null
 ): { user: boolean; pass: boolean; code: boolean } {
     const never = new Set([
         "hidden",
@@ -2409,12 +2423,21 @@ function typeIntoPage(
         field.blur();
     };
 
-    const typedUser = Boolean(username && user);
+    // A box that asks for an email gets the login's email, any other its
+    // username - each falling back to the other. `loginIdentifier` in
+    // `lib/fields`, copied for the reason above.
+    const asksEmail =
+        user !== null &&
+        (tokenOf(user) === "email" ||
+            user.type === "email" ||
+            /e-?mail|correo/i.test(describe(user)));
+    const signInAs = asksEmail ? email || username : username || email;
+    const typedUser = Boolean(signInAs && user);
     const typedPass = Boolean(password && pass);
     // Never over a code somebody has started typing themselves.
     const typedCode =
         Boolean(code) && codeBoxes.length > 0 && codeBoxes.every((box) => box.value === "");
-    if (typedUser) put(user!, username!);
+    if (typedUser) put(user!, signInAs!);
     if (typedPass) put(pass!, password!);
     if (typedCode && codeBoxes.length === 1) put(codeBoxes[0]!, code!);
     else if (typedCode)
@@ -2603,7 +2626,7 @@ async function fillTab(
             args:
                 only === "code"
                     ? [null, null, code, submit]
-                    : [login.username, login.password, code, submit]
+                    : [login.username, login.password, code, submit, login.email]
         });
         const filled = outcome?.result as
             | { user?: boolean; pass?: boolean; code?: boolean }
