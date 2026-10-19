@@ -152,6 +152,12 @@
             "output-denied": "Omitido"
         }
     },
+    "work": {
+        "done": "Trabajó {seconds} s - {tools, plural, one {# acción} other {# acciones}}",
+        "used": "{tools, plural, one {Usó # acción} other {Usó # acciones}}",
+        "running": "{step}...",
+        "failed": "{count, plural, one {# paso falló} other {# pasos fallaron}}"
+    },
     "files": {
         "add": "Añadir archivos",
         "remove": "Quitar {name}",

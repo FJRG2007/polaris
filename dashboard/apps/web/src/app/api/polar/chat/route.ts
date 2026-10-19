@@ -25,6 +25,7 @@ import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
+import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -119,6 +120,7 @@ export async function POST(request: Request): Promise<Response> {
             ? body.data.parentId
             : (list[index - 1]?.id ?? null);
 
+    const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
         system: polarSystemPrompt(user.name, fencePageContext(body.data.context)),
@@ -141,7 +143,10 @@ export async function POST(request: Request): Promise<Response> {
                       payer: resolved.credential.source,
                       fellBackFrom
                   }
-                : undefined,
+                : part.type === "finish"
+                  ? // How long the turn worked, for the line its steps fold into.
+                    { workedMs: Date.now() - startedAt }
+                  : undefined,
         onFinish: async ({ messages: finished }) => {
             try {
                 await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
@@ -150,6 +155,15 @@ export async function POST(request: Request): Promise<Response> {
             } catch (error) {
                 console.error("polar: could not save the turn", error);
             }
+            // A new thread is named by its model once the first answer is in,
+            // behind the reply; the screen asks for the title when it is ready.
+            startPolarTitle(
+                user.id,
+                body.data.threadId,
+                resolved.model,
+                finished,
+                reasoningFor("fast", resolved.option)
+            );
         },
         onError: () => "polar_failed"
     });

@@ -14981,6 +14981,11 @@ model PolarThread {
     userId      String            @db.Uuid
     user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
     title       String
+    // Where the title came from: "placeholder" (the first message, cut short)
+    // until the model names the thread once ("generating", then "model"), and
+    // "user" once somebody renames it. Rows older than this column read "user",
+    // so a title that predates it is never replaced.
+    titleSource String            @default("user")
     // The model choice the thread was last sent with ({ provider, model,
     // intelligence, payer }), so reopening it picks up where it was.
     choice      Json?

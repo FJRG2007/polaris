@@ -41,16 +41,18 @@ export function Tool({
     title,
     state,
     children,
+    defaultOpen = false,
     className
 }: {
     title: string;
     state: ToolState;
     children?: ReactNode;
+    defaultOpen?: boolean;
     className?: string;
 }) {
     const t = useTranslations("polar");
     const id = useId();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(defaultOpen);
     return (
         <div className={cn("w-full rounded-md border border-border bg-card text-xs", className)}>
             <button

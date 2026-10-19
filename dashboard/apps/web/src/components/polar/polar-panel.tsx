@@ -69,7 +69,9 @@ import {
     type SuggestionListItem
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
+import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
@@ -298,20 +300,28 @@ export function PolarAside() {
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
     };
-    if (!open || pathname.startsWith("/polar")) return null;
+    // Kept on screen while it slides away; the page itself has no side panel.
+    const presence = useExitPresence(open && !pathname.startsWith("/polar"));
+    if (!presence.mounted) return null;
     return (
         <aside
             aria-label="Polar"
+            data-state={presence.state}
+            onAnimationEnd={presence.onAnimationEnd}
             style={{ ["--polar-width" as string]: `${width}px` }}
-            className="fixed inset-0 z-50 flex flex-col bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:sticky xl:top-header xl:z-auto xl:h-below-header xl:shrink-0 xl:self-start xl:shadow-none"
+            className="polar-aside fixed inset-0 z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:sticky xl:top-header xl:z-auto xl:h-below-header xl:shrink-0 xl:self-start xl:shadow-none"
         >
             <div
                 role="separator"
                 aria-orientation="vertical"
                 onPointerDown={startResize}
-                className="absolute inset-y-0 left-0 hidden w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-primary/30 sm:block"
+                className="absolute inset-y-0 left-0 hidden w-1.5 cursor-col-resize hover:bg-primary/30 sm:block"
             />
-            <PolarChat onClose={() => setOpen(false)} />
+            {/* Its own width from xl, so growing the panel uncovers it instead of
+                squeezing it. */}
+            <div className="flex min-h-0 flex-1 flex-col xl:w-[calc(var(--polar-width)-1px)] xl:flex-none">
+                <PolarChat onClose={() => setOpen(false)} />
+            </div>
         </aside>
     );
 }
@@ -600,6 +610,29 @@ export function PolarChat({
         wasBusy.current = busy;
         if (ended && showHistory) loadThreads(true);
     }, [busy, showHistory, loadThreads]);
+    const settled = !busy && chat.messages.length > 0;
+    // A new thread is named by its model after the first answer; its title is
+    // asked for once, and the placeholder in the list is swapped for it.
+    const titled = useRef(new Set<string>());
+    useEffect(() => {
+        if (!settled || titled.current.has(threadId)) return;
+        if (!chat.messages.some((message) => message.role === "assistant")) return;
+        titled.current.add(threadId);
+        const id = threadId;
+        fetch(`/api/polar/threads/${id}/title`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { title?: unknown } | null) => {
+                const title = typeof data?.title === "string" ? data.title : null;
+                if (!title) return;
+                setThreads(
+                    (current) =>
+                        current?.map((row) =>
+                            row.id === id && row.title !== title ? { ...row, title } : row
+                        ) ?? null
+                );
+            })
+            .catch(() => undefined);
+    }, [settled, threadId]);
     // Whether the page's sidebar was put away, remembered per browser.
     useEffect(() => setCollapsed(readStored(SIDEBAR_KEY) === "hidden"), []);
     const setSidebarHidden = (hidden: boolean) => {
@@ -672,6 +705,8 @@ export function PolarChat({
             new Map(thread.messages.map((message) => [message.id, message.parentId]))
         );
         tree.current = next;
+        // A stored thread already has the title it will keep.
+        titled.current.add(thread.id);
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
         setThreadId(thread.id);
@@ -1339,11 +1374,57 @@ function MessageView({
     const t = useTranslations("polar");
     const mine = message.role === "user";
     const from = mine ? "user" : "assistant";
-    const meta = (message.metadata ?? {}) as { fellBackFrom?: string | null };
+    const meta = (message.metadata ?? {}) as {
+        fellBackFrom?: string | null;
+        workedMs?: number;
+    };
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) => tools[name]?.title ?? name;
     const { copied, copy } = useCopied();
+    const toolOf = (part: UIMessage["parts"][number]) => {
+        if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
+        const tool = part as unknown as ToolPart;
+        const name = part.type === "dynamic-tool" ? (tool.toolName ?? "tool") : part.type.slice(5);
+        return { tool, name };
+    };
+    // Thinking and tool calls fold into one line above the answer. A call
+    // waiting for (or given) an approval and a call that failed stay in view.
+    const folded = (part: UIMessage["parts"][number]) => {
+        if (part.type === "reasoning") return true;
+        const found = toolOf(part);
+        return !!found && !found.tool.approval && found.tool.state !== "output-error";
+    };
+    const work = message.parts.filter(folded);
+    const toolParts = message.parts.flatMap((part) => {
+        const found = toolOf(part);
+        return found ? [found] : [];
+    });
+    const failed = toolParts.filter(({ tool }) => tool.state === "output-error").length;
+    const lastWork = message.parts
+        .filter((part) => folded(part) || toolOf(part)?.tool.state === "output-error")
+        .at(-1);
+    const lastTool = lastWork ? toolOf(lastWork) : null;
+    const answering = message.parts
+        .slice(lastWork ? message.parts.indexOf(lastWork) + 1 : 0)
+        .some((part) => part.type === "text" && part.text.trim() !== "");
+    const current =
+        lastTool &&
+        (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
+            ? toolName(lastTool.name)
+            : null;
+    const workIndex = message.parts.findIndex(folded);
+    const renderTool = (part: UIMessage["parts"][number], index: number, opened = false) => {
+        const found = toolOf(part);
+        if (!found) return null;
+        const { tool, name } = found;
+        return (
+            <Tool key={index} title={toolName(name)} state={tool.state} defaultOpen={opened}>
+                <ToolInput input={tool.input} />
+                <ToolOutput output={tool.output} errorText={tool.errorText} />
+            </Tool>
+        );
+    };
     return (
         <Message from={from}>
             {meta.fellBackFrom ? (
@@ -1365,6 +1446,37 @@ function MessageView({
                 </Attachments>
             ) : null}
             {message.parts.map((part, index) => {
+                if (index === workIndex) {
+                    return (
+                        <Work
+                            key={`work-${index}`}
+                            messageId={message.id}
+                            streaming={streaming && !answering}
+                            current={current}
+                            tools={toolParts.length}
+                            failed={failed}
+                            seconds={
+                                typeof meta.workedMs === "number"
+                                    ? Math.max(1, Math.round(meta.workedMs / 1000))
+                                    : null
+                            }
+                        >
+                            {work.map((entry) =>
+                                entry.type === "reasoning" ? (
+                                    <Reasoning
+                                        key={message.parts.indexOf(entry)}
+                                        isStreaming={false}
+                                    >
+                                        {entry.text}
+                                    </Reasoning>
+                                ) : (
+                                    renderTool(entry, message.parts.indexOf(entry))
+                                )
+                            )}
+                        </Work>
+                    );
+                }
+                if (folded(part)) return null;
                 if (part.type === "text") {
                     if (!part.text.trim()) return null;
                     return (
@@ -1377,22 +1489,9 @@ function MessageView({
                         </MessageContent>
                     );
                 }
-                if (part.type === "reasoning") {
-                    return (
-                        <Reasoning
-                            key={index}
-                            isStreaming={streaming && index === message.parts.length - 1}
-                        >
-                            {part.text}
-                        </Reasoning>
-                    );
-                }
-                if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
-                    const tool = part as unknown as ToolPart;
-                    const name =
-                        part.type === "dynamic-tool"
-                            ? (tool.toolName ?? "tool")
-                            : part.type.slice(5);
+                const found = toolOf(part);
+                if (found) {
+                    const { tool, name } = found;
                     const described = tools[name];
                     if (tool.approval) {
                         return (
@@ -1409,12 +1508,9 @@ function MessageView({
                             />
                         );
                     }
-                    return (
-                        <Tool key={index} title={toolName(name)} state={tool.state}>
-                            <ToolInput input={tool.input} />
-                            <ToolOutput output={tool.output} errorText={tool.errorText} />
-                        </Tool>
-                    );
+                    // A failed call stays in view, opened: it may be why the
+                    // answer reads the way it does.
+                    return renderTool(part, index, true);
                 }
                 return null;
             })}

@@ -91,7 +91,8 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
     };
 }
 
-/** A title from the first thing somebody asked. */
+/** A title from the first thing somebody asked: the placeholder until the
+ *  model names the thread (`titles.ts`). */
 export function titleFrom(text: string): string {
     const line = text.replace(/\s+/g, " ").trim();
     return line.length > 80 ? `${line.slice(0, 79)}...` : line || "New conversation";
@@ -121,6 +122,7 @@ export async function ensurePolarThread(
             id,
             userId,
             title: titleFrom(firstText),
+            titleSource: "placeholder",
             choice: choice as unknown as Prisma.InputJsonValue
         }
     });
@@ -175,7 +177,7 @@ export async function renamePolarThread(
 ): Promise<boolean> {
     const { count } = await prisma.polarThread.updateMany({
         where: { id, userId },
-        data: { title }
+        data: { title, titleSource: "user" }
     });
     return count > 0;
 }

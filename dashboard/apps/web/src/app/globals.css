@@ -881,3 +881,45 @@ dialog.pdfSlick-dialog .dialogButton {
         display: none;
     }
 }
+
+/* Polar's side panel slides in from the right and back out. From xl it sits in
+   the page's flow, so it grows from nothing instead and the content beside it
+   reflows with it; its contents keep their width (see PolarAside) and are
+   uncovered rather than squeezed. The closing state stays mounted until its
+   animation ends (`useExitPresence`). Less motion is the global rule in
+   tokens.css: the animations still end, so the panel still goes. */
+.polar-aside[data-state="open"] {
+    animation: polar-slide-in var(--duration) var(--ease);
+}
+.polar-aside[data-state="closed"] {
+    animation: polar-slide-out var(--duration-fast) var(--ease) forwards;
+    pointer-events: none;
+}
+@media (min-width: 1280px) {
+    .polar-aside[data-state="open"] {
+        animation-name: polar-grow;
+    }
+    .polar-aside[data-state="closed"] {
+        animation-name: polar-shrink;
+    }
+}
+@keyframes polar-slide-in {
+    from {
+        transform: translateX(100%);
+    }
+}
+@keyframes polar-slide-out {
+    to {
+        transform: translateX(100%);
+    }
+}
+@keyframes polar-grow {
+    from {
+        width: 0;
+    }
+}
+@keyframes polar-shrink {
+    to {
+        width: 0;
+    }
+}
