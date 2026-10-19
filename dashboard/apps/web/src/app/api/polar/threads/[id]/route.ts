@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
-import { queueSchema } from "@/lib/polar/shared";
+import { queueSchema, threadTitleSchema } from "@/lib/polar/shared";
 import {
     deletePolarThread,
     getPolarThread,
@@ -21,7 +21,7 @@ const idSchema = z.string().uuid();
 
 const patchSchema = z
     .object({
-        title: z.string().trim().min(1).max(120).optional(),
+        title: threadTitleSchema.optional(),
         queue: queueSchema.optional()
     })
     .refine((value) => value.title !== undefined || value.queue !== undefined);

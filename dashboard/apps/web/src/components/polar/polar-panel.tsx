@@ -28,10 +28,46 @@ import {
     useMemo,
     useRef,
     useState,
+    useSyncExternalStore,
+    type KeyboardEvent as ReactKeyboardEvent,
     type ReactNode
 } from "react";
-import { useShortcutText } from "@polaris/ui";
-import { Copy, History, Maximize2, Pencil, Plus, Reply, RotateCcw, Trash2, X } from "lucide-react";
+import {
+    cn,
+    Dialog,
+    CopyIcon,
+    useToast,
+    useCopied,
+    DialogTitle,
+    DialogContent,
+    useShortcutText
+} from "@polaris/ui";
+import {
+    Cpu,
+    FileText,
+    History,
+    Maximize2,
+    Menu,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Paperclip,
+    Pencil,
+    Phone,
+    Plus,
+    Reply,
+    RotateCcw,
+    SquarePen,
+    Wrench,
+    X
+} from "lucide-react";
+import { PolarThreads, type ThreadRow } from "@/components/polar/polar-threads";
+import {
+    firstPickable,
+    stepPickable,
+    suggestionOptionId,
+    SuggestionList,
+    type SuggestionListItem
+} from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -298,13 +334,49 @@ function textOf(message: UIMessage): string {
         .trim();
 }
 
-type ThreadRow = { id: string; title: string; updatedAt: string };
 type ToolDescription = { title: string; writes: boolean; destructive: boolean };
 type StoredMessage = UIMessage & { parentId: string | null };
 
 const COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
+type Command = (typeof COMMANDS)[number];
 /** Commands that exist but belong to a later phase. */
-const LATER = new Set<string>(["call"]);
+const LATER = new Set<Command>(["call"]);
+const COMMAND_ICONS: Record<Command, SuggestionListItem["icon"]> = {
+    new: Plus,
+    model: Cpu,
+    page: FileText,
+    file: Paperclip,
+    tools: Wrench,
+    call: Phone
+};
+
+/** The "/" commands that start with what has been typed, or none once the
+ *  token has a space in it (a command with words after it is a message). */
+export function slashMatches(input: string): Command[] {
+    if (!input.startsWith("/") || /\s/.test(input)) return [];
+    const typed = input.toLowerCase();
+    return COMMANDS.filter((command) => `/${command}`.startsWith(typed));
+}
+
+const SIDEBAR_KEY = "polar.sidebar";
+const WIDE_QUERY = "(min-width: 768px)";
+
+/** Whether the screen is wide enough for the sidebar beside the chat. Wide on
+ *  the server and where there is no media query, which is what the CSS also
+ *  assumes until the page is live. */
+function useWide(): boolean {
+    return useSyncExternalStore(
+        (notify) => {
+            if (typeof window.matchMedia !== "function") return () => undefined;
+            const query = window.matchMedia(WIDE_QUERY);
+            query.addEventListener("change", notify);
+            return () => query.removeEventListener("change", notify);
+        },
+        () =>
+            typeof window.matchMedia === "function" ? window.matchMedia(WIDE_QUERY).matches : true,
+        () => true
+    );
+}
 
 /** Upload refusals the composer explains; anything else reads as a failed upload. */
 const UPLOAD_ERRORS = [
@@ -367,9 +439,18 @@ export function PolarChat({
     const [loadingMore, setLoadingMore] = useState(false);
     const [showHistory, setShowHistory] = useState(fullPage);
     const [lastApproved, setLastApproved] = useState(false);
+    const [collapsed, setCollapsed] = useState(false);
+    const [drawer, setDrawer] = useState(false);
+    const [modelOpen, setModelOpen] = useState(false);
+    const [slashActive, setSlashActive] = useState(0);
+    const [slashDismissed, setSlashDismissed] = useState(false);
+    const wide = useWide();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
+    const drawerButton = useRef<HTMLButtonElement>(null);
+    const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
+    const toast = useToast();
 
     const context = useMemo(
         () =>
@@ -468,9 +549,11 @@ export function PolarChat({
     }, [choice]);
 
     // History: last known list instantly, refreshed behind it.
-    const loadThreads = useCallback(() => {
+    // `keep` puts the fresh first page over the rows already loaded, so the
+    // pages read with "Show more" stay where they are.
+    const loadThreads = useCallback((keep = false) => {
         try {
-            const cached = window.sessionStorage.getItem(THREADS_KEY);
+            const cached = keep ? null : window.sessionStorage.getItem(THREADS_KEY);
             if (cached) setThreads(JSON.parse(cached) as ThreadRow[]);
         } catch {
             // No cache.
@@ -479,19 +562,55 @@ export function PolarChat({
             .then((response) => (response.ok ? response.json() : null))
             .then((data: { threads: ThreadRow[] } | null) => {
                 if (!data) return;
-                setThreads(data.threads);
-                setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
-                try {
-                    window.sessionStorage.setItem(THREADS_KEY, JSON.stringify(data.threads));
-                } catch {
-                    // No cache.
+                if (!keep) {
+                    setThreads(data.threads);
+                    setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
+                    return;
                 }
+                setThreads((current) => {
+                    const fresh = new Set(data.threads.map((row) => row.id));
+                    return [
+                        ...data.threads,
+                        ...(current ?? []).filter((row) => !fresh.has(row.id))
+                    ];
+                });
             })
             .catch(() => undefined);
     }, []);
     useEffect(() => {
         if (showHistory) loadThreads();
     }, [showHistory, loadThreads]);
+    // The cache follows every change, a rename or a delete included.
+    useEffect(() => {
+        if (!threads) return;
+        try {
+            window.sessionStorage.setItem(
+                THREADS_KEY,
+                JSON.stringify(threads.slice(0, POLAR_THREAD_PAGE))
+            );
+        } catch {
+            // No cache.
+        }
+    }, [threads]);
+    // A finished turn moves its conversation to the top of the list, or puts a
+    // new one there, so the list is read again once the turn ends.
+    const wasBusy = useRef(busy);
+    useEffect(() => {
+        const ended = wasBusy.current && !busy;
+        wasBusy.current = busy;
+        if (ended && showHistory) loadThreads(true);
+    }, [busy, showHistory, loadThreads]);
+    // Whether the page's sidebar was put away, remembered per browser.
+    useEffect(() => setCollapsed(readStored(SIDEBAR_KEY) === "hidden"), []);
+    const setSidebarHidden = (hidden: boolean) => {
+        setCollapsed(hidden);
+        writeStored(SIDEBAR_KEY, hidden ? "hidden" : "shown");
+    };
+    // A new "/" opens the list again after Escape closed it.
+    useEffect(() => {
+        setSlashActive(0);
+        if (!input.startsWith("/")) setSlashDismissed(false);
+    }, [input]);
     const loadMoreThreads = () => {
         const cursor = threads?.at(-1)?.id;
         if (!cursor || loadingMore) return;
@@ -560,6 +679,7 @@ export function PolarChat({
         setQueue(thread.queue);
         if (thread.choice) setChoice(thread.choice);
         setShowHistory(fullPage);
+        setDrawer(false);
     };
 
     const startNew = () => {
@@ -572,6 +692,30 @@ export function PolarChat({
         setQuote(null);
         setFiles([]);
         setEditing(null);
+        composerNext.current = drawer;
+        setDrawer(false);
+        setShowHistory(fullPage);
+        textarea.current?.focus();
+    };
+
+    const renameThread = async (id: string, title: string) => {
+        const before = threads?.find((row) => row.id === id)?.title ?? title;
+        setThreads(
+            (current) => current?.map((row) => (row.id === id ? { ...row, title } : row)) ?? null
+        );
+        const response = await fetch(`/api/polar/threads/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ title })
+        }).catch(() => null);
+        if (response?.ok) return;
+        setThreads(
+            (current) =>
+                current?.map((row) =>
+                    row.id === id && row.title === title ? { ...row, title: before } : row
+                ) ?? null
+        );
+        toast.show({ title: t("history.renameFailed") });
     };
 
     const removeThread = async (id: string) => {
@@ -623,28 +767,30 @@ export function PolarChat({
         setTreeTick((tick) => tick + 1);
     };
 
+    /** What a "/" command does, whether it was typed whole or picked from the list. */
+    const runCommand = (command: Command) => {
+        if (LATER.has(command)) return;
+        setInput("");
+        if (command === "new") return startNew();
+        if (command === "page") return setWithPage(true);
+        if (command === "model") return setModelOpen(true);
+        if (command === "file") {
+            return document
+                .getElementById(fullPage ? "polar-attach-page" : "polar-attach")
+                ?.querySelector("button")
+                ?.click();
+        }
+        if (command === "tools" && choice && !busy) {
+            void chat.sendMessage({ text: t("slash.toolsPrompt") });
+        }
+    };
+
     const submit = () => {
         const raw = input.trim();
         const ready = files.filter((file) => !file.pending);
         if ((!raw && ready.length === 0) || !choice || files.some((file) => file.pending)) return;
-        if (raw === "/new") return startNew();
-        if (raw === "/page") {
-            setWithPage(true);
-            return setInput("");
-        }
-        if (raw === "/model") {
-            setInput("");
-            return document.getElementById("polar-model")?.click();
-        }
-        if (raw === "/file") {
-            setInput("");
-            return document.getElementById("polar-attach")?.querySelector("button")?.click();
-        }
-        if (raw === "/tools") {
-            setInput("");
-            return void chat.sendMessage({ text: t("slash.toolsPrompt") });
-        }
-        if (raw === "/call") return;
+        const typed = COMMANDS.find((command) => raw === `/${command}`);
+        if (typed) return runCommand(typed);
         const text = quote ? `> ${quote}\n\n${raw}` : raw;
         const message = {
             text,
@@ -690,84 +836,301 @@ export function PolarChat({
                     ? "done"
                     : "idle";
     const noKeys = providers !== null && providers.length === 0;
-    const slashOpen = input.startsWith("/") && !input.includes(" ");
+    const slashItems: SuggestionListItem[] = slashMatches(input).map((command) => ({
+        key: command,
+        label: `/${command}`,
+        detail: LATER.has(command) ? t("slash.later") : t(`slash.${command}`),
+        icon: COMMAND_ICONS[command],
+        disabled: LATER.has(command)
+    }));
+    const slashOpen = !slashDismissed && slashItems.length > 0;
+    const slashHighlight =
+        slashItems[slashActive]?.disabled === false ? slashActive : firstPickable(slashItems);
+    const ids = fullPage
+        ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
+        : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
+    const pickSlash = (index: number) => {
+        const command = slashItems[index]?.key as Command | undefined;
+        if (command) runCommand(command);
+    };
+    // The keys the "/" list answers while it is open, as Chat's does: arrows
+    // walk the commands that can run, Enter and Tab run the highlighted one,
+    // Escape closes the list and leaves the text as it is.
+    const onComposerKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+        if (!slashOpen || event.nativeEvent.isComposing) return;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setSlashActive(
+                stepPickable(slashItems, slashHighlight, event.key === "ArrowDown" ? 1 : -1)
+            );
+        } else if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+            if (slashHighlight < 0) return;
+            event.preventDefault();
+            pickSlash(slashHighlight);
+        } else if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            setSlashDismissed(true);
+        }
+    };
+    const welcome = fullPage && !noKeys && chat.messages.length === 0;
+    const suggestions = (
+        <Suggestions>
+            {(["page", "summary", "tools"] as const).map((key) => (
+                <Suggestion
+                    key={key}
+                    suggestion={t(`suggestions.${key}`)}
+                    onClick={(text) => {
+                        setInput(text);
+                        textarea.current?.focus();
+                    }}
+                />
+            ))}
+        </Suggestions>
+    );
+    const threadList = (hide: Parameters<typeof PolarThreads>[0]["hide"]) => (
+        <PolarThreads
+            threads={threads}
+            activeId={threadId}
+            more={moreThreads}
+            loadingMore={loadingMore}
+            onOpen={(id) => void openThread(id)}
+            onNew={startNew}
+            onRename={(id, title) => void renameThread(id, title)}
+            onDelete={(id) => void removeThread(id)}
+            onLoadMore={loadMoreThreads}
+            hide={hide}
+        />
+    );
+    const sidebarShown = fullPage && wide && !collapsed;
+
+    const queueView =
+        queue.length > 0 ? (
+            <Queue className="mb-2">
+                <QueueSection label={t("queue.title")}>
+                    {queue.map((item, index) => (
+                        <QueueItem
+                            key={item.id}
+                            value={item.text}
+                            labels={{
+                                edit: t("queue.edit"),
+                                up: t("queue.up"),
+                                down: t("queue.down"),
+                                remove: t("queue.remove")
+                            }}
+                            first={index === 0}
+                            last={index === queue.length - 1}
+                            onChange={(text) =>
+                                setQueue(
+                                    queue.map((entry) =>
+                                        entry.id === item.id ? { ...entry, text } : entry
+                                    )
+                                )
+                            }
+                            onCommit={() => saveQueue(queue.filter((entry) => entry.text.trim()))}
+                            onUp={() => saveQueue(moveItem(queue, index, index - 1))}
+                            onDown={() => saveQueue(moveItem(queue, index, index + 1))}
+                            onRemove={() =>
+                                saveQueue(queue.filter((entry) => entry.id !== item.id))
+                            }
+                        />
+                    ))}
+                </QueueSection>
+            </Queue>
+        ) : null;
+
+    const composer = (
+        <div className="relative">
+            {slashOpen ? (
+                <SuggestionList
+                    id={ids.slash}
+                    label={t("slash.title")}
+                    items={slashItems}
+                    active={slashHighlight}
+                    onHover={setSlashActive}
+                    onPick={pickSlash}
+                    className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm"
+                />
+            ) : null}
+            <PromptInput onSubmit={submit}>
+                <PromptInputHeader>
+                    {context ? (
+                        <Chip
+                            title={t("context.title")}
+                            label={context.record?.name ?? context.title ?? context.route}
+                            removeLabel={t("context.remove")}
+                            onRemove={() => setWithPage(false)}
+                        />
+                    ) : null}
+                    {quote ? (
+                        <Chip
+                            label={`${t("reply.to")} "${quote}"`}
+                            removeLabel={t("reply.cancel")}
+                            onRemove={() => setQuote(null)}
+                        />
+                    ) : null}
+                    {editing ? (
+                        <Chip
+                            label={t("edit.editing")}
+                            removeLabel={t("edit.cancel")}
+                            onRemove={() => setEditing(null)}
+                        />
+                    ) : null}
+                </PromptInputHeader>
+                {files.length > 0 ? (
+                    <Attachments className="mb-2 mt-1">
+                        {files.map((file) => (
+                            <Attachment
+                                key={file.id}
+                                file={file}
+                                removeLabel={t("files.remove", {
+                                    name: file.filename ?? ""
+                                })}
+                                onRemove={() => removeFile(file)}
+                            />
+                        ))}
+                    </Attachments>
+                ) : null}
+                {fileError ? (
+                    <p role="alert" className="mb-1 text-xs text-danger-ink">
+                        {fileError}
+                    </p>
+                ) : null}
+                <label htmlFor={ids.input} className="sr-only">
+                    {t("composer.label")}
+                </label>
+                <PromptInputTextarea
+                    ref={textarea}
+                    id={ids.input}
+                    value={input}
+                    maxLength={20000}
+                    disabled={noKeys}
+                    placeholder={t("composer.placeholder")}
+                    aria-controls={slashOpen ? ids.slash : undefined}
+                    aria-activedescendant={
+                        slashOpen && slashHighlight >= 0
+                            ? suggestionOptionId(ids.slash, slashHighlight)
+                            : undefined
+                    }
+                    onKeyDown={onComposerKey}
+                    onChange={(event) => setInput(event.target.value)}
+                    onSubmitKey={submit}
+                    onPaste={(event) => {
+                        const pasted = Array.from(event.clipboardData.files);
+                        if (pasted.length > 0) {
+                            event.preventDefault();
+                            void addFiles(pasted);
+                        }
+                    }}
+                />
+                <PromptInputFooter>
+                    <PromptInputTools>
+                        <span id={ids.attach} className="contents">
+                            <PromptInputAttach
+                                label={t("files.add")}
+                                accept={POLAR_ATTACHMENT_TYPES}
+                                disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
+                                onFiles={(chosen) => void addFiles(chosen)}
+                                onFailed={setFileError}
+                            />
+                        </span>
+                        <ModelSelector
+                            providers={providers ?? []}
+                            choice={choice}
+                            onChoice={setChoice}
+                            open={modelOpen}
+                            onOpenChange={setModelOpen}
+                        />
+                    </PromptInputTools>
+                    <PromptInputSubmit
+                        busy={busy}
+                        disabled={
+                            (!input.trim() && files.length === 0) ||
+                            !choice ||
+                            files.some((file) => file.pending)
+                        }
+                        sendLabel={t("actions.send")}
+                        stopLabel={t("actions.stop")}
+                        onStop={() => void chat.stop()}
+                    />
+                </PromptInputFooter>
+            </PromptInput>
+            <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
+        </div>
+    );
 
     return (
-        <div className="relative flex h-full min-h-0 flex-1">
-            {showHistory ? (
-                <nav
-                    aria-label={t("history.title")}
-                    className={`${fullPage ? "w-64 shrink-0 border-r border-border" : "absolute inset-0 z-10 bg-card"} flex min-h-0 flex-col overflow-y-auto overscroll-contain p-2`}
-                >
-                    <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-foreground-subtle">
-                        {t("history.title")}
-                        {!fullPage ? (
-                            <MessageAction
-                                label={t("actions.close")}
-                                onClick={() => setShowHistory(false)}
-                            >
-                                <X />
-                            </MessageAction>
-                        ) : null}
-                    </div>
-                    {threads === null ? (
-                        <div className="space-y-2 p-2">
-                            {[0, 1, 2].map((key) => (
-                                <div
-                                    key={key}
-                                    className="h-6 rounded bg-muted motion-safe:animate-pulse"
-                                />
-                            ))}
-                        </div>
-                    ) : threads.length === 0 ? (
-                        <p className="p-2 text-sm text-muted-foreground">{t("history.empty")}</p>
-                    ) : (
-                        <>
-                            {threads.map((row) => (
-                                <div
-                                    key={row.id}
-                                    className={`group flex min-w-0 items-center rounded-md hover:bg-card-hover ${row.id === threadId ? "bg-card-hover" : ""}`}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => void openThread(row.id)}
-                                        title={row.title}
-                                        className="min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm text-foreground"
-                                    >
-                                        {row.title}
-                                    </button>
-                                    <MessageAction
-                                        label={t("history.delete")}
-                                        onClick={() => void removeThread(row.id)}
-                                    >
-                                        <Trash2 />
-                                    </MessageAction>
-                                </div>
-                            ))}
-                            {moreThreads ? (
-                                <button
-                                    type="button"
-                                    onClick={loadMoreThreads}
-                                    disabled={loadingMore}
-                                    className="mt-1 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
-                                >
-                                    {t("history.more")}
-                                </button>
-                            ) : null}
-                        </>
-                    )}
-                </nav>
+        <div className="relative flex h-full min-h-0 min-w-0 flex-1">
+            {sidebarShown ? (
+                <aside className="hidden w-64 shrink-0 flex-col border-r border-border md:flex">
+                    {threadList({
+                        label: t("history.hide"),
+                        icon: PanelLeftClose,
+                        onClick: () => setSidebarHidden(true)
+                    })}
+                </aside>
+            ) : null}
+            {fullPage && !wide ? (
+                <Dialog open={drawer} onOpenChange={setDrawer}>
+                    <DialogContent
+                        showClose={false}
+                        aria-describedby={undefined}
+                        onCloseAutoFocus={(event) => {
+                            event.preventDefault();
+                            const target = composerNext.current ? textarea : drawerButton;
+                            composerNext.current = false;
+                            target.current?.focus();
+                        }}
+                        className="left-0 top-0 flex h-full max-h-none w-72 max-w-[85vw] translate-x-0 translate-y-0 flex-col overflow-hidden rounded-none rounded-r-xl border-y-0 border-l-0 bg-card p-0 data-[state=open]:zoom-in-100 data-[state=open]:slide-in-from-left-4"
+                    >
+                        <DialogTitle className="sr-only">{t("history.title")}</DialogTitle>
+                        {threadList({
+                            label: t("history.close"),
+                            icon: X,
+                            onClick: () => setDrawer(false)
+                        })}
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+            {!fullPage && showHistory ? (
+                <div className="absolute inset-0 z-10 flex flex-col bg-card">
+                    {threadList({
+                        label: t("history.close"),
+                        icon: X,
+                        onClick: () => setShowHistory(false)
+                    })}
+                </div>
             ) : null}
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+                <div
+                    className={cn(
+                        "flex h-11 shrink-0 items-center gap-2 px-3",
+                        !fullPage && "border-b border-border"
+                    )}
+                >
+                    {fullPage && (!wide || collapsed) ? (
+                        <MessageAction
+                            ref={drawerButton}
+                            label={t("history.show")}
+                            onClick={() => (wide ? setSidebarHidden(false) : setDrawer(true))}
+                        >
+                            {wide ? <PanelLeftOpen /> : <Menu />}
+                        </MessageAction>
+                    ) : null}
                     <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">Polar</span>
                     <span className="flex-1" />
-                    <MessageAction label={t("actions.new")} onClick={startNew}>
-                        <Plus />
-                    </MessageAction>
-                    {!fullPage ? (
+                    {fullPage ? (
+                        !wide || collapsed ? (
+                            <MessageAction label={t("actions.new")} onClick={startNew}>
+                                <SquarePen />
+                            </MessageAction>
+                        ) : null
+                    ) : (
                         <>
+                            <MessageAction label={t("actions.new")} onClick={startNew}>
+                                <Plus />
+                            </MessageAction>
                             <MessageAction
                                 label={t("history.title")}
                                 onClick={() => setShowHistory(true)}
@@ -786,281 +1149,122 @@ export function PolarChat({
                                 <X />
                             </MessageAction>
                         </>
-                    ) : null}
+                    )}
                 </div>
 
-                <Conversation>
-                    <ConversationContent>
-                        {noKeys ? (
-                            <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
-                                <p className="text-foreground">{t("noKeys.title")}</p>
-                                <p className="mt-1">{t("noKeys.body")}</p>
-                                <div className="mt-2 flex flex-wrap gap-3">
-                                    <Link
-                                        href="/account/ai-keys"
-                                        className="text-primary hover:underline"
-                                    >
-                                        {t("noKeys.own")}
-                                    </Link>
-                                    {isAdmin ? (
-                                        <Link
-                                            href="/admin/integrations/models"
-                                            className="text-primary hover:underline"
-                                        >
-                                            {t("noKeys.admin")}
-                                        </Link>
-                                    ) : null}
-                                </div>
+                {welcome ? (
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-contain px-4 py-6">
+                        <div className="flex w-full max-w-3xl flex-col gap-4">
+                            <div className="flex flex-col items-center gap-3 text-center">
+                                <PolarMascot mood={mood} size={64} />
+                                <h1 className="text-xl font-semibold text-foreground">
+                                    {t("welcome")}
+                                </h1>
                             </div>
-                        ) : chat.messages.length === 0 ? (
-                            <ConversationEmptyState
-                                icon={<PolarMascot mood="idle" size={64} />}
-                                description={t("empty")}
+                            {queueView}
+                            {composer}
+                            {suggestions}
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <Conversation>
+                            <ConversationContent
+                                className={
+                                    fullPage ? "mx-auto w-full max-w-3xl px-4 py-6" : undefined
+                                }
                             >
-                                <Suggestions>
-                                    {(["page", "summary", "tools"] as const).map((key) => (
-                                        <Suggestion
-                                            key={key}
-                                            suggestion={t(`suggestions.${key}`)}
-                                            onClick={(text) => {
-                                                setInput(text);
+                                {noKeys ? (
+                                    <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
+                                        <p className="text-foreground">{t("noKeys.title")}</p>
+                                        <p className="mt-1">{t("noKeys.body")}</p>
+                                        <div className="mt-2 flex flex-wrap gap-3">
+                                            <Link
+                                                href="/account/ai-keys"
+                                                className="text-primary hover:underline"
+                                            >
+                                                {t("noKeys.own")}
+                                            </Link>
+                                            {isAdmin ? (
+                                                <Link
+                                                    href="/admin/integrations/models"
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {t("noKeys.admin")}
+                                                </Link>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                ) : chat.messages.length === 0 ? (
+                                    <ConversationEmptyState
+                                        icon={<PolarMascot mood="idle" size={64} />}
+                                        description={t("empty")}
+                                    >
+                                        {suggestions}
+                                    </ConversationEmptyState>
+                                ) : null}
+                                {chat.messages.map((message, index) => {
+                                    const versions = versionsOf(tree.current, message.id);
+                                    const at = versions.indexOf(message.id);
+                                    return (
+                                        <MessageView
+                                            key={message.id}
+                                            message={message}
+                                            tools={tools}
+                                            last={index === chat.messages.length - 1}
+                                            busy={busy}
+                                            version={{ current: at + 1, total: versions.length }}
+                                            onVersion={(step) => {
+                                                const target = versions[at + step];
+                                                if (target) switchVersion(index, target);
+                                            }}
+                                            onApprove={(id, approved) => {
+                                                setLastApproved(approved);
+                                                void chat.addToolApprovalResponse({ id, approved });
+                                            }}
+                                            onEdit={() => {
+                                                setEditing(message.id);
+                                                setInput(textOf(message));
                                                 textarea.current?.focus();
                                             }}
+                                            onQuote={() => setQuote(textOf(message).slice(0, 200))}
+                                            onRegenerate={() => void chat.regenerate()}
                                         />
-                                    ))}
-                                </Suggestions>
-                            </ConversationEmptyState>
-                        ) : null}
-                        {chat.messages.map((message, index) => {
-                            const versions = versionsOf(tree.current, message.id);
-                            const at = versions.indexOf(message.id);
-                            return (
-                                <MessageView
-                                    key={message.id}
-                                    message={message}
-                                    tools={tools}
-                                    last={index === chat.messages.length - 1}
-                                    busy={busy}
-                                    version={{ current: at + 1, total: versions.length }}
-                                    onVersion={(step) => {
-                                        const target = versions[at + step];
-                                        if (target) switchVersion(index, target);
-                                    }}
-                                    onApprove={(id, approved) => {
-                                        setLastApproved(approved);
-                                        void chat.addToolApprovalResponse({ id, approved });
-                                    }}
-                                    onEdit={() => {
-                                        setEditing(message.id);
-                                        setInput(textOf(message));
-                                        textarea.current?.focus();
-                                    }}
-                                    onQuote={() => setQuote(textOf(message).slice(0, 200))}
-                                    onRegenerate={() => void chat.regenerate()}
-                                />
-                            );
-                        })}
-                        {chat.status === "submitted" ? (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <PolarMascot mood="thinking" size={18} />
-                                <Shimmer>{t("status.thinking")}</Shimmer>
-                            </div>
-                        ) : null}
-                        {chat.error ? (
-                            <p
-                                role="alert"
-                                className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
-                            >
-                                {t("errors.failed")}
-                            </p>
-                        ) : null}
-                    </ConversationContent>
-                </Conversation>
-
-                {queue.length > 0 ? (
-                    <Queue className="mx-3 mb-2">
-                        <QueueSection label={t("queue.title")}>
-                            {queue.map((item, index) => (
-                                <QueueItem
-                                    key={item.id}
-                                    value={item.text}
-                                    labels={{
-                                        edit: t("queue.edit"),
-                                        up: t("queue.up"),
-                                        down: t("queue.down"),
-                                        remove: t("queue.remove")
-                                    }}
-                                    first={index === 0}
-                                    last={index === queue.length - 1}
-                                    onChange={(text) =>
-                                        setQueue(
-                                            queue.map((entry) =>
-                                                entry.id === item.id ? { ...entry, text } : entry
-                                            )
-                                        )
-                                    }
-                                    onCommit={() =>
-                                        saveQueue(queue.filter((entry) => entry.text.trim()))
-                                    }
-                                    onUp={() => saveQueue(moveItem(queue, index, index - 1))}
-                                    onDown={() => saveQueue(moveItem(queue, index, index + 1))}
-                                    onRemove={() =>
-                                        saveQueue(queue.filter((entry) => entry.id !== item.id))
-                                    }
-                                />
-                            ))}
-                        </QueueSection>
-                    </Queue>
-                ) : null}
-
-                <div className="shrink-0 border-t border-border p-3">
-                    {slashOpen ? (
-                        <ul
-                            role="listbox"
-                            aria-label={t("slash.title")}
-                            className="mb-2 rounded-lg border border-border bg-elevated p-1 shadow-popover"
-                        >
-                            {COMMANDS.filter((command) => `/${command}`.startsWith(input)).map(
-                                (command) => {
-                                    const disabled = LATER.has(command);
-                                    return (
-                                        <li key={command}>
-                                            <button
-                                                type="button"
-                                                role="option"
-                                                aria-selected={false}
-                                                aria-disabled={disabled}
-                                                title={disabled ? t("slash.later") : undefined}
-                                                onClick={() => {
-                                                    if (disabled) return;
-                                                    setInput(`/${command}`);
-                                                    textarea.current?.focus();
-                                                }}
-                                                className="flex w-full min-w-0 items-center gap-3 rounded px-2 py-1.5 text-left text-sm hover:bg-option-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-                                            >
-                                                <span className="shrink-0 font-mono text-foreground">
-                                                    /{command}
-                                                </span>
-                                                <span className="min-w-0 truncate text-muted-foreground">
-                                                    {disabled
-                                                        ? t("slash.later")
-                                                        : t(`slash.${command}`)}
-                                                </span>
-                                            </button>
-                                        </li>
                                     );
-                                }
+                                })}
+                                {chat.status === "submitted" ? (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <PolarMascot mood="thinking" size={18} />
+                                        <Shimmer>{t("status.thinking")}</Shimmer>
+                                    </div>
+                                ) : null}
+                                {chat.error ? (
+                                    <p
+                                        role="alert"
+                                        className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
+                                    >
+                                        {t("errors.failed")}
+                                    </p>
+                                ) : null}
+                            </ConversationContent>
+                        </Conversation>
+                        <div
+                            className={cn(
+                                "shrink-0",
+                                fullPage
+                                    ? "mx-auto w-full max-w-3xl px-4 pb-3"
+                                    : "border-t border-border p-3"
                             )}
-                        </ul>
-                    ) : null}
-                    <PromptInput onSubmit={submit}>
-                        <PromptInputHeader>
-                            {context ? (
-                                <Chip
-                                    title={t("context.title")}
-                                    label={context.record?.name ?? context.title ?? context.route}
-                                    removeLabel={t("context.remove")}
-                                    onRemove={() => setWithPage(false)}
-                                />
-                            ) : null}
-                            {quote ? (
-                                <Chip
-                                    label={`${t("reply.to")} "${quote}"`}
-                                    removeLabel={t("reply.cancel")}
-                                    onRemove={() => setQuote(null)}
-                                />
-                            ) : null}
-                            {editing ? (
-                                <Chip
-                                    label={t("edit.editing")}
-                                    removeLabel={t("edit.cancel")}
-                                    onRemove={() => setEditing(null)}
-                                />
-                            ) : null}
-                        </PromptInputHeader>
-                        {files.length > 0 ? (
-                            <Attachments className="mb-2 mt-1">
-                                {files.map((file) => (
-                                    <Attachment
-                                        key={file.id}
-                                        file={file}
-                                        removeLabel={t("files.remove", {
-                                            name: file.filename ?? ""
-                                        })}
-                                        onRemove={() => removeFile(file)}
-                                    />
-                                ))}
-                            </Attachments>
-                        ) : null}
-                        {fileError ? (
-                            <p role="alert" className="mb-1 text-xs text-danger-ink">
-                                {fileError}
-                            </p>
-                        ) : null}
-                        <label
-                            htmlFor={fullPage ? "polar-input-page" : "polar-input"}
-                            className="sr-only"
                         >
-                            {t("composer.label")}
-                        </label>
-                        <PromptInputTextarea
-                            ref={textarea}
-                            id={fullPage ? "polar-input-page" : "polar-input"}
-                            value={input}
-                            maxLength={20000}
-                            disabled={noKeys}
-                            placeholder={t("composer.placeholder")}
-                            onChange={(event) => setInput(event.target.value)}
-                            onSubmitKey={submit}
-                            onPaste={(event) => {
-                                const pasted = Array.from(event.clipboardData.files);
-                                if (pasted.length > 0) {
-                                    event.preventDefault();
-                                    void addFiles(pasted);
-                                }
-                            }}
-                        />
-                        <PromptInputFooter>
-                            <PromptInputTools>
-                                <span id="polar-attach" className="contents">
-                                    <PromptInputAttach
-                                        label={t("files.add")}
-                                        accept={POLAR_ATTACHMENT_TYPES}
-                                        disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
-                                        onFiles={(chosen) => void addFiles(chosen)}
-                                        onFailed={setFileError}
-                                    />
-                                </span>
-                                <span id="polar-model" className="contents">
-                                    <ModelSelector
-                                        providers={providers ?? []}
-                                        choice={choice}
-                                        onChoice={setChoice}
-                                    />
-                                </span>
-                            </PromptInputTools>
-                            <PromptInputSubmit
-                                busy={busy}
-                                disabled={
-                                    (!input.trim() && files.length === 0) ||
-                                    !choice ||
-                                    files.some((file) => file.pending)
-                                }
-                                sendLabel={t("actions.send")}
-                                stopLabel={t("actions.stop")}
-                                onStop={() => void chat.stop()}
-                            />
-                        </PromptInputFooter>
-                    </PromptInput>
-                    <p className="mt-1.5 text-center text-xs text-foreground-subtle">
-                        {t("footer")}
-                    </p>
-                </div>
+                            {queueView}
+                            {composer}
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
 }
-
 function moveItem<T>(list: T[], from: number, to: number): T[] {
     const next = [...list];
     const [moved] = next.splice(from, 1);
@@ -1139,6 +1343,7 @@ function MessageView({
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) => tools[name]?.title ?? name;
+    const { copied, copy } = useCopied();
     return (
         <Message from={from}>
             {meta.fellBackFrom ? (
@@ -1230,10 +1435,10 @@ function MessageView({
                         <Reply />
                     </MessageAction>
                     <MessageAction
-                        label={t("actions.copy")}
-                        onClick={() => void navigator.clipboard?.writeText(textOf(message))}
+                        label={copied ? t("actions.copied") : t("actions.copy")}
+                        onClick={() => void copy(textOf(message))}
                     >
-                        <Copy />
+                        <CopyIcon copied={copied} />
                     </MessageAction>
                     {!mine && last ? (
                         <MessageAction label={t("actions.regenerate")} onClick={onRegenerate}>

@@ -14,11 +14,29 @@
     "history": {
         "title": "Conversations",
         "empty": "No conversations yet.",
-        "delete": "Delete conversation",
-        "more": "Show more"
+        "delete": "Delete",
+        "more": "Show more",
+        "rename": "Rename",
+        "renameFailed": "Couldn't rename the conversation. Try again.",
+        "options": "Conversation options",
+        "name": "Conversation name",
+        "kind": "conversation",
+        "deleteTitle": "Delete conversation?",
+        "deleteQuestion": "\"{title}\" and its messages will be deleted for good.",
+        "deleteConfirm": "Delete",
+        "hide": "Hide sidebar",
+        "show": "Show conversations",
+        "close": "Back to chat",
+        "groups": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "week": "Previous 7 days",
+            "month": "Previous 30 days",
+            "older": "Older"
+        }
     },
     "actions": {
-        "new": "New conversation",
+        "new": "New chat",
         "openPage": "Open as a page",
         "close": "Close Polar",
         "stop": "Stop",
@@ -26,7 +44,8 @@
         "edit": "Edit message",
         "reply": "Reply to message",
         "copy": "Copy message",
-        "regenerate": "Answer again"
+        "regenerate": "Answer again",
+        "copied": "Copied"
     },
     "noKeys": {
         "title": "Polar needs an AI provider key",
@@ -86,7 +105,9 @@
         "signin": "Agent sign-in",
         "signinReason": "Sign-ins only run inside Agents sessions; Polar uses API keys.",
         "manage": "Manage AI provider keys",
-        "noReasoning": "This model has one fixed level"
+        "noReasoning": "This model has one fixed level",
+        "search": "Find a model",
+        "noMatch": "No models match"
     },
     "intelligence": {
         "fast": "Fast",
@@ -147,5 +168,6 @@
         "page": "What's on this page?",
         "summary": "Summarize what changed today",
         "tools": "What can you do here?"
-    }
+    },
+    "welcome": "How can I help?"
 }

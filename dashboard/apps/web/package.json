@@ -79,6 +79,7 @@
         "driver.js": "1.8.0",
         "dymo-api": "1.2.44",
         "fast-xml-parser": "5.11.1",
+        "fuse.js": "7.5.0",
         "highlight.js": "11.11.1",
         "iconv-lite": "0.7.3",
         "imapflow": "1.7.8",

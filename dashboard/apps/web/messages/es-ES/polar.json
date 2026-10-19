@@ -14,11 +14,29 @@
     "history": {
         "title": "Conversaciones",
         "empty": "Sin conversaciones aún.",
-        "delete": "Borrar conversación",
-        "more": "Ver más"
+        "delete": "Eliminar",
+        "more": "Ver más",
+        "rename": "Renombrar",
+        "renameFailed": "No se pudo renombrar la conversación. Inténtalo de nuevo.",
+        "options": "Opciones del chat",
+        "name": "Nombre del chat",
+        "kind": "conversación",
+        "deleteTitle": "¿Eliminar la conversación?",
+        "deleteQuestion": "\"{title}\" y sus mensajes se eliminarán para siempre.",
+        "deleteConfirm": "Eliminar",
+        "hide": "Ocultar panel",
+        "show": "Ver conversaciones",
+        "close": "Volver al chat",
+        "groups": {
+            "today": "Hoy",
+            "yesterday": "Ayer",
+            "week": "Últimos 7 días",
+            "month": "Últimos 30 días",
+            "older": "Antes"
+        }
     },
     "actions": {
-        "new": "Nueva conversación",
+        "new": "Nuevo chat",
         "openPage": "Abrir como página",
         "close": "Cerrar Polar",
         "stop": "Parar",
@@ -26,7 +44,8 @@
         "edit": "Editar mensaje",
         "reply": "Responder al mensaje",
         "copy": "Copiar mensaje",
-        "regenerate": "Regenerar"
+        "regenerate": "Regenerar",
+        "copied": "Copiado"
     },
     "noKeys": {
         "title": "Polar necesita una clave de IA",
@@ -86,7 +105,9 @@
         "signin": "Sesión de agente",
         "signinReason": "Las sesiones solo se usan en Agentes; Polar usa claves de API.",
         "manage": "Gestionar claves de IA",
-        "noReasoning": "Este modelo tiene un único nivel"
+        "noReasoning": "Este modelo tiene un único nivel",
+        "search": "Buscar modelo",
+        "noMatch": "Sin coincidencias"
     },
     "intelligence": {
         "fast": "Rápido",
@@ -147,5 +168,6 @@
         "page": "¿Qué hay en esta página?",
         "summary": "Resume qué ha cambiado hoy",
         "tools": "¿Qué puedes hacer aquí?"
-    }
+    },
+    "welcome": "¿En qué te ayudo?"
 }

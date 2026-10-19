@@ -20,16 +20,10 @@
  * Unhighlighted code never goes near `innerHTML` at all: it is a text node.
  */
 
-import { cn } from "@polaris/ui";
-import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { cn, CopyIcon, useCopied } from "@polaris/ui";
 import { useHighlighter } from "@/lib/code-highlight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { languageForToken } from "@/lib/code-language";
-
-/** How long the copy button stays ticked. Long enough to be seen, short enough
- *  that it is back to itself before anybody reaches for it again. */
-const COPIED_MS = 1600;
 
 export function CodeBlock({ code, language }: { code: string; language: string | null }) {
     // Resolved before asking for a grammar, so an unknown fence tag ("output",
@@ -65,29 +59,14 @@ export function CodeBlock({ code, language }: { code: string; language: string |
 
 function CopyButton({ code }: { code: string }) {
     const t = useTranslations("components");
-    const [copied, setCopied] = useState(false);
-
-    useEffect(() => {
-        if (!copied) return;
-        const timer = setTimeout(() => setCopied(false), COPIED_MS);
-        return () => clearTimeout(timer);
-    }, [copied]);
+    const { copied, copy } = useCopied();
 
     return (
         <button
             type="button"
             title={t("editor.copyCode")}
             aria-label={t("editor.copyCode")}
-            onClick={async () => {
-                if (!navigator.clipboard) return;
-                try {
-                    await navigator.clipboard.writeText(code);
-                    setCopied(true);
-                } catch {
-                    // Refused on an insecure origin or an unfocused document.
-                    // Nothing useful to say about it.
-                }
-            }}
+            onClick={() => void copy(code)}
             className={cn(
                 "shrink-0 rounded p-1 transition-colors",
                 copied
@@ -95,7 +74,7 @@ function CopyButton({ code }: { code: string }) {
                     : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
             )}
         >
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            <CopyIcon copied={copied} />
         </button>
     );
 }
