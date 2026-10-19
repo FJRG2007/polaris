@@ -111,6 +111,32 @@ describe("the shared picker in place of a file input", () => {
         expect(onFiles.mock.calls[0]?.[0]?.[0]?.type).toBe("image/png");
     });
 
+    it("hands a storage pick back by where it is when the screen can read it there", async () => {
+        stubDrive();
+        const onFiles = vi.fn();
+        const onDrive = vi.fn();
+        render(
+            <ChooseFilesDialog
+                accept="image/png"
+                onFiles={onFiles}
+                onDrive={onDrive}
+                onClose={() => {}}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        await userEvent.click(await screen.findByText("Skin.png"));
+        await userEvent.click(screen.getByRole("button", { name: "Attach" }));
+        expect(onDrive).toHaveBeenCalledWith([
+            { connectionId: "c1", path: "Skin.png", name: "Skin.png", size: 10 }
+        ]);
+        expect(onFiles).not.toHaveBeenCalled();
+        expect(
+            vi
+                .mocked(fetch)
+                .mock.calls.some(([url]) => String(url).includes("/api/attachments/fetch"))
+        ).toBe(false);
+    });
+
     it("says why a pick failed in the reader's words", async () => {
         vi.stubGlobal(
             "fetch",

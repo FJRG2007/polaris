@@ -13,6 +13,7 @@
  * the ceilings live.
  */
 
+import { z } from "zod";
 import { mimeForName } from "@/lib/mime";
 import { normalizeRelPath } from "@polaris/core";
 import { requireDriveDriver } from "@/lib/drive-authz";
@@ -141,6 +142,31 @@ export async function openFromDrive(
         await done();
         throw caught;
     }
+}
+
+/** A request body that names a file on one of the sender's storages instead of
+ *  carrying it. */
+const driveBodySchema = z.object({
+    connectionId: z.string().trim().min(1).max(200),
+    path: z.string().trim().min(1).max(4096)
+});
+
+/**
+ * The file a request is about, when its body names one on a storage rather than
+ * carrying the bytes: opened there, for a route that streams what it is sent to
+ * disk, so a file picked out of a Drive is not limited to what a browser can be
+ * handed and send back. Null when the body is the file itself.
+ */
+export async function openedDriveBody(
+    request: Request,
+    userId: string,
+    maxBytes: number
+): Promise<OpenedFile | null> {
+    const type = request.headers.get("content-type") ?? "";
+    if (!type.toLowerCase().startsWith("application/json")) return null;
+    const parsed = driveBodySchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) throw new AttachRefused("That file could not be read just now.");
+    return openFromDrive(userId, parsed.data.connectionId, parsed.data.path, maxBytes);
 }
 
 /**

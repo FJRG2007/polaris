@@ -20,6 +20,8 @@ import { validationMessage } from "@/components/i18n/validation-message";
 import type { TransferSummary } from "@/lib/instance-transfer/transfer";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
 import { applyImportAction, exportInstanceAction, previewImportAction } from "./transfer-actions";
+import type { KeptPick } from "@/components/file-picker/as-files";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 const MIN_PASSPHRASE = 12;
 
@@ -37,7 +39,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     const [exporting, setExporting] = useState(false);
     const [exported, setExported] = useState<{ id: string; summary: TransferSummary } | null>(null);
 
-    const [file, setFile] = useState<File | null>(null);
+    const [file, setFile] = useState<File | KeptPick | null>(null);
     const [importPass, setImportPass] = useState("");
     const [uploadId, setUploadId] = useState<string | null>(null);
     const [busy, setBusy] = useState<"upload" | "preview" | "apply" | null>(null);
@@ -47,6 +49,7 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
     } | null>(null);
     const [confirm, setConfirm] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
     // The file is only as safe as this passphrase once it leaves: one already in a
     // breach list, or made of this deployment's own name, is the first guess.
@@ -86,7 +89,18 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
             // Through the shared sender: an instance's whole export is the largest
             // file anybody puts into Polaris, and it used to be a button that said
             // "Working" for as long as it took.
-            const response = await sendFile("/api/admin/transfer/upload", file, {
+            // One already on a storage is named, and the server reads it there.
+            const payload =
+                file instanceof File
+                    ? file
+                    : new Blob(
+                          [JSON.stringify({ connectionId: file.connectionId, path: file.path })],
+                          {
+                              type: "application/json"
+                          }
+                      );
+            const response = await sendFile("/api/admin/transfer/upload", payload, {
+                name: file.name,
                 // Its answer is the whole restore, which takes as long as it takes.
                 answerWithinMs: null,
                 method: "POST",
@@ -189,16 +203,31 @@ export function TransferCard({ identity }: { identity: readonly string[] }) {
                 <section className="flex flex-col gap-2 border-t border-border pt-4">
                     <p className="text-muted-foreground">{t("settings.transfer.importIntro")}</p>
                     <div className="flex flex-wrap gap-2">
-                        <input
-                            type="file"
-                            accept=".polaris"
-                            onChange={(event) => {
-                                setFile(event.target.files?.[0] ?? null);
-                                setUploadId(null);
-                                setPreview(null);
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="min-w-0 max-w-full"
+                            title={file?.name}
+                            onClick={() => {
+                                const choose = (chosen: File | KeptPick | undefined) => {
+                                    if (!chosen) return;
+                                    setFile(chosen);
+                                    setUploadId(null);
+                                    setPreview(null);
+                                };
+                                void chooseFiles({
+                                    accept: ".polaris",
+                                    onFailed: setError,
+                                    onDrive: ([kept]) => choose(kept)
+                                }).then(([chosen]) => choose(chosen));
                             }}
-                            className="min-w-0 flex-1 text-xs"
-                        />
+                        >
+                            <span className="min-w-0 truncate">
+                                {file ? file.name : t("settings.transfer.chooseFile")}
+                            </span>
+                        </Button>
+                        {chooser}
                         <Input
                             type="password"
                             value={importPass}

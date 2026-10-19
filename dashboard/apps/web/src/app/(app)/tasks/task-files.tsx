@@ -15,7 +15,7 @@
 
 import Image from "next/image";
 import * as actions from "./actions";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Button, Input, cn } from "@polaris/ui";
 import { CopyButton } from "@/components/copy-button";
@@ -64,7 +64,6 @@ export function AttachmentSection({
 }) {
     const t = useTranslations("tasksDetail");
     const tFiles = useTranslations("components");
-    const input = useRef<HTMLInputElement | null>(null);
     const [busy, setBusy] = useState(false);
     const [picking, setPicking] = useState(false);
     const [dragging, setDragging] = useState(false);
@@ -108,7 +107,6 @@ export function AttachmentSection({
             }
         }
         setBusy(false);
-        if (input.current) input.current.value = "";
         onChanged();
     };
 
@@ -135,15 +133,6 @@ export function AttachmentSection({
                     </Button>
                 )}
             </header>
-
-            <input
-                ref={input}
-                type="file"
-                multiple
-                hidden
-                aria-hidden
-                onChange={(event) => void upload(event.target.files)}
-            />
 
             {picking && (
                 <FilePickerDialog

@@ -14,7 +14,7 @@
  */
 
 import * as actions from "../actions";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { PersonView } from "../../lib/people";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { FACE_IMAGE_TYPES } from "../../lib/face-image";
@@ -30,6 +30,8 @@ import {
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 const { runAction } = hostUi.runAction;
 
@@ -58,9 +60,9 @@ export function PersonDialog({
     const [busy, setBusy] = useState(false);
     const [progress, setProgress] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const fileInput = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
 
-    const add = (files: FileList | null) => {
+    const add = (files: Iterable<File> | null) => {
         if (!files) return;
         setChosen((current) => [
             ...current,
@@ -105,7 +107,11 @@ export function PersonDialog({
 
         if (refused.length > 0) {
             setError(
-                t("people.refused", { count: refused.length, total: chosen.length, first: refused[0] ?? "" })
+                t("people.refused", {
+                    count: refused.length,
+                    total: chosen.length,
+                    first: refused[0] ?? ""
+                })
             );
             // The person exists either way, so the list is told about them.
             onSaved({ ...created.person, faces: chosen.length - refused.length });
@@ -119,15 +125,14 @@ export function PersonDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("people.add")}</DialogTitle>
-                    <DialogDescription>
-                        {t("people.addIntro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("people.addIntro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            {t("placeDialog.name")}<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
@@ -170,27 +175,21 @@ export function PersonDialog({
                             size="sm"
                             className="self-start"
                             disabled={!recognizerReady}
-                            onClick={() => fileInput.current?.click()}
+                            onClick={() =>
+                                void chooseFiles({
+                                    accept: FACE_IMAGE_TYPES.join(","),
+                                    multiple: true,
+                                    onFailed: setError
+                                }).then(add)
+                            }
                         >
                             <ImagePlus className="size-4 shrink-0" />
                             {chosen.length > 0 ? t("people.addMore") : t("people.choose")}
                         </Button>
                         <span className="text-[0.6875rem] text-foreground-subtle">
-                            {recognizerReady
-                                ? t("people.photosHint")
-                                : t("people.facesOff")}
+                            {recognizerReady ? t("people.photosHint") : t("people.facesOff")}
                         </span>
-                        <input
-                            ref={fileInput}
-                            type="file"
-                            accept={FACE_IMAGE_TYPES.join(",")}
-                            multiple
-                            className="hidden"
-                            onChange={(event) => {
-                                add(event.target.files);
-                                event.target.value = "";
-                            }}
-                        />
+                        {chooser}
                     </div>
                 </div>
 

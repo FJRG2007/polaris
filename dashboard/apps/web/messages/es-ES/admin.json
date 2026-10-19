@@ -3103,6 +3103,7 @@
             "differ": "Las frases no coinciden",
             "exported": "{count, plural, one {Exportada {shown} fila} other {Exportadas {shown} filas}}.{unreadable, plural, =0 {} other { {unreadableShown} secretos guardados no se han podido abrir aquí y habrá que volver a introducirlos.}} Sin la frase de contraseña el archivo no se puede abrir.",
             "importIntro": "En una instalación nueva: importa una exportación. Sustituye todas las cuentas y ajustes de aquí, incluida esta.",
+            "chooseFile": "Elegir exportación",
             "itsPassphrase": "Su frase clave",
             "uploading": "Subiendo",
             "checkFile": "Comprobar",

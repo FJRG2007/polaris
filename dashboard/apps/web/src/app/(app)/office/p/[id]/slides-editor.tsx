@@ -88,6 +88,7 @@ import {
     Type,
     Undo2
 } from "lucide-react";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** Every key the editor answers to, in the order a press is tried. */
 const KEYS = [
@@ -213,7 +214,7 @@ export function SlidesEditor({
     const [motionOpen, setMotionOpen] = useState(false);
     const [previewing, setPreviewing] = useState(false);
     const toast = useToast();
-    const picker = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [atIndex, setAtIndex] = useState(0);
     /** The boxes chosen, in the order they were. */
     const [chosen, setChosen] = useState<string[]>([]);
@@ -854,7 +855,15 @@ export function SlidesEditor({
                                             size="sm"
                                             className="shrink-0"
                                             title={t("slides.image.insert")}
-                                            onClick={() => picker.current?.click()}
+                                            onClick={() =>
+                                                void chooseFiles({
+                                                    accept: "image/*",
+                                                    multiple: true,
+                                                    onFailed: (title) => toast.show({ title })
+                                                }).then((files) => {
+                                                    if (files.length > 0) void addPictures(files);
+                                                })
+                                            }
                                         >
                                             <ImagePlus className="size-4 shrink-0" aria-hidden />
                                             <span className="max-2xl:sr-only">
@@ -863,20 +872,7 @@ export function SlidesEditor({
                                         </Button>
                                         <TableMenu onPick={addTable} />
                                         <ChartMenu onPick={addChart} />
-                                        <input
-                                            ref={picker}
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            hidden
-                                            onChange={(event) => {
-                                                const files = [
-                                                    ...(event.currentTarget.files ?? [])
-                                                ];
-                                                event.currentTarget.value = "";
-                                                void addPictures(files);
-                                            }}
-                                        />
+                                        {chooser}
                                         <span
                                             className="mx-1 h-5 w-px shrink-0 bg-border"
                                             aria-hidden

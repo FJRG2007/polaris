@@ -347,7 +347,6 @@ export function Composer({
     // promise the room cannot keep.
     const mayAttach = attachable && rules.maxAttachments > 0;
     const [dragging, setDragging] = useState(false);
-    const picker = useRef<HTMLInputElement>(null);
     const gallery = useRef<HTMLInputElement>(null);
     const camera = useRef<HTMLInputElement>(null);
     // Whether this is something held in a hand, which is the only place a camera
@@ -1313,12 +1312,13 @@ export function Composer({
                 </div>
             </div>
 
-            {/* Three pickers rather than one that is reconfigured: setting
+            {/* The phone's own gallery and camera, which only the browser's
+                chooser opens - everything else goes through the shared picker.
+                Two inputs rather than one that is reconfigured: setting
                 `accept` and `capture` on the way to a click is a change the
                 browser is not obliged to have applied by the time the dialog
                 opens, and on a phone that is the difference between the gallery
                 and the camera. */}
-            <input ref={picker} type="file" multiple className="hidden" onChange={picked} />
             <input
                 ref={gallery}
                 type="file"

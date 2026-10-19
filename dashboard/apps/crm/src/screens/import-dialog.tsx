@@ -11,7 +11,7 @@ import { useCrmT } from "./i18n";
 import { Upload } from "lucide-react";
 import { messageOf, unwrap } from "./call";
 import * as actions from "../actions/records";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { fieldLabel, useCustomFields } from "./custom-fields";
 import { fieldsOf, primaryField, type CrmObject, type FieldDef } from "../model/objects";
 import {
@@ -36,6 +36,9 @@ import {
     parseCsv,
     type RowProblem
 } from "../model/import";
+import { hostUi } from "@polaris/app-host/client";
+
+const { useChooseFiles } = hostUi.filePicker;
 
 /** The value of the "do not import" choice. */
 const SKIP = "__skip";
@@ -66,7 +69,7 @@ export function ImportDialog(props: ImportDialogProps) {
     const t = useCrmT();
     const toast = useToast();
     const custom = useCustomFields();
-    const input = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [loaded, setLoaded] = useState<Loaded | null>(null);
     const [mapping, setMapping] = useState<(string | null)[]>([]);
     const [fileError, setFileError] = useState<string | null>(null);
@@ -221,7 +224,13 @@ export function ImportDialog(props: ImportDialogProps) {
             <div className="flex flex-col gap-2">
                 <button
                     type="button"
-                    onClick={() => input.current?.click()}
+                    onClick={() =>
+                        void chooseFiles({ accept: ".csv,text/csv", onFailed: setFileError }).then(
+                            (files) => {
+                                if (files[0]) void read(files[0]);
+                            }
+                        )
+                    }
                     onDragOver={(event) => {
                         event.preventDefault();
                         setDragging(true);
@@ -243,17 +252,7 @@ export function ImportDialog(props: ImportDialogProps) {
                         {t("import.drop", { rows: MAX_IMPORT_ROWS, size })}
                     </span>
                 </button>
-                <input
-                    ref={input}
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (file) void read(file);
-                    }}
-                />
+                {chooser}
                 {fileError ? (
                     <p role="alert" className="text-[0.8125rem] text-destructive">
                         {fileError}

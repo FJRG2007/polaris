@@ -45,6 +45,7 @@ import {
     SegmentedControl,
     shortcutPressed
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The highlight.js grammar each format is painted with: a `.env` reads as
  *  INI's key = value lines, comments included. */
@@ -82,6 +83,7 @@ export function VariablesRawDialog({
     const [format, setFormat] = useState<RawFormat>("env");
     const [text, setText] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [newAreSecrets, setNewAreSecrets] = useState(true);
     const [copied, setCopied] = useState(false);
     const [finding, setFinding] = useState(false);
@@ -220,30 +222,26 @@ export function VariablesRawDialog({
                                 <Search className="size-4" />
                             </Button>
                             {canWrite && format === "env" && (
-                                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-primary hover:underline">
+                                <button
+                                    type="button"
+                                    className="flex cursor-pointer items-center gap-1.5 text-xs text-primary hover:underline"
+                                    onClick={async () => {
+                                        const [file] = await chooseFiles({
+                                            accept: ".env,text/plain",
+                                            onFailed: setError
+                                        });
+                                        if (!file) return;
+                                        const more = await file.text();
+                                        setText((now) =>
+                                            now.trim() ? `${now.trimEnd()}\n${more}` : more
+                                        );
+                                    }}
+                                >
                                     <Upload className="size-3.5" />
                                     {t("variables.upload")}
-                                    <input
-                                        type="file"
-                                        accept=".env,text/plain"
-                                        className="hidden"
-                                        onChange={(event) => {
-                                            const file = event.target.files?.[0];
-                                            event.target.value = "";
-                                            if (file)
-                                                void file
-                                                    .text()
-                                                    .then((more) =>
-                                                        setText((now) =>
-                                                            now.trim()
-                                                                ? `${now.trimEnd()}\n${more}`
-                                                                : more
-                                                        )
-                                                    );
-                                        }}
-                                    />
-                                </label>
+                                </button>
                             )}
+                            {chooser}
                         </div>
                     </div>
                     <div

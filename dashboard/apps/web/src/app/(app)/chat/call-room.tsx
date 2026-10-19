@@ -155,6 +155,7 @@ import {
     cn,
     useShortcutHint
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /**
  * The room.
@@ -1604,8 +1605,20 @@ function Split({
     // The picker lives outside the menu on purpose: a menu that has closed has
     // unmounted its contents, and a file input that is chosen from after that is
     // an input nothing is listening to.
-    const picker = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [pickProblem, setPickProblem] = useState<string | null>(null);
+
+    /** Asks for a picture to sit behind you. */
+    const askPicture = () =>
+        void chooseFiles({ accept: "image/*", onFailed: setPickProblem }).then(([file]) => {
+            if (!file || !onPickBackground) return;
+            setPickProblem(null);
+            void onPickBackground(file).catch((caught: unknown) =>
+                setPickProblem(
+                    caught instanceof Error ? caught.message : "Polaris could not use that picture."
+                )
+            );
+        });
     /** Whether the picture in use is one of theirs rather than one of ours. */
     const ownPicture = Boolean(backgroundImage) && sceneOf(backgroundImage ?? null) === null;
 
@@ -1795,7 +1808,7 @@ function Split({
                                             // on, so it asks for one instead.
                                             if (choice.value === "image" && !backgroundImage) {
                                                 event.preventDefault();
-                                                picker.current?.click();
+                                                askPicture();
                                                 return;
                                             }
                                             onBackground(choice.value);
@@ -1867,7 +1880,7 @@ function Split({
                                                 title={t("callRoom.useAPictureOfYour")}
                                                 aria-label={t("callRoom.useAPictureOfYour")}
                                                 aria-pressed={ownPicture}
-                                                onClick={() => picker.current?.click()}
+                                                onClick={askPicture}
                                                 className={cn(
                                                     "flex aspect-video items-center justify-center overflow-hidden rounded border-2 text-muted-foreground transition-colors",
                                                     ownPicture
@@ -2041,29 +2054,7 @@ function Split({
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
-            {onPickBackground && (
-                <input
-                    ref={picker}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        // Cleared either way, so choosing the same file twice is
-                        // a second change event rather than silence.
-                        event.target.value = "";
-                        if (!file) return;
-                        setPickProblem(null);
-                        void onPickBackground(file).catch((caught: unknown) =>
-                            setPickProblem(
-                                caught instanceof Error
-                                    ? caught.message
-                                    : "Polaris could not use that picture."
-                            )
-                        );
-                    }}
-                />
-            )}
+            {chooser}
         </span>
     );
 }

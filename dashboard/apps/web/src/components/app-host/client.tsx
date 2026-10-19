@@ -48,6 +48,7 @@ import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { refreshAppFavorites } from "@/components/use-app-favorites";
 import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 const FilePickerDialog = dynamic(
     () =>
@@ -167,7 +168,7 @@ export const clientHost = {
     confirmDialog: { useConfirm },
     copyButton: { CopyButton },
     displayFormat: { useDisplayFormat },
-    filePicker: { ChooseFilesDialog, FilePickerDialog },
+    filePicker: { ChooseFilesDialog, FilePickerDialog, useChooseFiles },
     gameLogo: { GameLogo },
     i18nProvider: { useLocale },
     logViewer: { LogViewer },

@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, ImageUp, Loader2, MapPin } from "lucide-react";
 import { Button, Input, Select, Switch, cn, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** What the file says about itself, as the server read it. */
 interface Facts {
@@ -66,7 +67,7 @@ export function ImagesView() {
     const [longest, setLongest] = useState("");
     const [keepMetadata, setKeepMetadata] = useState(false);
 
-    const pickerRef = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     // The object URL of the result, revoked when it is replaced: a slider that
     // re-encodes on every move would otherwise leak one image per move.
     const madeUrl = useRef<string | null>(null);
@@ -83,7 +84,9 @@ export function ImagesView() {
                 });
                 if (!answer.ok) {
                     // The server says which: too large, or not a picture at all.
-                    const said = (await answer.json().catch(() => null)) as { error?: unknown } | null;
+                    const said = (await answer.json().catch(() => null)) as {
+                        error?: unknown;
+                    } | null;
                     throw new Error(typeof said?.error === "string" ? said.error : "");
                 }
                 setFacts((await answer.json()) as Facts);
@@ -157,22 +160,19 @@ export function ImagesView() {
 
     return (
         <div className="flex flex-col gap-4">
-            <input
-                ref={pickerRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                    const chosen = event.target.files?.[0];
-                    if (chosen) void take(chosen);
-                    event.target.value = "";
-                }}
-            />
+            {chooser}
 
             {!file ? (
                 <button
                     type="button"
-                    onClick={() => pickerRef.current?.click()}
+                    onClick={() =>
+                        void chooseFiles({
+                            accept: "image/*",
+                            onFailed: (title) => toast.show({ title })
+                        }).then(([chosen]) => {
+                            if (chosen) void take(chosen);
+                        })
+                    }
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => {
                         event.preventDefault();
@@ -219,7 +219,11 @@ export function ImagesView() {
                                 </Fact>
                                 <Fact label={t("images.now")}>
                                     {made
-                                        ? t("images.size", { width: made.width, height: made.height, weight: weigh(made.bytes) })
+                                        ? t("images.size", {
+                                              width: made.width,
+                                              height: made.height,
+                                              weight: weigh(made.bytes)
+                                          })
                                         : "-"}
                                 </Fact>
                                 <Fact label={t("images.saved")}>
@@ -232,7 +236,9 @@ export function ImagesView() {
                                         {made ? `${Math.round(saved * 100)}%` : "-"}
                                     </span>
                                 </Fact>
-                                <Fact label={t("images.taken")}>{facts.taken ?? t("images.notRecorded")}</Fact>
+                                <Fact label={t("images.taken")}>
+                                    {facts.taken ?? t("images.notRecorded")}
+                                </Fact>
                             </dl>
                         ) : null}
 
@@ -296,7 +302,9 @@ export function ImagesView() {
                         <label className="flex items-start justify-between gap-3 text-sm">
                             <span className="flex flex-col">
                                 {t("images.keepInfo")}
-                                <span className="text-xs text-foreground-subtle">{t("images.keepInfoHint")}</span>
+                                <span className="text-xs text-foreground-subtle">
+                                    {t("images.keepInfoHint")}
+                                </span>
                             </span>
                             <Switch
                                 checked={keepMetadata}

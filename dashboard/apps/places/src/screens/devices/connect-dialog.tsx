@@ -77,6 +77,8 @@ import type { PlacesTranslator } from "../../lib/i18n";
 import { philipsCountryGuess } from "../../lib/integrations/philips-regions";
 import type { PairingAsked, PairingFoundIn, PairingLookup } from "../../lib/drivers/contract";
 
+const { useChooseFiles } = hostUi.filePicker;
+
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
 const { QRCodeSVG } = hostUi.qrCode;
@@ -346,6 +348,7 @@ export function ConnectDialog({
     /** The file the attempt asked for after its code, and the one chosen. */
     const [fileStep, setFileStep] = useState<FileStep | null>(null);
     const [chosenFile, setChosenFile] = useState<File | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     /** A connection made with models it cannot fully operate yet: said once,
      *  before the dialog closes, rather than left to be found row by row. */
     const [finished, setFinished] = useState<{
@@ -1142,23 +1145,42 @@ export function ConnectDialog({
                                             {fileWords.homeid}
                                         </p>
                                     )}
-                                    <label className="flex flex-col gap-1.5">
+                                    <div className="flex flex-col gap-1.5">
                                         <span className="text-xs text-muted-foreground">
                                             {fileWords.field}
                                             <span className="text-danger"> *</span>
                                         </span>
-                                        <input
-                                            type="file"
-                                            accept={fileSpec.accept}
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
                                             disabled={saving}
-                                            onChange={(event) => {
-                                                setError("");
-                                                setChosenFile(event.target.files?.[0] ?? null);
-                                            }}
-                                            aria-label={fileWords.field}
-                                            className="min-w-0 rounded-md border border-border bg-background px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:text-foreground"
-                                        />
-                                    </label>
+                                            aria-label={
+                                                chosenFile
+                                                    ? `${fileWords.field}: ${chosenFile.name}`
+                                                    : fileWords.field
+                                            }
+                                            title={chosenFile?.name}
+                                            className="min-w-0 max-w-full self-start"
+                                            onClick={() =>
+                                                void chooseFiles({
+                                                    accept: fileSpec.accept,
+                                                    onFailed: setError
+                                                }).then(([file]) => {
+                                                    if (!file) return;
+                                                    setError("");
+                                                    setChosenFile(file);
+                                                })
+                                            }
+                                        >
+                                            <span className="min-w-0 truncate">
+                                                {chosenFile
+                                                    ? chosenFile.name
+                                                    : t("connections.chooseFile")}
+                                            </span>
+                                        </Button>
+                                        {chooser}
+                                    </div>
                                     {fileIssue && (
                                         <span className="text-xs text-danger">{fileIssue}</span>
                                     )}

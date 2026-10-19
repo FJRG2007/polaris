@@ -42,6 +42,8 @@ import {
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
 
+const { useChooseFiles } = hostUi.filePicker;
+
 const { runAction } = hostUi.runAction;
 
 export function PeopleView({ canManage }: { canManage: boolean }) {
@@ -52,7 +54,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
     const [uploading, setUploading] = useState<string | null>(null);
     const [removing, setRemoving] = useState<PersonView | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const fileInput = useRef<HTMLInputElement | null>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const uploadFor = useRef<string | null>(null);
     // The row the keyboard is on, and the one being renamed in place.
     const [focused, setFocused] = useState<string | null>(null);
@@ -85,7 +87,11 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
 
     const pickPhoto = (person: PersonView) => {
         uploadFor.current = person.id;
-        fileInput.current?.click();
+        void chooseFiles({ accept: FACE_IMAGE_TYPES.join(","), onFailed: setError }).then(
+            (files) => {
+                if (files[0]) void upload(files[0]);
+            }
+        );
     };
 
     const upload = async (file: File) => {
@@ -374,17 +380,7 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
                 />
             ) : null}
 
-            <input
-                ref={fileInput}
-                type="file"
-                accept={FACE_IMAGE_TYPES.join(",")}
-                className="hidden"
-                onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (file) void upload(file);
-                }}
-            />
+            {chooser}
 
             {removing ? (
                 <ConfirmDeleteDialog

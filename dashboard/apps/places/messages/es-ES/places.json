@@ -1107,7 +1107,8 @@
         "notPort": "Escribe un número de puerto del 1 al 65535.",
         "notAreas": "Escribe números de área del 1 al 255, separados por comas, hasta 64.",
         "macShort": "Una MAC tiene 12 dígitos.",
-        "macReserved": "Esa no es la MAC de un dispositivo."
+        "macReserved": "Esa no es la MAC de un dispositivo.",
+        "chooseFile": "Elegir archivo"
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",

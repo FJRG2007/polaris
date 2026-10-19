@@ -23,7 +23,7 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { chatAvatarUrl } from "@/lib/avatar-url";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
 import { openDirectAction } from "./actions";
 import { ChatPeoplePicker } from "./chat-people-picker";
@@ -40,6 +40,7 @@ import {
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 export function NewDirectDialog({
     open,
@@ -63,7 +64,7 @@ export function NewDirectDialog({
     const [preview, setPreview] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const file = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     /** Chosen, and waiting to be framed. Nothing is held until it has been. */
     const [chosen, setChosen] = useState<File | null>(null);
 
@@ -189,7 +190,14 @@ export function NewDirectDialog({
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
-                            onClick={() => file.current?.click()}
+                            onClick={() =>
+                                void chooseFiles({
+                                    accept: CROP_ACCEPTED,
+                                    onFailed: setError
+                                }).then(([picked]) => {
+                                    if (picked) setChosen(picked);
+                                })
+                            }
                             className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
                             aria-label={
                                 picture
@@ -208,17 +216,7 @@ export function NewDirectDialog({
                                 <ImagePlus className="mx-auto size-5" />
                             )}
                         </button>
-                        <input
-                            ref={file}
-                            type="file"
-                            accept={CROP_ACCEPTED}
-                            className="hidden"
-                            onChange={(event) => {
-                                const picked = event.target.files?.[0];
-                                event.target.value = "";
-                                if (picked) setChosen(picked);
-                            }}
-                        />
+                        {chooser}
                         <Input
                             value={name}
                             maxLength={MAX_CHAT_CHANNEL_NAME}
