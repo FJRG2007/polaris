@@ -16,7 +16,10 @@ import { useEffect, useState } from "react";
 import { Checkbox, Select, Skeleton } from "@polaris/ui";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { noticeChannelsAction, type NoticeDestinationChoice } from "@/app/(app)/automations/actions";
+import {
+    noticeChannelsAction,
+    type NoticeDestinationChoice
+} from "@/app/(app)/automations/actions";
 
 interface Channels {
     readonly mail: boolean;
@@ -63,7 +66,11 @@ function Row({
     );
 }
 
-export function NoticeDeliveryFields({ value, onChange, disabled = false }: NoticeDeliveryFieldsProps) {
+export function NoticeDeliveryFields({
+    value,
+    onChange,
+    disabled = false
+}: NoticeDeliveryFieldsProps) {
     const t = useTranslations("automations");
     const [channels, setChannels] = useState<Channels | null>(null);
     const [error, setError] = useState("");
@@ -166,7 +173,10 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
                                         onChange={(event) =>
                                             set({
                                                 destinations: event.target.checked
-                                                    ? [...delivery.destinations, entry.id].slice(0, 10)
+                                                    ? [...delivery.destinations, entry.id].slice(
+                                                          0,
+                                                          10
+                                                      )
                                                     : delivery.destinations.filter(
                                                           (id) => id !== entry.id
                                                       )
@@ -207,7 +217,9 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
                             <Select
                                 value={delivery.chat?.webhookId ?? ""}
                                 onValueChange={(webhookId) => {
-                                    const entry = webhooks.find((option) => option.id === webhookId);
+                                    const entry = webhooks.find(
+                                        (option) => option.id === webhookId
+                                    );
                                     if (entry)
                                         set({ chat: { webhookId: entry.id, stamp: entry.stamp } });
                                 }}
@@ -227,7 +239,9 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
                         {chatOpen && !delivery.chat && webhooks.length > 0 ? (
                             <p className="text-xs text-warning-ink">{t("delivery.chatPick")}</p>
                         ) : null}
-                        {hookGone && <p className="text-xs text-danger-ink">{t("fields.webhookGone")}</p>}
+                        {hookGone && (
+                            <p className="text-xs text-danger-ink">{t("fields.webhookGone")}</p>
+                        )}
                         {hookReset && chosenHook && (
                             <p className="text-xs text-warning-ink">
                                 {t("fields.webhookReset")}{" "}
@@ -236,7 +250,10 @@ export function NoticeDeliveryFields({ value, onChange, disabled = false }: Noti
                                     className="underline"
                                     onClick={() =>
                                         set({
-                                            chat: { webhookId: chosenHook.id, stamp: chosenHook.stamp }
+                                            chat: {
+                                                webhookId: chosenHook.id,
+                                                stamp: chosenHook.stamp
+                                            }
                                         })
                                     }
                                 >

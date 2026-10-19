@@ -105,7 +105,8 @@ export async function deliverAutomationNotice(notice: AutomationNotice): Promise
         attempt("destination", async () => {
             const outcome = await dispatch.deliverToDestination(input, destinationId);
             if (outcome.status === "sent") delivered.push("destination");
-            else missed.push({ channel: "destination", reason: reasonOf(outcome.detail, "failed") });
+            else
+                missed.push({ channel: "destination", reason: reasonOf(outcome.detail, "failed") });
         });
     }
     if (delivery.chat) {
