@@ -70,6 +70,7 @@ import {
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { Reasoning } from "@/components/polar/elements/reasoning";
+import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
@@ -298,12 +299,16 @@ export function PolarAside() {
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
     };
-    if (!open || pathname.startsWith("/polar")) return null;
+    // Kept on screen while it slides away; the page itself has no side panel.
+    const presence = useExitPresence(open && !pathname.startsWith("/polar"));
+    if (!presence.mounted) return null;
     return (
         <aside
             aria-label="Polar"
+            data-state={presence.state}
+            onAnimationEnd={presence.onAnimationEnd}
             style={{ ["--polar-width" as string]: `${width}px` }}
-            className="fixed inset-0 z-50 flex flex-col bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:sticky xl:top-header xl:z-auto xl:h-below-header xl:shrink-0 xl:self-start xl:shadow-none"
+            className="polar-aside fixed inset-0 z-50 flex flex-col overflow-hidden bg-card sm:inset-auto sm:bottom-0 sm:right-0 sm:top-header sm:w-[var(--polar-width)] sm:border-l sm:border-border sm:shadow-popover xl:sticky xl:top-header xl:z-auto xl:h-below-header xl:shrink-0 xl:self-start xl:shadow-none"
         >
             <div
                 role="separator"
@@ -311,7 +316,11 @@ export function PolarAside() {
                 onPointerDown={startResize}
                 className="absolute inset-y-0 left-0 hidden w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-primary/30 sm:block"
             />
-            <PolarChat onClose={() => setOpen(false)} />
+            {/* Its own width from xl, so growing the panel uncovers it instead of
+                squeezing it. */}
+            <div className="flex min-h-0 flex-1 flex-col xl:w-[calc(var(--polar-width)-1px)] xl:flex-none">
+                <PolarChat onClose={() => setOpen(false)} />
+            </div>
         </aside>
     );
 }
