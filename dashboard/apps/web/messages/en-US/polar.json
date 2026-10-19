@@ -168,7 +168,10 @@
             "rate_limited": "Too many uploads. Wait a minute.",
             "storage_failed": "{name} couldn't be saved. Try again.",
             "upload_failed": "{name} didn't upload. Try again."
-        }
+        },
+        "open": "Open {name}",
+        "retry": "Retry {name}",
+        "uploading": "Uploading {name}, {percent}%"
     },
     "suggestions": {
         "page": "What's on this page?",

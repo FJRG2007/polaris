@@ -168,7 +168,10 @@
             "rate_limited": "Demasiadas subidas. Espera un minuto.",
             "storage_failed": "{name} no se pudo guardar. Reinténtalo.",
             "upload_failed": "{name} no se subió. Reinténtalo."
-        }
+        },
+        "open": "Abrir {name}",
+        "retry": "Reintentar {name}",
+        "uploading": "Subiendo {name}, {percent}%"
     },
     "suggestions": {
         "page": "¿Qué hay en esta página?",
