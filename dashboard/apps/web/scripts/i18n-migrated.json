@@ -1411,6 +1411,7 @@
         "web/src/components/expiry-select.tsx",
         "web/src/components/geo-picker.tsx",
         "web/src/components/installed-app.tsx",
+        "web/src/components/json-view.tsx",
         "web/src/components/launcher-waiting.tsx",
         "web/src/components/log-viewer.tsx",
         "web/src/components/model-keys/model-keys-view.tsx",
