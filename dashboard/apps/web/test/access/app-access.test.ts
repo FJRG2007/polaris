@@ -14,7 +14,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { Permission } from "@polaris/core";
-import { ACCOUNT_HOME, homePathFor, reachableAppIds, reachableAppNav, reachableApps } from "@/lib/app-access";
+import {
+    ACCOUNT_HOME,
+    homePathFor,
+    reachableAppIds,
+    reachableAppNav,
+    reachableApps
+} from "@/lib/app-access";
 
 /** A person who holds exactly these permissions and is not an administrator. */
 function holding(...permissions: Permission[]) {
@@ -26,8 +32,16 @@ const ADMIN = { isAdmin: true, can: async () => true };
 
 describe("reachableAppIds", () => {
     it("offers only the apps the permissions open", async () => {
-        expect(await reachableAppIds(holding("drive.read"))).toEqual(["overview", "drive", "polar"]);
-        expect(await reachableAppIds(holding("tasks.read"))).toEqual(["overview", "tasks", "polar"]);
+        expect(await reachableAppIds(holding("drive.read"))).toEqual([
+            "overview",
+            "drive",
+            "polar"
+        ]);
+        expect(await reachableAppIds(holding("tasks.read"))).toEqual([
+            "overview",
+            "tasks",
+            "polar"
+        ]);
     });
 
     it("gives an administrator Management, and withholds it from everyone else", async () => {
@@ -36,7 +50,12 @@ describe("reachableAppIds", () => {
     });
 
     it("opens Watch on the same permission as Apps, since it reports on them", async () => {
-        expect(await reachableAppIds(holding("deploy.read"))).toEqual(["overview", "apps", "polar", "watch"]);
+        expect(await reachableAppIds(holding("deploy.read"))).toEqual([
+            "overview",
+            "apps",
+            "polar",
+            "watch"
+        ]);
     });
 
     it("offers nothing to a role that grants nothing, Overview included", async () => {

@@ -12,7 +12,14 @@ const OWNER = "11111111-1111-4111-8111-111111111111";
 const MINE = "22222222-2222-4222-8222-222222222222";
 const THEIRS = "33333333-3333-4333-8333-333333333333";
 
-type Message = { id: string; threadId: string; parentId: string | null; role: string; parts: unknown; createdAt: number };
+type Message = {
+    id: string;
+    threadId: string;
+    parentId: string | null;
+    role: string;
+    parts: unknown;
+    createdAt: number;
+};
 
 const state = {
     threads: [] as { id: string; userId: string }[],
@@ -30,7 +37,9 @@ vi.mock("@polaris/db", () => ({
         $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
         polarThread: {
             count: async ({ where }: { where: { id: string; userId: string } }) =>
-                state.threads.filter((thread) => thread.id === where.id && thread.userId === where.userId).length,
+                state.threads.filter(
+                    (thread) => thread.id === where.id && thread.userId === where.userId
+                ).length,
             update: async () => ({}),
             findFirst: async ({
                 where,
@@ -39,7 +48,9 @@ vi.mock("@polaris/db", () => ({
                 where: { id: string; userId: string };
                 select: { messages: { take: number } };
             }) => {
-                const thread = state.threads.find((entry) => entry.id === where.id && entry.userId === where.userId);
+                const thread = state.threads.find(
+                    (entry) => entry.id === where.id && entry.userId === where.userId
+                );
                 if (!thread) return null;
                 const messages = state.messages
                     .filter((message) => message.threadId === thread.id)
@@ -104,13 +115,19 @@ describe("savePolarMessages", () => {
         });
         await savePolarMessages(OWNER, MINE, [text("victim", "user", "overwritten")], () => null);
         expect(state.messages).toHaveLength(1);
-        expect(state.messages[0]).toMatchObject({ threadId: THEIRS, parts: [{ type: "text", text: "theirs" }] });
+        expect(state.messages[0]).toMatchObject({
+            threadId: THEIRS,
+            parts: [{ type: "text", text: "theirs" }]
+        });
     });
 
     it("adds new messages and rewrites the thread's own in place", async () => {
         await savePolarMessages(OWNER, MINE, [text("u1", "user", "hi")], () => null);
-        await savePolarMessages(OWNER, MINE, [text("u1", "user", "hi again"), text("a1", "assistant", "hello")], (index) =>
-            index === 1 ? "u1" : null
+        await savePolarMessages(
+            OWNER,
+            MINE,
+            [text("u1", "user", "hi again"), text("a1", "assistant", "hello")],
+            (index) => (index === 1 ? "u1" : null)
         );
         expect(state.messages.map((message) => [message.id, message.parentId])).toEqual([
             ["u1", null],
@@ -153,7 +170,10 @@ describe("sendableTail", () => {
     });
 
     it("sends only the newest messages of a long path, starting at a question", () => {
-        const path = Array.from({ length: 1000 }, (_, index) => ({ id: index, role: index % 2 ? "assistant" : "user" }));
+        const path = Array.from({ length: 1000 }, (_, index) => ({
+            id: index,
+            role: index % 2 ? "assistant" : "user"
+        }));
         const tail = sendableTail(path);
         expect(tail.length).toBeLessThanOrEqual(POLAR_SEND_MOST);
         expect(tail[0]?.role).toBe("user");

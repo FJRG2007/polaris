@@ -287,8 +287,14 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
         palette: ["#C9B8FA", "#9B78F5", "#6D3FD9"],
         draw: ({ base, face }) => (
             <>
-                <path d="M4 9a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5h-8l-6 4.5V24a5 5 0 0 1-5-5z" fill={base} />
-                <path d="M16 7.5q0 6.5 6.5 6.5q-6.5 0-6.5 6.5q0-6.5-6.5-6.5q6.5 0 6.5-6.5z" fill={WHITE} />
+                <path
+                    d="M4 9a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5h-8l-6 4.5V24a5 5 0 0 1-5-5z"
+                    fill={base}
+                />
+                <path
+                    d="M16 7.5q0 6.5 6.5 6.5q-6.5 0-6.5 6.5q0-6.5-6.5-6.5q6.5 0 6.5-6.5z"
+                    fill={WHITE}
+                />
                 <circle cx="24" cy="8" r="2.2" fill={face} />
             </>
         )

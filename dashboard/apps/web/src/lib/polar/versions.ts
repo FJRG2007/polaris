@@ -36,7 +36,9 @@ export function learnPath(
             existing.message = message;
             return;
         }
-        const parentId = known?.has(message.id) ? (known.get(message.id) ?? null) : (messages[index - 1]?.id ?? null);
+        const parentId = known?.has(message.id)
+            ? (known.get(message.id) ?? null)
+            : (messages[index - 1]?.id ?? null);
         tree.set(message.id, { message, parentId });
     });
 }
@@ -47,7 +49,8 @@ export function versionsOf(tree: VersionTree, id: string): string[] {
     if (!node) return [id];
     const versions: string[] = [];
     for (const [key, entry] of tree) {
-        if (entry.parentId === node.parentId && entry.message.role === node.message.role) versions.push(key);
+        if (entry.parentId === node.parentId && entry.message.role === node.message.role)
+            versions.push(key);
     }
     return versions;
 }

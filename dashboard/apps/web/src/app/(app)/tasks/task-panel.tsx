@@ -129,7 +129,15 @@ export function TaskPanel({
     const auto = useAutosave();
     const [detail, setDetail] = useState<TaskDetail | null>(null);
     usePolarContext(
-        detail ? { record: { kind: "task", id: detail.task.reference || detail.task.id, name: detail.task.name } } : null
+        detail
+            ? {
+                  record: {
+                      kind: "task",
+                      id: detail.task.reference || detail.task.id,
+                      name: detail.task.name
+                  }
+              }
+            : null
     );
     const [error, setError] = useState("");
 

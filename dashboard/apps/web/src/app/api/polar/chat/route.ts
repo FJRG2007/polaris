@@ -27,7 +27,12 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
 import { ensurePolarThread, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
-import { fencePageContext, modelChoiceSchema, pageContextSchema, type ModelChoice } from "@/lib/polar/shared";
+import {
+    fencePageContext,
+    modelChoiceSchema,
+    pageContextSchema,
+    type ModelChoice
+} from "@/lib/polar/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +84,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const toolset = await polarTools(user);
-    const checked = await safeValidateUIMessages({ messages: body.data.messages, tools: toolset.tools as never });
+    const checked = await safeValidateUIMessages({
+        messages: body.data.messages,
+        tools: toolset.tools as never
+    });
     if (!checked.success) return refuse("invalid", 400);
     const messages = checked.data as UIMessage[];
 
@@ -98,7 +106,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
 
-    const owned = await ensurePolarThread(user.id, body.data.threadId, firstText(messages[0]), choice);
+    const owned = await ensurePolarThread(
+        user.id,
+        body.data.threadId,
+        firstText(messages[0]),
+        choice
+    );
     if (!owned) return refuse("not_found", 404);
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>

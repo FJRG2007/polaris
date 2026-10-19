@@ -19,7 +19,9 @@ import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { RichText } from "@/components/rich-text/rich-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export type MessageProps = HTMLAttributes<HTMLDivElement> & { from: "user" | "assistant" | "system" };
+export type MessageProps = HTMLAttributes<HTMLDivElement> & {
+    from: "user" | "assistant" | "system";
+};
 
 export function Message({ className, from, ...props }: MessageProps) {
     return (
@@ -35,7 +37,9 @@ export function Message({ className, from, ...props }: MessageProps) {
     );
 }
 
-export type MessageContentProps = HTMLAttributes<HTMLDivElement> & { from: "user" | "assistant" | "system" };
+export type MessageContentProps = HTMLAttributes<HTMLDivElement> & {
+    from: "user" | "assistant" | "system";
+};
 
 export function MessageContent({ className, from, ...props }: MessageContentProps) {
     return (
@@ -75,7 +79,14 @@ export type MessageActionProps = ButtonProps & { label: string };
 /** An icon action under a message: the label is its name and its tooltip. */
 export function MessageAction({ label, children, ...props }: MessageActionProps) {
     return (
-        <Button type="button" variant="ghost" size="icon-xs" aria-label={label} title={label} {...props}>
+        <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={label}
+            title={label}
+            {...props}
+        >
             {children}
         </Button>
     );
@@ -99,11 +110,19 @@ export function MessageBranchSelector({
     if (total <= 1) return null;
     return (
         <div className={cn("flex items-center gap-0.5 text-xs text-muted-foreground", className)}>
-            <MessageAction label={t("elements.previousVersion")} disabled={current <= 1} onClick={onPrevious}>
+            <MessageAction
+                label={t("elements.previousVersion")}
+                disabled={current <= 1}
+                onClick={onPrevious}
+            >
                 <ChevronLeft />
             </MessageAction>
             <span className="tabular-nums">{t("elements.versionOf", { current, total })}</span>
-            <MessageAction label={t("elements.nextVersion")} disabled={current >= total} onClick={onNext}>
+            <MessageAction
+                label={t("elements.nextVersion")}
+                disabled={current >= total}
+                onClick={onNext}
+            >
                 <ChevronRight />
             </MessageAction>
         </div>

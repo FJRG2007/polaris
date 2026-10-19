@@ -79,7 +79,10 @@ export function Conversation({ className, children, ...props }: ConversationProp
         setAtBottom(near);
     };
 
-    const value = useMemo(() => ({ atBottom, scrollToBottom, contentRef: setContent }), [atBottom, scrollToBottom]);
+    const value = useMemo(
+        () => ({ atBottom, scrollToBottom, contentRef: setContent }),
+        [atBottom, scrollToBottom]
+    );
     return (
         <ConversationContext.Provider value={value}>
             <div className={cn("relative min-h-0 flex-1", className)} {...props}>

@@ -44,14 +44,12 @@ const CONTEXT_ITEMS = 20;
 
 /** Strips control characters and fences a model could read as structure. */
 export function cleanContextText(value: string): string {
-    return (
-        value
-            .replace(/[\u0000-\u001f\u007f]+/g, " ")
-            .replace(/`{3,}|<\/?page_context>/gi, "")
-            .replace(/\s+/g, " ")
-            .trim()
-            .slice(0, CONTEXT_TEXT)
-    );
+    return value
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .replace(/`{3,}|<\/?page_context>/gi, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, CONTEXT_TEXT);
 }
 
 const contextText = z

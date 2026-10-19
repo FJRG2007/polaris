@@ -8,7 +8,12 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import { queueSchema } from "@/lib/polar/shared";
-import { deletePolarThread, getPolarThread, renamePolarThread, setPolarQueue } from "@/lib/polar/threads";
+import {
+    deletePolarThread,
+    getPolarThread,
+    renamePolarThread,
+    setPolarQueue
+} from "@/lib/polar/threads";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +47,10 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
     const body = patchSchema.safeParse(await request.json().catch(() => null));
     if (!body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     let found = true;
-    if (body.data.title !== undefined) found = await renamePolarThread(user.id, id.data, body.data.title);
-    if (found && body.data.queue !== undefined) found = await setPolarQueue(user.id, id.data, body.data.queue);
+    if (body.data.title !== undefined)
+        found = await renamePolarThread(user.id, id.data, body.data.title);
+    if (found && body.data.queue !== undefined)
+        found = await setPolarQueue(user.id, id.data, body.data.queue);
     return found ? NextResponse.json({ ok: true }) : NOT_FOUND();
 }
 
@@ -52,5 +59,7 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Res
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
-    return (await deletePolarThread(user.id, id.data)) ? NextResponse.json({ ok: true }) : NOT_FOUND();
+    return (await deletePolarThread(user.id, id.data))
+        ? NextResponse.json({ ok: true })
+        : NOT_FOUND();
 }

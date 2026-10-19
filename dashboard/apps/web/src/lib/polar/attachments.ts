@@ -23,7 +23,11 @@ import { prisma } from "@polaris/db";
 import { chatTarget, removeStoredFiles } from "@/lib/chat/attachments";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { driverForTarget, LOCAL_TARGET, safeName, streamFile } from "@/lib/storage-target";
-import { POLAR_ATTACHMENT_MAX_BYTES, POLAR_ATTACHMENT_TYPES, polarAttachmentId } from "@/lib/polar/shared";
+import {
+    POLAR_ATTACHMENT_MAX_BYTES,
+    POLAR_ATTACHMENT_TYPES,
+    polarAttachmentId
+} from "@/lib/polar/shared";
 
 /** Under POLARIS_DATA_DIR, when the file stays on this server. */
 const LOCAL_FOLDER = "polar";
@@ -89,16 +93,36 @@ export async function storePolarAttachment(input: {
     };
 }
 
-type StoredRow = { name: string; mediaType: string; size: number; connectionId: string | null; path: string };
+type StoredRow = {
+    name: string;
+    mediaType: string;
+    size: number;
+    connectionId: string | null;
+    path: string;
+};
 
-const STORED_ROW = { name: true, mediaType: true, size: true, connectionId: true, path: true } as const;
+const STORED_ROW = {
+    name: true,
+    mediaType: true,
+    size: true,
+    connectionId: true,
+    path: true
+} as const;
 
 /** One of this person's files, streamed, or null when it is not theirs. */
 export async function readPolarAttachment(
     userId: string,
     id: string
-): Promise<{ name: string; mediaType: string; size: number; body: ReadableStream<Uint8Array> } | null> {
-    const row = await prisma.polarAttachment.findFirst({ where: { id, userId }, select: STORED_ROW });
+): Promise<{
+    name: string;
+    mediaType: string;
+    size: number;
+    body: ReadableStream<Uint8Array>;
+} | null> {
+    const row = await prisma.polarAttachment.findFirst({
+        where: { id, userId },
+        select: STORED_ROW
+    });
     return row ? openStored(row) : null;
 }
 
@@ -113,7 +137,12 @@ async function openStored(
         await driver.dispose().catch(() => undefined);
         throw error;
     }
-    return { name: row.name, mediaType: row.mediaType, size: row.size, body: pipeThenDispose(body, driver) };
+    return {
+        name: row.name,
+        mediaType: row.mediaType,
+        size: row.size,
+        body: pipeThenDispose(body, driver)
+    };
 }
 
 /** The ids of Polar's own files a message carries. */
@@ -135,10 +164,16 @@ function attachmentIds(message: UIMessage): string[] {
  * always goes, and an older file that no longer fits is left out without being
  * read from storage at all.
  */
-export async function inlinePolarFiles(userId: string, messages: readonly UIMessage[]): Promise<UIMessage[]> {
+export async function inlinePolarFiles(
+    userId: string,
+    messages: readonly UIMessage[]
+): Promise<UIMessage[]> {
     const ids = [...new Set(messages.flatMap(attachmentIds))];
     const rows = ids.length
-        ? await prisma.polarAttachment.findMany({ where: { id: { in: ids }, userId }, select: { id: true, ...STORED_ROW } })
+        ? await prisma.polarAttachment.findMany({
+              where: { id: { in: ids }, userId },
+              select: { id: true, ...STORED_ROW }
+          })
         : [];
     const stored = new Map(rows.map((row) => [row.id, row]));
     let budget = TURN_MAX_BYTES;
@@ -196,7 +231,9 @@ export function threadAttachments(userId: string, threadId: string): Promise<Pol
 /** Rows first, bytes second: bytes without a row only cost disk. */
 export async function discardPolarAttachments(files: readonly PolarStoredFile[]): Promise<void> {
     if (files.length === 0) return;
-    await prisma.polarAttachment.deleteMany({ where: { id: { in: files.map((file) => file.id) } } });
+    await prisma.polarAttachment.deleteMany({
+        where: { id: { in: files.map((file) => file.id) } }
+    });
     await removeStoredFiles(files, LOCAL_FOLDER).catch(() => undefined);
 }
 
@@ -213,7 +250,9 @@ export async function removeUnsentAttachment(userId: string, id: string): Promis
 }
 
 /** Files no saved message carries, a day after they were uploaded. */
-export async function sweepUnsentPolarAttachments(olderThanMs: number = UNSENT_TTL_MS): Promise<{ swept: number }> {
+export async function sweepUnsentPolarAttachments(
+    olderThanMs: number = UNSENT_TTL_MS
+): Promise<{ swept: number }> {
     const stale = await prisma.polarAttachment.findMany({
         where: { threadId: null, createdAt: { lt: new Date(Date.now() - olderThanMs) } },
         select: { id: true, connectionId: true, path: true },

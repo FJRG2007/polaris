@@ -8,7 +8,14 @@
  * Polar's own identity and stay fixed in both themes.
  */
 
-export const POLAR_MOODS = ["idle", "thinking", "listening", "speaking", "done", "trouble"] as const;
+export const POLAR_MOODS = [
+    "idle",
+    "thinking",
+    "listening",
+    "speaking",
+    "done",
+    "trouble"
+] as const;
 export type PolarMood = (typeof POLAR_MOODS)[number];
 
 const STYLE = `
@@ -76,16 +83,42 @@ export function PolarMascot({
             <g transform={plate ? "translate(6.4 7) scale(0.8)" : undefined}>
                 <g className="polar-body">
                     <g className="polar-ear-l">
-                        <circle cx="15" cy="19" r="7.5" fill={FUR} stroke={INK} strokeOpacity="0.14" />
+                        <circle
+                            cx="15"
+                            cy="19"
+                            r="7.5"
+                            fill={FUR}
+                            stroke={INK}
+                            strokeOpacity="0.14"
+                        />
                         <circle cx="15" cy="19" r="3.8" fill={EAR} />
                     </g>
                     <g className="polar-ear-r">
-                        <circle cx="49" cy="19" r="7.5" fill={FUR} stroke={INK} strokeOpacity="0.14" />
+                        <circle
+                            cx="49"
+                            cy="19"
+                            r="7.5"
+                            fill={FUR}
+                            stroke={INK}
+                            strokeOpacity="0.14"
+                        />
                         <circle cx="49" cy="19" r="3.8" fill={EAR} />
                     </g>
-                    <ellipse cx="32" cy="37" rx="22.5" ry="19.5" fill={FUR} stroke={INK} strokeOpacity="0.14" />
+                    <ellipse
+                        cx="32"
+                        cy="37"
+                        rx="22.5"
+                        ry="19.5"
+                        fill={FUR}
+                        stroke={INK}
+                        strokeOpacity="0.14"
+                    />
                     <g opacity={mood === "trouble" ? 0.4 : 1}>
-                        <g className={mood === "idle" || mood === "done" ? "polar-twinkle" : undefined}>
+                        <g
+                            className={
+                                mood === "idle" || mood === "done" ? "polar-twinkle" : undefined
+                            }
+                        >
                             <path
                                 className={mood === "thinking" ? "polar-star-spin" : undefined}
                                 d="M32 19 Q32 24.5 37.5 24.5 Q32 24.5 32 30 Q32 24.5 26.5 24.5 Q32 24.5 32 19 Z"
@@ -111,7 +144,13 @@ export function PolarMascot({
                             </g>
                         </g>
                     </g>
-                    <g opacity={on(["done"])} fill="none" stroke={INK} strokeWidth="1.9" strokeLinecap="round">
+                    <g
+                        opacity={on(["done"])}
+                        fill="none"
+                        stroke={INK}
+                        strokeWidth="1.9"
+                        strokeLinecap="round"
+                    >
                         <path d="M20.8 35.8 Q23.5 32.4 26.2 35.8" />
                         <path d="M37.8 35.8 Q40.5 32.4 43.2 35.8" />
                     </g>
@@ -127,10 +166,16 @@ export function PolarMascot({
                         />
                     </g>
                     <g fill="none" stroke={INK} strokeWidth="1.6" strokeLinecap="round">
-                        <path opacity={on(["idle", "listening"])} d="M32 43.2 V45.4 M29.4 45.4 Q32 47.8 34.6 45.4" />
+                        <path
+                            opacity={on(["idle", "listening"])}
+                            d="M32 43.2 V45.4 M29.4 45.4 Q32 47.8 34.6 45.4"
+                        />
                         <path opacity={on(["thinking"])} d="M32 43.2 V45.6 M30 46.4 H34" />
                         <path opacity={on(["done"])} d="M32 43.2 V45 M28.6 45 Q32 49.4 35.4 45" />
-                        <path opacity={on(["trouble"])} d="M32 43.2 V45.2 M29.4 47.6 Q32 45.4 34.6 47.6" />
+                        <path
+                            opacity={on(["trouble"])}
+                            d="M32 43.2 V45.2 M29.4 47.6 Q32 45.4 34.6 47.6"
+                        />
                     </g>
                     <ellipse
                         className={mood === "speaking" ? "polar-talk" : undefined}

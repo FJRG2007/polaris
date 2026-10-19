@@ -9,7 +9,11 @@ import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { acceptedType, storePolarAttachment, POLAR_ATTACHMENT_MAX_BYTES } from "@/lib/polar/attachments";
+import {
+    acceptedType,
+    storePolarAttachment,
+    POLAR_ATTACHMENT_MAX_BYTES
+} from "@/lib/polar/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +36,12 @@ export async function POST(request: Request): Promise<Response> {
     if (!bytes) return NextResponse.json({ error: "too_large" }, { status: 413 });
     if (bytes.byteLength === 0) return NextResponse.json({ error: "invalid" }, { status: 400 });
     try {
-        const file = await storePolarAttachment({ userId: user.id, name: query.data.name, mediaType, bytes });
+        const file = await storePolarAttachment({
+            userId: user.id,
+            name: query.data.name,
+            mediaType,
+            bytes
+        });
         return NextResponse.json({ file });
     } catch (error) {
         console.error("polar: could not store an attachment", error);

@@ -13,7 +13,12 @@ import { MockLanguageModelV4 } from "ai/test";
 import { tool, type LanguageModelV4StreamPart } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const USER = { id: "11111111-1111-4111-8111-111111111111", name: "Ada", isAdmin: false, viewingAs: null };
+const USER = {
+    id: "11111111-1111-4111-8111-111111111111",
+    name: "Ada",
+    isAdmin: false,
+    viewingAs: null
+};
 const THREAD = "22222222-2222-4222-8222-222222222222";
 
 const state = {
@@ -34,7 +39,9 @@ vi.mock("@/lib/api-session", () => ({
             : { ...USER, ...(state.user as object) }
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !state.limited }) }));
-vi.mock("@/lib/polar/attachments", () => ({ inlinePolarFiles: async (_user: string, messages: unknown) => messages }));
+vi.mock("@/lib/polar/attachments", () => ({
+    inlinePolarFiles: async (_user: string, messages: unknown) => messages
+}));
 vi.mock("@/lib/polar/threads", () => ({
     ensurePolarThread: async () => state.owned,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
@@ -47,7 +54,8 @@ function model() {
         doStream: async () => ({
             stream: new ReadableStream({
                 start(controller) {
-                    for (const part of step++ === 0 ? state.parts : says("Here you go.")) controller.enqueue(part);
+                    for (const part of step++ === 0 ? state.parts : says("Here you go."))
+                        controller.enqueue(part);
                     controller.close();
                 }
             })
@@ -55,16 +63,25 @@ function model() {
     });
 }
 
-const OPTION = { provider: "anthropic", providerName: "Anthropic", model: "m-1", name: "M 1", reasoning: false };
+const OPTION = {
+    provider: "anthropic",
+    providerName: "Anthropic",
+    model: "m-1",
+    name: "M 1",
+    reasoning: false
+};
 
 vi.mock("@/lib/polar/models", () => ({
-    polarModelOptions: async () => [{ provider: "anthropic", models: [{ provider: "anthropic", model: "m-1" }] }],
+    polarModelOptions: async () => [
+        { provider: "anthropic", models: [{ provider: "anthropic", model: "m-1" }] }
+    ],
     reasoningFor: () => undefined,
     resolvePolarModel: async (_user: string, choice: { model: string }) => {
         state.resolveCalls++;
         if (state.resolved === "no_key") return "no_key";
         if (state.resolved === "unknown_model") return "unknown_model";
-        if (state.resolved === "retired-then-ok" && choice.model === "retired") return "unknown_model";
+        if (state.resolved === "retired-then-ok" && choice.model === "retired")
+            return "unknown_model";
         return { model: model(), option: OPTION, credential: { source: "own" } };
     }
 }));
@@ -123,7 +140,13 @@ function body(overrides: Record<string, unknown> = {}): Record<string, unknown> 
     return {
         threadId: THREAD,
         messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: "Tidy my tasks" }] }],
-        choice: { kind: "language", provider: "anthropic", model: "m-1", intelligence: "balanced", payer: null },
+        choice: {
+            kind: "language",
+            provider: "anthropic",
+            model: "m-1",
+            intelligence: "balanced",
+            payer: null
+        },
         context: { route: "/tasks", title: "Tasks" },
         ...overrides
     };
@@ -181,7 +204,10 @@ describe("what a request has to look like", () => {
         ["no messages", body({ messages: [] })],
         ["a message that is not a UI message", body({ messages: [{ hello: "world" }] })],
         ["a page route with a query string", body({ context: { route: "/tasks?token=x" } })],
-        ["an unknown intelligence", body({ choice: { provider: "anthropic", model: "m-1", intelligence: "huge" } })]
+        [
+            "an unknown intelligence",
+            body({ choice: { provider: "anthropic", model: "m-1", intelligence: "huge" } })
+        ]
     ])("refuses %s", async (_name, payload) => {
         const answer = await post(payload);
         expect(answer.status).toBe(400);
@@ -198,7 +224,14 @@ describe("what a request has to look like", () => {
     it("answers with the first available model when the chosen one was retired", async () => {
         state.resolved = "retired-then-ok";
         const answer = await post(
-            body({ choice: { provider: "anthropic", model: "retired", intelligence: "balanced", payer: null } })
+            body({
+                choice: {
+                    provider: "anthropic",
+                    model: "retired",
+                    intelligence: "balanced",
+                    payer: null
+                }
+            })
         );
         expect(answer.status).toBe(200);
         const text = await answer.text();

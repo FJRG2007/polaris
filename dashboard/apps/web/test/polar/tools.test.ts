@@ -71,7 +71,9 @@ beforeEach(() => {
 });
 
 async function run(name: string, toolset: Awaited<ReturnType<typeof polarTools>>, input: object) {
-    const entry = toolset.tools[name] as { execute: (input: object, options: object) => Promise<unknown> };
+    const entry = toolset.tools[name] as {
+        execute: (input: object, options: object) => Promise<unknown>;
+    };
     return entry.execute(input, { toolCallId: "c1", messages: [] });
 }
 
@@ -85,8 +87,15 @@ describe("polarTools", () => {
     it("holds every tool that changes something for approval, and none that only reads", async () => {
         held.add("tasks.read").add("tasks.manage");
         const toolset = await polarTools(USER);
-        expect(toolset.approval).toEqual({ tasks_delete: "user-approval", tasks_rename: "user-approval" });
-        expect(toolset.described.tasks_list).toEqual({ title: "List tasks", writes: false, destructive: false });
+        expect(toolset.approval).toEqual({
+            tasks_delete: "user-approval",
+            tasks_rename: "user-approval"
+        });
+        expect(toolset.described.tasks_list).toEqual({
+            title: "List tasks",
+            writes: false,
+            destructive: false
+        });
         expect(toolset.described.tasks_delete).toMatchObject({ writes: true, destructive: true });
         expect(toolset.described.tasks_rename).toMatchObject({ writes: true, destructive: false });
     });
@@ -94,7 +103,11 @@ describe("polarTools", () => {
     it("runs a tool as the person and hands back its answer as data", async () => {
         held.add("tasks.read");
         const toolset = await polarTools(USER);
-        expect(await run("tasks_list", toolset, {})).toEqual({ ok: true, text: "none", data: null });
+        expect(await run("tasks_list", toolset, {})).toEqual({
+            ok: true,
+            text: "none",
+            data: null
+        });
         expect(ran).toEqual(["tasks_list"]);
     });
 

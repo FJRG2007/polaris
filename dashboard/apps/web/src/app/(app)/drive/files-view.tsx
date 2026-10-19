@@ -1023,7 +1023,10 @@ export function FilesView({
     const selectedEntries = selectable.filter((entry) => selected.has(entry.path));
     usePolarContext({
         record: { kind: "drive folder", id: path || "/" },
-        selection: selectedEntries.length > 0 ? selectedEntries.slice(0, 20).map((entry) => entry.name) : undefined
+        selection:
+            selectedEntries.length > 0
+                ? selectedEntries.slice(0, 20).map((entry) => entry.name)
+                : undefined
     });
     const allSelected = selectable.length > 0 && selectedEntries.length === selectable.length;
     // How many downloads the server has not answered yet, so the button that

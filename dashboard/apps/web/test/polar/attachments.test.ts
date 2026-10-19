@@ -43,14 +43,22 @@ function row(id: string, extra: Partial<Row> = {}): Row {
 }
 
 const state = {
-    user: { id: OWNER, viewingAs: null as string | null } as { id: string; viewingAs: string | null } | null,
+    user: { id: OWNER, viewingAs: null as string | null } as {
+        id: string;
+        viewingAs: string | null;
+    } | null,
     stored: [] as unknown[],
     rows: [] as Row[],
     reads: [] as string[],
     removed: [] as string[]
 };
 
-type Where = { id?: string | { in: string[] }; userId?: string; threadId?: string | null; createdAt?: { lt: Date } };
+type Where = {
+    id?: string | { in: string[] };
+    userId?: string;
+    threadId?: string | null;
+    createdAt?: { lt: Date };
+};
 
 function matches(entry: Row, where: Where): boolean {
     if (typeof where.id === "string" && entry.id !== where.id) return false;
@@ -63,12 +71,15 @@ function matches(entry: Row, where: Where): boolean {
 
 vi.mock("@/lib/api-session", () => ({
     apiUser: async () =>
-        state.user ? { ...state.user, isAdmin: false } : NextResponse.json({ error: "unauthorized" }, { status: 401 })
+        state.user
+            ? { ...state.user, isAdmin: false }
+            : NextResponse.json({ error: "unauthorized" }, { status: 401 })
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/chat/attachments", () => ({
     chatTarget: async () => "local",
-    removeStoredFiles: async (files: { path: string }[]) => void state.removed.push(...files.map((file) => file.path))
+    removeStoredFiles: async (files: { path: string }[]) =>
+        void state.removed.push(...files.map((file) => file.path))
 }));
 vi.mock("@/lib/drive-stream", () => ({ pipeThenDispose: (body: ReadableStream) => body }));
 vi.mock("@/lib/storage-target", () => ({
@@ -82,7 +93,9 @@ vi.mock("@/lib/storage-target", () => ({
         readStream: async (path: string) => {
             state.reads.push(path);
             const size = state.rows.find((entry) => entry.path === path)?.size ?? 4;
-            return new Blob([size === 4 ? new Uint8Array([1, 2, 3, 4]) : new Uint8Array(size)]).stream();
+            return new Blob([
+                size === 4 ? new Uint8Array([1, 2, 3, 4]) : new Uint8Array(size)
+            ]).stream();
         },
         dispose: async () => undefined
     })
@@ -90,14 +103,20 @@ vi.mock("@/lib/storage-target", () => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         polarAttachment: {
-            create: async ({ data }: { data: { name: string; mediaType: string; size: number } }) => ({
+            create: async ({
+                data
+            }: {
+                data: { name: string; mediaType: string; size: number };
+            }) => ({
                 id: MINE,
                 name: data.name,
                 mediaType: data.mediaType,
                 size: data.size
             }),
-            findFirst: async ({ where }: { where: Where }) => state.rows.find((entry) => matches(entry, where)) ?? null,
-            findMany: async ({ where }: { where: Where }) => state.rows.filter((entry) => matches(entry, where)),
+            findFirst: async ({ where }: { where: Where }) =>
+                state.rows.find((entry) => matches(entry, where)) ?? null,
+            findMany: async ({ where }: { where: Where }) =>
+                state.rows.filter((entry) => matches(entry, where)),
             updateMany: async ({ where, data }: { where: Where; data: Partial<Row> }) => {
                 const hit = state.rows.filter((entry) => matches(entry, where));
                 for (const entry of hit) Object.assign(entry, data);
@@ -137,19 +156,30 @@ function send(type: string, bytes: Uint8Array, name = "cat.png"): Promise<Respon
 }
 
 const fetchFile = (id: string) =>
-    read.GET(new Request(`https://polaris.test/api/polar/attachments/${id}`), { params: Promise.resolve({ id }) });
-
-const removeFile = (id: string) =>
-    read.DELETE(new Request(`https://polaris.test/api/polar/attachments/${id}`, { method: "DELETE" }), {
+    read.GET(new Request(`https://polaris.test/api/polar/attachments/${id}`), {
         params: Promise.resolve({ id })
     });
+
+const removeFile = (id: string) =>
+    read.DELETE(
+        new Request(`https://polaris.test/api/polar/attachments/${id}`, { method: "DELETE" }),
+        {
+            params: Promise.resolve({ id })
+        }
+    );
 
 describe("POST /api/polar/attachments", () => {
     it("stores a picture and answers the address a message names it by", async () => {
         const answer = await send("image/png", new Uint8Array([1, 2, 3, 4]));
         expect(answer.status).toBe(200);
         expect(await answer.json()).toEqual({
-            file: { id: MINE, url: `/api/polar/attachments/${MINE}`, filename: "cat.png", mediaType: "image/png", size: 4 }
+            file: {
+                id: MINE,
+                url: `/api/polar/attachments/${MINE}`,
+                filename: "cat.png",
+                mediaType: "image/png",
+                size: 4
+            }
         });
     });
 
@@ -197,8 +227,16 @@ describe("inlinePolarFiles", () => {
                 parts: [
                     { type: "text", text: "look" },
                     { type: "file", mediaType: "image/png", url: `/api/polar/attachments/${MINE}` },
-                    { type: "file", mediaType: "image/png", url: `/api/polar/attachments/${THEIRS}` },
-                    { type: "file", mediaType: "image/png", url: "https://169.254.169.254/latest/meta-data" }
+                    {
+                        type: "file",
+                        mediaType: "image/png",
+                        url: `/api/polar/attachments/${THEIRS}`
+                    },
+                    {
+                        type: "file",
+                        mediaType: "image/png",
+                        url: "https://169.254.169.254/latest/meta-data"
+                    }
                 ]
             }
         ];
@@ -212,7 +250,11 @@ describe("inlinePolarFiles", () => {
     it("spends the budget from the newest message back and never reads what does not fit", async () => {
         const big = 13 * 1024 * 1024;
         state.rows.push(row(OLD, { size: big }), row(NEW, { size: big }));
-        const file = (id: string) => ({ type: "file" as const, mediaType: "image/png", url: `/api/polar/attachments/${id}` });
+        const file = (id: string) => ({
+            type: "file" as const,
+            mediaType: "image/png",
+            url: `/api/polar/attachments/${id}`
+        });
         const messages: UIMessage[] = [
             { id: "u1", role: "user", parts: [file(OLD)] },
             { id: "a1", role: "assistant", parts: [{ type: "text", text: "seen" }] },
@@ -228,7 +270,11 @@ describe("inlinePolarFiles", () => {
 
 describe("a file's lifetime", () => {
     const carrying = (id: string): UIMessage[] => [
-        { id: "u1", role: "user", parts: [{ type: "file", mediaType: "image/png", url: `/api/polar/attachments/${id}` }] }
+        {
+            id: "u1",
+            role: "user",
+            parts: [{ type: "file", mediaType: "image/png", url: `/api/polar/attachments/${id}` }]
+        }
     ];
 
     it("belongs to the thread whose saved message carries it, and only the owner's", async () => {
@@ -249,7 +295,11 @@ describe("a file's lifetime", () => {
 
     it("is swept a day after upload when no saved message carries it", async () => {
         const old = new Date(Date.now() - 25 * 60 * 60 * 1000);
-        state.rows = [row(OLD, { createdAt: old }), row(MINE, { createdAt: old, threadId: THREAD }), row(NEW)];
+        state.rows = [
+            row(OLD, { createdAt: old }),
+            row(MINE, { createdAt: old, threadId: THREAD }),
+            row(NEW)
+        ];
         expect(await sweepUnsentPolarAttachments()).toEqual({ swept: 1 });
         expect(state.rows.map((entry) => entry.id)).toEqual([MINE, NEW]);
         expect(state.removed).toEqual([`p/${OLD}`]);

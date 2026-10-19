@@ -437,7 +437,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                             }
                                                                                         />
                                                                                     }
-                                                                                    aside={<PolarAside />}
+                                                                                    aside={
+                                                                                        <PolarAside />
+                                                                                    }
                                                                                     sidebar={
                                                                                         <AppSidebar
                                                                                             appIds={
@@ -557,7 +559,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
 
     // The frame's own words - the rail, the switcher, the account menu - for
     // every client component in it.
-    return <Messages namespaces={["nav", "chat", "shortcuts", "tours", "polar"]}>
+    return (
+        <Messages namespaces={["nav", "chat", "shortcuts", "tours", "polar"]}>
             <PolarProvider>{frame}</PolarProvider>
-        </Messages>;
+        </Messages>
+    );
 }

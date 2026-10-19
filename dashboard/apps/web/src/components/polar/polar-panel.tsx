@@ -15,7 +15,11 @@
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { usePathname } from "next/navigation";
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses, type UIMessage } from "ai";
+import {
+    DefaultChatTransport,
+    lastAssistantMessageIsCompleteWithApprovalResponses,
+    type UIMessage
+} from "ai";
 import {
     createContext,
     useCallback,
@@ -36,10 +40,25 @@ import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
-import { Attachment, Attachments, type AttachmentData } from "@/components/polar/elements/attachments";
-import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
-import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/polar/elements/conversation";
-import { affectedBy, Confirmation, type ConfirmationApproval } from "@/components/polar/elements/confirmation";
+import {
+    Attachment,
+    Attachments,
+    type AttachmentData
+} from "@/components/polar/elements/attachments";
+import {
+    ModelSelector,
+    type ModelSelectorProvider
+} from "@/components/polar/elements/model-selector";
+import {
+    Conversation,
+    ConversationContent,
+    ConversationEmptyState
+} from "@/components/polar/elements/conversation";
+import {
+    affectedBy,
+    Confirmation,
+    type ConfirmationApproval
+} from "@/components/polar/elements/confirmation";
 import {
     Message,
     MessageAction,
@@ -103,7 +122,11 @@ export function usePolarContext(extra: ExtraContext | null): void {
 }
 
 /** Route, title and the ids the URL names, everywhere. */
-export function pageContextFrom(pathname: string, title: string, extra: ExtraContext | null): PageContext {
+export function pageContextFrom(
+    pathname: string,
+    title: string,
+    extra: ExtraContext | null
+): PageContext {
     const segments = pathname.split("/").filter(Boolean);
     const ids: Record<string, string> = {};
     for (let index = 1; index < segments.length; index++) {
@@ -171,7 +194,12 @@ export function PolarProvider({ children }: { children: ReactNode }) {
     }, []);
     useEffect(() => {
         function onKey(event: KeyboardEvent) {
-            if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "j") {
+            if (
+                (event.ctrlKey || event.metaKey) &&
+                !event.altKey &&
+                !event.shiftKey &&
+                event.key.toLowerCase() === "j"
+            ) {
                 event.preventDefault();
                 setOpenState((current) => {
                     writeStored(OPEN_KEY, current ? "0" : "1");
@@ -252,7 +280,6 @@ export function PolarAside() {
     );
 }
 
-
 // ---------------------------------------------------------------------------
 // The chat
 // ---------------------------------------------------------------------------
@@ -280,11 +307,18 @@ const COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
 const LATER = new Set<string>(["call"]);
 
 /** Upload refusals the composer explains; anything else reads as a failed upload. */
-const UPLOAD_ERRORS = ["unsupported_type", "too_large", "rate_limited", "storage_failed", "upload_failed"] as const;
+const UPLOAD_ERRORS = [
+    "unsupported_type",
+    "too_large",
+    "rate_limited",
+    "storage_failed",
+    "upload_failed"
+] as const;
 type UploadError = (typeof UPLOAD_ERRORS)[number];
 
 async function uploadFile(file: File): Promise<AttachmentData | string> {
-    if (!(POLAR_ATTACHMENT_TYPES as readonly string[]).includes(file.type)) return "unsupported_type";
+    if (!(POLAR_ATTACHMENT_TYPES as readonly string[]).includes(file.type))
+        return "unsupported_type";
     if (file.size > POLAR_ATTACHMENT_MAX_BYTES) return "too_large";
     const response = await fetch(`/api/polar/attachments?name=${encodeURIComponent(file.name)}`, {
         method: "POST",
@@ -298,10 +332,21 @@ async function uploadFile(file: File): Promise<AttachmentData | string> {
     const { file: stored } = (await response.json()) as {
         file: { id: string; url: string; filename: string; mediaType: string };
     };
-    return { id: stored.id, url: stored.url, filename: stored.filename, mediaType: stored.mediaType };
+    return {
+        id: stored.id,
+        url: stored.url,
+        filename: stored.filename,
+        mediaType: stored.mediaType
+    };
 }
 
-export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void; fullPage?: boolean }) {
+export function PolarChat({
+    onClose,
+    fullPage = false
+}: {
+    onClose?: () => void;
+    fullPage?: boolean;
+}) {
     const t = useTranslations("polar");
     const pathname = usePathname();
     const state = useContext(PolarContext);
@@ -329,7 +374,11 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
     const context = useMemo(
         () =>
             withPage
-                ? pageContextFrom(pathname, typeof document === "undefined" ? "" : document.title, state?.extra ?? null)
+                ? pageContextFrom(
+                      pathname,
+                      typeof document === "undefined" ? "" : document.title,
+                      state?.extra ?? null
+                  )
                 : null,
         [withPage, pathname, state?.extra]
     );
@@ -346,7 +395,8 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                         messages: sendableTail(messages),
                         choice: live.current.choice,
                         context: live.current.context,
-                        parentId: messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
+                        parentId:
+                            messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
                     }
                 })
             }),
@@ -392,7 +442,9 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     setChoice((current) => {
                         const known = data.providers.some((entry) =>
                             entry.models.some(
-                                (model) => model.provider === current?.provider && model.model === current?.model
+                                (model) =>
+                                    model.provider === current?.provider &&
+                                    model.model === current?.model
                             )
                         );
                         if (current && known) return current;
@@ -450,7 +502,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                 if (!data) return;
                 setThreads((current) => {
                     const known = new Set((current ?? []).map((row) => row.id));
-                    return [...(current ?? []), ...data.threads.filter((row) => !known.has(row.id))];
+                    return [
+                        ...(current ?? []),
+                        ...data.threads.filter((row) => !known.has(row.id))
+                    ];
                 });
                 setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
             })
@@ -483,11 +538,20 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         if (!response?.ok) return;
         const { thread } = (await response.json()) as {
-            thread: { id: string; messages: StoredMessage[]; queue: QueuedMessage[]; choice: ModelChoice | null };
+            thread: {
+                id: string;
+                messages: StoredMessage[];
+                queue: QueuedMessage[];
+                choice: ModelChoice | null;
+            };
         };
         // Every stored version goes into the tree; the newest path is shown.
         const next: VersionTree = new Map();
-        learnPath(next, thread.messages, new Map(thread.messages.map((message) => [message.id, message.parentId])));
+        learnPath(
+            next,
+            thread.messages,
+            new Map(thread.messages.map((message) => [message.id, message.parentId]))
+        );
         tree.current = next;
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
@@ -512,7 +576,9 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
 
     const removeThread = async (id: string) => {
         setThreads((current) => current?.filter((row) => row.id !== id) ?? null);
-        const response = await fetch(`/api/polar/threads/${id}`, { method: "DELETE" }).catch(() => null);
+        const response = await fetch(`/api/polar/threads/${id}`, { method: "DELETE" }).catch(
+            () => null
+        );
         if (!response?.ok) loadThreads();
         if (id === threadId) startNew();
     };
@@ -545,9 +611,9 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
     const removeFile = (file: AttachmentData) => {
         setFiles((current) => current.filter((entry) => entry.id !== file.id));
         if (!file.pending) {
-            void fetch(`/api/polar/attachments/${encodeURIComponent(file.id)}`, { method: "DELETE" }).catch(
-                () => undefined
-            );
+            void fetch(`/api/polar/attachments/${encodeURIComponent(file.id)}`, {
+                method: "DELETE"
+            }).catch(() => undefined);
         }
     };
 
@@ -609,7 +675,8 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         void chat.sendMessage(message);
     };
 
-    const streamingText = chat.status === "streaming" && chat.messages.at(-1)?.parts.at(-1)?.type === "text";
+    const streamingText =
+        chat.status === "streaming" && chat.messages.at(-1)?.parts.at(-1)?.type === "text";
     const mood: PolarMood =
         chat.status === "error"
             ? "trouble"
@@ -635,7 +702,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-foreground-subtle">
                         {t("history.title")}
                         {!fullPage ? (
-                            <MessageAction label={t("actions.close")} onClick={() => setShowHistory(false)}>
+                            <MessageAction
+                                label={t("actions.close")}
+                                onClick={() => setShowHistory(false)}
+                            >
                                 <X />
                             </MessageAction>
                         ) : null}
@@ -643,7 +713,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     {threads === null ? (
                         <div className="space-y-2 p-2">
                             {[0, 1, 2].map((key) => (
-                                <div key={key} className="h-6 rounded bg-muted motion-safe:animate-pulse" />
+                                <div
+                                    key={key}
+                                    className="h-6 rounded bg-muted motion-safe:animate-pulse"
+                                />
                             ))}
                         </div>
                     ) : threads.length === 0 ? (
@@ -663,7 +736,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                     >
                                         {row.title}
                                     </button>
-                                    <MessageAction label={t("history.delete")} onClick={() => void removeThread(row.id)}>
+                                    <MessageAction
+                                        label={t("history.delete")}
+                                        onClick={() => void removeThread(row.id)}
+                                    >
                                         <Trash2 />
                                     </MessageAction>
                                 </div>
@@ -692,7 +768,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     </MessageAction>
                     {!fullPage ? (
                         <>
-                            <MessageAction label={t("history.title")} onClick={() => setShowHistory(true)}>
+                            <MessageAction
+                                label={t("history.title")}
+                                onClick={() => setShowHistory(true)}
+                            >
                                 <History />
                             </MessageAction>
                             <Link
@@ -717,11 +796,17 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                 <p className="text-foreground">{t("noKeys.title")}</p>
                                 <p className="mt-1">{t("noKeys.body")}</p>
                                 <div className="mt-2 flex flex-wrap gap-3">
-                                    <Link href="/account/ai-keys" className="text-primary hover:underline">
+                                    <Link
+                                        href="/account/ai-keys"
+                                        className="text-primary hover:underline"
+                                    >
                                         {t("noKeys.own")}
                                     </Link>
                                     {isAdmin ? (
-                                        <Link href="/admin/integrations/models" className="text-primary hover:underline">
+                                        <Link
+                                            href="/admin/integrations/models"
+                                            className="text-primary hover:underline"
+                                        >
                                             {t("noKeys.admin")}
                                         </Link>
                                     ) : null}
@@ -808,12 +893,20 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                     first={index === 0}
                                     last={index === queue.length - 1}
                                     onChange={(text) =>
-                                        setQueue(queue.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)))
+                                        setQueue(
+                                            queue.map((entry) =>
+                                                entry.id === item.id ? { ...entry, text } : entry
+                                            )
+                                        )
                                     }
-                                    onCommit={() => saveQueue(queue.filter((entry) => entry.text.trim()))}
+                                    onCommit={() =>
+                                        saveQueue(queue.filter((entry) => entry.text.trim()))
+                                    }
                                     onUp={() => saveQueue(moveItem(queue, index, index - 1))}
                                     onDown={() => saveQueue(moveItem(queue, index, index + 1))}
-                                    onRemove={() => saveQueue(queue.filter((entry) => entry.id !== item.id))}
+                                    onRemove={() =>
+                                        saveQueue(queue.filter((entry) => entry.id !== item.id))
+                                    }
                                 />
                             ))}
                         </QueueSection>
@@ -827,31 +920,37 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                             aria-label={t("slash.title")}
                             className="mb-2 rounded-lg border border-border bg-elevated p-1 shadow-popover"
                         >
-                            {COMMANDS.filter((command) => `/${command}`.startsWith(input)).map((command) => {
-                                const disabled = LATER.has(command);
-                                return (
-                                    <li key={command}>
-                                        <button
-                                            type="button"
-                                            role="option"
-                                            aria-selected={false}
-                                            aria-disabled={disabled}
-                                            title={disabled ? t("slash.later") : undefined}
-                                            onClick={() => {
-                                                if (disabled) return;
-                                                setInput(`/${command}`);
-                                                textarea.current?.focus();
-                                            }}
-                                            className="flex w-full min-w-0 items-center gap-3 rounded px-2 py-1.5 text-left text-sm hover:bg-option-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-                                        >
-                                            <span className="shrink-0 font-mono text-foreground">/{command}</span>
-                                            <span className="min-w-0 truncate text-muted-foreground">
-                                                {disabled ? t("slash.later") : t(`slash.${command}`)}
-                                            </span>
-                                        </button>
-                                    </li>
-                                );
-                            })}
+                            {COMMANDS.filter((command) => `/${command}`.startsWith(input)).map(
+                                (command) => {
+                                    const disabled = LATER.has(command);
+                                    return (
+                                        <li key={command}>
+                                            <button
+                                                type="button"
+                                                role="option"
+                                                aria-selected={false}
+                                                aria-disabled={disabled}
+                                                title={disabled ? t("slash.later") : undefined}
+                                                onClick={() => {
+                                                    if (disabled) return;
+                                                    setInput(`/${command}`);
+                                                    textarea.current?.focus();
+                                                }}
+                                                className="flex w-full min-w-0 items-center gap-3 rounded px-2 py-1.5 text-left text-sm hover:bg-option-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                                            >
+                                                <span className="shrink-0 font-mono text-foreground">
+                                                    /{command}
+                                                </span>
+                                                <span className="min-w-0 truncate text-muted-foreground">
+                                                    {disabled
+                                                        ? t("slash.later")
+                                                        : t(`slash.${command}`)}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    );
+                                }
+                            )}
                         </ul>
                     ) : null}
                     <PromptInput onSubmit={submit}>
@@ -885,7 +984,9 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                     <Attachment
                                         key={file.id}
                                         file={file}
-                                        removeLabel={t("files.remove", { name: file.filename ?? "" })}
+                                        removeLabel={t("files.remove", {
+                                            name: file.filename ?? ""
+                                        })}
                                         onRemove={() => removeFile(file)}
                                     />
                                 ))}
@@ -896,7 +997,10 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                 {fileError}
                             </p>
                         ) : null}
-                        <label htmlFor={fullPage ? "polar-input-page" : "polar-input"} className="sr-only">
+                        <label
+                            htmlFor={fullPage ? "polar-input-page" : "polar-input"}
+                            className="sr-only"
+                        >
                             {t("composer.label")}
                         </label>
                         <PromptInputTextarea
@@ -928,19 +1032,29 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                     />
                                 </span>
                                 <span id="polar-model" className="contents">
-                                    <ModelSelector providers={providers ?? []} choice={choice} onChoice={setChoice} />
+                                    <ModelSelector
+                                        providers={providers ?? []}
+                                        choice={choice}
+                                        onChoice={setChoice}
+                                    />
                                 </span>
                             </PromptInputTools>
                             <PromptInputSubmit
                                 busy={busy}
-                                disabled={(!input.trim() && files.length === 0) || !choice || files.some((file) => file.pending)}
+                                disabled={
+                                    (!input.trim() && files.length === 0) ||
+                                    !choice ||
+                                    files.some((file) => file.pending)
+                                }
                                 sendLabel={t("actions.send")}
                                 stopLabel={t("actions.stop")}
                                 onStop={() => void chat.stop()}
                             />
                         </PromptInputFooter>
                     </PromptInput>
-                    <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
+                    <p className="mt-1.5 text-center text-xs text-foreground-subtle">
+                        {t("footer")}
+                    </p>
                 </div>
             </div>
         </div>
@@ -971,7 +1085,13 @@ function Chip({
             title={title ? `${title}: ${label}` : label}
         >
             <span className="min-w-0 truncate">{label}</span>
-            <button type="button" aria-label={removeLabel} title={removeLabel} onClick={onRemove} className="shrink-0">
+            <button
+                type="button"
+                aria-label={removeLabel}
+                title={removeLabel}
+                onClick={onRemove}
+                className="shrink-0"
+            >
                 <X className="h-3 w-3" />
             </button>
         </span>
@@ -1021,13 +1141,20 @@ function MessageView({
     const toolName = (name: string) => tools[name]?.title ?? name;
     return (
         <Message from={from}>
-            {meta.fellBackFrom ? <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p> : null}
+            {meta.fellBackFrom ? (
+                <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p>
+            ) : null}
             {files.length > 0 ? (
                 <Attachments className={mine ? "justify-end" : undefined}>
                     {files.map((part, index) => (
                         <Attachment
                             key={index}
-                            file={{ id: String(index), url: part.url, filename: part.filename, mediaType: part.mediaType }}
+                            file={{
+                                id: String(index),
+                                url: part.url,
+                                filename: part.filename,
+                                mediaType: part.mediaType
+                            }}
                         />
                     ))}
                 </Attachments>
@@ -1037,20 +1164,30 @@ function MessageView({
                     if (!part.text.trim()) return null;
                     return (
                         <MessageContent key={index} from={from}>
-                            {mine ? <p className="whitespace-pre-wrap">{part.text}</p> : <MessageResponse>{part.text}</MessageResponse>}
+                            {mine ? (
+                                <p className="whitespace-pre-wrap">{part.text}</p>
+                            ) : (
+                                <MessageResponse>{part.text}</MessageResponse>
+                            )}
                         </MessageContent>
                     );
                 }
                 if (part.type === "reasoning") {
                     return (
-                        <Reasoning key={index} isStreaming={streaming && index === message.parts.length - 1}>
+                        <Reasoning
+                            key={index}
+                            isStreaming={streaming && index === message.parts.length - 1}
+                        >
                             {part.text}
                         </Reasoning>
                     );
                 }
                 if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
                     const tool = part as unknown as ToolPart;
-                    const name = part.type === "dynamic-tool" ? (tool.toolName ?? "tool") : part.type.slice(5);
+                    const name =
+                        part.type === "dynamic-tool"
+                            ? (tool.toolName ?? "tool")
+                            : part.type.slice(5);
                     const described = tools[name];
                     if (tool.approval) {
                         return (

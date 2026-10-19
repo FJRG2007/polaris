@@ -65,7 +65,10 @@ export function Confirmation({
         <div
             role={requested ? "alertdialog" : undefined}
             aria-label={requested ? t("approval.label") : undefined}
-            className={cn("w-full space-y-2 rounded-lg border border-border bg-card p-3 text-sm", className)}
+            className={cn(
+                "w-full space-y-2 rounded-lg border border-border bg-card p-3 text-sm",
+                className
+            )}
         >
             <p className="font-medium text-foreground">{t("approval.question", { action })}</p>
             {affects.length > 0 ? (
@@ -93,7 +96,12 @@ export function Confirmation({
                     <Button type="button" variant="outline" size="sm" onClick={onReject}>
                         {t("approval.deny")}
                     </Button>
-                    <Button type="button" variant={destructive ? "danger" : "primary"} size="sm" onClick={onApprove}>
+                    <Button
+                        type="button"
+                        variant={destructive ? "danger" : "primary"}
+                        size="sm"
+                        onClick={onApprove}
+                    >
                         {t("approval.run")}
                     </Button>
                 </div>
@@ -128,7 +136,9 @@ export function affectedBy(input: unknown): string[] {
     const found: string[] = [];
     for (const key of AFFECTS_KEYS) {
         const value = record[key];
-        const text = Array.isArray(value) ? value.filter((entry) => typeof entry === "string").join(", ") : value;
+        const text = Array.isArray(value)
+            ? value.filter((entry) => typeof entry === "string").join(", ")
+            : value;
         if (typeof text === "string" && text.trim()) found.push(text.trim().slice(0, 80));
         else if (typeof text === "number") found.push(String(text));
         if (found.length === 3) break;

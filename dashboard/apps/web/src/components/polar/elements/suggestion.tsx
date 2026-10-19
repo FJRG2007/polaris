@@ -17,10 +17,24 @@ export function Suggestions({ className, ...props }: HTMLAttributes<HTMLDivEleme
     return <div className={cn("flex flex-wrap justify-center gap-2", className)} {...props} />;
 }
 
-export function Suggestion({ suggestion, onClick }: { suggestion: string; onClick: (suggestion: string) => void }) {
+export function Suggestion({
+    suggestion,
+    onClick
+}: {
+    suggestion: string;
+    onClick: (suggestion: string) => void;
+}) {
     return (
-        <Button type="button" variant="outline" size="sm" className="max-w-full" onClick={() => onClick(suggestion)}>
-            <span className="truncate" title={suggestion}>{suggestion}</span>
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="max-w-full"
+            onClick={() => onClick(suggestion)}
+        >
+            <span className="truncate" title={suggestion}>
+                {suggestion}
+            </span>
         </Button>
     );
 }

@@ -62,7 +62,10 @@ export function Reasoning({
                     <span>{t("reasoning")}</span>
                 )}
                 <ChevronDown
-                    className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-fast", open && "rotate-180")}
+                    className={cn(
+                        "h-3.5 w-3.5 shrink-0 transition-transform duration-fast",
+                        open && "rotate-180"
+                    )}
                 />
             </button>
             {open ? (

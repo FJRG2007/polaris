@@ -14,7 +14,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 
 const chat = {
     status: "ready" as "ready" | "submitted" | "streaming" | "error",
-    messages: [] as Array<{ id: string; role: string; parts: Array<{ type: string; text?: string }> }>,
+    messages: [] as Array<{
+        id: string;
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+    }>,
     sent: [] as Array<{ text?: string }>,
     stopped: 0,
     rerender: () => undefined as void
@@ -38,7 +42,10 @@ vi.mock("@ai-sdk/react", () => ({
         addToolApprovalResponse: async () => undefined
     })
 }));
-vi.mock("next/navigation", () => ({ usePathname: () => "/tasks", useRouter: () => ({ push: () => undefined }) }));
+vi.mock("next/navigation", () => ({
+    usePathname: () => "/tasks",
+    useRouter: () => ({ push: () => undefined })
+}));
 
 const PROVIDERS = [
     {
@@ -74,7 +81,9 @@ beforeEach(() => {
                 return Response.json({ providers, tools: {}, isAdmin: false });
             }
             if (url === "/api/polar/threads") {
-                return Response.json({ threads: [{ id: "t-old", title: "Old chat", updatedAt: "2026-10-19T00:00:00Z" }] });
+                return Response.json({
+                    threads: [{ id: "t-old", title: "Old chat", updatedAt: "2026-10-19T00:00:00Z" }]
+                });
             }
             if (url.startsWith("/api/polar/threads/") && init?.method === "PATCH") {
                 patches.push(JSON.parse(String(init.body)));
@@ -121,7 +130,9 @@ describe("an empty panel", () => {
     it("says in plain words that it needs a key, with the way to add one", async () => {
         providers = [];
         mount();
-        await waitFor(() => expect(screen.getByText("Polar needs an AI provider key")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Polar needs an AI provider key")).toBeTruthy()
+        );
         const link = screen.getByText("Add your own key").closest("a");
         expect(link?.getAttribute("href")).toBe("/account/ai-keys");
         expect(screen.queryByText("Manage this Polaris's keys")).toBeNull();
@@ -162,9 +173,13 @@ describe("the queue", () => {
         const [first] = screen.getAllByLabelText("Queued message") as HTMLInputElement[];
         fireEvent.change(first!, { target: { value: "second, edited" } });
         fireEvent.blur(first!);
-        expect(patches.at(-1)).toMatchObject({ queue: [{ text: "second, edited" }, { text: "third" }] });
+        expect(patches.at(-1)).toMatchObject({
+            queue: [{ text: "second, edited" }, { text: "third" }]
+        });
         fireEvent.click(screen.getAllByLabelText("Move down")[0]!);
-        expect(patches.at(-1)).toMatchObject({ queue: [{ text: "third" }, { text: "second, edited" }] });
+        expect(patches.at(-1)).toMatchObject({
+            queue: [{ text: "third" }, { text: "second, edited" }]
+        });
         fireEvent.click(screen.getAllByLabelText("Remove from queue")[0]!);
         expect(patches.at(-1)).toMatchObject({ queue: [{ text: "second, edited" }] });
     });
@@ -181,15 +196,19 @@ describe("the queue", () => {
         chat.status = "ready";
         act(() => view.again());
         await waitFor(() => expect(chat.sent.map((message) => message.text)).toEqual(["second"]));
-        expect((screen.getAllByLabelText("Queued message") as HTMLInputElement[]).map((item) => item.value)).toEqual([
-            "third"
-        ]);
+        expect(
+            (screen.getAllByLabelText("Queued message") as HTMLInputElement[]).map(
+                (item) => item.value
+            )
+        ).toEqual(["third"]);
     });
 
     it("comes back with the thread after a reload", async () => {
         storedThread = {
             id: "t-old",
-            messages: [{ id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Hi" }] }],
+            messages: [
+                { id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Hi" }] }
+            ],
             queue: [{ id: "q1", text: "waiting since before the reload" }],
             choice: null
         };

@@ -69,7 +69,10 @@ export function Tool({
                     {t(`elements.toolState.${state}`)}
                 </span>
                 <ChevronDown
-                    className={cn("h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform duration-fast", open && "rotate-180")}
+                    className={cn(
+                        "h-3.5 w-3.5 shrink-0 text-foreground-subtle transition-transform duration-fast",
+                        open && "rotate-180"
+                    )}
                 />
             </button>
             {open ? (
@@ -94,7 +97,9 @@ export function ToolInput({ input }: { input: unknown }) {
     const t = useTranslations("polar");
     return (
         <div className="space-y-1">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">{t("elements.parameters")}</p>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
+                {t("elements.parameters")}
+            </p>
             <pre className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground">
                 {jsonOf(input)}
             </pre>

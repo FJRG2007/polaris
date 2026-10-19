@@ -38,7 +38,15 @@ describe("the version tree", () => {
     it("places stored messages by the parent they were saved with", () => {
         const tree: VersionTree = new Map();
         const stored = [message("u1", "user"), message("a1", "assistant"), message("u1b", "user")];
-        learnPath(tree, stored, new Map([["u1", null], ["a1", "u1"], ["u1b", null]]));
+        learnPath(
+            tree,
+            stored,
+            new Map([
+                ["u1", null],
+                ["a1", "u1"],
+                ["u1b", null]
+            ])
+        );
         expect(versionsOf(tree, "u1")).toEqual(["u1", "u1b"]);
         expect(ids(pathThrough(tree, [], 0, "u1"))).toEqual(["u1", "a1"]);
     });
@@ -46,7 +54,10 @@ describe("the version tree", () => {
     it("refreshes a message's content in place without moving it", () => {
         const tree: VersionTree = new Map();
         learnPath(tree, [message("u1", "user")]);
-        const updated = { ...message("u1", "user"), parts: [{ type: "text" as const, text: "changed" }] };
+        const updated = {
+            ...message("u1", "user"),
+            parts: [{ type: "text" as const, text: "changed" }]
+        };
         learnPath(tree, [message("x", "assistant"), updated]);
         expect(tree.get("u1")?.parentId).toBeNull();
         expect(tree.get("u1")?.message.parts).toEqual(updated.parts);

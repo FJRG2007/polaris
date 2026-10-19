@@ -33,7 +33,12 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import { agentSignins, isSigninRow, isSigninSlug, signinSlug } from "@/lib/agents/agent-signins";
-import { encryptSecret, decryptSecret, secretFingerprint, CredentialDecryptError } from "@polaris/storage";
+import {
+    encryptSecret,
+    decryptSecret,
+    secretFingerprint,
+    CredentialDecryptError
+} from "@polaris/storage";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
 export type KeyOwner = string | null;
@@ -48,7 +53,10 @@ const SHARE_KEY = "agents.keys.shareInstance";
 
 /** Every slug somebody may store a key under. The gateway is one of them: it is
  *  how an account reuses a subscription it already pays for. */
-const STORABLE = new Set<string>([...MODEL_PROVIDERS.map((provider) => provider.slug), GATEWAY_SLUG]);
+const STORABLE = new Set<string>([
+    ...MODEL_PROVIDERS.map((provider) => provider.slug),
+    GATEWAY_SLUG
+]);
 
 export function isStorableProvider(slug: string): boolean {
     // Agent sign-ins live in this table too, under their own prefix. Asked
@@ -190,7 +198,11 @@ function envelope(secret: string, provider: string, config?: Record<string, unkn
         encryptedSecret: blob.ciphertext,
         secretNonce: blob.nonce,
         secretKeyId: blob.keyId,
-        secretFingerprint: secretFingerprint(secret.trim(), fingerprintScope(provider, config), master),
+        secretFingerprint: secretFingerprint(
+            secret.trim(),
+            fingerprintScope(provider, config),
+            master
+        ),
         expiryNotice: ""
     };
 }
@@ -204,7 +216,11 @@ function envelope(secret: string, provider: string, config?: Record<string, unkn
  * case-insensitive filter Postgres would use is not available on the SQLite the
  * dev setup runs on, and a rule that only holds in production is not a rule.
  */
-export async function ownerHasModelKeyName(owner: KeyOwner, name: string, exceptId?: string): Promise<boolean> {
+export async function ownerHasModelKeyName(
+    owner: KeyOwner,
+    name: string,
+    exceptId?: string
+): Promise<boolean> {
     const rows = await prisma.userModelKey.findMany({
         where: { userId: owner },
         select: { id: true, name: true }
@@ -316,7 +332,9 @@ export async function updateModelKey(
             ...(input.config === undefined ? {} : { config: JSON.stringify(input.config) }),
             // A date pushed out has to start the warnings over, or the one already
             // sent would be the last thing said about a key that is fine now.
-            ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt, expiryNotice: "" })
+            ...(input.expiresAt === undefined
+                ? {}
+                : { expiresAt: input.expiresAt, expiryNotice: "" })
         }
     });
     return true;
@@ -416,7 +434,10 @@ function readSecret(row: StoredKey): string | null {
 
 /** The first key of this provider that can actually be read, with the row it came
  *  from so the caller can note that it was used. */
-function firstUsable(keys: StoredKey[], provider: string): { row: StoredKey; secret: string } | null {
+function firstUsable(
+    keys: StoredKey[],
+    provider: string
+): { row: StoredKey; secret: string } | null {
     for (const row of keys) {
         if (row.provider !== provider) continue;
         const secret = readSecret(row);
@@ -664,7 +685,9 @@ function writeGateway(
  * as each other: the first is a fault here, the second is somebody who has not
  * linked an account yet and can be told so.
  */
-export async function sessionSecretsFor(userId: string | null): Promise<Record<string, string> | null> {
+export async function sessionSecretsFor(
+    userId: string | null
+): Promise<Record<string, string> | null> {
     const secrets = await runSecretsFor(userId);
     if (secrets === null) return null;
     try {
@@ -723,17 +746,26 @@ export async function listProviderKeys(owner: KeyOwner): Promise<ModelKeyView[]>
  *
  * Own before the deployment's, which is the order they are spent in.
  */
-export async function signinOptionsFor(userId: string | null): Promise<
+export async function signinOptionsFor(
+    userId: string | null
+): Promise<
     Array<{ id: string; env: string; name: string; identity: string | null; source: KeySource }>
 > {
-    const options: Array<{ id: string; env: string; name: string; identity: string | null; source: KeySource }> =
-        [];
+    const options: Array<{
+        id: string;
+        env: string;
+        name: string;
+        identity: string | null;
+        source: KeySource;
+    }> = [];
     try {
         const shared = await instanceKeysAreShared();
         const rows = await prisma.userModelKey.findMany({
             where: {
                 AND: [
-                    { OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])] },
+                    {
+                        OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                    },
                     unexpired()
                 ]
             },
@@ -757,7 +789,9 @@ export async function signinOptionsFor(userId: string | null): Promise<
         return options;
     }
     // Own first, since that is the order a session would spend them in.
-    return options.sort((left, right) => (left.source === right.source ? 0 : left.source === "own" ? -1 : 1));
+    return options.sort((left, right) =>
+        left.source === right.source ? 0 : left.source === "own" ? -1 : 1
+    );
 }
 
 export async function signinAccountsFor(
@@ -771,10 +805,14 @@ export async function signinAccountsFor(
         // The name and whose account it is are not on the row the resolver
         // returns, so the descriptive columns are read alongside it.
         const described = new Map(
-            (await prisma.userModelKey.findMany({
-                where: { OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])] },
-                select: { id: true, name: true, config: true }
-            })).map((row) => [row.id, row])
+            (
+                await prisma.userModelKey.findMany({
+                    where: {
+                        OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                    },
+                    select: { id: true, name: true, config: true }
+                })
+            ).map((row) => [row.id, row])
         );
         for (const signin of agentSignins()) {
             const slug = signinSlug(signin.env);

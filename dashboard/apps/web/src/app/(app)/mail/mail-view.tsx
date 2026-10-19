@@ -412,7 +412,15 @@ export function MailView({
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
     const openSubject = threads.find((thread) => thread.id === openThreadId)?.subject;
     usePolarContext(
-        openThreadId ? { record: { kind: "mail conversation", id: openThreadId, name: openSubject || undefined } } : null
+        openThreadId
+            ? {
+                  record: {
+                      kind: "mail conversation",
+                      id: openThreadId,
+                      name: openSubject || undefined
+                  }
+              }
+            : null
     );
 
     /**

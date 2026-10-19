@@ -312,7 +312,6 @@ function Media({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     }
     // Not next/image: these point at whatever somebody wrote, which is usually
     // an attachment on this Polaris but can be any address at all.
-    // eslint-disable-next-line @next/next/no-img-element
     return <img src={src} alt={alt} />;
 }
 

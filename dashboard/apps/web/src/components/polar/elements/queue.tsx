@@ -17,7 +17,9 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { MessageAction } from "@/components/polar/elements/message";
 
 export function Queue({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-    return <div className={cn("rounded-lg border border-border bg-card p-2", className)} {...props} />;
+    return (
+        <div className={cn("rounded-lg border border-border bg-card p-2", className)} {...props} />
+    );
 }
 
 export function QueueSection({ label, children }: { label: string; children: ReactNode }) {

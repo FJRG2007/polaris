@@ -11,8 +11,17 @@
 
 import type { UIMessage } from "ai";
 import { prisma, type Prisma } from "@polaris/db";
-import { discardPolarAttachments, linkPolarAttachments, threadAttachments } from "@/lib/polar/attachments";
-import { POLAR_THREAD_PAGE, queueSchema, type ModelChoice, type QueuedMessage } from "@/lib/polar/shared";
+import {
+    discardPolarAttachments,
+    linkPolarAttachments,
+    threadAttachments
+} from "@/lib/polar/attachments";
+import {
+    POLAR_THREAD_PAGE,
+    queueSchema,
+    type ModelChoice,
+    type QueuedMessage
+} from "@/lib/polar/shared";
 
 export interface PolarThreadRow {
     id: string;
@@ -95,7 +104,10 @@ export async function ensurePolarThread(
     firstText: string,
     choice: ModelChoice
 ): Promise<boolean> {
-    const existing = await prisma.polarThread.findUnique({ where: { id }, select: { userId: true } });
+    const existing = await prisma.polarThread.findUnique({
+        where: { id },
+        select: { userId: true }
+    });
     if (existing) {
         if (existing.userId !== userId) return false;
         await prisma.polarThread.update({
@@ -105,7 +117,12 @@ export async function ensurePolarThread(
         return true;
     }
     await prisma.polarThread.create({
-        data: { id, userId, title: titleFrom(firstText), choice: choice as unknown as Prisma.InputJsonValue }
+        data: {
+            id,
+            userId,
+            title: titleFrom(firstText),
+            choice: choice as unknown as Prisma.InputJsonValue
+        }
     });
     return true;
 }
@@ -151,12 +168,23 @@ export async function savePolarMessages(
     await linkPolarAttachments(userId, threadId, messages);
 }
 
-export async function renamePolarThread(userId: string, id: string, title: string): Promise<boolean> {
-    const { count } = await prisma.polarThread.updateMany({ where: { id, userId }, data: { title } });
+export async function renamePolarThread(
+    userId: string,
+    id: string,
+    title: string
+): Promise<boolean> {
+    const { count } = await prisma.polarThread.updateMany({
+        where: { id, userId },
+        data: { title }
+    });
     return count > 0;
 }
 
-export async function setPolarQueue(userId: string, id: string, queue: QueuedMessage[]): Promise<boolean> {
+export async function setPolarQueue(
+    userId: string,
+    id: string,
+    queue: QueuedMessage[]
+): Promise<boolean> {
     const { count } = await prisma.polarThread.updateMany({
         where: { id, userId },
         data: { queue: queue as unknown as Prisma.InputJsonValue }

@@ -45,7 +45,11 @@ export function Attachment({
 }) {
     const name = file.filename ?? file.mediaType;
     const body = showable(file) ? (
-        <img src={file.url} alt={name} className="h-16 w-16 rounded-md border border-border object-cover" />
+        <img
+            src={file.url}
+            alt={name}
+            className="h-16 w-16 rounded-md border border-border object-cover"
+        />
     ) : (
         <span className="flex h-16 w-40 min-w-0 items-center gap-2 rounded-md border border-border bg-muted px-2 text-xs text-muted-foreground">
             <FileText className="h-4 w-4 shrink-0" />

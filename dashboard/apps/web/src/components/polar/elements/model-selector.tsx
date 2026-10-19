@@ -28,11 +28,21 @@ export interface ModelSelectorProvider {
     provider: string;
     name: string;
     payers: Payer[];
-    models: Array<{ provider: string; model: string; name: string; reasoning: boolean; attachment?: boolean }>;
+    models: Array<{
+        provider: string;
+        model: string;
+        name: string;
+        reasoning: boolean;
+        attachment?: boolean;
+    }>;
 }
 
 function Mark({ on }: { on: boolean }) {
-    return <Check className={on ? "ml-auto h-3.5 w-3.5 text-primary" : "ml-auto h-3.5 w-3.5 opacity-0"} />;
+    return (
+        <Check
+            className={on ? "ml-auto h-3.5 w-3.5 text-primary" : "ml-auto h-3.5 w-3.5 opacity-0"}
+        />
+    );
 }
 
 export function ModelSelector({
@@ -55,13 +65,18 @@ export function ModelSelector({
                     title={t("picker.title")}
                     className="inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
                 >
-                    <span className="truncate text-foreground">{model?.name ?? t("picker.none")}</span>
+                    <span className="truncate text-foreground">
+                        {model?.name ?? t("picker.none")}
+                    </span>
                     {choice && model?.reasoning ? (
                         <span className="shrink-0">{t(`intelligence.${choice.intelligence}`)}</span>
                     ) : null}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-96 w-72 overflow-y-auto overscroll-contain">
+            <DropdownMenuContent
+                align="start"
+                className="max-h-96 w-72 overflow-y-auto overscroll-contain"
+            >
                 {providers.map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
@@ -81,7 +96,12 @@ export function ModelSelector({
                                 <span className="min-w-0 truncate" title={option.name}>
                                     {option.name}
                                 </span>
-                                <Mark on={option.provider === choice?.provider && option.model === choice?.model} />
+                                <Mark
+                                    on={
+                                        option.provider === choice?.provider &&
+                                        option.model === choice?.model
+                                    }
+                                />
                             </DropdownMenuItem>
                         ))}
                     </div>
@@ -104,7 +124,10 @@ export function ModelSelector({
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>{t("picker.payer")}</DropdownMenuLabel>
                         {(provider?.payers ?? []).map((payer) => (
-                            <DropdownMenuItem key={payer} onSelect={() => onChoice({ ...choice, payer })}>
+                            <DropdownMenuItem
+                                key={payer}
+                                onSelect={() => onChoice({ ...choice, payer })}
+                            >
                                 {t(`picker.${payer}`)}
                                 <Mark on={(choice.payer ?? provider?.payers[0]) === payer} />
                             </DropdownMenuItem>

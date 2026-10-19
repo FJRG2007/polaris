@@ -16,7 +16,12 @@
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
-import { forwardRef, type FormEvent, type HTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+    forwardRef,
+    type FormEvent,
+    type HTMLAttributes,
+    type TextareaHTMLAttributes
+} from "react";
 
 export function PromptInput({
     className,
@@ -39,7 +44,12 @@ export function PromptInput({
 }
 
 export function PromptInputHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-    return <div className={cn("mb-1 flex min-w-0 flex-wrap gap-1 empty:hidden", className)} {...props} />;
+    return (
+        <div
+            className={cn("mb-1 flex min-w-0 flex-wrap gap-1 empty:hidden", className)}
+            {...props}
+        />
+    );
 }
 
 /** Most lines the box grows to before it scrolls. */
@@ -87,7 +97,16 @@ export function PromptInputTools({ className, ...props }: HTMLAttributes<HTMLDiv
 }
 
 export function PromptInputButton({ label, ...props }: ButtonProps & { label: string }) {
-    return <Button type="button" variant="ghost" size="icon-sm" aria-label={label} title={label} {...props} />;
+    return (
+        <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={label}
+            title={label}
+            {...props}
+        />
+    );
 }
 
 /** Opens the shared file picker; the chosen files go to `onFiles`. */
@@ -113,7 +132,12 @@ export function PromptInputAttach({
                 label={label}
                 disabled={disabled}
                 onClick={async () => {
-                    const files = await choose({ accept: accept.join(","), multiple: true, title: label, onFailed });
+                    const files = await choose({
+                        accept: accept.join(","),
+                        multiple: true,
+                        title: label,
+                        onFailed
+                    });
                     if (files.length > 0) onFiles(files);
                 }}
             >
@@ -138,13 +162,27 @@ export function PromptInputSubmit({
 }) {
     if (busy) {
         return (
-            <Button type="button" variant="secondary" size="icon-sm" aria-label={stopLabel} title={stopLabel} onClick={onStop}>
+            <Button
+                type="button"
+                variant="secondary"
+                size="icon-sm"
+                aria-label={stopLabel}
+                title={stopLabel}
+                onClick={onStop}
+            >
                 <Square />
             </Button>
         );
     }
     return (
-        <Button type="submit" variant="primary" size="icon-sm" aria-label={sendLabel} title={sendLabel} disabled={disabled}>
+        <Button
+            type="submit"
+            variant="primary"
+            size="icon-sm"
+            aria-label={sendLabel}
+            title={sendLabel}
+            disabled={disabled}
+        >
             <ArrowUp />
         </Button>
     );

@@ -102,7 +102,11 @@ export async function polarModelOptions(userId: string): Promise<PolarProviderOp
     return options;
 }
 
-function catalogueOption(slug: string, providerName: string, model: CatalogModel): PolarModelOption {
+function catalogueOption(
+    slug: string,
+    providerName: string,
+    model: CatalogModel
+): PolarModelOption {
     return {
         provider: slug,
         providerName,
@@ -162,7 +166,9 @@ export async function resolvePolarModel(
     choice: ModelChoice
 ): Promise<ResolvedModel | ModelRefusal> {
     if (choice.kind !== "language") return "unsupported_kind";
-    const provider = (await polarModelOptions(userId)).find((entry) => entry.provider === choice.provider);
+    const provider = (await polarModelOptions(userId)).find(
+        (entry) => entry.provider === choice.provider
+    );
     if (!provider) return "no_key";
     if (choice.payer && !provider.payers.includes(choice.payer)) return "no_key";
     const option = provider.models.find((model) => model.model === choice.model);
