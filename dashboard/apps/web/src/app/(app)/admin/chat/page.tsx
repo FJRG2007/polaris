@@ -32,10 +32,7 @@ export default async function ChatRulesPage() {
         // narrow admin pages are: a limit of three words in a track the width of
         // the screen is the whole reason this page looked wrong.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("chat.page.title")}
-                description={t("chat.page.description")}
-            />
+            <PageHeader title={t("chat.page.title")} description={t("chat.page.description")} />
             <ChatRulesView initial={rules} />
             {/* Beside the size limit it qualifies: the limit is about what this
                 instance stores, and this is what decides whether sending a file

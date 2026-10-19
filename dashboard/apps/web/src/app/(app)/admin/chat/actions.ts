@@ -56,7 +56,8 @@ export async function setChatRulesAction(
  */
 export async function setDriveShareAction(how: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    if (!isDriveShare(how)) return { error: (await getTranslations("admin"))("chat.errors.notAShare") };
+    if (!isDriveShare(how))
+        return { error: (await getTranslations("admin"))("chat.errors.notAShare") };
     await setDriveShare(how);
     await recordAudit({
         actorId: admin.id,
