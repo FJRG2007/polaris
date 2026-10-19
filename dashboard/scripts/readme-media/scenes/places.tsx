@@ -27,13 +27,7 @@ export const placesOverview = defineScene({
                         />
                         <PlaceSwitcher places={all} current={current} canManage />
                     </div>
-                    <OverviewView
-                        placeId={CABIN_ID}
-                        places={all}
-                        resident
-                        canControl
-                        canManage
-                    />
+                    <OverviewView placeId={CABIN_ID} places={all} resident canControl canManage />
                 </div>
             </Chrome>
         );

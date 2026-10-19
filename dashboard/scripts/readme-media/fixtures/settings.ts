@@ -115,7 +115,12 @@ export function directory(ctx: SceneContext): Page<DirectoryUser> {
                 joinedDaysAgo: 420,
                 seenMinutesAgo: 0
             }),
-            member(ctx, TEAM.ana, { isAdmin: true, roles: ["admin"], joinedDaysAgo: 410, seenMinutesAgo: 1 }),
+            member(ctx, TEAM.ana, {
+                isAdmin: true,
+                roles: ["admin"],
+                joinedDaysAgo: 410,
+                seenMinutesAgo: 1
+            }),
             member(ctx, TEAM.kenji, { joinedDaysAgo: 300, seenMinutesAgo: 3 }),
             member(ctx, TEAM.priya, { roles: ["support"], joinedDaysAgo: 260, seenMinutesAgo: 45 }),
             member(ctx, TEAM.lena, { joinedDaysAgo: 190, seenMinutesAgo: 60 * 5 }),
