@@ -78,11 +78,8 @@ import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
-import {
-    Attachment,
-    Attachments,
-    type AttachmentData
-} from "@/components/polar/elements/attachments";
+import { sendFile } from "@/components/transfers/move-file";
+import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
 import {
     ModelSelector,
     type ModelSelectorProvider
@@ -117,6 +114,7 @@ import {
 import {
     cleanContextText,
     MAX_QUEUE,
+    polarAttachmentId,
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
@@ -388,6 +386,17 @@ function useWide(): boolean {
     );
 }
 
+/** A staged file the message cannot go without yet: uploading, or failed. */
+function stillStaging(file: AttachmentData): boolean {
+    return !!file.pending || !!file.failed;
+}
+
+/** The size a file part was sent with, when it was. */
+function sizeOf(metadata: unknown): number | undefined {
+    const size = (metadata as { polaris?: { size?: unknown } } | undefined)?.polaris?.size;
+    return typeof size === "number" && Number.isFinite(size) && size >= 0 ? size : undefined;
+}
+
 /** Upload refusals the composer explains; anything else reads as a failed upload. */
 const UPLOAD_ERRORS = [
     "unsupported_type",
@@ -398,27 +407,52 @@ const UPLOAD_ERRORS = [
 ] as const;
 type UploadError = (typeof UPLOAD_ERRORS)[number];
 
-async function uploadFile(file: File): Promise<AttachmentData | string> {
+/** Why a file cannot be attached at all, decided before a byte is sent. */
+export function refusalOf(file: Pick<File, "type" | "size">): UploadError | null {
     if (!(POLAR_ATTACHMENT_TYPES as readonly string[]).includes(file.type))
         return "unsupported_type";
     if (file.size > POLAR_ATTACHMENT_MAX_BYTES) return "too_large";
-    const response = await fetch(`/api/polar/attachments?name=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { "content-type": file.type },
-        body: file
-    }).catch(() => null);
-    if (!response?.ok) {
-        const body = (await response?.json().catch(() => null)) as { error?: string } | null;
-        return body?.error ?? "upload_failed";
+    return null;
+}
+
+/** The files a paste carries: `files` where the browser fills it, else the items. */
+export function pastedFiles(data: DataTransfer): File[] {
+    const files = Array.from(data.files ?? []);
+    if (files.length > 0) return files;
+    return Array.from(data.items ?? []).flatMap((item) => {
+        const file = item.kind === "file" ? item.getAsFile() : null;
+        return file ? [file] : [];
+    });
+}
+
+async function uploadFile(
+    file: File,
+    onProgress: (share: number) => void
+): Promise<AttachmentData | string> {
+    const sent = await sendFile(
+        `/api/polar/attachments?name=${encodeURIComponent(file.name)}`,
+        file,
+        {
+            method: "POST",
+            onProgress: (moved, total) => onProgress(total > 0 ? moved / total : 0)
+        }
+    ).catch(() => null);
+    let body: {
+        error?: string;
+        file?: { id: string; url: string; filename: string; mediaType: string };
+    } | null = null;
+    try {
+        body = sent?.body ? JSON.parse(sent.body) : null;
+    } catch {
+        body = null;
     }
-    const { file: stored } = (await response.json()) as {
-        file: { id: string; url: string; filename: string; mediaType: string };
-    };
+    if (!sent?.ok || !body?.file) return body?.error ?? "upload_failed";
     return {
-        id: stored.id,
-        url: stored.url,
-        filename: stored.filename,
-        mediaType: stored.mediaType
+        id: body.file.id,
+        url: body.file.url,
+        filename: body.file.filename,
+        mediaType: body.file.mediaType,
+        size: file.size
     };
 }
 
@@ -444,6 +478,11 @@ export function PolarChat({
     const [editing, setEditing] = useState<string | null>(null);
     const [files, setFiles] = useState<AttachmentData[]>([]);
     const [fileError, setFileError] = useState<string | null>(null);
+    const [dragging, setDragging] = useState(false);
+    /** The original of each staged file not yet stored, for a retry. */
+    const picked = useRef(new Map<string, File>());
+    const filesNow = useRef(files);
+    filesNow.current = files;
     const [threads, setThreads] = useState<ThreadRow[] | null>(null);
     const [moreThreads, setMoreThreads] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -717,6 +756,22 @@ export function PolarChat({
         setDrawer(false);
     };
 
+    /** Empties the composer's files, letting go of their local previews. */
+    const clearFiles = () => {
+        for (const file of filesNow.current) if (file.preview) URL.revokeObjectURL(file.preview);
+        picked.current.clear();
+        setFiles([]);
+        setFileError(null);
+    };
+
+    useEffect(
+        () => () => {
+            for (const file of filesNow.current)
+                if (file.preview) URL.revokeObjectURL(file.preview);
+        },
+        []
+    );
+
     const startNew = () => {
         void chat.stop();
         tree.current = new Map();
@@ -725,7 +780,7 @@ export function PolarChat({
         setQueue([]);
         setInput("");
         setQuote(null);
-        setFiles([]);
+        clearFiles();
         setEditing(null);
         composerNext.current = drawer;
         setDrawer(false);
@@ -762,35 +817,89 @@ export function PolarChat({
         if (id === threadId) startNew();
     };
 
-    const addFiles = async (chosen: File[]) => {
-        setFileError(null);
-        const room = POLAR_ATTACHMENT_MOST - files.length;
-        if (chosen.length > room) setFileError(t("files.tooMany", { most: POLAR_ATTACHMENT_MOST }));
-        for (const file of chosen.slice(0, Math.max(0, room))) {
+    /** Uploads one staged file, drawing its progress, and leaves it ready or failed. */
+    const upload = async (key: string, file: File) => {
+        const stored = await uploadFile(file, (share) =>
+            setFiles((current) =>
+                current.map((entry) => (entry.id === key ? { ...entry, progress: share } : entry))
+            )
+        );
+        if (typeof stored === "string") {
+            const code: UploadError = (UPLOAD_ERRORS as readonly string[]).includes(stored)
+                ? (stored as UploadError)
+                : "upload_failed";
+            const sentence = t(`files.errors.${code}`, { name: file.name });
+            setFiles((current) =>
+                current.map((entry) =>
+                    entry.id === key ? { ...entry, pending: false, failed: sentence } : entry
+                )
+            );
+            setFileError(sentence);
+            return;
+        }
+        picked.current.delete(key);
+        // The local preview stays on the thumbnail until the file leaves the
+        // composer, so the picture does not blink while the stored one loads.
+        setFiles((current) =>
+            current.map((entry) =>
+                entry.id === key ? { ...stored, id: entry.id, preview: entry.preview } : entry
+            )
+        );
+    };
+
+    const addFiles = (chosen: File[]) => {
+        const refused: string[] = [];
+        const accepted = chosen.filter((file) => {
+            const refusal = refusalOf(file);
+            if (refusal) refused.push(t(`files.errors.${refusal}`, { name: file.name }));
+            return !refusal;
+        });
+        const room = Math.max(0, POLAR_ATTACHMENT_MOST - files.length);
+        if (accepted.length > room)
+            refused.push(t("files.tooMany", { most: POLAR_ATTACHMENT_MOST }));
+        setFileError(refused.length > 0 ? refused.join(" ") : null);
+        for (const file of accepted.slice(0, room)) {
             const key = newId();
-            const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+            const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+            picked.current.set(key, file);
             setFiles((current) => [
                 ...current,
-                { id: key, url: preview, filename: file.name, mediaType: file.type, pending: true }
+                {
+                    id: key,
+                    url: "",
+                    filename: file.name,
+                    mediaType: file.type,
+                    size: file.size,
+                    pending: true,
+                    progress: 0,
+                    preview
+                }
             ]);
-            const stored = await uploadFile(file);
-            if (preview) URL.revokeObjectURL(preview);
-            if (typeof stored === "string") {
-                setFiles((current) => current.filter((entry) => entry.id !== key));
-                const code: UploadError = (UPLOAD_ERRORS as readonly string[]).includes(stored)
-                    ? (stored as UploadError)
-                    : "upload_failed";
-                setFileError(t(`files.errors.${code}`, { name: file.name }));
-            } else {
-                setFiles((current) => current.map((entry) => (entry.id === key ? stored : entry)));
-            }
+            void upload(key, file);
         }
+    };
+
+    const retryFile = (file: AttachmentData) => {
+        const original = picked.current.get(file.id);
+        if (!original) return;
+        setFileError(null);
+        setFiles((current) =>
+            current.map((entry) =>
+                entry.id === file.id
+                    ? { ...entry, pending: true, progress: 0, failed: undefined }
+                    : entry
+            )
+        );
+        void upload(file.id, original);
     };
 
     const removeFile = (file: AttachmentData) => {
         setFiles((current) => current.filter((entry) => entry.id !== file.id));
-        if (!file.pending) {
-            void fetch(`/api/polar/attachments/${encodeURIComponent(file.id)}`, {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+        picked.current.delete(file.id);
+        const stored = file.pending ? null : polarAttachmentId(file.url);
+        if (stored) {
+            void fetch(`/api/polar/attachments/${encodeURIComponent(stored)}`, {
                 method: "DELETE"
             }).catch(() => undefined);
         }
@@ -822,8 +931,8 @@ export function PolarChat({
 
     const submit = () => {
         const raw = input.trim();
-        const ready = files.filter((file) => !file.pending);
-        if ((!raw && ready.length === 0) || !choice || files.some((file) => file.pending)) return;
+        const ready = files.filter((file) => !file.pending && !file.failed);
+        if ((!raw && ready.length === 0) || !choice || files.some(stillStaging)) return;
         const typed = COMMANDS.find((command) => raw === `/${command}`);
         if (typed) return runCommand(typed);
         const text = quote ? `> ${quote}\n\n${raw}` : raw;
@@ -833,12 +942,15 @@ export function PolarChat({
                 type: "file" as const,
                 mediaType: file.mediaType,
                 filename: file.filename,
-                url: file.url
+                url: file.url,
+                ...(file.size !== undefined
+                    ? { providerMetadata: { polaris: { size: file.size } } }
+                    : {})
             }))
         };
         setInput("");
         setQuote(null);
-        setFiles([]);
+        clearFiles();
         if (editing) {
             const index = chat.messages.findIndex((entry) => entry.id === editing);
             setEditing(null);
@@ -987,7 +1099,25 @@ export function PolarChat({
                     className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm"
                 />
             ) : null}
-            <PromptInput onSubmit={submit}>
+            <PromptInput
+                onSubmit={submit}
+                className={cn(dragging && "border-primary bg-primary/10")}
+                onDragOver={(event) => {
+                    if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                    event.preventDefault();
+                    setDragging(true);
+                }}
+                onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                        setDragging(false);
+                }}
+                onDrop={(event) => {
+                    if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                    event.preventDefault();
+                    setDragging(false);
+                    addFiles(Array.from(event.dataTransfer.files));
+                }}
+            >
                 <PromptInputHeader>
                     {context ? (
                         <Chip
@@ -1012,20 +1142,12 @@ export function PolarChat({
                         />
                     ) : null}
                 </PromptInputHeader>
-                {files.length > 0 ? (
-                    <Attachments className="mb-2 mt-1">
-                        {files.map((file) => (
-                            <Attachment
-                                key={file.id}
-                                file={file}
-                                removeLabel={t("files.remove", {
-                                    name: file.filename ?? ""
-                                })}
-                                onRemove={() => removeFile(file)}
-                            />
-                        ))}
-                    </Attachments>
-                ) : null}
+                <AttachmentList
+                    files={files}
+                    className="mb-2 mt-1"
+                    onRemove={removeFile}
+                    onRetry={retryFile}
+                />
                 {fileError ? (
                     <p role="alert" className="mb-1 text-xs text-danger-ink">
                         {fileError}
@@ -1051,10 +1173,10 @@ export function PolarChat({
                     onChange={(event) => setInput(event.target.value)}
                     onSubmitKey={submit}
                     onPaste={(event) => {
-                        const pasted = Array.from(event.clipboardData.files);
+                        const pasted = pastedFiles(event.clipboardData);
                         if (pasted.length > 0) {
                             event.preventDefault();
-                            void addFiles(pasted);
+                            addFiles(pasted);
                         }
                     }}
                 />
@@ -1065,7 +1187,7 @@ export function PolarChat({
                                 label={t("files.add")}
                                 accept={POLAR_ATTACHMENT_TYPES}
                                 disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
-                                onFiles={(chosen) => void addFiles(chosen)}
+                                onFiles={addFiles}
                                 onFailed={setFileError}
                             />
                         </span>
@@ -1082,7 +1204,7 @@ export function PolarChat({
                         disabled={
                             (!input.trim() && files.length === 0) ||
                             !choice ||
-                            files.some((file) => file.pending)
+                            files.some(stillStaging)
                         }
                         sendLabel={t("actions.send")}
                         stopLabel={t("actions.stop")}
@@ -1430,21 +1552,16 @@ function MessageView({
             {meta.fellBackFrom ? (
                 <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p>
             ) : null}
-            {files.length > 0 ? (
-                <Attachments className={mine ? "justify-end" : undefined}>
-                    {files.map((part, index) => (
-                        <Attachment
-                            key={index}
-                            file={{
-                                id: String(index),
-                                url: part.url,
-                                filename: part.filename,
-                                mediaType: part.mediaType
-                            }}
-                        />
-                    ))}
-                </Attachments>
-            ) : null}
+            <AttachmentList
+                className={mine ? "justify-end" : undefined}
+                files={files.map((part, index) => ({
+                    id: String(index),
+                    url: part.url,
+                    filename: part.filename,
+                    mediaType: part.mediaType,
+                    size: sizeOf(part.providerMetadata)
+                }))}
+            />
             {message.parts.map((part, index) => {
                 if (index === workIndex) {
                     return (
