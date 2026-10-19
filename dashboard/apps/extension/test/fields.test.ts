@@ -13,6 +13,7 @@ import {
     findFields,
     isOneTimeCode,
     isUsername,
+    loginIdentifier,
     readForm,
     type FieldFacts
 } from "../src/lib/fields";
@@ -411,5 +412,22 @@ describe("the rest of a sign-up", () => {
             field({ type: "password" })
         ]);
         expect(form).toMatchObject({ username: 0, usernameAsks: "phone" });
+    });
+});
+
+describe("the username or the email, for the box that asks", () => {
+    it("types the email into a box that asks for one", () => {
+        expect(loginIdentifier("email", "ada_l", "ada@example.com")).toBe("ada@example.com");
+    });
+
+    it("types the username anywhere else", () => {
+        expect(loginIdentifier("username", "ada_l", "ada@example.com")).toBe("ada_l");
+        expect(loginIdentifier(null, "ada_l", "ada@example.com")).toBe("ada_l");
+    });
+
+    it("falls back to whichever one the login has", () => {
+        expect(loginIdentifier("email", "ada_l", null)).toBe("ada_l");
+        expect(loginIdentifier("username", null, "ada@example.com")).toBe("ada@example.com");
+        expect(loginIdentifier("email", null, null)).toBeNull();
     });
 });

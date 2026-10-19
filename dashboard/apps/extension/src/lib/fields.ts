@@ -574,3 +574,19 @@ export function isOneTimeCode(field: FieldFacts | undefined): boolean {
     const digits = field.inputMode === "numeric" || field.type === "tel" || field.type === "number";
     return length !== 1 && (short || digits);
 }
+
+/**
+ * What a login types into the box a sign-in asks who you are in.
+ *
+ * A Polaris login keeps its email apart from its username, so a box that asks
+ * for an email gets the email and any other box the username - each falling
+ * back to the other when the login has only one. `typeIntoPage` in the worker
+ * makes the same choice inline, for the reason at the top of this file.
+ */
+export function loginIdentifier(
+    asks: PageFields["usernameAsks"],
+    username: string | null,
+    email: string | null
+): string | null {
+    return (asks === "email" ? email || username : username || email) || null;
+}

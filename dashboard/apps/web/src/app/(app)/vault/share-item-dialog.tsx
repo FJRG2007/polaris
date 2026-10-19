@@ -170,23 +170,26 @@ export function ShareItemDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {item?.name ? t("share.title", { name: item.name }) : t("share.titleUnnamed")}
+                        {item?.name
+                            ? t("share.title", { name: item.name })
+                            : t("share.titleUnnamed")}
                     </DialogTitle>
-                    <DialogDescription>
-                        {t("share.description")}
-                    </DialogDescription>
+                    <DialogDescription>{t("share.description")}</DialogDescription>
                 </DialogHeader>
 
                 {link ? (
                     <div className="flex flex-col gap-2">
-                        <p className="text-sm">
-                            {t("share.copyNow")}
-                        </p>
+                        <p className="text-sm">{t("share.copyNow")}</p>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={link} className="font-mono text-xs" />
+                            <Input
+                                readOnly
+                                value={link}
+                                className="min-w-0 flex-1 font-mono text-xs"
+                            />
                             <Button
                                 type="button"
                                 size="icon"
+                                className="shrink-0"
                                 variant="secondary"
                                 title={t("share.copyLink")}
                                 aria-label={t("share.copyLink")}
@@ -202,9 +205,7 @@ export function ShareItemDialog({
                                 )}
                             </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            {t("share.listed")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("share.listed")}</p>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
@@ -224,7 +225,9 @@ export function ShareItemDialog({
                                         {WARNED_PARTS.has(part) ? (
                                             <span className="flex items-start gap-1 text-xs text-warning">
                                                 <ShieldAlert className="mt-0.5 size-3 shrink-0" />
-                                                {t(`share.warnings.${part as "totp" | "recovery" | "sshKey"}`)}
+                                                {t(
+                                                    `share.warnings.${part as "totp" | "recovery" | "sshKey"}`
+                                                )}
                                             </span>
                                         ) : null}
                                     </span>

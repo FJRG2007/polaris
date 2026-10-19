@@ -63,6 +63,12 @@ import {
     decryptItem,
     emptyItem,
     encryptItem,
+    ITEM_API_KEY,
+    ITEM_KINDS,
+    itemKind,
+    loginEmail,
+    managedFieldNames,
+    matchesSearch,
     type VaultFolder,
     type VaultItem
 } from "./vault-model";
@@ -92,6 +98,7 @@ import {
     MoveRight,
     Building2,
     KeyRound,
+    KeySquare,
     Loader2,
     Lock,
     Plus,
@@ -110,8 +117,18 @@ const TYPE_ICON: Record<number, typeof KeyRound> = {
     [core.CIPHER_SECURE_NOTE]: FileText,
     [core.CIPHER_CARD]: CreditCard,
     [core.CIPHER_IDENTITY]: Contact,
-    [core.CIPHER_SSH_KEY]: Terminal
+    [core.CIPHER_SSH_KEY]: Terminal,
+    [ITEM_API_KEY]: KeySquare
 };
+
+/** The second line under an item's name: who it signs in as, where an API key
+ *  is used, or else what kind of item it is. */
+function itemDetail(item: VaultItem): string {
+    if (item.login.username || loginEmail(item)) return item.login.username || loginEmail(item);
+    if (itemKind(item) === ITEM_API_KEY)
+        return core.fieldValue(item.fields, core.API_ENDPOINT_FIELD);
+    return "";
+}
 
 /**
  * An address as a browser will actually open it, or null when there is nothing
@@ -253,7 +270,8 @@ export function VaultApp() {
         return items.filter((item) => {
             if (filter === "trash" ? !item.deleted : item.deleted) return false;
             if (filter === "favorites" && !item.favorite) return false;
-            if (filter.startsWith("type:") && item.type !== Number(filter.slice(5))) return false;
+            if (filter.startsWith("type:") && itemKind(item) !== Number(filter.slice(5)))
+                return false;
             if (filter.startsWith("folder:") && item.folderId !== filter.slice(7)) return false;
             if (filter === "vault:mine" && item.organizationId !== null) return false;
             if (
@@ -263,11 +281,7 @@ export function VaultApp() {
             ) {
                 return false;
             }
-            if (!needle) return true;
-            return [item.name, item.login.username, item.login.uris.join(" "), item.notes]
-                .join(" ")
-                .toLowerCase()
-                .includes(needle);
+            return matchesSearch(item, needle);
         });
     }, [items, query, filter]);
 
@@ -301,12 +315,9 @@ export function VaultApp() {
      * keyed by.
      */
     const extraFields = useMemo(() => {
-        const managed = new Set<string>([
-            core.RECOVERY_CODES_FIELD,
-            core.BANK_FIELD,
-            core.ICON_FIELD
-        ]);
-        return (current?.fields ?? [])
+        if (!current) return [];
+        const managed = managedFieldNames(current);
+        return current.fields
             .map((field, index) => ({ field, index }))
             .filter(({ field }) => !managed.has(field.name));
     }, [current]);
@@ -430,7 +441,9 @@ export function VaultApp() {
     function onRowKey(event: React.KeyboardEvent, item: VaultItem): void {
         if (shortcutPressed(event, "vault.copyUsername")) {
             event.preventDefault();
-            void copy("username", item.login.username);
+            // The email when the login has no username: the one box a sign-in
+            // asks for first, whichever of the two it is.
+            void copy("username", item.login.username || loginEmail(item));
         } else if (shortcutPressed(event, "vault.copyPassword")) {
             event.preventDefault();
             void copy("password", item.login.password);
@@ -564,7 +577,7 @@ export function VaultApp() {
                                               }))
                                           ]
                                         : []),
-                                    ...core.CIPHER_TYPES.map((type) => ({
+                                    ...ITEM_KINDS.map((type) => ({
                                         value: `type:${type}`,
                                         label: cipherTypeLabel(t, type)
                                     })),
@@ -598,7 +611,7 @@ export function VaultApp() {
                         ) : (
                             <ul className="-mr-1 flex max-h-[calc(100dvh-16rem-var(--notice-height))] flex-col gap-0.5 overflow-y-auto overscroll-contain pr-1">
                                 {visible.map((item) => {
-                                    const Icon = TYPE_ICON[item.type] ?? KeyRound;
+                                    const Icon = TYPE_ICON[itemKind(item)] ?? KeyRound;
                                     return (
                                         // Right-click does what right-click does
                                         // everywhere else in Polaris. Copying the
@@ -639,8 +652,11 @@ export function VaultApp() {
                                                                 {item.name || t("labels.untitled")}
                                                             </p>
                                                             <p className="truncate text-xs text-muted-foreground">
-                                                                {item.login.username ||
-                                                                    cipherTypeLabel(t, item.type)}
+                                                                {itemDetail(item) ||
+                                                                    cipherTypeLabel(
+                                                                        t,
+                                                                        itemKind(item)
+                                                                    )}
                                                             </p>
                                                         </div>
                                                         {item.favorite ? (
@@ -657,22 +673,44 @@ export function VaultApp() {
                                                     {item.type === core.CIPHER_LOGIN ? (
                                                         <>
                                                             <ContextMenuItem
-                                                                disabled={!item.login.username}
+                                                                disabled={
+                                                                    !item.login.username &&
+                                                                    !loginEmail(item)
+                                                                }
                                                                 onSelect={() =>
                                                                     void copy(
                                                                         "username",
-                                                                        item.login.username
+                                                                        item.login.username ||
+                                                                            loginEmail(item)
                                                                     )
                                                                 }
                                                             >
                                                                 <Copy className="size-4" />
-                                                                {core.looksLikeEmail(
-                                                                    item.login.username
+                                                                {(
+                                                                    loginEmail(item)
+                                                                        ? !item.login.username
+                                                                        : core.looksLikeEmail(
+                                                                              item.login.username
+                                                                          )
                                                                 )
                                                                     ? t("app.menu.copyEmail")
                                                                     : t("app.menu.copyUsername")}
                                                                 <ShortcutHint id="vault.copyUsername" />
                                                             </ContextMenuItem>
+                                                            {item.login.username &&
+                                                            loginEmail(item) ? (
+                                                                <ContextMenuItem
+                                                                    onSelect={() =>
+                                                                        void copy(
+                                                                            "email",
+                                                                            loginEmail(item)
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Copy className="size-4" />
+                                                                    {t("app.menu.copyEmail")}
+                                                                </ContextMenuItem>
+                                                            ) : null}
                                                             <ContextMenuItem
                                                                 disabled={!item.login.password}
                                                                 onSelect={() => {
@@ -716,6 +754,44 @@ export function VaultApp() {
                                                                     </a>
                                                                 </ContextMenuItem>
                                                             ) : null}
+                                                            <ContextMenuSeparator />
+                                                        </>
+                                                    ) : null}
+                                                    {itemKind(item) === ITEM_API_KEY ? (
+                                                        <>
+                                                            <ContextMenuItem
+                                                                disabled={
+                                                                    !core.readApiKey(item.fields)
+                                                                        .key
+                                                                }
+                                                                onSelect={() =>
+                                                                    void copy(
+                                                                        "apiKey",
+                                                                        core.readApiKey(item.fields)
+                                                                            .key
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Copy className="size-4" />
+                                                                {t("app.menu.copyApiKey")}
+                                                            </ContextMenuItem>
+                                                            <ContextMenuItem
+                                                                disabled={
+                                                                    !core.readApiKey(item.fields)
+                                                                        .secret
+                                                                }
+                                                                onSelect={() => {
+                                                                    void copy(
+                                                                        "apiSecret",
+                                                                        core.readApiKey(item.fields)
+                                                                            .secret
+                                                                    );
+                                                                    noteUse(item, "copy");
+                                                                }}
+                                                            >
+                                                                <Copy className="size-4" />
+                                                                {t("app.menu.copySecret")}
+                                                            </ContextMenuItem>
                                                             <ContextMenuSeparator />
                                                         </>
                                                     ) : null}
@@ -802,7 +878,8 @@ export function VaultApp() {
                                     ) : (
                                         <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-muted">
                                             {(() => {
-                                                const Icon = TYPE_ICON[current.type] ?? KeyRound;
+                                                const Icon =
+                                                    TYPE_ICON[itemKind(current)] ?? KeyRound;
                                                 return (
                                                     <Icon className="size-5 text-muted-foreground" />
                                                 );
@@ -814,8 +891,8 @@ export function VaultApp() {
                                             {current.name || t("labels.untitled")}
                                         </h2>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {current.login.username ||
-                                                cipherTypeLabel(t, current.type)}
+                                            {itemDetail(current) ||
+                                                cipherTypeLabel(t, itemKind(current))}
                                         </p>
                                     </div>
                                 </div>
@@ -954,11 +1031,17 @@ export function VaultApp() {
                                     <Section
                                         title={t("app.sections.signIn")}
                                         when={Boolean(
-                                            current.login.username || current.login.password
+                                            current.login.username ||
+                                                loginEmail(current) ||
+                                                current.login.password
                                         )}
                                     >
                                         <Row
                                             label={
+                                                // An older login kept the address in
+                                                // the username; one with an email of
+                                                // its own has a username that is one.
+                                                !loginEmail(current) &&
                                                 core.looksLikeEmail(current.login.username)
                                                     ? t("app.fields.email")
                                                     : t("app.fields.username")
@@ -966,6 +1049,12 @@ export function VaultApp() {
                                             value={current.login.username}
                                             copied={copied === "username"}
                                             onCopy={() => copy("username", current.login.username)}
+                                        />
+                                        <Row
+                                            label={t("app.fields.email")}
+                                            value={loginEmail(current)}
+                                            copied={copied === "email"}
+                                            onCopy={() => copy("email", loginEmail(current))}
                                         />
                                         <Row
                                             label={t("app.fields.password")}
@@ -1219,6 +1308,44 @@ export function VaultApp() {
                                     />
                                 </Section>
                             ) : null}
+
+                            {itemKind(current) === ITEM_API_KEY
+                                ? (() => {
+                                      const parts = core.readApiKey(current.fields);
+                                      return (
+                                          <Section title={t("app.sections.apiKey")} when>
+                                              <Row
+                                                  label={t("app.fields.apiKey")}
+                                                  value={parts.key}
+                                                  copied={copied === "apiKey"}
+                                                  onCopy={() => copy("apiKey", parts.key)}
+                                              />
+                                              <Row
+                                                  label={t("app.fields.apiSecret")}
+                                                  value={parts.secret}
+                                                  secret={!revealed}
+                                                  revealed={revealed}
+                                                  copied={copied === "apiSecret"}
+                                                  onCopy={() => {
+                                                      void copy("apiSecret", parts.secret);
+                                                      noteUse(current, "copy");
+                                                  }}
+                                                  onReveal={() => {
+                                                      if (!revealed) noteUse(current, "reveal");
+                                                      setRevealed((prev) => !prev);
+                                                  }}
+                                              />
+                                              <Row
+                                                  label={t("app.fields.endpoint")}
+                                                  value={parts.endpoint}
+                                                  link
+                                                  copied={copied === "endpoint"}
+                                                  onCopy={() => copy("endpoint", parts.endpoint)}
+                                              />
+                                          </Section>
+                                      );
+                                  })()
+                                : null}
 
                             {/* Only the fields nothing else on this screen has
                                 already drawn. The recovery codes, the bank and

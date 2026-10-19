@@ -14,12 +14,13 @@ import { validationMessage } from "@/components/i18n/validation-message";
 
 type VaultT = NamespaceTranslator<"vault">;
 
-const TYPE_KEYS: Record<core.CipherType, NamespaceKey<"vault">> = {
+const TYPE_KEYS: Readonly<Record<number, NamespaceKey<"vault">>> = {
     [core.CIPHER_LOGIN]: "labels.types.login",
     [core.CIPHER_SECURE_NOTE]: "labels.types.note",
     [core.CIPHER_CARD]: "labels.types.card",
     [core.CIPHER_IDENTITY]: "labels.types.identity",
-    [core.CIPHER_SSH_KEY]: "labels.types.sshKey"
+    [core.CIPHER_SSH_KEY]: "labels.types.sshKey",
+    [core.ITEM_API_KEY]: "labels.types.apiKey"
 };
 
 const MATCH_KEYS: Record<core.UriMatch, NamespaceKey<"vault">> = {
@@ -77,7 +78,7 @@ export function importRefusalText(t: VaultT, message: string): string {
 
 /** What a kind of item is called, or nothing for a type this does not know. */
 export function cipherTypeLabel(t: VaultT, type: number): string {
-    const key = TYPE_KEYS[type as core.CipherType];
+    const key = TYPE_KEYS[type];
     return key ? t(key) : "";
 }
 
@@ -98,12 +99,17 @@ const SCHEMA_KEYS: Readonly<Record<string, NamespaceKey<"vault">>> = {
     "Unknown item type": "errors.schema.itemType",
     "Unknown send type": "errors.schema.sendType",
     "Give it a name": "errors.schema.name",
-    "Mix at least two kinds of character - letters and numbers, or letters and punctuation.": "errors.schema.mix"
+    "Mix at least two kinds of character - letters and numbers, or letters and punctuation.":
+        "errors.schema.mix"
 };
 
 /** A vault schema's complaint in the reader's words: the vault's own, then the
  *  shared ones (a length), then as it came. */
-export function vaultSchemaText(t: VaultT, validation: NamespaceTranslator<"validation">, message: string): string {
+export function vaultSchemaText(
+    t: VaultT,
+    validation: NamespaceTranslator<"validation">,
+    message: string
+): string {
     const key = SCHEMA_KEYS[message];
     if (key) return t(key);
     // core's master password rule says its length with a full stop.

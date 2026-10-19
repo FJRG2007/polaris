@@ -47,7 +47,9 @@
             "deleteForGood": "Borrar para siempre",
             "trash": "A la papelera",
             "defaultIdentity": "Usar al registrarte",
-            "notDefaultIdentity": "Dejar de usar al registrarte"
+            "notDefaultIdentity": "Dejar de usar al registrarte",
+            "copyApiKey": "Copiar clave",
+            "copySecret": "Copiar secreto"
         },
         "inTrash": "En la papelera",
         "unstar": "Desmarcar",
@@ -71,7 +73,8 @@
             "key": "Clave",
             "more": "Más",
             "notes": "Notas",
-            "uses": "Quién lo ha usado"
+            "uses": "Quién lo ha usado",
+            "apiKey": "Clave API"
         },
         "fields": {
             "email": "Correo",
@@ -83,7 +86,10 @@
             "expires": "Caduca",
             "securityCode": "Código CVV",
             "publicKey": "Clave pública",
-            "privateKey": "Clave privada"
+            "privateKey": "Clave privada",
+            "apiKey": "Clave API",
+            "apiSecret": "Secreto",
+            "endpoint": "URL base"
         },
         "cardExpired": "Esta tarjeta ha caducado.",
         "cardExpiring": "Esta tarjeta caduca pronto.",
@@ -273,7 +279,13 @@
         "keepHidden": "Guardar oculto",
         "toggleHidden": "Cambiar si este campo se guarda oculto",
         "removeField": "Quitar este campo",
-        "expiryPlaceholder": "MM/AA"
+        "expiryPlaceholder": "MM/AA",
+        "email": "Correo",
+        "emailPlaceholder": "nombre@ejemplo.com",
+        "emailInvalid": "Escribe un correo, como nombre@ejemplo.com.",
+        "apiKey": "Clave API",
+        "apiSecret": "Secreto",
+        "endpoint": "URL base"
     },
     "labels": {
         "types": {
@@ -281,7 +293,8 @@
             "note": "Nota",
             "card": "Tarjeta",
             "identity": "Identidad",
-            "sshKey": "Clave SSH"
+            "sshKey": "Clave SSH",
+            "apiKey": "Clave API"
         },
         "uriMatch": {
             "domain": "El sitio y todo lo que cuelga de él",

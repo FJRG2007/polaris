@@ -30,6 +30,105 @@ export const BANK_FIELD = "Bank";
 export const ICON_FIELD = "Icon";
 
 /**
+ * The field a login's email lives in, apart from its username.
+ *
+ * Bitwarden's login has `username` and nothing else for who you are, and a site
+ * that signs you in by handle still mails you at an address. So the username
+ * stays exactly the username and the address is a plain custom field named
+ * "Email" - which a Bitwarden client shows as a field, and its autofill matches
+ * by name against a box called "email". A login that already carried a field of
+ * that name is read as having that email, which is what it was.
+ */
+export const EMAIL_FIELD = "Email";
+
+/**
+ * An API key, which Bitwarden has no cipher type for.
+ *
+ * Stored as a Secure Note (`CIPHER_SECURE_NOTE`, type 2) carrying these custom
+ * fields:
+ *
+ *   - `Polaris item` = `api-key` (text): the marker. Only a note with exactly
+ *     this pair is an API key here; without it the same fields are an ordinary
+ *     note's custom fields.
+ *   - `API key` (text): the key, or the key id.
+ *   - `Secret` (hidden): the secret, behind the same press as a password.
+ *   - `Endpoint` (text, optional): the base URL it is used against.
+ *
+ * Named in words rather than codes because they are what a Bitwarden client, an
+ * export or a CSV shows: a secure note with "API key", "Secret" and "Endpoint"
+ * is usable anywhere, and the marker says where it came from.
+ */
+export const ITEM_KIND_FIELD = "Polaris item";
+export const API_KEY_KIND = "api-key";
+export const API_KEY_FIELD = "API key";
+export const API_SECRET_FIELD = "Secret";
+export const API_ENDPOINT_FIELD = "Endpoint";
+
+/** The kind Polaris's own screens show an API key as, beside the cipher types.
+ *  A screen's number only: what is stored is always `CIPHER_SECURE_NOTE`. */
+export const ITEM_API_KEY = 100;
+
+/** The fields an API key note is made of, marker included. */
+export const API_KEY_FIELDS: readonly string[] = [
+    ITEM_KIND_FIELD,
+    API_KEY_FIELD,
+    API_SECRET_FIELD,
+    API_ENDPOINT_FIELD
+];
+
+/** Whether a stored item is one of Polaris's API keys: a secure note with the
+ *  marker field. */
+export function isApiKeyItem(item: {
+    type: number;
+    fields: readonly { name: string; value: string }[];
+}): boolean {
+    return item.type === 2 && fieldValue(item.fields, ITEM_KIND_FIELD) === API_KEY_KIND;
+}
+
+/** An API key's parts, read off its fields. */
+export interface ApiKeyParts {
+    key: string;
+    secret: string;
+    endpoint: string;
+}
+
+export function readApiKey(fields: readonly { name: string; value: string }[]): ApiKeyParts {
+    return {
+        key: fieldValue(fields, API_KEY_FIELD),
+        secret: fieldValue(fields, API_SECRET_FIELD),
+        endpoint: fieldValue(fields, API_ENDPOINT_FIELD)
+    };
+}
+
+/** The fields with an API key's parts and its marker written in. Only the
+ *  parts that changed are rewritten, so a field another client retyped keeps
+ *  the kind it was given there. */
+export function writeApiKey<T extends { name: string; value: string; type: number }>(
+    fields: readonly T[],
+    parts: ApiKeyParts
+): T[] {
+    const FIELD_TEXT = 0;
+    const FIELD_HIDDEN = 1;
+    let next = withChangedField(fields, ITEM_KIND_FIELD, API_KEY_KIND, FIELD_TEXT);
+    next = withChangedField(next, API_KEY_FIELD, parts.key, FIELD_TEXT);
+    next = withChangedField(next, API_SECRET_FIELD, parts.secret, FIELD_HIDDEN);
+    return withChangedField(next, API_ENDPOINT_FIELD, parts.endpoint, FIELD_TEXT);
+}
+
+/** `withField`, but a no-op when the stored value is already this one - so an
+ *  item opened and saved again keeps its field list exactly as it was. */
+export function withChangedField<T extends { name: string; value: string; type: number }>(
+    fields: readonly T[],
+    name: string,
+    value: string,
+    type: number
+): T[] {
+    const existing = fields.find((field) => field.name === name);
+    if ((existing?.value ?? "") === (value.trim() ? value : "")) return [...fields];
+    return withField(fields, name, value, type);
+}
+
+/**
  * How short a master password may be.
  *
  * The number that has always been enforced, and the reason it is a named
@@ -54,7 +153,9 @@ export function masterPasswordProblem(password: string): string | null {
     if (password.length < MASTER_PASSWORD_MIN) {
         return `Use at least ${MASTER_PASSWORD_MIN} characters.`;
     }
-    const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((shape) => shape.test(password)).length;
+    const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((shape) =>
+        shape.test(password)
+    ).length;
     if (classes < 2) {
         return "Mix at least two kinds of character - letters and numbers, or letters and punctuation.";
     }
@@ -160,16 +261,20 @@ export function withField<T extends { name: string; value: string; type: number 
  * to hold in your head.
  */
 export function readRecoveryCodes(value: string): string[] {
-    return value
-        .split(/\s+/)
-        .map((token) => token.trim())
-        // A leading "3." or "3)" is the list's numbering rather than part of the
-        // code - but only when what is left still looks like one.
-        .map((token) => {
-            const numbered = /^\d{1,2}[.)]$/.test(token) ? "" : token.replace(/^\d{1,2}[.)]/, "");
-            return numbered;
-        })
-        .filter((token) => token.length > 0);
+    return (
+        value
+            .split(/\s+/)
+            .map((token) => token.trim())
+            // A leading "3." or "3)" is the list's numbering rather than part of the
+            // code - but only when what is left still looks like one.
+            .map((token) => {
+                const numbered = /^\d{1,2}[.)]$/.test(token)
+                    ? ""
+                    : token.replace(/^\d{1,2}[.)]/, "");
+                return numbered;
+            })
+            .filter((token) => token.length > 0)
+    );
 }
 
 /** How the codes are written back: one per line, which is how every site that
@@ -204,7 +309,11 @@ export function looksLikeEmail(value: string): boolean {
  */
 export function itemInitials(name: string, host: string | null): string {
     const source = host ? host.replace(/^www\./, "") : name;
-    const word = source.trim().split(/[\s.\-_]+/).filter(Boolean)[0] ?? "";
+    const word =
+        source
+            .trim()
+            .split(/[\s.\-_]+/)
+            .filter(Boolean)[0] ?? "";
     if (!word) return "?";
     return word.slice(0, 2).toUpperCase();
 }

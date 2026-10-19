@@ -145,23 +145,26 @@ export function SendsView() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sends.title")}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {t("sends.intro")}
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("sends.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t("sends.intro")}</p>
             </div>
 
             {link ? (
                 <Card>
                     <CardBody className="flex flex-col gap-2">
-                        <p className="text-sm">
-                            {t("sends.copyNow")}
-                        </p>
+                        <p className="text-sm">{t("sends.copyNow")}</p>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={link} className="font-mono text-xs" />
+                            <Input
+                                readOnly
+                                value={link}
+                                className="min-w-0 flex-1 font-mono text-xs"
+                            />
                             <Button
                                 type="button"
                                 size="icon"
+                                className="shrink-0"
                                 variant="secondary"
                                 title={t("sends.copyLink")}
                                 aria-label={t("sends.copyLink")}
@@ -192,18 +195,21 @@ export function SendsView() {
                             {t("sends.text")}
                             <Textarea name="text" rows={4} className="font-mono text-xs" />
                         </label>
-                        <div className="grid grid-cols-3 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("sends.lasts")}
                                 <Select
                                     name="days"
                                     value={days}
                                     onValueChange={setDays}
-                                    options={EXPIRY_OPTIONS.map((option) => ({ value: option.value, label: t(option.key) }))}
+                                    options={EXPIRY_OPTIONS.map((option) => ({
+                                        value: option.value,
+                                        label: t(option.key)
+                                    }))}
                                     aria-label={t("sends.lastsLabel")}
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("sends.maxViews")}
                                 <Input
                                     name="maxViews"
@@ -212,7 +218,7 @@ export function SendsView() {
                                     placeholder={t("sends.unlimited")}
                                 />
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("app.fields.password")}
                                 <Input
                                     name="password"
@@ -273,7 +279,9 @@ export function SendsView() {
                                     {row.hasPassword ? (
                                         <Badge variant="neutral">{t("app.fields.password")}</Badge>
                                     ) : null}
-                                    {row.disabled ? <Badge variant="warning">{t("sends.off")}</Badge> : null}
+                                    {row.disabled ? (
+                                        <Badge variant="warning">{t("sends.off")}</Badge>
+                                    ) : null}
                                     <Button
                                         size="sm"
                                         variant="ghost"

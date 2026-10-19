@@ -40,7 +40,15 @@ import {
     UserRound,
     X
 } from "lucide-react";
-import { emptyItem, type VaultFolder, type VaultItem } from "./vault-model";
+import {
+    ITEM_API_KEY,
+    ITEM_KINDS,
+    emptyItem,
+    itemKind,
+    managedFieldNames,
+    type VaultFolder,
+    type VaultItem
+} from "./vault-model";
 import { IDENTITY_GROUPS, identityHintKey, identityLabelKey } from "./identity-fields";
 import { cipherTypeLabel, uriMatchLabel } from "./vault-labels";
 import { accountIdentityAction } from "./vault-actions";
@@ -87,15 +95,6 @@ const PROBLEM_KEYS: Record<string, NamespaceKey<"vault">> = {
     "That is more digits than a card number has.": "item.problems.tooLong",
     "Those digits do not add up - one of them is probably wrong.": "item.problems.luhn"
 };
-
-/** The custom fields this form draws with an editor of its own. They are stored
- *  as custom fields for compatibility with every other Bitwarden client, not
- *  because anybody should be editing them as name-and-value pairs. */
-const MANAGED_FIELDS = new Set<string>([
-    core.RECOVERY_CODES_FIELD,
-    core.BANK_FIELD,
-    core.ICON_FIELD
-]);
 
 /** The folder picker's own entry for making one, rather than picking one. */
 const NEW_FOLDER = "__new-folder__";
@@ -146,6 +145,11 @@ export function ItemDialog({
      *  hidden custom field, so they are encrypted like the password and read as
      *  a field by any other client. */
     const [codes, setCodes] = useState("");
+    /** A login's email, apart from its username - a custom field to every
+     *  other client (`EMAIL_FIELD`). */
+    const [email, setEmail] = useState("");
+    /** An API key's parts, kept in custom fields - see `API_KEY_FIELDS`. */
+    const [apiKey, setApiKey] = useState<core.ApiKeyParts>({ key: "", secret: "", endpoint: "" });
     const [newFolder, setNewFolder] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -166,7 +170,8 @@ export function ItemDialog({
 
     useEffect(() => {
         if (!item) return;
-        setDraft(item);
+        // An API key is edited as its own kind and stored as the note it is.
+        setDraft(itemKind(item) === ITEM_API_KEY ? { ...item, type: ITEM_API_KEY } : item);
         setGenerator(false);
         setScanning(false);
         setNewFolder(null);
@@ -182,6 +187,8 @@ export function ItemDialog({
         );
         setBank(core.fieldValue(item.fields, core.BANK_FIELD));
         setCodes(core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD));
+        setEmail(core.fieldValue(item.fields, core.EMAIL_FIELD));
+        setApiKey(core.readApiKey(item.fields));
     }, [item]);
 
     /**
@@ -288,7 +295,19 @@ export function ItemDialog({
         });
     }
 
+    /** The email as it is stored: trimmed and lowercased. One that was only
+     *  opened keeps the spelling it was saved with. */
+    const storedEmail = core.fieldValue(draft.fields, core.EMAIL_FIELD);
+    const typedEmail = email.trim().toLowerCase();
+    const emailEdited = typedEmail !== storedEmail.trim().toLowerCase();
+    const emailInvalid =
+        draft.type === core.CIPHER_LOGIN &&
+        emailEdited &&
+        typedEmail !== "" &&
+        !core.looksLikeEmail(typedEmail);
+
     async function onSubmit(): Promise<void> {
+        if (emailInvalid) return;
         const intoVault = !draft.id && draft.organizationId !== null;
         if (intoVault && !collectionId) {
             setError(t("item.pickCollection"));
@@ -299,22 +318,16 @@ export function ItemDialog({
         // The conventions that live in custom fields are folded in here rather
         // than kept in the draft as it is edited: they are one value each, and
         // the field list is what actually gets stored.
-        const saving: VaultItem = {
-            ...draft,
-            fields:
-                draft.type === core.CIPHER_CARD
-                    ? core.withField(draft.fields, core.BANK_FIELD, bank, core.FIELD_TEXT)
-                    : draft.type === core.CIPHER_LOGIN
-                      ? core.withField(
-                            draft.fields,
-                            core.RECOVERY_CODES_FIELD,
-                            codes,
-                            // Hidden, because a recovery code is a password and
-                            // belongs behind the same press as one.
-                            core.FIELD_HIDDEN
-                        )
-                      : draft.fields
-        };
+        // Each one only when it changed, so an item opened and saved again
+        // keeps its field list exactly as it was.
+        const saving: VaultItem =
+            draft.type === ITEM_API_KEY
+                ? {
+                      ...draft,
+                      type: core.CIPHER_SECURE_NOTE,
+                      fields: core.writeApiKey(draft.fields, apiKey)
+                  }
+                : { ...draft, fields: foldFields(draft) };
         const failure = await onSave(saving, intoVault ? [collectionId] : []);
         setPending(false);
         if (failure) {
@@ -323,6 +336,32 @@ export function ItemDialog({
         }
         onClose();
     }
+
+    /** The custom fields a card or a login keeps its extra boxes in. */
+    function foldFields(from: VaultItem): VaultItem["fields"] {
+        if (from.type === core.CIPHER_CARD) {
+            return core.withChangedField(from.fields, core.BANK_FIELD, bank, core.FIELD_TEXT);
+        }
+        if (from.type !== core.CIPHER_LOGIN) return from.fields;
+        // Hidden, because a recovery code is a password and belongs behind the
+        // same press as one.
+        const withCodes = core.withChangedField(
+            from.fields,
+            core.RECOVERY_CODES_FIELD,
+            codes,
+            core.FIELD_HIDDEN
+        );
+        return core.withChangedField(
+            withCodes,
+            core.EMAIL_FIELD,
+            emailEdited ? typedEmail : storedEmail,
+            core.FIELD_TEXT
+        );
+    }
+
+    /** The custom fields drawn as name and value: everything this form has no
+     *  box of its own for. */
+    const managed = managedFieldNames(draft);
 
     return (
         <Dialog open={item !== null} onOpenChange={(open) => !open && onClose()}>
@@ -333,13 +372,13 @@ export function ItemDialog({
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
-                    <div className="grid grid-cols-2 gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <label className="flex min-w-0 flex-col gap-1 text-sm">
                             {t("item.kind")}
                             <Select
                                 value={String(draft.type)}
                                 onValueChange={(value) => patch({ type: Number(value) })}
-                                options={core.CIPHER_TYPES.map((type) => ({
+                                options={ITEM_KINDS.map((type) => ({
                                     value: String(type),
                                     label: cipherTypeLabel(t, type)
                                 }))}
@@ -347,7 +386,7 @@ export function ItemDialog({
                                 disabled={Boolean(draft.id)}
                             />
                         </label>
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className="flex min-w-0 flex-col gap-1 text-sm">
                             {t("item.folder")}
                             <Select
                                 value={draft.folderId ?? ""}
@@ -376,8 +415,8 @@ export function ItemDialog({
                         item: moving one that exists re-encrypts it under another
                         key, which is what the move dialog is for. */}
                     {choosable.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="flex flex-col gap-1 text-sm">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 {t("item.vault")}
                                 <Select
                                     value={draft.organizationId ?? ""}
@@ -395,7 +434,7 @@ export function ItemDialog({
                                 />
                             </label>
                             {draft.organizationId ? (
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className="flex min-w-0 flex-col gap-1 text-sm">
                                     {t("item.collection")}
                                     <Select
                                         value={collectionId}
@@ -418,6 +457,7 @@ export function ItemDialog({
                     {newFolder !== null ? (
                         <div className="flex items-center gap-2">
                             <Input
+                                className="min-w-0 flex-1"
                                 ref={folderNameField}
                                 value={newFolder}
                                 onChange={(event) => setNewFolder(event.target.value)}
@@ -434,6 +474,7 @@ export function ItemDialog({
                             <Button
                                 type="button"
                                 size="sm"
+                                className="shrink-0"
                                 disabled={pending || newFolder.trim().length === 0}
                                 onClick={() => void createFolder()}
                             >
@@ -444,6 +485,7 @@ export function ItemDialog({
                                 type="button"
                                 size="icon"
                                 variant="ghost"
+                                className="shrink-0"
                                 title={tc("actions.cancel")}
                                 aria-label={t("item.cancelFolder")}
                                 onClick={() => setNewFolder(null)}
@@ -475,13 +517,41 @@ export function ItemDialog({
                                         })
                                     }
                                     autoComplete="off"
+                                    spellCheck={false}
                                 />
+                            </label>
+                            {/* Apart from the username: a site that signs you in
+                                by handle still writes to an address, and which
+                                one is worth keeping with the login. */}
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("item.email")}
+                                <Input
+                                    type="email"
+                                    inputMode="email"
+                                    value={email}
+                                    onChange={(event) => setEmail(event.target.value)}
+                                    placeholder={t("item.emailPlaceholder")}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    aria-invalid={emailInvalid || undefined}
+                                    aria-describedby={
+                                        emailInvalid ? "vault-item-email-hint" : undefined
+                                    }
+                                />
+                                {emailInvalid ? (
+                                    <span
+                                        id="vault-item-email-hint"
+                                        className="text-xs text-danger"
+                                    >
+                                        {t("item.emailInvalid")}
+                                    </span>
+                                ) : null}
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("item.password")}
                                 <div className="flex items-center gap-2">
                                     {/* The Input carries its own show/hide eye. */}
-                                    <div className="flex-1">
+                                    <div className="min-w-0 flex-1">
                                         <Input
                                             type="password"
                                             value={draft.login.password}
@@ -501,6 +571,7 @@ export function ItemDialog({
                                         type="button"
                                         size="icon"
                                         variant="secondary"
+                                        className="shrink-0"
                                         title={t("item.generateOne")}
                                         aria-label={t("item.generatePassword")}
                                         onClick={() => {
@@ -549,7 +620,7 @@ export function ItemDialog({
                                 <span>{t("item.totp")}</span>
                                 <div className="flex items-center gap-2">
                                     <Input
-                                        className="flex-1 font-mono text-xs"
+                                        className="min-w-0 flex-1 font-mono text-xs"
                                         value={draft.login.totp}
                                         onChange={(event) =>
                                             patch({
@@ -569,6 +640,7 @@ export function ItemDialog({
                                         type="button"
                                         variant="outline"
                                         size="sm"
+                                        className="shrink-0"
                                         onClick={() => setScanning(true)}
                                     >
                                         <QrCode className="size-4 shrink-0" />
@@ -611,7 +683,7 @@ export function ItemDialog({
                                         <div key={index} className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
                                                 <Input
-                                                    className="flex-1"
+                                                    className="min-w-0 flex-1"
                                                     value={entry.uri}
                                                     onChange={(event) =>
                                                         patch({
@@ -635,6 +707,7 @@ export function ItemDialog({
                                                     type="button"
                                                     size="icon-sm"
                                                     variant="ghost"
+                                                    className="shrink-0"
                                                     aria-label={t("item.removeWebsite")}
                                                     title={t("item.removeWebsite")}
                                                     disabled={draft.login.uris.length === 0}
@@ -786,8 +859,8 @@ export function ItemDialog({
                                     </span>
                                 ) : null}
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="flex flex-col gap-1 text-sm">
+                            <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
+                                <div className="flex min-w-0 flex-col gap-1 text-sm">
                                     {/* One box, because a card prints one. People
                                         type 0830, 08/30 or 08 / 2030 and all of
                                         them mean the same August. */}
@@ -821,7 +894,7 @@ export function ItemDialog({
                                         </span>
                                     ) : null}
                                 </div>
-                                <label className="flex flex-col gap-1 text-sm">
+                                <label className="flex min-w-0 flex-col gap-1 text-sm">
                                     {t("item.securityCode")}
                                     <Input
                                         type="password"
@@ -888,13 +961,13 @@ export function ItemDialog({
                                     <legend className="text-xs font-medium text-muted-foreground">
                                         {t(`identity.groups.${group.id}`)}
                                     </legend>
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
                                         {group.fields.map(({ field, span }) => (
                                             <label
                                                 key={field}
                                                 className={cn(
-                                                    "flex flex-col gap-1 text-sm",
-                                                    span === "full" && "col-span-2"
+                                                    "flex min-w-0 flex-col gap-1 text-sm",
+                                                    span === "full" && "min-[400px]:col-span-2"
                                                 )}
                                             >
                                                 {t(identityLabelKey(field))}
@@ -986,6 +1059,58 @@ export function ItemDialog({
                         </>
                     ) : null}
 
+                    {draft.type === ITEM_API_KEY ? (
+                        // Stored as a secure note with these as custom fields, so
+                        // any Bitwarden client still has the key, the secret and
+                        // where it is used - see `API_KEY_FIELDS`.
+                        <>
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("item.apiKey")}
+                                <Input
+                                    value={apiKey.key}
+                                    onChange={(event) =>
+                                        setApiKey((prev) => ({ ...prev, key: event.target.value }))
+                                    }
+                                    className="font-mono"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("item.apiSecret")}
+                                <Input
+                                    type="password"
+                                    value={apiKey.secret}
+                                    onChange={(event) =>
+                                        setApiKey((prev) => ({
+                                            ...prev,
+                                            secret: event.target.value
+                                        }))
+                                    }
+                                    className="font-mono"
+                                    autoComplete="off"
+                                />
+                            </label>
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("item.endpoint")}
+                                <Input
+                                    type="url"
+                                    inputMode="url"
+                                    value={apiKey.endpoint}
+                                    onChange={(event) =>
+                                        setApiKey((prev) => ({
+                                            ...prev,
+                                            endpoint: event.target.value
+                                        }))
+                                    }
+                                    placeholder="https://api.example.com"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                />
+                            </label>
+                        </>
+                    ) : null}
+
                     <label className="flex flex-col gap-1 text-sm">
                         {t("item.notes")}
                         <Textarea
@@ -1025,12 +1150,22 @@ export function ItemDialog({
                             what every edit below writes through. */}
                         {draft.fields
                             .map((field, index) => ({ field, index }))
-                            .filter(({ field }) => !MANAGED_FIELDS.has(field.name))
+                            .filter(({ field }) => !managed.has(field.name))
                             .map(({ field, index }) => (
-                                <div key={index} className="flex items-center gap-2">
+                                // Stacked on a phone, side by side from there up.
+                                // Each half may shrink (`min-w-0`) and the two
+                                // buttons never do: the name box used to keep its
+                                // full width and leave the value a sliver.
+                                <div
+                                    key={index}
+                                    data-custom-field=""
+                                    className="flex flex-col gap-2 sm:flex-row sm:items-center"
+                                >
                                     <Input
+                                        className="min-w-0 sm:flex-1"
                                         value={field.name}
                                         placeholder={t("item.fieldName")}
+                                        aria-label={t("item.fieldName")}
                                         onChange={(event) =>
                                             patch({
                                                 fields: draft.fields.map((entry, at) =>
@@ -1044,75 +1179,83 @@ export function ItemDialog({
                                     {/* A hidden field masks itself and carries the eye
                                     that shows it; the button beside it is the
                                     stored kind, not a second reveal. */}
-                                    <div className="flex-1">
-                                        <Input
-                                            value={field.value}
-                                            placeholder={t("item.fieldValue")}
-                                            type={
+                                    <div className="flex min-w-0 items-center gap-2 sm:flex-1">
+                                        <div className="min-w-0 flex-1">
+                                            <Input
+                                                value={field.value}
+                                                placeholder={t("item.fieldValue")}
+                                                aria-label={t("item.fieldValue")}
+                                                type={
+                                                    field.type === core.FIELD_HIDDEN
+                                                        ? "password"
+                                                        : "text"
+                                                }
+                                                onChange={(event) =>
+                                                    patch({
+                                                        fields: draft.fields.map((entry, at) =>
+                                                            at === index
+                                                                ? {
+                                                                      ...entry,
+                                                                      value: event.target.value
+                                                                  }
+                                                                : entry
+                                                        )
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="shrink-0"
+                                            title={
                                                 field.type === core.FIELD_HIDDEN
-                                                    ? "password"
-                                                    : "text"
+                                                    ? t("item.keepPlain")
+                                                    : t("item.keepHidden")
                                             }
-                                            onChange={(event) =>
+                                            aria-label={t("item.toggleHidden")}
+                                            onClick={() =>
                                                 patch({
                                                     fields: draft.fields.map((entry, at) =>
                                                         at === index
                                                             ? {
                                                                   ...entry,
-                                                                  value: event.target.value
+                                                                  type:
+                                                                      entry.type ===
+                                                                      core.FIELD_HIDDEN
+                                                                          ? core.FIELD_TEXT
+                                                                          : core.FIELD_HIDDEN
                                                               }
                                                             : entry
                                                     )
                                                 })
                                             }
-                                        />
+                                        >
+                                            {field.type === core.FIELD_HIDDEN ? (
+                                                <Lock className="size-4" />
+                                            ) : (
+                                                <LockOpen className="size-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            className="shrink-0"
+                                            title={t("item.removeField")}
+                                            aria-label={t("item.removeField")}
+                                            onClick={() =>
+                                                patch({
+                                                    fields: draft.fields.filter(
+                                                        (_, at) => at !== index
+                                                    )
+                                                })
+                                            }
+                                        >
+                                            <X className="size-4" />
+                                        </Button>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        title={
-                                            field.type === core.FIELD_HIDDEN
-                                                ? t("item.keepPlain")
-                                                : t("item.keepHidden")
-                                        }
-                                        aria-label={t("item.toggleHidden")}
-                                        onClick={() =>
-                                            patch({
-                                                fields: draft.fields.map((entry, at) =>
-                                                    at === index
-                                                        ? {
-                                                              ...entry,
-                                                              type:
-                                                                  entry.type === core.FIELD_HIDDEN
-                                                                      ? core.FIELD_TEXT
-                                                                      : core.FIELD_HIDDEN
-                                                          }
-                                                        : entry
-                                                )
-                                            })
-                                        }
-                                    >
-                                        {field.type === core.FIELD_HIDDEN ? (
-                                            <Lock className="size-4" />
-                                        ) : (
-                                            <LockOpen className="size-4" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        title={t("item.removeField")}
-                                        aria-label={t("item.removeField")}
-                                        onClick={() =>
-                                            patch({
-                                                fields: draft.fields.filter((_, at) => at !== index)
-                                            })
-                                        }
-                                    >
-                                        <X className="size-4" />
-                                    </Button>
                                 </div>
                             ))}
                     </div>
@@ -1123,7 +1266,7 @@ export function ItemDialog({
                     <Button type="button" variant="secondary" onClick={onClose}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button type="button" onClick={onSubmit} disabled={pending}>
+                    <Button type="button" onClick={onSubmit} disabled={pending || emailInvalid}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         {tc("actions.save")}
                     </Button>
