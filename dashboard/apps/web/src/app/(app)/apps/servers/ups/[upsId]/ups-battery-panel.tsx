@@ -21,7 +21,12 @@ const TEST_LABEL = {
     "test.battery.start.deep": "ups.test.deep",
     "test.battery.stop": "ups.test.stop"
 } as const;
-const HEALTH_TONE = { good: "success", fair: "warning", replace: "danger", unknown: "neutral" } as const;
+const HEALTH_TONE = {
+    good: "success",
+    fair: "warning",
+    replace: "danger",
+    unknown: "neutral"
+} as const;
 
 export function UpsBatteryPanel({
     upsId,
@@ -61,11 +66,18 @@ export function UpsBatteryPanel({
                 {
                     key: "runtime",
                     label: t("ups.metrics.runtime"),
-                    points: points.map((point) => ({ t: point.t, v: point.runtimeS === null ? null : point.runtimeS / 60 }))
+                    points: points.map((point) => ({
+                        t: point.t,
+                        v: point.runtimeS === null ? null : point.runtimeS / 60
+                    }))
                 }
             ],
             voltage: [
-                { key: "battery", label: t("ups.metrics.battery"), points: points.map((point) => ({ t: point.t, v: point.batteryV })) }
+                {
+                    key: "battery",
+                    label: t("ups.metrics.battery"),
+                    points: points.map((point) => ({ t: point.t, v: point.batteryV }))
+                }
             ],
             empty: points.length === 0
         };
@@ -84,7 +96,9 @@ export function UpsBatteryPanel({
                     {health === null ? (
                         <Skeleton className="h-5 w-16" />
                     ) : (
-                        <Badge variant={HEALTH_TONE[health.state]}>{t(`ups.battery.states.${health.state}`)}</Badge>
+                        <Badge variant={HEALTH_TONE[health.state]}>
+                            {t(`ups.battery.states.${health.state}`)}
+                        </Badge>
                     )}
                 </div>
                 {health && health.reasons.length > 0 ? (
@@ -97,18 +111,52 @@ export function UpsBatteryPanel({
                 {reading ? (
                     <dl className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-3 text-sm">
                         {[
-                            { key: "age", value: health?.ageYears == null ? null : t("ups.battery.years", { value: health.ageYears }) },
+                            {
+                                key: "age",
+                                value:
+                                    health?.ageYears == null
+                                        ? null
+                                        : t("ups.battery.years", { value: health.ageYears })
+                            },
                             { key: "date", value: reading.batteryDate },
                             { key: "type", value: reading.batteryType },
-                            { key: "nominal", value: reading.batteryVNominal === null ? null : t("ups.units.volts", { value: reading.batteryVNominal }) },
-                            { key: "chargeLow", value: reading.chargeLow === null ? null : t("ups.units.percent", { value: reading.chargeLow }) },
-                            { key: "runtimeLow", value: reading.runtimeLowS === null ? null : t("ups.units.minutes", { count: Math.round(reading.runtimeLowS / 60) }) }
+                            {
+                                key: "nominal",
+                                value:
+                                    reading.batteryVNominal === null
+                                        ? null
+                                        : t("ups.units.volts", { value: reading.batteryVNominal })
+                            },
+                            {
+                                key: "chargeLow",
+                                value:
+                                    reading.chargeLow === null
+                                        ? null
+                                        : t("ups.units.percent", { value: reading.chargeLow })
+                            },
+                            {
+                                key: "runtimeLow",
+                                value:
+                                    reading.runtimeLowS === null
+                                        ? null
+                                        : t("ups.units.minutes", {
+                                              count: Math.round(reading.runtimeLowS / 60)
+                                          })
+                            }
                         ]
                             .filter((one) => one.value !== null)
                             .map((one) => (
-                                <div key={one.key} className="min-w-0 rounded-md bg-muted/50 px-3 py-2">
-                                    <dt className="text-xs text-muted-foreground">{t(`ups.battery.facts.${one.key as "age"}`)}</dt>
-                                    <dd className="truncate font-medium tabular-nums" title={one.value ?? undefined}>
+                                <div
+                                    key={one.key}
+                                    className="min-w-0 rounded-md bg-muted/50 px-3 py-2"
+                                >
+                                    <dt className="text-xs text-muted-foreground">
+                                        {t(`ups.battery.facts.${one.key as "age"}`)}
+                                    </dt>
+                                    <dd
+                                        className="truncate font-medium tabular-nums"
+                                        title={one.value ?? undefined}
+                                    >
                                         {one.value}
                                     </dd>
                                 </div>
@@ -126,7 +174,13 @@ export function UpsBatteryPanel({
                 ) : TESTS.some((one) => available.has(one)) ? (
                     <div className="flex flex-wrap gap-2">
                         {TESTS.filter((one) => available.has(one)).map((one) => (
-                            <Button key={one} size="sm" variant="outline" disabled={command.busy} onClick={() => command.ask(one)}>
+                            <Button
+                                key={one}
+                                size="sm"
+                                variant="outline"
+                                disabled={command.busy}
+                                onClick={() => command.ask(one)}
+                            >
                                 {t(TEST_LABEL[one])}
                             </Button>
                         ))}
@@ -143,16 +197,33 @@ export function UpsBatteryPanel({
                         {tests.data.events.map((event) => {
                             const outcome = upsReading.testOutcome(event.detail);
                             return (
-                                <li key={event.id} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
+                                <li
+                                    key={event.id}
+                                    className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm"
+                                >
                                     {outcome ? (
-                                        <Badge variant={outcome === "passed" ? "success" : outcome === "failed" ? "danger" : "neutral"}>
+                                        <Badge
+                                            variant={
+                                                outcome === "passed"
+                                                    ? "success"
+                                                    : outcome === "failed"
+                                                      ? "danger"
+                                                      : "neutral"
+                                            }
+                                        >
                                             {t(`ups.test.outcome.${outcome}`)}
                                         </Badge>
                                     ) : null}
-                                    <span className="min-w-0 flex-1 truncate" title={event.detail ?? undefined}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={event.detail ?? undefined}
+                                    >
                                         {event.detail ?? ""}
                                     </span>
-                                    <time dateTime={event.ts} className="shrink-0 tabular-nums text-muted-foreground">
+                                    <time
+                                        dateTime={event.ts}
+                                        className="shrink-0 tabular-nums text-muted-foreground"
+                                    >
                                         {new Date(event.ts).toLocaleString()}
                                     </time>
                                 </li>

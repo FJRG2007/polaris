@@ -80,11 +80,25 @@ const FLAG_KIND: Record<string, UpsEventKind> = {
 };
 
 /** What a first reading raises: only what needs somebody now. */
-const URGENT: ReadonlySet<UpsEventKind> = new Set(["ONBATT", "LOWBATT", "REPLBATT", "FSD", "OVERLOAD", "OFF"]);
+const URGENT: ReadonlySet<UpsEventKind> = new Set([
+    "ONBATT",
+    "LOWBATT",
+    "REPLBATT",
+    "FSD",
+    "OVERLOAD",
+    "OFF"
+]);
 
 /** `ups.status` as a sorted set of upper-case flags, stored as one string. */
 export function normalizeFlags(raw: string | null | undefined): string {
-    return [...new Set((raw ?? "").toUpperCase().split(/\s+/).filter((flag) => /^[A-Z]{1,12}$/.test(flag)))]
+    return [
+        ...new Set(
+            (raw ?? "")
+                .toUpperCase()
+                .split(/\s+/)
+                .filter((flag) => /^[A-Z]{1,12}$/.test(flag))
+        )
+    ]
         .sort()
         .join(" ");
 }
@@ -99,7 +113,8 @@ export function flagEvents(before: string | null, now: string): UpsEventKind[] {
     const is = new Set(now.split(" ").filter(Boolean));
     const events: UpsEventKind[] = [];
     for (const [flag, kind] of Object.entries(FLAG_KIND)) {
-        if (is.has(flag) && !was.has(flag) && (before !== null || URGENT.has(kind))) events.push(kind);
+        if (is.has(flag) && !was.has(flag) && (before !== null || URGENT.has(kind)))
+            events.push(kind);
     }
     if (before !== null && was.has("OB") && !is.has("OB") && is.has("OL")) events.push("ONLINE");
     return events;

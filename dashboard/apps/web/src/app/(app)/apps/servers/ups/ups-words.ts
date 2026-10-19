@@ -5,7 +5,12 @@
 
 import type { UpsReading } from "@/lib/ups/ups-reading";
 import type { UsbDiscovery, UpsReadResult, UpsView } from "@/lib/ups/ups-service";
-import type { EnergyBucket, UpsActionView, UpsAnalyticsRow, UpsEventView } from "@/lib/ups/ups-data";
+import type {
+    EnergyBucket,
+    UpsActionView,
+    UpsAnalyticsRow,
+    UpsEventView
+} from "@/lib/ups/ups-data";
 
 export interface UpsListAnswer {
     ups: { ups: UpsView; result: UpsReadResult }[];
@@ -91,7 +96,11 @@ export interface UpsAnalyticsAnswer {
 /** An amount in a currency, in the reader's own number format. */
 export function formatMoney(amount: number, currency: string): string {
     try {
-        return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
+        return new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency,
+            maximumFractionDigits: 2
+        }).format(amount);
     } catch {
         return `${amount.toFixed(2)} ${currency}`;
     }
@@ -125,6 +134,12 @@ const COMMAND_LABELS = {
 } as const;
 
 /** The words for a command NUT documents, or null to show its own name. */
-export function commandLabelKey(name: string): (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS] | null {
-    return (COMMAND_LABELS as Record<string, (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS]>)[name] ?? null;
+export function commandLabelKey(
+    name: string
+): (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS] | null {
+    return (
+        (COMMAND_LABELS as Record<string, (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS]>)[
+            name
+        ] ?? null
+    );
 }

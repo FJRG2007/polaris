@@ -147,7 +147,13 @@ export async function runUpsCommandAction(
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
         const outcome = await upsService.runUpsCommand(row, parsed);
-        await upsData.logAction({ upsId, actorId: user.id, kind: "command", name: parsed, outcome });
+        await upsData.logAction({
+            upsId,
+            actorId: user.id,
+            kind: "command",
+            name: parsed,
+            outcome
+        });
         await recordAudit({
             actorId: user.id,
             action: "ups.command",
@@ -168,7 +174,8 @@ export async function updateUpsSettingsAction(id: string, raw: unknown): Promise
         const input = upsSettings.upsSettingsSchema.parse(upsSettings.normalizeUpsSettings(raw));
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
-        if (input.netserverEnabled && !upsService.canOfferNetwork(row)) return { ok: false, error: "networkUnavailable" };
+        if (input.netserverEnabled && !upsService.canOfferNetwork(row))
+            return { ok: false, error: "networkUnavailable" };
         await upsService.updateUpsSettings(upsId, input);
         await recordAudit({
             actorId: user.id,
@@ -188,12 +195,16 @@ export async function updateUpsSettingsAction(id: string, raw: unknown): Promise
     }
 }
 
-export async function updateUpsVariableMapAction(id: string, raw: unknown): Promise<UpsActionResult> {
+export async function updateUpsVariableMapAction(
+    id: string,
+    raw: unknown
+): Promise<UpsActionResult> {
     const user = await requirePermission("system.manage");
     try {
         const upsId = idSchema.parse(id);
         const map = upsSettings.variableMapSchema.parse(raw);
-        if (!(await upsService.updateUpsVariableMap(upsId, map))) return { ok: false, error: "notFound" };
+        if (!(await upsService.updateUpsVariableMap(upsId, map)))
+            return { ok: false, error: "notFound" };
         await recordAudit({
             actorId: user.id,
             action: "ups.mapping",
@@ -209,7 +220,10 @@ export async function updateUpsVariableMapAction(id: string, raw: unknown): Prom
 
 const acknowledgeSchema = z.union([z.literal("all"), z.array(z.string().uuid()).min(1).max(200)]);
 
-export async function acknowledgeUpsEventsAction(id: string, ids: unknown): Promise<UpsActionResult<number>> {
+export async function acknowledgeUpsEventsAction(
+    id: string,
+    ids: unknown
+): Promise<UpsActionResult<number>> {
     const user = await requirePermission("system.manage");
     try {
         const upsId = idSchema.parse(id);
@@ -261,20 +275,32 @@ export async function upsNetworkLoginAction(
         const upsId = idSchema.parse(id);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
-        if (!row.netserverEnabled || !upsService.canOfferNetwork(row)) return { ok: false, error: "networkUnavailable" };
+        if (!row.netserverEnabled || !upsService.canOfferNetwork(row))
+            return { ok: false, error: "networkUnavailable" };
         const upsName = upsService.daemonUpsName(row);
         if (!upsName) return { ok: false, error: "networkUnavailable" };
-        await recordAudit({ actorId: user.id, action: "ups.networkLogin", targetType: "ups", targetId: upsId });
+        await recordAudit({
+            actorId: user.id,
+            action: "ups.networkLogin",
+            targetType: "ups",
+            targetId: upsId
+        });
         return { ok: true, value: { ...upsService.netserverLogin(), upsName } };
     } catch (error) {
         return refused(error);
     }
 }
 
-const exportSchema = z.object({ what: z.enum(upsSettings.EXPORT_KINDS), days: z.number().int().min(1).max(365) });
+const exportSchema = z.object({
+    what: z.enum(upsSettings.EXPORT_KINDS),
+    days: z.number().int().min(1).max(365)
+});
 
 /** One UPS's records as CSV, written into this admin's own drive. */
-export async function saveUpsExportAction(id: string, raw: unknown): Promise<UpsActionResult<string>> {
+export async function saveUpsExportAction(
+    id: string,
+    raw: unknown
+): Promise<UpsActionResult<string>> {
     const user = await requirePermission("system.manage");
     try {
         const upsId = idSchema.parse(id);
@@ -296,14 +322,18 @@ export async function makeUpsReportAction(id: string): Promise<UpsActionResult<s
         const upsId = idSchema.parse(id);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
-        const schedule = row.reportSchedule === "off" ? "daily" : (row.reportSchedule as "daily" | "weekly" | "monthly");
+        const schedule =
+            row.reportSchedule === "off"
+                ? "daily"
+                : (row.reportSchedule as "daily" | "weekly" | "monthly");
         const period = upsSettings.previousPeriod(schedule, Date.now());
         const words = await wordsFor(user.id, "notices");
-        const content = await upsData.buildReport(row, period, (key, values) => words(`ups.${key}` as const, values));
+        const content = await upsData.buildReport(row, period, (key, values) =>
+            words(`ups.${key}` as const, values)
+        );
         const name = `${upsData.fileStem(row.name)}-${schedule}-${period.from.toISOString().slice(0, 10)}.md`;
         return { ok: true, value: await upsData.saveToDrive(user.id, name, content) };
     } catch (error) {
         return refused(error);
     }
 }
-

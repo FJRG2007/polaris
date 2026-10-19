@@ -553,7 +553,8 @@ export async function setUpsVar(
         if (error) return { outcome: "invalid", error };
         if (row.connection === "nut") {
             const { password } = open(row);
-            if (!row.username || !password || !row.host || !row.upsName) return { outcome: "loginNeeded" };
+            if (!row.username || !password || !row.host || !row.upsName)
+                return { outcome: "loginNeeded" };
             await nutSetVar(
                 { host: row.host, port: row.port ?? 3493, upsName: row.upsName },
                 row.username,
@@ -565,7 +566,8 @@ export async function setUpsVar(
         }
         const daemon = daemonFor(row.machineId);
         if (!daemon) return { outcome: "unreachable" };
-        const id = row.connection === "usb" ? row.deviceId : (await daemon.upsSnmp(snmpSource(row)))?.id;
+        const id =
+            row.connection === "usb" ? row.deviceId : (await daemon.upsSnmp(snmpSource(row)))?.id;
         if (!id) return { outcome: "unreachable" };
         const answer = await daemon.upsSet(id, name, value);
         if (answer === null) return { outcome: "unreachable" };
@@ -590,10 +592,14 @@ export function netserverLogin(): { user: string; password: string; port: number
 }
 
 /** The name the machine daemon serves a UPS under. */
-export function daemonUpsName(row: Pick<UpsRow, "connection" | "deviceId" | "host" | "port">): string | null {
+export function daemonUpsName(
+    row: Pick<UpsRow, "connection" | "deviceId" | "host" | "port">
+): string | null {
     if (row.connection === "usb") return row.deviceId;
     if (row.connection !== "snmp" || !row.host) return null;
-    return upsSettings.snmpUpsName(`${row.host}${row.port && row.port !== 161 ? `:${row.port}` : ""}`);
+    return upsSettings.snmpUpsName(
+        `${row.host}${row.port && row.port !== 161 ? `:${row.port}` : ""}`
+    );
 }
 
 /** Whether a UPS can be offered to the network: one this machine's daemon drives. */
@@ -603,7 +609,9 @@ export function canOfferNetwork(row: Pick<UpsRow, "connection" | "machineId">): 
 
 /** Make the local daemon offer, or stop offering, its UPSes to the network. */
 async function syncNetserver(rows: readonly UpsRow[]): Promise<void> {
-    const wanted = rows.some((row) => canOfferNetwork(row) && row.netserverEnabled) ? netserverLogin() : null;
+    const wanted = rows.some((row) => canOfferNetwork(row) && row.netserverEnabled)
+        ? netserverLogin()
+        : null;
     await new HostdClient().upsNetserver(wanted).catch(() => undefined);
 }
 

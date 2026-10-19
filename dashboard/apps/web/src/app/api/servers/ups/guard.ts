@@ -15,7 +15,10 @@ export async function upsAdmin(): Promise<ApiUser | Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!user.isAdmin && !(await sessionCan(user, "system.manage"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
     return user;
 }
@@ -23,12 +26,22 @@ export async function upsAdmin(): Promise<ApiUser | Response> {
 export async function upsFromPath(
     params: Promise<{ upsId: string }>
 ): Promise<NonNullable<Awaited<ReturnType<typeof upsService.getUps>>> | Response> {
-    const id = z.string().uuid().safeParse((await params).upsId);
+    const id = z
+        .string()
+        .uuid()
+        .safeParse((await params).upsId);
     const row = id.success ? await upsService.getUps(id.data) : null;
-    if (!row) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
+    if (!row)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.notFound") },
+            { status: 404 }
+        );
     return row;
 }
 
 export async function badRequest(): Promise<Response> {
-    return Response.json({ error: (await readerWords("api"))("errors.invalidRequest") }, { status: 400 });
+    return Response.json(
+        { error: (await readerWords("api"))("errors.invalidRequest") },
+        { status: 400 }
+    );
 }

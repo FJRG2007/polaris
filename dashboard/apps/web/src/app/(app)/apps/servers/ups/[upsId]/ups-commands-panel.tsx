@@ -48,7 +48,10 @@ export function useUpsCommand(upsId: string, onDone?: () => void) {
     }
 
     const dialog = (
-        <Dialog open={asking !== null} onOpenChange={(open) => (open ? undefined : setAsking(null))}>
+        <Dialog
+            open={asking !== null}
+            onOpenChange={(open) => (open ? undefined : setAsking(null))}
+        >
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("ups.commands.confirm.title")}</DialogTitle>
@@ -81,7 +84,13 @@ export function useUpsCommand(upsId: string, onDone?: () => void) {
     return { ask: setAsking, busy, dialog };
 }
 
-export function UpsCommandsPanel({ upsId, commands }: { upsId: string; commands: string[] | null }) {
+export function UpsCommandsPanel({
+    upsId,
+    commands
+}: {
+    upsId: string;
+    commands: string[] | null;
+}) {
     const t = useTranslations("servers");
     const [filter, setFilter] = useState("");
     const history = useLiveResource<UpsActionsAnswer>({
@@ -117,12 +126,24 @@ export function UpsCommandsPanel({ upsId, commands }: { upsId: string; commands:
                         {shown.map((name) => {
                             const key = commandLabelKey(name);
                             return (
-                                <li key={name} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
+                                <li
+                                    key={name}
+                                    className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm"
+                                >
                                     <div className="flex min-w-0 flex-1 flex-col">
                                         <span className="truncate">{key ? t(key) : name}</span>
-                                        <code className="truncate text-xs text-muted-foreground" title={name}>{name}</code>
+                                        <code
+                                            className="truncate text-xs text-muted-foreground"
+                                            title={name}
+                                        >
+                                            {name}
+                                        </code>
                                     </div>
-                                    {isDangerousCommand(name) ? <Badge variant="danger">{t("ups.commands.dangerous")}</Badge> : null}
+                                    {isDangerousCommand(name) ? (
+                                        <Badge variant="danger">
+                                            {t("ups.commands.dangerous")}
+                                        </Badge>
+                                    ) : null}
                                     <Button
                                         size="sm"
                                         variant="outline"
@@ -153,21 +174,35 @@ export function UpsCommandsPanel({ upsId, commands }: { upsId: string; commands:
 export function UpsActionHistory({ answer }: { answer: UpsActionsAnswer | null }) {
     const t = useTranslations("servers");
     if (!answer) return <Skeleton className="h-20 w-full" />;
-    if (answer.actions.length === 0) return <p className="text-sm text-muted-foreground">{t("ups.commands.noHistory")}</p>;
+    if (answer.actions.length === 0)
+        return <p className="text-sm text-muted-foreground">{t("ups.commands.noHistory")}</p>;
     return (
         <ul className="flex max-h-72 flex-col divide-y overflow-auto rounded-md border">
             {answer.actions.map((action) => (
                 <li key={action.id} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
-                    <code className="min-w-0 flex-1 truncate" title={action.value === null ? action.name : `${action.name} = ${action.value}`}>
+                    <code
+                        className="min-w-0 flex-1 truncate"
+                        title={
+                            action.value === null ? action.name : `${action.name} = ${action.value}`
+                        }
+                    >
                         {action.value === null ? action.name : `${action.name} = ${action.value}`}
                     </code>
                     <Badge variant={action.outcome === "ok" ? "success" : "danger"}>
-                        {t(`ups.commandResult.${(["ok", "unsupported", "refused", "unreachable", "loginNeeded", "invalid"].includes(action.outcome) ? action.outcome : "refused") as "ok"}`)}
+                        {t(
+                            `ups.commandResult.${(["ok", "unsupported", "refused", "unreachable", "loginNeeded", "invalid"].includes(action.outcome) ? action.outcome : "refused") as "ok"}`
+                        )}
                     </Badge>
-                    <span className="hidden max-w-32 truncate text-muted-foreground sm:inline" title={action.actor ?? undefined}>
+                    <span
+                        className="hidden max-w-32 truncate text-muted-foreground sm:inline"
+                        title={action.actor ?? undefined}
+                    >
                         {action.actor ?? ""}
                     </span>
-                    <time dateTime={action.ts} className="shrink-0 tabular-nums text-muted-foreground">
+                    <time
+                        dateTime={action.ts}
+                        className="shrink-0 tabular-nums text-muted-foreground"
+                    >
                         {new Date(action.ts).toLocaleString()}
                     </time>
                 </li>

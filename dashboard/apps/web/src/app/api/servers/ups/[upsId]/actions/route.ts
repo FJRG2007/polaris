@@ -9,7 +9,10 @@ export const dynamic = "force-dynamic";
 
 const kindSchema = z.enum(["command", "variable"]).optional().catch(undefined);
 
-export async function GET(request: Request, { params }: { params: Promise<{ upsId: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ upsId: string }> }
+): Promise<Response> {
     const user = await upsAdmin();
     if (user instanceof Response) return user;
     const row = await upsFromPath(params);

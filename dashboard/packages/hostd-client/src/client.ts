@@ -343,7 +343,11 @@ export class HostdClient {
         variable: string,
         value: string
     ): Promise<{ ok: boolean; error?: string } | null> {
-        const response = await this.call("POST", "/v1/ups/set", JSON.stringify({ id, var: variable, value }));
+        const response = await this.call(
+            "POST",
+            "/v1/ups/set",
+            JSON.stringify({ id, var: variable, value })
+        );
         if (response.status === 404) return null;
         if (response.status !== 200) throw new Error(`hostd ups set failed (${response.status})`);
         return JSON.parse(response.body) as { ok: boolean; error?: string };
@@ -356,10 +360,20 @@ export class HostdClient {
     public async upsNetserver(
         netserver: HostdUpsNetserver | null
     ): Promise<{ available: boolean; ok?: boolean; changed?: boolean; error?: string } | null> {
-        const response = await this.call("POST", "/v1/ups/netserver", JSON.stringify({ netserver }));
+        const response = await this.call(
+            "POST",
+            "/v1/ups/netserver",
+            JSON.stringify({ netserver })
+        );
         if (response.status === 404) return null;
-        if (response.status !== 200) throw new Error(`hostd ups netserver failed (${response.status})`);
-        return JSON.parse(response.body) as { available: boolean; ok?: boolean; changed?: boolean; error?: string };
+        if (response.status !== 200)
+            throw new Error(`hostd ups netserver failed (${response.status})`);
+        return JSON.parse(response.body) as {
+            available: boolean;
+            ok?: boolean;
+            changed?: boolean;
+            error?: string;
+        };
     }
 
     /** Power this host off cleanly. True once started; null from an older daemon. */

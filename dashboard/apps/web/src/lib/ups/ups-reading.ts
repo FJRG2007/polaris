@@ -145,7 +145,9 @@ export function readingFromVars(
         serial: text(vars, "device.serial", "ups.serial"),
         beeper: text(vars, "ups.beeper.status"),
         testResult: testResult && !/^no test/i.test(testResult) ? testResult : null,
-        commands: [...new Set(commands.filter((command) => /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(command)))].sort(),
+        commands: [
+            ...new Set(commands.filter((command) => /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(command)))
+        ].sort(),
         flags: normalizeFlags(vars["ups.status"]),
         realPowerW: num(vars, "ups.realpower"),
         nominalPowerW: num(vars, "ups.realpower.nominal"),

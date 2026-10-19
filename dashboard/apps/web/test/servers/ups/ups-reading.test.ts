@@ -36,7 +36,12 @@ describe("reading the Atlantis A03-OP2002-RC", () => {
     });
 
     it("drops a command name that is not one NUT word", () => {
-        const odd = ups.readingFromVars({}, ["beeper.enable", "load.off\nSET VAR", "BAD", "beeper.enable"]);
+        const odd = ups.readingFromVars({}, [
+            "beeper.enable",
+            "load.off\nSET VAR",
+            "BAD",
+            "beeper.enable"
+        ]);
         expect(odd.commands).toEqual(["beeper.enable"]);
     });
 

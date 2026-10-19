@@ -11,7 +11,10 @@ import { badRequest, upsAdmin, upsFromPath } from "../../guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: Promise<{ upsId: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ upsId: string }> }
+): Promise<Response> {
     const user = await upsAdmin();
     if (user instanceof Response) return user;
     const row = await upsFromPath(params);

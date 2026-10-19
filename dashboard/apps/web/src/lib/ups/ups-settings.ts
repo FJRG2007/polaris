@@ -72,7 +72,8 @@ export const energyQuerySchema = z
     })
     .refine((value) => value.from < value.to, { message: "invalidRange", path: ["to"] })
     .refine(
-        (value) => value.to.getTime() - value.from.getTime() <= MAX_SPAN_DAYS[value.unit] * 86_400_000,
+        (value) =>
+            value.to.getTime() - value.from.getTime() <= MAX_SPAN_DAYS[value.unit] * 86_400_000,
         { message: "rangeTooLong", path: ["from"] }
     );
 export type EnergyQuery = z.infer<typeof energyQuerySchema>;
@@ -129,10 +130,15 @@ export function batteryHealth(input: {
         reasons.push("lowVoltage");
     }
     const made = parseBatteryDate(input.batteryDate);
-    const ageYears = made ? Math.max(0, (input.now - made.getTime()) / (365.25 * 86_400_000)) : null;
+    const ageYears = made
+        ? Math.max(0, (input.now - made.getTime()) / (365.25 * 86_400_000))
+        : null;
     if (ageYears !== null && ageYears >= BATTERY_LIFE_YEARS) reasons.push("old");
-    const judged = input.charge !== null || input.batteryV !== null || made !== null || reasons.length > 0;
-    const state: BatteryHealthState = reasons.some((one) => one === "replaceFlag" || one === "testFailed")
+    const judged =
+        input.charge !== null || input.batteryV !== null || made !== null || reasons.length > 0;
+    const state: BatteryHealthState = reasons.some(
+        (one) => one === "replaceFlag" || one === "testFailed"
+    )
         ? "replace"
         : reasons.length > 0
           ? "fair"
@@ -160,7 +166,10 @@ export function periodStart(schedule: Exclude<ReportSchedule, "off">, at: number
 }
 
 /** The full period before the one `at` falls in: what a report covers. */
-export function previousPeriod(schedule: Exclude<ReportSchedule, "off">, at: number): { from: Date; to: Date } {
+export function previousPeriod(
+    schedule: Exclude<ReportSchedule, "off">,
+    at: number
+): { from: Date; to: Date } {
     const to = periodStart(schedule, at);
     return { from: periodStart(schedule, to.getTime() - 1), to };
 }
@@ -207,7 +216,10 @@ export function normalizeUpsSettings(raw: unknown): unknown {
     const value = raw as Record<string, unknown>;
     return {
         ...value,
-        currency: typeof value.currency === "string" ? value.currency.trim().toUpperCase() : value.currency
+        currency:
+            typeof value.currency === "string"
+                ? value.currency.trim().toUpperCase()
+                : value.currency
     };
 }
 
@@ -215,8 +227,17 @@ export const upsSettingsSchema = z
     .object({
         currency: z.string().regex(/^[A-Z]{3}$/, "invalidCurrency"),
         pricePerKwh: z.number().min(0, "invalidPrice").max(100, "invalidPrice").nullable(),
-        nominalPowerW: z.number().int("invalidPower").min(1, "invalidPower").max(100_000, "invalidPower").nullable(),
-        retentionDays: z.number().int("invalidRetention").min(7, "invalidRetention").max(365, "invalidRetention"),
+        nominalPowerW: z
+            .number()
+            .int("invalidPower")
+            .min(1, "invalidPower")
+            .max(100_000, "invalidPower")
+            .nullable(),
+        retentionDays: z
+            .number()
+            .int("invalidRetention")
+            .min(7, "invalidRetention")
+            .max(365, "invalidRetention"),
         notifyKinds: z.array(z.enum(UPS_EVENT_KINDS)).max(UPS_EVENT_KINDS.length),
         reportSchedule: z.enum(REPORT_SCHEDULES),
         netserverEnabled: z.boolean()
@@ -258,7 +279,9 @@ export const nutName = z
 
 export const variableMapSchema = z
     .record(z.enum(MAPPABLE_VARS), nutName)
-    .refine((map) => Object.entries(map).every(([from, to]) => from !== to), { message: "mapsToItself" });
+    .refine((map) => Object.entries(map).every(([from, to]) => from !== to), {
+        message: "mapsToItself"
+    });
 export type VariableMap = z.infer<typeof variableMapSchema>;
 
 /** A stored mapping read back total: anything that no longer parses is none. */
@@ -268,7 +291,10 @@ export function readVariableMap(stored: unknown): VariableMap {
 }
 
 /** The variables with each mapped standard name filled from the UPS's own. */
-export function applyVariableMap(vars: Record<string, string>, map: VariableMap): Record<string, string> {
+export function applyVariableMap(
+    vars: Record<string, string>,
+    map: VariableMap
+): Record<string, string> {
     const out = { ...vars };
     for (const [standard, own] of Object.entries(map)) {
         const value = vars[own];
@@ -296,21 +322,26 @@ const SAFE_VALUE = /^[\x20-\x21\x23-\x5b\x5d-\x7e]*$/;
 /** Why `value` cannot be set on `rw`, or null when it can. Shared by both sides. */
 export function rwValueError(rw: UpsRwVar, value: string): string | null {
     if (value.length === 0) return "required";
-    if (value.length > 64 || (rw.maxLen !== undefined && value.length > rw.maxLen)) return "tooLong";
+    if (value.length > 64 || (rw.maxLen !== undefined && value.length > rw.maxLen))
+        return "tooLong";
     if (!SAFE_VALUE.test(value)) return "invalidValue";
     if (rw.kind === "enum") return (rw.options ?? []).includes(value) ? null : "notAnOption";
     if (rw.kind === "number" || rw.kind === "range") {
         if (!/^-?\d+(\.\d+)?$/.test(value)) return "notANumber";
         const number = Number(value);
         if (rw.kind === "range" && (rw.ranges ?? []).length > 0) {
-            const inside = (rw.ranges ?? []).some(([min, max]) => number >= Number(min) && number <= Number(max));
+            const inside = (rw.ranges ?? []).some(
+                ([min, max]) => number >= Number(min) && number <= Number(max)
+            );
             if (!inside) return "outOfRange";
         }
     }
     return null;
 }
 
-export const setVarSchema = z.object({ name: nutName, value: z.string().max(64, "tooLong") }).strict();
+export const setVarSchema = z
+    .object({ name: nutName, value: z.string().max(64, "tooLong") })
+    .strict();
 
 /** The name a machine daemon runs an SNMP UPS under: `snmp-` and the 64-bit
  *  FNV-1a hash of its address, exactly as `SnmpSource::name` in hostd. */

@@ -77,35 +77,62 @@ export function UpsAnalytics() {
                         <thead className="text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-normal">{t("ups.analytics.ups")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.energy.kwh")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.energy.cost")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.analytics.outages")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.analytics.events")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.analytics.load")}</th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.energy.kwh")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.energy.cost")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.analytics.outages")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.analytics.events")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.analytics.load")}
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {answer.rows.map((row) => (
                                 <tr key={row.upsId} className="border-t">
                                     <td className="max-w-48 truncate px-3 py-2">
-                                        <Link href={`/apps/servers/ups/${row.upsId}`} className="hover:underline" title={row.name}>
+                                        <Link
+                                            href={`/apps/servers/ups/${row.upsId}`}
+                                            className="hover:underline"
+                                            title={row.name}
+                                        >
                                             {row.name}
                                         </Link>
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">{row.kwh.toFixed(2)}</td>
                                     <td className="px-3 py-2 text-right tabular-nums">
-                                        {row.costs.filter((one) => one.cost > 0).map((one) => formatMoney(one.cost, one.currency)).join(" + ") || "-"}
+                                        {row.kwh.toFixed(2)}
                                     </td>
-                                    <td className="px-3 py-2 text-right tabular-nums">{row.outages}</td>
                                     <td className="px-3 py-2 text-right tabular-nums">
-                                        <Link href={`/apps/servers/ups/${row.upsId}?tab=events`} className="hover:underline">
+                                        {row.costs
+                                            .filter((one) => one.cost > 0)
+                                            .map((one) => formatMoney(one.cost, one.currency))
+                                            .join(" + ") || "-"}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                        {row.outages}
+                                    </td>
+                                    <td className="px-3 py-2 text-right tabular-nums">
+                                        <Link
+                                            href={`/apps/servers/ups/${row.upsId}?tab=events`}
+                                            className="hover:underline"
+                                        >
                                             {row.events}
                                         </Link>
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         {row.avgLoad === null
                                             ? "-"
-                                            : t("ups.analytics.loadValue", { avg: Math.round(row.avgLoad), max: Math.round(row.maxLoad ?? row.avgLoad) })}
+                                            : t("ups.analytics.loadValue", {
+                                                  avg: Math.round(row.avgLoad),
+                                                  max: Math.round(row.maxLoad ?? row.avgLoad)
+                                              })}
                                     </td>
                                 </tr>
                             ))}

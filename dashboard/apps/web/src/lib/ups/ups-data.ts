@@ -28,10 +28,17 @@ export interface UpsEventView {
     acknowledgedAt: string | null;
 }
 
-export async function recordEvent(upsId: string, kind: upsEvents.UpsEventKind, at: Date, detail?: string | null) {
+export async function recordEvent(
+    upsId: string,
+    kind: upsEvents.UpsEventKind,
+    at: Date,
+    detail?: string | null
+) {
     await prisma.upsEvent
         .create({ data: { upsId, kind, ts: at, detail: detail ? detail.slice(0, 200) : null } })
-        .catch((error: unknown) => console.error("polaris: a UPS event could not be logged:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: a UPS event could not be logged:", error)
+        );
 }
 
 export async function listEvents(
@@ -75,7 +82,11 @@ export async function listEvents(
 }
 
 /** Mark events seen: the ids given, or every open one of the UPS. */
-export async function acknowledgeEvents(upsId: string, ids: string[] | "all", userId: string): Promise<number> {
+export async function acknowledgeEvents(
+    upsId: string,
+    ids: string[] | "all",
+    userId: string
+): Promise<number> {
     const result = await prisma.upsEvent.updateMany({
         where: { upsId, acknowledgedAt: null, ...(ids === "all" ? {} : { id: { in: ids } }) },
         data: { acknowledgedAt: new Date(), acknowledgedById: userId }
@@ -127,18 +138,28 @@ export async function logAction(input: {
                 outcome: input.outcome
             }
         })
-        .catch((error: unknown) => console.error("polaris: a UPS action could not be logged:", error));
+        .catch((error: unknown) =>
+            console.error("polaris: a UPS action could not be logged:", error)
+        );
 }
 
-export async function listActions(upsId: string, kind?: "command" | "variable"): Promise<UpsActionView[]> {
+export async function listActions(
+    upsId: string,
+    kind?: "command" | "variable"
+): Promise<UpsActionView[]> {
     const rows = await prisma.upsAction.findMany({
         where: { upsId, ...(kind ? { kind } : {}) },
         orderBy: { ts: "desc" },
         take: 100
     });
-    const actorIds = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => id !== null))];
+    const actorIds = [
+        ...new Set(rows.map((row) => row.actorId).filter((id): id is string => id !== null))
+    ];
     const actors = actorIds.length
-        ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: actorIds } },
+              select: { id: true, name: true }
+          })
         : [];
     const names = new Map(actors.map((actor) => [actor.id, actor.name]));
     return rows.map((row) => ({
@@ -217,12 +238,21 @@ export interface UpsAnalyticsRow {
 export async function analytics(days: number, tz: string, now = Date.now()) {
     const from = new Date(now - days * DAY_MS);
     const to = new Date(now);
-    const rows = await prisma.ups.findMany({ orderBy: { createdAt: "asc" }, take: 200, select: { id: true, name: true } });
+    const rows = await prisma.ups.findMany({
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: { id: true, name: true }
+    });
     const ids = rows.map((row) => row.id);
-    if (ids.length === 0) return { rows: [], daily: [] as Awaited<ReturnType<typeof energyRollup>> };
+    if (ids.length === 0)
+        return { rows: [], daily: [] as Awaited<ReturnType<typeof energyRollup>> };
     const [daily, events, outages, loads] = await Promise.all([
         energyRollup(ids, { unit: "day", from, to, tz }),
-        prisma.upsEvent.groupBy({ by: ["upsId"], where: { upsId: { in: ids }, ts: { gte: from } }, _count: true }),
+        prisma.upsEvent.groupBy({
+            by: ["upsId"],
+            where: { upsId: { in: ids }, ts: { gte: from } },
+            _count: true
+        }),
         prisma.upsEvent.groupBy({
             by: ["upsId"],
             where: { upsId: { in: ids }, ts: { gte: from }, kind: "ONBATT" },
@@ -264,12 +294,27 @@ export async function analytics(days: number, tz: string, now = Date.now()) {
 const EXPORT_PAGE = 5_000;
 
 /** One UPS's records over the last `days` as CSV, read and yielded a page at a time. */
-export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, days: number, now = Date.now()) {
+export async function* exportCsv(
+    upsId: string,
+    what: upsSettings.ExportKind,
+    days: number,
+    now = Date.now()
+) {
     const since = new Date(now - days * DAY_MS);
     const take = EXPORT_PAGE;
     const line = (row: readonly unknown[]) => `${row.map(upsSettings.csvCell).join(",")}\r\n`;
     if (what === "samples") {
-        yield line(["time", "charge_pct", "runtime_s", "load_pct", "power_w", "input_v", "input_hz", "output_v", "battery_v"]);
+        yield line([
+            "time",
+            "charge_pct",
+            "runtime_s",
+            "load_pct",
+            "power_w",
+            "input_v",
+            "input_hz",
+            "output_v",
+            "battery_v"
+        ]);
         for (let after = since, first = true; ; first = false) {
             const rows = await prisma.upsSample.findMany({
                 where: { upsId, ts: first ? { gte: after } : { gt: after } },
@@ -278,7 +323,19 @@ export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, da
             });
             if (rows.length > 0) {
                 yield rows
-                    .map((r) => line([r.ts, r.charge, r.runtimeS, r.load, r.powerW, r.inputV, r.inputHz, r.outputV, r.batteryV]))
+                    .map((r) =>
+                        line([
+                            r.ts,
+                            r.charge,
+                            r.runtimeS,
+                            r.load,
+                            r.powerW,
+                            r.inputV,
+                            r.inputHz,
+                            r.outputV,
+                            r.batteryV
+                        ])
+                    )
                     .join("");
             }
             if (rows.length < take) return;
@@ -294,7 +351,11 @@ export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, da
                 take
             });
             if (rows.length > 0) {
-                yield rows.map((r) => line([r.hour, (r.wh / 1000).toFixed(4), r.cost.toFixed(4), r.currency])).join("");
+                yield rows
+                    .map((r) =>
+                        line([r.hour, (r.wh / 1000).toFixed(4), r.cost.toFixed(4), r.currency])
+                    )
+                    .join("");
             }
             if (rows.length < take) return;
             after = rows[rows.length - 1]!.hour;
@@ -309,7 +370,8 @@ export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, da
                 take,
                 ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
             });
-            if (rows.length > 0) yield rows.map((r) => line([r.ts, r.kind, r.detail, r.acknowledgedAt])).join("");
+            if (rows.length > 0)
+                yield rows.map((r) => line([r.ts, r.kind, r.detail, r.acknowledgedAt])).join("");
             if (rows.length < take) return;
             cursor = rows[rows.length - 1]!.id;
         }
@@ -322,7 +384,8 @@ export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, da
             take,
             ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
         });
-        if (rows.length > 0) yield rows.map((r) => line([r.ts, r.kind, r.name, r.value, r.outcome])).join("");
+        if (rows.length > 0)
+            yield rows.map((r) => line([r.ts, r.kind, r.name, r.value, r.outcome])).join("");
         if (rows.length < take) return;
         cursor = rows[rows.length - 1]!.id;
     }
@@ -360,7 +423,9 @@ export async function saveToDrive(
     try {
         await driver.mkdir(DRIVE_FOLDER).catch(() => undefined);
         const path = `${DRIVE_FOLDER}/${fileName}`;
-        const body = Readable.toWeb(Readable.from(utf8Chunks(content))) as ReadableStream<Uint8Array>;
+        const body = Readable.toWeb(
+            Readable.from(utf8Chunks(content))
+        ) as ReadableStream<Uint8Array>;
         await driver.writeStream(path, body);
         return path;
     } finally {
@@ -386,7 +451,10 @@ export type ReportKey =
     | "minCharge"
     | "events"
     | "noEvents";
-export type ReportWords = (key: `report.${ReportKey}`, values?: Record<string, string | number>) => string;
+export type ReportWords = (
+    key: `report.${ReportKey}`,
+    values?: Record<string, string | number>
+) => string;
 
 /** A period's summary of one UPS, as Markdown for the reader's drive. */
 export async function buildReport(
@@ -409,16 +477,25 @@ export async function buildReport(
         })
     ]);
     const totals = energyTotals(daily);
-    const n = (value: number | null | undefined, digits = 1) => (value === null || value === undefined ? "-" : value.toFixed(digits));
+    const n = (value: number | null | undefined, digits = 1) =>
+        value === null || value === undefined ? "-" : value.toFixed(digits);
     const lines = [
         `# ${t("report.title", { name: row.name })}`,
         "",
-        t("report.period", { from: period.from.toISOString().slice(0, 10), to: new Date(period.to.getTime() - 1).toISOString().slice(0, 10) }),
+        t("report.period", {
+            from: period.from.toISOString().slice(0, 10),
+            to: new Date(period.to.getTime() - 1).toISOString().slice(0, 10)
+        }),
         "",
         `## ${t("report.energy")}`,
         "",
         `- ${t("report.kwh", { value: totals.kwh.toFixed(3) })}`,
-        ...totals.costs.filter((one) => one.cost > 0).map((one) => `- ${t("report.cost", { value: one.cost.toFixed(2), currency: one.currency })}`),
+        ...totals.costs
+            .filter((one) => one.cost > 0)
+            .map(
+                (one) =>
+                    `- ${t("report.cost", { value: one.cost.toFixed(2), currency: one.currency })}`
+            ),
         "",
         `| ${t("report.day")} | kWh |`,
         "| --- | ---: |",
@@ -432,7 +509,9 @@ export async function buildReport(
         "",
         `## ${t("report.events")}`,
         "",
-        ...(events.length === 0 ? [t("report.noEvents")] : events.map((one) => `- ${one.kind}: ${one._count}`)),
+        ...(events.length === 0
+            ? [t("report.noEvents")]
+            : events.map((one) => `- ${one.kind}: ${one._count}`)),
         ""
     ];
     return lines.join("\n");

@@ -56,7 +56,16 @@ import {
 const POLL_MS = 10_000;
 const RANGES = { h6: 6, h24: 24, d7: 168, d30: 720 } as const;
 type RangeKey = keyof typeof RANGES;
-const TABS = ["overview", "energy", "power", "battery", "events", "commands", "variables", "settings"] as const;
+const TABS = [
+    "overview",
+    "energy",
+    "power",
+    "battery",
+    "events",
+    "commands",
+    "variables",
+    "settings"
+] as const;
 type Tab = (typeof TABS)[number];
 
 export function UpsDetailView({
@@ -73,7 +82,9 @@ export function UpsDetailView({
     const pathname = usePathname();
     const search = useSearchParams();
     const asked = search.get("tab");
-    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "") ? (asked as Tab) : "overview";
+    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "")
+        ? (asked as Tab)
+        : "overview";
     const [range, setRange] = useState<RangeKey>("h24");
     const [editing, setEditing] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -155,47 +166,51 @@ export function UpsDetailView({
             </div>
 
             {tab === "overview" ? (
-            <div className="flex flex-col gap-6">
-                <section aria-labelledby="ups-now" className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h2 id="ups-now" className="text-sm font-medium">
-                            {t("ups.regions.now")}
+                <div className="flex flex-col gap-6">
+                    <section aria-labelledby="ups-now" className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 id="ups-now" className="text-sm font-medium">
+                                {t("ups.regions.now")}
+                            </h2>
+                            {result === null ? (
+                                <Skeleton className="h-5 w-20" />
+                            ) : (
+                                <Badge variant={upsStatus(reading).tone}>
+                                    {t(`ups.status.${upsStatus(reading).key}`)}
+                                </Badge>
+                            )}
+                        </div>
+                        {result && !result.ok ? (
+                            <p role="status" className="text-sm text-muted-foreground">
+                                {t(`ups.unreachable.${result.reason}`)}
+                            </p>
+                        ) : (
+                            <UpsNow reading={reading} overrideW={ups.settings.nominalPowerW} />
+                        )}
+                    </section>
+
+                    <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
+                        <h2 id="ups-controls" className="text-sm font-medium">
+                            {t("ups.regions.controls")}
                         </h2>
                         {result === null ? (
-                            <Skeleton className="h-5 w-20" />
+                            <Skeleton className="h-16 w-full" />
                         ) : (
-                            <Badge variant={upsStatus(reading).tone}>
-                                {t(`ups.status.${upsStatus(reading).key}`)}
-                            </Badge>
+                            <UpsControls id={ups.id} reading={reading} />
                         )}
-                    </div>
-                    {result && !result.ok ? (
-                        <p role="status" className="text-sm text-muted-foreground">
-                            {t(`ups.unreachable.${result.reason}`)}
-                        </p>
-                    ) : (
-                        <UpsNow reading={reading} overrideW={ups.settings.nominalPowerW} />
-                    )}
-                </section>
+                    </section>
 
-                <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
-                    <h2 id="ups-controls" className="text-sm font-medium">
-                        {t("ups.regions.controls")}
-                    </h2>
-                    {result === null ? (
-                        <Skeleton className="h-16 w-full" />
-                    ) : (
-                        <UpsControls id={ups.id} reading={reading} />
-                    )}
-                </section>
-
-                <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
-                    <h2 id="ups-shutdown" className="text-sm font-medium">
-                        {t("ups.regions.shutdown")}
-                    </h2>
-                    <UpsShutdown ups={initial} machines={machines} sentAt={ups.shutdownSentAt} />
-                </section>
-            </div>
+                    <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
+                        <h2 id="ups-shutdown" className="text-sm font-medium">
+                            {t("ups.regions.shutdown")}
+                        </h2>
+                        <UpsShutdown
+                            ups={initial}
+                            machines={machines}
+                            sentAt={ups.shutdownSentAt}
+                        />
+                    </section>
+                </div>
             ) : null}
 
             {tab === "power" ? (
@@ -217,7 +232,12 @@ export function UpsDetailView({
                 </div>
             ) : null}
             {tab === "events" ? <UpsEventsPanel upsId={ups.id} /> : null}
-            {tab === "commands" ? <UpsCommandsPanel upsId={ups.id} commands={result === null ? null : (reading?.commands ?? [])} /> : null}
+            {tab === "commands" ? (
+                <UpsCommandsPanel
+                    upsId={ups.id}
+                    commands={result === null ? null : (reading?.commands ?? [])}
+                />
+            ) : null}
             {tab === "variables" ? (
                 <UpsVariablesPanel
                     ups={ups}
@@ -229,7 +249,9 @@ export function UpsDetailView({
                     }}
                 />
             ) : null}
-            {tab === "settings" ? <UpsSettingsPanel ups={initial} canOfferNetwork={canOfferNetwork} /> : null}
+            {tab === "settings" ? (
+                <UpsSettingsPanel ups={initial} canOfferNetwork={canOfferNetwork} />
+            ) : null}
 
             {editing ? (
                 <UpsConnectionDialog
@@ -261,7 +283,13 @@ export function UpsDetailView({
     );
 }
 
-function UpsNow({ reading, overrideW }: { reading: upsReading.UpsReading | null; overrideW: number | null }) {
+function UpsNow({
+    reading,
+    overrideW
+}: {
+    reading: upsReading.UpsReading | null;
+    overrideW: number | null;
+}) {
     const t = useTranslations("servers");
     const percent = (value: number | null) => {
         const shown = rounded(value);

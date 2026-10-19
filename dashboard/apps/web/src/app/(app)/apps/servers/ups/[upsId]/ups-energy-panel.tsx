@@ -38,11 +38,24 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
     const range = useMemo(() => {
         if (preset !== "custom") {
             const end = Date.now();
-            return { unit: PRESETS[preset].unit, from: end - PRESETS[preset].days * 86_400_000, to: end };
+            return {
+                unit: PRESETS[preset].unit,
+                from: end - PRESETS[preset].days * 86_400_000,
+                to: end
+            };
         }
         const start = Date.parse(`${from}T00:00:00`);
         const end = Date.parse(`${to}T00:00:00`) + 86_400_000;
-        return { unit: end - start <= 2 * 86_400_000 ? "hour" : end - start > 120 * 86_400_000 ? "month" : "day", from: start, to: end };
+        return {
+            unit:
+                end - start <= 2 * 86_400_000
+                    ? "hour"
+                    : end - start > 120 * 86_400_000
+                      ? "month"
+                      : "day",
+            from: start,
+            to: end
+        };
     }, [preset, from, to]);
     const valid = upsSettings.energyQuerySchema.safeParse({
         unit: range.unit,
@@ -84,7 +97,12 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
         {
             key: "now",
             label: t("ups.energy.powerNow"),
-            value: reading === null ? null : powerW === null ? t("ups.energy.noRating") : t("ups.units.watts", { value: Math.round(powerW) })
+            value:
+                reading === null
+                    ? null
+                    : powerW === null
+                      ? t("ups.energy.noRating")
+                      : t("ups.units.watts", { value: Math.round(powerW) })
         },
         {
             key: "kwh",
@@ -95,10 +113,12 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
             key: "cost",
             label: t("ups.energy.cost"),
             value: answer
-                ? ups.settings.pricePerKwh === null && answer.totals.costs.every((one) => one.cost === 0)
+                ? ups.settings.pricePerKwh === null &&
+                  answer.totals.costs.every((one) => one.cost === 0)
                     ? t("ups.energy.noPrice")
-                    : answer.totals.costs.map((one) => formatMoney(one.cost, one.currency)).join(" + ") ||
-                      formatMoney(0, ups.settings.currency)
+                    : answer.totals.costs
+                          .map((one) => formatMoney(one.cost, one.currency))
+                          .join(" + ") || formatMoney(0, ups.settings.currency)
                 : null
         }
     ];
@@ -111,31 +131,49 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                     aria-label={t("ups.energy.range")}
                     value={preset}
                     onValueChange={setPreset}
-                    options={(Object.keys(PRESETS) as Preset[]).map((key) => ({ value: key, label: t(`ups.energy.presets.${key}`) }))}
+                    options={(Object.keys(PRESETS) as Preset[]).map((key) => ({
+                        value: key,
+                        label: t(`ups.energy.presets.${key}`)
+                    }))}
                 />
                 {preset === "custom" ? (
                     <div className="flex flex-wrap items-end gap-2">
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("ups.energy.from")}
-                            <Input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} />
+                            <Input
+                                type="date"
+                                value={from}
+                                max={to}
+                                onChange={(event) => setFrom(event.target.value)}
+                            />
                         </label>
                         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                             {t("ups.energy.to")}
-                            <Input type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} />
+                            <Input
+                                type="date"
+                                value={to}
+                                min={from}
+                                onChange={(event) => setTo(event.target.value)}
+                            />
                         </label>
                     </div>
                 ) : null}
             </div>
             {!valid.success ? (
                 <p role="alert" className="text-sm text-danger-ink">
-                    {t(`ups.energy.errors.${valid.error.issues[0]?.message === "rangeTooLong" ? "rangeTooLong" : "invalidRange"}`)}
+                    {t(
+                        `ups.energy.errors.${valid.error.issues[0]?.message === "rangeTooLong" ? "rangeTooLong" : "invalidRange"}`
+                    )}
                 </p>
             ) : null}
             <dl className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
                 {tiles.map((tile) => (
                     <div key={tile.key} className="min-w-0 rounded-md bg-muted/50 px-3 py-2">
                         <dt className="text-xs text-muted-foreground">{tile.label}</dt>
-                        <dd className="truncate text-sm font-medium tabular-nums" title={tile.value ?? undefined}>
+                        <dd
+                            className="truncate text-sm font-medium tabular-nums"
+                            title={tile.value ?? undefined}
+                        >
                             {tile.value ?? <Skeleton className="mt-1 h-4 w-16" />}
                         </dd>
                     </div>
@@ -160,18 +198,33 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                         <thead className="sticky top-0 bg-background text-left text-xs text-muted-foreground">
                             <tr>
                                 <th className="px-3 py-2 font-normal">{t("ups.energy.when")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.energy.kwh")}</th>
-                                <th className="px-3 py-2 text-right font-normal">{t("ups.energy.cost")}</th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.energy.kwh")}
+                                </th>
+                                <th className="px-3 py-2 text-right font-normal">
+                                    {t("ups.energy.cost")}
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {[...answer.buckets].reverse().map((one) => (
                                 <tr key={`${one.ts}:${one.currency}`} className="border-t">
                                     <td className="px-3 py-1.5 tabular-nums">
-                                        {new Date(one.ts).toLocaleString(undefined, range.unit === "hour" ? { dateStyle: "short", timeStyle: "short" } : range.unit === "day" ? { dateStyle: "medium" } : { year: "numeric", month: "long" })}
+                                        {new Date(one.ts).toLocaleString(
+                                            undefined,
+                                            range.unit === "hour"
+                                                ? { dateStyle: "short", timeStyle: "short" }
+                                                : range.unit === "day"
+                                                  ? { dateStyle: "medium" }
+                                                  : { year: "numeric", month: "long" }
+                                        )}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{one.kwh.toFixed(3)}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{formatMoney(one.cost, one.currency)}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                        {one.kwh.toFixed(3)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                        {formatMoney(one.cost, one.currency)}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

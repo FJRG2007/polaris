@@ -51,7 +51,15 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
     }
 
     const events = live.data?.events ?? null;
-    const open = live.data ? Math.max(0, live.data.open - [...seen].filter((id) => events?.some((one) => one.id === id && !one.acknowledgedAt)).length) : null;
+    const open = live.data
+        ? Math.max(
+              0,
+              live.data.open -
+                  [...seen].filter((id) =>
+                      events?.some((one) => one.id === id && !one.acknowledgedAt)
+                  ).length
+          )
+        : null;
 
     return (
         <div className="flex flex-col gap-3">
@@ -60,14 +68,20 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                     aria-label={t("ups.events.state")}
                     value={state}
                     onValueChange={(value) => setState(value as typeof state)}
-                    options={(["all", "open", "acknowledged"] as const).map((one) => ({ value: one, label: t(`ups.events.states.${one}`) }))}
+                    options={(["all", "open", "acknowledged"] as const).map((one) => ({
+                        value: one,
+                        label: t(`ups.events.states.${one}`)
+                    }))}
                     className="w-40"
                 />
                 <Select
                     aria-label={t("ups.events.since")}
                     value={days}
                     onValueChange={(value) => setDays(value as typeof days)}
-                    options={DAYS.map((one) => ({ value: one, label: t("ups.events.days", { count: Number(one) }) }))}
+                    options={DAYS.map((one) => ({
+                        value: one,
+                        label: t("ups.events.days", { count: Number(one) })
+                    }))}
                     className="w-40"
                 />
                 <Button
@@ -79,14 +93,19 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                     }}
                 >
                     <CheckCheck className="size-4 shrink-0" aria-hidden />
-                    {open === null ? t("ups.events.ackAll") : t("ups.events.ackAllCount", { count: open })}
+                    {open === null
+                        ? t("ups.events.ackAll")
+                        : t("ups.events.ackAllCount", { count: open })}
                 </Button>
             </div>
             <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
                 <legend className="sr-only">{t("ups.events.kinds")}</legend>
                 {upsEvents.UPS_EVENT_KINDS.map((kind) => (
                     <label key={kind} className="flex items-center gap-1.5 text-xs">
-                        <Checkbox checked={kinds.includes(kind)} onChange={(event) => toggleKind(kind, event.target.checked)} />
+                        <Checkbox
+                            checked={kinds.includes(kind)}
+                            onChange={(event) => toggleKind(kind, event.target.checked)}
+                        />
                         {t(`ups.kinds.${kind}`)}
                     </label>
                 ))}
@@ -104,17 +123,34 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                     {events.map((event) => {
                         const acknowledged = event.acknowledgedAt !== null || seen.has(event.id);
                         return (
-                            <li key={event.id} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
-                                <Badge variant={upsEvents.UPS_EVENT_TONE[event.kind]}>{t(`ups.kinds.${event.kind}`)}</Badge>
-                                <span className="min-w-0 flex-1 truncate text-muted-foreground" title={event.detail ?? undefined}>
+                            <li
+                                key={event.id}
+                                className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm"
+                            >
+                                <Badge variant={upsEvents.UPS_EVENT_TONE[event.kind]}>
+                                    {t(`ups.kinds.${event.kind}`)}
+                                </Badge>
+                                <span
+                                    className="min-w-0 flex-1 truncate text-muted-foreground"
+                                    title={event.detail ?? undefined}
+                                >
                                     {event.detail ?? ""}
                                 </span>
-                                <time dateTime={event.ts} className="shrink-0 tabular-nums text-muted-foreground">
+                                <time
+                                    dateTime={event.ts}
+                                    className="shrink-0 tabular-nums text-muted-foreground"
+                                >
                                     {new Date(event.ts).toLocaleString()}
                                 </time>
                                 {acknowledged ? (
-                                    <span className="w-8 shrink-0 text-center" title={t("ups.events.acknowledged")}>
-                                        <Check className="mx-auto size-4 shrink-0 text-muted-foreground" aria-label={t("ups.events.acknowledged")} />
+                                    <span
+                                        className="w-8 shrink-0 text-center"
+                                        title={t("ups.events.acknowledged")}
+                                    >
+                                        <Check
+                                            className="mx-auto size-4 shrink-0 text-muted-foreground"
+                                            aria-label={t("ups.events.acknowledged")}
+                                        />
                                     </span>
                                 ) : (
                                     <Button
@@ -132,7 +168,9 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                     })}
                 </ul>
             )}
-            {live.data?.more ? <p className="text-xs text-muted-foreground">{t("ups.events.more")}</p> : null}
+            {live.data?.more ? (
+                <p className="text-xs text-muted-foreground">{t("ups.events.more")}</p>
+            ) : null}
         </div>
     );
 }

@@ -11,15 +11,22 @@ import { badRequest, upsAdmin, upsFromPath } from "../../guard";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request, { params }: { params: Promise<{ upsId: string }> }): Promise<Response> {
+export async function GET(
+    request: Request,
+    { params }: { params: Promise<{ upsId: string }> }
+): Promise<Response> {
     const user = await upsAdmin();
     if (user instanceof Response) return user;
     const row = await upsFromPath(params);
     if (row instanceof Response) return row;
-    const query = upsSettings.exportQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+    const query = upsSettings.exportQuerySchema.safeParse(
+        Object.fromEntries(new URL(request.url).searchParams)
+    );
     if (!query.success) return badRequest();
     const csv = Readable.toWeb(
-        Readable.from(upsData.exportCsv(row.id, query.data.what, query.data.days), { objectMode: false })
+        Readable.from(upsData.exportCsv(row.id, query.data.what, query.data.days), {
+            objectMode: false
+        })
     ) as ReadableStream<Uint8Array>;
     const name = `${upsData.fileStem(row.name)}-${query.data.what}-${query.data.days}d.csv`;
     return new Response(csv, {

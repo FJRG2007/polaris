@@ -76,7 +76,9 @@ export function parseQuoted(answer: string, verb: "ENUM" | "RANGE"): string[][] 
     return answer
         .split(/\r?\n/)
         .filter((line) => line.startsWith(`${verb} `))
-        .map((line) => [...line.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) => unescape(match[1]!)));
+        .map((line) =>
+            [...line.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) => unescape(match[1]!))
+        );
 }
 
 /** One connection: requests answered strictly in order. */
@@ -153,7 +155,10 @@ class NutSession {
     }
 }
 
-async function withSession<T>(target: Pick<NutTarget, "host" | "port">, run: (s: NutSession) => Promise<T>): Promise<T> {
+async function withSession<T>(
+    target: Pick<NutTarget, "host" | "port">,
+    run: (s: NutSession) => Promise<T>
+): Promise<T> {
     const session = new NutSession(target);
     try {
         await session.open();
@@ -174,9 +179,16 @@ async function readWritable(session: NutSession, name: string): Promise<UpsRwVar
     const out: UpsRwVar[] = [];
     for (const [variable, value] of parseListRw(listed).slice(0, MAX_RW)) {
         if (!/^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(variable)) continue;
-        const rw: UpsRwVar = { name: variable, value, ...parseType(await session.ask(`GET TYPE ${name} ${variable}`)) };
+        const rw: UpsRwVar = {
+            name: variable,
+            value,
+            ...parseType(await session.ask(`GET TYPE ${name} ${variable}`))
+        };
         if (rw.kind === "enum") {
-            rw.options = parseQuoted(await session.ask(`LIST ENUM ${name} ${variable}`), "ENUM").map((one) => one[0]!);
+            rw.options = parseQuoted(
+                await session.ask(`LIST ENUM ${name} ${variable}`),
+                "ENUM"
+            ).map((one) => one[0]!);
         } else if (rw.kind === "range") {
             rw.ranges = parseQuoted(await session.ask(`LIST RANGE ${name} ${variable}`), "RANGE")
                 .filter((one) => one.length === 2)
@@ -199,7 +211,11 @@ export async function nutRead(
         if (error) throw new Error(error);
         const commands = await session.ask(`LIST CMD ${name}`);
         const rw = writable ? await readWritable(session, name).catch(() => []) : [];
-        return { vars: parseListVar(vars), commands: errorOf(commands) ? [] : parseListCmd(commands), rw };
+        return {
+            vars: parseListVar(vars),
+            commands: errorOf(commands) ? [] : parseListCmd(commands),
+            rw
+        };
     });
 }
 
@@ -219,7 +235,9 @@ export async function nutCommand(
 ): Promise<void> {
     await withSession(target, async (session) => {
         await login(session, username, password);
-        const error = errorOf(await session.ask(`INSTCMD ${word(target.upsName)} ${word(command)}`));
+        const error = errorOf(
+            await session.ask(`INSTCMD ${word(target.upsName)} ${word(command)}`)
+        );
         if (error) throw new Error(error);
     });
 }
@@ -235,7 +253,9 @@ export async function nutSetVar(
     await withSession(target, async (session) => {
         await login(session, username, password);
         const quoted = `"${value.replace(/["\\]/g, "\\$&")}"`;
-        const error = errorOf(await session.ask(`SET VAR ${word(target.upsName)} ${word(variable)} ${quoted}`));
+        const error = errorOf(
+            await session.ask(`SET VAR ${word(target.upsName)} ${word(variable)} ${quoted}`)
+        );
         if (error) throw new Error(error);
     });
 }

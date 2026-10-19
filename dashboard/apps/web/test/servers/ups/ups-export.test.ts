@@ -32,7 +32,13 @@ const calls: string[] = [];
 vi.mock("@polaris/db", () => ({
     prisma: {
         upsSample: {
-            findMany: async ({ where, take }: { where: { ts: { gte?: Date; gt?: Date } }; take: number }) => {
+            findMany: async ({
+                where,
+                take
+            }: {
+                where: { ts: { gte?: Date; gt?: Date } };
+                take: number;
+            }) => {
                 calls.push("samples");
                 return samples
                     .filter((r) => (where.ts.gte ? r.ts >= where.ts.gte : r.ts > where.ts.gt!))
@@ -40,7 +46,14 @@ vi.mock("@polaris/db", () => ({
             }
         },
         upsEvent: {
-            findMany: async ({ take, cursor }: { take: number; cursor?: { id: string }; skip?: number }) => {
+            findMany: async ({
+                take,
+                cursor
+            }: {
+                take: number;
+                cursor?: { id: string };
+                skip?: number;
+            }) => {
                 calls.push("events");
                 const from = cursor ? events.findIndex((r) => r.id === cursor.id) + 1 : 0;
                 return events.slice(from, from + take);

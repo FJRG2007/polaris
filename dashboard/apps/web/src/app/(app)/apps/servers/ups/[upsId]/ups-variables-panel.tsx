@@ -64,11 +64,17 @@ export function UpsVariablesPanel({
                 ) : (
                     <ul className="flex flex-col divide-y rounded-md border">
                         {rw.map((one) => (
-                            <li key={one.name} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
+                            <li
+                                key={one.name}
+                                className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm"
+                            >
                                 <code className="min-w-0 flex-1 truncate" title={one.name}>
                                     {one.name}
                                 </code>
-                                <span className="max-w-48 truncate font-medium tabular-nums" title={one.value}>
+                                <span
+                                    className="max-w-48 truncate font-medium tabular-nums"
+                                    title={one.value}
+                                >
                                     {one.value}
                                 </span>
                                 <Button
@@ -84,7 +90,9 @@ export function UpsVariablesPanel({
                         ))}
                     </ul>
                 )}
-                <h4 className="text-xs font-medium text-muted-foreground">{t("ups.variables.history")}</h4>
+                <h4 className="text-xs font-medium text-muted-foreground">
+                    {t("ups.variables.history")}
+                </h4>
                 <UpsActionHistory answer={history.data} />
             </section>
 
@@ -126,7 +134,9 @@ function EditVariableDialog({
     const ready = value !== "" && error === null && value !== rw.value;
     const hint =
         rw.kind === "range" && rw.ranges?.length
-            ? t("ups.variables.range", { ranges: rw.ranges.map(([min, max]) => `${min}-${max}`).join(", ") })
+            ? t("ups.variables.range", {
+                  ranges: rw.ranges.map(([min, max]) => `${min}-${max}`).join(", ")
+              })
             : rw.kind === "string" && rw.maxLen
               ? t("ups.variables.maxLen", { count: rw.maxLen })
               : null;
@@ -141,10 +151,17 @@ function EditVariableDialog({
             return;
         }
         if (outcome.value.outcome === "invalid") {
-            setServerError(t(`ups.variables.errors.${(outcome.value.error ?? "invalidValue") as "invalidValue"}`));
+            setServerError(
+                t(
+                    `ups.variables.errors.${(outcome.value.error ?? "invalidValue") as "invalidValue"}`
+                )
+            );
             return;
         }
-        toast.show({ key: `ups:${upsId}:set`, title: t(`ups.commandResult.${outcome.value.outcome}`) });
+        toast.show({
+            key: `ups:${upsId}:set`,
+            title: t(`ups.commandResult.${outcome.value.outcome}`)
+        });
         onDone();
         if (outcome.value.outcome === "ok") onClose();
     }
@@ -169,7 +186,9 @@ function EditVariableDialog({
                     ) : (
                         <Input
                             value={value}
-                            inputMode={rw.kind === "number" || rw.kind === "range" ? "decimal" : undefined}
+                            inputMode={
+                                rw.kind === "number" || rw.kind === "range" ? "decimal" : undefined
+                            }
                             maxLength={rw.maxLen ?? 64}
                             aria-invalid={error !== null}
                             onChange={(event) => setValue(event.target.value)}
@@ -206,7 +225,10 @@ function UpsRawVariables({ vars }: { vars: Record<string, string> | null }) {
     const [filter, setFilter] = useState("");
     const needle = filter.trim().toLowerCase();
     const rows = vars
-        ? Object.entries(vars).filter(([name, value]) => !needle || name.includes(needle) || value.toLowerCase().includes(needle))
+        ? Object.entries(vars).filter(
+              ([name, value]) =>
+                  !needle || name.includes(needle) || value.toLowerCase().includes(needle)
+          )
         : null;
     return (
         <section aria-labelledby="ups-raw" className="flex flex-col gap-3">
@@ -242,7 +264,10 @@ function UpsRawVariables({ vars }: { vars: Record<string, string> | null }) {
                         <tbody>
                             {rows.map(([name, value]) => (
                                 <tr key={name} className="border-t first:border-t-0">
-                                    <td className="w-1/2 truncate px-3 py-1.5 font-mono text-xs" title={name}>
+                                    <td
+                                        className="w-1/2 truncate px-3 py-1.5 font-mono text-xs"
+                                        title={name}
+                                    >
                                         {name}
                                     </td>
                                     <td className="truncate px-3 py-1.5 tabular-nums" title={value}>
@@ -274,7 +299,9 @@ function UpsMappings({
     );
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const candidate = Object.fromEntries(rows.filter((row) => row.from && row.to).map((row) => [row.from, row.to.trim()]));
+    const candidate = Object.fromEntries(
+        rows.filter((row) => row.from && row.to).map((row) => [row.from, row.to.trim()])
+    );
     const parsed = upsSettings.variableMapSchema.safeParse(candidate);
     const incomplete = rows.some((row) => !row.from || !row.to.trim());
     const dirty = JSON.stringify(candidate) !== JSON.stringify(saved);
@@ -307,8 +334,16 @@ function UpsMappings({
                         className="w-56"
                         value={row.from}
                         placeholder={t("ups.mappings.standard")}
-                        onValueChange={(value) => setRows(rows.map((one, at) => (at === index ? { ...one, from: value } : one)))}
-                        options={upsSettings.MAPPABLE_VARS.filter((name) => name === row.from || !used.has(name)).map((name) => ({ value: name, label: name }))}
+                        onValueChange={(value) =>
+                            setRows(
+                                rows.map((one, at) =>
+                                    at === index ? { ...one, from: value } : one
+                                )
+                            )
+                        }
+                        options={upsSettings.MAPPABLE_VARS.filter(
+                            (name) => name === row.from || !used.has(name)
+                        ).map((name) => ({ value: name, label: name }))}
                     />
                     <span className="text-muted-foreground" aria-hidden>
                         &larr;
@@ -318,7 +353,11 @@ function UpsMappings({
                         className="w-56"
                         value={row.to}
                         placeholder={t("ups.mappings.own")}
-                        onValueChange={(value) => setRows(rows.map((one, at) => (at === index ? { ...one, to: value } : one)))}
+                        onValueChange={(value) =>
+                            setRows(
+                                rows.map((one, at) => (at === index ? { ...one, to: value } : one))
+                            )
+                        }
                         options={Object.keys(vars ?? {})
                             .concat(row.to && !(vars ?? {})[row.to] ? [row.to] : [])
                             .map((name) => ({ value: name, label: name }))}
@@ -350,7 +389,8 @@ function UpsMappings({
                     variant="outline"
                     aria-disabled={used.size >= upsSettings.MAPPABLE_VARS.length}
                     onClick={() => {
-                        if (used.size < upsSettings.MAPPABLE_VARS.length) setRows([...rows, { from: "", to: "" }]);
+                        if (used.size < upsSettings.MAPPABLE_VARS.length)
+                            setRows([...rows, { from: "", to: "" }]);
                     }}
                 >
                     <Plus className="size-4 shrink-0" aria-hidden />
