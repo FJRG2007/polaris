@@ -129,6 +129,14 @@ const OVERVIEW_RETRY_MAX_MS = 30_000;
  *  for. */
 const AUTO_CHECK_MS = 5 * 60_000;
 
+/** How many answers in a row the new build has to give before the page reloads
+ *  onto it. While a rollover overlaps, the edge sends each request to either
+ *  container, so the first answer from the new build says nothing about the next
+ *  one - and a reload into that overlap fetches the page from one container and
+ *  its scripts from the other, which 404 there and leave the page unhydrated:
+ *  every value a skeleton until somebody reloads by hand. */
+const SETTLED_ANSWERS = 3;
+
 /** How much of a finished run's log to show. Matches the endpoint's chunk cap, so
  *  the tail arrives in one read. */
 const TAIL_BYTES = 128 * 1024;
@@ -647,6 +655,14 @@ export function SettingsView({
         let offset = 0;
         let missing = 0;
         let sawContent = false;
+        let newAnswers = 0;
+        // Whether this answer is the new build, and whether it has now been the
+        // only one answering for long enough to reload onto - see SETTLED_ANSWERS.
+        const settledOnNewBuild = (build: string | null): boolean => {
+            if (!build || !startBuild.current) return false;
+            newAnswers = build === startBuild.current ? 0 : newAnswers + 1;
+            return newAnswers >= SETTLED_ANSWERS;
+        };
         stopPolling();
         pollRef.current = setInterval(async () => {
             try {
@@ -670,7 +686,7 @@ export function SettingsView({
                 // The build check still stands, because a rollover that finished
                 // this fast is a real completion whatever the log says.
                 if (!logIsFromRun(data, runFrom.current)) {
-                    if (data.build && startBuild.current && data.build !== startBuild.current) {
+                    if (settledOnNewBuild(data.build)) {
                         setLogResult({ code: 0 });
                         finish(t("settings.run.serving"));
                     }
@@ -682,10 +698,10 @@ export function SettingsView({
                     const clean = data.content.replace(MARKER_RE, "");
                     if (clean) setLogText((prev) => prev + clean);
                 }
-                // A different build answering means the new dashboard is serving.
-                // True whether it took over by rollover or by restart, and true even
-                // if the updater never got to write its marker.
-                if (data.build && startBuild.current && data.build !== startBuild.current) {
+                // The new build answering, and only it, means the new dashboard is
+                // serving. True whether it took over by rollover or by restart, and
+                // true even if the updater never got to write its marker.
+                if (settledOnNewBuild(data.build)) {
                     setLogResult({ code: 0 });
                     finish(t("settings.run.serving"));
                     return;

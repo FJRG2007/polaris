@@ -34,7 +34,9 @@ const STALE_BUILD_PATTERNS: readonly RegExp[] = [
  * the page - so anything that might be a real fault in the code has to reach the
  * boundary and be read, not be answered with a refresh that hides it.
  */
-export function isStaleBuildError(error: { name?: string; message?: string } | null | undefined): boolean {
+export function isStaleBuildError(
+    error: { name?: string; message?: string } | null | undefined
+): boolean {
     if (!error) return false;
     if (error.name === "ChunkLoadError") return true;
     const message = error.message ?? "";
@@ -71,3 +73,68 @@ export function reloadForNewBuild(): boolean {
     window.location.reload();
     return true;
 }
+
+/**
+ * Reload a page whose own scripts never arrived.
+ *
+ * Everything above runs inside React, and so does every error boundary - which
+ * is exactly what is missing when a script the page was served with fails to
+ * load. While an update rolls over, both dashboards answer and the edge sends
+ * each request to either of them: the page can come from the new build and one
+ * of its chunks from the old container, which has never had it. The page then
+ * stays as the server drew it - labels, menus, and a skeleton for every value -
+ * with nothing running to fetch them, until somebody reloads by hand.
+ *
+ * So this is not a component. It is rendered into the document's head as a
+ * plain script, listens for a `/_next/static` script or stylesheet failing to
+ * load, and reloads after a pause long enough for the rollover to finish. Only
+ * while the document is still loading: a chunk that fails after that belongs to
+ * a page that is up and may have something typed into it, and the banner in
+ * `new-build` offers that reload instead of doing it.
+ *
+ * Bounded by its own count in session storage, so a build that is genuinely
+ * missing a file is a page that stops trying, not a page that reloads forever.
+ * Written in plain ES5 with no outside references, because it is serialised
+ * with `toString` - see `CHUNK_RECOVERY_SCRIPT`.
+ */
+export function recoverMissingChunks(): void {
+    var KEY = "polaris.chunkRecovery";
+    var WINDOW_MS = 120000;
+    var MAX_RELOADS = 3;
+    var DELAY_MS = 1500;
+    var scheduled = false;
+    window.addEventListener(
+        "error",
+        function (event) {
+            var element = event.target as (Element & { src?: string; href?: string }) | null;
+            if (scheduled || document.readyState === "complete" || !element) return;
+            if (element.tagName !== "SCRIPT" && element.tagName !== "LINK") return;
+            var url = element.src || element.href || "";
+            if (url.indexOf("/_next/static/") === -1) return;
+            var now = Date.now();
+            var recent: number[];
+            try {
+                var stored = JSON.parse(window.sessionStorage.getItem(KEY) || "[]");
+                recent = (Array.isArray(stored) ? stored : []).filter(function (at: unknown) {
+                    return typeof at === "number" && now - at < WINDOW_MS;
+                });
+                if (recent.length >= MAX_RELOADS) return;
+                recent.push(now);
+                window.sessionStorage.setItem(KEY, JSON.stringify(recent));
+            } catch {
+                // Nowhere to count the attempts means no guarantee this stops.
+                return;
+            }
+            scheduled = true;
+            setTimeout(function () {
+                window.location.reload();
+            }, DELAY_MS);
+        },
+        // Load failures do not bubble; only a listener in the capture phase sees
+        // the element that failed.
+        true
+    );
+}
+
+/** `recoverMissingChunks` as the source of an inline script. */
+export const CHUNK_RECOVERY_SCRIPT = `(${recoverMissingChunks.toString()})();`;
