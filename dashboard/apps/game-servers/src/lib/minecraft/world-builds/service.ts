@@ -87,9 +87,15 @@ async function runChunks(
 }
 
 /** Run `work` with the box's chunks held loaded, and let them go after - all
- *  but the ones somebody held before, a farm's, which stay loaded. */
-async function loaded<T>(server: ServerContainer, box: Box, work: () => Promise<T>): Promise<T> {
+ *  but the ones somebody held before, a farm's, which stay loaded. Null, with
+ *  nothing run, when those could not be read: left for a later pass. */
+async function loaded<T>(
+    server: ServerContainer,
+    box: Box,
+    work: () => Promise<T>
+): Promise<T | null> {
     const held = chunks.readForced(await server.say([chunks.READ_FORCED]).catch(() => ""));
+    if (!held) return null;
     await server.sayAll([arena.forceloadArea(box, true)]);
     try {
         return await work();

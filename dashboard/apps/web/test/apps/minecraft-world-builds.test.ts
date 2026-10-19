@@ -375,6 +375,8 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64) {
         running: true,
         say: async ([command]: readonly string[]) => {
             said.push(command!);
+            if (command!.endsWith("forceload query"))
+                return "No force loaded chunks were found in minecraft:overworld";
             if (command!.includes("@a[distance=0..]"))
                 return "Steve has the following entity data: [0.5d, 64.0d, 0.5d]";
             if (
@@ -496,6 +498,18 @@ describe("the season's builds in the world", () => {
             const holds = x1! >> 4 <= 1 && x2! >> 4 >= 1 && z1! >> 4 <= 0 && z2! >> 4 >= 0;
             expect(holds).toBe(false);
         }
+    });
+
+    it("loads and lets go of nothing when it cannot tell which chunks were held", async () => {
+        const { server, sent } = fakeServer();
+        const say = server.say.bind(server);
+        server.say = async (argv) => {
+            if (argv[0]!.endsWith("forceload query")) throw new Error("rcon closed");
+            return say(argv);
+        };
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(sent.some((line) => line.includes(" forceload "))).toBe(false);
+        expect(plan.readPlaced(config)).toEqual([]);
     });
 
     it("surveys with markers of its own, which an event's mark or survey never reads or clears", async () => {
