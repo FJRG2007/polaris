@@ -52,6 +52,7 @@ jobs:
   warm:
     name: warm the build caches
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: read
       # To delete main's older Next caches once the new one is saved.

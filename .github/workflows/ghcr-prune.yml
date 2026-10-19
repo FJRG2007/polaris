@@ -57,6 +57,7 @@ jobs:
     # been interrupted mid-push; neither is a safe moment to decide what is unused.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && !(github.event.workflow_run.event == 'workflow_dispatch' && startsWith(github.event.workflow_run.display_title, 'Dry run'))) }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: docker/login-action@v4
         with:
