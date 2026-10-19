@@ -487,6 +487,10 @@
         "upsReplaceBattery": {
             "label": "Un SAI pide batería nueva",
             "description": "Un SAI indica que su batería está gastada."
+        },
+        "upsShutdownFailed": {
+            "label": "Una máquina no se apagó",
+            "description": "Un SAI se quedó sin batería y Polaris no pudo apagar una máquina que protege."
         }
     },
     "groups": {

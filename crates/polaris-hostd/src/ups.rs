@@ -289,46 +289,61 @@ impl SnmpSource {
 // NUT configuration
 // ---------------------------------------------------------------------------
 
+fn usb_section(ups: &UsbUps) -> String {
+    let mut out = format!(
+        "\n[{}]\n  driver = usbhid-ups\n  port = auto\n  vendorid = {}\n  productid = {}\n  bus = \"{}\"\n",
+        ups.id,
+        safe_token(&ups.vendor_id),
+        safe_token(&ups.product_id),
+        safe_token(&ups.bus)
+    );
+    if !ups.serial.is_empty() {
+        out.push_str(&format!("  serial = \"{}\"\n", ups.serial));
+    }
+    out
+}
+
+fn snmp_section(source: &SnmpSource) -> String {
+    let mut out = format!(
+        "\n[{}]\n  driver = snmp-ups\n  port = \"{}\"\n  snmp_version = {}\n",
+        source.name(),
+        source.address,
+        source.version
+    );
+    if let Some(c) = &source.community {
+        out.push_str(&format!("  community = \"{c}\"\n"));
+    }
+    if let Some(u) = &source.user {
+        out.push_str(&format!("  secName = \"{u}\"\n"));
+        let level = match (&source.auth_password, &source.priv_password) {
+            (Some(_), Some(_)) => "authPriv",
+            (Some(_), None) => "authNoPriv",
+            _ => "noAuthNoPriv",
+        };
+        out.push_str(&format!("  secLevel = {level}\n"));
+    }
+    if let Some(a) = &source.auth_password {
+        out.push_str(&format!("  authPassword = \"{a}\"\n"));
+    }
+    if let Some(p) = &source.priv_password {
+        out.push_str(&format!("  privPassword = \"{p}\"\n"));
+    }
+    out
+}
+
+/// Every UPS to drive: its NUT name, its driver and its `ups.conf` section.
+fn sections(usb: &[UsbUps], snmp: &[SnmpSource]) -> Vec<(String, &'static str, String)> {
+    usb.iter()
+        .map(|u| (u.id.clone(), "usbhid-ups", usb_section(u)))
+        .chain(snmp.iter().map(|s| (s.name(), "snmp-ups", snmp_section(s))))
+        .collect()
+}
+
 /// `ups.conf` for the devices found and the SNMP sources asked for.
 pub fn render_ups_conf(usb: &[UsbUps], snmp: &[SnmpSource]) -> String {
     let mut out = String::from("maxretry = 3\n");
-    for ups in usb {
-        out.push_str(&format!(
-            "\n[{}]\n  driver = usbhid-ups\n  port = auto\n  vendorid = {}\n  productid = {}\n  bus = \"{}\"\n",
-            ups.id,
-            safe_token(&ups.vendor_id),
-            safe_token(&ups.product_id),
-            safe_token(&ups.bus)
-        ));
-        if !ups.serial.is_empty() {
-            out.push_str(&format!("  serial = \"{}\"\n", ups.serial));
-        }
-    }
-    for source in snmp {
-        out.push_str(&format!(
-            "\n[{}]\n  driver = snmp-ups\n  port = \"{}\"\n  snmp_version = {}\n",
-            source.name(),
-            source.address,
-            source.version
-        ));
-        if let Some(c) = &source.community {
-            out.push_str(&format!("  community = \"{c}\"\n"));
-        }
-        if let Some(u) = &source.user {
-            out.push_str(&format!("  secName = \"{u}\"\n"));
-            let level = match (&source.auth_password, &source.priv_password) {
-                (Some(_), Some(_)) => "authPriv",
-                (Some(_), None) => "authNoPriv",
-                _ => "noAuthNoPriv",
-            };
-            out.push_str(&format!("  secLevel = {level}\n"));
-        }
-        if let Some(a) = &source.auth_password {
-            out.push_str(&format!("  authPassword = \"{a}\"\n"));
-        }
-        if let Some(p) = &source.priv_password {
-            out.push_str(&format!("  privPassword = \"{p}\"\n"));
-        }
+    for (_, _, section) in sections(usb, snmp) {
+        out.push_str(&section);
     }
     out
 }
@@ -475,8 +490,11 @@ struct Supervisor {
     password: String,
     usb: Vec<UsbUps>,
     snmp: Vec<SnmpSource>,
-    drivers: BTreeMap<String, Child>,
+    /// Each running driver and the `ups.conf` section it was started with.
+    drivers: BTreeMap<String, (Child, String)>,
     upsd: Option<Child>,
+    /// The `ups.conf` last written, and read by `upsd` when it has anything to serve.
+    applied_conf: Option<String>,
     last_check: Option<Instant>,
 }
 
@@ -489,6 +507,7 @@ fn supervisor() -> &'static Mutex<Supervisor> {
             snmp: Vec::new(),
             drivers: BTreeMap::new(),
             upsd: None,
+            applied_conf: None,
             last_check: None,
         })
     })
@@ -520,12 +539,23 @@ fn stop(mut child: Child) {
     let _ = child.wait();
 }
 
+/// One source per NUT name, the last one given winning.
+fn dedupe(sources: Vec<SnmpSource>) -> Vec<SnmpSource> {
+    let mut out: Vec<SnmpSource> = Vec::new();
+    for source in sources {
+        let name = source.name();
+        out.retain(|s| s.name() != name);
+        out.push(source);
+    }
+    out
+}
+
 impl Supervisor {
-    fn write_config(&self) -> io::Result<()> {
+    fn write_config(&self, conf: &str) -> io::Result<()> {
         let dir = Path::new(RUNTIME_DIR);
         fs::create_dir_all(dir.join("state"))?;
         fs::write(dir.join("nut.conf"), "MODE=standalone\n")?;
-        fs::write(dir.join("ups.conf"), render_ups_conf(&self.usb, &self.snmp))?;
+        fs::write(dir.join("ups.conf"), conf)?;
         fs::write(dir.join("upsd.conf"), render_upsd_conf())?;
         fs::write(dir.join("upsd.users"), render_upsd_users(&self.password))?;
         #[cfg(unix)]
@@ -537,34 +567,41 @@ impl Supervisor {
         Ok(())
     }
 
-    /// Make the running drivers match the wanted set, and `upsd` run.
-    fn reconcile(&mut self, usb: Vec<UsbUps>) -> io::Result<()> {
-        let changed = usb != self.usb;
-        self.usb = usb;
-        let wanted: Vec<(String, &'static str)> = self
-            .usb
-            .iter()
-            .map(|u| (u.id.clone(), "usbhid-ups"))
-            .chain(self.snmp.iter().map(|s| (s.name(), "snmp-ups")))
-            .collect();
-        if changed || self.drivers.is_empty() {
-            self.write_config()?;
+    /// Make the running drivers and `upsd` match `self.usb` and `self.snmp`: a
+    /// driver whose section changed is restarted with the new one, one no
+    /// longer wanted is stopped, and `upsd` restarts to read a changed list.
+    fn reconcile(&mut self) -> io::Result<()> {
+        let wanted = sections(&self.usb, &self.snmp);
+        let conf = render_ups_conf(&self.usb, &self.snmp);
+        let changed = self.applied_conf.as_deref() != Some(conf.as_str());
+        if changed {
+            self.write_config(&conf)?;
         }
-        let names: Vec<String> = self.drivers.keys().cloned().collect();
-        for name in names {
-            if !wanted.iter().any(|(w, _)| *w == name) {
-                if let Some(child) = self.drivers.remove(&name) {
-                    stop(child);
-                }
+        let stale: Vec<String> = self
+            .drivers
+            .iter()
+            .filter(|(name, (_, started))| {
+                !wanted
+                    .iter()
+                    .any(|(w, _, section)| w == *name && section == started)
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        for name in stale {
+            if let Some((child, _)) = self.drivers.remove(&name) {
+                stop(child);
             }
         }
-        for (name, driver) in &wanted {
-            let running = self.drivers.get_mut(name).is_some_and(alive);
+        for (name, driver, section) in &wanted {
+            let running = self
+                .drivers
+                .get_mut(name)
+                .is_some_and(|(child, _)| alive(child));
             if !running {
                 let child = nut_command(&Path::new(DRIVER_DIR).join(driver))
                     .args(["-F", "-u", "root", "-a", name])
                     .spawn()?;
-                self.drivers.insert(name.clone(), child);
+                self.drivers.insert(name.clone(), (child, section.clone()));
             }
         }
         let upsd_running = self.upsd.as_mut().is_some_and(alive);
@@ -572,15 +609,18 @@ impl Supervisor {
             if let Some(child) = self.upsd.take() {
                 stop(child);
             }
+            self.applied_conf = Some(conf);
         } else if !upsd_running || changed {
             if let Some(child) = self.upsd.take() {
                 stop(child);
             }
+            self.applied_conf = None;
             self.upsd = Some(
                 nut_command(Path::new(UPSD_BIN))
                     .args(["-F", "-u", "root"])
                     .spawn()?,
             );
+            self.applied_conf = Some(conf);
             // upsd answers within a moment of starting; a read right after
             // this one is what sees it.
             std::thread::sleep(Duration::from_millis(500));
@@ -622,7 +662,8 @@ pub fn list_usb(sys_usb: &Path) -> io::Result<Vec<(UsbUps, Result<Reading, Strin
             .is_none_or(|t| t.elapsed() >= Duration::from_secs(1));
         if due {
             sup.last_check = Some(Instant::now());
-            sup.reconcile(found.clone())?;
+            sup.usb = found.clone();
+            sup.reconcile()?;
         }
     }
     Ok(found
@@ -635,22 +676,32 @@ pub fn list_usb(sys_usb: &Path) -> io::Result<Vec<(UsbUps, Result<Reading, Strin
         .collect())
 }
 
-/// The reading of an SNMP UPS, starting its driver the first time it is asked.
+/// The reading of an SNMP UPS, starting its driver the first time it is asked
+/// and restarting it when its version or credentials changed.
 pub fn read_snmp(source: SnmpSource) -> io::Result<Result<Reading, String>> {
     let name = source.name();
     {
         let mut sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
         if !sup.snmp.contains(&source) {
-            sup.snmp.retain(|s| s.name() != name);
-            sup.snmp.push(source);
-            let usb = sup.usb.clone();
-            sup.write_config()?;
-            // Force upsd to reread the list of UPSes.
-            sup.usb = Vec::new();
-            sup.reconcile(usb)?;
+            let mut snmp = sup.snmp.clone();
+            snmp.push(source);
+            sup.snmp = dedupe(snmp);
+            sup.reconcile()?;
         }
     }
     Ok(read_one(&name).map_err(|_| "the SNMP UPS has not answered yet".to_string()))
+}
+
+/// Make the SNMP UPSes this daemon drives exactly `sources`: one left out has
+/// its driver stopped and its credentials dropped from `ups.conf`.
+pub fn set_snmp(sources: Vec<SnmpSource>) -> io::Result<()> {
+    let sources = dedupe(sources);
+    let mut sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
+    if sup.snmp != sources {
+        sup.snmp = sources;
+        sup.reconcile()?;
+    }
+    Ok(())
 }
 
 /// Run one allowed command on a UPS this daemon drives.
@@ -827,6 +878,40 @@ mod tests {
         assert_eq!(ok.name(), ok.clone().name());
         assert!(
             serde_json::from_str::<SnmpSource>(r#"{"address":"a","version":"v1","x":1}"#).is_err()
+        );
+    }
+
+    #[test]
+    fn a_changed_credential_is_a_changed_driver_and_an_address_is_one_name() {
+        let first = SnmpSource {
+            address: "192.168.1.50".into(),
+            version: "v2c".into(),
+            community: Some("public".into()),
+            user: None,
+            auth_password: None,
+            priv_password: None,
+        };
+        let fixed = SnmpSource {
+            community: Some("private".into()),
+            ..first.clone()
+        };
+        let other = SnmpSource {
+            address: "192.168.1.51".into(),
+            ..first.clone()
+        };
+        let before = sections(&[], std::slice::from_ref(&first));
+        let after = sections(&[], std::slice::from_ref(&fixed));
+        assert_eq!(before[0].0, after[0].0);
+        assert_ne!(before[0].2, after[0].2);
+        let kept = dedupe(vec![first.clone(), other.clone(), fixed.clone()]);
+        assert_eq!(kept, vec![other.clone(), fixed.clone()]);
+        assert_eq!(
+            render_ups_conf(&[], &kept),
+            format!(
+                "maxretry = 3\n{}{}",
+                snmp_section(&other),
+                snmp_section(&fixed)
+            )
         );
     }
 

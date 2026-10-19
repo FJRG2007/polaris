@@ -287,6 +287,30 @@ export const upsConnectionSchema = z.discriminatedUnion("connection", [
 ]);
 export type UpsConnectionInput = z.infer<typeof upsConnectionSchema>;
 
+/** Which SNMP secrets are already stored, so an empty field keeps them. */
+export interface SnmpKept {
+    community: boolean;
+    authPassword: boolean;
+    privPassword: boolean;
+}
+
+/**
+ * The SNMP field a UPS cannot be read without, once what is stored is kept:
+ * the community for v1/v2c, the user for v3, and the authentication password
+ * whenever there is a privacy one. Null when nothing is missing.
+ */
+export function missingSnmpField(
+    input: UpsConnectionInput,
+    kept: SnmpKept
+): "community" | "username" | "authPassword" | null {
+    if (input.connection !== "snmp") return null;
+    if (input.snmpVersion !== "v3") return input.community || kept.community ? null : "community";
+    if (!input.username) return "username";
+    const auth = Boolean(input.authPassword) || kept.authPassword;
+    const priv = Boolean(input.privPassword) || kept.privPassword;
+    return priv && !auth ? "authPassword" : null;
+}
+
 export const upsShutdownSchema = z
     .object({
         enabled: z.boolean(),

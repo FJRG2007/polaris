@@ -115,6 +115,33 @@ describe("the form input", () => {
         expect(result.success).toBe(false);
     });
 
+    it("asks for the SNMP field the UPS cannot be read without, unless it is stored", () => {
+        const none = { community: false, authPassword: false, privPassword: false };
+        const snmp = (fields: Record<string, string>) =>
+            ups.upsConnectionSchema.parse({
+                connection: "snmp",
+                name: "Rack",
+                machineId: MACHINE,
+                host: "10.0.0.9",
+                snmpVersion: "v2c",
+                ...fields
+            });
+        expect(ups.missingSnmpField(snmp({}), none)).toBe("community");
+        expect(ups.missingSnmpField(snmp({}), { ...none, community: true })).toBeNull();
+        expect(ups.missingSnmpField(snmp({ community: "public" }), none)).toBeNull();
+        expect(ups.missingSnmpField(snmp({ snmpVersion: "v3" }), none)).toBe("username");
+        expect(ups.missingSnmpField(snmp({ snmpVersion: "v3", username: "ops" }), none)).toBeNull();
+        expect(
+            ups.missingSnmpField(snmp({ snmpVersion: "v3", username: "ops", privPassword: "secret" }), none)
+        ).toBe("authPassword");
+        expect(
+            ups.missingSnmpField(snmp({ snmpVersion: "v3", username: "ops", privPassword: "secret" }), {
+                ...none,
+                authPassword: true
+            })
+        ).toBeNull();
+    });
+
     it("refuses an enabled shutdown with no threshold or no machine", () => {
         const draft = { enabled: true, belowCharge: 30, belowRuntimeMin: null, protectedMachineIds: [] };
         expect(ups.upsShutdownSchema.safeParse(draft).success).toBe(false);

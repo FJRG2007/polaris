@@ -306,6 +306,17 @@ export class HostdClient {
         return JSON.parse(response.body) as HostdUpsReading;
     }
 
+    /**
+     * Every SNMP UPS the daemon should drive; it stops and forgets any other.
+     * Null from a daemon that predates the call.
+     */
+    public async upsSnmpSet(sources: readonly HostdSnmpSource[]): Promise<{ available: boolean } | null> {
+        const response = await this.call("POST", "/v1/ups/snmp/set", JSON.stringify({ sources }));
+        if (response.status === 404) return null;
+        if (response.status !== 200) throw new Error(`hostd snmp ups set failed (${response.status})`);
+        return JSON.parse(response.body) as { available: boolean };
+    }
+
     /** Run one allow-listed instant command (beeper, battery test) on a UPS. */
     public async upsCommand(
         id: string,

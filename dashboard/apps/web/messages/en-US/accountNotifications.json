@@ -487,6 +487,10 @@
         "upsReplaceBattery": {
             "label": "A UPS battery needs replacing",
             "description": "A UPS reports that its battery is worn out."
+        },
+        "upsShutdownFailed": {
+            "label": "A machine did not shut down",
+            "description": "A UPS ran low and Polaris could not power off a machine it protects."
         }
     },
     "groups": {

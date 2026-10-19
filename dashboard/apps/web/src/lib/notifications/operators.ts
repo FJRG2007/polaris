@@ -30,6 +30,8 @@ export interface OperatorAlert {
     say?: (t: NamespaceTranslator<"notices">) => { title: string; body: string };
     /** Who of them is told, when the caller has already narrowed it down. */
     recipients?: readonly string[];
+    /** Kept with the notification, for whatever reads it back. */
+    metadata?: Record<string, unknown>;
 }
 
 /** Raise one alert with every recipient, never failing its caller. */
@@ -46,7 +48,8 @@ export async function notifyOperators(alert: OperatorAlert): Promise<void> {
                 href: alert.href,
                 level: alert.level,
                 audience: "admins",
-                actionRequired: alert.actionRequired
+                actionRequired: alert.actionRequired,
+                metadata: alert.metadata
             });
         })
     );

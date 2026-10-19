@@ -9,15 +9,19 @@
  * daemon. Secrets are sealed with the master key and never leave the server.
  */
 
+import { z } from "zod";
 import { loadEnv } from "@polaris/config";
 import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
-import { prisma, VISIBLE_USER } from "@polaris/db";
+import { prisma } from "@polaris/db";
 import { nutCommand, nutRead } from "./nut-client";
-import { notify } from "@/lib/notifications/dispatch";
 import { getHostConnection } from "@/lib/host-service";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
-import { wordsFor } from "@/lib/notifications/notice-words";
+import { notifyOperators } from "@/lib/notifications/operators";
+import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { DEFAULT_LOCALE, type Permission } from "@polaris/core";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { HostdClient, type HostdSnmpSource, type HostdUpsList } from "@polaris/hostd-client";
 import * as upsReading from "./ups-reading";
@@ -161,6 +165,12 @@ function columnsFor(input: upsReading.UpsConnectionInput, stored: UpsSecret) {
                 : { encryptedSecret: null, secretNonce: null, secretKeyId: null })
         };
     }
+    const missing = upsReading.missingSnmpField(input, {
+        community: Boolean(stored.community),
+        authPassword: Boolean(stored.authPassword),
+        privPassword: Boolean(stored.privPassword)
+    });
+    if (missing) throw new z.ZodError([{ code: "custom", path: [missing], message: "required" }]);
     const v3 = input.snmpVersion === "v3";
     const secret: UpsSecret = v3
         ? {
@@ -183,6 +193,7 @@ function columnsFor(input: upsReading.UpsConnectionInput, stored: UpsSecret) {
 
 export async function createUps(input: upsReading.UpsConnectionInput): Promise<string> {
     const row = await prisma.ups.create({ data: columnsFor(input, {}) });
+    if (input.connection === "snmp") await syncSnmp();
     return row.id;
 }
 
@@ -193,6 +204,7 @@ export async function updateUpsConnection(id: string, input: upsReading.UpsConne
         where: { id },
         data: columnsFor(input, row.connection === input.connection ? open(row) : {})
     });
+    if (row.connection === "snmp" || input.connection === "snmp") await syncSnmp();
     return true;
 }
 
@@ -210,7 +222,9 @@ export async function updateUpsShutdown(id: string, input: upsReading.UpsShutdow
 }
 
 export async function removeUps(id: string): Promise<boolean> {
-    return (await prisma.ups.deleteMany({ where: { id } })).count > 0;
+    const removed = await prisma.ups.deleteMany({ where: { id } });
+    if (removed.count > 0) await syncSnmp();
+    return removed.count > 0;
 }
 
 export async function upsHistory(
@@ -235,10 +249,18 @@ function daemonFor(machineId: string | null): HostdClient | null {
     return machineId === LOCAL_HOST_SUBJECT ? new HostdClient() : null;
 }
 
+/** The local daemon's USB listing, asked for once however many read it. */
+export type UsbListing = () => Promise<HostdUpsList | null>;
+
+export function usbListing(): UsbListing {
+    let pending: Promise<HostdUpsList | null> | null = null;
+    return () => (pending ??= new HostdClient().ups());
+}
+
 /** What the local daemon sees on its USB bus; null without one. */
-export async function discoverUsb(): Promise<HostdUpsList | "updateNeeded" | null> {
+export async function discoverUsb(listUsb: UsbListing = usbListing()): Promise<HostdUpsList | "updateNeeded" | null> {
     try {
-        const list = await new HostdClient().ups();
+        const list = await listUsb();
         if (list === null || !list.available) return "updateNeeded";
         return list;
     } catch {
@@ -263,7 +285,31 @@ function snmpSource(row: UpsRow): HostdSnmpSource {
     };
 }
 
-export async function readUps(row: UpsRow): Promise<UpsReadResult> {
+/** Whether the daemon would take this source; one it refuses would sink the whole set. */
+function usableSource(source: HostdSnmpSource): boolean {
+    if (source.version !== "v3") return Boolean(source.community);
+    return Boolean(source.user) && !(source.privPassword && !source.authPassword);
+}
+
+/**
+ * Tell the local daemon exactly which SNMP UPSes to drive, so one removed or
+ * moved to another address stops being polled and its credentials leave the
+ * daemon's configuration. Best-effort: a daemon that is down or predates the
+ * call is told again on the watcher's next pass.
+ */
+export async function syncSnmp(): Promise<void> {
+    try {
+        const rows = await prisma.ups.findMany({
+            where: { connection: "snmp", machineId: LOCAL_HOST_SUBJECT },
+            take: 200
+        });
+        await new HostdClient().upsSnmpSet(rows.map(snmpSource).filter(usableSource));
+    } catch {
+        // No daemon (the limited edition) has no SNMP drivers to tell.
+    }
+}
+
+export async function readUps(row: UpsRow, listUsb: UsbListing = usbListing()): Promise<UpsReadResult> {
     try {
         if (row.connection === "nut") {
             if (!row.host || !row.upsName) return { ok: false, reason: "notFound" };
@@ -273,7 +319,7 @@ export async function readUps(row: UpsRow): Promise<UpsReadResult> {
         const daemon = daemonFor(row.machineId);
         if (!daemon) return { ok: false, reason: "machineUnreachable" };
         if (row.connection === "usb") {
-            const list = await daemon.ups();
+            const list = await listUsb();
             if (list === null || !list.available) return { ok: false, reason: "updateNeeded" };
             const found = list.devices.find((one) => one.device.id === row.deviceId);
             if (!found) return { ok: false, reason: "notFound" };
@@ -309,9 +355,9 @@ export interface UpsSnapshotEntry {
 }
 
 /** Every UPS read at once; one that does not answer is its reason, not a failure. */
-export async function upsSnapshot(): Promise<UpsSnapshotEntry[]> {
+export async function upsSnapshot(listUsb: UsbListing = usbListing()): Promise<UpsSnapshotEntry[]> {
     const rows = await prisma.ups.findMany({ orderBy: { createdAt: "asc" }, take: 200 });
-    return Promise.all(rows.map(async (row) => ({ ups: toView(row), result: await readUps(row) })));
+    return Promise.all(rows.map(async (row) => ({ ups: toView(row), result: await readUps(row, listUsb) })));
 }
 
 /** A UPS on a machine's USB bus that is not added yet, offered in one click. */
@@ -327,8 +373,11 @@ export type UsbDiscovery =
     | { state: "updateNeeded" | "fullEditionNeeded"; offers: [] };
 
 /** What the local daemon sees on USB, less what is already added. */
-export async function usbOffers(known: readonly UpsView[]): Promise<UsbDiscovery> {
-    const list = await discoverUsb();
+export async function usbOffers(
+    known: readonly UpsView[],
+    listUsb: UsbListing = usbListing()
+): Promise<UsbDiscovery> {
+    const list = await discoverUsb(listUsb);
     if (list === null) return { state: "fullEditionNeeded", offers: [] };
     if (list === "updateNeeded") return { state: "updateNeeded", offers: [] };
     const added = new Set(
@@ -425,14 +474,18 @@ export async function powerOffMachine(machineId: string): Promise<boolean> {
 const TICK_MS = 30_000;
 const SAMPLE_EVERY_MS = 60_000;
 const KEEP_MS = 30 * 24 * 3_600_000;
+/** UPSes read at once, so one slow to answer never holds up the rest's shutdown. */
+const READ_CONCURRENCY = 8;
+/** Who hears about a UPS: whoever may open its screen and act on it. */
+const UPS_PERMISSION: Permission = "system.manage";
 const lastSample = new Map<string, number>();
+/** Per UPS, the protected machines this outage's power-off has not reached
+ *  yet. Retried every pass while the UPS stays on battery. */
+const powerOffPending = new Map<string, Set<string>>();
 
-async function admins(): Promise<string[]> {
-    return (
-        await prisma.user
-            .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
-            .catch(() => [])
-    ).map((user) => user.id);
+/** An alert in each reader's words, and in the default language when theirs cannot be worked out. */
+function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; body: string }) {
+    return { ...say(translatorFor(DEFAULT_LOCALE, "notices")), say };
 }
 
 const EVENT_WORDS = {
@@ -445,85 +498,147 @@ const EVENT_WORDS = {
 
 async function announce(row: UpsRow, event: upsReading.UpsEvent, reading: upsReading.UpsReading): Promise<void> {
     const outcome = upsReading.testOutcome(reading.testResult);
-    for (const userId of await admins()) {
-        const t = await wordsFor(userId, "notices");
-        await notify({
-            userId,
-            event,
+    await notifyOperators({
+        permission: UPS_PERMISSION,
+        event,
+        ...inWords((t) => ({
             title: t(EVENT_WORDS[event].title, { name: row.name }),
             body: t(EVENT_WORDS[event].body, {
                 charge: reading.charge === null ? "?" : Math.round(reading.charge),
                 minutes: reading.runtimeS === null ? "?" : Math.round(reading.runtimeS / 60),
                 result: reading.testResult ?? ""
-            }),
-            ...(event === "ups.test" && outcome === "failed" ? { level: "danger" as const } : {}),
-            audience: "admins",
-            href: `/apps/servers/ups/${row.id}`,
-            metadata: { upsId: row.id }
-        }).catch((error: unknown) => console.error("polaris: could not report a UPS event:", error));
-    }
+            })
+        })),
+        ...(event === "ups.test" && outcome === "failed" ? { level: "danger" as const } : {}),
+        href: `/apps/servers/ups/${row.id}`,
+        metadata: { upsId: row.id }
+    }).catch((error: unknown) => console.error("polaris: could not report a UPS event:", error));
     const { raiseAutomationEventEverywhere } = await import("@/lib/deploy/automations");
     await raiseAutomationEventEverywhere(event);
 }
 
-/** One pass over every UPS: sample, alert on a change, shut down when due. */
-export async function watchUpsOnce(now = Date.now()): Promise<void> {
-    const rows = await prisma.ups.findMany({ take: 200 });
-    for (const row of rows) {
-        const result = await readUps(row);
-        if (!result.ok) continue;
-        const reading = result.reading;
-        if (now - (lastSample.get(row.id) ?? 0) >= SAMPLE_EVERY_MS) {
-            lastSample.set(row.id, now);
-            await prisma.upsSample
-                .create({
-                    data: {
-                        upsId: row.id,
-                        ts: new Date(now),
-                        charge: reading.charge,
-                        runtimeS: reading.runtimeS,
-                        load: reading.load,
-                        inputV: reading.inputV
-                    }
-                })
-                .catch(() => undefined);
-        }
-        const memory = upsReading.memoryOf(reading);
-        const events = upsReading.upsTransitions(upsReading.decodeMemory(row.lastStatus, row.lastTestResult), memory);
-        const due = upsReading.shutdownDue(reading, {
-            enabled: row.shutdownEnabled,
-            belowCharge: row.shutdownBelowCharge,
-            belowRuntimeMin: row.shutdownBelowRuntimeMin
-        });
-        const encoded = upsReading.encodeMemory(memory);
-        // Back on the mains ends the outage: the next one may shut down again.
-        const rearm = reading.status.online && row.shutdownSentAt !== null;
-        const send = due && !row.shutdownSentAt;
-        // Written on a change only: a steady UPS is no write every pass.
-        if (
-            encoded.lastStatus !== row.lastStatus ||
-            encoded.lastTestResult !== row.lastTestResult ||
-            rearm ||
-            send
-        ) {
-            await prisma.ups.update({
-                where: { id: row.id },
-                data: {
-                    ...encoded,
-                    ...(rearm ? { shutdownSentAt: null } : {}),
-                    ...(send ? { shutdownSentAt: new Date(now) } : {})
-                }
-            });
-        }
-        for (const event of events) await announce(row, event, reading);
-        if (send) {
-            // The machine Polaris runs on goes last, so the others are told first.
-            const order = [...row.protectedMachineIds].sort(
-                (a, b) => Number(a === LOCAL_HOST_SUBJECT) - Number(b === LOCAL_HOST_SUBJECT)
-            );
-            for (const machineId of order) await powerOffMachine(machineId);
-        }
+/** How a protected machine is named to the people told about it. */
+async function machineName(machineId: string): Promise<string> {
+    if (machineId === LOCAL_HOST_SUBJECT) {
+        return (await getLocalServerName().catch(() => null)) ?? LOCAL_SERVER_FALLBACK_NAME;
     }
+    const host = await prisma.host
+        .findUnique({ where: { id: machineId }, select: { name: true } })
+        .catch(() => null);
+    return host?.name ?? machineId;
+}
+
+async function reportPowerOffFailed(row: UpsRow, machineId: string): Promise<void> {
+    const machine = await machineName(machineId);
+    await notifyOperators({
+        permission: UPS_PERMISSION,
+        event: "ups.shutdownFailed",
+        ...inWords((t) => ({
+            title: t("ups.shutdownFailed.title", { machine }),
+            body: t("ups.shutdownFailed.body", { name: row.name })
+        })),
+        level: "danger",
+        actionRequired: true,
+        href: `/apps/servers/ups/${row.id}`,
+        metadata: { upsId: row.id, machineId }
+    }).catch((error: unknown) => console.error("polaris: could not report a failed UPS shutdown:", error));
+}
+
+/**
+ * Power off `machineIds` in turn, the machine Polaris runs on last so the
+ * others are told first. One that fails stays pending for the next pass, and is
+ * reported the first time it fails in an outage rather than on every retry.
+ */
+async function powerOff(row: UpsRow, machineIds: readonly string[]): Promise<void> {
+    const order = [...machineIds].sort(
+        (a, b) => Number(a === LOCAL_HOST_SUBJECT) - Number(b === LOCAL_HOST_SUBJECT)
+    );
+    const reported = powerOffPending.get(row.id) ?? new Set<string>();
+    const pending = new Set<string>();
+    for (const machineId of order) {
+        if (await powerOffMachine(machineId)) continue;
+        pending.add(machineId);
+        if (!reported.has(machineId)) await reportPowerOffFailed(row, machineId);
+    }
+    if (pending.size > 0) powerOffPending.set(row.id, pending);
+    else powerOffPending.delete(row.id);
+}
+
+/** One UPS's pass: sample, alert on a change, shut down when due. */
+async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<void> {
+    const result = await readUps(row, listUsb);
+    if (!result.ok) return;
+    const reading = result.reading;
+    if (now - (lastSample.get(row.id) ?? 0) >= SAMPLE_EVERY_MS) {
+        lastSample.set(row.id, now);
+        await prisma.upsSample
+            .create({
+                data: {
+                    upsId: row.id,
+                    ts: new Date(now),
+                    charge: reading.charge,
+                    runtimeS: reading.runtimeS,
+                    load: reading.load,
+                    inputV: reading.inputV
+                }
+            })
+            .catch(() => undefined);
+    }
+    const memory = upsReading.memoryOf(reading);
+    const events = upsReading.upsTransitions(upsReading.decodeMemory(row.lastStatus, row.lastTestResult), memory);
+    const due = upsReading.shutdownDue(reading, {
+        enabled: row.shutdownEnabled,
+        belowCharge: row.shutdownBelowCharge,
+        belowRuntimeMin: row.shutdownBelowRuntimeMin
+    });
+    const encoded = upsReading.encodeMemory(memory);
+    // Back on the mains ends the outage: the next one may shut down again.
+    const rearm = reading.status.online && row.shutdownSentAt !== null;
+    const send = due && !row.shutdownSentAt;
+    // Written on a change only: a steady UPS is no write every pass.
+    if (
+        encoded.lastStatus !== row.lastStatus ||
+        encoded.lastTestResult !== row.lastTestResult ||
+        rearm ||
+        send
+    ) {
+        await prisma.ups.update({
+            where: { id: row.id },
+            data: {
+                ...encoded,
+                ...(rearm ? { shutdownSentAt: null } : {}),
+                ...(send ? { shutdownSentAt: new Date(now) } : {})
+            }
+        });
+    }
+    if (reading.status.online) powerOffPending.delete(row.id);
+    for (const event of events) await announce(row, event, reading);
+    if (send) {
+        powerOffPending.delete(row.id);
+        await powerOff(row, row.protectedMachineIds);
+    } else if (row.shutdownSentAt && reading.status.onBattery) {
+        const retry = [...(powerOffPending.get(row.id) ?? [])].filter((id) =>
+            row.protectedMachineIds.includes(id)
+        );
+        if (retry.length > 0) await powerOff(row, retry);
+    }
+}
+
+/** One pass over every UPS, a few read side by side. */
+export async function watchUpsOnce(now = Date.now()): Promise<void> {
+    await syncSnmp();
+    const rows = await prisma.ups.findMany({ take: 200 });
+    const listUsb = usbListing();
+    const queue = [...rows];
+    await Promise.all(
+        Array.from({ length: Math.min(READ_CONCURRENCY, queue.length) }, async () => {
+            for (let row = queue.shift(); row; row = queue.shift()) {
+                await watchOne(row, now, listUsb).catch((error: unknown) =>
+                    console.error("polaris: the UPS watcher failed on one UPS:", error)
+                );
+            }
+        })
+    );
     await prisma.upsSample
         .deleteMany({ where: { ts: { lt: new Date(now - KEEP_MS) } } })
         .catch(() => undefined);

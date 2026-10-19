@@ -172,10 +172,13 @@ export function UpsConnectionDialog({
     }));
     const usbLocked = editing?.connection === "usb";
     const keepsSecret = editing !== null && editing.connection === values.connection && editing.hasSecret;
+    const kept = { community: keepsSecret, authPassword: keepsSecret, privPassword: keepsSecret };
+    const missing = parsed.success ? upsReading.missingSnmpField(parsed.data, kept) : null;
+    const ready = parsed.success && missing === null;
 
     async function submit(event: FormEvent) {
         event.preventDefault();
-        if (!parsed.success || pending) return;
+        if (!ready || pending) return;
         setPending(true);
         const input = connectionInput(values);
         const result = editing
@@ -310,14 +313,22 @@ export function UpsConnectionDialog({
                             />
                             {values.snmpVersion === "v3" ? (
                                 <>
-                                    {field("username", t("ups.form.username"), { autoComplete: "off" })}
+                                    {field("username", `${t("ups.form.username")} *`, { autoComplete: "off" })}
                                     <div className="grid grid-cols-2 gap-2">
-                                        {secretField("authPassword", t("ups.form.authPassword"))}
+                                        {secretField(
+                                            "authPassword",
+                                            missing === "authPassword"
+                                                ? `${t("ups.form.authPassword")} *`
+                                                : t("ups.form.authPassword")
+                                        )}
                                         {secretField("privPassword", t("ups.form.privPassword"))}
                                     </div>
                                 </>
                             ) : (
-                                secretField("community", t("ups.form.community"))
+                                secretField(
+                                    "community",
+                                    keepsSecret ? t("ups.form.community") : `${t("ups.form.community")} *`
+                                )
                             )}
                         </>
                     ) : null}
@@ -334,7 +345,7 @@ export function UpsConnectionDialog({
                         </Button>
                         <Button
                             type="submit"
-                            aria-disabled={!parsed.success || pending}
+                            aria-disabled={!ready || pending}
                             disabled={pending}
                         >
                             {editing ? t("ups.form.submitEdit") : t("ups.form.submitAdd")}

@@ -354,6 +354,10 @@
         "replaceBattery": {
             "title": "{name} necesita batería nueva",
             "body": "El SAI indica que la batería está gastada. Cámbiala antes del próximo corte."
+        },
+        "shutdownFailed": {
+            "title": "{machine} no se apagó",
+            "body": "{name} funciona con batería y Polaris no pudo apagarla. Lo seguirá intentando hasta que vuelva la luz."
         }
     }
 }

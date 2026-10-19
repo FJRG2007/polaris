@@ -354,6 +354,10 @@
         "replaceBattery": {
             "title": "{name} needs a new battery",
             "body": "The UPS reports a worn battery. Replace it before the next outage."
+        },
+        "shutdownFailed": {
+            "title": "{machine} did not shut down",
+            "body": "{name} is on battery and Polaris could not power it off. It keeps trying until the power is back."
         }
     }
 }

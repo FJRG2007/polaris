@@ -679,6 +679,14 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "ups.shutdownFailed",
+        group: "deploy",
+        label: "A machine did not shut down",
+        description: "A UPS ran low and Polaris could not power off a machine it protects.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "mailserver.inbound",
         group: "mail",
         label: "Mail matched a rule",

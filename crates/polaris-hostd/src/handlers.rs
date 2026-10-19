@@ -273,6 +273,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("GET", "/v1/host/gpu") => host_gpu(),
         ("GET", "/v1/ups") => ups_list(),
         ("POST", "/v1/ups/snmp") => ups_snmp(req, body),
+        ("POST", "/v1/ups/snmp/set") => ups_snmp_set(req, body),
         ("POST", "/v1/ups/command") => ups_command(req, body),
         ("POST", "/v1/host/poweroff") => host_poweroff(req, body),
         ("POST", "/v1/host/security/image") => host_security_image(req, body),
@@ -1440,6 +1441,44 @@ fn ups_snmp<R: Read>(req: &Request, body: &mut R) -> Response {
             "OK",
             &serde_json::json!({ "available": true, "id": name, "error": e }),
         ),
+        Err(e) => {
+            eprintln!("polaris-hostd: snmp ups supervision failed: {e}");
+            Response::text(502, "Bad Gateway", "could not start the UPS service")
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpsSnmpSetRequest {
+    sources: Vec<ups::SnmpSource>,
+}
+
+/// Most SNMP UPSes one daemon drives; the dashboard keeps at most 200 UPSes.
+const MAX_SNMP_SOURCES: usize = 200;
+
+/// Every SNMP UPS this daemon should drive; any other is stopped and forgotten.
+fn ups_snmp_set<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let Ok(request) = serde_json::from_slice::<UpsSnmpSetRequest>(&raw) else {
+        return Response::bad_request("invalid SNMP sources");
+    };
+    if request.sources.len() > MAX_SNMP_SOURCES {
+        return Response::bad_request("too many SNMP sources");
+    }
+    for source in &request.sources {
+        if let Err(why) = source.validate() {
+            return Response::bad_request(why);
+        }
+    }
+    if !ups::nut_installed() {
+        return Response::json(200, "OK", &serde_json::json!({ "available": false }));
+    }
+    match ups::set_snmp(request.sources) {
+        Ok(()) => Response::json(200, "OK", &serde_json::json!({ "available": true })),
         Err(e) => {
             eprintln!("polaris-hostd: snmp ups supervision failed: {e}");
             Response::text(502, "Bad Gateway", "could not start the UPS service")

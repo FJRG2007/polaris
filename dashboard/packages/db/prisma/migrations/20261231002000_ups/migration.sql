@@ -47,7 +47,5 @@ CREATE TABLE IF NOT EXISTS "UpsSample" (
 CREATE INDEX IF NOT EXISTS "UpsSample_ts_idx" ON "UpsSample"("ts");
 
 -- AddForeignKey
-DO $$ BEGIN
-    ALTER TABLE "UpsSample" ADD CONSTRAINT "UpsSample_upsId_fkey" FOREIGN KEY ("upsId") REFERENCES "Ups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "UpsSample" DROP CONSTRAINT IF EXISTS "UpsSample_upsId_fkey";
+ALTER TABLE "UpsSample" ADD CONSTRAINT "UpsSample_upsId_fkey" FOREIGN KEY ("upsId") REFERENCES "Ups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
