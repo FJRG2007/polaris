@@ -597,7 +597,7 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
             {showHistory ? (
                 <nav
                     aria-label={t("history.title")}
-                    className={`${fullPage ? "w-64 shrink-0 border-r border-border" : "absolute inset-0 z-10 bg-card"} flex min-h-0 flex-col overflow-y-auto p-2`}
+                    className={`${fullPage ? "w-64 shrink-0 border-r border-border" : "absolute inset-0 z-10 bg-card"} flex min-h-0 flex-col overflow-y-auto overscroll-contain p-2`}
                 >
                     <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-foreground-subtle">
                         {t("history.title")}
@@ -879,6 +879,7 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                         accept={POLAR_ATTACHMENT_TYPES}
                                         disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
                                         onFiles={(chosen) => void addFiles(chosen)}
+                                        onFailed={setFileError}
                                     />
                                 </span>
                                 <span id="polar-model" className="contents">

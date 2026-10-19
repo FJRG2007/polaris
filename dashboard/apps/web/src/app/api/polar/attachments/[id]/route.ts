@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { readPolarAttachment } from "@/lib/polar/attachments";
 
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ const INLINE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params): Promise<Response> {
+export async function GET(request: Request, { params }: Params): Promise<Response> {
     const user = await apiUser();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
@@ -41,7 +42,8 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
             "content-disposition": `${disposition}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
             "x-content-type-options": "nosniff",
             "content-security-policy": "default-src 'none'; sandbox",
-            "cache-control": "private, max-age=3600"
+            "cache-control": "private, max-age=3600",
+            ...downloadTicketHeaders(request)
         }
     });
 }

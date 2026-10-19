@@ -8,12 +8,15 @@
  * packages/elements/src/prompt-input.tsx at ca8be60), Apache-2.0 - see the
  * LICENSE beside this file. Changed: Tailwind 3, Polaris tokens and Button; the
  * parts Polar uses only (no provider, no drag-and-drop zone, no speech); and
- * files are handed straight to the caller, which uploads them before sending.
+ * files are handed straight to the caller, which uploads them before sending,
+ * and chosen through Polaris's shared picker (this computer, a storage or an
+ * address) rather than the browser's own chooser.
  */
 
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@polaris/ui";
-import { forwardRef, useRef, type FormEvent, type HTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import { forwardRef, type FormEvent, type HTMLAttributes, type TextareaHTMLAttributes } from "react";
 
 export function PromptInput({
     className,
@@ -87,33 +90,33 @@ export function PromptInputButton({ label, ...props }: ButtonProps & { label: st
     return <Button type="button" variant="ghost" size="icon-sm" aria-label={label} title={label} {...props} />;
 }
 
-/** Opens the file picker; the chosen files go to `onFiles`. */
+/** Opens the shared file picker; the chosen files go to `onFiles`. */
 export function PromptInputAttach({
     label,
     accept,
     disabled,
-    onFiles
+    onFiles,
+    onFailed
 }: {
     label: string;
     accept: readonly string[];
     disabled?: boolean;
     onFiles: (files: File[]) => void;
+    /** A pick that could not be fetched, in a sentence the composer shows. */
+    onFailed?: (message: string) => void;
 }) {
-    const input = useRef<HTMLInputElement>(null);
+    const [choose, chooser] = useChooseFiles();
     return (
         <>
-            <input
-                ref={input}
-                type="file"
-                multiple
-                hidden
-                accept={accept.join(",")}
-                onChange={(event) => {
-                    onFiles(Array.from(event.target.files ?? []));
-                    event.target.value = "";
+            {chooser}
+            <PromptInputButton
+                label={label}
+                disabled={disabled}
+                onClick={async () => {
+                    const files = await choose({ accept: accept.join(","), multiple: true, title: label, onFailed });
+                    if (files.length > 0) onFiles(files);
                 }}
-            />
-            <PromptInputButton label={label} disabled={disabled} onClick={() => input.current?.click()}>
+            >
                 <Paperclip />
             </PromptInputButton>
         </>

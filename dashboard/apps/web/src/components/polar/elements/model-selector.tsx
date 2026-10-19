@@ -61,7 +61,7 @@ export function ModelSelector({
                     ) : null}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-96 w-72 overflow-y-auto">
+            <DropdownMenuContent align="start" className="max-h-96 w-72 overflow-y-auto overscroll-contain">
                 {providers.map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>

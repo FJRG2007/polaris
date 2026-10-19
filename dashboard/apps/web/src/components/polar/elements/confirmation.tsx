@@ -84,7 +84,7 @@ export function Confirmation({
             </p>
             <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">{t("approval.details")}</summary>
-                <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px]">
+                <pre className="mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px]">
                     {jsonOf(input)}
                 </pre>
             </details>

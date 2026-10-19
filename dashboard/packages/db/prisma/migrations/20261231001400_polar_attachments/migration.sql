@@ -1,5 +1,7 @@
 -- Pictures and files given to Polar, one person's each.
-CREATE TABLE "PolarAttachment" (
+--
+-- Every statement is written so that running it a second time is a no-op.
+CREATE TABLE IF NOT EXISTS "PolarAttachment" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "name" TEXT NOT NULL,
@@ -12,6 +14,7 @@ CREATE TABLE "PolarAttachment" (
     CONSTRAINT "PolarAttachment_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "PolarAttachment_userId_createdAt_idx" ON "PolarAttachment"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "PolarAttachment_userId_createdAt_idx" ON "PolarAttachment"("userId", "createdAt");
 
+ALTER TABLE "PolarAttachment" DROP CONSTRAINT IF EXISTS "PolarAttachment_userId_fkey";
 ALTER TABLE "PolarAttachment" ADD CONSTRAINT "PolarAttachment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

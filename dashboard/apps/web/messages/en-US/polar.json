@@ -96,7 +96,6 @@
     "footer": "Polar acts with your access and asks before it changes anything.",
     "reasoning": "Reasoning",
     "approval": {
-        "title": "Run {tool}?",
         "run": "Run it",
         "deny": "Not now",
         "runsAsYou": "Runs as you",
@@ -107,12 +106,6 @@
         "details": "Details",
         "accepted": "Approved",
         "rejected": "Not run"
-    },
-    "tool": {
-        "running": "Using {tool}",
-        "done": "Used {tool}",
-        "denied": "Skipped {tool}",
-        "failed": "{tool} failed"
     },
     "page": {
         "title": "Polar"

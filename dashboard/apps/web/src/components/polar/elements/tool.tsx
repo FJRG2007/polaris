@@ -95,7 +95,7 @@ export function ToolInput({ input }: { input: unknown }) {
     return (
         <div className="space-y-1">
             <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">{t("elements.parameters")}</p>
-            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground">
+            <pre className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground">
                 {jsonOf(input)}
             </pre>
         </div>
@@ -118,7 +118,7 @@ export function ToolOutput({ output, errorText }: { output: unknown; errorText?:
             </p>
             <pre
                 className={cn(
-                    "max-h-56 overflow-auto whitespace-pre-wrap break-words rounded p-2 font-mono text-[11px]",
+                    "max-h-56 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded p-2 font-mono text-[11px]",
                     errorText ? "bg-danger-soft text-danger-ink" : "bg-muted text-muted-foreground"
                 )}
             >

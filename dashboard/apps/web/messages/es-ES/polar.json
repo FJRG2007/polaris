@@ -1,10 +1,10 @@
 {
     "toggle": {
-        "title": "Preguntar a Polar (Ctrl+J)",
+        "title": "Pide a Polar (Ctrl+J)",
         "label": "Preguntar"
     },
     "mood": {
-        "idle": "Polar, en reposo",
+        "idle": "Polar, quieto",
         "thinking": "Polar, pensando",
         "listening": "Polar, te espera",
         "speaking": "Polar, hablando",
@@ -25,12 +25,12 @@
         "edit": "Editar mensaje",
         "reply": "Responder al mensaje",
         "copy": "Copiar mensaje",
-        "regenerate": "Responder otra vez"
+        "regenerate": "Regenerar"
     },
     "noKeys": {
         "title": "Polar necesita una clave de IA",
         "body": "Añade una clave de un proveedor como Anthropic, OpenAI o Google, o pide a un administrador que comparta las de este Polaris.",
-        "own": "Añadir tu propia clave",
+        "own": "Añade tu clave",
         "admin": "Gestionar claves de Polaris"
     },
     "empty": "Pregunta por esta página o por lo que puedes hacer en Polaris.",
@@ -42,7 +42,7 @@
         "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible."
     },
     "queue": {
-        "title": "Se envía luego",
+        "title": "Van después",
         "edit": "Mensaje en cola",
         "up": "Subir",
         "down": "Bajar",
@@ -65,14 +65,14 @@
     },
     "reply": {
         "to": "Respondiendo a:",
-        "cancel": "Cancelar respuesta"
+        "cancel": "No responder"
     },
     "edit": {
         "editing": "Editando un mensaje enviado",
-        "cancel": "Cancelar edición"
+        "cancel": "Anular edición"
     },
     "composer": {
-        "label": "Mensaje para Polar",
+        "label": "Escribe a Polar",
         "placeholder": "Pregunta a Polar o escribe / para comandos"
     },
     "picker": {
@@ -90,29 +90,22 @@
     "intelligence": {
         "fast": "Rápido",
         "balanced": "Medio",
-        "deep": "Profundo",
+        "deep": "Intenso",
         "max": "Máximo"
     },
     "footer": "Polar actúa con tu acceso y pregunta antes de cambiar nada.",
     "reasoning": "Razonamiento",
     "approval": {
-        "title": "¿Ejecutar {tool}?",
         "run": "Ejecutar",
         "deny": "Ahora no",
-        "runsAsYou": "Se ejecuta como tú",
+        "runsAsYou": "Actúa como tú",
         "label": "Polar pregunta antes de actuar",
         "question": "¿{action}?",
         "affects": "Afecta a:",
         "destructive": "No se puede deshacer aquí.",
         "details": "Detalles",
         "accepted": "Aprobado",
-        "rejected": "No se ejecutó"
-    },
-    "tool": {
-        "running": "Usando {tool}",
-        "done": "Usó {tool}",
-        "denied": "Omitió {tool}",
-        "failed": "{tool} falló"
+        "rejected": "Omitido"
     },
     "page": {
         "title": "Polar"
@@ -120,7 +113,7 @@
     "elements": {
         "scrollDown": "Ir a lo último",
         "previousVersion": "Versión anterior",
-        "nextVersion": "Versión siguiente",
+        "nextVersion": "Ver siguiente",
         "versionOf": "{current} de {total}",
         "thinking": "Pensando",
         "thoughtFor": "Pensó {seconds} s",
@@ -134,11 +127,11 @@
             "approval-responded": "Respondido",
             "output-available": "Hecho",
             "output-error": "Falló",
-            "output-denied": "No se ejecutó"
+            "output-denied": "Omitido"
         }
     },
     "files": {
-        "add": "Adjuntar archivos",
+        "add": "Añadir archivos",
         "remove": "Quitar {name}",
         "tooMany": "Hasta {most} archivos por mensaje.",
         "errors": {
