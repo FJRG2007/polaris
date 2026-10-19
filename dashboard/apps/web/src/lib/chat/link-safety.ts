@@ -196,10 +196,15 @@ async function activeProviders(): Promise<LinkSafetyProvider[]> {
     if (!settings.enabled) return [];
     const active: LinkSafetyProvider[] = [];
     for (const provider of settings.providers) {
-        const state = await getIntegrationState(provider);
-        if (state?.enabled) active.push(provider);
+        if (await providerConfigured(provider)) active.push(provider);
     }
     return active;
+}
+
+/** Whether a provider is switched on with a key in Integrations. */
+async function providerConfigured(provider: LinkSafetyProvider): Promise<boolean> {
+    const state = await getIntegrationState(provider);
+    return Boolean(state?.enabled && state.hasSecret);
 }
 
 /** Ask every active provider about one link. The first that flags it is the
@@ -340,14 +345,11 @@ export async function linkSafetyOverview(): Promise<{
 }> {
     const settings = await linkSafetySettings();
     const providers = await Promise.all(
-        LINK_SAFETY_PROVIDERS.map(async (provider) => {
-            const state = await getIntegrationState(provider);
-            return {
-                provider,
-                chosen: settings.providers.includes(provider),
-                configured: Boolean(state?.enabled && state.hasSecret)
-            };
-        })
+        LINK_SAFETY_PROVIDERS.map(async (provider) => ({
+            provider,
+            chosen: settings.providers.includes(provider),
+            configured: await providerConfigured(provider)
+        }))
     );
     return { enabled: settings.enabled, providers };
 }

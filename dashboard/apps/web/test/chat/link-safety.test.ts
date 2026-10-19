@@ -15,6 +15,7 @@ const MESSAGE = "018f2b7a-0000-7000-8000-0000000000a1";
 const state = vi.hoisted(() => ({
     settings: null as string | null,
     enabled: new Set<string>(),
+    keyless: new Set<string>(),
     bodies: new Map<string, string[]>(),
     cache: new Map<string, { allow: boolean; reason: string | null }>(),
     flags: [] as { messageId: string; url: string; provider: string; reason: string | null }[]
@@ -59,7 +60,9 @@ vi.mock("@/lib/setting-store", () => ({
 }));
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: vi.fn(async (provider: string) =>
-        state.enabled.has(provider) ? { enabled: true } : null
+        state.enabled.has(provider)
+            ? { enabled: true, hasSecret: !state.keyless.has(provider) }
+            : null
     ),
     getIntegrationSecret: vi.fn(async (provider: string) =>
         state.enabled.has(provider) ? "test-key" : null
@@ -106,6 +109,7 @@ beforeEach(() => {
     resetLinkSafetyBudget();
     state.settings = null;
     state.enabled.clear();
+    state.keyless.clear();
     state.bodies.clear();
     state.cache.clear();
     state.flags = [];
@@ -175,6 +179,15 @@ describe("checkMessageLinks", () => {
         expect(prisma.chatMessage.findUnique).not.toHaveBeenCalled();
         expect(lookupDomain).not.toHaveBeenCalled();
         expect(verifyUrl).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when the provider is switched on without a key", async () => {
+        turnOn(["virustotal"]);
+        state.keyless.add("virustotal");
+        state.bodies.set(MESSAGE, ["https://bad.example/"]);
+        await checkMessageLinks(MESSAGE);
+        expect(prisma.chatMessage.findUnique).not.toHaveBeenCalled();
+        expect(lookupDomain).not.toHaveBeenCalled();
     });
 
     it("flags a bad link and leaves a clean one alone", async () => {

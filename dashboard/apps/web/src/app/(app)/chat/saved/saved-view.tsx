@@ -234,7 +234,10 @@ export function SavedView() {
                                         title={t("saved.openInConversation")}
                                         className="mt-1 block rounded text-sm transition-colors hover:bg-card-hover"
                                     >
-                                        <RichText value={message.body} />
+                                        <RichText
+                                            value={message.body}
+                                            flaggedLinks={message.flaggedLinks}
+                                        />
                                     </Link>
                                 </li>
                             );

@@ -47,6 +47,21 @@ describe("a flagged link", () => {
         expect(open).toHaveBeenCalledWith(BAD, "_blank", "noopener,noreferrer");
         open.mockRestore();
     });
+
+    it("keeps its clicks, and the dialog's, from reaching what the text sits in", () => {
+        const open = vi.spyOn(window, "open").mockImplementation(() => null);
+        const outer = vi.fn();
+        render(
+            <div onClick={outer}>
+                <RichText value={`look ${BAD}`} flaggedLinks={[FLAG]} />
+            </div>,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.click(screen.getByRole("link"));
+        fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+        expect(outer).not.toHaveBeenCalled();
+        open.mockRestore();
+    });
 });
 
 describe("a link nobody flagged", () => {

@@ -92,7 +92,11 @@ export function EditHistoryDialog({
                                 {t("editHistory.now")}
                             </p>
                             <div className="text-sm">
-                                <RichText value={message?.body ?? ""} customEmoji={emoji} />
+                                <RichText
+                                    value={message?.body ?? ""}
+                                    customEmoji={emoji}
+                                    flaggedLinks={message?.flaggedLinks}
+                                />
                             </div>
                         </li>
 
@@ -112,7 +116,11 @@ export function EditHistoryDialog({
                                     })}
                                 </p>
                                 <div className="text-sm text-muted-foreground">
-                                    <RichText value={version.body} customEmoji={emoji} />
+                                    <RichText
+                                        value={version.body}
+                                        customEmoji={emoji}
+                                        flaggedLinks={message?.flaggedLinks}
+                                    />
                                 </div>
                             </li>
                         ))}

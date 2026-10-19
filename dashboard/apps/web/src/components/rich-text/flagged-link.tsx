@@ -54,11 +54,13 @@ export function FlaggedAnchor({
                     // Modified clicks too: a middle click or Ctrl+click is still
                     // somebody opening the link without having been told.
                     event.preventDefault();
+                    event.stopPropagation();
                     setOpen(true);
                 }}
                 onAuxClick={(event) => {
                     if (event.button !== 1) return;
                     event.preventDefault();
+                    event.stopPropagation();
                     setOpen(true);
                 }}
                 className="text-danger-ink decoration-danger-edge"
@@ -69,27 +71,29 @@ export function FlaggedAnchor({
                 />
                 {children}
             </a>
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{t("linkWarning.title")}</DialogTitle>
-                        <DialogDescription>
-                            {t("linkWarning.description", { provider: name })}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <p className="min-w-0 break-all rounded-md border border-danger-edge bg-danger-soft px-3 py-2 font-mono text-xs text-danger-ink">
-                        {href}
-                    </p>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={proceed}>
-                            {t("linkWarning.continue")}
-                        </Button>
-                        <Button autoFocus onClick={() => setOpen(false)}>
-                            {t("linkWarning.goBack")}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <span className="contents" onClick={(event) => event.stopPropagation()}>
+                <Dialog open={open} onOpenChange={setOpen}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>{t("linkWarning.title")}</DialogTitle>
+                            <DialogDescription>
+                                {t("linkWarning.description", { provider: name })}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <p className="min-w-0 break-all rounded-md border border-danger-edge bg-danger-soft px-3 py-2 font-mono text-xs text-danger-ink">
+                            {href}
+                        </p>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={proceed}>
+                                {t("linkWarning.continue")}
+                            </Button>
+                            <Button autoFocus onClick={() => setOpen(false)}>
+                                {t("linkWarning.goBack")}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </span>
         </>
     );
 }

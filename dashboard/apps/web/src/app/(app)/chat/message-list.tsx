@@ -1890,20 +1890,6 @@ function QuotedMessageCard({
 }
 
 /**
- * The card under a message with a link in it, once there is one to draw.
- *
- * Three states, and the middle one is the reason this exists. Polaris may
- * already know what the link is; it may never have looked, in which case this
- * asks and the card appears a moment later; or the site may have refused to
- * describe itself, which for most links means no card - but not for a video
- * Polaris knows how to play, which plays regardless of what the page said.
- *
- * Asking from here rather than waiting to be told is deliberate. A background
- * look-up finishes just after the conversation has reloaded, and nothing reloads
- * it again until somebody speaks - so the last message in a conversation, the
- * one actually being read, never got its card.
- */
-/**
  * A quiet line under a message with a flagged link, for the two people who can
  * do something about it: the one who sent it, who may not know, and whoever
  * moderates the room, who can take it down from the message's menu. Everybody
@@ -1936,6 +1922,20 @@ function isFlagged(message: ChatMessageView, url: string): boolean {
     return normalized !== null && flags.some((flag) => flag.url === normalized);
 }
 
+/**
+ * The card under a message with a link in it, once there is one to draw.
+ *
+ * Three states, and the middle one is the reason this exists. Polaris may
+ * already know what the link is; it may never have looked, in which case this
+ * asks and the card appears a moment later; or the site may have refused to
+ * describe itself, which for most links means no card - but not for a video
+ * Polaris knows how to play, which plays regardless of what the page said.
+ *
+ * Asking from here rather than waiting to be told is deliberate. A background
+ * look-up finishes just after the conversation has reloaded, and nothing reloads
+ * it again until somebody speaks - so the last message in a conversation, the
+ * one actually being read, never got its card.
+ */
 function LinkArea({ message }: { message: ChatMessageView }) {
     const [found, setFound] = useState(message.preview);
 

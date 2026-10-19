@@ -271,6 +271,7 @@ export function SearchPanel({
                                         <RichText
                                             value={hit.message.body}
                                             references={referenced(hit.message)}
+                                            flaggedLinks={hit.message.flaggedLinks}
                                         />
                                     </span>
                                 </button>
