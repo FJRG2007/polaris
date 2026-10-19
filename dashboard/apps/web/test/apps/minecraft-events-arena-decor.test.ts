@@ -16,7 +16,7 @@
  *   back after a restart, before the block it stands on.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
 import * as boss from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss";
 import * as hill from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill";
@@ -39,6 +39,18 @@ import * as netherMaze from "@polaris-app/game-servers/src/lib/minecraft/events/
 import * as elytraRace from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race";
 import * as stageService from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage-service";
 import * as arenaService from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena-service";
+
+// These runs play the arenas Polaris generates; a spleef or TNT run drawn to
+// be played on a build is covered in minecraft-build-catalogue and -events-run.
+vi.mock(
+    "@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas",
+    async (importOriginal) => ({
+        ...(await importOriginal<
+            typeof import("@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas")
+        >()),
+        layoutIdFor: () => null
+    })
+);
 
 const SITE = { x: 300, y: 120, z: -120 };
 const SEEDS = 4;

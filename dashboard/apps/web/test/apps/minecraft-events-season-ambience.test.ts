@@ -15,7 +15,7 @@
  * - and out of season every line is exactly what it was before.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as stored from "@polaris-app/game-servers/src/lib/minecraft/events/state";
 import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
@@ -28,6 +28,18 @@ import { gameOf } from "@polaris-app/game-servers/src/lib/minecraft/events/kinds
 import * as glass from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/glass-bridge";
 import * as ambience from "@polaris-app/game-servers/src/lib/minecraft/events/season-ambience";
 import * as stageService from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage-service";
+
+// These runs play the arenas Polaris generates; a spleef or TNT run drawn to
+// be played on a build is covered in minecraft-build-catalogue and -events-run.
+vi.mock(
+    "@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas",
+    async (importOriginal) => ({
+        ...(await importOriginal<
+            typeof import("@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas")
+        >()),
+        layoutIdFor: () => null
+    })
+);
 
 const SITE = { x: 300, y: 120, z: -120 };
 const SEASONS = ["halloween", "winter"] as const;

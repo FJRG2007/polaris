@@ -21,7 +21,7 @@ import { DECORATIONS } from "../seasonal";
 import * as arena from "../events/kinds/arena";
 import { arenaSchema, type Box } from "../events/state";
 import { falls, fallingGone } from "../events/kinds/stage";
-import { blockOf, decodeCells, type PolarisBuild } from "./format";
+import { blockOf, decodeCells, type BuildCells, type PolarisBuild } from "./format";
 
 /** Install-config key the builds a server has up are written under. */
 export const WORLD_BUILDS_KEY = "seasonalWorldBuilds";
@@ -188,7 +188,7 @@ export interface PastePiece {
  * `fill ... keep`, a lone block a `setblock ... keep`, the bottom layer first so
  * whatever falls or hangs has what holds it already in place.
  */
-export function pastePieces(build: PolarisBuild, origin: Point): PastePiece[] {
+export function pastePieces(build: BuildCells, origin: Point): PastePiece[] {
     const cells = decodeCells(build);
     const { x: width, z: depth, y: height } = build.size;
     const pieces: PastePiece[] = [];
