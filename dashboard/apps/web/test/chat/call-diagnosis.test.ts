@@ -162,6 +162,16 @@ describe("this browser's own half", () => {
         );
     });
 
+    it("says nothing about a microphone held back while resting alone", () => {
+        // Alone in a voice channel the room is let go of after 45 s, and the
+        // microphone with it. That read as "Your mic is not being sent".
+        const alone = working({ link: "resting", mic: "unpublished", others: [] });
+        const report = diagnoseCall(alone);
+        expect(report.ok).toBe(true);
+        expect(report.headline).toBe("");
+        expect(row(alone, "Your microphone")).toBe("Ready, sent once somebody joins");
+    });
+
     it("leaves deafening to the headphones button rather than blaming the other end", () => {
         const deaf = working({
             deafened: true,

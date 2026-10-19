@@ -321,8 +321,14 @@ function linkLine(link: CallLink): CallAudioLine {
 }
 
 /** This microphone, as a row. */
-function micLine(mic: MicSending): CallAudioLine {
+function micLine(mic: MicSending, link: CallLink): CallAudioLine {
     const label = "Your microphone";
+    // Alone, the room is let go of and the microphone goes with it - see
+    // `REST_AFTER_MS`. Open and not sent is then the call working as meant, and
+    // it is sent again the moment somebody joins.
+    if (mic === "unpublished" && link === "resting") {
+        return { label, value: "Ready, sent once somebody joins", state: "idle" };
+    }
     switch (mic) {
         case "sending":
             return { label, value: "Being sent", state: "good" };
@@ -404,7 +410,7 @@ function playbackLine(facts: CallAudioFacts): CallAudioLine {
 export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
     const lines: CallAudioLine[] = [
         linkLine(facts.link),
-        micLine(facts.mic),
+        micLine(facts.mic, facts.link),
         heardLine(facts.others),
         playbackLine(facts)
     ];
@@ -464,7 +470,10 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
             "Check it is not muted on the machine itself, and that nothing else is holding it."
         );
     }
-    if (facts.mic === "unpublished") {
+    // Not while resting alone: nobody is there to send it to, and saying nobody
+    // can hear you to a person testing their microphone in an empty voice
+    // channel was a false alarm forty-five seconds after every join.
+    if (facts.mic === "unpublished" && facts.link !== "resting") {
         return said(
             "Your microphone is open but is not being sent, so nobody can hear you.",
             "Leave the call and join it again."

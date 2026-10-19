@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { useCallHold } from "./call-session";
 import { Phone, PhoneOff } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 // The shape from the module that defines it: a "use server" file exports only
 // the actions themselves.
 import type { CallElsewhere as Found } from "@/lib/chat/meetings";
@@ -57,6 +57,22 @@ export function CallElsewhere() {
     const [moving, setMoving] = useState(false);
     const [failed, setFailed] = useState("");
 
+    // The call this browser just hung up. The seat it held is still on the
+    // server for the moment the leave takes to land, and asking in that moment
+    // found it and offered to "move" the call that was just left - a card that
+    // flashed in the corner after every hang-up.
+    const left = useRef<string | null>(null);
+    const held = useRef<string | null>(null);
+    useEffect(() => {
+        if (session) {
+            held.current = session.meetingId;
+            left.current = null;
+        } else if (held.current) {
+            left.current = held.current;
+            held.current = null;
+        }
+    }, [session]);
+
     const look = useCallback(() => {
         // A browser that is in a call is the device holding it. Asking would
         // only ever find its own seat.
@@ -64,7 +80,9 @@ export function CallElsewhere() {
             setFound(null);
             return;
         }
-        void askCallElsewhere().then(setFound);
+        void askCallElsewhere().then((call) =>
+            setFound(call && call.meetingId === left.current ? null : call)
+        );
     }, [session]);
 
     useEffect(() => {

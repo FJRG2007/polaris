@@ -26,7 +26,13 @@ import { Button, cn } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import type { CallState } from "./call-state";
 import * as rules from "@/lib/chat/soundboard";
-import { clipsPlaying, onClipsChanged, previewSound, stopClips } from "./soundboard-player";
+import {
+    clipsPlaying,
+    onClipsChanged,
+    playClip,
+    previewSound,
+    stopClips
+} from "./soundboard-player";
 import type { SoundView } from "@/lib/chat/soundboard-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallSoundboard } from "@/lib/chat/soundboard-service";
@@ -42,12 +48,7 @@ import {
     useSyncExternalStore
 } from "react";
 import { rememberPlayed, useSoundboardPrefs, useSoundboardVolume } from "./soundboard-prefs";
-import {
-    callSoundboardAction,
-    favoriteSoundAction,
-    playSoundAction,
-    stopSoundAction
-} from "./soundboard-actions";
+import { favoriteSoundAction, playSoundAction, stopSoundAction } from "./soundboard-actions";
 
 /** One sound as the grid draws it, whatever it came from. */
 interface Tile {
@@ -91,6 +92,27 @@ export function Cue({ shown }: { shown: ShownReaction }) {
 
 /** Each call's last answer, so the picker opens on it while it asks again. */
 const boards = new Map<string, CallSoundboard>();
+/** The last answer from any call: a call this tab has not asked about yet opens
+ *  on it rather than on a spinner, since a space's sounds rarely change between
+ *  two calls. Replaced the moment this call's own answer arrives. */
+let lastBoard: CallSoundboard | null = null;
+
+/** Ask what this call's picker offers. A route, not an action - see
+ *  `api/chat/meetings/[meetingId]/soundboard`. Nothing at all on a failure:
+ *  the picker keeps whatever it last showed. */
+async function fetchBoard(meetingId: string): Promise<CallSoundboard | null> {
+    try {
+        const response = await fetch(
+            `/api/chat/meetings/${encodeURIComponent(meetingId)}/soundboard`,
+            { cache: "no-store" }
+        );
+        if (!response.ok) return null;
+        const body = (await response.json()) as { board?: CallSoundboard };
+        return body.board ?? null;
+    } catch {
+        return null;
+    }
+}
 
 /** The panel's size. Wide enough for four tiles beside the section column. */
 const PANEL_WIDTH = 440;
@@ -144,7 +166,9 @@ const REFUSAL_KEY = {
 export function SoundboardButton({ meetingId, call }: { meetingId: string; call: CallState }) {
     const t = useTranslations("chat");
     const [open, setOpen] = useState(false);
-    const [board, setBoard] = useState<CallSoundboard | null>(() => boards.get(meetingId) ?? null);
+    const [board, setBoard] = useState<CallSoundboard | null>(
+        () => boards.get(meetingId) ?? lastBoard
+    );
     const trigger = useRef<HTMLButtonElement>(null);
     const panel = useRef<HTMLDivElement>(null);
     const [at, setAt] = useState<ReturnType<typeof place> | null>(null);
@@ -152,10 +176,11 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
     // Asked when the call opens, so the button already knows whether it is
     // allowed before anybody presses it, and again each time the picker opens.
     const load = useCallback(() => {
-        void callSoundboardAction(meetingId).then((answer) => {
-            if (!answer.board) return;
-            boards.set(meetingId, answer.board);
-            setBoard(answer.board);
+        void fetchBoard(meetingId).then((answer) => {
+            if (!answer) return;
+            boards.set(meetingId, answer);
+            lastBoard = answer;
+            setBoard(answer);
         });
     }, [meetingId]);
     useEffect(load, [load]);
@@ -433,6 +458,16 @@ export function SoundboardPanel({
         if (answer.error) {
             setError(answer.error);
             return;
+        }
+        // Nobody else is connected, so the room never carries it back: sounded
+        // here instead, at the volume it would have arrived at.
+        if (answer.alone) {
+            const played = answer.alone;
+            void playClip(played.sound, {
+                url: played.url ?? null,
+                volume: rules.playbackVolume(played, { volume, muted: new Set() }),
+                channel: played.from
+            });
         }
         rememberPlayed(tile.ref);
         setPlayedAt(Date.now());

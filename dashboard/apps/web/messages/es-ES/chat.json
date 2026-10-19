@@ -220,7 +220,6 @@
         "soundboardExternal": "Este espacio solo reproduce sus propios sonidos",
         "soundboardCooldown": "Espera {seconds} s antes del siguiente sonido",
         "soundboardUnreachable": "El servidor de llamadas no respondió. Inténtalo de nuevo.",
-        "soundboardNobody": "No hay nadie más conectado a la llamada para oírlo.",
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
         "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s."

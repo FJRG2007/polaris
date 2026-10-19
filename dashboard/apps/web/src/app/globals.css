@@ -585,6 +585,40 @@ dialog.pdfSlick-dialog .dialogButton {
  * list that changes shape between frames is interpolated as a whole rather than
  * per function, which is a visible jump in the middle of a 700ms animation.
  */
+/*
+ * A call control under the pointer: its icon gives a small turn and settles,
+ * the way a voice client answers a hover - instead of the button changing
+ * colour, which on a tinted control (a muted microphone, a camera that is on)
+ * only read as the tint getting louder. A transform on the icon alone, so the
+ * button keeps its size and nothing beside it moves.
+ */
+@keyframes polaris-control-nudge {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+    30% {
+        transform: scale(1.12) rotate(-10deg);
+    }
+    60% {
+        transform: scale(1.06) rotate(8deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+.polaris-control-nudge button:hover > svg,
+.polaris-control-nudge button:focus-visible > svg {
+    animation: polaris-control-nudge 420ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .polaris-control-nudge button:hover > svg,
+    .polaris-control-nudge button:focus-visible > svg {
+        animation: none;
+    }
+}
+
 @keyframes polaris-hand-up {
     0% {
         transform: translateY(0.4rem) scale(0.8) rotate(0deg);

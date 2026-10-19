@@ -1408,18 +1408,23 @@ export function CallRoom({
                     )}
                 </div>
 
-                <Button
-                    size="icon"
-                    variant="danger"
-                    aria-label={t("callRoom.leaveTheCall")}
-                    title={t("callRoom.leaveTheCall")}
-                    onClick={() => {
-                        playCallSound("hangUp");
-                        onLeave();
-                    }}
-                >
-                    <PhoneOff className="size-4" />
-                </Button>
+                {/* In a cluster of its own, so it has the same frame, padding
+                    and height as the groups beside it rather than a bare
+                    button sitting lower and narrower at the end of the bar. */}
+                <div className={CLUSTER}>
+                    <Button
+                        size="icon"
+                        variant="danger"
+                        aria-label={t("callRoom.leaveTheCall")}
+                        title={t("callRoom.leaveTheCall")}
+                        onClick={() => {
+                            playCallSound("hangUp");
+                            onLeave();
+                        }}
+                    >
+                        <PhoneOff className="size-4" />
+                    </Button>
+                </div>
             </div>
 
             {viewerId && (mayInvite || canShare) && (
@@ -2065,7 +2070,7 @@ function Split({
  * its size and nothing in the bar moves when it is hovered or changes state.
  */
 const CLUSTER = cn(
-    "flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1",
+    "polaris-control-nudge flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1",
     "[&_button]:border-transparent [&_button]:shadow-none",
     "[&_button.bg-muted]:bg-transparent [&_button.bg-muted:hover]:bg-card-hover [&_button.bg-muted:active]:bg-card-hover/80"
 );
@@ -2080,8 +2085,10 @@ const NARROW_BAR = 440;
 const TINTS: Record<"secondary" | "danger" | "success" | "primary", string | undefined> = {
     secondary: undefined,
     primary: undefined,
-    danger: "border-danger-edge bg-danger-soft text-danger-ink hover:brightness-110",
-    success: "border-success-edge bg-success-soft text-success-ink hover:brightness-110"
+    // No hover colour of their own: the icon answers the pointer instead - see
+    // `polaris-control-nudge` - so a red control does not read redder.
+    danger: "border-danger-edge bg-danger-soft text-danger-ink hover:bg-danger-soft",
+    success: "border-success-edge bg-success-soft text-success-ink hover:bg-success-soft"
 };
 
 /** Where the devices, the voice and the camera are set for good. */
