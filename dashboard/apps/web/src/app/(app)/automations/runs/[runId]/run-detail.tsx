@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { took } from "../runs-view";
+import { JsonView } from "@/components/json-view";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -367,7 +368,7 @@ function StepItem({
     );
 }
 
-function DataBlock({ title, value }: { title: string; value: unknown }) {
+export function DataBlock({ title, value }: { title: string; value: unknown }) {
     const t = useTranslations("automations");
     return (
         <div className="min-w-0 space-y-1">
@@ -377,9 +378,7 @@ function DataBlock({ title, value }: { title: string; value: unknown }) {
             {value === null || value === undefined ? (
                 <p className="text-xs text-muted-foreground">{t("runView.noData")}</p>
             ) : (
-                <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">
-                    {JSON.stringify(value, null, 2)}
-                </pre>
+                <JsonView className="max-h-64" label={title} value={JSON.stringify(value)} />
             )}
         </div>
     );

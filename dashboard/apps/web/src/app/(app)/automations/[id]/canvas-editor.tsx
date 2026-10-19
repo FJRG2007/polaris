@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { JsonEditor, JsonView } from "@/components/json-view";
 import type { AutomationDetail } from "@/lib/automations/service";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -1032,15 +1033,11 @@ function NodePanel({
                     </h3>
                     {pinText !== null ? (
                         <>
-                            <Textarea
-                                rows={8}
-                                className="font-mono text-xs"
-                                aria-label={t("canvas.editPin")}
+                            <JsonEditor
+                                className="max-h-64"
+                                label={t("canvas.editPin")}
                                 value={pinText}
-                                aria-invalid={
-                                    pinJson === undefined || pinTooLarge ? true : undefined
-                                }
-                                onChange={(event) => setPinText(event.target.value)}
+                                onChange={setPinText}
                             />
                             {pinJson === undefined ? (
                                 <p className="text-xs text-danger">{t("canvas.pinInvalid")}</p>
@@ -1065,9 +1062,11 @@ function NodePanel({
                             </div>
                         </>
                     ) : shownSample !== undefined && shownSample !== null ? (
-                        <pre className="max-h-64 overflow-auto overscroll-contain rounded-md bg-field p-2 font-mono text-xs">
-                            {JSON.stringify(shownSample, null, 2)}
-                        </pre>
+                        <JsonView
+                            className="max-h-64"
+                            label={t("canvas.lastOutput")}
+                            value={JSON.stringify(shownSample)}
+                        />
                     ) : (
                         <p className="text-xs text-muted-foreground">{t("canvas.noOutput")}</p>
                     )}
