@@ -464,3 +464,63 @@ export async function unlockVaultKey(
     if (raw === null || raw.length !== 64) return null;
     return symmetricKeyFromBytes(raw);
 }
+
+/**
+ * Unlocking with a passkey: the WebAuthn PRF extension.
+ *
+ * The same shape Bitwarden and 1Password use. An authenticator that supports PRF
+ * turns a salt it is handed into 32 bytes only it can produce for that
+ * credential; those bytes are run through HKDF-SHA256 into a 64-byte key, and
+ * that key wraps the user's own vault key as an ordinary type-2 enc string. The
+ * server keeps the wrapped key, the credential id and the salt - none of which
+ * open anything - and never sees the PRF output or the key derived from it.
+ *
+ * The vault key itself is not new, so the master password keeps opening the
+ * same vault and changing it re-wraps only `protectedKey`; every passkey wrap
+ * stays valid. A wrong PRF output fails the HMAC and opens nothing.
+ */
+
+/** Bytes of PRF salt, and of PRF output a passkey has to give back. */
+export const PASSKEY_PRF_BYTES = 32;
+
+/** What the HKDF is bound to, so the same PRF output wraps nothing else. */
+const PASSKEY_KEY_INFO = "polaris-vault-passkey-unlock-v1";
+
+/** A fresh salt to evaluate a passkey's PRF with. Not a secret. */
+export function generatePasskeyPrfSalt(): Uint8Array {
+    return crypto.getRandomValues(new Uint8Array(PASSKEY_PRF_BYTES));
+}
+
+/** The key a passkey's PRF output wraps the vault key under. */
+export async function derivePasskeyKey(prfOutput: Uint8Array, prfSalt: Uint8Array): Promise<SymmetricKey> {
+    if (prfOutput.length < PASSKEY_PRF_BYTES) throw new Error("A passkey's PRF output is 32 bytes");
+    const ikm = await crypto.subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+        { name: "HKDF", hash: "SHA-256", salt: prfSalt, info: encoder.encode(PASSKEY_KEY_INFO) },
+        ikm,
+        512
+    );
+    const bytes = new Uint8Array(bits);
+    return { enc: bytes.subarray(0, 32), mac: bytes.subarray(32, 64) };
+}
+
+/** The vault key, wrapped under what a passkey's PRF gave back. */
+export async function wrapVaultKeyWithPasskey(
+    vaultKey: SymmetricKey,
+    prfOutput: Uint8Array,
+    prfSalt: Uint8Array
+): Promise<string> {
+    return encryptBytes(symmetricKeyBytes(vaultKey), await derivePasskeyKey(prfOutput, prfSalt));
+}
+
+/** The vault key back out of a passkey wrap, or null when this PRF output is not the one. */
+export async function unwrapVaultKeyWithPasskey(
+    wrappedKey: string,
+    prfOutput: Uint8Array,
+    prfSalt: Uint8Array
+): Promise<SymmetricKey | null> {
+    if (prfOutput.length < PASSKEY_PRF_BYTES) return null;
+    const raw = await decryptBytes(wrappedKey, await derivePasskeyKey(prfOutput, prfSalt));
+    if (raw === null || raw.length !== 64) return null;
+    return symmetricKeyFromBytes(raw);
+}

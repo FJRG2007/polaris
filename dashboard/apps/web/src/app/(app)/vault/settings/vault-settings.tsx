@@ -14,6 +14,7 @@ import * as core from "@polaris/core";
 import * as crypto from "@/lib/vault/crypto";
 import { VaultImport } from "./vault-import";
 import { VaultExport } from "./vault-export";
+import { VaultPasskeys } from "./vault-passkeys";
 import { type FormEvent, useEffect, useState } from "react";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -281,6 +282,8 @@ export function VaultSettings() {
                     </form>
                 </CardBody>
             </Card>
+
+            <VaultPasskeys confirm={confirm} />
 
             <Card>
                 <CardHeader>

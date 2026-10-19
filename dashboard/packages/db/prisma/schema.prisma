@@ -3072,6 +3072,7 @@ model VaultAccount {
     identityDefaults VaultIdentityDefault[]
     sends            VaultSend[]
     devices          VaultDevice[]
+    passkeys         VaultPasskey[]
     refreshTokens    VaultRefreshToken[]
     memberships      VaultOrgUser[]
     emergencyGiven   VaultEmergencyAccess[] @relation("VaultEmergencyGrantor")
@@ -3340,6 +3341,35 @@ model VaultSend {
 // A client that has signed in to the vault. Bitwarden clients identify
 // themselves with an id they generate and keep, which is what makes "this phone"
 // a thing an owner can recognize and end.
+// A passkey that unlocks this vault in the browser, through the WebAuthn PRF
+// extension. The credential is one of the account's own sign-in passkeys (the
+// `Passkey` table); this row is only what the vault needs on top of it. The
+// authenticator turns `prfSalt` into 32 bytes the browser derives a key from,
+// and that key wraps the user's vault key into `wrappedKey`. Neither the PRF
+// output nor the derived key is ever sent here, so nothing in this row opens
+// the vault - it is as blind as `protectedKey`. The master password stays: it
+// is what enrolls a passkey and the way back in when every passkey is gone.
+model VaultPasskey {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    userId       String    @db.Uuid
+    // Base64url, as WebAuthn reports it and as the `Passkey` row stores it.
+    credentialId String
+    // The address the credential belongs to. A passkey only answers there.
+    rpId         String
+    // Base64 of the 32 random bytes the PRF is evaluated with. Not a secret.
+    prfSalt      String
+    // The vault key as a type-2 enc string under the PRF-derived key.
+    wrappedKey   String
+    name         String
+    createdAt    DateTime  @default(now())
+    lastUsedAt   DateTime?
+
+    vault VaultAccount @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+    @@unique([userId, credentialId])
+    @@index([userId])
+}
+
 model VaultDevice {
     id           String   @id @default(uuid(7)) @db.Uuid
     userId       String   @db.Uuid

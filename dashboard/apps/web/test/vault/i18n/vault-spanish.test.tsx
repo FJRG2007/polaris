@@ -15,6 +15,7 @@ import { DEFAULT_KDF_SETTINGS, VAULT_LOCK_ON_TAB_CLOSE } from "@polaris/core";
 import { importRefusalText, unlockTimeoutLabel, vaultSchemaText } from "@/app/(app)/vault/vault-labels";
 
 vi.mock("@/app/(app)/vault/vault-actions", () => ({ createAccountVaultAction: async () => ({}) }));
+vi.mock("@/app/(app)/vault/passkey-actions", () => ({ vaultPasskeyUsedAction: async () => undefined }));
 
 const { VaultUnlock } = await import("@/app/(app)/vault/vault-unlock");
 const { VaultSetup } = await import("@/app/(app)/vault/vault-setup");

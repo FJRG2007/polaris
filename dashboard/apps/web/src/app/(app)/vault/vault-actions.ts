@@ -28,6 +28,8 @@ import * as accessLog from "@/lib/vault/access-log";
 import type { ItemUseEntry } from "@/lib/vault/item-uses";
 import { accountIdentity, type AccountIdentity } from "@/lib/vault/account-identity";
 import { z } from "zod";
+import { listVaultPasskeys } from "@/lib/vault/passkeys";
+import type { VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
 
 /** What the vault screen needs before it can draw anything. */
 export interface VaultState {
@@ -42,6 +44,9 @@ export interface VaultState {
     email: string;
     /** Minutes a browser may keep this vault open while idle. */
     unlockTimeout: number;
+    /** Passkeys that can unlock it, each with its wrapped key. Optional so a
+     *  state built before passkeys existed still reads as "none". */
+    passkeys?: VaultPasskeyEntry[];
 }
 
 /** Whether there is a vault, and what the browser needs to open it. */
@@ -71,7 +76,8 @@ export async function vaultStateAction(): Promise<VaultState> {
         privateKey: row.privateKey,
         publicKey: row.publicKey,
         email: user.email,
-        unlockTimeout: row.unlockTimeout
+        unlockTimeout: row.unlockTimeout,
+        passkeys: await listVaultPasskeys(user.id)
     };
 }
 
@@ -155,6 +161,7 @@ export async function changeMasterPasswordAction(input: unknown): Promise<{ erro
     if (!current) return { error: await vaultRefusal("errors.accountNoVault") };
 
     const result = await account.changeMasterPassword(user.id, {
+        sameVaultKey: true,
         currentHash: parsed.data.masterPasswordHash,
         newHash: parsed.data.newMasterPasswordHash,
         newProtectedKey: parsed.data.key,
