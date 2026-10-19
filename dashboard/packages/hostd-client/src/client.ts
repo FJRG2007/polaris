@@ -337,6 +337,45 @@ export class HostdClient {
         return JSON.parse(response.body) as { ok: boolean; error?: string };
     }
 
+    /** Set one variable the UPS lists as writable. Null from an older daemon. */
+    public async upsSet(
+        id: string,
+        variable: string,
+        value: string
+    ): Promise<{ ok: boolean; error?: string } | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/ups/set",
+            JSON.stringify({ id, var: variable, value })
+        );
+        if (response.status === 404) return null;
+        if (response.status !== 200) throw new Error(`hostd ups set failed (${response.status})`);
+        return JSON.parse(response.body) as { ok: boolean; error?: string };
+    }
+
+    /**
+     * Offer this daemon's UPSes to other machines' upsmon (NUT netserver), or
+     * stop with null. Idempotent: the daemon restarts upsd only on a change.
+     */
+    public async upsNetserver(
+        netserver: HostdUpsNetserver | null
+    ): Promise<{ available: boolean; ok?: boolean; changed?: boolean; error?: string } | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/ups/netserver",
+            JSON.stringify({ netserver })
+        );
+        if (response.status === 404) return null;
+        if (response.status !== 200)
+            throw new Error(`hostd ups netserver failed (${response.status})`);
+        return JSON.parse(response.body) as {
+            available: boolean;
+            ok?: boolean;
+            changed?: boolean;
+            error?: string;
+        };
+    }
+
     /** Power this host off cleanly. True once started; null from an older daemon. */
     public async hostPowerOff(): Promise<boolean | null> {
         const response = await this.call(
@@ -873,7 +912,26 @@ export interface HostdUpsReading {
     id?: string;
     vars?: Record<string, string>;
     commands?: string[];
+    /** Writable variables, from a daemon that reads them. */
+    rw?: HostdUpsRwVar[];
     error?: string;
+}
+
+/** One writable UPS variable, with what it may be set to. */
+export interface HostdUpsRwVar {
+    name: string;
+    value: string;
+    kind: "string" | "number" | "enum" | "range";
+    maxLen?: number;
+    options?: string[];
+    ranges?: [string, string][];
+}
+
+/** The login other machines' upsmon uses to follow this daemon's UPSes. */
+export interface HostdUpsNetserver {
+    port: number;
+    user: string;
+    password: string;
 }
 
 export interface HostdUpsList {

@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { createUpsAction } from "./actions";
 import type { UsbOffer } from "@/lib/ups/ups-service";
 import { BatteryCharging, Plus, Usb } from "lucide-react";
+import { UpsAnalytics } from "./ups-analytics";
 import { UpsConnectionDialog } from "./ups-connection-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -215,6 +216,7 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                 </div>
             )}
 
+            {data && data.ups.length > 1 ? <UpsAnalytics /> : null}
             {adding ? (
                 <UpsConnectionDialog
                     open

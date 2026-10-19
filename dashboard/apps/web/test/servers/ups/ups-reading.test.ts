@@ -31,8 +31,24 @@ describe("reading the Atlantis A03-OP2002-RC", () => {
         expect(reading.status).toMatchObject({ online: true, onBattery: false, charging: true });
     });
 
-    it("keeps only the commands Polaris offers", () => {
-        expect(reading.commands).toEqual(["beeper.enable", "test.battery.start.quick"]);
+    it("lists every command the UPS offers, sorted", () => {
+        expect(reading.commands).toEqual(["beeper.enable", "load.off", "test.battery.start.quick"]);
+    });
+
+    it("drops a command name that is not one NUT word", () => {
+        const odd = ups.readingFromVars({}, [
+            "beeper.enable",
+            "load.off\nSET VAR",
+            "BAD",
+            "beeper.enable"
+        ]);
+        expect(odd.commands).toEqual(["beeper.enable"]);
+    });
+
+    it("reads the flags, power, battery and transfer values", () => {
+        expect(reading.flags).toBe("CHRG OL");
+        expect(reading.nominalPowerW).toBe(1200);
+        expect(reading.realPowerW).toBeNull();
     });
 
     it("reads a passed test as passed", () => {

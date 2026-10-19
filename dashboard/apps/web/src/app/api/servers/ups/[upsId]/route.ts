@@ -32,7 +32,7 @@ export async function GET(
     if (!row) return Response.json({ error: t("errors.notFound") }, { status: 404 });
     const hours = hoursSchema.parse(new URL(request.url).searchParams.get("hours") ?? undefined);
     const [result, history] = await Promise.all([
-        upsService.readUps(row),
+        upsService.readUps(row, upsService.usbListing(), { writable: true }),
         upsService.upsHistory(row.id, hours)
     ]);
     return Response.json({ ups: upsService.toView(row), result, history });

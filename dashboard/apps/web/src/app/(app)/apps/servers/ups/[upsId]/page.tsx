@@ -19,6 +19,7 @@ export default async function UpsDetailPage({ params }: { params: Promise<{ upsI
         <UpsDetailView
             initial={upsService.toView(row)}
             machines={rows.map((one) => ({ id: hostSubject(one.id), name: one.name }))}
+            canOfferNetwork={upsService.canOfferNetwork(row)}
         />
     );
 }

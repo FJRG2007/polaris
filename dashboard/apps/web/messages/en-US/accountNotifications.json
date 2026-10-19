@@ -491,6 +491,30 @@
         "upsShutdownFailed": {
             "label": "A machine did not shut down",
             "description": "A UPS ran low and Polaris could not power off a machine it protects."
+        },
+        "upsShutdown": {
+            "label": "A UPS is shutting machines down",
+            "description": "The battery ran low and the protected machines are being shut down."
+        },
+        "upsOverload": {
+            "label": "A UPS is overloaded",
+            "description": "A UPS is asked for more power than it can give."
+        },
+        "upsCommLost": {
+            "label": "A UPS stopped answering",
+            "description": "Polaris cannot read a UPS any more."
+        },
+        "upsCommRestored": {
+            "label": "A UPS answers again",
+            "description": "A UPS that had stopped answering can be read again."
+        },
+        "upsPowerIssue": {
+            "label": "A UPS corrected the power",
+            "description": "A UPS is trimming or boosting the voltage, on bypass, calibrating or off."
+        },
+        "upsReport": {
+            "label": "A UPS report is ready",
+            "description": "A scheduled UPS report was saved to your drive."
         }
     },
     "groups": {

@@ -380,7 +380,12 @@
             "upsOnline": "The power came back",
             "upsLowBattery": "A UPS ran low",
             "upsTest": "A UPS test finished",
-            "upsReplaceBattery": "A UPS needs a battery"
+            "upsReplaceBattery": "A UPS needs a battery",
+            "upsShutdown": "A UPS shuts machines down",
+            "upsOverload": "A UPS is overloaded",
+            "upsCommLost": "A UPS stops answering",
+            "upsCommRestored": "A UPS answers again",
+            "upsPowerIssue": "A UPS corrects the power"
         },
         "actions": {
             "redeploy": "Redeploy",

@@ -12,6 +12,22 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const prismaDir = join(here, "..", "packages", "db", "prisma");
 
+/**
+ * A scalar list's default as the JSON array it is stored as, escaped for the
+ * inside of a Prisma string: `"A", "B"` -> `[\"A\",\"B\"]`. An enum member is
+ * a bare name in Prisma and a string in JSON, so it is quoted here.
+ */
+function listDefault(items) {
+    const values = items
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) =>
+            /^[A-Za-z_]\w*$/.test(item) && item !== "true" && item !== "false" ? `"${item}"` : item
+        );
+    return `[${values.join(",")}]`.replaceAll('"', '\\"');
+}
+
 /** Rewrite the Postgres schema source into its SQLite equivalent. */
 export function toSqliteSchema(source) {
     return (
@@ -29,13 +45,14 @@ export function toSqliteSchema(source) {
             // such column as Json instead: the client still reads and writes an array.
             .replace(
                 /^(\s+\w+\s+)(?:String|Int|BigInt|Float|Decimal|Boolean|DateTime|Bytes)\[\](.*)$/gm,
-                (_, field, rest) => `${field}Json${rest.replace("@default([])", '@default("[]")')}`
+                (_, field, rest) =>
+                    `${field}Json${rest.replace(/@default\(\[([^\]]*)\]\)/, (_m, items) => `@default("${listDefault(items)}")`)}`
             )
             // Prisma accepts a Json default for SQLite but writes it into the table
             // unquoted (`DEFAULT {}`), which SQLite rejects and `db push` fails on.
             // Spell it as the quoted SQL literal the column should get instead.
             .replace(
-                /^(\s+\w+\s+Json\??\s.*)@default\("([^"]*)"\)/gm,
+                /^(\s+\w+\s+Json\??\s.*)@default\("((?:[^"\\]|\\.)*)"\)/gm,
                 (_, head, value) =>
                     `${head}@default(dbgenerated("'${value.replaceAll("'", "''")}'"))`
             )

@@ -5,6 +5,12 @@
 
 import type { UpsReading } from "@/lib/ups/ups-reading";
 import type { UsbDiscovery, UpsReadResult, UpsView } from "@/lib/ups/ups-service";
+import type {
+    EnergyBucket,
+    UpsActionView,
+    UpsAnalyticsRow,
+    UpsEventView
+} from "@/lib/ups/ups-data";
 
 export interface UpsListAnswer {
     ups: { ups: UpsView; result: UpsReadResult }[];
@@ -17,6 +23,10 @@ export interface UpsHistoryPoint {
     load: number | null;
     runtimeS: number | null;
     inputV: number | null;
+    inputHz: number | null;
+    outputV: number | null;
+    batteryV: number | null;
+    powerW: number | null;
 }
 
 export interface UpsDetailAnswer {
@@ -61,4 +71,75 @@ export function rounded(value: number | null, decimals = 0): string | null {
 
 export function minutesLeft(runtimeS: number | null): number | null {
     return runtimeS === null ? null : Math.max(0, Math.round(runtimeS / 60));
+}
+
+export interface UpsEnergyAnswer {
+    buckets: EnergyBucket[];
+    totals: { kwh: number; costs: { currency: string; cost: number }[] };
+}
+
+export interface UpsEventsAnswer {
+    events: UpsEventView[];
+    more: boolean;
+    open: number;
+}
+
+export interface UpsActionsAnswer {
+    actions: UpsActionView[];
+}
+
+export interface UpsAnalyticsAnswer {
+    rows: UpsAnalyticsRow[];
+    daily: (EnergyBucket & { upsId: string })[];
+}
+
+/** An amount in a currency, in the reader's own number format. */
+export function formatMoney(amount: number, currency: string): string {
+    try {
+        return new Intl.NumberFormat(undefined, {
+            style: "currency",
+            currency,
+            maximumFractionDigits: 2
+        }).format(amount);
+    } catch {
+        return `${amount.toFixed(2)} ${currency}`;
+    }
+}
+
+/** Commands that cut the power, stop protecting or drain the battery. */
+export function isDangerousCommand(name: string): boolean {
+    return /^(load\.off|shutdown\.|bypass\.start|calibrate\.start)/.test(name);
+}
+
+const COMMAND_LABELS = {
+    "beeper.enable": "ups.commands.names.beeperEnable",
+    "beeper.disable": "ups.commands.names.beeperDisable",
+    "beeper.mute": "ups.commands.names.beeperMute",
+    "beeper.toggle": "ups.commands.names.beeperToggle",
+    "test.battery.start.quick": "ups.commands.names.testQuick",
+    "test.battery.start.deep": "ups.commands.names.testDeep",
+    "test.battery.stop": "ups.commands.names.testStop",
+    "test.panel.start": "ups.commands.names.panelStart",
+    "test.panel.stop": "ups.commands.names.panelStop",
+    "calibrate.start": "ups.commands.names.calibrateStart",
+    "calibrate.stop": "ups.commands.names.calibrateStop",
+    "load.on": "ups.commands.names.loadOn",
+    "load.off": "ups.commands.names.loadOff",
+    "shutdown.return": "ups.commands.names.shutdownReturn",
+    "shutdown.stayoff": "ups.commands.names.shutdownStayoff",
+    "shutdown.stop": "ups.commands.names.shutdownStop",
+    "shutdown.reboot": "ups.commands.names.shutdownReboot",
+    "bypass.start": "ups.commands.names.bypassStart",
+    "bypass.stop": "ups.commands.names.bypassStop"
+} as const;
+
+/** The words for a command NUT documents, or null to show its own name. */
+export function commandLabelKey(
+    name: string
+): (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS] | null {
+    return (
+        (COMMAND_LABELS as Record<string, (typeof COMMAND_LABELS)[keyof typeof COMMAND_LABELS]>)[
+            name
+        ] ?? null
+    );
 }

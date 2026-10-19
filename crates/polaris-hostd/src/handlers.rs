@@ -275,6 +275,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/ups/snmp") => ups_snmp(req, body),
         ("POST", "/v1/ups/snmp/set") => ups_snmp_set(req, body),
         ("POST", "/v1/ups/command") => ups_command(req, body),
+        ("POST", "/v1/ups/set") => ups_set(req, body),
+        ("POST", "/v1/ups/netserver") => ups_netserver(req, body),
         ("POST", "/v1/host/poweroff") => host_poweroff(req, body),
         ("POST", "/v1/host/security/image") => host_security_image(req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
@@ -1505,6 +1507,62 @@ fn ups_command<R: Read>(req: &Request, body: &mut R) -> Response {
     match ups::command(&request.id, &request.command) {
         Ok(()) => Response::json(200, "OK", &serde_json::json!({ "ok": true })),
         Err(why) => Response::json(200, "OK", &serde_json::json!({ "ok": false, "error": why })),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpsSetRequest {
+    id: String,
+    var: String,
+    value: String,
+}
+
+/// Set one variable the UPS lists as writable.
+fn ups_set<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let Ok(request) = serde_json::from_slice::<UpsSetRequest>(&raw) else {
+        return Response::bad_request("invalid UPS variable");
+    };
+    match ups::set_var(&request.id, &request.var, &request.value) {
+        Ok(()) => Response::json(200, "OK", &serde_json::json!({ "ok": true })),
+        Err(why) => Response::json(200, "OK", &serde_json::json!({ "ok": false, "error": why })),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpsNetserverRequest {
+    /// Null stops offering the UPS service to the network.
+    netserver: Option<ups::Netserver>,
+}
+
+/// Offer the UPSes this daemon drives to other machines' `upsmon`, or stop.
+fn ups_netserver<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let Ok(request) = serde_json::from_slice::<UpsNetserverRequest>(&raw) else {
+        return Response::bad_request("invalid UPS network setting");
+    };
+    if !ups::nut_installed() {
+        return Response::json(200, "OK", &serde_json::json!({ "available": false }));
+    }
+    match ups::set_netserver(request.netserver) {
+        Ok(changed) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "available": true, "ok": true, "changed": changed }),
+        ),
+        Err(why) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "available": true, "ok": false, "error": why }),
+        ),
     }
 }
 

@@ -50,16 +50,31 @@ const UPS_VENDORS: &[&str] = &[
     "050d", // Belkin
 ];
 
-/// The commands the dashboard may run. Anything else is refused before it
-/// reaches `upsd`, so this daemon never becomes a generic NUT proxy.
-pub const ALLOWED_COMMANDS: &[&str] = &[
-    "beeper.enable",
-    "beeper.disable",
-    "beeper.mute",
-    "test.battery.start.quick",
-    "test.battery.start.deep",
-    "test.battery.stop",
-];
+/// Most writable variables read per UPS, each one costing a round trip or two.
+const MAX_RW_VARS: usize = 64;
+
+/// A NUT command or variable name (`test.battery.start.quick`,
+/// `input.transfer.low`): lowercase words joined by dots. Anything else is
+/// refused before it reaches `upsd`, so no request can add a second verb.
+pub fn valid_nut_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name.split('.').all(|part| {
+            !part.is_empty()
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        })
+}
+
+/// A value for `SET VAR`: printable ASCII and spaces, never a quote, a
+/// backslash or a line break, so it cannot leave its quotes.
+pub fn valid_var_value(value: &str) -> bool {
+    value.len() <= 64
+        && value
+            .chars()
+            .all(|c| (c.is_ascii_graphic() || c == ' ') && c != '"' && c != '\\')
+}
 
 // ---------------------------------------------------------------------------
 // HID report descriptor
@@ -348,12 +363,69 @@ pub fn render_ups_conf(usb: &[UsbUps], snmp: &[SnmpSource]) -> String {
     out
 }
 
-pub fn render_upsd_conf() -> String {
-    format!("LISTEN 127.0.0.1 {UPSD_PORT}\n")
+/// This UPS service offered to other machines on the network (NUT's
+/// netserver mode): one login, for their `upsmon`, which can read and be told
+/// to shut down but can run no command and set nothing.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Netserver {
+    pub port: u16,
+    pub user: String,
+    pub password: String,
 }
 
-pub fn render_upsd_users(password: &str) -> String {
-    format!("[{ADMIN_USER}]\n  password = {password}\n  instcmds = ALL\n")
+impl Netserver {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.port < 1024 && self.port != UPSD_PORT {
+            return Err("the port must be 3493 or above 1023");
+        }
+        let user_ok = !self.user.is_empty()
+            && self.user.len() <= 32
+            && self.user != ADMIN_USER
+            && self
+                .user
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !user_ok {
+            return Err("invalid user name");
+        }
+        let password_ok = (16..=64).contains(&self.password.len())
+            && self.password.chars().all(|c| c.is_ascii_alphanumeric());
+        if !password_ok {
+            return Err("invalid password");
+        }
+        Ok(())
+    }
+}
+
+/// Loopback for the dashboard always; every address too while this UPS
+/// service is offered to the network. One socket per address and port.
+pub fn render_upsd_conf(net: Option<&Netserver>) -> String {
+    match net {
+        Some(n) if n.port == UPSD_PORT => format!("LISTEN 0.0.0.0 {UPSD_PORT}\n"),
+        Some(n) => format!("LISTEN 127.0.0.1 {UPSD_PORT}\nLISTEN 0.0.0.0 {}\n", n.port),
+        None => format!("LISTEN 127.0.0.1 {UPSD_PORT}\n"),
+    }
+}
+
+pub fn render_upsd_users(password: &str, net: Option<&Netserver>) -> String {
+    let mut out =
+        format!("[{ADMIN_USER}]\n  password = {password}\n  instcmds = ALL\n  actions = SET\n");
+    if let Some(n) = net {
+        out.push_str(&format!(
+            "[{}]\n  password = {}\n  upsmon secondary\n",
+            n.user, n.password
+        ));
+    }
+    out
+}
+
+pub fn render_nut_conf(net: Option<&Netserver>) -> &'static str {
+    if net.is_some() {
+        "MODE=netserver\n"
+    } else {
+        "MODE=standalone\n"
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +487,86 @@ pub fn parse_cmds(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// One writable variable: its value, its kind and what it may be set to.
+#[derive(Debug, Default, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RwVar {
+    pub name: String,
+    pub value: String,
+    /// string | number | enum | range
+    pub kind: String,
+    /// The longest a string may be, from `STRING:n`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_len: Option<u32>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub ranges: Vec<(String, String)>,
+}
+
+/// `RW ups name "value"` lines of a `LIST RW` answer.
+pub fn parse_rw(text: &str) -> Vec<(String, String)> {
+    text.lines()
+        .filter_map(|line| line.trim_end_matches('\r').strip_prefix("RW "))
+        .filter_map(|rest| {
+            let mut parts = rest.splitn(3, ' ');
+            let (_, Some(name), Some(value)) = (parts.next(), parts.next(), parts.next()) else {
+                return None;
+            };
+            Some((name.to_string(), unquote(value)))
+        })
+        .collect()
+}
+
+/// The kind and string length out of a `TYPE ups var RW STRING:16` answer.
+pub fn parse_type(answer: &str) -> (String, Option<u32>) {
+    let words: Vec<&str> = answer.split_whitespace().skip(3).collect();
+    if words.contains(&"ENUM") {
+        return ("enum".into(), None);
+    }
+    if words.contains(&"RANGE") {
+        return ("range".into(), None);
+    }
+    if let Some(len) = words.iter().find_map(|w| w.strip_prefix("STRING:")) {
+        return ("string".into(), len.parse().ok());
+    }
+    if words.contains(&"NUMBER") {
+        return ("number".into(), None);
+    }
+    ("string".into(), None)
+}
+
+/// The quoted values of `ENUM ups var "x"` or `RANGE ups var "a" "b"` lines.
+pub fn parse_quoted_tail(text: &str, verb: &str) -> Vec<Vec<String>> {
+    text.lines()
+        .filter_map(|line| line.trim_end_matches('\r').strip_prefix(verb))
+        .map(|rest| {
+            let mut out = Vec::new();
+            let mut cur = String::new();
+            let mut inside = false;
+            let mut escaped = false;
+            for c in rest.chars() {
+                if inside {
+                    if escaped {
+                        cur.push(c);
+                        escaped = false;
+                    } else if c == '\\' {
+                        escaped = true;
+                    } else if c == '"' {
+                        out.push(std::mem::take(&mut cur));
+                        inside = false;
+                    } else {
+                        cur.push(c);
+                    }
+                } else if c == '"' {
+                    inside = true;
+                }
+            }
+            out
+        })
+        .collect()
+}
+
 /// One connection to a NUT server.
 pub struct NutSession {
     reader: BufReader<TcpStream>,
@@ -466,13 +618,83 @@ impl NutSession {
         ))
     }
 
-    pub fn instcmd(&mut self, ups: &str, user: &str, password: &str, cmd: &str) -> io::Result<()> {
+    fn login(&mut self, user: &str, password: &str) -> io::Result<()> {
         for (verb, arg) in [("USERNAME", user), ("PASSWORD", password)] {
             let answer = self.ask(&format!("{verb} {arg}"))?;
             if !answer.starts_with("OK") {
                 return Err(io::Error::new(io::ErrorKind::PermissionDenied, answer));
             }
         }
+        Ok(())
+    }
+
+    /// Every writable variable with its kind and allowed values.
+    pub fn writable(&mut self, ups: &str) -> io::Result<Vec<RwVar>> {
+        let listed = match self.list(&format!("RW {ups}")) {
+            Ok(text) => parse_rw(&text),
+            Err(_) => return Ok(Vec::new()),
+        };
+        let mut out = Vec::new();
+        for (name, value) in listed.into_iter().take(MAX_RW_VARS) {
+            if !valid_nut_name(&name) {
+                continue;
+            }
+            let (kind, max_len) = parse_type(&self.ask(&format!("GET TYPE {ups} {name}"))?);
+            let mut var = RwVar {
+                name: name.clone(),
+                value,
+                kind,
+                max_len,
+                ..RwVar::default()
+            };
+            if var.kind == "enum" {
+                var.options = self
+                    .list(&format!("ENUM {ups} {name}"))
+                    .map(|t| {
+                        parse_quoted_tail(&t, "ENUM ")
+                            .into_iter()
+                            .filter_map(|v| v.into_iter().next())
+                            .collect()
+                    })
+                    .unwrap_or_default();
+            } else if var.kind == "range" {
+                var.ranges = self
+                    .list(&format!("RANGE {ups} {name}"))
+                    .map(|t| {
+                        parse_quoted_tail(&t, "RANGE ")
+                            .into_iter()
+                            .filter_map(|v| match v.as_slice() {
+                                [a, b] => Some((a.clone(), b.clone())),
+                                _ => None,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+            }
+            out.push(var);
+        }
+        Ok(out)
+    }
+
+    pub fn set_var(
+        &mut self,
+        ups: &str,
+        user: &str,
+        password: &str,
+        var: &str,
+        value: &str,
+    ) -> io::Result<()> {
+        self.login(user, password)?;
+        let answer = self.ask(&format!("SET VAR {ups} {var} \"{value}\""))?;
+        if answer.starts_with("OK") {
+            Ok(())
+        } else {
+            Err(io::Error::other(answer))
+        }
+    }
+
+    pub fn instcmd(&mut self, ups: &str, user: &str, password: &str, cmd: &str) -> io::Result<()> {
+        self.login(user, password)?;
         let answer = self.ask(&format!("INSTCMD {ups} {cmd}"))?;
         if answer.starts_with("OK") {
             Ok(())
@@ -490,10 +712,12 @@ struct Supervisor {
     password: String,
     usb: Vec<UsbUps>,
     snmp: Vec<SnmpSource>,
+    netserver: Option<Netserver>,
     /// Each running driver and the `ups.conf` section it was started with.
     drivers: BTreeMap<String, (Child, String)>,
     upsd: Option<Child>,
-    /// The `ups.conf` last written, and read by `upsd` when it has anything to serve.
+    /// The `ups.conf` and netserver setting last written, and read by `upsd`
+    /// when it has anything to serve.
     applied_conf: Option<String>,
     last_check: Option<Instant>,
 }
@@ -505,6 +729,7 @@ fn supervisor() -> &'static Mutex<Supervisor> {
             password: crate::security::generate_token(),
             usb: Vec::new(),
             snmp: Vec::new(),
+            netserver: None,
             drivers: BTreeMap::new(),
             upsd: None,
             applied_conf: None,
@@ -554,10 +779,14 @@ impl Supervisor {
     fn write_config(&self, conf: &str) -> io::Result<()> {
         let dir = Path::new(RUNTIME_DIR);
         fs::create_dir_all(dir.join("state"))?;
-        fs::write(dir.join("nut.conf"), "MODE=standalone\n")?;
+        let net = self.netserver.as_ref();
+        fs::write(dir.join("nut.conf"), render_nut_conf(net))?;
         fs::write(dir.join("ups.conf"), conf)?;
-        fs::write(dir.join("upsd.conf"), render_upsd_conf())?;
-        fs::write(dir.join("upsd.users"), render_upsd_users(&self.password))?;
+        fs::write(dir.join("upsd.conf"), render_upsd_conf(net))?;
+        fs::write(
+            dir.join("upsd.users"),
+            render_upsd_users(&self.password, net),
+        )?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -573,7 +802,9 @@ impl Supervisor {
     fn reconcile(&mut self) -> io::Result<()> {
         let wanted = sections(&self.usb, &self.snmp);
         let conf = render_ups_conf(&self.usb, &self.snmp);
-        let changed = self.applied_conf.as_deref() != Some(conf.as_str());
+        // Offering the service to the network changes upsd's own files too.
+        let applied = format!("{conf}\n{:?}", self.netserver);
+        let changed = self.applied_conf.as_deref() != Some(applied.as_str());
         if changed {
             self.write_config(&conf)?;
         }
@@ -609,7 +840,7 @@ impl Supervisor {
             if let Some(child) = self.upsd.take() {
                 stop(child);
             }
-            self.applied_conf = Some(conf);
+            self.applied_conf = Some(applied);
         } else if !upsd_running || changed {
             if let Some(child) = self.upsd.take() {
                 stop(child);
@@ -620,7 +851,7 @@ impl Supervisor {
                     .args(["-F", "-u", "root"])
                     .spawn()?,
             );
-            self.applied_conf = Some(conf);
+            self.applied_conf = Some(applied);
             // upsd answers within a moment of starting; a read right after
             // this one is what sees it.
             std::thread::sleep(Duration::from_millis(500));
@@ -639,6 +870,7 @@ fn local_upsd() -> SocketAddr {
 pub struct Reading {
     pub vars: BTreeMap<String, String>,
     pub commands: Vec<String>,
+    pub rw: Vec<RwVar>,
 }
 
 fn read_one(name: &str) -> io::Result<Reading> {
@@ -648,7 +880,8 @@ fn read_one(name: &str) -> io::Result<Reading> {
         .list(&format!("CMD {name}"))
         .map(|t| parse_cmds(&t))
         .unwrap_or_default();
-    Ok(Reading { vars, commands })
+    let rw = session.writable(name).unwrap_or_default();
+    Ok(Reading { vars, commands, rw })
 }
 
 /// Every UPS on this host's USB bus, with its reading where the driver has
@@ -704,22 +937,81 @@ pub fn set_snmp(sources: Vec<SnmpSource>) -> io::Result<()> {
     Ok(())
 }
 
-/// Run one allowed command on a UPS this daemon drives.
-pub fn command(name: &str, cmd: &str) -> Result<(), String> {
-    if !ALLOWED_COMMANDS.contains(&cmd) {
-        return Err("command not allowed".into());
+/// The admin password for a UPS this daemon drives, or why there is none.
+fn driven(name: &str) -> Result<String, String> {
+    let sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
+    let known = sup.usb.iter().any(|u| u.id == name) || sup.snmp.iter().any(|s| s.name() == name);
+    if known {
+        Ok(sup.password.clone())
+    } else {
+        Err("unknown UPS".into())
     }
-    let password = {
-        let sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
-        let known =
-            sup.usb.iter().any(|u| u.id == name) || sup.snmp.iter().any(|s| s.name() == name);
-        if !known {
-            return Err("unknown UPS".into());
-        }
-        sup.password.clone()
-    };
+}
+
+/// Set one writable variable the UPS itself lists as writable.
+pub fn set_var(name: &str, var: &str, value: &str) -> Result<(), String> {
+    if !valid_nut_name(var) {
+        return Err("invalid variable".into());
+    }
+    if !valid_var_value(value) {
+        return Err("invalid value".into());
+    }
+    let password = driven(name)?;
     let mut session =
         NutSession::connect(local_upsd()).map_err(|_| "upsd is not running".to_string())?;
+    let writable = session
+        .list(&format!("RW {name}"))
+        .map(|t| parse_rw(&t))
+        .unwrap_or_default();
+    if !writable.iter().any(|(n, _)| n == var) {
+        return Err("this UPS does not let that be changed".into());
+    }
+    session
+        .set_var(name, ADMIN_USER, &password, var, value)
+        .map_err(|e| {
+            let text = e.to_string();
+            if text.contains("INVALID-VALUE") || text.contains("TOO-LONG") {
+                "the UPS refused that value".to_string()
+            } else {
+                "the UPS refused the change".to_string()
+            }
+        })
+}
+
+/// Offer the UPS service to the network, or stop offering it. Restarts
+/// `upsd` only when the setting changed, so the dashboard may send it on
+/// every pass and a restarted daemon picks it back up.
+pub fn set_netserver(net: Option<Netserver>) -> Result<bool, String> {
+    if let Some(n) = &net {
+        n.validate()?;
+    }
+    let mut sup = supervisor().lock().unwrap_or_else(|p| p.into_inner());
+    if sup.netserver == net {
+        return Ok(false);
+    }
+    sup.netserver = net;
+    // A changed setting is a changed configuration: upsd restarts with the
+    // new listeners and users.
+    sup.reconcile()
+        .map_err(|_| "could not restart the UPS service".to_string())?;
+    Ok(true)
+}
+
+/// Run one instant command the UPS itself lists.
+pub fn command(name: &str, cmd: &str) -> Result<(), String> {
+    if !valid_nut_name(cmd) {
+        return Err("command not allowed".into());
+    }
+    let password = driven(name)?;
+    let mut session =
+        NutSession::connect(local_upsd()).map_err(|_| "upsd is not running".to_string())?;
+    let listed = session
+        .list(&format!("CMD {name}"))
+        .map(|t| parse_cmds(&t))
+        .unwrap_or_default();
+    if !listed.iter().any(|c| c == cmd) {
+        return Err("this UPS does not support that command".into());
+    }
     session
         .instcmd(name, ADMIN_USER, &password, cmd)
         .map_err(|e| {
@@ -917,10 +1209,140 @@ mod tests {
 
     #[test]
     fn upsd_only_listens_on_loopback_and_commands_are_allowlisted() {
-        assert_eq!(render_upsd_conf(), "LISTEN 127.0.0.1 3493\n");
-        assert!(render_upsd_users("s3cret").contains("instcmds = ALL"));
-        assert!(command("usb-x", "load.off").is_err());
-        assert!(command("usb-x", "shutdown.return").is_err());
+        assert_eq!(render_upsd_conf(None), "LISTEN 127.0.0.1 3493\n");
+        assert!(render_upsd_users("s3cret", None).contains("instcmds = ALL"));
+        assert!(!render_upsd_users("s3cret", None).contains("upsmon"));
+        assert_eq!(render_nut_conf(None), "MODE=standalone\n");
+        // A name that is not one NUT word never reaches upsd.
+        assert_eq!(
+            command("usb-x", "load.off\nSET VAR").unwrap_err(),
+            "command not allowed"
+        );
+        assert_eq!(
+            command("usb-x", "LOAD.OFF").unwrap_err(),
+            "command not allowed"
+        );
+        // A UPS this daemon does not drive is refused before any login.
+        assert_eq!(command("usb-x", "load.off").unwrap_err(), "unknown UPS");
+    }
+
+    #[test]
+    fn the_snmp_name_matches_the_dashboard() {
+        // The dashboard computes the same name (ups-settings.ts snmpUpsName).
+        let source: SnmpSource =
+            serde_json::from_str(r#"{"address":"10.0.0.5","version":"v2c","community":"public"}"#)
+                .unwrap();
+        assert_eq!(source.name(), "snmp-87f7eb5de06ff0c1");
+    }
+
+    #[test]
+    fn nut_names_and_values_cannot_break_out() {
+        assert!(valid_nut_name("test.battery.start.quick"));
+        assert!(valid_nut_name("input.transfer.low"));
+        assert!(!valid_nut_name("a..b"));
+        assert!(!valid_nut_name("a b"));
+        assert!(!valid_nut_name(""));
+        assert!(valid_var_value("230"));
+        assert!(valid_var_value("Server room"));
+        assert!(!valid_var_value("x\" OK"));
+        assert!(!valid_var_value("x\nSET"));
+        assert!(!valid_var_value("a\\b"));
+        assert_eq!(
+            set_var("usb-x", "bad name", "1").unwrap_err(),
+            "invalid variable"
+        );
+        assert_eq!(
+            set_var("usb-x", "ups.delay.shutdown", "1\"").unwrap_err(),
+            "invalid value"
+        );
+        assert_eq!(
+            set_var("usb-x", "ups.delay.shutdown", "20").unwrap_err(),
+            "unknown UPS"
+        );
+    }
+
+    #[test]
+    fn writable_variables_parse_with_their_kinds() {
+        let rw = parse_rw("RW ups input.transfer.low \"170\"\nRW ups ups.id \"my \\\"ups\\\"\"\n");
+        assert_eq!(
+            rw,
+            vec![
+                ("input.transfer.low".to_string(), "170".to_string()),
+                ("ups.id".to_string(), "my \"ups\"".to_string())
+            ]
+        );
+        assert_eq!(
+            parse_type("TYPE ups ups.id RW STRING:16"),
+            ("string".to_string(), Some(16))
+        );
+        assert_eq!(parse_type("TYPE ups input.transfer.low RW ENUM").0, "enum");
+        assert_eq!(
+            parse_type("TYPE ups battery.charge.low RW RANGE").0,
+            "range"
+        );
+        assert_eq!(parse_type("TYPE ups ups.delay.start RW NUMBER").0, "number");
+        let enums = parse_quoted_tail(
+            "ENUM ups input.transfer.low \"160\"\nENUM ups input.transfer.low \"170\"\n",
+            "ENUM ",
+        );
+        assert_eq!(
+            enums,
+            vec![vec!["160".to_string()], vec!["170".to_string()]]
+        );
+        let ranges = parse_quoted_tail("RANGE ups battery.charge.low \"5\" \"50\"\n", "RANGE ");
+        assert_eq!(ranges, vec![vec!["5".to_string(), "50".to_string()]]);
+    }
+
+    #[test]
+    fn the_netserver_listens_everywhere_with_one_monitor_login() {
+        let net = Netserver {
+            port: 3493,
+            user: "monitor".into(),
+            password: "abcdefgh12345678".into(),
+        };
+        assert!(net.validate().is_ok());
+        assert_eq!(render_upsd_conf(Some(&net)), "LISTEN 0.0.0.0 3493\n");
+        assert_eq!(render_nut_conf(Some(&net)), "MODE=netserver\n");
+        let users = render_upsd_users("s3cret", Some(&net));
+        assert!(users.contains("[monitor]\n  password = abcdefgh12345678\n  upsmon secondary\n"));
+        let other = Netserver {
+            port: 3500,
+            ..net.clone()
+        };
+        assert_eq!(
+            render_upsd_conf(Some(&other)),
+            "LISTEN 127.0.0.1 3493\nLISTEN 0.0.0.0 3500\n"
+        );
+        assert!(Netserver {
+            port: 80,
+            ..net.clone()
+        }
+        .validate()
+        .is_err());
+        assert!(Netserver {
+            user: "polaris".into(),
+            ..net.clone()
+        }
+        .validate()
+        .is_err());
+        assert!(Netserver {
+            user: "a]\n[b".into(),
+            ..net.clone()
+        }
+        .validate()
+        .is_err());
+        assert!(Netserver {
+            password: "short".into(),
+            ..net.clone()
+        }
+        .validate()
+        .is_err());
+        assert!(Netserver {
+            password: "abcdefgh1234567\n".into(),
+            ..net
+        }
+        .validate()
+        .is_err());
     }
 
     #[test]

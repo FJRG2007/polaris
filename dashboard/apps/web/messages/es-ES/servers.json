@@ -807,7 +807,9 @@
             "percent": "{value} %",
             "volts": "{value} V",
             "hertz": "{value} Hz",
-            "celsius": "{value} °C"
+            "celsius": "{value} °C",
+            "watts": "{value} W",
+            "kwh": "{value} kWh"
         },
         "regions": {
             "now": "Ahora",
@@ -826,7 +828,11 @@
             "temperature": "Temperatura",
             "model": "Modelo",
             "manufacturer": "Fabricante",
-            "serial": "Serie"
+            "serial": "Serie",
+            "power": "Potencia",
+            "transfer": "Conmuta a",
+            "firmware": "Firmware",
+            "frequency": "Frecuencia"
         },
         "ranges": {
             "h6": "6 h",
@@ -837,7 +843,11 @@
         "chart": {
             "percent": "Carga y uso",
             "voltage": "Tensión de red",
-            "empty": "Aún no hay historial. Se guarda una lectura por minuto."
+            "empty": "Aún no hay historial. Se guarda una lectura por minuto.",
+            "power": "Potencia usada",
+            "frequency": "Frecuencia de red",
+            "batteryVoltage": "Tensión de batería",
+            "runtime": "Autonomía"
         },
         "beeper": {
             "label": "Pitido",
@@ -861,7 +871,8 @@
                 "passed": "Superada",
                 "failed": "Fallida",
                 "running": "En curso"
-            }
+            },
+            "moved": "Las pruebas de batería están en Batería."
         },
         "noCommands": "Este SAI no ofrece estos controles.",
         "commandResult": {
@@ -869,7 +880,8 @@
             "unsupported": "Este SAI no admite eso.",
             "refused": "El SAI lo rechazó.",
             "unreachable": "No se pudo contactar con el SAI.",
-            "loginNeeded": "Los controles a través de un servidor NUT necesitan su usuario y contraseña. Añádelos a la conexión."
+            "loginNeeded": "Los controles a través de un servidor NUT necesitan su usuario y contraseña. Añádelos a la conexión.",
+            "invalid": "El SAI no aceptó ese valor."
         },
         "shutdown": {
             "intro": "Cuando se va la luz y la batería se agota, Polaris apaga estas máquinas de forma ordenada. La máquina donde corre Polaris se apaga la última.",
@@ -930,6 +942,233 @@
             "notFound": "Este SAI se quitó.",
             "failed": "No funcionó. Inténtalo de nuevo.",
             "invalid": "Revisa los campos marcados."
+        },
+        "tabs": {
+            "label": "Secciones",
+            "overview": "Resumen",
+            "energy": "Energía",
+            "power": "Potencia",
+            "battery": "Batería",
+            "events": "Eventos",
+            "commands": "Comandos",
+            "variables": "Variables",
+            "settings": "Ajustes"
+        },
+        "energy": {
+            "kwh": "kWh",
+            "powerNow": "Ahora",
+            "noRating": "Indica su potencia",
+            "used": "Consumo",
+            "cost": "Coste",
+            "noPrice": "Pon un precio",
+            "range": "Rango",
+            "from": "Desde",
+            "to": "Hasta",
+            "empty": "Aún no hay energía registrada en este rango.",
+            "chart": "Energía usada",
+            "when": "Cuándo",
+            "presets": {
+                "d1": "24 h",
+                "d7": "7 días",
+                "d30": "30 días",
+                "m12": "12 meses",
+                "custom": "Fechas"
+            },
+            "errors": {
+                "rangeTooLong": "Ese rango es demasiado largo para esta vista. Elige menos días.",
+                "invalidRange": "La fecha final debe ser posterior a la inicial."
+            }
+        },
+        "events": {
+            "state": "Vistos o no",
+            "since": "Desde cuándo",
+            "days": "{count} d",
+            "ackAll": "Marcar vistos",
+            "ackAllCount": "Marcar vistos ({count})",
+            "kinds": "Tipos",
+            "empty": "Ningún evento coincide.",
+            "acknowledged": "Visto",
+            "ack": "Marcar visto",
+            "more": "Se muestran los 100 más recientes. Acota los filtros para ver los anteriores.",
+            "states": {
+                "all": "Todos",
+                "open": "Sin ver",
+                "acknowledged": "Vistos"
+            }
+        },
+        "kinds": {
+            "ONLINE": "Vuelve la red",
+            "ONBATT": "En batería",
+            "LOWBATT": "Batería baja",
+            "REPLBATT": "Cambiar batería",
+            "FSD": "Apagado forzoso",
+            "CAL": "Calibrando",
+            "TRIM": "Bajando tensión",
+            "BOOST": "Subiendo tensión",
+            "OFF": "Apagado",
+            "OVERLOAD": "Sobrecarga",
+            "BYPASS": "En bypass",
+            "COMMOK": "Responde de nuevo",
+            "COMMBAD": "No responde",
+            "NOCOMM": "Mudo 5 min",
+            "SHUTDOWN": "Apagado enviado",
+            "TEST": "Prueba"
+        },
+        "commands": {
+            "confirm": {
+                "title": "¿Ejecutar este comando?",
+                "body": "Se enviará {command} al SAI ahora.",
+                "danger": "Esto puede cortar la corriente a todo lo conectado al SAI."
+            },
+            "run": "Lanzar",
+            "title": "Comandos",
+            "filter": "Filtrar comandos",
+            "dangerous": "Corta la luz",
+            "history": "Recientes",
+            "noHistory": "Aún no se ha ejecutado nada.",
+            "names": {
+                "beeperEnable": "Activar el pitido",
+                "beeperDisable": "Desactivar el pitido",
+                "beeperMute": "Silenciar el pitido",
+                "beeperToggle": "Alternar el pitido",
+                "testQuick": "Prueba rápida",
+                "testDeep": "Prueba larga",
+                "testStop": "Parar prueba de batería",
+                "panelStart": "Probar el panel",
+                "panelStop": "Parar prueba del panel",
+                "calibrateStart": "Calibrar la batería",
+                "calibrateStop": "Parar la calibración",
+                "loadOn": "Encender la salida",
+                "loadOff": "Apagar la salida",
+                "shutdownReturn": "Apagar, volver con red",
+                "shutdownStayoff": "Apagar y no volver",
+                "shutdownStop": "Cancelar un apagado",
+                "shutdownReboot": "Reiniciar la salida",
+                "bypassStart": "Pasar a bypass",
+                "bypassStop": "Salir de bypass"
+            }
+        },
+        "battery": {
+            "health": "Salud de batería",
+            "states": {
+                "good": "Buena",
+                "fair": "Regular",
+                "replace": "Cambiar",
+                "unknown": "Sin datos"
+            },
+            "reasons": {
+                "replaceFlag": "El SAI indica que hay que cambiar la batería.",
+                "testFailed": "La última prueba falló.",
+                "lowVoltage": "Cargada del todo, se queda por debajo de su tensión nominal.",
+                "old": "Tiene más de los 3 años que suele durar la batería de un SAI."
+            },
+            "years": "{value} años",
+            "facts": {
+                "age": "Edad",
+                "date": "Instalada",
+                "type": "Tipo",
+                "nominal": "Nominal",
+                "chargeLow": "Baja al",
+                "runtimeLow": "Autonomía baja"
+            },
+            "tests": "Autopruebas",
+            "noTests": "Este SAI no ofrece pruebas de batería.",
+            "noResults": "Aún no hay resultados.",
+            "history": "Batería en el tiempo"
+        },
+        "variables": {
+            "writable": "Ajustes del SAI",
+            "noWritable": "Este SAI no tiene nada que se pueda cambiar desde aquí.",
+            "edit": "Cambiar {name}",
+            "history": "Cambios",
+            "editTitle": "Cambiar un ajuste del SAI",
+            "value": "Valor",
+            "range": "Permitido: {ranges}",
+            "maxLen": "Hasta {count} caracteres.",
+            "set": "Fijar",
+            "raw": "Todas",
+            "filter": "Filtrar variables",
+            "copyAll": "Copiar todo",
+            "noMatch": "Ninguna variable coincide.",
+            "errors": {
+                "required": "Obligatorio",
+                "tooLong": "Muy largo",
+                "invalidValue": "Usa caracteres imprimibles, sin comillas ni barras invertidas.",
+                "notAnOption": "Elige uno de los valores que acepta el SAI.",
+                "notANumber": "Escribe un número.",
+                "outOfRange": "Fuera de lo que acepta el SAI."
+            }
+        },
+        "mappings": {
+            "title": "Mapeo de variables",
+            "intro": "Si este SAI da un valor con otro nombre, apunta el nombre estándar a ese.",
+            "standard": "Nombre estándar",
+            "own": "Nombre en este SAI",
+            "remove": "Quitar mapeo",
+            "invalid": "Usa el nombre propio del SAI, no el estándar.",
+            "add": "Añadir mapeo",
+            "save": "Guardar mapeo"
+        },
+        "settings": {
+            "errors": {
+                "networkUnavailable": "Solo se puede compartir en la red un SAI conectado a esta máquina.",
+                "invalidPrice": "Escribe un precio de 0 a 100.",
+                "invalidPower": "Escribe vatios enteros, de 1 a 100000.",
+                "invalidRetention": "Guarda de 7 a 365 días.",
+                "invalidCurrency": "Usa un código de moneda de 3 letras, como EUR.",
+                "invalid": "Revisa los campos de arriba."
+            },
+            "saved": "Ajustes guardados",
+            "savedTo": "Guardado en tu unidad como {path}",
+            "energy": "Energía y coste",
+            "currency": "Moneda",
+            "price": "Precio por kWh",
+            "rating": "Potencia en W",
+            "ratingHint": "Solo hace falta si el SAI no informa de su potencia real. Viene en su etiqueta.",
+            "notify": "Avisos",
+            "notifyIntro": "Todo evento queda registrado. Estos además avisan a los admins por sus propios canales.",
+            "reports": "Informe programado",
+            "reportsIntro": "Un resumen de energía, carga y eventos, guardado en la unidad de cada admin.",
+            "schedules": {
+                "off": "No",
+                "daily": "Diario",
+                "weekly": "Semanal",
+                "monthly": "Mensual"
+            },
+            "reportNow": "Hacer uno ya",
+            "reportLast": "El último se hizo el {when}.",
+            "data": "Datos",
+            "retention": "Guardar lecturas (días)",
+            "retentionHint": "La energía por horas y los eventos se guardan más tiempo.",
+            "exportWhat": "Qué exportar",
+            "exportDays": "Rango",
+            "exports": {
+                "samples": "Lecturas",
+                "events": "Eventos",
+                "energy": "Energía/hora",
+                "actions": "Comandos"
+            },
+            "download": "Bajar CSV",
+            "toDrive": "Guardar en unidad",
+            "network": "Compartir con otras máquinas",
+            "networkIntro": "Permite que otras máquinas sigan este SAI y se apaguen solas cuando se agote su batería. Polaris prepara el servicio y su acceso.",
+            "networkUnavailable": "Solo se puede compartir un SAI conectado por USB o SNMP a esta máquina.",
+            "networkOn": "Compartir este SAI en la red",
+            "networkHow": "En la otra máquina, añade esta línea a su monitor de NUT:",
+            "thisMachine": "dirección de esta máquina",
+            "copyLine": "Copiar línea",
+            "networkPort": "Las otras máquinas lo alcanzan en el puerto {port}. Ven todos los SAI de esta máquina.",
+            "showLogin": "Ver cómo conectar",
+            "save": "Guardar ajustes"
+        },
+        "analytics": {
+            "title": "Cada SAI",
+            "chart": "Energía por SAI",
+            "ups": "SAI",
+            "outages": "Cortes",
+            "events": "Eventos",
+            "load": "Carga",
+            "loadValue": "{avg}% media, {max}% máx."
         }
     }
 }

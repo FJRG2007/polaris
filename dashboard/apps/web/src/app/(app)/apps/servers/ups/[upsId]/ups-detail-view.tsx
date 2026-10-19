@@ -11,7 +11,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import {
     Badge,
@@ -35,6 +35,13 @@ import {
 import * as upsReading from "@/lib/ups/ups-reading";
 import type { UpsView } from "@/lib/ups/ups-service";
 import { UpsConnectionDialog } from "../ups-connection-dialog";
+import { UpsEnergyPanel } from "./ups-energy-panel";
+import { UpsEventsPanel } from "./ups-events-panel";
+import { UpsBatteryPanel } from "./ups-battery-panel";
+import { UpsCommandsPanel } from "./ups-commands-panel";
+import { UpsSettingsPanel } from "./ups-settings-panel";
+import { UpsVariablesPanel } from "./ups-variables-panel";
+import * as upsSettings from "@/lib/ups/ups-settings";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { removeUpsAction, runUpsCommandAction, updateUpsShutdownAction } from "../actions";
@@ -49,10 +56,35 @@ import {
 const POLL_MS = 10_000;
 const RANGES = { h6: 6, h24: 24, d7: 168, d30: 720 } as const;
 type RangeKey = keyof typeof RANGES;
+const TABS = [
+    "overview",
+    "energy",
+    "power",
+    "battery",
+    "events",
+    "commands",
+    "variables",
+    "settings"
+] as const;
+type Tab = (typeof TABS)[number];
 
-export function UpsDetailView({ initial, machines }: { initial: UpsView; machines: UpsMachine[] }) {
+export function UpsDetailView({
+    initial,
+    machines,
+    canOfferNetwork
+}: {
+    initial: UpsView;
+    machines: UpsMachine[];
+    canOfferNetwork: boolean;
+}) {
     const t = useTranslations("servers");
     const router = useRouter();
+    const pathname = usePathname();
+    const search = useSearchParams();
+    const asked = search.get("tab");
+    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "")
+        ? (asked as Tab)
+        : "overview";
     const [range, setRange] = useState<RangeKey>("h24");
     const [editing, setEditing] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -75,6 +107,27 @@ export function UpsDetailView({ initial, machines }: { initial: UpsView; machine
         }
         router.push("/apps/servers/ups");
     }
+
+    function openTab(next: Tab) {
+        const params = new URLSearchParams(search.toString());
+        if (next === "overview") params.delete("tab");
+        else params.set("tab", next);
+        const query = params.toString();
+        router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+
+    const rangePicker = (
+        <SegmentedControl<RangeKey>
+            size="sm"
+            aria-label={t("ups.regions.history")}
+            value={range}
+            onValueChange={setRange}
+            options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({
+                value: key,
+                label: t(`ups.ranges.${key}`)
+            }))}
+        />
+    );
 
     return (
         <>
@@ -102,66 +155,103 @@ export function UpsDetailView({ initial, machines }: { initial: UpsView; machine
                 }
             />
 
-            <div className="flex flex-col gap-6">
-                <section aria-labelledby="ups-now" className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <h2 id="ups-now" className="text-sm font-medium">
-                            {t("ups.regions.now")}
+            <div className="mb-4 overflow-x-auto">
+                <SegmentedControl<Tab>
+                    size="sm"
+                    aria-label={t("ups.tabs.label")}
+                    value={tab}
+                    onValueChange={openTab}
+                    options={TABS.map((key) => ({ value: key, label: t(`ups.tabs.${key}`) }))}
+                />
+            </div>
+
+            {tab === "overview" ? (
+                <div className="flex flex-col gap-6">
+                    <section aria-labelledby="ups-now" className="flex flex-col gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 id="ups-now" className="text-sm font-medium">
+                                {t("ups.regions.now")}
+                            </h2>
+                            {result === null ? (
+                                <Skeleton className="h-5 w-20" />
+                            ) : (
+                                <Badge variant={upsStatus(reading).tone}>
+                                    {t(`ups.status.${upsStatus(reading).key}`)}
+                                </Badge>
+                            )}
+                        </div>
+                        {result && !result.ok ? (
+                            <p role="status" className="text-sm text-muted-foreground">
+                                {t(`ups.unreachable.${result.reason}`)}
+                            </p>
+                        ) : (
+                            <UpsNow reading={reading} overrideW={ups.settings.nominalPowerW} />
+                        )}
+                    </section>
+
+                    <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
+                        <h2 id="ups-controls" className="text-sm font-medium">
+                            {t("ups.regions.controls")}
                         </h2>
                         {result === null ? (
-                            <Skeleton className="h-5 w-20" />
+                            <Skeleton className="h-16 w-full" />
                         ) : (
-                            <Badge variant={upsStatus(reading).tone}>
-                                {t(`ups.status.${upsStatus(reading).key}`)}
-                            </Badge>
+                            <UpsControls id={ups.id} reading={reading} />
                         )}
-                    </div>
-                    {result && !result.ok ? (
-                        <p role="status" className="text-sm text-muted-foreground">
-                            {t(`ups.unreachable.${result.reason}`)}
-                        </p>
-                    ) : (
-                        <UpsNow reading={reading} />
-                    )}
-                </section>
+                    </section>
 
+                    <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
+                        <h2 id="ups-shutdown" className="text-sm font-medium">
+                            {t("ups.regions.shutdown")}
+                        </h2>
+                        <UpsShutdown
+                            ups={initial}
+                            machines={machines}
+                            sentAt={ups.shutdownSentAt}
+                        />
+                    </section>
+                </div>
+            ) : null}
+
+            {tab === "power" ? (
                 <section aria-labelledby="ups-history" className="flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 id="ups-history" className="text-sm font-medium">
                             {t("ups.regions.history")}
                         </h2>
-                        <SegmentedControl<RangeKey>
-                            size="sm"
-                            aria-label={t("ups.regions.history")}
-                            value={range}
-                            onValueChange={setRange}
-                            options={(Object.keys(RANGES) as RangeKey[]).map((key) => ({
-                                value: key,
-                                label: t(`ups.ranges.${key}`)
-                            }))}
-                        />
+                        {rangePicker}
                     </div>
                     <UpsHistory answer={live.data} hours={RANGES[range]} />
                 </section>
-
-                <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
-                    <h2 id="ups-controls" className="text-sm font-medium">
-                        {t("ups.regions.controls")}
-                    </h2>
-                    {result === null ? (
-                        <Skeleton className="h-16 w-full" />
-                    ) : (
-                        <UpsControls id={ups.id} reading={reading} />
-                    )}
-                </section>
-
-                <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
-                    <h2 id="ups-shutdown" className="text-sm font-medium">
-                        {t("ups.regions.shutdown")}
-                    </h2>
-                    <UpsShutdown ups={initial} machines={machines} sentAt={ups.shutdownSentAt} />
-                </section>
-            </div>
+            ) : null}
+            {tab === "energy" ? <UpsEnergyPanel ups={ups} reading={reading} /> : null}
+            {tab === "battery" ? (
+                <div className="flex flex-col gap-3">
+                    <div className="flex justify-end">{rangePicker}</div>
+                    <UpsBatteryPanel upsId={ups.id} answer={live.data} hours={RANGES[range]} />
+                </div>
+            ) : null}
+            {tab === "events" ? <UpsEventsPanel upsId={ups.id} /> : null}
+            {tab === "commands" ? (
+                <UpsCommandsPanel
+                    upsId={ups.id}
+                    commands={result === null ? null : (reading?.commands ?? [])}
+                />
+            ) : null}
+            {tab === "variables" ? (
+                <UpsVariablesPanel
+                    ups={ups}
+                    vars={result === null ? null : result.ok ? result.vars : {}}
+                    rw={result === null ? null : result.ok ? result.rw : []}
+                    onChanged={() => {
+                        live.refresh();
+                        router.refresh();
+                    }}
+                />
+            ) : null}
+            {tab === "settings" ? (
+                <UpsSettingsPanel ups={initial} canOfferNetwork={canOfferNetwork} />
+            ) : null}
 
             {editing ? (
                 <UpsConnectionDialog
@@ -193,7 +283,13 @@ export function UpsDetailView({ initial, machines }: { initial: UpsView; machine
     );
 }
 
-function UpsNow({ reading }: { reading: upsReading.UpsReading | null }) {
+function UpsNow({
+    reading,
+    overrideW
+}: {
+    reading: upsReading.UpsReading | null;
+    overrideW: number | null;
+}) {
     const t = useTranslations("servers");
     const percent = (value: number | null) => {
         const shown = rounded(value);
@@ -237,7 +333,31 @@ function UpsNow({ reading }: { reading: upsReading.UpsReading | null }) {
             label: t("ups.metrics.temperature"),
             value: temperature === null ? null : t("ups.units.celsius", { value: temperature })
         },
+        {
+            key: "power",
+            label: t("ups.metrics.power"),
+            value: (() => {
+                const watts = reading
+                    ? upsSettings.powerWatts({
+                          realPowerW: reading.realPowerW,
+                          load: reading.load,
+                          nominalPowerW: reading.nominalPowerW,
+                          overrideW: overrideW
+                      })
+                    : null;
+                return watts === null ? null : t("ups.units.watts", { value: Math.round(watts) });
+            })()
+        },
+        {
+            key: "transfer",
+            label: t("ups.metrics.transfer"),
+            value:
+                reading?.transferLowV == null || reading.transferHighV == null
+                    ? null
+                    : `${t("ups.units.volts", { value: reading.transferLowV })} - ${t("ups.units.volts", { value: reading.transferHighV })}`
+        },
         { key: "model", label: t("ups.metrics.model"), value: reading?.model ?? null },
+        { key: "firmware", label: t("ups.metrics.firmware"), value: reading?.firmware ?? null },
         {
             key: "manufacturer",
             label: t("ups.metrics.manufacturer"),
@@ -288,6 +408,32 @@ function UpsHistory({ answer, hours }: { answer: UpsDetailAnswer | null; hours: 
                     key: "input",
                     label: t("ups.metrics.input"),
                     points: points.map((point) => ({ t: point.t, v: point.inputV }))
+                },
+                {
+                    key: "output",
+                    label: t("ups.metrics.output"),
+                    points: points.map((point) => ({ t: point.t, v: point.outputV }))
+                }
+            ],
+            power: [
+                {
+                    key: "power",
+                    label: t("ups.metrics.power"),
+                    points: points.map((point) => ({ t: point.t, v: point.powerW }))
+                }
+            ],
+            frequency: [
+                {
+                    key: "hz",
+                    label: t("ups.metrics.frequency"),
+                    points: points.map((point) => ({ t: point.t, v: point.inputHz }))
+                }
+            ],
+            battery: [
+                {
+                    key: "battery",
+                    label: t("ups.metrics.battery"),
+                    points: points.map((point) => ({ t: point.t, v: point.batteryV }))
                 }
             ],
             empty: points.length === 0
@@ -314,6 +460,27 @@ function UpsHistory({ answer, hours }: { answer: UpsDetailAnswer | null; hours: 
                 from={from}
                 to={to}
                 format={(value) => t("ups.units.volts", { value: Math.round(value) })}
+            />
+            <MultiSeriesChart
+                label={t("ups.chart.power")}
+                series={charts.power}
+                from={from}
+                to={to}
+                format={(value) => t("ups.units.watts", { value: Math.round(value) })}
+            />
+            <MultiSeriesChart
+                label={t("ups.chart.frequency")}
+                series={charts.frequency}
+                from={from}
+                to={to}
+                format={(value) => t("ups.units.hertz", { value: value.toFixed(1) })}
+            />
+            <MultiSeriesChart
+                label={t("ups.chart.batteryVoltage")}
+                series={charts.battery}
+                from={from}
+                to={to}
+                format={(value) => t("ups.units.volts", { value: value.toFixed(1) })}
             />
         </div>
     );
@@ -351,7 +518,6 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
         ) : null;
 
     const beeper = reading?.beeper?.toLowerCase();
-    const outcome = upsReading.testOutcome(reading?.testResult ?? null);
     const hasBeeper = ["beeper.enable", "beeper.disable", "beeper.mute"].some((one) =>
         commands.has(one as upsReading.UpsCommand)
     );
@@ -376,37 +542,7 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
                 </div>
             ) : null}
             {hasTest ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm">{t("ups.test.label")}</span>
-                    {button("test.battery.start.quick", t("ups.test.quick"))}
-                    {button("test.battery.start.deep", t("ups.test.deep"))}
-                    {button("test.battery.stop", t("ups.test.stop"))}
-                    <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                        {t("ups.test.result")}:
-                        {reading?.testResult ? (
-                            <>
-                                {outcome ? (
-                                    <Badge
-                                        variant={
-                                            outcome === "passed"
-                                                ? "success"
-                                                : outcome === "failed"
-                                                  ? "danger"
-                                                  : "neutral"
-                                        }
-                                    >
-                                        {t(`ups.test.outcome.${outcome}`)}
-                                    </Badge>
-                                ) : null}
-                                <span className="truncate" title={reading.testResult}>
-                                    {reading.testResult}
-                                </span>
-                            </>
-                        ) : (
-                            <span>{t("ups.test.none")}</span>
-                        )}
-                    </span>
-                </div>
+                <p className="text-sm text-muted-foreground">{t("ups.test.moved")}</p>
             ) : null}
         </div>
     );
