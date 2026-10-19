@@ -84,7 +84,8 @@
         "instance": "Compartida por Polaris",
         "signin": "Sesión de agente",
         "signinReason": "Las sesiones solo se usan en Agentes; Polar usa claves de API.",
-        "manage": "Gestionar claves de IA"
+        "manage": "Gestionar claves de IA",
+        "noReasoning": "Este modelo tiene un único nivel"
     },
     "intelligence": {
         "fast": "Rápido",
@@ -98,7 +99,14 @@
         "title": "¿Ejecutar {tool}?",
         "run": "Ejecutar",
         "deny": "Ahora no",
-        "runsAsYou": "Se ejecuta como tú"
+        "runsAsYou": "Se ejecuta como tú",
+        "label": "Polar pregunta antes de actuar",
+        "question": "¿{action}?",
+        "affects": "Afecta a:",
+        "destructive": "No se puede deshacer aquí.",
+        "details": "Detalles",
+        "accepted": "Aprobado",
+        "rejected": "No se ejecutó"
     },
     "tool": {
         "running": "Usando {tool}",
@@ -108,5 +116,42 @@
     },
     "page": {
         "title": "Polar"
+    },
+    "elements": {
+        "scrollDown": "Ir a lo último",
+        "previousVersion": "Versión anterior",
+        "nextVersion": "Versión siguiente",
+        "versionOf": "{current} de {total}",
+        "thinking": "Pensando",
+        "thoughtFor": "Pensó {seconds} s",
+        "parameters": "Parámetros",
+        "result": "Resultado",
+        "error": "Error",
+        "toolState": {
+            "input-streaming": "Preparando",
+            "input-available": "Ejecutando",
+            "approval-requested": "Espera tu visto bueno",
+            "approval-responded": "Respondido",
+            "output-available": "Hecho",
+            "output-error": "Falló",
+            "output-denied": "No se ejecutó"
+        }
+    },
+    "files": {
+        "add": "Adjuntar archivos",
+        "remove": "Quitar {name}",
+        "tooMany": "Hasta {most} archivos por mensaje.",
+        "errors": {
+            "unsupported_type": "{name}: ese tipo de archivo no se adjunta.",
+            "too_large": "{name} pesa más de 10 MB.",
+            "rate_limited": "Demasiadas subidas. Espera un minuto.",
+            "storage_failed": "{name} no se pudo guardar. Reinténtalo.",
+            "upload_failed": "{name} no se subió. Reinténtalo."
+        }
+    },
+    "suggestions": {
+        "page": "¿Qué hay en esta página?",
+        "summary": "Resume qué ha cambiado hoy",
+        "tools": "¿Qué puedes hacer aquí?"
     }
 }

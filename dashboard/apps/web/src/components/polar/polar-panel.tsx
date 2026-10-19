@@ -26,21 +26,41 @@ import {
     useState,
     type ReactNode
 } from "react";
-import { ArrowDown, ArrowUp, Copy, History, Maximize2, Pencil, Plus, RotateCcw, Square, Trash2, X } from "lucide-react";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger
-} from "@polaris/ui";
+import { Copy, History, Maximize2, Pencil, Plus, Reply, RotateCcw, Trash2, X } from "lucide-react";
+import { Shimmer } from "@/components/polar/elements/shimmer";
+import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
+import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
+import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
+import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
+import { Attachment, Attachments, type AttachmentData } from "@/components/polar/elements/attachments";
+import { ModelSelector, type ModelSelectorProvider } from "@/components/polar/elements/model-selector";
+import { Conversation, ConversationContent, ConversationEmptyState } from "@/components/polar/elements/conversation";
+import { affectedBy, Confirmation, type ConfirmationApproval } from "@/components/polar/elements/confirmation";
 import {
-    INTELLIGENCE_LEVELS,
+    Message,
+    MessageAction,
+    MessageActions,
+    MessageBranchSelector,
+    MessageContent,
+    MessageResponse
+} from "@/components/polar/elements/message";
+import {
+    PromptInput,
+    PromptInputAttach,
+    PromptInputFooter,
+    PromptInputHeader,
+    PromptInputSubmit,
+    PromptInputTextarea,
+    PromptInputTools
+} from "@/components/polar/elements/prompt-input";
+import {
     MAX_QUEUE,
-    type Intelligence,
+    POLAR_ATTACHMENT_MAX_BYTES,
+    POLAR_ATTACHMENT_MOST,
+    POLAR_ATTACHMENT_TYPES,
     type ModelChoice,
     type PageContext,
     type QueuedMessage
@@ -75,7 +95,6 @@ export function usePolarContext(extra: ExtraContext | null): void {
         if (!state) return;
         state.setExtra(extra);
         return () => state.setExtra(null);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [key]);
 }
 
@@ -208,16 +227,10 @@ export function PolarAside() {
     );
 }
 
+
 // ---------------------------------------------------------------------------
 // The chat
 // ---------------------------------------------------------------------------
-
-interface ProviderOption {
-    provider: string;
-    name: string;
-    payers: Array<"own" | "instance">;
-    models: Array<{ provider: string; model: string; name: string; reasoning: boolean }>;
-}
 
 const CHOICE_KEY = "polar.choice";
 const THREADS_KEY = "polar.threads";
@@ -234,13 +247,42 @@ function textOf(message: UIMessage): string {
 }
 
 type ThreadRow = { id: string; title: string; updatedAt: string };
+type ToolDescription = { title: string; writes: boolean; destructive: boolean };
+type StoredMessage = UIMessage & { parentId: string | null };
+
+const COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
+/** Commands that exist but belong to a later phase. */
+const LATER = new Set<string>(["call"]);
+
+/** Upload refusals the composer explains; anything else reads as a failed upload. */
+const UPLOAD_ERRORS = ["unsupported_type", "too_large", "rate_limited", "storage_failed", "upload_failed"] as const;
+type UploadError = (typeof UPLOAD_ERRORS)[number];
+
+async function uploadFile(file: File): Promise<AttachmentData | string> {
+    if (!(POLAR_ATTACHMENT_TYPES as readonly string[]).includes(file.type)) return "unsupported_type";
+    if (file.size > POLAR_ATTACHMENT_MAX_BYTES) return "too_large";
+    const response = await fetch(`/api/polar/attachments?name=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "content-type": file.type },
+        body: file
+    }).catch(() => null);
+    if (!response?.ok) {
+        const body = (await response?.json().catch(() => null)) as { error?: string } | null;
+        return body?.error ?? "upload_failed";
+    }
+    const { file: stored } = (await response.json()) as {
+        file: { id: string; url: string; filename: string; mediaType: string };
+    };
+    return { id: stored.id, url: stored.url, filename: stored.filename, mediaType: stored.mediaType };
+}
 
 export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void; fullPage?: boolean }) {
     const t = useTranslations("polar");
     const pathname = usePathname();
     const state = useContext(PolarContext);
     const [threadId, setThreadId] = useState(newId);
-    const [providers, setProviders] = useState<ProviderOption[] | null>(null);
+    const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
+    const [tools, setTools] = useState<Record<string, ToolDescription>>({});
     const [isAdmin, setIsAdmin] = useState(false);
     const [choice, setChoice] = useState<ModelChoice | null>(null);
     const [input, setInput] = useState("");
@@ -248,12 +290,20 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
     const [withPage, setWithPage] = useState(true);
     const [queue, setQueue] = useState<QueuedMessage[]>([]);
     const [editing, setEditing] = useState<string | null>(null);
+    const [files, setFiles] = useState<AttachmentData[]>([]);
+    const [fileError, setFileError] = useState<string | null>(null);
     const [threads, setThreads] = useState<ThreadRow[] | null>(null);
     const [showHistory, setShowHistory] = useState(fullPage);
     const [lastApproved, setLastApproved] = useState(false);
+    const tree = useRef<VersionTree>(new Map());
+    const textarea = useRef<HTMLTextAreaElement>(null);
+    const [, setTreeTick] = useState(0);
 
     const context = useMemo(
-        () => (withPage ? pageContextFrom(pathname, typeof document === "undefined" ? "" : document.title, state?.extra ?? null) : null),
+        () =>
+            withPage
+                ? pageContextFrom(pathname, typeof document === "undefined" ? "" : document.title, state?.extra ?? null)
+                : null,
         [withPage, pathname, state?.extra]
     );
     const live = useRef({ threadId, choice, context });
@@ -285,7 +335,12 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
 
-    // Models: last known value first, then the server's.
+    // Every message on screen joins the version tree as it appears.
+    useEffect(() => {
+        learnPath(tree.current, chat.messages);
+    }, [chat.messages]);
+
+    // Models and tools: last known choice first, then the server's.
     useEffect(() => {
         try {
             const cached = window.localStorage.getItem(CHOICE_KEY);
@@ -295,21 +350,38 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         }
         fetch("/api/polar/models")
             .then((response) => (response.ok ? response.json() : null))
-            .then((data: { providers: ProviderOption[]; isAdmin: boolean } | null) => {
-                if (!data) return setProviders([]);
-                setProviders(data.providers);
-                setIsAdmin(data.isAdmin);
-                setChoice((current) => {
-                    const known = data.providers.some((entry) =>
-                        entry.models.some((model) => model.provider === current?.provider && model.model === current?.model)
-                    );
-                    if (current && known) return current;
-                    const first = data.providers[0]?.models[0];
-                    return first
-                        ? { kind: "language", provider: first.provider, model: first.model, intelligence: "balanced", payer: null }
-                        : null;
-                });
-            })
+            .then(
+                (
+                    data: {
+                        providers: ModelSelectorProvider[];
+                        tools?: Record<string, ToolDescription>;
+                        isAdmin: boolean;
+                    } | null
+                ) => {
+                    if (!data) return setProviders([]);
+                    setProviders(data.providers);
+                    setTools(data.tools ?? {});
+                    setIsAdmin(data.isAdmin);
+                    setChoice((current) => {
+                        const known = data.providers.some((entry) =>
+                            entry.models.some(
+                                (model) => model.provider === current?.provider && model.model === current?.model
+                            )
+                        );
+                        if (current && known) return current;
+                        const first = data.providers[0]?.models[0];
+                        return first
+                            ? {
+                                  kind: "language",
+                                  provider: first.provider,
+                                  model: first.model,
+                                  intelligence: "balanced",
+                                  payer: null
+                              }
+                            : null;
+                    });
+                }
+            )
             .catch(() => setProviders([]));
     }, []);
     useEffect(() => {
@@ -360,29 +432,37 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         const [next, ...rest] = queue;
         saveQueue(rest);
         if (next) void chat.sendMessage({ text: next.text });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [busy, waitingApproval, queue.length, chat.status]);
 
     const openThread = async (id: string) => {
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         if (!response?.ok) return;
         const { thread } = (await response.json()) as {
-            thread: { id: string; messages: UIMessage[]; queue: QueuedMessage[]; choice: ModelChoice | null };
+            thread: { id: string; messages: StoredMessage[]; queue: QueuedMessage[]; choice: ModelChoice | null };
         };
+        // Every stored version goes into the tree; the newest path is shown.
+        const next: VersionTree = new Map();
+        learnPath(next, thread.messages, new Map(thread.messages.map((message) => [message.id, message.parentId])));
+        tree.current = next;
+        const roots = thread.messages.filter((message) => message.parentId === null);
+        const newestRoot = roots.at(-1);
         setThreadId(thread.id);
-        chat.setMessages(thread.messages);
+        chat.setMessages(newestRoot ? pathThrough(next, [], 0, newestRoot.id) : []);
         setQueue(thread.queue);
         if (thread.choice) setChoice(thread.choice);
         setShowHistory(fullPage);
     };
 
     const startNew = () => {
-        chat.stop();
+        void chat.stop();
+        tree.current = new Map();
         setThreadId(newId());
         chat.setMessages([]);
         setQueue([]);
         setInput("");
         setQuote(null);
+        setFiles([]);
+        setEditing(null);
     };
 
     const removeThread = async (id: string) => {
@@ -392,72 +472,134 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
         if (id === threadId) startNew();
     };
 
+    const addFiles = async (chosen: File[]) => {
+        setFileError(null);
+        const room = POLAR_ATTACHMENT_MOST - files.length;
+        if (chosen.length > room) setFileError(t("files.tooMany", { most: POLAR_ATTACHMENT_MOST }));
+        for (const file of chosen.slice(0, Math.max(0, room))) {
+            const key = newId();
+            const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+            setFiles((current) => [
+                ...current,
+                { id: key, url: preview, filename: file.name, mediaType: file.type, pending: true }
+            ]);
+            const stored = await uploadFile(file);
+            if (preview) URL.revokeObjectURL(preview);
+            if (typeof stored === "string") {
+                setFiles((current) => current.filter((entry) => entry.id !== key));
+                const code: UploadError = (UPLOAD_ERRORS as readonly string[]).includes(stored)
+                    ? (stored as UploadError)
+                    : "upload_failed";
+                setFileError(t(`files.errors.${code}`, { name: file.name }));
+            } else {
+                setFiles((current) => current.map((entry) => (entry.id === key ? stored : entry)));
+            }
+        }
+    };
+
+    const switchVersion = (index: number, version: string) => {
+        if (busy) return;
+        chat.setMessages(pathThrough(tree.current, chat.messages, index, version));
+        setTreeTick((tick) => tick + 1);
+    };
+
     const submit = () => {
         const raw = input.trim();
-        if (!raw || !choice) return;
+        const ready = files.filter((file) => !file.pending);
+        if ((!raw && ready.length === 0) || !choice || files.some((file) => file.pending)) return;
         if (raw === "/new") return startNew();
         if (raw === "/page") {
             setWithPage(true);
             return setInput("");
         }
+        if (raw === "/model") {
+            setInput("");
+            return document.getElementById("polar-model")?.click();
+        }
+        if (raw === "/file") {
+            setInput("");
+            return document.getElementById("polar-attach")?.querySelector("button")?.click();
+        }
         if (raw === "/tools") {
             setInput("");
             return void chat.sendMessage({ text: t("slash.toolsPrompt") });
         }
+        if (raw === "/call") return;
         const text = quote ? `> ${quote}\n\n${raw}` : raw;
+        const message = {
+            text,
+            files: ready.map((file) => ({
+                type: "file" as const,
+                mediaType: file.mediaType,
+                filename: file.filename,
+                url: file.url
+            }))
+        };
         setInput("");
         setQuote(null);
+        setFiles([]);
         if (editing) {
-            const index = chat.messages.findIndex((message) => message.id === editing);
+            const index = chat.messages.findIndex((entry) => entry.id === editing);
             setEditing(null);
-            if (index >= 0) {
+            if (index >= 0 && !busy) {
+                // The edited message stays in the tree as the earlier version.
                 chat.setMessages(chat.messages.slice(0, index));
-                return void chat.sendMessage({ text });
+                return void chat.sendMessage(message);
             }
         }
         if (busy || waitingApproval) {
-            if (queue.length < MAX_QUEUE) saveQueue([...queue, { id: newId(), text }]);
+            if (queue.length < MAX_QUEUE && text) saveQueue([...queue, { id: newId(), text }]);
             return;
         }
         setLastApproved(false);
-        void chat.sendMessage({ text });
+        void chat.sendMessage(message);
     };
 
+    const streamingText = chat.status === "streaming" && chat.messages.at(-1)?.parts.at(-1)?.type === "text";
     const mood: PolarMood =
-        chat.status === "error" ? "trouble" : busy ? "thinking" : waitingApproval ? "listening" : lastApproved ? "done" : "idle";
+        chat.status === "error"
+            ? "trouble"
+            : streamingText
+              ? "speaking"
+              : busy
+                ? "thinking"
+                : waitingApproval
+                  ? "listening"
+                  : lastApproved
+                    ? "done"
+                    : "idle";
     const noKeys = providers !== null && providers.length === 0;
-    const selected = providers
-        ?.flatMap((entry) => entry.models)
-        .find((model) => model.provider === choice?.provider && model.model === choice?.model);
     const slashOpen = input.startsWith("/") && !input.includes(" ");
-    const commands = ["new", "model", "page", "file", "tools", "call"] as const;
 
     return (
-        <div className="flex h-full min-h-0 flex-1">
+        <div className="relative flex h-full min-h-0 flex-1">
             {showHistory ? (
                 <nav
                     aria-label={t("history.title")}
-                    className={`${fullPage ? "w-64 border-r border-border" : "absolute inset-0 z-10 bg-card"} flex min-h-0 flex-col overflow-y-auto p-2`}
+                    className={`${fullPage ? "w-64 shrink-0 border-r border-border" : "absolute inset-0 z-10 bg-card"} flex min-h-0 flex-col overflow-y-auto p-2`}
                 >
                     <div className="flex items-center justify-between px-2 py-1 text-xs font-medium text-foreground-subtle">
                         {t("history.title")}
                         {!fullPage ? (
-                            <IconButton label={t("actions.close")} onClick={() => setShowHistory(false)}>
-                                <X className="h-4 w-4" />
-                            </IconButton>
+                            <MessageAction label={t("actions.close")} onClick={() => setShowHistory(false)}>
+                                <X />
+                            </MessageAction>
                         ) : null}
                     </div>
                     {threads === null ? (
                         <div className="space-y-2 p-2">
                             {[0, 1, 2].map((key) => (
-                                <div key={key} className="h-6 animate-pulse rounded bg-muted" />
+                                <div key={key} className="h-6 rounded bg-muted motion-safe:animate-pulse" />
                             ))}
                         </div>
                     ) : threads.length === 0 ? (
                         <p className="p-2 text-sm text-muted-foreground">{t("history.empty")}</p>
                     ) : (
                         threads.map((row) => (
-                            <div key={row.id} className="group flex min-w-0 items-center rounded-md hover:bg-card-hover">
+                            <div
+                                key={row.id}
+                                className={`group flex min-w-0 items-center rounded-md hover:bg-card-hover ${row.id === threadId ? "bg-card-hover" : ""}`}
+                            >
                                 <button
                                     type="button"
                                     onClick={() => void openThread(row.id)}
@@ -466,9 +608,9 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                 >
                                     {row.title}
                                 </button>
-                                <IconButton label={t("history.delete")} onClick={() => void removeThread(row.id)}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </IconButton>
+                                <MessageAction label={t("history.delete")} onClick={() => void removeThread(row.id)}>
+                                    <Trash2 />
+                                </MessageAction>
                             </div>
                         ))
                     )}
@@ -479,352 +621,325 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">Polar</span>
                     <span className="flex-1" />
-                    <IconButton label={t("actions.new")} onClick={startNew}>
-                        <Plus className="h-4 w-4" />
-                    </IconButton>
+                    <MessageAction label={t("actions.new")} onClick={startNew}>
+                        <Plus />
+                    </MessageAction>
                     {!fullPage ? (
                         <>
-                            <IconButton label={t("history.title")} onClick={() => setShowHistory(true)}>
-                                <History className="h-4 w-4" />
-                            </IconButton>
+                            <MessageAction label={t("history.title")} onClick={() => setShowHistory(true)}>
+                                <History />
+                            </MessageAction>
                             <Link
                                 href="/polar"
                                 aria-label={t("actions.openPage")}
                                 title={t("actions.openPage")}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-card-hover hover:text-foreground"
                             >
-                                <Maximize2 className="h-4 w-4" />
+                                <Maximize2 className="h-3.5 w-3.5" />
                             </Link>
-                            <IconButton label={t("actions.close")} onClick={() => onClose?.()}>
-                                <X className="h-4 w-4" />
-                            </IconButton>
+                            <MessageAction label={t("actions.close")} onClick={() => onClose?.()}>
+                                <X />
+                            </MessageAction>
                         </>
                     ) : null}
                 </div>
 
-                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3" aria-live="polite">
-                    {noKeys ? (
-                        <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
-                            <p className="text-foreground">{t("noKeys.title")}</p>
-                            <p className="mt-1">{t("noKeys.body")}</p>
-                            <div className="mt-2 flex flex-wrap gap-3">
-                                <Link href="/account/ai-keys" className="text-primary hover:underline">
-                                    {t("noKeys.own")}
-                                </Link>
-                                {isAdmin ? (
-                                    <Link href="/admin/ai-keys" className="text-primary hover:underline">
-                                        {t("noKeys.admin")}
+                <Conversation>
+                    <ConversationContent>
+                        {noKeys ? (
+                            <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
+                                <p className="text-foreground">{t("noKeys.title")}</p>
+                                <p className="mt-1">{t("noKeys.body")}</p>
+                                <div className="mt-2 flex flex-wrap gap-3">
+                                    <Link href="/account/ai-keys" className="text-primary hover:underline">
+                                        {t("noKeys.own")}
                                     </Link>
-                                ) : null}
+                                    {isAdmin ? (
+                                        <Link href="/admin/integrations/models" className="text-primary hover:underline">
+                                            {t("noKeys.admin")}
+                                        </Link>
+                                    ) : null}
+                                </div>
                             </div>
-                        </div>
-                    ) : chat.messages.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 py-10 text-center">
-                            <PolarMascot mood="idle" size={64} />
-                            <p className="text-sm text-muted-foreground">{t("empty")}</p>
-                        </div>
-                    ) : null}
-                    {chat.messages.map((message, index) => (
-                        <MessageView
-                            key={message.id}
-                            message={message}
-                            last={index === chat.messages.length - 1}
-                            busy={busy}
-                            onApprove={(id, approved) => {
-                                setLastApproved(approved);
-                                void chat.addToolApprovalResponse({ id, approved });
-                            }}
-                            onEdit={() => {
-                                setEditing(message.id);
-                                setInput(textOf(message));
-                            }}
-                            onQuote={() => setQuote(textOf(message).slice(0, 200))}
-                            onRegenerate={() => void chat.regenerate()}
-                        />
-                    ))}
-                    {busy ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <PolarMascot mood="thinking" size={18} />
-                            <span className="polar-shimmer">{t("status.thinking")}</span>
-                        </div>
-                    ) : null}
-                    {chat.error ? (
-                        <p role="alert" className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink">
-                            {t("errors.failed")}
-                        </p>
-                    ) : null}
-                </div>
+                        ) : chat.messages.length === 0 ? (
+                            <ConversationEmptyState
+                                icon={<PolarMascot mood="idle" size={64} />}
+                                description={t("empty")}
+                            >
+                                <Suggestions>
+                                    {(["page", "summary", "tools"] as const).map((key) => (
+                                        <Suggestion
+                                            key={key}
+                                            suggestion={t(`suggestions.${key}`)}
+                                            onClick={(text) => {
+                                                setInput(text);
+                                                textarea.current?.focus();
+                                            }}
+                                        />
+                                    ))}
+                                </Suggestions>
+                            </ConversationEmptyState>
+                        ) : null}
+                        {chat.messages.map((message, index) => {
+                            const versions = versionsOf(tree.current, message.id);
+                            const at = versions.indexOf(message.id);
+                            return (
+                                <MessageView
+                                    key={message.id}
+                                    message={message}
+                                    tools={tools}
+                                    last={index === chat.messages.length - 1}
+                                    busy={busy}
+                                    version={{ current: at + 1, total: versions.length }}
+                                    onVersion={(step) => {
+                                        const target = versions[at + step];
+                                        if (target) switchVersion(index, target);
+                                    }}
+                                    onApprove={(id, approved) => {
+                                        setLastApproved(approved);
+                                        void chat.addToolApprovalResponse({ id, approved });
+                                    }}
+                                    onEdit={() => {
+                                        setEditing(message.id);
+                                        setInput(textOf(message));
+                                        textarea.current?.focus();
+                                    }}
+                                    onQuote={() => setQuote(textOf(message).slice(0, 200))}
+                                    onRegenerate={() => void chat.regenerate()}
+                                />
+                            );
+                        })}
+                        {chat.status === "submitted" ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <PolarMascot mood="thinking" size={18} />
+                                <Shimmer>{t("status.thinking")}</Shimmer>
+                            </div>
+                        ) : null}
+                        {chat.error ? (
+                            <p
+                                role="alert"
+                                className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
+                            >
+                                {t("errors.failed")}
+                            </p>
+                        ) : null}
+                    </ConversationContent>
+                </Conversation>
 
                 {queue.length > 0 ? (
-                    <ol aria-label={t("queue.title")} className="mx-3 mb-2 space-y-1 rounded-lg border border-border bg-background p-2">
-                        <li className="text-xs text-foreground-subtle">{t("queue.title")}</li>
-                        {queue.map((item, index) => (
-                            <li key={item.id} className="flex min-w-0 items-center gap-1">
-                                <input
-                                    aria-label={t("queue.edit")}
+                    <Queue className="mx-3 mb-2">
+                        <QueueSection label={t("queue.title")}>
+                            {queue.map((item, index) => (
+                                <QueueItem
+                                    key={item.id}
                                     value={item.text}
-                                    maxLength={20000}
-                                    onChange={(event) =>
-                                        setQueue(queue.map((entry) => (entry.id === item.id ? { ...entry, text: event.target.value } : entry)))
+                                    labels={{
+                                        edit: t("queue.edit"),
+                                        up: t("queue.up"),
+                                        down: t("queue.down"),
+                                        remove: t("queue.remove")
+                                    }}
+                                    first={index === 0}
+                                    last={index === queue.length - 1}
+                                    onChange={(text) =>
+                                        setQueue(queue.map((entry) => (entry.id === item.id ? { ...entry, text } : entry)))
                                     }
-                                    onBlur={() => saveQueue(queue.filter((entry) => entry.text.trim()))}
-                                    className="h-7 min-w-0 flex-1 rounded border border-border bg-field px-2 text-sm text-foreground"
+                                    onCommit={() => saveQueue(queue.filter((entry) => entry.text.trim()))}
+                                    onUp={() => saveQueue(moveItem(queue, index, index - 1))}
+                                    onDown={() => saveQueue(moveItem(queue, index, index + 1))}
+                                    onRemove={() => saveQueue(queue.filter((entry) => entry.id !== item.id))}
                                 />
-                                <IconButton
-                                    label={t("queue.up")}
-                                    disabled={index === 0}
-                                    onClick={() => saveQueue(swap(queue, index, index - 1))}
-                                >
-                                    <ArrowUp className="h-3.5 w-3.5" />
-                                </IconButton>
-                                <IconButton
-                                    label={t("queue.down")}
-                                    disabled={index === queue.length - 1}
-                                    onClick={() => saveQueue(swap(queue, index, index + 1))}
-                                >
-                                    <ArrowDown className="h-3.5 w-3.5" />
-                                </IconButton>
-                                <IconButton label={t("queue.remove")} onClick={() => saveQueue(queue.filter((entry) => entry.id !== item.id))}>
-                                    <X className="h-3.5 w-3.5" />
-                                </IconButton>
-                            </li>
-                        ))}
-                    </ol>
+                            ))}
+                        </QueueSection>
+                    </Queue>
                 ) : null}
 
                 <div className="shrink-0 border-t border-border p-3">
                     {slashOpen ? (
-                        <ul role="listbox" aria-label={t("slash.title")} className="mb-2 rounded-lg border border-border bg-elevated p-1 shadow-popover">
-                            {commands
-                                .filter((command) => `/${command}`.startsWith(input))
-                                .map((command) => {
-                                    const disabled = command === "call" || command === "file";
-                                    return (
-                                        <li key={command}>
-                                            <button
-                                                type="button"
-                                                role="option"
-                                                aria-selected={false}
-                                                disabled={disabled}
-                                                title={disabled ? t("slash.later") : undefined}
-                                                onClick={() => setInput(`/${command}`)}
-                                                className="flex w-full items-center gap-3 rounded px-2 py-1.5 text-left text-sm hover:bg-option-hover disabled:opacity-50"
-                                            >
-                                                <span className="font-mono text-foreground">/{command}</span>
-                                                <span className="truncate text-muted-foreground">{t(`slash.${command}`)}</span>
-                                            </button>
-                                        </li>
-                                    );
-                                })}
+                        <ul
+                            role="listbox"
+                            aria-label={t("slash.title")}
+                            className="mb-2 rounded-lg border border-border bg-elevated p-1 shadow-popover"
+                        >
+                            {COMMANDS.filter((command) => `/${command}`.startsWith(input)).map((command) => {
+                                const disabled = LATER.has(command);
+                                return (
+                                    <li key={command}>
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            aria-selected={false}
+                                            aria-disabled={disabled}
+                                            title={disabled ? t("slash.later") : undefined}
+                                            onClick={() => {
+                                                if (disabled) return;
+                                                setInput(`/${command}`);
+                                                textarea.current?.focus();
+                                            }}
+                                            className="flex w-full min-w-0 items-center gap-3 rounded px-2 py-1.5 text-left text-sm hover:bg-option-hover aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                                        >
+                                            <span className="shrink-0 font-mono text-foreground">/{command}</span>
+                                            <span className="min-w-0 truncate text-muted-foreground">
+                                                {disabled ? t("slash.later") : t(`slash.${command}`)}
+                                            </span>
+                                        </button>
+                                    </li>
+                                );
+                            })}
                         </ul>
                     ) : null}
-                    <div className="rounded-lg border border-border bg-field p-2 focus-within:border-border-strong">
-                        <div className="mb-1 flex flex-wrap gap-1">
+                    <PromptInput onSubmit={submit}>
+                        <PromptInputHeader>
                             {context ? (
-                                <span className="inline-flex max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" title={t("context.title")}>
-                                    <span className="truncate">{context.title ?? context.route}</span>
-                                    <button type="button" aria-label={t("context.remove")} onClick={() => setWithPage(false)}>
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </span>
+                                <Chip
+                                    title={t("context.title")}
+                                    label={context.record?.name ?? context.title ?? context.route}
+                                    removeLabel={t("context.remove")}
+                                    onRemove={() => setWithPage(false)}
+                                />
                             ) : null}
                             {quote ? (
-                                <span className="inline-flex max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                                    <span className="truncate">
-                                        {t("reply.to")} &quot;{quote}&quot;
-                                    </span>
-                                    <button type="button" aria-label={t("reply.cancel")} onClick={() => setQuote(null)}>
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </span>
+                                <Chip
+                                    label={`${t("reply.to")} "${quote}"`}
+                                    removeLabel={t("reply.cancel")}
+                                    onRemove={() => setQuote(null)}
+                                />
                             ) : null}
                             {editing ? (
-                                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                                    {t("edit.editing")}
-                                    <button type="button" aria-label={t("edit.cancel")} onClick={() => setEditing(null)}>
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </span>
+                                <Chip
+                                    label={t("edit.editing")}
+                                    removeLabel={t("edit.cancel")}
+                                    onRemove={() => setEditing(null)}
+                                />
                             ) : null}
-                        </div>
-                        <label htmlFor="polar-input" className="sr-only">
+                        </PromptInputHeader>
+                        {files.length > 0 ? (
+                            <Attachments className="mb-2 mt-1">
+                                {files.map((file) => (
+                                    <Attachment
+                                        key={file.id}
+                                        file={file}
+                                        removeLabel={t("files.remove", { name: file.filename ?? "" })}
+                                        onRemove={() => setFiles((current) => current.filter((entry) => entry.id !== file.id))}
+                                    />
+                                ))}
+                            </Attachments>
+                        ) : null}
+                        {fileError ? (
+                            <p role="alert" className="mb-1 text-xs text-danger-ink">
+                                {fileError}
+                            </p>
+                        ) : null}
+                        <label htmlFor={fullPage ? "polar-input-page" : "polar-input"} className="sr-only">
                             {t("composer.label")}
                         </label>
-                        <textarea
-                            id="polar-input"
-                            rows={2}
+                        <PromptInputTextarea
+                            ref={textarea}
+                            id={fullPage ? "polar-input-page" : "polar-input"}
                             value={input}
                             maxLength={20000}
                             disabled={noKeys}
                             placeholder={t("composer.placeholder")}
                             onChange={(event) => setInput(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey) {
+                            onSubmitKey={submit}
+                            onPaste={(event) => {
+                                const pasted = Array.from(event.clipboardData.files);
+                                if (pasted.length > 0) {
                                     event.preventDefault();
-                                    submit();
+                                    void addFiles(pasted);
                                 }
                             }}
-                            className="w-full resize-none bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-subtle"
                         />
-                        <div className="flex items-center gap-1">
-                            <ModelPicker providers={providers ?? []} choice={choice} onChoice={setChoice} label={selected?.name ?? t("picker.none")} />
-                            <span className="flex-1" />
-                            {busy ? (
-                                <IconButton label={t("actions.stop")} onClick={() => void chat.stop()}>
-                                    <Square className="h-4 w-4" />
-                                </IconButton>
-                            ) : null}
-                            <button
-                                type="button"
-                                aria-label={t("actions.send")}
-                                title={t("actions.send")}
-                                disabled={!input.trim() || !choice}
-                                onClick={submit}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground disabled:opacity-50"
-                            >
-                                <ArrowUp className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
+                        <PromptInputFooter>
+                            <PromptInputTools>
+                                <span id="polar-attach" className="contents">
+                                    <PromptInputAttach
+                                        label={t("files.add")}
+                                        accept={POLAR_ATTACHMENT_TYPES}
+                                        disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
+                                        onFiles={(chosen) => void addFiles(chosen)}
+                                    />
+                                </span>
+                                <span id="polar-model" className="contents">
+                                    <ModelSelector providers={providers ?? []} choice={choice} onChoice={setChoice} />
+                                </span>
+                            </PromptInputTools>
+                            <PromptInputSubmit
+                                busy={busy}
+                                disabled={(!input.trim() && files.length === 0) || !choice || files.some((file) => file.pending)}
+                                sendLabel={t("actions.send")}
+                                stopLabel={t("actions.stop")}
+                                onStop={() => void chat.stop()}
+                            />
+                        </PromptInputFooter>
+                    </PromptInput>
                     <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
                 </div>
             </div>
-            <style>{`@keyframes polar-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}.polar-shimmer{background:linear-gradient(90deg,hsl(var(--muted-foreground)) 0,hsl(var(--foreground)) 50%,hsl(var(--muted-foreground)) 100%);background-size:200px 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:polar-shimmer 1.6s linear infinite}@media (prefers-reduced-motion: reduce){.polar-shimmer{animation:none;color:hsl(var(--muted-foreground))}}`}</style>
         </div>
     );
 }
 
-function swap<T>(list: T[], from: number, to: number): T[] {
+function moveItem<T>(list: T[], from: number, to: number): T[] {
     const next = [...list];
     const [moved] = next.splice(from, 1);
     if (moved !== undefined) next.splice(to, 0, moved);
     return next;
 }
 
-function IconButton({
+function Chip({
     label,
-    onClick,
-    disabled,
-    children
+    title,
+    removeLabel,
+    onRemove
 }: {
     label: string;
-    onClick: () => void;
-    disabled?: boolean;
-    children: ReactNode;
+    title?: string;
+    removeLabel: string;
+    onRemove: () => void;
 }) {
     return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground disabled:opacity-40"
+        <span
+            className="inline-flex min-w-0 max-w-full items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+            title={title ? `${title}: ${label}` : label}
         >
-            {children}
-        </button>
-    );
-}
-
-function ModelPicker({
-    providers,
-    choice,
-    onChoice,
-    label
-}: {
-    providers: ProviderOption[];
-    choice: ModelChoice | null;
-    onChoice: (choice: ModelChoice) => void;
-    label: string;
-}) {
-    const t = useTranslations("polar");
-    const provider = providers.find((entry) => entry.provider === choice?.provider);
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    title={t("picker.title")}
-                    className="inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
-                >
-                    <span className="truncate text-foreground">{label}</span>
-                    {choice ? <span>{t(`intelligence.${choice.intelligence}`)}</span> : null}
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-96 w-72 overflow-y-auto">
-                {providers.map((entry) => (
-                    <div key={entry.provider}>
-                        <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
-                        {entry.models.map((model) => (
-                            <DropdownMenuItem
-                                key={model.model}
-                                onSelect={() =>
-                                    onChoice({
-                                        kind: "language",
-                                        provider: model.provider,
-                                        model: model.model,
-                                        intelligence: choice?.intelligence ?? "balanced",
-                                        payer: null
-                                    })
-                                }
-                            >
-                                <span className="truncate" title={model.name}>{model.name}</span>
-                            </DropdownMenuItem>
-                        ))}
-                    </div>
-                ))}
-                {choice ? (
-                    <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>{t("picker.intelligence")}</DropdownMenuLabel>
-                        {INTELLIGENCE_LEVELS.map((level: Intelligence) => (
-                            <DropdownMenuItem key={level} onSelect={() => onChoice({ ...choice, intelligence: level })}>
-                                {t(`intelligence.${level}`)}
-                                {choice.intelligence === level ? " *" : ""}
-                            </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>{t("picker.payer")}</DropdownMenuLabel>
-                        {(provider?.payers ?? []).map((payer) => (
-                            <DropdownMenuItem key={payer} onSelect={() => onChoice({ ...choice, payer })}>
-                                {t(`picker.${payer}`)}
-                            </DropdownMenuItem>
-                        ))}
-                        <DropdownMenuItem disabled title={t("picker.signinReason")}>
-                            <span className="text-foreground-subtle">{t("picker.signin")}</span>
-                        </DropdownMenuItem>
-                    </>
-                ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                    <Link href="/account/ai-keys">{t("picker.manage")}</Link>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+            <span className="min-w-0 truncate">{label}</span>
+            <button type="button" aria-label={removeLabel} title={removeLabel} onClick={onRemove} className="shrink-0">
+                <X className="h-3 w-3" />
+            </button>
+        </span>
     );
 }
 
 type ToolPart = {
     type: string;
-    state: string;
+    state: ToolState;
     toolCallId: string;
+    toolName?: string;
     input?: unknown;
     output?: unknown;
-    approval?: { id: string };
+    errorText?: string;
+    approval?: ConfirmationApproval;
 };
 
 function MessageView({
     message,
+    tools,
     last,
     busy,
+    version,
+    onVersion,
     onApprove,
     onEdit,
     onQuote,
     onRegenerate
 }: {
     message: UIMessage;
+    tools: Record<string, ToolDescription>;
     last: boolean;
     busy: boolean;
+    version: { current: number; total: number };
+    onVersion: (step: -1 | 1) => void;
     onApprove: (id: string, approved: boolean) => void;
     onEdit: () => void;
     onQuote: () => void;
@@ -832,90 +947,97 @@ function MessageView({
 }) {
     const t = useTranslations("polar");
     const mine = message.role === "user";
-    const meta = (message.metadata ?? {}) as { fellBackFrom?: string | null; model?: string };
+    const from = mine ? "user" : "assistant";
+    const meta = (message.metadata ?? {}) as { fellBackFrom?: string | null };
+    const files = message.parts.filter((part) => part.type === "file");
+    const streaming = busy && last;
+    const toolName = (name: string) => tools[name]?.title ?? name;
     return (
-        <div className={`group flex flex-col gap-1 ${mine ? "items-end" : "items-start"}`}>
-            {meta.fellBackFrom ? (
-                <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p>
+        <Message from={from}>
+            {meta.fellBackFrom ? <p className="text-xs text-warning-ink">{t("errors.modelGone")}</p> : null}
+            {files.length > 0 ? (
+                <Attachments className={mine ? "justify-end" : undefined}>
+                    {files.map((part, index) => (
+                        <Attachment
+                            key={index}
+                            file={{ id: String(index), url: part.url, filename: part.filename, mediaType: part.mediaType }}
+                        />
+                    ))}
+                </Attachments>
             ) : null}
             {message.parts.map((part, index) => {
                 if (part.type === "text") {
+                    if (!part.text.trim()) return null;
                     return (
-                        <div
-                            key={index}
-                            className={`max-w-full whitespace-pre-wrap break-words text-sm ${mine ? "rounded-lg bg-muted px-3 py-2 text-foreground" : "text-foreground"}`}
-                        >
-                            {part.text}
-                        </div>
+                        <MessageContent key={index} from={from}>
+                            {mine ? <p className="whitespace-pre-wrap">{part.text}</p> : <MessageResponse>{part.text}</MessageResponse>}
+                        </MessageContent>
                     );
                 }
                 if (part.type === "reasoning") {
                     return (
-                        <details key={index} className="text-xs text-muted-foreground">
-                            <summary className="cursor-pointer">{t("reasoning")}</summary>
-                            <p className="mt-1 whitespace-pre-wrap">{part.text}</p>
-                        </details>
+                        <Reasoning key={index} isStreaming={streaming && index === message.parts.length - 1}>
+                            {part.text}
+                        </Reasoning>
                     );
                 }
                 if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
                     const tool = part as unknown as ToolPart;
-                    const name = part.type === "dynamic-tool" ? "tool" : part.type.slice(5);
-                    if (tool.state === "approval-requested" && tool.approval) {
-                        const approvalId = tool.approval.id;
+                    const name = part.type === "dynamic-tool" ? (tool.toolName ?? "tool") : part.type.slice(5);
+                    const described = tools[name];
+                    if (tool.approval) {
                         return (
-                            <div key={index} className="w-full rounded-lg border border-border bg-background p-3 text-sm">
-                                <p className="font-medium text-foreground">{t("approval.title", { tool: name })}</p>
-                                <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">
-                                    {JSON.stringify(tool.input, null, 2)}
-                                </pre>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => onApprove(approvalId, true)}
-                                        className="h-7 rounded-md bg-primary px-3 text-xs text-primary-foreground"
-                                    >
-                                        {t("approval.run")}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => onApprove(approvalId, false)}
-                                        className="h-7 rounded-md border border-border px-3 text-xs text-foreground hover:bg-card-hover"
-                                    >
-                                        {t("approval.deny")}
-                                    </button>
-                                    <span className="text-xs text-foreground-subtle">{t("approval.runsAsYou")}</span>
-                                </div>
-                            </div>
+                            <Confirmation
+                                key={index}
+                                state={tool.state}
+                                approval={tool.approval}
+                                action={toolName(name)}
+                                affects={affectedBy(tool.input)}
+                                destructive={described?.destructive ?? true}
+                                input={tool.input}
+                                onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
+                                onReject={() => tool.approval && onApprove(tool.approval.id, false)}
+                            />
                         );
                     }
                     return (
-                        <div key={index} className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                            {t(`tool.${tool.state === "output-denied" ? "denied" : tool.state === "output-available" ? "done" : tool.state === "output-error" ? "failed" : "running"}`, { tool: name })}
-                        </div>
+                        <Tool key={index} title={toolName(name)} state={tool.state}>
+                            <ToolInput input={tool.input} />
+                            <ToolOutput output={tool.output} errorText={tool.errorText} />
+                        </Tool>
                     );
                 }
                 return null;
             })}
-            {!busy || !last ? (
-                <div className="flex gap-0.5 opacity-0 transition-opacity duration-fast focus-within:opacity-100 group-hover:opacity-100">
+            {!streaming ? (
+                <MessageActions className="opacity-0 transition-opacity duration-fast focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                    <MessageBranchSelector
+                        current={version.current}
+                        total={version.total}
+                        onPrevious={() => onVersion(-1)}
+                        onNext={() => onVersion(1)}
+                    />
                     {mine ? (
-                        <IconButton label={t("actions.edit")} onClick={onEdit}>
-                            <Pencil className="h-3.5 w-3.5" />
-                        </IconButton>
+                        <MessageAction label={t("actions.edit")} onClick={onEdit}>
+                            <Pencil />
+                        </MessageAction>
                     ) : null}
-                    <IconButton label={t("actions.reply")} onClick={onQuote}>
-                        <RotateCcw className="h-3.5 w-3.5 -scale-x-100" />
-                    </IconButton>
-                    <IconButton label={t("actions.copy")} onClick={() => void navigator.clipboard?.writeText(textOf(message))}>
-                        <Copy className="h-3.5 w-3.5" />
-                    </IconButton>
+                    <MessageAction label={t("actions.reply")} onClick={onQuote}>
+                        <Reply />
+                    </MessageAction>
+                    <MessageAction
+                        label={t("actions.copy")}
+                        onClick={() => void navigator.clipboard?.writeText(textOf(message))}
+                    >
+                        <Copy />
+                    </MessageAction>
                     {!mine && last ? (
-                        <IconButton label={t("actions.regenerate")} onClick={onRegenerate}>
-                            <RotateCcw className="h-3.5 w-3.5" />
-                        </IconButton>
+                        <MessageAction label={t("actions.regenerate")} onClick={onRegenerate}>
+                            <RotateCcw />
+                        </MessageAction>
                     ) : null}
-                </div>
+                </MessageActions>
             ) : null}
-        </div>
+        </Message>
     );
 }

@@ -84,7 +84,8 @@
         "instance": "Shared by this Polaris",
         "signin": "Agent sign-in",
         "signinReason": "Sign-ins only run inside Agents sessions; Polar uses API keys.",
-        "manage": "Manage AI provider keys"
+        "manage": "Manage AI provider keys",
+        "noReasoning": "This model has one fixed level"
     },
     "intelligence": {
         "fast": "Fast",
@@ -98,7 +99,14 @@
         "title": "Run {tool}?",
         "run": "Run it",
         "deny": "Not now",
-        "runsAsYou": "Runs as you"
+        "runsAsYou": "Runs as you",
+        "label": "Polar asks before it acts",
+        "question": "{action}?",
+        "affects": "Affects:",
+        "destructive": "This can't be undone from here.",
+        "details": "Details",
+        "accepted": "Approved",
+        "rejected": "Not run"
     },
     "tool": {
         "running": "Using {tool}",
@@ -108,5 +116,42 @@
     },
     "page": {
         "title": "Polar"
+    },
+    "elements": {
+        "scrollDown": "Scroll to newest",
+        "previousVersion": "Previous version",
+        "nextVersion": "Next version",
+        "versionOf": "{current} of {total}",
+        "thinking": "Thinking",
+        "thoughtFor": "Thought for {seconds} s",
+        "parameters": "Parameters",
+        "result": "Result",
+        "error": "Error",
+        "toolState": {
+            "input-streaming": "Preparing",
+            "input-available": "Running",
+            "approval-requested": "Awaiting approval",
+            "approval-responded": "Answered",
+            "output-available": "Done",
+            "output-error": "Failed",
+            "output-denied": "Not run"
+        }
+    },
+    "files": {
+        "add": "Attach files",
+        "remove": "Remove {name}",
+        "tooMany": "Up to {most} files per message.",
+        "errors": {
+            "unsupported_type": "{name}: that kind of file can't be attached.",
+            "too_large": "{name} is bigger than 10 MB.",
+            "rate_limited": "Too many uploads. Wait a minute.",
+            "storage_failed": "{name} couldn't be saved. Try again.",
+            "upload_failed": "{name} didn't upload. Try again."
+        }
+    },
+    "suggestions": {
+        "page": "What's on this page?",
+        "summary": "Summarize what changed today",
+        "tools": "What can you do here?"
     }
 }
