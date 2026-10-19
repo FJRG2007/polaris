@@ -248,9 +248,8 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { playSound, stopSound, setSoundDenial, setChannelSoundboard, spaceSoundboard } = await import(
-    "@/lib/chat/soundboard-service"
-);
+const { playSound, stopSound, setSoundDenial, setChannelSoundboard, spaceSoundboard } =
+    await import("@/lib/chat/soundboard-service");
 const { ChatAccessError } = await import("@/lib/chat/access");
 
 const seat = { meetingId: MEETING, participantId: SEAT, admission: "admitted" } as never;
@@ -457,7 +456,11 @@ describe("stopping a sound", () => {
     it("tells the room to stop this seat's sound, stamped from the seat", async () => {
         await stopSound(seat);
         expect(sent).toEqual([
-            { meetingId: MEETING, payload: { kind: "stop", from: SEAT }, topic: "polaris.soundboard" }
+            {
+                meetingId: MEETING,
+                payload: { kind: "stop", from: SEAT },
+                topic: "polaris.soundboard"
+            }
         ]);
     });
 

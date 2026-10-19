@@ -16,7 +16,9 @@ const resolveSeat = vi.fn();
 const keepSeat = vi.fn(async () => undefined);
 const leave = vi.fn(async () => undefined);
 const retakeSeat = vi.fn(async () => SEAT as typeof SEAT | null);
-const backgroundUser = vi.fn(async () => ({ id: "u1", name: "Ada" }) as { id: string; name: string } | null);
+const backgroundUser = vi.fn(
+    async () => ({ id: "u1", name: "Ada" }) as { id: string; name: string } | null
+);
 const sessionCan = vi.fn(async () => true);
 
 vi.mock("@/lib/chat/meeting-seat", () => ({ resolveSeat }));

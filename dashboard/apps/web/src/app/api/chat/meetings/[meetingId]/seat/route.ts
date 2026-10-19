@@ -57,7 +57,8 @@ async function seatFor(params: Params["params"]) {
 async function reseat(meetingId: string): Promise<meetings.MeetingSeat | null> {
     const user = await backgroundUser();
     if (!user) return null;
-    if (!(await sessionCan(user, "chat.use")) || !(await sessionCan(user, "chat.call"))) return null;
+    if (!(await sessionCan(user, "chat.use")) || !(await sessionCan(user, "chat.call")))
+        return null;
     if (await callsUnavailable()) return null;
     try {
         return await meetings.retakeSeat({ id: user.id, name: user.name }, meetingId);
@@ -97,7 +98,11 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     }
     // Gone rather than not found: the seat was swept or left, and the browser
     // asking should stop rather than keep trying a path that exists.
-    if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInCall") }, { status: 410 });
+    if (!seat)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.notInCall") },
+            { status: 410 }
+        );
     await meetings.keepSeat(seat, beat ? (voice as meetings.VoiceState) : undefined);
     return new Response(null, { status: 204 });
 }

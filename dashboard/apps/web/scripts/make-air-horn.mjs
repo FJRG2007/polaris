@@ -30,14 +30,17 @@ const VOICES = [220, 261.6, 329.6].flatMap((hz) => [hz * 0.997, hz * 1.004]);
 const LEAD = 0.02;
 const TAIL = 0.12;
 
-const total = Math.ceil((LEAD + BLASTS.reduce((sum, [on, gap]) => sum + on + gap, 0) + TAIL) * RATE);
+const total = Math.ceil(
+    (LEAD + BLASTS.reduce((sum, [on, gap]) => sum + on + gap, 0) + TAIL) * RATE
+);
 const samples = new Float64Array(total);
 
 /** One band-limited sawtooth: harmonics at 1/n, none above Nyquist, so it
  *  carries no aliasing whistle. */
 function saw(hz, time) {
     let value = 0;
-    for (let n = 1; hz * n < NYQUIST * 0.9; n += 1) value += Math.sin(2 * Math.PI * hz * n * time) / n;
+    for (let n = 1; hz * n < NYQUIST * 0.9; n += 1)
+        value += Math.sin(2 * Math.PI * hz * n * time) / n;
     return value;
 }
 
@@ -77,7 +80,8 @@ function gatedRms(data) {
 
 const gain = 10 ** (-20 / 20) / gatedRms(samples);
 let peak = 0;
-for (let index = 0; index < total; index += 1) peak = Math.max(peak, Math.abs(samples[index] * gain));
+for (let index = 0; index < total; index += 1)
+    peak = Math.max(peak, Math.abs(samples[index] * gain));
 if (peak > 10 ** (-1 / 20)) throw new Error(`peak ${peak.toFixed(3)} is over -1 dBFS`);
 
 const wav = Buffer.alloc(44 + total * 2);
@@ -95,7 +99,10 @@ wav.writeUInt16LE(16, 34);
 wav.write("data", 36, "ascii");
 wav.writeUInt32LE(total * 2, 40);
 for (let index = 0; index < total; index += 1) {
-    wav.writeInt16LE(Math.round(Math.max(-1, Math.min(1, samples[index] * gain)) * 32_767), 44 + index * 2);
+    wav.writeInt16LE(
+        Math.round(Math.max(-1, Math.min(1, samples[index] * gain)) * 32_767),
+        44 + index * 2
+    );
 }
 
 writeFileSync(new URL("../public/sounds/soundboard/horn.wav", import.meta.url), wav);

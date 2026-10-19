@@ -32,7 +32,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallSoundboard } from "@/lib/chat/soundboard-service";
 import { shownGlyph, SOUND_GLYPH, type ShownReaction } from "./call-signals";
 import { Clock, Loader2, Music2, Search, Sparkles, Square, Star, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore
+} from "react";
 import { rememberPlayed, useSoundboardPrefs, useSoundboardVolume } from "./soundboard-prefs";
 import {
     callSoundboardAction,
@@ -277,7 +285,11 @@ export function SoundboardPanel({
     const [busy, setBusy] = useState<string | null>(null);
     const [jump, setJump] = useState<string | null>(null);
     const scroller = useRef<HTMLDivElement>(null);
-    const playingHere = useSyncExternalStore(onClipsChanged, () => clipsPlaying(), () => false);
+    const playingHere = useSyncExternalStore(
+        onClipsChanged,
+        () => clipsPlaying(),
+        () => false
+    );
     // When this seat last played, so its sound can be stopped for the room
     // even by a reader who turned their own soundboard volume to nothing.
     const [playedAt, setPlayedAt] = useState(0);
@@ -483,7 +495,10 @@ export function SoundboardPanel({
                     ))}
                 </nav>
 
-                <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2">
+                <div
+                    ref={scroller}
+                    className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2"
+                >
                     {board === null && (
                         <p className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground">
                             <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
@@ -568,7 +583,10 @@ export function SoundboardPanel({
                                                 )}
                                             >
                                                 <Star
-                                                    className={cn("size-3.5", starred && "fill-current")}
+                                                    className={cn(
+                                                        "size-3.5",
+                                                        starred && "fill-current"
+                                                    )}
                                                 />
                                             </button>
                                         </div>

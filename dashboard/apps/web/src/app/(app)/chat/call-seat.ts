@@ -28,7 +28,11 @@ export interface VoiceState {
  * the media server, so the seat is where they read who is muted or deafened, and
  * who is sharing a screen.
  */
-export async function keepSeat(meetingId: string, voice: VoiceState, rejoin = false): Promise<void> {
+export async function keepSeat(
+    meetingId: string,
+    voice: VoiceState,
+    rejoin = false
+): Promise<void> {
     const response = await fetch(seatUrl(meetingId), {
         method: "POST",
         cache: "no-store",

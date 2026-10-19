@@ -1679,10 +1679,7 @@ function Split({
                             variant={variant === "primary" ? "primary" : "secondary"}
                             aria-label={t("callRoom.deviceSettings", { device: devicesLabel })}
                             title={t("callRoom.deviceSettings", { device: devicesLabel })}
-                            className={cn(
-                                "w-6 rounded-l-none",
-                                TINTS[variant]
-                            )}
+                            className={cn("w-6 rounded-l-none", TINTS[variant])}
                         >
                             <ChevronUp className="size-3.5" />
                         </Button>
