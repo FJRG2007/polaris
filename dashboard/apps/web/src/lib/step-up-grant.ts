@@ -40,7 +40,12 @@ export const STEP_UP_GRANT_MS = 2 * 60 * 1000;
 
 /** What a grant may be given for. A closed list, because the whole value of the
  *  scoping is that nothing can invent a purpose that covers everything. */
-export const STEP_UP_PURPOSES = ["connected-sign-in", "lockdown", "close-account"] as const;
+export const STEP_UP_PURPOSES = [
+    "connected-sign-in",
+    "lockdown",
+    "close-account",
+    "vault-passkeys"
+] as const;
 
 export type StepUpPurpose = (typeof STEP_UP_PURPOSES)[number];
 

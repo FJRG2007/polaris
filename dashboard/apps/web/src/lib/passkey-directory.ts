@@ -60,15 +60,13 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
             lastUsedAt: true
         }
     });
-    // Rows from before passkeys followed the address carry none: every one of
-    // them was issued under the published app URL.
-    const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL) ?? "";
+    const hostOf = passkeyHostReader();
     return rows.map((row) => {
         const client = describeClient(row.userAgent, row.userAgentBrands, row.userAgentPlatform);
         return {
             id: row.id,
             name: row.name?.trim() || "Unnamed passkey",
-            host: row.rpId ?? published,
+            host: hostOf(row.rpId),
             browser: client.browser,
             os: client.os,
             ip: row.ip,
@@ -76,4 +74,14 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
             lastUsedAt: row.lastUsedAt?.toISOString() ?? null
         };
     });
+}
+
+/**
+ * The address a passkey row signs in on. Rows from before passkeys followed the
+ * address carry none: every one of them was issued under the published app URL.
+ * Returned as a reader so a list resolves the published address once.
+ */
+export function passkeyHostReader(): (rpId: string | null) => string {
+    const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL) ?? "";
+    return (rpId) => rpId ?? published;
 }

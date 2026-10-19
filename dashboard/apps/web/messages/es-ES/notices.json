@@ -47,7 +47,7 @@
         "account_passkey_added": "Se ha añadido una llave de acceso a tu cuenta",
         "vault_passkey_added": "Una llave de acceso ya puede abrir tu bóveda",
         "vault_passkey_removed": "Una llave de acceso ya no puede abrir tu bóveda",
-        "vault_passkeys_reset": "Tus llaves de la bóveda se quitaron tras un cambio de clave. Añádelas de nuevo para usarlas",
+        "vault_passkeys_reset": "Tus llaves de la bóveda se desactivaron tras un cambio de clave. Actívalas para usarlas",
         "account_login_approval_enabled": "Hay que aprobar los inicios de sesión",
         "account_login_approval_disabled": "Ya no hay que aprobar los inicios de sesión",
         "account_new_device_grace_updated": "Ha cambiado la espera para un dispositivo nuevo",

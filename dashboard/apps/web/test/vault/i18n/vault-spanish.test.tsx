@@ -2,7 +2,7 @@
  * The vault, drawn in Spanish.
  *
  * The lock screen and the setup form are the two screens every vault passes
- * through, and the rest of what is asserted is what a migration misses: a label
+ * through, the passkeys card is where a passkey is turned on, and the rest of what is asserted is what a migration misses: a label
  * core keeps in English (when a vault locks itself), a schema's complaint, and a
  * file parser's refusal.
  */
@@ -20,10 +20,23 @@ import {
 
 vi.mock("@/app/(app)/vault/vault-actions", () => ({ createAccountVaultAction: async () => ({}) }));
 vi.mock("@/app/(app)/vault/passkey-actions", () => ({
-    vaultPasskeyUsedAction: async () => undefined
+    vaultPasskeyUsedAction: async () => undefined,
+    vaultPasskeyChoicesAction: async () => [],
+    enrollVaultPasskeyAction: async () => ({}),
+    removeVaultPasskeyAction: async () => ({})
+}));
+vi.mock("@/app/(app)/account/step-up-actions", () => ({
+    stepUpRemainingAction: async () => ({ remainingMs: 0 }),
+    proveStepUpAction: async () => ({}),
+    stepUpOptionsAction: async () => ({ choices: [] }),
+    sendStepUpCodeAction: async () => ({})
+}));
+vi.mock("@/app/(app)/vault/vault-session", () => ({
+    useVaultSession: () => ({ state: {}, key: null })
 }));
 
 const { VaultUnlock } = await import("@/app/(app)/vault/vault-unlock");
+const { VaultPasskeys } = await import("@/app/(app)/vault/settings/vault-passkeys");
 const { VaultSetup } = await import("@/app/(app)/vault/vault-setup");
 
 const t = translatorFor("es-ES", "vault");
@@ -46,6 +59,16 @@ describe("the lock screen", () => {
         expect(markup).toContain('placeholder="Contraseña maestra"');
         expect(markup).toContain("Desbloquear");
         expect(markup).not.toContain("Unlock");
+    });
+});
+
+describe("the passkeys card", () => {
+    it("offers the account's passkeys in Spanish, with no name or password field", () => {
+        const markup = renderToStaticMarkup(withMessages(<VaultPasskeys />, "es-ES"));
+        expect(markup).toContain("Llaves");
+        expect(markup).toContain("Activa una llave de acceso de tu cuenta de Polaris");
+        expect(markup).not.toContain("Turn on");
+        expect(markup).not.toContain("<input");
     });
 });
 

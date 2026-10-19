@@ -1,112 +1,122 @@
 "use client";
 
 /**
- * The passkeys that unlock this vault.
+ * The account's sign-in passkeys, each with a switch that lets it unlock this
+ * vault.
  *
- * Adding one needs the vault unlocked (the key is what gets wrapped) and the
- * master password typed again (the server checks its hash before it stores
- * anything). Removing one leaves the master password exactly as it was, so the
- * way back in never depends on a device.
+ * Nothing is created here: the list is the passkeys already on the account,
+ * under the names they were given on the security page, and an account with
+ * none is sent there to add one. Turning one on runs the PRF ceremony with that
+ * credential alone and wraps the key this tab already holds, so it asks for the
+ * account's step-up proof rather than the master password - once, and good for
+ * two minutes of switches. Turning one off only drops the wrap: the passkey
+ * still signs in, and the master password still opens the vault.
  */
 
 import Link from "next/link";
-import * as crypto from "@/lib/vault/crypto";
+import { KeyRound, Loader2 } from "lucide-react";
 import { useVaultSession } from "../vault-session";
-import { KeyRound, Loader2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { StepUpDialog } from "@/components/step-up-dialog";
 import * as passkeyClient from "@/lib/vault/passkey-client";
-import { type FormEvent, useEffect, useState } from "react";
+import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
-import {
-    VAULT_PASSKEY_NAME_MAX,
-    normalizePasskeyName,
-    type VaultPasskeyEntry
-} from "@/lib/vault/passkey-schema";
+import type { VaultPasskeyChoice } from "@/lib/vault/passkey-schema";
+import { stepUpRemainingAction } from "@/app/(app)/account/step-up-actions";
+import { Button, Card, CardBody, CardHeader, CardTitle, Skeleton, Switch } from "@polaris/ui";
 import {
     enrollVaultPasskeyAction,
     removeVaultPasskeyAction,
-    vaultPasskeyCandidatesAction
+    vaultPasskeyChoicesAction
 } from "../passkey-actions";
 
-type Confirm = (options: {
-    title: string;
-    description: string;
-    confirmLabel: string;
-    danger?: boolean;
-}) => Promise<boolean>;
+/** The step-up purpose these switches are proved under. */
+const PURPOSE = "vault-passkeys";
 
-export function VaultPasskeys({ confirm }: { confirm: Confirm }) {
+const SECURITY_PATH = "/account/security";
+
+export function VaultPasskeys() {
     const t = useTranslations("vault");
-    const { state, key: vaultKey } = useVaultSession();
-    const [entries, setEntries] = useState<VaultPasskeyEntry[]>(state.passkeys ?? []);
-    useEffect(() => setEntries(state.passkeys ?? []), [state.passkeys]);
+    const format = useDisplayFormat();
+    const { key: vaultKey } = useVaultSession();
+    const [choices, setChoices] = useState<VaultPasskeyChoice[] | null>(null);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [support, setSupport] = useState<passkeyClient.PasskeySupport | null>(null);
-    useEffect(() => {
-        void passkeyClient.passkeySupport().then(setSupport);
-    }, []);
     const [host, setHost] = useState("");
-    useEffect(() => setHost(window.location.hostname), []);
-    const [name, setName] = useState("");
-    const [master, setMaster] = useState("");
+    const [proved, setProved] = useState(false);
+    const [asking, setAsking] = useState<VaultPasskeyChoice | null>(null);
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [needsAccountPasskey, setNeedsAccountPasskey] = useState(false);
     const [done, setDone] = useState<string | null>(null);
 
-    const cleanName = String(normalizePasskeyName(name));
-    const nameTooLong = cleanName.length > VAULT_PASSKEY_NAME_MAX;
-    const canAdd = cleanName.length > 0 && !nameTooLong && master.length > 0 && pending === null;
+    const load = useCallback(async () => {
+        setLoadFailed(false);
+        try {
+            setChoices(await vaultPasskeyChoicesAction());
+        } catch {
+            setLoadFailed(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        let live = true;
+        setHost(window.location.hostname);
+        void load();
+        void passkeyClient.passkeySupport().then((value) => live && setSupport(value));
+        // A proof given a minute ago on this screen is still good; asking for it
+        // again would be asking for nothing.
+        void stepUpRemainingAction(PURPOSE)
+            .then((result) => live && setProved(result.remainingMs > 0))
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [load]);
+
     const unavailable = support === "no-webauthn" || support === "no-prf";
+
+    function nameOf(choice: VaultPasskeyChoice): string {
+        if (choice.name) return choice.name;
+        const date = format.date(choice.addedAt);
+        return choice.deviceType === "multiDevice"
+            ? t("passkeys.synced", { date })
+            : t("passkeys.device", { date });
+    }
 
     function failureText(failure: passkeyClient.PasskeyFailure): string {
         if (failure === "cancelled") return t("passkeys.cancelled");
         if (failure === "no-prf") return t("passkeys.noPrfPasskey");
+        if (failure === "wrong") return t("passkeys.wrong");
         return t("passkeys.failed");
     }
 
-    async function onAdd(event: FormEvent) {
-        event.preventDefault();
-        if (!canAdd || !vaultKey) return;
-        setPending("add");
-        setError(null);
-        setDone(null);
-        setNeedsAccountPasskey(false);
+    async function turnOn(choice: VaultPasskeyChoice) {
+        if (!vaultKey) return;
+        setPending(choice.passkeyId);
         try {
-            // Checked here first, against the wrap this tab already has: a
-            // mistyped password costs a derivation, not a rate-limited request.
-            const masterKey = await crypto.deriveMasterKey(master, state.email, state.kdf);
-            const opened = await crypto.decryptBytes(
-                state.protectedKey ?? "",
-                await crypto.stretchMasterKey(masterKey)
-            );
-            if (!opened) {
-                setError(t("errors.wrongMaster"));
-                return;
-            }
-            const candidates = await vaultPasskeyCandidatesAction();
-            if (candidates.length === 0) {
-                setNeedsAccountPasskey(true);
-                return;
-            }
             const result = await passkeyClient.enrollWithPasskey({
                 vaultKey,
-                candidates,
-                name: cleanName,
-                masterPasswordHash: await crypto.masterPasswordHash(masterKey, master)
+                credentialId: choice.credentialId
             });
             if ("failure" in result) {
                 setError(failureText(result.failure));
                 return;
             }
             const saved = await enrollVaultPasskeyAction(result.enrollment);
+            if (saved.needsProof) {
+                // The two minutes ran out between the proof and the save.
+                setProved(false);
+                setError(saved.error ?? null);
+                setAsking(choice);
+                return;
+            }
             if (saved.error) {
                 setError(saved.error);
                 return;
             }
-            setName("");
-            setMaster("");
-            setDone(t("passkeys.added"));
+            setDone(t("passkeys.turnedOn", { name: nameOf(choice) }));
+            await load();
         } catch {
             setError(t("passkeys.failed"));
         } finally {
@@ -114,148 +124,170 @@ export function VaultPasskeys({ confirm }: { confirm: Confirm }) {
         }
     }
 
-    async function onRemove(entry: VaultPasskeyEntry) {
-        const confirmed = await confirm({
-            title: t("passkeys.removeTitle"),
-            description: t("passkeys.removeBody", { name: entry.name }),
-            confirmLabel: t("passkeys.remove"),
-            danger: true
-        });
-        if (!confirmed) return;
-        setError(null);
-        setDone(null);
-        const before = entries;
-        setEntries(before.filter((candidate) => candidate.id !== entry.id));
-        setPending(entry.id);
+    async function turnOff(choice: VaultPasskeyChoice) {
+        const vault = choice.vault;
+        if (!vault) return;
+        const before = choices;
+        setChoices(
+            (current) =>
+                current?.map((entry) =>
+                    entry.passkeyId === choice.passkeyId ? { ...entry, vault: null } : entry
+                ) ?? null
+        );
+        setPending(choice.passkeyId);
         try {
-            const result = await removeVaultPasskeyAction(entry.id);
+            const result = await removeVaultPasskeyAction(vault.id);
             if (result.error) {
-                setEntries(before);
+                setChoices(before);
                 setError(result.error);
+                return;
             }
+            setDone(t("passkeys.turnedOff", { name: nameOf(choice) }));
         } catch {
-            setEntries(before);
+            setChoices(before);
             setError(t("passkeys.failed"));
         } finally {
             setPending(null);
         }
+    }
+
+    function onToggle(choice: VaultPasskeyChoice, next: boolean) {
+        setError(null);
+        setDone(null);
+        if (!next) {
+            void turnOff(choice);
+            return;
+        }
+        if (proved) void turnOn(choice);
+        else setAsking(choice);
     }
 
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                    <KeyRound className="size-4" />
+                    <KeyRound className="size-4 shrink-0" />
                     {t("passkeys.title")}
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">{t("passkeys.body")}</p>
-                {entries.length > 0 ? (
-                    <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-                        {entries.map((entry) => (
-                            <li key={entry.id} className="flex items-center gap-3 px-3 py-2">
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={entry.name}>
-                                        {entry.name}
-                                    </p>
-                                    <p className="truncate text-xs text-muted-foreground">
-                                        {entry.lastUsedAt ? (
-                                            <>
-                                                {t("passkeys.lastUsed")}{" "}
-                                                <RelativeTime iso={entry.lastUsedAt} />
-                                            </>
-                                        ) : (
-                                            t("passkeys.neverUsed")
-                                        )}
-                                        {host && entry.rpId !== host ? (
-                                            <span className="font-mono">
-                                                {" - "}
-                                                {t("passkeys.onlyOn", { host: entry.rpId })}
-                                            </span>
-                                        ) : null}
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={t("passkeys.removeNamed", { name: entry.name })}
-                                    title={t("passkeys.remove")}
-                                    disabled={pending !== null}
-                                    onClick={() => void onRemove(entry)}
-                                >
-                                    {pending === entry.id ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Trash2 className="size-4" />
-                                    )}
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
-                ) : null}
                 {unavailable ? (
-                    <p className="text-sm text-muted-foreground" data-testid="passkey-unavailable">
+                    <p
+                        id="vault-passkeys-unavailable"
+                        className="text-sm text-muted-foreground"
+                        data-testid="passkey-unavailable"
+                    >
                         {support === "no-prf"
                             ? t("passkeys.noPrfBrowser")
                             : t("passkeys.noWebAuthn")}
                     </p>
-                ) : support === null ? null : (
-                    <form onSubmit={onAdd} className="flex flex-col gap-3">
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span>
-                                {t("passkeys.name")} <span aria-hidden="true">*</span>
-                            </span>
-                            <Input
-                                value={name}
-                                maxLength={VAULT_PASSKEY_NAME_MAX + 8}
-                                placeholder={t("passkeys.namePlaceholder")}
-                                onChange={(event) => setName(event.target.value)}
-                            />
-                            {nameTooLong ? (
-                                <span className="text-xs text-danger">
-                                    {t("passkeys.nameTooLong", { count: VAULT_PASSKEY_NAME_MAX })}
-                                </span>
-                            ) : null}
-                        </label>
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span>
-                                {t("settings.master")} <span aria-hidden="true">*</span>
-                            </span>
-                            {/* enigma:allow-no-breach-check enigma:allow-identity-password
-                                The existing master password, typed to prove who this is;
-                                it is checked against the vault, not chosen here. */}
-                            <Input
-                                type="password"
-                                autoComplete="current-password"
-                                value={master}
-                                onChange={(event) => setMaster(event.target.value)}
-                            />
-                            <span className="text-xs text-muted-foreground">
-                                {t("passkeys.masterHint")}
-                            </span>
-                        </label>
-                        {needsAccountPasskey ? (
-                            <p className="text-sm text-muted-foreground">
-                                {t("passkeys.needsAccountPasskey")}{" "}
-                                <Link href="/account/security" className="underline">
-                                    {t("passkeys.openSecurity")}
-                                </Link>
-                            </p>
-                        ) : null}
-                        {done ? <p className="text-sm text-success">{done}</p> : null}
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <div className="flex justify-end">
-                            <Button type="submit" disabled={!canAdd} aria-disabled={!canAdd}>
-                                {pending === "add" ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : null}
-                                {t("passkeys.add")}
-                            </Button>
-                        </div>
-                    </form>
+                ) : null}
+                {loadFailed ? (
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <span className="text-danger">{t("passkeys.loadFailed")}</span>
+                        <Button variant="secondary" size="sm" onClick={() => void load()}>
+                            {t("passkeys.retry")}
+                        </Button>
+                    </div>
+                ) : choices === null ? (
+                    <div className="flex flex-col gap-2" aria-hidden="true">
+                        <Skeleton className="h-11 w-full" />
+                        <Skeleton className="h-11 w-full" />
+                    </div>
+                ) : choices.length === 0 ? (
+                    <p className="text-sm text-muted-foreground" data-testid="passkey-none">
+                        {t("passkeys.none")}{" "}
+                        <Link href={SECURITY_PATH} className="underline">
+                            {t("passkeys.openSecurity")}
+                        </Link>
+                    </p>
+                ) : (
+                    <>
+                        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                            {choices.map((choice) => {
+                                const name = nameOf(choice);
+                                const elsewhere = host !== "" && choice.rpId !== host;
+                                const on = choice.vault !== null;
+                                // Off is always allowed; on needs this browser to
+                                // reach the credential, which only its own address can.
+                                const blocked = !on && (unavailable || elsewhere || !vaultKey);
+                                return (
+                                    <li
+                                        key={choice.passkeyId}
+                                        className="flex items-center gap-3 px-3 py-2"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className="truncate text-sm font-medium"
+                                                title={name}
+                                            >
+                                                {name}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {!choice.vault ? (
+                                                    t("passkeys.off")
+                                                ) : choice.vault.lastUsedAt ? (
+                                                    <>
+                                                        {t("passkeys.lastUsed")}{" "}
+                                                        <RelativeTime
+                                                            iso={choice.vault.lastUsedAt}
+                                                        />
+                                                    </>
+                                                ) : (
+                                                    t("passkeys.neverUsed")
+                                                )}
+                                                {elsewhere ? (
+                                                    <span className="font-mono">
+                                                        {" - "}
+                                                        {t("passkeys.onlyOn", {
+                                                            host: choice.rpId
+                                                        })}
+                                                    </span>
+                                                ) : null}
+                                            </p>
+                                        </div>
+                                        {pending === choice.passkeyId ? (
+                                            <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                                        ) : null}
+                                        <Switch
+                                            checked={on}
+                                            disabled={pending !== null || blocked}
+                                            aria-label={t("passkeys.toggle", { name })}
+                                            aria-describedby={
+                                                unavailable && !on
+                                                    ? "vault-passkeys-unavailable"
+                                                    : undefined
+                                            }
+                                            onChange={(next) => onToggle(choice, next)}
+                                        />
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        <Link
+                            href={SECURITY_PATH}
+                            className="self-start text-xs text-muted-foreground underline"
+                        >
+                            {t("passkeys.manage")}
+                        </Link>
+                    </>
                 )}
-                {unavailable && error ? <p className="text-sm text-danger">{error}</p> : null}
+                {done ? <p className="text-sm text-success">{done}</p> : null}
+                {error ? <p className="text-sm text-danger">{error}</p> : null}
+                <StepUpDialog
+                    open={asking !== null}
+                    purpose={PURPOSE}
+                    title={t("passkeys.stepUpTitle")}
+                    description={t("passkeys.stepUp")}
+                    onOpenChange={(open) => !open && setAsking(null)}
+                    onProved={() => {
+                        setProved(true);
+                        const choice = asking;
+                        setAsking(null);
+                        if (choice) void turnOn(choice);
+                    }}
+                />
             </CardBody>
         </Card>
     );

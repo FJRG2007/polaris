@@ -47,7 +47,7 @@
         "account_passkey_added": "A passkey was added to your account",
         "vault_passkey_added": "A passkey can now unlock your vault",
         "vault_passkey_removed": "A passkey can no longer unlock your vault",
-        "vault_passkeys_reset": "Your vault passkeys were removed after a key change. Add them again to use them",
+        "vault_passkeys_reset": "Your vault passkeys were turned off after a key change. Turn them on again to use them",
         "account_login_approval_enabled": "Sign-ins now have to be approved",
         "account_login_approval_disabled": "Sign-ins no longer have to be approved",
         "account_new_device_grace_updated": "The wait for a new device changed",
