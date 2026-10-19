@@ -1113,7 +1113,6 @@
         "web/src/app/(app)/tasks/time/page.tsx",
         "web/src/app/(app)/tasks/timesheet-view.tsx",
         "web/src/app/(app)/tasks/trackers/actions.ts",
-        "web/src/app/(app)/tasks/trackers/page.tsx",
         "web/src/app/(app)/tasks/trackers/tracker-sentence.ts",
         "web/src/app/(app)/tasks/trackers/trackers-view.tsx",
         "web/src/app/(app)/tasks/tree-create.tsx",

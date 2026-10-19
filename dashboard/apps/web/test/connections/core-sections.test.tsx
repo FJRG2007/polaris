@@ -8,23 +8,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 let canManageTasks = false;
 const listTrackers = vi.fn(async () => []);
-const redirect = vi.fn((href: string) => {
-    throw new Error(`redirect:${href}`);
-});
 
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => key
 }));
 vi.mock("@/lib/session", () => ({
     sessionCan: async (_user: unknown, permission: string) =>
-        permission === "tasks.manage" && canManageTasks,
-    requirePermission: async () => ({ id: "user-1" })
+        permission === "tasks.manage" && canManageTasks
 }));
-vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/lib/tasks/trackers/service", () => ({ listTrackers }));
 vi.mock("@/app/(app)/account/ai-keys/ai-keys-panel", () => ({ AiKeysPanel: () => null }));
 vi.mock("@/app/(app)/tasks/trackers/trackers-view", () => ({ TrackersView: () => null }));
 
+const { default: nextConfig } = await import("../../next.config.mjs");
+const { connectionsHref, TASK_TRACKERS_SECTION } = await import("@/lib/connections/hub-href");
 const { hubCoreSections } = await import("../../src/app/(app)/account/connections/core-sections");
 const user = { id: "user-1" } as Parameters<typeof hubCoreSections>[0];
 
@@ -49,10 +46,12 @@ describe("hubCoreSections", () => {
 });
 
 describe("/tasks/trackers", () => {
+    // A 307 from the config, not a page: a page that only redirects is drawn
+    // inside the signed-in group's loading boundary (see redirect-inside-loading).
     it("sends people to the hub's trackers section, with the way back to Tasks", async () => {
-        const { default: page } = await import("../../src/app/(app)/tasks/trackers/page");
-        await expect(page()).rejects.toThrow(
-            "redirect:/account/connections?provider=task-trackers&return=%2Ftasks"
-        );
+        const rules = (await nextConfig.redirects?.()) ?? [];
+        const rule = rules.find((r) => r.source === "/tasks/trackers");
+        expect(rule?.destination).toBe(connectionsHref(TASK_TRACKERS_SECTION, "/tasks"));
+        expect(rule?.permanent).toBe(false);
     });
 });
