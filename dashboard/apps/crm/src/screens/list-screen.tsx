@@ -938,7 +938,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onColumns={setColumns}
                 onAggregate={aggregate}
                 draft={drafting ? { onCreate: create, onCancel: () => setDrafting(false) } : null}
-                hasMore={rows.length < flat.total}
+                hasMore={flat.hasMore}
                 loadingMore={flat.loadingMore}
                 onLoadMore={flat.loadMore}
                 onOpen={setPeek}

@@ -190,3 +190,104 @@ export function keysetOrder(orderBy: readonly Record<string, unknown>[]): boolea
         return values.length === 1 && (values[0] === "asc" || values[0] === "desc");
     });
 }
+
+type KeyValue = string | number | boolean | { readonly at: string };
+
+/** The column and direction of each entry of an order a cursor can follow. */
+function keyColumns(orderBy: readonly Record<string, unknown>[]): [string, "asc" | "desc"][] {
+    return orderBy.map((entry) => Object.entries(entry)[0] as [string, "asc" | "desc"]);
+}
+
+/**
+ * Where the next page starts: the values the last row of a page was read with,
+ * in the order's columns. It is taken from the row as the database ordered it,
+ * so an edit made to that row afterwards does not move it, and it names no row,
+ * so nothing outside the list's own `where` is ever looked up through it.
+ */
+export function pageCursor(
+    orderBy: readonly Record<string, unknown>[],
+    row: Readonly<Record<string, unknown>>
+): string | null {
+    if (!keysetOrder(orderBy)) return null;
+    const values: KeyValue[] = [];
+    for (const [column] of keyColumns(orderBy)) {
+        const value = row[column];
+        if (value instanceof Date) values.push({ at: value.toISOString() });
+        else if (typeof value === "string" || typeof value === "boolean") values.push(value);
+        else if (typeof value === "number" && Number.isFinite(value)) values.push(value);
+        else return null;
+    }
+    return Buffer.from(JSON.stringify(values)).toString("base64url");
+}
+
+function readCursor(cursor: string, length: number): unknown[] | null {
+    let values: unknown;
+    try {
+        values = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    } catch {
+        return null;
+    }
+    if (!Array.isArray(values) || values.length !== length) return null;
+    const read: unknown[] = [];
+    for (const value of values) {
+        if (typeof value === "string" || typeof value === "boolean") read.push(value);
+        else if (typeof value === "number" && Number.isFinite(value)) read.push(value);
+        else if (
+            value !== null &&
+            typeof value === "object" &&
+            typeof (value as { at?: unknown }).at === "string" &&
+            !Number.isNaN(Date.parse((value as { at: string }).at))
+        )
+            read.push(new Date((value as { at: string }).at));
+        else return null;
+    }
+    return read;
+}
+
+/** The rows of one column that come after `value` in `direction`, or null when
+ *  none can (a yes/no column already at its last value). */
+function beyond(
+    column: string,
+    direction: "asc" | "desc",
+    value: unknown
+): Record<string, unknown> | null {
+    if (typeof value === "boolean") {
+        const next = direction === "asc" ? true : false;
+        return value === next ? null : { [column]: next };
+    }
+    return { [column]: { [direction === "asc" ? "gt" : "lt"]: value } };
+}
+
+/**
+ * The rows after a page's cursor (`pageCursor`), as a `where` to add to the
+ * list's own: for an order (a, b, id), `a` past the cursor's, or `a` equal and
+ * `b` past it, and so on. The first column is also bounded on its own so the
+ * database starts the read inside its index. Null when the cursor does not fit
+ * this order - the caller pages by offset instead.
+ */
+export function afterCursor(
+    orderBy: readonly Record<string, unknown>[],
+    cursor: string
+): Record<string, unknown> | null {
+    if (!keysetOrder(orderBy)) return null;
+    const columns = keyColumns(orderBy);
+    const values = readCursor(cursor, columns.length);
+    if (!values) return null;
+    const branches: Record<string, unknown>[] = [];
+    columns.forEach(([column, direction], at) => {
+        const past = beyond(column, direction, values[at]);
+        if (!past) return;
+        const tied = columns
+            .slice(0, at)
+            .map(([earlier], before) => ({ [earlier]: values[before] }));
+        branches.push(tied.length > 0 ? { AND: [...tied, past] } : past);
+    });
+    if (branches.length === 0) return { id: { in: [] } };
+    const [first, direction] = columns[0]!;
+    const start = values[0];
+    const bound =
+        typeof start === "boolean"
+            ? []
+            : [{ [first]: { [direction === "asc" ? "gte" : "lte"]: start } }];
+    return { AND: [...bound, { OR: branches }] };
+}

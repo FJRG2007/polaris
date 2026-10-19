@@ -266,7 +266,13 @@ describe("a board over an added select", () => {
         expect(db.records.findMany).toHaveBeenCalledTimes(2);
         expect(groups.map((group) => group.value)).toEqual([...options, ""]);
         expect(groups[2]!.total).toBe(2);
-        expect(groups[0]).toEqual({ value: "Choice 1", records: [], total: 0 });
+        expect(groups[0]).toEqual({
+            value: "Choice 1",
+            records: [],
+            total: 0,
+            next: null,
+            more: false
+        });
     });
 });
 

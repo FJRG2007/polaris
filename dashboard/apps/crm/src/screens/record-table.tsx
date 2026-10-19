@@ -23,6 +23,7 @@ import Link from "next/link";
 import { recordHref } from "../model/related";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { morePages } from "./use-records";
 import type { RowGroup } from "./use-groups";
 import { CellDisplay, OptionChip } from "./cell-display";
 import type { InputValue } from "../model/values";
@@ -164,10 +165,14 @@ export function RecordTable(props: TableProps) {
         [columns, object, props.locked]
     );
     const virtual = !grouping && rows.length >= VIRTUAL_FROM;
+    // The heading row, and the new record's row when one is being typed, sit
+    // above the first row in the scrolled box.
+    const above = ROW_HEIGHT * (props.draft ? 2 : 1);
     const rowWindow = useVirtualizer({
         count: rows.length,
         getScrollElement: () => scroller.current,
         estimateSize: () => ROW_HEIGHT,
+        scrollMargin: above,
         overscan: 16,
         enabled: virtual
     });
@@ -336,8 +341,8 @@ export function RecordTable(props: TableProps) {
      *  two empty rows so the scroll bar and the sticky headings stay true. */
     const windowed = () => {
         const items = rowWindow.getVirtualItems();
-        const before = items[0]?.start ?? 0;
-        const after = rowWindow.getTotalSize() - (items[items.length - 1]?.end ?? 0);
+        const before = (items[0]?.start ?? above) - above;
+        const after = rowWindow.getTotalSize() - ((items[items.length - 1]?.end ?? above) - above);
         return (
             <>
                 {before > 0 ? (
@@ -474,7 +479,7 @@ export function RecordTable(props: TableProps) {
                                           </td>
                                       </tr>
                                       {closed ? null : group.rows.map(row)}
-                                      {!closed && group.rows.length < group.total ? (
+                                      {!closed && morePages(group) ? (
                                           <tr>
                                               <td
                                                   colSpan={fields.length + 1}

@@ -14,7 +14,7 @@
 import { unwrap } from "./call";
 import { useCrmT } from "./i18n";
 import * as actions from "../actions/records";
-import { lastRead, type RowStore } from "./use-records";
+import { morePages, type RowStore } from "./use-records";
 import type { ViewSort } from "../model/views";
 import { hostUi } from "@polaris/app-host/client";
 import type { ViewFilter } from "../model/filters";
@@ -30,6 +30,11 @@ export interface RowGroup {
     readonly rows: readonly CrmRecord[];
     /** How many rows of this group match, across every page. */
     readonly total: number;
+    /** Where the server said this group's next page starts; unknown on a copy
+     *  the tab kept, whose next page is counted by offset. */
+    readonly next?: string | null;
+    /** False once the server sent this group's last page. */
+    readonly more?: boolean;
 }
 
 export interface GroupsState extends RowStore {
@@ -47,7 +52,15 @@ export interface GroupsState extends RowStore {
     ) => { readonly position: number; readonly last: boolean };
 }
 
-type Kept = { groups: { value: string; records: CrmRecord[]; total: number }[] };
+type Kept = {
+    groups: {
+        value: string;
+        records: CrmRecord[];
+        total: number;
+        next?: string | null;
+        more?: boolean;
+    }[];
+};
 
 /** The place between two neighbours: halfway, or a step past the one there is. */
 export function placeBetween(before: number | undefined, after: number | undefined): number {
@@ -92,7 +105,9 @@ export function useGroups(
                 groups: groups.map((group) => ({
                     value: group.value,
                     records: group.records,
-                    total: group.total
+                    total: group.total,
+                    next: group.next,
+                    more: group.more
                 }))
             })),
         // The sorts and the filter are read through their keys.
@@ -109,7 +124,9 @@ export function useGroups(
             ? kept.groups.map((group) => ({
                   value: group.value,
                   rows: group.records,
-                  total: group.total
+                  total: group.total,
+                  next: group.next,
+                  more: group.more
               }))
             : null;
 
@@ -152,7 +169,7 @@ export function useGroups(
     const loadMore = useCallback(
         (value: string) => {
             const group = current.current?.find((one) => one.value === value);
-            if (loadingGroup || !group || !groupKey || group.rows.length >= group.total) return;
+            if (loadingGroup || !group || !groupKey || !morePages(group)) return;
             const forKey = key;
             setLoadingGroup(value);
             unwrap(
@@ -165,7 +182,7 @@ export function useGroups(
                         byPosition: query.byPosition,
                         group: { key: groupKey, value },
                         offset: group.rows.length,
-                        after: lastRead(group.rows)
+                        after: group.next ?? undefined
                     }),
                 t("errors.loadFailed")
             )
@@ -181,7 +198,9 @@ export function useGroups(
                                     ...one.rows,
                                     ...page.records.filter((row) => !known.has(row.id))
                                 ],
-                                total: page.total ?? one.total
+                                total: page.total ?? one.total,
+                                next: page.next,
+                                more: page.more
                             };
                         })
                     );

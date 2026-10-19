@@ -27,7 +27,7 @@ const records = (count: number) =>
         values: { name: `Example Co ${at}` }
     })) as never[];
 
-function drawn(count: number): number {
+function table(count: number, draft = false): HTMLElement {
     const noop = () => undefined;
     const { container } = render(
         <RecordTable
@@ -46,15 +46,17 @@ function drawn(count: number): number {
             onSort={noop}
             onColumns={noop}
             onAggregate={noop}
-            draft={null}
+            draft={draft ? { onCreate: noop, onCancel: noop } : null}
             hasMore={false}
             loadingMore={false}
             onLoadMore={noop}
         />,
         { wrapper: crmHost() }
     );
-    return container.querySelectorAll("tbody tr[aria-selected]").length;
+    return container;
 }
+
+const drawn = (count: number) => table(count).querySelectorAll("tbody tr[aria-selected]").length;
 
 describe("a long list", () => {
     it("draws every row of a short list", () => {
@@ -66,4 +68,19 @@ describe("a long list", () => {
         expect(rows).toBeGreaterThan(0);
         expect(rows).toBeLessThan(100);
     });
+
+    it.each([false, true])(
+        "keeps the rows out of sight exactly as tall as they are (new record row: %s)",
+        (draft) => {
+            const count = 5_000;
+            const body = table(count, draft).querySelector("tbody")!;
+            const drawnRows = body.querySelectorAll("tr[aria-selected]").length;
+            const spacers = [...body.querySelectorAll<HTMLElement>("tr[aria-hidden][style]")];
+            const spaced = spacers.reduce((sum, one) => sum + parseFloat(one.style.height), 0);
+            expect(body.querySelector("tr[aria-selected]")?.previousElementSibling).toBe(
+                draft ? body.firstElementChild : null
+            );
+            expect(spaced + drawnRows * 36).toBe(count * 36);
+        }
+    );
 });

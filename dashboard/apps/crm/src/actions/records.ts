@@ -131,7 +131,7 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
             byPosition: z.boolean().default(false),
             deleted: z.boolean().default(false),
             offset: z.number().int().min(0).max(1_000_000).default(0),
-            after: z.string().uuid().optional()
+            after: z.string().max(4096).optional()
         })
         .safeParse(input);
     if (!parsed.success) return invalid();

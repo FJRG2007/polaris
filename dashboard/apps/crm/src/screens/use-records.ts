@@ -51,21 +51,42 @@ export interface RowStore {
 export interface RecordsState extends RowStore {
     /** A page after the first is on its way. */
     readonly loadingMore: boolean;
+    /** There are rows past the ones on screen. */
+    readonly hasMore: boolean;
     readonly loadMore: () => void;
 }
 
 interface Listing {
     readonly rows: readonly CrmRecord[];
     readonly total: number;
+    /** Where the server said the next page starts - kept apart from the rows,
+     *  which an edit on screen may have moved since. Unknown on a copy the tab
+     *  kept, whose next page is counted by offset. */
+    readonly next?: string | null;
+    /** False once the server sent the last page. */
+    readonly more?: boolean;
 }
 
-/** The last row the server sent, for the next page to start after: a row
- *  still being created has no place in the server's order yet. */
-export function lastRead(rows: readonly CrmRecord[]): string | undefined {
-    for (let at = rows.length - 1; at >= 0; at--) {
-        if (!rows[at]!.id.startsWith("draft:")) return rows[at]!.id;
-    }
-    return undefined;
+/** Whether a list or a group has a page after the ones on screen. */
+export function morePages(listed: {
+    readonly rows: readonly unknown[];
+    readonly total: number;
+    readonly more?: boolean;
+}): boolean {
+    return listed.more !== false && listed.rows.length < listed.total;
+}
+
+/** The first page as read, or as the tab kept it (without where it ends). */
+interface Kept {
+    readonly records: readonly CrmRecord[];
+    readonly total: number;
+    readonly next?: string | null;
+    readonly more?: boolean;
+}
+
+/** What the tab kept, or the first page just read, as a listing. */
+function fromKept(kept: Kept): Listing {
+    return { rows: kept.records, total: kept.total, next: kept.next, more: kept.more };
 }
 
 export function useRecords(
@@ -85,7 +106,7 @@ export function useRecords(
     const filterKey = JSON.stringify(query.filter);
     const key = `crm:list:${object}:${sortsKey}:${filterKey}:${query.search}`;
     const load = useCallback(
-        async () =>
+        async (): Promise<Kept> =>
             unwrap(
                 () =>
                     actions.listRecordsAction({
@@ -96,7 +117,12 @@ export function useRecords(
                         offset: 0
                     }),
                 t("errors.loadFailed")
-            ).then(({ records, total }) => ({ records, total: total ?? records.length })),
+            ).then(({ records, total, next, more }) => ({
+                records,
+                total: total ?? records.length,
+                next,
+                more
+            })),
         // The sorts and the filter are read through their keys: a new array
         // with the same sorts is the same read.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,8 +137,7 @@ export function useRecords(
     const [loadingMore, setLoadingMore] = useState(false);
     const current = useRef<Listing | null>(null);
     // What is on screen: the listing, or the first page before it is copied in.
-    current.current =
-        listing ?? (first.data ? { rows: first.data.records, total: first.data.total } : null);
+    current.current = listing ?? (first.data ? fromKept(first.data) : null);
     // The query on screen, so a late page for a search somebody has since
     // changed is thrown away rather than appended.
     const shown = useRef(key);
@@ -127,7 +152,7 @@ export function useRecords(
 
     useEffect(() => {
         if (!first.data || first.data === echo.current) return;
-        setListing({ rows: first.data.records, total: first.data.total });
+        setListing(fromKept(first.data));
     }, [first.data]);
 
     const commit = useCallback(
@@ -135,7 +160,7 @@ export function useRecords(
             // Read by the next change before React renders this one.
             current.current = next;
             setListing(next);
-            const kept = { records: [...next.rows.slice(0, KEPT_ROWS)], total: next.total };
+            const kept: Kept = { records: [...next.rows.slice(0, KEPT_ROWS)], total: next.total };
             echo.current = kept;
             first.replace(kept);
         },
@@ -146,7 +171,7 @@ export function useRecords(
 
     const loadMore = useCallback(() => {
         const listed = current.current;
-        if (loadingMore || !listed || listed.rows.length >= listed.total) return;
+        if (loadingMore || !listed || !morePages(listed)) return;
         const forKey = key;
         setLoadingMore(true);
         unwrap(
@@ -157,7 +182,7 @@ export function useRecords(
                     sorts: query.sorts,
                     filter: query.filter,
                     offset: listed.rows.length,
-                    after: lastRead(listed.rows)
+                    after: listed.next ?? undefined
                 }),
             t("errors.loadFailed")
         )
@@ -168,7 +193,9 @@ export function useRecords(
                     const known = new Set(rows.map((row) => row.id));
                     return {
                         rows: [...rows, ...page.records.filter((row) => !known.has(row.id))],
-                        total: page.total ?? previous?.total ?? listed.total
+                        total: page.total ?? previous?.total ?? listed.total,
+                        next: page.next,
+                        more: page.more
                     };
                 });
             })
@@ -181,10 +208,7 @@ export function useRecords(
             const listed = current.current;
             if (!listed) return;
             const byId = new Map(records.map((record) => [record.id, record]));
-            commit({
-                rows: listed.rows.map((row) => byId.get(row.id) ?? row),
-                total: listed.total
-            });
+            commit({ ...listed, rows: listed.rows.map((row) => byId.get(row.id) ?? row) });
         },
         [commit]
     );
@@ -195,11 +219,11 @@ export function useRecords(
             if (!listed) return;
             const byId = new Map(changes.map((change) => [change.id, change.values]));
             commit({
+                ...listed,
                 rows: listed.rows.map((row) => {
                     const values = byId.get(row.id);
                     return values ? { ...row, values: { ...row.values, ...values } } : row;
-                }),
-                total: listed.total
+                })
             });
         },
         [commit]
@@ -209,6 +233,7 @@ export function useRecords(
         (record: CrmRecord) => {
             const listed = current.current ?? { rows: [], total: 0 };
             commit({
+                ...listed,
                 rows: [record, ...listed.rows.filter((row) => row.id !== record.id)],
                 total: listed.total + 1
             });
@@ -222,7 +247,11 @@ export function useRecords(
             if (!listed) return;
             const gone = new Set(ids);
             const rows = listed.rows.filter((row) => !gone.has(row.id));
-            commit({ rows, total: Math.max(0, listed.total - (listed.rows.length - rows.length)) });
+            commit({
+                ...listed,
+                rows,
+                total: Math.max(0, listed.total - (listed.rows.length - rows.length))
+            });
         },
         [commit]
     );
@@ -241,6 +270,7 @@ export function useRecords(
         total: visible?.total ?? 0,
         error: visible ? null : first.error,
         loadingMore,
+        hasMore: visible ? morePages(visible) : false,
         loadMore,
         put,
         patch,
