@@ -12,11 +12,19 @@
 
 import { cn } from "../lib/cn";
 import { Check, Copy } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUiStrings } from "../lib/ui-strings";
 
-export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
-    const words = useUiStrings();
+/** How long the check mark stays: long enough to be seen, short enough that a
+ *  second copy still shows one. */
+const COPIED_MS = 1500;
+
+/**
+ * The acknowledgement on its own, for a copy control drawn somewhere else - a
+ * message action, a code block. `copied` turns true only once the clipboard has
+ * the value, and back after `COPIED_MS`.
+ */
+export function useCopied(): { copied: boolean; copy: (value: string) => Promise<boolean> } {
     const [copied, setCopied] = useState(false);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -27,19 +35,36 @@ export function CopyButton({ value, label, className }: { value: string; label?:
         []
     );
 
-    async function copy(): Promise<void> {
+    const copy = useCallback(async (value: string): Promise<boolean> => {
         // Absent on an insecure origin, and refused when the document is not
         // focused or permission is denied. Either way there is nothing to confirm.
-        if (!navigator.clipboard) return;
+        if (!navigator.clipboard) return false;
         try {
             await navigator.clipboard.writeText(value);
         } catch {
-            return;
+            return false;
         }
         setCopied(true);
         if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => setCopied(false), 1500);
-    }
+        timer.current = setTimeout(() => setCopied(false), COPIED_MS);
+        return true;
+    }, []);
+
+    return { copied, copy };
+}
+
+/** The copy icon, swapped for the check mark while `copied`. */
+export function CopyIcon({ copied, className }: { copied: boolean; className?: string }) {
+    return copied ? (
+        <Check className={cn("size-3.5 text-success-ink", className)} />
+    ) : (
+        <Copy className={cn("size-3.5", className)} />
+    );
+}
+
+export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
+    const words = useUiStrings();
+    const { copied, copy } = useCopied();
 
     return (
         <button
@@ -47,9 +72,9 @@ export function CopyButton({ value, label, className }: { value: string; label?:
             aria-label={words.copyNamed(label ?? value)}
             title={words.copy}
             className={cn("text-muted-foreground transition-colors hover:text-foreground", className)}
-            onClick={() => void copy()}
+            onClick={() => void copy(value)}
         >
-            {copied ? <Check className="size-3.5 text-success-ink" /> : <Copy className="size-3.5" />}
+            <CopyIcon copied={copied} />
         </button>
     );
 }
