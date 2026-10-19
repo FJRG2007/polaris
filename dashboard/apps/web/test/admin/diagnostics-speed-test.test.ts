@@ -8,9 +8,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const rateLimit = vi.fn(
-    async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 })
-);
+const rateLimit = vi.fn(async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({
+    ok: true,
+    retryAfterMs: 0
+}));
 const setSetting = vi.fn(async () => undefined);
 
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
@@ -66,7 +67,10 @@ function endpoint(record: Seen, options: { stall?: boolean; refuseAbove?: number
         const size = Number(new URL(url).searchParams.get("bytes"));
         if (size === 0)
             return new Response(null, {
-                headers: { "cf-ray": "8f1a2b3c4d5e6f70-MAD", "server-timing": "cfRequestDuration;dur=2" }
+                headers: {
+                    "cf-ray": "8f1a2b3c4d5e6f70-MAD",
+                    "server-timing": "cfRequestDuration;dur=2"
+                }
             });
         record.asked.push(size);
         open += 1;
@@ -118,11 +122,15 @@ describe("the speed test", () => {
         vi.stubGlobal("fetch", endpoint(record));
         const outcome = await runSpeedTest();
         expect(outcome.ok).toBe(true);
-        expect(record.asked.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(DOWNLOAD_BYTES);
+        expect(record.asked.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(
+            DOWNLOAD_BYTES
+        );
         // The far end sends three times what is asked; reading stops at each
         // request's size, give or take one piece already buffered per request.
         expect(record.pulled).toBeLessThanOrEqual(DOWNLOAD_BYTES + record.asked.length * PIECE);
-        expect(record.uploaded.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(UPLOAD_BYTES);
+        expect(record.uploaded.reduce((sum, size) => sum + size, 0)).toBeLessThanOrEqual(
+            UPLOAD_BYTES
+        );
         expect(record.signals.every((signal) => signal instanceof AbortSignal)).toBe(true);
         expect(setSetting).toHaveBeenCalledWith("diagnostics.speedTest", expect.any(String));
         if (outcome.ok) {
@@ -164,7 +172,12 @@ describe("the speed test", () => {
     });
 
     it("reads a result stored before the data center was recorded", () => {
-        const stored = { downloadMbps: 393, uploadMbps: 78.2, latencyMs: 58, at: "2026-10-19T10:00:00.000Z" };
+        const stored = {
+            downloadMbps: 393,
+            uploadMbps: 78.2,
+            latencyMs: 58,
+            at: "2026-10-19T10:00:00.000Z"
+        };
         expect(speedResultSchema.safeParse(stored).success).toBe(true);
     });
 
