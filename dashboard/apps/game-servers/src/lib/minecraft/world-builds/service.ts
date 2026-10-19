@@ -19,6 +19,7 @@ import type { PolarisBuild } from "./format";
 import type { Decoration } from "../seasonal";
 import * as commands from "../events/commands";
 import * as arena from "../events/kinds/arena";
+import * as chunks from "../events/kinds/chunks";
 import type { ServerContainer } from "../service";
 import { build, cancelBatch, capabilities } from "../events/in-server";
 
@@ -38,6 +39,12 @@ const SAMPLE_TAG = "pw_samp";
 
 /** Servers whose builds are being worked on: a pass never overlaps the last. */
 const busy = new Set<string>();
+
+/** Per server and build, the site a search starts at next: each pass goes on
+ *  round the rings where the last one stopped, so a home whose nearest ground
+ *  is all built on still gets a site further out. Kept in memory: a restart
+ *  starts again from the nearest. */
+const nextSite = new Map<string, number>();
 
 /** The batch key a build is pasted and cancelled under: the same across restarts. */
 function batchKeyFor(installedAppId: string, id: string): string {
@@ -79,13 +86,15 @@ async function runChunks(
     return true;
 }
 
-/** Run `work` with the box's chunks held loaded, and let them go after. */
+/** Run `work` with the box's chunks held loaded, and let them go after - all
+ *  but the ones somebody held before, a farm's, which stay loaded. */
 async function loaded<T>(server: ServerContainer, box: Box, work: () => Promise<T>): Promise<T> {
+    const held = chunks.readForced(await server.say([chunks.READ_FORCED]).catch(() => ""));
     await server.sayAll([arena.forceloadArea(box, true)]);
     try {
         return await work();
     } finally {
-        await server.sayAll([arena.forceloadArea(box, false)]);
+        await server.sayAll(chunks.spareHeld(arena.forceloadArea(box, false), held));
     }
 }
 
@@ -161,9 +170,13 @@ async function surveySite(
     }
 }
 
-/** A site for `wanted` near the players: its origin, or null when none of the nearest will do. */
+/** A site for `wanted` near the players: its origin, or null when none of this pass's will do. */
 async function findSite(server: ServerContainer, wanted: PolarisBuild): Promise<plan.Point | null> {
-    for (const center of plan.candidateCenters(await homesOf(server), wanted, SITES_PER_PASS)) {
+    const centers = plan.candidateCenters(await homesOf(server), wanted, Number.POSITIVE_INFINITY);
+    const key = `${server.installedAppId}:${wanted.id}`;
+    const from = (nextSite.get(key) ?? 0) % Math.max(centers.length, 1);
+    nextSite.set(key, from + SITES_PER_PASS >= centers.length ? 0 : from + SITES_PER_PASS);
+    for (const center of centers.slice(from, from + SITES_PER_PASS)) {
         const reach = plan.radiusOf(wanted) + 1;
         const area = {
             x1: center.x - reach,
@@ -174,7 +187,10 @@ async function findSite(server: ServerContainer, wanted: PolarisBuild): Promise<
             z2: center.z + reach
         };
         const origin = await loaded(server, area, () => surveySite(server, wanted, center));
-        if (origin) return origin;
+        if (origin) {
+            nextSite.delete(key);
+            return origin;
+        }
     }
     return null;
 }

@@ -363,8 +363,9 @@ describe("the catalog", () => {
 
 let ids = 0;
 
-/** A vanilla server on level ground at y 64 with nobody's builds on it. */
-function fakeServer() {
+/** A vanilla server on level ground at y 64 with nobody's builds on it, or the
+ *  ground `heightAt` says. */
+function fakeServer(heightAt: (x: number, z: number) => number = () => 64) {
     const said: string[] = [];
     const sent: string[] = [];
     const columns: { x: number; z: number }[] = [];
@@ -385,7 +386,7 @@ function fakeServer() {
                 return columns
                     .map(
                         (one) =>
-                            `Marker has the following entity data: [${one.x + 0.5}d, 64.0d, ${one.z + 0.5}d]`
+                            `Marker has the following entity data: [${one.x + 0.5}d, ${heightAt(one.x, one.z)}.0d, ${one.z + 0.5}d]`
                     )
                     .join("\n");
             if (command!.includes(" if blocks ")) return "Test passed, count: 0";
@@ -457,6 +458,44 @@ describe("the season's builds in the world", () => {
         );
         expect(sent.some((line) => line.endsWith(" keep"))).toBe(false);
         expect(plan.readPlaced(config)).toEqual([]);
+    });
+
+    it("goes on round the rings on the next pass when every site it tried was uneven", async () => {
+        // Built up out to 40 blocks from the player: steps of two everywhere nearer.
+        const stepped = (x: number, z: number) =>
+            Math.hypot(x, z) < 40 ? 64 + 2 * Math.abs(Math.floor(x / 4) % 2) : 64;
+        const first = fakeServer(stepped);
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        const next = fakeServer(stepped);
+        next.server.installedAppId = first.server.installedAppId;
+        for (let pass = 0; pass < 8 && plan.readPlaced(config).length === 0; pass++)
+            await reconcileWorldBuilds(next.server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        expect(placed).toMatchObject({ up: true });
+        const box = placed!.arena.box;
+        expect(Math.hypot((box.x1 + box.x2) / 2, (box.z1 + box.z2) / 2)).toBeGreaterThanOrEqual(40);
+    });
+
+    it("never lets go of a chunk that was held loaded before it came", async () => {
+        const { server, sent } = fakeServer();
+        const say = server.say.bind(server);
+        // The chunk under the first site, kept loaded by the operator.
+        server.say = async (argv) =>
+            argv[0]!.endsWith("forceload query")
+                ? "1 force loaded chunk was found in minecraft:overworld at: [1, 0]"
+                : say(argv);
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const removes = sent.filter((line) => line.includes(" forceload remove "));
+        expect(removes.length).toBeGreaterThan(0);
+        for (const line of removes) {
+            const [x1, z1, x2 = x1, z2 = z1] = line
+                .split(" forceload remove ")[1]!
+                .split(" ")
+                .map(Number);
+            const holds = x1! >> 4 <= 1 && x2! >> 4 >= 1 && z1! >> 4 <= 0 && z2! >> 4 >= 0;
+            expect(holds).toBe(false);
+        }
     });
 
     it("surveys with markers of its own, which an event's mark or survey never reads or clears", async () => {
