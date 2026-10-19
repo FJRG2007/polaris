@@ -1,0 +1,112 @@
+{
+    "toggle": {
+        "title": "Preguntar a Polar (Ctrl+J)",
+        "label": "Preguntar"
+    },
+    "mood": {
+        "idle": "Polar, en reposo",
+        "thinking": "Polar, pensando",
+        "listening": "Polar, te espera",
+        "speaking": "Polar, hablando",
+        "done": "Polar, hecho",
+        "trouble": "Polar, algo falló"
+    },
+    "history": {
+        "title": "Conversaciones",
+        "empty": "Sin conversaciónes aún.",
+        "delete": "Borrar conversación"
+    },
+    "actions": {
+        "new": "Nueva conversación",
+        "openPage": "Abrir como página",
+        "close": "Cerrar Polar",
+        "stop": "Parar",
+        "send": "Enviar (Intro)",
+        "edit": "Editar mensaje",
+        "reply": "Responder al mensaje",
+        "copy": "Copiar mensaje",
+        "regenerate": "Responder otra vez"
+    },
+    "noKeys": {
+        "title": "Polar necesita una clave de IA",
+        "body": "Añade una clave de un proveedor como Anthropic, OpenAI o Google, o pide a un administrador que comparta las de este Polaris.",
+        "own": "Añadir tu propia clave",
+        "admin": "Gestionar claves de Polaris"
+    },
+    "empty": "Pregunta por esta página o por lo que puedes hacer en Polaris.",
+    "status": {
+        "thinking": "Pensando"
+    },
+    "errors": {
+        "failed": "Polar no pudo responder. Reintenta o elige otro modelo.",
+        "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible."
+    },
+    "queue": {
+        "title": "Se envía luego",
+        "edit": "Mensaje en cola",
+        "up": "Subir",
+        "down": "Bajar",
+        "remove": "Quitar de la cola"
+    },
+    "slash": {
+        "title": "Comandos",
+        "new": "Empezar una conversación",
+        "model": "Cambiar modelo, nivel o clave",
+        "page": "Adjuntar lo que muestra la página",
+        "file": "Adjuntar un archivo de Drive",
+        "tools": "Ver qué puede hacer Polar aqui",
+        "call": "Hablar con Polar en voz alta",
+        "later": "Llega en una versión posterior",
+        "toolsPrompt": "¿Qué puedes hacer por mí en esta página? Enumera tus herramientas, en breve."
+    },
+    "context": {
+        "title": "Polar ve esta página",
+        "remove": "Dejar de compartir la página"
+    },
+    "reply": {
+        "to": "Respondiendo a:",
+        "cancel": "Cancelar respuesta"
+    },
+    "edit": {
+        "editing": "Editando un mensaje enviado",
+        "cancel": "Cancelar edición"
+    },
+    "composer": {
+        "label": "Mensaje para Polar",
+        "placeholder": "Pregunta a Polar o escribe / para comandos"
+    },
+    "picker": {
+        "none": "Sin modelo",
+        "title": "Modelo, inteligencia y clave",
+        "intelligence": "Inteligencia",
+        "payer": "Paga con",
+        "own": "Tu clave personal",
+        "instance": "Compartida por Polaris",
+        "signin": "Sesión de agente",
+        "signinReason": "Las sesiones solo se usan en Agentes; Polar usa claves de API.",
+        "manage": "Gestionar claves de IA"
+    },
+    "intelligence": {
+        "fast": "Rápido",
+        "balanced": "Medio",
+        "deep": "Profundo",
+        "max": "Máximo"
+    },
+    "footer": "Polar actúa con tu acceso y pregunta antes de cambiar nada.",
+    "reasoning": "Razonamiento",
+    "approval": {
+        "title": "¿Ejecutar {tool}?",
+        "run": "Ejecutar",
+        "deny": "Ahora no",
+        "runsAsYou": "Se ejecuta como tú"
+    },
+    "tool": {
+        "running": "Usando {tool}",
+        "done": "Usó {tool}",
+        "denied": "Omitió {tool}",
+        "failed": "{tool} falló"
+    },
+    "page": {
+        "title": "Polar"
+    }
+}

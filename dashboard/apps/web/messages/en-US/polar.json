@@ -1,0 +1,112 @@
+{
+    "toggle": {
+        "title": "Ask Polar (Ctrl+J)",
+        "label": "Ask Polar"
+    },
+    "mood": {
+        "idle": "Polar, idle",
+        "thinking": "Polar, thinking",
+        "listening": "Polar, waiting for you",
+        "speaking": "Polar, speaking",
+        "done": "Polar, done",
+        "trouble": "Polar, something went wrong"
+    },
+    "history": {
+        "title": "Conversations",
+        "empty": "No conversations yet.",
+        "delete": "Delete conversation"
+    },
+    "actions": {
+        "new": "New conversation",
+        "openPage": "Open as a page",
+        "close": "Close Polar",
+        "stop": "Stop",
+        "send": "Send (Enter)",
+        "edit": "Edit message",
+        "reply": "Reply to message",
+        "copy": "Copy message",
+        "regenerate": "Answer again"
+    },
+    "noKeys": {
+        "title": "Polar needs an AI provider key",
+        "body": "Add a key from a provider such as Anthropic, OpenAI or Google, or ask an administrator to share this Polaris's keys.",
+        "own": "Add your own key",
+        "admin": "Manage this Polaris's keys"
+    },
+    "empty": "Ask about this page, or anything you can do in Polaris.",
+    "status": {
+        "thinking": "Thinking"
+    },
+    "errors": {
+        "failed": "Polar could not answer. Try again, or pick another model.",
+        "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one."
+    },
+    "queue": {
+        "title": "Sends next",
+        "edit": "Queued message",
+        "up": "Move up",
+        "down": "Move down",
+        "remove": "Remove from queue"
+    },
+    "slash": {
+        "title": "Commands",
+        "new": "Start a new conversation",
+        "model": "Switch model, intelligence or key",
+        "page": "Attach what this page shows",
+        "file": "Attach a file from Drive",
+        "tools": "See what Polar can do here",
+        "call": "Talk to Polar out loud",
+        "later": "Coming in a later update",
+        "toolsPrompt": "What can you do for me on this page? List the tools you have, briefly."
+    },
+    "context": {
+        "title": "Polar sees this page",
+        "remove": "Stop sharing this page"
+    },
+    "reply": {
+        "to": "Replying to:",
+        "cancel": "Cancel reply"
+    },
+    "edit": {
+        "editing": "Editing a sent message",
+        "cancel": "Cancel edit"
+    },
+    "composer": {
+        "label": "Message Polar",
+        "placeholder": "Ask Polar, or type / for commands"
+    },
+    "picker": {
+        "none": "No model",
+        "title": "Model, intelligence and key",
+        "intelligence": "Intelligence",
+        "payer": "Pays with",
+        "own": "Your key, personal",
+        "instance": "Shared by this Polaris",
+        "signin": "Agent sign-in",
+        "signinReason": "Sign-ins only run inside Agents sessions; Polar uses API keys.",
+        "manage": "Manage AI provider keys"
+    },
+    "intelligence": {
+        "fast": "Fast",
+        "balanced": "Balanced",
+        "deep": "Deep",
+        "max": "Max"
+    },
+    "footer": "Polar acts with your access and asks before it changes anything.",
+    "reasoning": "Reasoning",
+    "approval": {
+        "title": "Run {tool}?",
+        "run": "Run it",
+        "deny": "Not now",
+        "runsAsYou": "Runs as you"
+    },
+    "tool": {
+        "running": "Using {tool}",
+        "done": "Used {tool}",
+        "denied": "Skipped {tool}",
+        "failed": "{tool} failed"
+    },
+    "page": {
+        "title": "Polar"
+    }
+}

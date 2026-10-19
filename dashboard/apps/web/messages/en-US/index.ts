@@ -9,6 +9,7 @@
 import api from "./api.json";
 import dns from "./dns.json";
 import mcp from "./mcp.json";
+import polar from "./polar.json";
 import nav from "./nav.json";
 import auth from "./auth.json";
 import chat from "./chat.json";
@@ -129,6 +130,7 @@ export default {
     notes,
     notices,
     office,
+    polar,
     publicPages,
     reference,
     runners,

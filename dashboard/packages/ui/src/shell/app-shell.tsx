@@ -17,6 +17,7 @@ export function AppShell({
     search,
     account,
     sidebar,
+    aside,
     children
 }: {
     /** The wordmark in the top-left. Callers pass it wrapped in their router's
@@ -31,6 +32,8 @@ export function AppShell({
     search?: ReactNode;
     account: ReactNode;
     sidebar?: ReactNode;
+    /** A panel on the right of the content (Polar), which places itself. */
+    aside?: ReactNode;
     children: ReactNode;
 }) {
     return (
@@ -84,6 +87,7 @@ export function AppShell({
                 <main className="min-w-0 flex-1 p-3 [--page-inset:1.5rem] sm:p-4 sm:[--page-inset:2rem] md:px-6 md:py-5 md:[--page-inset:2.5rem]">
                     {children}
                 </main>
+                {aside}
             </div>
         </div>
     );

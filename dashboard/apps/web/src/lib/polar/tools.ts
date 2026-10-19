@@ -13,7 +13,7 @@
  * Server-only.
  */
 
-import { tool, type ToolSet } from "ai";
+import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { MCP_SCOPES, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
@@ -67,7 +67,7 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
         const writes = needsApproval(entry);
         result.tools[entry.name] = tool({
             description: entry.description,
-            inputSchema: entry.input,
+            inputSchema: entry.input as unknown as FlexibleSchema<unknown>,
             async execute(input: unknown) {
                 // Checked again at the moment it runs: an approval can sit for a
                 // while, and a permission removed in between must hold.
