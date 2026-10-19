@@ -18,7 +18,7 @@ import * as insights from "@/lib/dns-blocker/insights";
 import * as queryLog from "@/lib/dns-blocker/query-log";
 import { getTranslations } from "@/lib/i18n/request";
 import { installApp } from "@/lib/apps/install-service";
-import { DNS_BLOCKER_APP } from "@/lib/dns-blocker/settings";
+import { DNS_BLOCKER_APP, type DnsSettings } from "@/lib/dns-blocker/settings";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
@@ -136,7 +136,7 @@ export async function turnOffDnsBlockerAction(): Promise<Result> {
     }
 }
 
-/** Today's numbers and the newest lookups that match the filter. */
+/** The range's numbers and one page of the lookups that match the filter. */
 export async function dnsInsightsAction(
     input: unknown,
     fresh?: unknown
@@ -154,13 +154,90 @@ export async function dnsInsightsAction(
     }
 }
 
-/** Let every lookup through for the given minutes. */
+/** The newest lookups that match, for the live view. */
+export async function dnsTailAction(
+    input: unknown
+): Promise<Result<{ rows: queryLog.QueryRow[] }>> {
+    await requireAdmin();
+    try {
+        return { rows: await insights.tailQueries(queryLog.queryFilterSchema.parse(input)) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** How many names the lists hold and when they were last loaded. `metrics` is
+ *  null when the engine runs a configuration from before they were counted. */
+export async function dnsListsAction(): Promise<
+    Result<{ metrics: queryLog.EngineMetrics | null }>
+> {
+    await requireAdmin();
+    try {
+        return { metrics: await insights.engineMetrics() };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Download every list again now. */
+export async function refreshDnsListsAction(): Promise<Result> {
+    const user = await requireAdmin();
+    try {
+        await insights.refreshLists();
+        await recordAudit({ actorId: user.id, action: "dnsBlocker.refreshLists" });
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/**
+ * Allow or block a name from the query log: added to that list, taken off the
+ * other, and applied. Answers with the settings as saved, so the form below
+ * shows the rule without a reload.
+ */
+export async function ruleFromLogAction(
+    input: unknown
+): Promise<Result<{ settings: DnsSettings }>> {
+    const user = await requireAdmin();
+    try {
+        const { domain, list } = queryLog.ruleFromLogSchema.parse(input);
+        const current = await blocker.readSettings();
+        const other = list === "allow" ? "deny" : "allow";
+        const next: DnsSettings = {
+            ...current,
+            [list]: current[list].includes(domain) ? current[list] : [...current[list], domain],
+            [other]: current[other].filter((rule) => rule !== domain)
+        };
+        const notApplied = await blocker.saveSettings(next, user.id).then(
+            () => null,
+            (error: unknown) => {
+                if (error instanceof blocker.DnsBlockerRefusal && error.code === "notApplied")
+                    return error;
+                throw error;
+            }
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "dnsBlocker.settings",
+            targetType: "installedApp",
+            targetId: DNS_BLOCKER_APP,
+            metadata: { [list]: domain }
+        });
+        refresh();
+        return notApplied ? failed(notApplied) : { settings: next };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Let every lookup through for the given seconds, or until resumed (0). */
 export async function pauseDnsBlockingAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     try {
-        const { minutes } = queryLog.pauseSchema.parse(input);
-        await insights.pauseBlocking(minutes);
-        await recordAudit({ actorId: user.id, action: "dnsBlocker.pause", metadata: { minutes } });
+        const { seconds } = queryLog.pauseSchema.parse(input);
+        await insights.pauseBlocking(seconds);
+        await recordAudit({ actorId: user.id, action: "dnsBlocker.pause", metadata: { seconds } });
         return {};
     } catch (error) {
         return failed(error);

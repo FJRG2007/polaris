@@ -122,3 +122,67 @@ describe("blockyConfig", () => {
         expect(encoded.length).toBeLessThanOrEqual(ENV_VALUE_MAX);
     });
 });
+
+describe("Pi-hole parity settings", () => {
+    it("gives each device group its own categories, always with the check name", () => {
+        const config = render.blockyConfig(
+            settings({
+                sources: ["hagezi-pro", "hagezi-tif"],
+                clientGroups: [
+                    {
+                        name: "Kids",
+                        clients: ["192.168.1.0/24", "kids-*"],
+                        categories: ["ads", "adult"]
+                    }
+                ]
+            })
+        );
+        const groups = (config.blocking as { clientGroupsBlock: Record<string, string[]> })
+            .clientGroupsBlock;
+        expect(groups.default).toEqual(["ads", "malware", "polaris"]);
+        // Adult has no list switched on, so it is left out rather than named empty.
+        expect(groups["192.168.1.0/24"]).toEqual(["ads", "polaris"]);
+        expect(groups["kids-*"]).toEqual(["ads", "polaris"]);
+    });
+
+    it("writes aliases as an absolute zone and leaves a clashing local name out", () => {
+        const config = render.blockyConfig(
+            settings({
+                records: [
+                    { name: "nas.home", address: "192.168.1.20" },
+                    { name: "media.home", address: "192.168.1.21" }
+                ],
+                aliases: [{ name: "media.home", target: "nas.home" }]
+            })
+        );
+        const custom = config.customDNS as { mapping: Record<string, string>; zone: string };
+        expect(custom.mapping).toEqual({ "nas.home": "192.168.1.20" });
+        expect(custom.zone).toBe("media.home. 300 IN CNAME nas.home.\n");
+    });
+
+    it("keeps the asked days of log, turns metrics on and names devices from the router", () => {
+        const config = render.blockyConfig(settings({ logDays: 14, namesFrom: "192.168.1.1" }));
+        expect(config.queryLog).toMatchObject({
+            type: "csv",
+            target: "/logs",
+            logRetentionDays: 15
+        });
+        expect(config.prometheus).toEqual({ enable: true, path: "/metrics" });
+        expect(config.clientLookup).toEqual({ upstream: "192.168.1.1", singleNameOrder: [1] });
+        expect(render.blockyConfig(settings()).clientLookup).toBeUndefined();
+    });
+
+    it("reads an older stored row with the new fields defaulted", () => {
+        const read = dns.readDnsSettings({ sources: ["hagezi-pro"], refreshHours: 12 });
+        expect(read).toMatchObject({ aliases: [], clientGroups: [], logDays: 7, namesFrom: "" });
+    });
+
+    it("accepts addresses, ranges and device names as group clients", () => {
+        expect(dns.normalizeDnsClient(" 192.168.1.20 ")).toBe("192.168.1.20");
+        expect(dns.normalizeDnsClient("10.0.0.0/8")).toBe("10.0.0.0/8");
+        expect(dns.normalizeDnsClient("Kids-*")).toBe("kids-*");
+        expect(dns.normalizeDnsClient("10.0.0.0/40")).toBeNull();
+        expect(dns.normalizeDnsClient("default")).toBeNull();
+        expect(dns.normalizeDnsClient("a b")).toBeNull();
+    });
+});

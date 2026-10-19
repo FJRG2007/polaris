@@ -157,7 +157,11 @@ export const DNS_LIMITS = {
     rules: 1000,
     customLists: 30,
     records: 200,
-    upstreams: 8
+    upstreams: 8,
+    clientGroups: 20,
+    groupClients: 50,
+    /** Days of lookups the engine keeps, which is as far back as the screen reads. */
+    logDays: 30
 } as const;
 
 const HOSTNAME = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))*$/;
@@ -263,6 +267,53 @@ export const dnsRecordSchema = z.object({
         )
 });
 
+/** One name pointing at another (a CNAME), answered on this network. */
+export const dnsAliasSchema = z.object({
+    name: z
+        .string()
+        .transform((value) => normalizeDnsName(value))
+        .refine((value) => HOSTNAME.test(value), "invalidName"),
+    target: z
+        .string()
+        .transform((value) => normalizeDnsName(value))
+        .refine((value) => HOSTNAME.test(value), "invalidName")
+});
+
+/**
+ * Who a client group holds: an address (`192.168.1.20`), a range
+ * (`192.168.1.0/24`), or a device name as the router reports it, with `*` for
+ * any run of characters (`kids-*`). Normalized, or null when it is none of them.
+ */
+export function normalizeDnsClient(text: string): string | null {
+    const value = text.trim().toLowerCase();
+    if (value.length === 0 || value.length > 64 || CONTROL.test(value)) return null;
+    const cidr = /^([^/]+)\/(\d{1,3})$/.exec(value);
+    if (cidr?.[1] && cidr[2]) {
+        const bits = Number(cidr[2]);
+        if (IPV4.test(cidr[1])) return bits <= 32 ? value : null;
+        return cidr[1].includes(":") && IPV6.test(cidr[1]) && bits <= 128 ? value : null;
+    }
+    if (IPV4.test(value) || (value.includes(":") && IPV6.test(value))) return value;
+    if (value === "default") return null;
+    return /^[a-z0-9*](?:[a-z0-9*._-]{0,62})$/.test(value) ? value : null;
+}
+
+const clientSchema = z.string().transform((value, ctx) => {
+    const client = normalizeDnsClient(value);
+    if (!client) {
+        ctx.addIssue({ code: "custom", message: "invalidClient" }); // i18n-ignore a key the screen says
+        return z.NEVER;
+    }
+    return client;
+});
+
+/** Some devices that block a different set of categories from everybody else. */
+export const dnsClientGroupSchema = z.object({
+    name: z.string().trim().min(1).max(40),
+    clients: z.array(clientSchema).min(1).max(DNS_LIMITS.groupClients),
+    categories: z.array(z.enum(DNS_CATEGORIES)).max(DNS_CATEGORIES.length)
+});
+
 export const dnsCustomListSchema = z.object({
     url: listUrlSchema,
     category: z.enum(DNS_CATEGORIES)
@@ -291,12 +342,25 @@ export const dnsSettingsSchema = z.object({
     /** Names this network answers itself, like `nas.home`. */
     records: z.array(dnsRecordSchema).max(DNS_LIMITS.records),
     /** How often the lists are downloaded again. */
-    refreshHours: z.number().int().min(1).max(168)
+    refreshHours: z.number().int().min(1).max(168),
+    /** Names that point at another name (CNAME records). */
+    aliases: z.array(dnsAliasSchema).max(DNS_LIMITS.records),
+    /** Devices that block other categories than the rest of the network. */
+    clientGroups: z.array(dnsClientGroupSchema).max(DNS_LIMITS.clientGroups),
+    /** How many days of lookups are kept. */
+    logDays: z.number().int().min(1).max(DNS_LIMITS.logDays),
+    /** The router asked for device names (reverse lookups), or "" for none. */
+    namesFrom: z
+        .string()
+        .trim()
+        .refine((value) => value === "" || IPV4.test(value), "invalidAddress")
 });
 
 export type DnsSettings = z.infer<typeof dnsSettingsSchema>;
 export type DnsRecord = z.infer<typeof dnsRecordSchema>;
 export type DnsCustomList = z.infer<typeof dnsCustomListSchema>;
+export type DnsAlias = z.infer<typeof dnsAliasSchema>;
+export type DnsClientGroup = z.infer<typeof dnsClientGroupSchema>;
 
 export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     sources: DNS_LIST_SOURCES.filter((source) => source.recommended).map((source) => source.id),
@@ -306,7 +370,11 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     upstream: "cloudflare",
     customUpstreams: [],
     records: [],
-    refreshHours: 24
+    refreshHours: 24,
+    aliases: [],
+    clientGroups: [],
+    logDays: 7,
+    namesFrom: ""
 };
 
 /**
@@ -337,6 +405,10 @@ export function readDnsSettings(raw: unknown): DnsSettings {
                 : DEFAULT_DNS_SETTINGS.upstream,
         customUpstreams,
         records: field("records"),
-        refreshHours: field("refreshHours")
+        refreshHours: field("refreshHours"),
+        aliases: field("aliases"),
+        clientGroups: field("clientGroups"),
+        logDays: field("logDays"),
+        namesFrom: field("namesFrom")
     };
 }

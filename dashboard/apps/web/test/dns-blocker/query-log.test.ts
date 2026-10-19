@@ -2,26 +2,44 @@ import { describe, expect, it } from "vitest";
 import {
     QUERY_LOG_ROWS,
     QueryLogReader,
+    TAIL_ROWS,
     parseBlockingStatus,
+    parseEngineMetrics,
     parseQueryLine,
+    parseTail,
+    pauseSchema,
     queryFilterSchema,
-    queryLogPath
+    queryLogPath,
+    rangeWindow,
+    ruleFromLogSchema
 } from "@/lib/dns-blocker/query-log";
 
-function line(client: string, domain: string, responseType: string): string {
+const NOW = Date.parse("2026-10-18T12:00:00Z");
+
+function line(
+    client: string,
+    domain: string,
+    responseType: string,
+    options: { time?: string; reason?: string; type?: string; name?: string } = {}
+): string {
     return [
-        "2026-10-18 10:00:00",
+        options.time ?? "2026-10-18 10:00:00",
         client,
-        client,
+        options.name ?? client,
         "3",
-        "reason",
+        options.reason ?? "reason",
         `${domain}.`,
         "1.2.3.4",
         "NOERROR",
         responseType,
-        "A",
+        options.type ?? "A",
         "x"
     ].join("\t");
+}
+
+function reader(filter: Partial<ReturnType<typeof queryFilterSchema.parse>> = {}) {
+    const parsed = queryFilterSchema.parse(filter);
+    return new QueryLogReader(parsed, rangeWindow(parsed.range, NOW));
 }
 
 describe("query log", () => {
@@ -29,62 +47,167 @@ describe("query log", () => {
         expect(queryLogPath(new Date("2026-10-18T23:59:00Z"))).toBe("/logs/2026-10-18_ALL.log");
     });
 
-    it("parses a row and refuses a short line", () => {
-        expect(parseQueryLine(line("10.0.0.2", "Ads.Example.com", "BLOCKED"))).toMatchObject({
+    it("parses a row, who answered it and what blocked it, and refuses a short line", () => {
+        expect(
+            parseQueryLine(
+                line("10.0.0.2", "Ads.Example.com", "BLOCKED", { reason: "BLOCKED (ads)" })
+            )
+        ).toMatchObject({
             client: "10.0.0.2",
+            clientName: "",
             domain: "ads.example.com",
             outcome: "blocked",
             type: "A",
-            durationMs: 3
+            durationMs: 3,
+            via: "blocked",
+            list: "ads",
+            at: Date.parse("2026-10-18T10:00:00Z")
         });
         expect(parseQueryLine(line("10.0.0.2", "a.com", "REBIND"))?.outcome).toBe("blocked");
-        expect(parseQueryLine(line("10.0.0.2", "a.com", "CACHED"))?.outcome).toBe("allowed");
-        expect(parseQueryLine("garbage")).toBeNull();
-        expect(parseQueryLine("")).toBeNull();
+        expect(
+            parseQueryLine(
+                line("10.0.0.2", "a.com", "RESOLVED", {
+                    reason: "RESOLVED (https://1.1.1.1:443/dns-query)",
+                    name: "laptop.lan"
+                })
+            )
+        ).toMatchObject({ via: "https://1.1.1.1:443/dns-query", clientName: "laptop.lan" });
+        expect(parseQueryLine(line("10.0.0.2", "a.com", "CACHED"))?.via).toBe("cache");
+        expect(parseQueryLine(line("10.0.0.2", "nas.home", "CUSTOMDNS"))?.via).toBe("local");
+        expect(parseQueryLine("too\tshort")).toBeNull();
     });
 
-    it("sums every line and keeps only matching rows, newest first", () => {
-        const reader = new QueryLogReader(queryFilterSchema.parse({ outcome: "blocked" }));
-        reader.add(line("10.0.0.2", "ads.com", "BLOCKED"));
-        reader.add(line("10.0.0.2", "news.com", "RESOLVED"));
-        reader.add(line("10.0.0.3", "track.com", "BLOCKED"));
-        reader.add(line("10.0.0.3", "ads.com", "BLOCKED"));
-        const stats = reader.stats();
-        expect(stats).toMatchObject({ queries: 4, blocked: 3, blockedPercent: 75 });
-        expect(stats.topBlocked[0]).toEqual({ name: "ads.com", count: 2 });
-        expect(stats.clients).toEqual(["10.0.0.2", "10.0.0.3"]);
-        expect(reader.newest().map((row) => row.domain)).toEqual([
-            "ads.com",
-            "track.com",
-            "ads.com"
+    it("ends the window on the next bar and covers the days it touches", () => {
+        const day = rangeWindow("24h", NOW);
+        expect(day.to).toBe(NOW + 10 * 60_000);
+        expect(day.to - day.from).toBe(24 * 3_600_000);
+        expect(day.days.map((d) => d.toISOString().slice(0, 10))).toEqual([
+            "2026-10-17",
+            "2026-10-18"
         ]);
+        expect(rangeWindow("7d", NOW).days).toHaveLength(8);
     });
 
-    it("filters by search and client, and bounds the rows", () => {
-        const reader = new QueryLogReader(
-            queryFilterSchema.parse({ search: " ADS ", client: "10.0.0.2" })
+    it("sums the window into totals, ten-minute bars, types, upstreams and top lists", () => {
+        const log = reader();
+        log.add(line("10.0.0.2", "ads.example", "BLOCKED", { reason: "BLOCKED (ads)" }));
+        log.add(line("10.0.0.2", "ok.example", "RESOLVED", { reason: "RESOLVED (1.1.1.1:53)" }));
+        log.add(
+            line("10.0.0.3", "ok.example", "CACHED", { type: "AAAA", time: "2026-10-18 10:05:00" })
         );
-        for (let i = 0; i < QUERY_LOG_ROWS * 3; i += 1)
-            reader.add(line("10.0.0.2", `ads${i}.com`, "CACHED"));
-        reader.add(line("10.0.0.3", "ads.com", "CACHED"));
-        reader.add(line("10.0.0.2", "news.com", "CACHED"));
-        const rows = reader.newest();
-        expect(rows).toHaveLength(QUERY_LOG_ROWS);
-        expect(rows[0]?.domain).toBe(`ads${QUERY_LOG_ROWS * 3 - 1}.com`);
-        expect(new QueryLogReader(queryFilterSchema.parse({})).stats().blockedPercent).toBe(0);
+        // Outside the 24 hours: in no number.
+        log.add(line("10.0.0.9", "old.example", "RESOLVED", { time: "2026-10-16 10:00:00" }));
+        const stats = log.stats();
+        expect(stats).toMatchObject({ queries: 3, blocked: 1, blockedPercent: 33.3 });
+        expect(stats.timeline.allowed).toHaveLength(144);
+        const bar = (Date.parse("2026-10-18T10:00:00Z") - stats.timeline.from) / 600_000;
+        expect(stats.timeline.allowed[bar]).toBe(2);
+        expect(stats.timeline.blocked[bar]).toBe(1);
+        expect(stats.queryTypes).toEqual([
+            { name: "A", count: 2 },
+            { name: "AAAA", count: 1 }
+        ]);
+        expect(stats.destinations.map((item) => item.name).sort()).toEqual([
+            "1.1.1.1:53",
+            "blocked",
+            "cache"
+        ]);
+        expect(stats.blockedBy).toEqual([{ name: "ads", count: 1 }]);
+        expect(stats.topPermitted).toEqual([{ name: "ok.example", count: 2 }]);
+        expect(stats.topBlocked).toEqual([{ name: "ads.example", count: 1 }]);
+        expect(stats.topClients[0]).toEqual({ name: "10.0.0.2", count: 2 });
+        expect(stats.topBlockedClients).toEqual([{ name: "10.0.0.2", count: 1 }]);
+        expect(stats.clientSeries[0]?.client).toBe("10.0.0.2");
+        expect(stats.clientSeries[0]?.counts[bar]).toBe(2);
+    });
+
+    it("pages the matching rows newest first and says when there is an older page", () => {
+        const log = reader({ outcome: "blocked" });
+        for (let at = 0; at < QUERY_LOG_ROWS + 5; at += 1) {
+            log.add(line("10.0.0.2", `n${at}.example`, "BLOCKED"));
+            log.add(line("10.0.0.2", "ok.example", "RESOLVED"));
+        }
+        const page = log.page(0);
+        expect(page.rows).toHaveLength(QUERY_LOG_ROWS);
+        expect(page.rows[0]?.domain).toBe(`n${QUERY_LOG_ROWS + 4}.example`);
+        expect(page.hasMore).toBe(true);
+        const older = log.page(1);
+        expect(older.rows).toHaveLength(5);
+        expect(older.rows.at(-1)?.domain).toBe("n0.example");
+        expect(older.hasMore).toBe(false);
+    });
+
+    it("filters by search, client and type", () => {
+        const log = reader({ search: "ads", client: "10.0.0.3", type: "aaaa" });
+        log.add(line("10.0.0.2", "ads.example", "BLOCKED", { type: "AAAA" }));
+        log.add(line("10.0.0.3", "ads.example", "BLOCKED", { type: "AAAA" }));
+        log.add(line("10.0.0.3", "ads.example", "BLOCKED"));
+        expect(log.page(0).rows).toHaveLength(1);
+    });
+
+    it("reads the live tail newest first, dropping a cut first line", () => {
+        const lines = [
+            "cut\tline",
+            line("10.0.0.2", "a.example", "RESOLVED"),
+            line("10.0.0.2", "b.example", "BLOCKED"),
+            ""
+        ].join("\n");
+        const all = queryFilterSchema.parse({});
+        expect(parseTail(lines, false, all).map((row) => row.domain)).toEqual([
+            "b.example",
+            "a.example"
+        ]);
+        expect(parseTail(lines, false, { ...all, outcome: "blocked" })).toHaveLength(1);
+        const many = Array.from({ length: TAIL_ROWS + 10 }, () =>
+            line("10.0.0.2", "a.example", "RESOLVED")
+        ).join("\n");
+        expect(parseTail(many, true, all)).toHaveLength(TAIL_ROWS);
+    });
+
+    it("reads the engine's list metrics", () => {
+        const metrics = parseEngineMetrics(
+            [
+                "# HELP blocky_denylist_cache_entries Number of entries",
+                'blocky_denylist_cache_entries{group="ads"} 120000',
+                'blocky_denylist_cache_entries{group="malware"} 5000',
+                "blocky_last_list_group_refresh_timestamp_seconds 1.7604e+09",
+                "blocky_failed_downloads_total 2"
+            ].join("\n")
+        );
+        expect(metrics).toEqual({
+            lists: [
+                { name: "ads", count: 120000 },
+                { name: "malware", count: 5000 }
+            ],
+            listed: 125000,
+            lastRefresh: 1.7604e12,
+            failedDownloads: 2
+        });
+        expect(parseEngineMetrics("").lastRefresh).toBeNull();
     });
 
     it("reads the engine's blocking status sentence", () => {
-        expect(parseBlockingStatus('level=info msg="blocking enabled"')).toEqual({
+        expect(parseBlockingStatus("blocking enabled")).toEqual({
             enabled: true,
             secondsLeft: null
         });
-        expect(parseBlockingStatus("blocking disabled for groups: 'ads', for 299 seconds")).toEqual(
-            { enabled: false, secondsLeft: 299 }
-        );
-        expect(parseBlockingStatus("blocking disabled for groups: ads")).toEqual({
+        expect(parseBlockingStatus("blocking disabled for 120 seconds")).toEqual({
+            enabled: false,
+            secondsLeft: 120
+        });
+        expect(parseBlockingStatus("blocking disabled")).toEqual({
             enabled: false,
             secondsLeft: null
         });
+    });
+
+    it("bounds a pause and takes a domain from the log as a rule", () => {
+        expect(pauseSchema.parse({ seconds: 0 }).seconds).toBe(0);
+        expect(pauseSchema.safeParse({ seconds: 90_000 }).success).toBe(false);
+        expect(ruleFromLogSchema.parse({ domain: "Ads.Example.com.", list: "allow" })).toEqual({
+            domain: "ads.example.com",
+            list: "allow"
+        });
+        expect(ruleFromLogSchema.safeParse({ domain: "/x/", list: "deny" }).success).toBe(false);
     });
 });

@@ -68,6 +68,19 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
 
     const groups = [...DNS_CATEGORIES.filter((category) => denylists[category]), OWN_GROUP];
+    const clientGroupsBlock: Record<string, string[]> = { default: groups };
+    // A device in a group blocks that group's categories (of the ones that
+    // have a list) and the operator's own names, which hold the check name.
+    // A device named by two groups takes the first.
+    for (const group of settings.clientGroups) {
+        const blocks = [
+            ...DNS_CATEGORIES.filter(
+                (category) => denylists[category] && group.categories.includes(category)
+            ),
+            OWN_GROUP
+        ];
+        for (const client of group.clients) clientGroupsBlock[client] ??= blocks;
+    }
     // The engine checks a name against the allow lists of every group a client
     // blocks with before any deny list, so one copy, in the group that always
     // has a deny list, covers them all.
@@ -75,8 +88,12 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
         settings.allow.length > 0 ? { [OWN_GROUP]: [inline(settings.allow)] } : undefined;
 
     const { servers, bootstrap } = upstreamsOf(settings);
+    const aliased = new Set(settings.aliases.map((alias) => alias.name));
     const mapping = new Map<string, string[]>();
     for (const record of settings.records) {
+        // The engine lets a zone entry replace a mapped one of the same name,
+        // so a name that is an alias is written only as the alias.
+        if (aliased.has(record.name)) continue;
         const addresses = mapping.get(record.name) ?? [];
         if (!addresses.includes(record.address)) addresses.push(record.address);
         mapping.set(record.name, addresses);
@@ -95,7 +112,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
         blocking: {
             denylists,
             ...(allowlists ? { allowlists } : {}),
-            clientGroupsBlock: { default: groups },
+            clientGroupsBlock,
             blockType: "zeroIp",
             blockTTL: "1m",
             loading: {
@@ -107,23 +124,45 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                 maxErrorsPerSource: -1
             }
         },
-        ...(mapping.size > 0
+        ...(mapping.size > 0 || settings.aliases.length > 0
             ? {
                   customDNS: {
                       customTTL: "5m",
-                      mapping: Object.fromEntries(
-                          [...mapping].map(([name, addresses]) => [name, addresses.join(",")])
-                      )
+                      ...(mapping.size > 0
+                          ? {
+                                mapping: Object.fromEntries(
+                                    [...mapping].map(([name, addresses]) => [
+                                        name,
+                                        addresses.join(",")
+                                    ])
+                                )
+                            }
+                          : {}),
+                      // Aliases (CNAME) can only be written as a zone file; every
+                      // name is absolute, so no origin is needed.
+                      ...(settings.aliases.length > 0 ? { zone: aliasZone(settings) } : {})
                   }
               }
             : {}),
+        ...(settings.namesFrom
+            ? { clientLookup: { upstream: settings.namesFrom, singleNameOrder: [1] } }
+            : {}),
+        // Read on the container's loopback only (the HTTP port is never
+        // published): how many names each category's lists hold, and when they
+        // were last loaded.
+        prometheus: { enable: true, path: "/metrics" },
         caching: { prefetching: true },
         ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
-        // One file a day inside the container, read back by the screen; two
-        // days kept so the night before midnight is still there in the morning.
-        queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: 2 },
+        // One file a day on the engine's own volume, read back by the screen;
+        // a day more than asked, so the oldest day is still whole.
+        queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: settings.logDays + 1 },
         log: { level: "info", format: "text", timestamp: true, privacy: false }
     };
+}
+
+/** The aliases as zone-file lines, one CNAME each. Exported for tests. */
+export function aliasZone(settings: DnsSettings): string {
+    return inline(settings.aliases.map((alias) => `${alias.name}. 300 IN CNAME ${alias.target}.`));
 }
 
 /** The configuration file's text. */
