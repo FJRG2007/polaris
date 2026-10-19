@@ -17,7 +17,8 @@ export function isShowing(box: HTMLInputElement): boolean {
     if (!box.isConnected) return false;
     let node: Element | null = box;
     while (node) {
-        if (node.hasAttribute("hidden") || node.getAttribute("aria-hidden") === "true") return false;
+        if (node.hasAttribute("hidden") || node.getAttribute("aria-hidden") === "true")
+            return false;
         const view: Window | null = node.ownerDocument.defaultView;
         const style = view?.getComputedStyle(node);
         if (style && (style.display === "none" || /hidden|collapse/.test(style.visibility)))
@@ -35,8 +36,9 @@ export function stillHolds(boxes: readonly (HTMLInputElement | null)[], password
     return boxes.some((box) => box !== null && box.value === password && isShowing(box));
 }
 
-/** The kinds of request a page sends a form with from a script. */
-const SCRIPTED = new Set(["fetch", "xmlhttprequest", "beacon"]);
+/** The kinds of request a page sends a form with from a script. A beacon is
+ *  not one: it is how analytics reports the press itself. */
+const SCRIPTED = new Set(["fetch", "xmlhttprequest"]);
 
 /** What of a resource timing entry is read here. `responseStatus` is missing in
  *  older browsers, and 0 where the browser will not say. */
@@ -44,19 +46,33 @@ export interface SentRequest {
     readonly initiatorType: string;
     /** When it started, in milliseconds since the epoch. */
     readonly startedAt: number;
+    /** Whether it went to the page's own origin. */
+    readonly sameOrigin: boolean;
     readonly responseStatus?: number;
 }
 
 /**
- * Whether a request the page sent is the form going: sent by a script, after a
- * press on the form's button and soon after it, and not answered with a
- * refusal. A sign-in that failed is not one to save.
+ * Whether a request the page sent is the form going: sent by a script to the
+ * page's own origin, after a press on the form's button and soon after it, and
+ * answered with a status the browser reports and that is not a refusal. A
+ * sign-in that failed is not one to save, and one whose answer is unknown may
+ * have failed.
  */
 export function requestSendsForm(request: SentRequest, pressedAt: number, within: number): boolean {
-    if (pressedAt === 0 || !SCRIPTED.has(request.initiatorType)) return false;
+    if (pressedAt === 0 || !request.sameOrigin || !SCRIPTED.has(request.initiatorType))
+        return false;
     if (request.startedAt < pressedAt || request.startedAt - pressedAt > within) return false;
     const status = request.responseStatus ?? 0;
-    return status === 0 || status < 400;
+    return status >= 200 && status < 400;
+}
+
+/** Whether an address is on the page's own origin. */
+export function onOrigin(address: string, origin: string): boolean {
+    try {
+        return new URL(address, origin).origin === origin;
+    } catch {
+        return false;
+    }
 }
 
 /**

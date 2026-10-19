@@ -61,6 +61,7 @@ import { CLIPBOARD_CLEAR_MS } from "@/lib/generator";
 import {
     GENERATED_HOOK,
     generatedPasswords,
+    onOrigin,
     requestSendsForm,
     stillHolds
 } from "@/lib/submit-signals";
@@ -662,6 +663,9 @@ async function start(): Promise<void> {
      */
     let typed: { username: string; password: string; newAccount: boolean } | null = null;
     let pressedAt = 0;
+    /** The last press that belongs with the login's boxes, which is all a
+     *  request the page sends after it can be taken as the form going. */
+    let formPressedAt = 0;
     const remember = (event: Event): void => {
         const box = origin(event);
         const { fields } = seen;
@@ -702,9 +706,9 @@ async function start(): Promise<void> {
     window.addEventListener("pagehide", sendTyped);
 
     // A request the page sends by script right after the form's button is
-    // pressed, and that is not refused: a sign-up posted with `fetch` whose page
-    // keeps the boxes where they were. Only the request's kind, start and status
-    // are read - never what it carried.
+    // pressed, to the page's own origin, and that is not refused: a sign-up
+    // posted with `fetch` whose page keeps the boxes where they were. Only the
+    // request's kind, address, start and status are read - never what it carried.
     try {
         new PerformanceObserver((list) => {
             if (!typed) return;
@@ -712,9 +716,10 @@ async function start(): Promise<void> {
                 const request = {
                     initiatorType: entry.initiatorType,
                     startedAt: performance.timeOrigin + entry.startTime,
+                    sameOrigin: onOrigin(entry.name, location.origin),
                     responseStatus: (entry as { responseStatus?: number }).responseStatus
                 };
-                if (requestSendsForm(request, pressedAt, GONE_AFTER_PRESS_MS)) {
+                if (requestSendsForm(request, formPressedAt, GONE_AFTER_PRESS_MS)) {
                     sendTyped();
                     return;
                 }
@@ -760,8 +765,9 @@ async function start(): Promise<void> {
         pressedAt = Date.now();
         // Only a press that belongs with the login's boxes: a cookie banner's
         // button is not somebody signing in.
-        if (pressed.nodeName === "A" || !pressed.matches(BUTTON) || !sharesForm(pressed, box))
-            return;
+        if (!sharesForm(pressed, box)) return;
+        formPressedAt = pressedAt;
+        if (pressed.nodeName === "A" || !pressed.matches(BUTTON)) return;
         submitted();
     };
     // Enter in a login box that no form submits, which neither of the two
@@ -775,8 +781,10 @@ async function start(): Promise<void> {
             repeat: event.repeat,
             target: origin(event)
         };
-        if (sending.key === "Enter" && boxes.includes(sending.target as HTMLInputElement))
+        if (sending.key === "Enter" && boxes.includes(sending.target as HTMLInputElement)) {
             pressedAt = Date.now();
+            formPressedAt = pressedAt;
+        }
         if (enterSendsLogin(sending, boxes)) submitted();
     };
 

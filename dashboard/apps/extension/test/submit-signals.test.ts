@@ -11,6 +11,7 @@ import {
     GENERATED_HOOK,
     generatedPasswords,
     isShowing,
+    onOrigin,
     requestSendsForm,
     stillHolds
 } from "@/lib/submit-signals";
@@ -83,35 +84,55 @@ describe("a form going out of sight", () => {
 describe("a request after the button is pressed", () => {
     const pressed = 1_000_000;
     const within = 10_000;
+    const at = (startedAt: number, responseStatus?: number, initiatorType = "fetch") => ({
+        initiatorType,
+        startedAt,
+        sameOrigin: true,
+        responseStatus
+    });
 
     it("is the form going when a script sends it soon after the press", () => {
-        expect(
-            requestSendsForm({ initiatorType: "fetch", startedAt: pressed + 50 }, pressed, within)
-        ).toBe(true);
-        expect(
-            requestSendsForm(
-                { initiatorType: "xmlhttprequest", startedAt: pressed + 900, responseStatus: 302 },
-                pressed,
-                within
-            )
-        ).toBe(true);
+        expect(requestSendsForm(at(pressed + 50, 200), pressed, within)).toBe(true);
+        expect(requestSendsForm(at(pressed + 900, 302, "xmlhttprequest"), pressed, within)).toBe(
+            true
+        );
     });
 
     it("is not one refused, before the press, too late, or with no press at all", () => {
-        const at = (startedAt: number, responseStatus?: number) => ({
-            initiatorType: "fetch",
-            startedAt,
-            responseStatus
-        });
         expect(requestSendsForm(at(pressed + 10, 401), pressed, within)).toBe(false);
-        expect(requestSendsForm(at(pressed - 10), pressed, within)).toBe(false);
-        expect(requestSendsForm(at(pressed + within + 1), pressed, within)).toBe(false);
-        expect(requestSendsForm(at(10), 0, within)).toBe(false);
+        expect(requestSendsForm(at(pressed - 10, 200), pressed, within)).toBe(false);
+        expect(requestSendsForm(at(pressed + within + 1, 200), pressed, within)).toBe(false);
+        expect(requestSendsForm(at(10, 200), 0, within)).toBe(false);
+    });
+
+    it("is not one whose answer the browser does not report", () => {
+        expect(requestSendsForm(at(pressed + 10), pressed, within)).toBe(false);
+        expect(requestSendsForm(at(pressed + 10, 0), pressed, within)).toBe(false);
+    });
+
+    it("is not one sent to another origin, or a beacon", () => {
+        expect(
+            requestSendsForm({ ...at(pressed + 10, 200), sameOrigin: false }, pressed, within)
+        ).toBe(false);
+        expect(requestSendsForm(at(pressed + 10, 204, "beacon"), pressed, within)).toBe(false);
     });
 
     it("is not an image or a stylesheet the page loads", () => {
-        expect(
-            requestSendsForm({ initiatorType: "img", startedAt: pressed + 10 }, pressed, within)
-        ).toBe(false);
+        expect(requestSendsForm(at(pressed + 10, 200, "img"), pressed, within)).toBe(false);
+    });
+});
+
+describe("an address on the page's origin", () => {
+    const origin = "https://login.example.test";
+
+    it("is one on the same scheme, host and port, relative or not", () => {
+        expect(onOrigin("https://login.example.test/api/session", origin)).toBe(true);
+        expect(onOrigin("/api/session", origin)).toBe(true);
+    });
+
+    it("is not another host, scheme or port", () => {
+        expect(onOrigin("https://analytics.example.test/collect", origin)).toBe(false);
+        expect(onOrigin("http://login.example.test/api", origin)).toBe(false);
+        expect(onOrigin("https://login.example.test:8443/api", origin)).toBe(false);
     });
 });
