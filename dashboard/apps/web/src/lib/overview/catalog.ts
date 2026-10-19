@@ -25,6 +25,7 @@ import {
     ListTodo,
     Rocket,
     ScrollText,
+    ShieldBan,
     Star,
     ChartColumn,
     MonitorSmartphone,
@@ -39,6 +40,9 @@ export interface OverviewWidgetEntry {
     icon: LucideIcon;
     /** The capability that opens it. Cards with none are for everybody signed in. */
     permission?: Permission;
+    /** Only administrators may open it, whatever they were granted: the card of
+     *  a screen that checks for an administrator rather than a permission. */
+    adminOnly?: boolean;
     /** Where the card's own screen is, for its "open" link. Null for the cards
      *  that are not a shortcut to anywhere - the pinned links are the whole of
      *  themselves, and so is the launcher. */
@@ -62,7 +66,7 @@ export interface OverviewWidgetEntry {
 }
 
 /** The things a card can depend on being present, answered once on the server. */
-export type OverviewFeature = "games" | "calendar";
+export type OverviewFeature = "games" | "calendar" | "dnsBlocker";
 
 /** Which of those this account actually has. A feature absent from the record is
  *  treated as absent, so a new one is off until something answers for it. */
@@ -195,6 +199,16 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         requires: "calendar"
     },
     {
+        id: "dnsBlocker",
+        label: "Ad blocker", // i18n-ignore
+        description: "The last 24 hours' lookups on your network, and how many were blocked.", // i18n-ignore
+        icon: ShieldBan,
+        adminOnly: true,
+        href: "/apps/dns-blocker",
+        sizes: ["sm", "md", "lg"],
+        requires: "dnsBlocker"
+    },
+    {
         id: "sessions",
         label: "Signed in", // i18n-ignore
         description: "The devices your account is open on right now.", // i18n-ignore
@@ -247,12 +261,14 @@ export interface OverviewAccessInput {
  * somebody had arranged theirs.
  */
 export async function availableOverviewWidgets({
+    isAdmin,
     can,
     features
 }: OverviewAccessInput): Promise<OverviewWidgetId[]> {
     const decided = await Promise.all(
         OVERVIEW_WIDGETS.map(async (widget) => {
             if (widget.requires && features?.[widget.requires] !== true) return null;
+            if (widget.adminOnly && !isAdmin) return null;
             return !widget.permission || (await can(widget.permission)) ? widget.id : null;
         })
     );

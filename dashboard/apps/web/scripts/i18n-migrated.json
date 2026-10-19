@@ -931,6 +931,7 @@
         "web/src/app/(app)/home/shortcut-picker.tsx",
         "web/src/app/(app)/home/widget-card.tsx",
         "web/src/app/(app)/home/widgets/account.tsx",
+        "web/src/app/(app)/home/widgets/dns-blocker.tsx",
         "web/src/app/(app)/home/widgets/infrastructure.tsx",
         "web/src/app/(app)/home/widgets/personal.tsx",
         "web/src/app/(app)/launcher-waiting-actions.ts",

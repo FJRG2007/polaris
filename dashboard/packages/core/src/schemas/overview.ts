@@ -37,7 +37,8 @@ export const OVERVIEW_WIDGET_IDS = [
     "sessions",
     "activity",
     "games",
-    "calendar"
+    "calendar",
+    "dnsBlocker"
 ] as const;
 
 export type OverviewWidgetId = (typeof OVERVIEW_WIDGET_IDS)[number];
@@ -168,6 +169,9 @@ export const DEFAULT_OVERVIEW_LAYOUT: readonly OverviewWidgetPreference[] = [
     // Between the infrastructure cards and the account's own: it belongs with what
     // is running, and it is only ever on the grid of somebody who runs one.
     { id: "games", size: "md", hidden: false },
+    // The network's ad blocker, beside the other things this instance runs. Only
+    // on the grid of an administrator of an instance that installed it.
+    { id: "dnsBlocker", size: "md", hidden: false },
     { id: "activity", size: "md", hidden: false },
     { id: "sessions", size: "md", hidden: false },
     { id: "recent", size: "md", hidden: false },

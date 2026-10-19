@@ -36,7 +36,9 @@ describe("passkey wrap", () => {
         ).toBeNull();
         expect(await unwrapVaultKeyWithPasskey(wrapped, new Uint8Array(16), SALT)).toBeNull();
         const [head, body, mac] = wrapped.split("|");
-        const flipped = `${head}|${body!.slice(0, -2)}${body!.endsWith("A=") ? "B=" : "A="}|${mac}`;
+        // The first character carries six real bits; the one before "=" holds
+        // padding bits atob ignores, so changing it may not change the bytes.
+        const flipped = `${head}|${body!.startsWith("A") ? "B" : "A"}${body!.slice(1)}|${mac}`;
         expect(await unwrapVaultKeyWithPasskey(flipped, PRF, SALT)).toBeNull();
     });
 

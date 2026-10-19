@@ -18,7 +18,9 @@ function holding(...permissions: Permission[]) {
 }
 
 /** Cards that ask for nothing, which everybody signed in is offered. */
-const FREE = OVERVIEW_WIDGETS.filter((widget) => !widget.permission && !widget.requires).map((widget) => widget.id);
+const FREE = OVERVIEW_WIDGETS.filter((widget) => !widget.permission && !widget.requires).map(
+    (widget) => widget.id
+);
 
 describe("availableOverviewWidgets", () => {
     it("offers the cards that ask for nothing to an account that holds nothing", async () => {
@@ -32,18 +34,31 @@ describe("availableOverviewWidgets", () => {
 
     it("withholds the game servers card until one is installed, permission or not", async () => {
         expect(await availableOverviewWidgets(holding("games.read"))).not.toContain("games");
-        expect(await availableOverviewWidgets({ ...holding("games.read"), features: { games: false } })).not.toContain(
-            "games"
-        );
-        expect(await availableOverviewWidgets({ ...holding("games.read"), features: { games: true } })).toContain(
-            "games"
-        );
+        expect(
+            await availableOverviewWidgets({ ...holding("games.read"), features: { games: false } })
+        ).not.toContain("games");
+        expect(
+            await availableOverviewWidgets({ ...holding("games.read"), features: { games: true } })
+        ).toContain("games");
     });
 
     it("still withholds it from somebody without the permission on an instance that runs them", async () => {
-        expect(await availableOverviewWidgets({ ...holding("drive.read"), features: { games: true } })).not.toContain(
-            "games"
+        expect(
+            await availableOverviewWidgets({ ...holding("drive.read"), features: { games: true } })
+        ).not.toContain("games");
+    });
+
+    it("offers the ad blocker only to an administrator of an instance that installed it", async () => {
+        const installed = { features: { dnsBlocker: true } };
+        expect(await availableOverviewWidgets({ ...holding(), ...installed })).not.toContain(
+            "dnsBlocker"
         );
+        expect(await availableOverviewWidgets({ ...holding(), isAdmin: true })).not.toContain(
+            "dnsBlocker"
+        );
+        expect(
+            await availableOverviewWidgets({ ...holding(), isAdmin: true, ...installed })
+        ).toContain("dnsBlocker");
     });
 
     it("keeps the catalogue order, so the grid is arranged the way it is written", async () => {

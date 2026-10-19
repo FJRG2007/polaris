@@ -88,6 +88,10 @@
         "activity": {
             "label": "Actividad reciente",
             "description": "Lo que se ha hecho con tu cuenta, y desde dónde."
+        },
+        "dnsBlocker": {
+            "label": "Antianuncios",
+            "description": "Las consultas de las últimas 24 horas en tu red y cuántas se han bloqueado."
         }
     },
     "picker": {
@@ -196,5 +200,20 @@
         "pick": "Elegir qué mostrar",
         "increase": "Subir {label} en {name}",
         "decrease": "Bajar {label} en {name}"
+    },
+    "dnsBlocker": {
+        "unavailable": "No se ha podido leer Antianuncios ahora mismo.",
+        "off": "El bloqueo está apagado y todavía no se filtra nada.",
+        "open": "Abrir Antianuncios",
+        "active": "Bloqueando",
+        "paused": "En pausa",
+        "pausedFor": "En pausa {minutes} min",
+        "pause": "Pausar 15 min",
+        "pauseHint": "Dejar pasar todas las consultas 15 minutos",
+        "resume": "Reanudar",
+        "queries": "Consultas, últimas 24 h",
+        "blocked": "Bloqueadas",
+        "share": "Parte bloqueada",
+        "permitted": "Permitidas"
     }
 }

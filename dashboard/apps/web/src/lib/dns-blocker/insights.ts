@@ -20,6 +20,7 @@ import {
     parseBlockingStatus,
     parseEngineMetrics,
     parseTail,
+    queryFilterSchema,
     queryLogPath,
     rangeWindow,
     type EngineMetrics,
@@ -213,4 +214,56 @@ export async function pauseBlocking(seconds: number): Promise<void> {
 /** End a pause early. */
 export async function resumeBlocking(): Promise<void> {
     await blocky(await engine(), ["blocking", "enable"]);
+}
+
+/** One hour of the last day's lookups. */
+export interface HourCount {
+    readonly allowed: number;
+    readonly blocked: number;
+}
+
+/** The last 24 hours without the rows, for the Overview's card. */
+export interface DnsBlockerSummary {
+    readonly queries: number;
+    readonly blocked: number;
+    readonly blockedPercent: number;
+    /** Hour by hour, oldest first, ending with the current hour. */
+    readonly hourly: readonly HourCount[];
+    readonly pause: DnsInsights["pause"];
+}
+
+/** Adds the timeline's bars up into whole hours. */
+export function hourlyFrom(stats: QueryStats): HourCount[] {
+    const { bucketMs, allowed, blocked } = stats.timeline;
+    const per = Math.max(1, Math.round(3_600_000 / bucketMs));
+    const hours: HourCount[] = [];
+    for (let start = 0; start < allowed.length; start += per) {
+        const sum = (bars: readonly number[]) =>
+            bars.slice(start, start + per).reduce((total, count) => total + count, 0);
+        hours.push({ allowed: sum(allowed), blocked: sum(blocked) });
+    }
+    return hours;
+}
+
+/**
+ * The last 24 hours' totals and whether blocking is paused, or null when the
+ * DNS server is not running. Read through the same unfiltered log read as the
+ * app's own screen, so the two share it rather than each copying the file.
+ */
+export async function dnsBlockerSummary(fresh = false): Promise<DnsBlockerSummary | null> {
+    let insights: DnsInsights;
+    try {
+        insights = await dnsInsights(queryFilterSchema.parse({}), fresh);
+    } catch (error) {
+        if (error instanceof DnsBlockerRefusal && error.code === "notRunning") return null;
+        throw error;
+    }
+    const { queries, blocked, blockedPercent } = insights.stats;
+    return {
+        queries,
+        blocked,
+        blockedPercent,
+        hourly: hourlyFrom(insights.stats),
+        pause: insights.pause
+    };
 }
