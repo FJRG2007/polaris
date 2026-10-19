@@ -25,6 +25,7 @@ import { useMail } from "./mail-shell";
 import { MessageBody } from "./message-body";
 import { spamReasonText } from "./spam-reason";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
+import * as flying from "@/components/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
 import { forwardSeed, replySeed } from "./answering";
@@ -1159,6 +1160,9 @@ function MessageCard({
                                                 <button
                                                     type="button"
                                                     className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-muted-foreground hover:text-foreground"
+                                                    // What a picture grows out of
+                                                    // and shrinks back into.
+                                                    data-mail-attachment={file.id}
                                                     onClick={() => setViewing(viewerTargetOf(file))}
                                                 >
                                                     <Paperclip
@@ -1296,6 +1300,9 @@ function MessageCard({
                         `/api/mail/attachments/${target.path}${inline ? "?inline=1" : ""}`
                     }
                     onOpenChange={(open) => (open ? undefined : setViewing(null))}
+                    thumbnailFor={(target) =>
+                        flying.thumbnailBy("data-mail-attachment", target.path)
+                    }
                     steps={
                         viewing && viewingAt !== -1
                             ? {

@@ -14,6 +14,7 @@
  */
 
 import { saveFile, sendFile } from "@/components/transfers/move-file";
+import * as flying from "@/components/image-flight";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { TransfersView } from "@/components/transfers/transfers-view";
@@ -670,12 +671,16 @@ export function ShareExplorer({
     /** Icon + color for an entry (custom folder icon, or a type-derived default). */
     function EntryIcon({ entry, className }: { entry: DriveEntry; className?: string }) {
         const custom = iconComponent(entry.icon);
+        // What a preview grows out of and shrinks back into.
+        const thumbnail = { "data-share-thumbnail": entry.path };
         if (custom) {
             const Custom = custom;
-            return <Custom className={cn(className, iconColorClass(entry.iconColor))} />;
+            return (
+                <Custom {...thumbnail} className={cn(className, iconColorClass(entry.iconColor))} />
+            );
         }
         if (entry.kind === "dir") return <Folder className={cn(className, "text-primary")} />;
-        return <File className={cn(className, "text-muted-foreground")} />;
+        return <File {...thumbnail} className={cn(className, "text-muted-foreground")} />;
     }
 
     const rowActions = (entry: DriveEntry) => (
@@ -1390,6 +1395,7 @@ export function ShareExplorer({
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
                 token={token}
                 readOnly
+                thumbnailFor={(target) => flying.thumbnailBy("data-share-thumbnail", target.path)}
             />
         </div>
     );

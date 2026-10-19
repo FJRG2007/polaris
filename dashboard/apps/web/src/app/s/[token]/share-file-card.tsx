@@ -56,7 +56,12 @@ export function ShareFileCard({
                         <Button
                             variant="secondary"
                             onClick={() =>
-                                setViewerTarget({ path, name, size, locationLabel: t("share.sharedFile") })
+                                setViewerTarget({
+                                    path,
+                                    name,
+                                    size,
+                                    locationLabel: t("share.sharedFile")
+                                })
                             }
                         >
                             <Eye className="size-4" />
@@ -80,6 +85,8 @@ export function ShareFileCard({
                 urlFor={(target, inline) => fileUrl(token, target.path, inline)}
                 token={token}
                 readOnly
+                // No thumbnail on the card: the picture fades in and out in place.
+                thumbnailFor={() => null}
             />
         </Card>
     );
