@@ -9,8 +9,10 @@
  */
 
 import { z } from "zod";
+import { normalizeFlags } from "./ups-events";
 
-/** The commands Polaris offers. The machine daemon refuses any other. */
+/** The commands the quick controls offer; every other one the UPS lists is
+ *  under Commands, behind a confirmation. */
 export const UPS_COMMANDS = [
     "beeper.enable",
     "beeper.disable",
@@ -51,8 +53,27 @@ export interface UpsReading {
     beeper: string | null;
     /** The last self-test's result in the UPS's own words, or null. */
     testResult: string | null;
-    /** The commands this UPS accepts, of the ones Polaris offers. */
-    commands: UpsCommand[];
+    /** Every instant command this UPS lists. */
+    commands: string[];
+    /** `ups.status` normalized: sorted upper-case flags. */
+    flags: string;
+    /** Real power now and the UPS's real power rating, in watts. */
+    realPowerW: number | null;
+    nominalPowerW: number | null;
+    /** Apparent power now and its rating, in volt-amperes. */
+    apparentVA: number | null;
+    nominalVA: number | null;
+    batteryVNominal: number | null;
+    /** When the battery was installed or made, as the UPS says it. */
+    batteryDate: string | null;
+    batteryType: string | null;
+    firmware: string | null;
+    /** The input voltages outside which the UPS moves to battery. */
+    transferLowV: number | null;
+    transferHighV: number | null;
+    /** The charge and runtime at which the UPS itself says "low battery". */
+    chargeLow: number | null;
+    runtimeLowS: number | null;
 }
 
 /** NUT variables out of `upsc` output (`name: value`), for tests and fixtures. */
@@ -124,7 +145,20 @@ export function readingFromVars(
         serial: text(vars, "device.serial", "ups.serial"),
         beeper: text(vars, "ups.beeper.status"),
         testResult: testResult && !/^no test/i.test(testResult) ? testResult : null,
-        commands: UPS_COMMANDS.filter((command) => commands.includes(command))
+        commands: [...new Set(commands.filter((command) => /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(command)))].sort(),
+        flags: normalizeFlags(vars["ups.status"]),
+        realPowerW: num(vars, "ups.realpower"),
+        nominalPowerW: num(vars, "ups.realpower.nominal"),
+        apparentVA: num(vars, "ups.power"),
+        nominalVA: num(vars, "ups.power.nominal"),
+        batteryVNominal: num(vars, "battery.voltage.nominal"),
+        batteryDate: text(vars, "battery.date", "battery.mfr.date"),
+        batteryType: text(vars, "battery.type"),
+        firmware: text(vars, "ups.firmware", "device.firmware"),
+        transferLowV: num(vars, "input.transfer.low"),
+        transferHighV: num(vars, "input.transfer.high"),
+        chargeLow: num(vars, "battery.charge.low"),
+        runtimeLowS: num(vars, "battery.runtime.low")
     };
 }
 

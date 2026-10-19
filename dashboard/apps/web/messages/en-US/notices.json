@@ -358,6 +358,70 @@
         "shutdownFailed": {
             "title": "{machine} did not shut down",
             "body": "{name} is on battery and Polaris could not power it off. It keeps trying until the power is back."
+        },
+        "kinds": {
+            "FSD": {
+                "title": "{name} is shutting down",
+                "body": "The UPS ordered a forced shutdown. Its machines are being turned off."
+            },
+            "CAL": {
+                "title": "{name} is calibrating",
+                "body": "The UPS is running a battery calibration."
+            },
+            "TRIM": {
+                "title": "{name} is lowering the voltage",
+                "body": "The mains voltage is high and the UPS is trimming it."
+            },
+            "BOOST": {
+                "title": "{name} is raising the voltage",
+                "body": "The mains voltage is low and the UPS is boosting it."
+            },
+            "OFF": {
+                "title": "{name} is off",
+                "body": "The UPS output is off. Its machines have no power."
+            },
+            "OVERLOAD": {
+                "title": "{name} is overloaded",
+                "body": "The UPS is asked for more power than it can give. Unplug something."
+            },
+            "BYPASS": {
+                "title": "{name} is on bypass",
+                "body": "The mains reaches the machines directly. They are not protected."
+            },
+            "COMMOK": {
+                "title": "{name} answers again",
+                "body": "Polaris can read the UPS again."
+            },
+            "COMMBAD": {
+                "title": "{name} stopped answering",
+                "body": "Polaris cannot read the UPS. Check its cable or network."
+            },
+            "NOCOMM": {
+                "title": "{name} has been silent for 5 min",
+                "body": "Polaris still cannot read the UPS. An outage now would go unseen."
+            },
+            "SHUTDOWN": {
+                "title": "{name} is shutting machines down",
+                "body": "The battery reached your limit. The protected machines are being shut down."
+            }
+        },
+        "report": {
+            "ready": {
+                "title": "UPS report for {name}",
+                "body": "Saved to your drive as {file}."
+            },
+            "title": "UPS report: {name}",
+            "period": "From {from} to {to} (UTC).",
+            "energy": "Energy",
+            "kwh": "{value} kWh used",
+            "cost": "{value} {currency} spent",
+            "day": "Day",
+            "load": "Load and battery",
+            "avgLoad": "Average load: {value}%",
+            "maxLoad": "Highest load: {value}%",
+            "minCharge": "Lowest charge: {value}%",
+            "events": "Events",
+            "noEvents": "Nothing happened in this period."
         }
     }
 }

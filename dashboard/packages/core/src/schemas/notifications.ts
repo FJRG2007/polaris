@@ -696,6 +696,54 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "ups.shutdown",
+        group: "deploy",
+        label: "A UPS is shutting machines down",
+        description: "The battery ran low and the protected machines are being shut down.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "ups.overload",
+        group: "deploy",
+        label: "A UPS is overloaded",
+        description: "A UPS is asked for more power than it can give.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "ups.commLost",
+        group: "deploy",
+        label: "A UPS stopped answering",
+        description: "Polaris cannot read a UPS any more.",
+        level: "warning",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "ups.commRestored",
+        group: "deploy",
+        label: "A UPS answers again",
+        description: "A UPS that had stopped answering can be read again.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "ups.powerIssue",
+        group: "deploy",
+        label: "A UPS corrected the power",
+        description: "A UPS is trimming or boosting the voltage, on bypass, calibrating or off.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "ups.report",
+        group: "deploy",
+        label: "A UPS report is ready",
+        description: "A scheduled UPS report was saved to your drive.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "mailserver.inbound",
         group: "mail",
         label: "Mail matched a rule",

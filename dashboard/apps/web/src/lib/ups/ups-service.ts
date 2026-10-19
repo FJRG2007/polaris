@@ -10,13 +10,17 @@
  */
 
 import { z } from "zod";
+import { createHmac } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
+import { usersWithPermission } from "@polaris/auth";
 import { prisma } from "@polaris/db";
-import { nutCommand, nutRead } from "./nut-client";
+import { nutCommand, nutRead, nutSetVar } from "./nut-client";
 import { getHostConnection } from "@/lib/host-service";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
+import { notify } from "@/lib/notifications/dispatch";
+import { wordsFor } from "@/lib/notifications/notice-words";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 import { translatorFor } from "@/lib/i18n/translate";
@@ -24,7 +28,10 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { DEFAULT_LOCALE, type Permission } from "@polaris/core";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { HostdClient, type HostdSnmpSource, type HostdUpsList } from "@polaris/hostd-client";
+import * as upsData from "./ups-data";
+import * as upsEvents from "./ups-events";
 import * as upsReading from "./ups-reading";
+import * as upsSettings from "./ups-settings";
 
 type UpsRow = NonNullable<Awaited<ReturnType<typeof prisma.ups.findUnique>>>;
 
@@ -37,7 +44,13 @@ export type UpsUnreachable =
     | "noAnswer";
 
 export type UpsReadResult =
-    | { ok: true; reading: upsReading.UpsReading }
+    | {
+          ok: true;
+          reading: upsReading.UpsReading;
+          /** Every variable as the UPS says it, before any mapping. */
+          vars: Record<string, string>;
+          rw: upsSettings.UpsRwVar[];
+      }
     | { ok: false; reason: UpsUnreachable };
 
 /** What a browser may see of a UPS: everything but the secret. */
@@ -55,6 +68,9 @@ export interface UpsView {
     hasSecret: boolean;
     shutdown: upsReading.UpsShutdownInput;
     shutdownSentAt: string | null;
+    settings: upsSettings.UpsSettingsInput;
+    variableMap: upsSettings.VariableMap;
+    reportLastAt: string | null;
 }
 
 export function toView(row: UpsRow): UpsView {
@@ -76,7 +92,24 @@ export function toView(row: UpsRow): UpsView {
             belowRuntimeMin: row.shutdownBelowRuntimeMin,
             protectedMachineIds: row.protectedMachineIds
         },
-        shutdownSentAt: row.shutdownSentAt?.toISOString() ?? null
+        shutdownSentAt: row.shutdownSentAt?.toISOString() ?? null,
+        settings: {
+            currency: row.currency,
+            pricePerKwh: row.pricePerKwh,
+            nominalPowerW: row.nominalPowerW,
+            retentionDays: row.retentionDays,
+            notifyKinds: row.notifyKinds.filter((kind): kind is upsEvents.UpsEventKind =>
+                (upsEvents.UPS_EVENT_KINDS as readonly string[]).includes(kind)
+            ),
+            reportSchedule: (upsSettings.REPORT_SCHEDULES as readonly string[]).includes(
+                row.reportSchedule
+            )
+                ? (row.reportSchedule as upsSettings.ReportSchedule)
+                : "off",
+            netserverEnabled: row.netserverEnabled
+        },
+        variableMap: upsSettings.readVariableMap(row.variableMap),
+        reportLastAt: row.reportLastAt?.toISOString() ?? null
     };
 }
 
@@ -227,6 +260,22 @@ export async function updateUpsShutdown(
     return result.count > 0;
 }
 
+export async function updateUpsSettings(
+    id: string,
+    input: upsSettings.UpsSettingsInput
+): Promise<boolean> {
+    const result = await prisma.ups.updateMany({ where: { id }, data: input });
+    return result.count > 0;
+}
+
+export async function updateUpsVariableMap(
+    id: string,
+    map: upsSettings.VariableMap
+): Promise<boolean> {
+    const result = await prisma.ups.updateMany({ where: { id }, data: { variableMap: map } });
+    return result.count > 0;
+}
+
 export async function removeUps(id: string): Promise<boolean> {
     const removed = await prisma.ups.deleteMany({ where: { id } });
     if (removed.count > 0) await syncSnmp();
@@ -243,12 +292,26 @@ export async function upsHistory(
         load: number | null;
         runtimeS: number | null;
         inputV: number | null;
+        inputHz: number | null;
+        outputV: number | null;
+        batteryV: number | null;
+        powerW: number | null;
     }[]
 > {
     const rows = await prisma.upsSample.findMany({
         where: { upsId: id, ts: { gte: new Date(Date.now() - hours * 3_600_000) } },
         orderBy: { ts: "asc" },
-        select: { ts: true, charge: true, load: true, runtimeS: true, inputV: true },
+        select: {
+            ts: true,
+            charge: true,
+            load: true,
+            runtimeS: true,
+            inputV: true,
+            inputHz: true,
+            outputV: true,
+            batteryV: true,
+            powerW: true
+        },
         take: 24 * 60 * 7
     });
     return rows.map((row) => ({ ...row, ts: row.ts.toISOString() }));
@@ -325,6 +388,17 @@ export async function syncSnmp(): Promise<void> {
     }
 }
 
+/** A reading out of what the UPS answered, with its variable mapping applied. */
+function answered(
+    row: UpsRow,
+    vars: Record<string, string>,
+    commands: string[],
+    rw: upsSettings.UpsRwVar[]
+): UpsReadResult {
+    const mapped = upsSettings.applyVariableMap(vars, upsSettings.readVariableMap(row.variableMap));
+    return { ok: true, reading: upsReading.readingFromVars(mapped, commands), vars, rw };
+}
+
 export async function readUps(
     row: UpsRow,
     listUsb: UsbListing = usbListing()
@@ -337,7 +411,7 @@ export async function readUps(
                 port: row.port ?? 3493,
                 upsName: row.upsName
             });
-            return { ok: true, reading: upsReading.readingFromVars(answer.vars, answer.commands) };
+            return answered(row, answer.vars, answer.commands, answer.rw);
         }
         const daemon = daemonFor(row.machineId);
         if (!daemon) return { ok: false, reason: "machineUnreachable" };
@@ -347,19 +421,13 @@ export async function readUps(
             const found = list.devices.find((one) => one.device.id === row.deviceId);
             if (!found) return { ok: false, reason: "notFound" };
             if (!found.vars) return { ok: false, reason: "noAnswer" };
-            return {
-                ok: true,
-                reading: upsReading.readingFromVars(found.vars, found.commands ?? [])
-            };
+            return answered(row, found.vars, found.commands ?? [], found.rw ?? []);
         }
         const reading = await daemon.upsSnmp(snmpSource(row));
         if (reading === null || reading.available === false)
             return { ok: false, reason: "updateNeeded" };
         if (!reading.vars) return { ok: false, reason: "noAnswer" };
-        return {
-            ok: true,
-            reading: upsReading.readingFromVars(reading.vars, reading.commands ?? [])
-        };
+        return answered(row, reading.vars, reading.commands ?? [], reading.rw ?? []);
     } catch {
         // No daemon at all is the limited edition.
         if (row.connection !== "nut" && !(await daemonAnswers())) {
@@ -436,11 +504,11 @@ export async function usbOffers(
 
 export type UpsCommandResult = "ok" | "unsupported" | "refused" | "unreachable" | "loginNeeded";
 
-export async function runUpsCommand(
-    row: UpsRow,
-    command: upsReading.UpsCommand
-): Promise<UpsCommandResult> {
+/** Run one instant command the UPS itself lists. */
+export async function runUpsCommand(row: UpsRow, command: string): Promise<UpsCommandResult> {
     try {
+        const now = await readUps(row);
+        if (now.ok && !now.reading.commands.includes(command)) return "unsupported";
         if (row.connection === "nut") {
             const { password } = open(row);
             if (!row.username || !password || !row.host || !row.upsName) return "loginNeeded";
@@ -466,6 +534,79 @@ export async function runUpsCommand(
             ? "unsupported"
             : "refused";
     }
+}
+
+export type UpsSetResult = UpsCommandResult | "invalid";
+
+/** Set one variable the UPS lists as writable, checked against its kind first. */
+export async function setUpsVar(
+    row: UpsRow,
+    name: string,
+    value: string
+): Promise<{ outcome: UpsSetResult; error?: string }> {
+    try {
+        const now = await readUps(row);
+        if (!now.ok) return { outcome: "unreachable" };
+        const rw = now.rw.find((one) => one.name === name);
+        if (!rw) return { outcome: "unsupported" };
+        const error = upsSettings.rwValueError(rw, value);
+        if (error) return { outcome: "invalid", error };
+        if (row.connection === "nut") {
+            const { password } = open(row);
+            if (!row.username || !password || !row.host || !row.upsName) return { outcome: "loginNeeded" };
+            await nutSetVar(
+                { host: row.host, port: row.port ?? 3493, upsName: row.upsName },
+                row.username,
+                password,
+                name,
+                value
+            );
+            return { outcome: "ok" };
+        }
+        const daemon = daemonFor(row.machineId);
+        if (!daemon) return { outcome: "unreachable" };
+        const id = row.connection === "usb" ? row.deviceId : (await daemon.upsSnmp(snmpSource(row)))?.id;
+        if (!id) return { outcome: "unreachable" };
+        const answer = await daemon.upsSet(id, name, value);
+        if (answer === null) return { outcome: "unreachable" };
+        return { outcome: answer.ok ? "ok" : "refused" };
+    } catch {
+        return { outcome: "refused" };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Network UPS service (netserver)
+// ---------------------------------------------------------------------------
+
+/** The login other machines' upsmon uses. Derived from the master key, so it
+ *  needs no storage, is the same after every restart, and repairs itself. */
+export function netserverLogin(): { user: string; password: string; port: number } {
+    const password = createHmac("sha256", loadEnv().POLARIS_MASTER_KEY)
+        .update("polaris-ups-netserver")
+        .digest("hex")
+        .slice(0, 32);
+    return { user: "upsmon-remote", password, port: 3493 };
+}
+
+/** The name the machine daemon serves a UPS under. */
+export function daemonUpsName(row: Pick<UpsRow, "connection" | "deviceId" | "host" | "port">): string | null {
+    if (row.connection === "usb") return row.deviceId;
+    if (row.connection !== "snmp" || !row.host) return null;
+    return upsSettings.snmpUpsName(`${row.host}${row.port && row.port !== 161 ? `:${row.port}` : ""}`);
+}
+
+/** Whether a UPS can be offered to the network: one this machine's daemon drives. */
+export function canOfferNetwork(row: Pick<UpsRow, "connection" | "machineId">): boolean {
+    return row.connection !== "nut" && row.machineId === LOCAL_HOST_SUBJECT;
+}
+
+/** Make the local daemon offer, or stop offering, its UPSes to the network. */
+async function syncNetserver(rows: readonly UpsRow[]): Promise<void> {
+    const local = rows.filter(canOfferNetwork);
+    if (local.length === 0) return;
+    const wanted = local.some((row) => row.netserverEnabled) ? netserverLogin() : null;
+    await new HostdClient().upsNetserver(wanted).catch(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -514,12 +655,19 @@ export async function powerOffMachine(machineId: string): Promise<boolean> {
 
 const TICK_MS = 30_000;
 const SAMPLE_EVERY_MS = 60_000;
-const KEEP_MS = 30 * 24 * 3_600_000;
+const DAY_MS = 24 * 3_600_000;
+/** Events and actions are kept a year; hourly energy five. */
+const LOG_KEEP_MS = 365 * DAY_MS;
+const ENERGY_KEEP_MS = 1830 * DAY_MS;
+const PRUNE_EVERY_MS = 3_600_000;
+const REPORT_RETRY_MS = 3_600_000;
 /** UPSes read at once, so one slow to answer never holds up the rest's shutdown. */
 const READ_CONCURRENCY = 8;
 /** Who hears about a UPS: whoever may open its screen and act on it. */
 const UPS_PERMISSION: Permission = "system.manage";
 const lastSample = new Map<string, number>();
+const lastReportTry = new Map<string, number>();
+let lastPrune = 0;
 /** Per UPS, the protected machines this outage's power-off has not reached
  *  yet. Retried every pass while the UPS stays on battery. */
 const powerOffPending = new Map<string, Set<string>>();
@@ -529,35 +677,61 @@ function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; bo
     return { ...say(translatorFor(DEFAULT_LOCALE, "notices")), say };
 }
 
-const EVENT_WORDS = {
-    "ups.onBattery": { title: "ups.onBattery.title", body: "ups.onBattery.body" },
-    "ups.online": { title: "ups.online.title", body: "ups.online.body" },
-    "ups.lowBattery": { title: "ups.lowBattery.title", body: "ups.lowBattery.body" },
-    "ups.test": { title: "ups.test.title", body: "ups.test.body" },
-    "ups.replaceBattery": { title: "ups.replaceBattery.title", body: "ups.replaceBattery.body" }
-} as const satisfies Record<upsReading.UpsEvent, { title: string; body: string }>;
+/** The notice words each kind is told in. The first five keep the words they
+ *  had before the event log; every other kind has its own. */
+const KIND_WORDS = {
+    ONBATT: "ups.onBattery",
+    ONLINE: "ups.online",
+    LOWBATT: "ups.lowBattery",
+    TEST: "ups.test",
+    REPLBATT: "ups.replaceBattery",
+    FSD: "ups.kinds.FSD",
+    CAL: "ups.kinds.CAL",
+    TRIM: "ups.kinds.TRIM",
+    BOOST: "ups.kinds.BOOST",
+    OFF: "ups.kinds.OFF",
+    OVERLOAD: "ups.kinds.OVERLOAD",
+    BYPASS: "ups.kinds.BYPASS",
+    COMMOK: "ups.kinds.COMMOK",
+    COMMBAD: "ups.kinds.COMMBAD",
+    NOCOMM: "ups.kinds.NOCOMM",
+    SHUTDOWN: "ups.kinds.SHUTDOWN"
+} as const satisfies Record<upsEvents.UpsEventKind, string>;
 
+/** Log one event, tell whoever may act on the UPS if it notifies for this
+ *  kind, and start the automations that follow it. */
 async function announce(
     row: UpsRow,
-    event: upsReading.UpsEvent,
-    reading: upsReading.UpsReading
+    kind: upsEvents.UpsEventKind,
+    at: number,
+    reading: upsReading.UpsReading | null,
+    detail: string | null = null
 ): Promise<void> {
-    const outcome = upsReading.testOutcome(reading.testResult);
-    await notifyOperators({
-        permission: UPS_PERMISSION,
-        event,
-        ...inWords((t) => ({
-            title: t(EVENT_WORDS[event].title, { name: row.name }),
-            body: t(EVENT_WORDS[event].body, {
-                charge: reading.charge === null ? "?" : Math.round(reading.charge),
-                minutes: reading.runtimeS === null ? "?" : Math.round(reading.runtimeS / 60),
-                result: reading.testResult ?? ""
-            })
-        })),
-        ...(event === "ups.test" && outcome === "failed" ? { level: "danger" as const } : {}),
-        href: `/apps/servers/ups/${row.id}`,
-        metadata: { upsId: row.id }
-    }).catch((error: unknown) => console.error("polaris: could not report a UPS event:", error));
+    await upsData.recordEvent(row.id, kind, new Date(at), detail);
+    const event = upsEvents.KIND_NOTICE[kind];
+    if (row.notifyKinds.includes(kind)) {
+        const outcome = upsReading.testOutcome(reading?.testResult ?? null);
+        const tone = upsEvents.UPS_EVENT_TONE[kind];
+        await notifyOperators({
+            permission: UPS_PERMISSION,
+            event,
+            ...inWords((t) => ({
+                title: t(`${KIND_WORDS[kind]}.title` as const, { name: row.name }),
+                body: t(`${KIND_WORDS[kind]}.body` as const, {
+                    charge: reading?.charge == null ? "?" : Math.round(reading.charge),
+                    minutes: reading?.runtimeS == null ? "?" : Math.round(reading.runtimeS / 60),
+                    result: reading?.testResult ?? detail ?? ""
+                })
+            })),
+            ...((kind === "TEST" && outcome === "failed") || tone === "danger"
+                ? { level: "danger" as const }
+                : {}),
+            href: `/apps/servers/ups/${row.id}?tab=events`,
+            metadata: { upsId: row.id, kind }
+        }).catch((error: unknown) =>
+            console.error("polaris: could not report a UPS event:", error)
+        );
+    }
     const { raiseAutomationEventEverywhere } = await import("@/lib/deploy/automations");
     await raiseAutomationEventEverywhere(event);
 }
@@ -611,13 +785,122 @@ async function powerOff(row: UpsRow, machineIds: readonly string[]): Promise<voi
     else powerOffPending.delete(row.id);
 }
 
-/** One UPS's pass: sample, alert on a change, shut down when due. */
+/** The flags a row last saw; a row from before the event log has only its
+ *  power state, which is enough not to raise "on battery" twice. */
+function flagsBefore(row: UpsRow): string | null {
+    if (row.lastFlags !== null) return row.lastFlags;
+    const memory = upsReading.decodeMemory(row.lastStatus, row.lastTestResult);
+    if (!memory) return null;
+    const flags =
+        memory.power === "online" ? ["OL"] : memory.power === "battery" ? ["OB"] : ["OB", "LB"];
+    if (memory.replaceBattery) flags.push("RB");
+    return upsEvents.normalizeFlags(flags.join(" "));
+}
+
+/** A UPS that does not answer: COMMBAD now, NOCOMM once it stays quiet. */
+async function watchUnreachable(row: UpsRow, now: number): Promise<void> {
+    const nocommLogged =
+        row.commLostAt !== null &&
+        (await prisma.upsEvent.count({
+            where: { upsId: row.id, kind: "NOCOMM", ts: { gte: row.commLostAt } }
+        })) > 0;
+    const comm = upsEvents.commEvents(row.commLostAt, false, now, nocommLogged);
+    if (comm.commLostAt?.getTime() !== row.commLostAt?.getTime()) {
+        await prisma.ups.update({ where: { id: row.id }, data: { commLostAt: comm.commLostAt } });
+    }
+    for (const kind of comm.events) await announce(row, kind, now, null);
+}
+
+/** Add this reading's energy to its hour. */
+async function addEnergy(
+    row: UpsRow,
+    powerW: number | null,
+    now: number,
+    elapsedMs: number
+): Promise<void> {
+    const wh = upsSettings.energyWh(powerW, elapsedMs);
+    if (wh <= 0) return;
+    const cost = upsSettings.costOf(wh, row.pricePerKwh);
+    const hour = upsSettings.hourOf(now);
+    await prisma.upsEnergyHour
+        .upsert({
+            where: { upsId_hour: { upsId: row.id, hour } },
+            create: { upsId: row.id, hour, wh, cost, currency: row.currency },
+            update: { wh: { increment: wh }, cost: { increment: cost } }
+        })
+        .catch(() => undefined);
+}
+
+/** Write a due report into the drive of everyone who may act on the UPS, and
+ *  tell them it is there. */
+async function sendReport(row: UpsRow, now: number): Promise<void> {
+    const schedule = row.reportSchedule as upsSettings.ReportSchedule;
+    if (!upsSettings.reportDue(schedule, row.reportLastAt, now) || schedule === "off") return;
+    if (now - (lastReportTry.get(row.id) ?? 0) < REPORT_RETRY_MS) return;
+    lastReportTry.set(row.id, now);
+    const period = upsSettings.previousPeriod(schedule, now);
+    try {
+        for (const userId of await usersWithPermission(UPS_PERMISSION)) {
+            const words = await wordsFor(userId, "notices");
+            const t: upsData.ReportWords = (key, values) => words(`ups.${key}` as const, values);
+            const content = await upsData.buildReport(row, period, t);
+            const name = `${upsData.fileStem(row.name)}-${schedule}-${period.from.toISOString().slice(0, 10)}.md`;
+            await upsData.saveToDrive(userId, name, content);
+            await notify({
+                userId,
+                event: "ups.report",
+                title: words("ups.report.ready.title", { name: row.name }),
+                body: words("ups.report.ready.body", { file: `${upsData.DRIVE_FOLDER}/${name}` }),
+                audience: "admins",
+                href: "/drive",
+                metadata: { upsId: row.id }
+            }).catch(() => undefined);
+        }
+        await prisma.ups.update({ where: { id: row.id }, data: { reportLastAt: new Date(now) } });
+    } catch (error) {
+        console.error("polaris: a UPS report could not be written:", error);
+    }
+}
+
+/** Old readings past each UPS's own retention, and old logs. Hourly at most. */
+async function prune(rows: readonly UpsRow[], now: number): Promise<void> {
+    if (now - lastPrune < PRUNE_EVERY_MS) return;
+    lastPrune = now;
+    for (const row of rows) {
+        await prisma.upsSample
+            .deleteMany({
+                where: { upsId: row.id, ts: { lt: new Date(now - row.retentionDays * DAY_MS) } }
+            })
+            .catch(() => undefined);
+    }
+    await prisma.upsEvent
+        .deleteMany({ where: { ts: { lt: new Date(now - LOG_KEEP_MS) } } })
+        .catch(() => undefined);
+    await prisma.upsAction
+        .deleteMany({ where: { ts: { lt: new Date(now - LOG_KEEP_MS) } } })
+        .catch(() => undefined);
+    await prisma.upsEnergyHour
+        .deleteMany({ where: { hour: { lt: new Date(now - ENERGY_KEEP_MS) } } })
+        .catch(() => undefined);
+}
+
+/** One UPS's pass: sample, log and alert on a change, shut down when due. */
 async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<void> {
     const result = await readUps(row, listUsb);
-    if (!result.ok) return;
+    if (!result.ok) {
+        await watchUnreachable(row, now);
+        return;
+    }
     const reading = result.reading;
-    if (now - (lastSample.get(row.id) ?? 0) >= SAMPLE_EVERY_MS) {
+    const previous = lastSample.get(row.id);
+    if (previous === undefined || now - previous >= SAMPLE_EVERY_MS) {
         lastSample.set(row.id, now);
+        const powerW = upsSettings.powerWatts({
+            realPowerW: reading.realPowerW,
+            load: reading.load,
+            nominalPowerW: reading.nominalPowerW,
+            overrideW: row.nominalPowerW
+        });
         await prisma.upsSample
             .create({
                 data: {
@@ -626,16 +909,27 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
                     charge: reading.charge,
                     runtimeS: reading.runtimeS,
                     load: reading.load,
-                    inputV: reading.inputV
+                    inputV: reading.inputV,
+                    inputHz: reading.inputHz,
+                    outputV: reading.outputV,
+                    batteryV: reading.batteryV,
+                    powerW
                 }
             })
             .catch(() => undefined);
+        // The first sample after a restart has no interval to count.
+        if (previous !== undefined) await addEnergy(row, powerW, now, now - previous);
     }
     const memory = upsReading.memoryOf(reading);
-    const events = upsReading.upsTransitions(
-        upsReading.decodeMemory(row.lastStatus, row.lastTestResult),
-        memory
+    const testEvent = upsReading
+        .upsTransitions(upsReading.decodeMemory(row.lastStatus, row.lastTestResult), memory)
+        .includes("ups.test");
+    // Firmware that says "replace" only in the test result counts as RB.
+    const flags = upsEvents.normalizeFlags(
+        `${reading.flags}${reading.status.replaceBattery ? " RB" : ""}`
     );
+    const kinds = upsEvents.flagEvents(flagsBefore(row), flags);
+    const comm = upsEvents.commEvents(row.commLostAt, true, now, false);
     const due = upsReading.shutdownDue(reading, {
         enabled: row.shutdownEnabled,
         belowCharge: row.shutdownBelowCharge,
@@ -649,6 +943,8 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
     if (
         encoded.lastStatus !== row.lastStatus ||
         encoded.lastTestResult !== row.lastTestResult ||
+        flags !== row.lastFlags ||
+        row.commLostAt !== null ||
         rearm ||
         send
     ) {
@@ -656,14 +952,20 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
             where: { id: row.id },
             data: {
                 ...encoded,
+                lastFlags: flags,
+                commLostAt: null,
                 ...(rearm ? { shutdownSentAt: null } : {}),
                 ...(send ? { shutdownSentAt: new Date(now) } : {})
             }
         });
     }
     if (reading.status.online) powerOffPending.delete(row.id);
-    for (const event of events) await announce(row, event, reading);
+    for (const kind of comm.events) await announce(row, kind, now, reading);
+    for (const kind of kinds) await announce(row, kind, now, reading);
+    if (testEvent) await announce(row, "TEST", now, reading, reading.testResult);
+    await sendReport(row, now);
     if (send) {
+        await announce(row, "SHUTDOWN", now, reading, String(row.protectedMachineIds.length));
         powerOffPending.delete(row.id);
         await powerOff(row, row.protectedMachineIds);
     } else if (row.shutdownSentAt && reading.status.onBattery) {
@@ -678,6 +980,7 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
 export async function watchUpsOnce(now = Date.now()): Promise<void> {
     await syncSnmp();
     const rows = await prisma.ups.findMany({ take: 200 });
+    await syncNetserver(rows);
     const listUsb = usbListing();
     const queue = [...rows];
     await Promise.all(
@@ -689,9 +992,7 @@ export async function watchUpsOnce(now = Date.now()): Promise<void> {
             }
         })
     );
-    await prisma.upsSample
-        .deleteMany({ where: { ts: { lt: new Date(now - KEEP_MS) } } })
-        .catch(() => undefined);
+    await prune(rows, now);
 }
 
 const STARTED = Symbol.for("polaris.ups.watch");

@@ -380,7 +380,12 @@
             "upsOnline": "Volvió la luz",
             "upsLowBattery": "Un SAI se agota",
             "upsTest": "Acabó un test de SAI",
-            "upsReplaceBattery": "Un SAI pide batería"
+            "upsReplaceBattery": "Un SAI pide batería",
+            "upsShutdown": "Un SAI apaga equipos",
+            "upsOverload": "Un SAI se sobrecarga",
+            "upsCommLost": "Un SAI no responde",
+            "upsCommRestored": "Un SAI responde",
+            "upsPowerIssue": "Un SAI corrige la tensión"
         },
         "actions": {
             "redeploy": "Redesplegar",

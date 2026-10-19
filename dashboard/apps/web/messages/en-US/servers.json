@@ -807,7 +807,9 @@
             "percent": "{value}%",
             "volts": "{value} V",
             "hertz": "{value} Hz",
-            "celsius": "{value} °C"
+            "celsius": "{value} °C",
+            "watts": "{value} W",
+            "kwh": "{value} kWh"
         },
         "regions": {
             "now": "Now",
@@ -826,7 +828,11 @@
             "temperature": "Temperature",
             "model": "Model",
             "manufacturer": "Manufacturer",
-            "serial": "Serial"
+            "serial": "Serial",
+            "power": "Power",
+            "transfer": "Transfer at",
+            "firmware": "Firmware",
+            "frequency": "Frequency"
         },
         "ranges": {
             "h6": "6 h",
@@ -837,7 +843,11 @@
         "chart": {
             "percent": "Charge and load",
             "voltage": "Mains voltage",
-            "empty": "No history yet. One reading is kept every minute."
+            "empty": "No history yet. One reading is kept every minute.",
+            "power": "Power drawn",
+            "frequency": "Mains frequency",
+            "batteryVoltage": "Battery voltage",
+            "runtime": "Runtime"
         },
         "beeper": {
             "label": "Beeper",
@@ -861,7 +871,8 @@
                 "passed": "Passed",
                 "failed": "Failed",
                 "running": "Running"
-            }
+            },
+            "moved": "Battery tests are under Battery."
         },
         "noCommands": "This UPS does not offer these controls.",
         "commandResult": {
@@ -869,7 +880,8 @@
             "unsupported": "This UPS does not support that.",
             "refused": "The UPS refused that.",
             "unreachable": "The UPS could not be reached.",
-            "loginNeeded": "Controls through a NUT server need its user and password. Add them to the connection."
+            "loginNeeded": "Controls through a NUT server need its user and password. Add them to the connection.",
+            "invalid": "The UPS would not take that value."
         },
         "shutdown": {
             "intro": "When the power is out and the battery runs low, Polaris shuts these machines down cleanly. The machine Polaris runs on goes last.",
@@ -930,6 +942,233 @@
             "notFound": "This UPS was removed.",
             "failed": "That did not work. Try again.",
             "invalid": "Check the highlighted fields."
+        },
+        "tabs": {
+            "label": "UPS sections",
+            "overview": "Overview",
+            "energy": "Energy",
+            "power": "Power",
+            "battery": "Battery",
+            "events": "Events",
+            "commands": "Commands",
+            "variables": "Variables",
+            "settings": "Settings"
+        },
+        "energy": {
+            "kwh": "kWh",
+            "powerNow": "Power now",
+            "noRating": "Set its rating",
+            "used": "Used",
+            "cost": "Cost",
+            "noPrice": "Set a price",
+            "range": "Energy range",
+            "from": "From",
+            "to": "To",
+            "empty": "No energy recorded in this range yet.",
+            "chart": "Energy used",
+            "when": "When",
+            "presets": {
+                "d1": "24 h",
+                "d7": "7 days",
+                "d30": "30 days",
+                "m12": "12 months",
+                "custom": "Dates"
+            },
+            "errors": {
+                "rangeTooLong": "That range is too long for this view. Pick fewer days.",
+                "invalidRange": "The end date must be after the start."
+            }
+        },
+        "events": {
+            "state": "Seen or not",
+            "since": "How far back",
+            "days": "{count} d",
+            "ackAll": "Mark all seen",
+            "ackAllCount": "Mark all seen ({count})",
+            "kinds": "Event kinds",
+            "empty": "No events match.",
+            "acknowledged": "Seen",
+            "ack": "Mark seen",
+            "more": "Showing the newest 100. Narrow the filters to see older ones.",
+            "states": {
+                "all": "All",
+                "open": "Not seen",
+                "acknowledged": "Seen"
+            }
+        },
+        "kinds": {
+            "ONLINE": "Back on mains",
+            "ONBATT": "On battery",
+            "LOWBATT": "Low battery",
+            "REPLBATT": "Replace battery",
+            "FSD": "Forced shutdown",
+            "CAL": "Calibrating",
+            "TRIM": "Lowering voltage",
+            "BOOST": "Raising voltage",
+            "OFF": "Output off",
+            "OVERLOAD": "Overloaded",
+            "BYPASS": "On bypass",
+            "COMMOK": "Answering again",
+            "COMMBAD": "Not answering",
+            "NOCOMM": "Silent for 5 min",
+            "SHUTDOWN": "Shutdown sent",
+            "TEST": "Battery test"
+        },
+        "commands": {
+            "confirm": {
+                "title": "Run this command?",
+                "body": "{command} will be sent to the UPS now.",
+                "danger": "This can cut the power to everything plugged into the UPS."
+            },
+            "run": "Run",
+            "title": "Instant commands",
+            "filter": "Filter commands",
+            "dangerous": "Cuts power",
+            "history": "Recent",
+            "noHistory": "Nothing run yet.",
+            "names": {
+                "beeperEnable": "Turn the beeper on",
+                "beeperDisable": "Turn the beeper off",
+                "beeperMute": "Mute the beeper for now",
+                "beeperToggle": "Toggle the beeper",
+                "testQuick": "Quick battery test",
+                "testDeep": "Deep battery test",
+                "testStop": "Stop the battery test",
+                "panelStart": "Test the front panel",
+                "panelStop": "Stop the panel test",
+                "calibrateStart": "Calibrate the battery",
+                "calibrateStop": "Stop calibrating",
+                "loadOn": "Turn the output on",
+                "loadOff": "Turn the output off",
+                "shutdownReturn": "Shut down, return with power",
+                "shutdownStayoff": "Shut down and stay off",
+                "shutdownStop": "Cancel a shutdown",
+                "shutdownReboot": "Restart the output",
+                "bypassStart": "Switch to bypass",
+                "bypassStop": "Leave bypass"
+            }
+        },
+        "battery": {
+            "health": "Battery health",
+            "states": {
+                "good": "Good",
+                "fair": "Fair",
+                "replace": "Replace",
+                "unknown": "Unknown"
+            },
+            "reasons": {
+                "replaceFlag": "The UPS says its battery needs replacing.",
+                "testFailed": "The last self-test failed.",
+                "lowVoltage": "Fully charged, it stays below its nominal voltage.",
+                "old": "It is older than the 3 years a UPS battery usually lasts."
+            },
+            "years": "{value} years",
+            "facts": {
+                "age": "Age",
+                "date": "Installed",
+                "type": "Type",
+                "nominal": "Nominal",
+                "chargeLow": "Low at",
+                "runtimeLow": "Low runtime"
+            },
+            "tests": "Self-tests",
+            "noTests": "This UPS offers no battery test.",
+            "noResults": "No test results yet.",
+            "history": "Battery over time"
+        },
+        "variables": {
+            "writable": "Settings on the UPS",
+            "noWritable": "This UPS has nothing that can be changed from here.",
+            "edit": "Change {name}",
+            "history": "Changes",
+            "editTitle": "Change a UPS setting",
+            "value": "Value",
+            "range": "Allowed: {ranges}",
+            "maxLen": "Up to {count} characters.",
+            "set": "Set",
+            "raw": "All variables",
+            "filter": "Filter variables",
+            "copyAll": "Copy all",
+            "noMatch": "No variable matches.",
+            "errors": {
+                "required": "Required",
+                "tooLong": "Too long",
+                "invalidValue": "Use printable characters, without quotes or backslashes.",
+                "notAnOption": "Pick one of the values the UPS accepts.",
+                "notANumber": "Enter a number.",
+                "outOfRange": "Outside what the UPS accepts."
+            }
+        },
+        "mappings": {
+            "title": "Variable mappings",
+            "intro": "If this UPS reports a value under its own name, point the standard name at it.",
+            "standard": "Standard name",
+            "own": "This UPS's name",
+            "remove": "Remove mapping",
+            "invalid": "Use the UPS's own variable name, not the standard one.",
+            "add": "Add mapping",
+            "save": "Save mappings"
+        },
+        "settings": {
+            "errors": {
+                "networkUnavailable": "Only a UPS reached through this machine can be offered to the network.",
+                "invalidPrice": "Enter a price from 0 to 100.",
+                "invalidPower": "Enter whole watts, from 1 to 100000.",
+                "invalidRetention": "Keep from 7 to 365 days.",
+                "invalidCurrency": "Use a 3-letter currency code, like EUR.",
+                "invalid": "Check the fields above."
+            },
+            "saved": "Settings saved",
+            "savedTo": "Saved to your drive as {path}",
+            "energy": "Energy and cost",
+            "currency": "Currency",
+            "price": "Price per kWh",
+            "rating": "Rating in watts",
+            "ratingHint": "Only needed when the UPS does not report its real power. It is on its label.",
+            "notify": "Notifications",
+            "notifyIntro": "Every event is logged. These also notify the admins, through their own channels.",
+            "reports": "Scheduled report",
+            "reportsIntro": "A summary of energy, load and events, saved to each admin's drive.",
+            "schedules": {
+                "off": "Off",
+                "daily": "Daily",
+                "weekly": "Weekly",
+                "monthly": "Monthly"
+            },
+            "reportNow": "Make one now",
+            "reportLast": "Last one made {when}.",
+            "data": "Data",
+            "retention": "Keep readings for (days)",
+            "retentionHint": "Hourly energy and events are kept longer.",
+            "exportWhat": "What to export",
+            "exportDays": "Export range",
+            "exports": {
+                "samples": "Readings",
+                "events": "Events",
+                "energy": "Hourly energy",
+                "actions": "Commands"
+            },
+            "download": "Download CSV",
+            "toDrive": "Save to drive",
+            "network": "Share with other machines",
+            "networkIntro": "Lets other machines follow this UPS and shut down on their own when its battery runs low. Polaris sets up the service and its login.",
+            "networkUnavailable": "Only a UPS on this machine's USB or SNMP can be shared.",
+            "networkOn": "Share this UPS on the network",
+            "networkHow": "On the other machine, add this line to its NUT monitor:",
+            "thisMachine": "this machine's address",
+            "copyLine": "Copy line",
+            "networkPort": "Other machines reach it on port {port}. Every UPS on this machine is visible to them.",
+            "showLogin": "Show how to connect",
+            "save": "Save settings"
+        },
+        "analytics": {
+            "title": "All UPSes",
+            "chart": "Energy per UPS",
+            "ups": "UPS",
+            "outages": "Outages",
+            "events": "Events",
+            "load": "Load",
+            "loadValue": "{avg}% avg, {max}% max"
         }
     }
 }

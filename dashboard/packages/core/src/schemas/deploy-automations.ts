@@ -26,7 +26,12 @@ export const DEPLOY_AUTOMATION_EVENTS = [
     "ups.online",
     "ups.lowBattery",
     "ups.test",
-    "ups.replaceBattery"
+    "ups.replaceBattery",
+    "ups.shutdown",
+    "ups.overload",
+    "ups.commLost",
+    "ups.commRestored",
+    "ups.powerIssue"
 ] as const;
 export type DeployAutomationEvent = (typeof DEPLOY_AUTOMATION_EVENTS)[number];
 

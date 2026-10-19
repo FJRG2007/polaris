@@ -358,6 +358,70 @@
         "shutdownFailed": {
             "title": "{machine} no se apagó",
             "body": "{name} funciona con batería y Polaris no pudo apagarla. Lo seguirá intentando hasta que vuelva la luz."
+        },
+        "kinds": {
+            "FSD": {
+                "title": "{name} se está apagando",
+                "body": "El SAI ordenó un apagado forzoso. Sus equipos se están apagando."
+            },
+            "CAL": {
+                "title": "{name} está calibrando",
+                "body": "El SAI está calibrando la batería."
+            },
+            "TRIM": {
+                "title": "{name} baja la tensión",
+                "body": "La tensión de red es alta y el SAI la está reduciendo."
+            },
+            "BOOST": {
+                "title": "{name} sube la tensión",
+                "body": "La tensión de red es baja y el SAI la está elevando."
+            },
+            "OFF": {
+                "title": "{name} está apagado",
+                "body": "La salida del SAI está apagada. Sus equipos no tienen corriente."
+            },
+            "OVERLOAD": {
+                "title": "{name} está sobrecargado",
+                "body": "Se pide al SAI más potencia de la que puede dar. Desconecta algo."
+            },
+            "BYPASS": {
+                "title": "{name} está en bypass",
+                "body": "La red llega directa a los equipos. No están protegidos."
+            },
+            "COMMOK": {
+                "title": "{name} vuelve a responder",
+                "body": "Polaris puede leer de nuevo el SAI."
+            },
+            "COMMBAD": {
+                "title": "{name} dejó de responder",
+                "body": "Polaris no puede leer el SAI. Revisa su cable o la red."
+            },
+            "NOCOMM": {
+                "title": "{name} lleva 5 min sin responder",
+                "body": "Polaris sigue sin poder leer el SAI. Un corte ahora pasaría inadvertido."
+            },
+            "SHUTDOWN": {
+                "title": "{name} está apagando equipos",
+                "body": "La batería llegó a tu límite. Se están apagando los equipos protegidos."
+            }
+        },
+        "report": {
+            "ready": {
+                "title": "Informe del SAI {name}",
+                "body": "Guardado en tu unidad como {file}."
+            },
+            "title": "Informe del SAI: {name}",
+            "period": "Del {from} al {to} (UTC).",
+            "energy": "Energía",
+            "kwh": "{value} kWh consumidos",
+            "cost": "{value} {currency} gastados",
+            "day": "Día",
+            "load": "Carga y batería",
+            "avgLoad": "Carga media: {value}%",
+            "maxLoad": "Carga máxima: {value}%",
+            "minCharge": "Carga mínima: {value}%",
+            "events": "Eventos",
+            "noEvents": "No pasó nada en este periodo."
         }
     }
 }

@@ -91,7 +91,12 @@ const EVENT_LABELS = {
     "ups.online": "automations.events.upsOnline",
     "ups.lowBattery": "automations.events.upsLowBattery",
     "ups.test": "automations.events.upsTest",
-    "ups.replaceBattery": "automations.events.upsReplaceBattery"
+    "ups.replaceBattery": "automations.events.upsReplaceBattery",
+    "ups.shutdown": "automations.events.upsShutdown",
+    "ups.overload": "automations.events.upsOverload",
+    "ups.commLost": "automations.events.upsCommLost",
+    "ups.commRestored": "automations.events.upsCommRestored",
+    "ups.powerIssue": "automations.events.upsPowerIssue"
 } as const satisfies Record<core.DeployAutomationEvent, Key>;
 
 const ACTION_LABELS = {

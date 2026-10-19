@@ -10,6 +10,8 @@ export {
     type HostdUpsDevice,
     type HostdUpsList,
     type HostdUpsReading,
+    type HostdUpsRwVar,
+    type HostdUpsNetserver,
     type MountResult,
     type MountSpec
 } from "./client.js";

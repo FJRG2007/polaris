@@ -491,6 +491,30 @@
         "upsShutdownFailed": {
             "label": "Una máquina no se apagó",
             "description": "Un SAI se quedó sin batería y Polaris no pudo apagar una máquina que protege."
+        },
+        "upsShutdown": {
+            "label": "Un SAI apaga equipos",
+            "description": "La batería se agota y se están apagando los equipos protegidos."
+        },
+        "upsOverload": {
+            "label": "Un SAI está sobrecargado",
+            "description": "Un SAI está entregando más potencia de la que puede dar."
+        },
+        "upsCommLost": {
+            "label": "Un SAI dejó de responder",
+            "description": "Polaris ya no puede leer un SAI."
+        },
+        "upsCommRestored": {
+            "label": "Un SAI responde",
+            "description": "Un SAI que había dejado de responder vuelve a leerse."
+        },
+        "upsPowerIssue": {
+            "label": "Un SAI corrige la tensión",
+            "description": "Un SAI está reduciendo o elevando la tensión, en bypass, calibrando o apagado."
+        },
+        "upsReport": {
+            "label": "Informe de SAI listo",
+            "description": "Se guardó en tu unidad un informe programado de un SAI."
         }
     },
     "groups": {

@@ -14880,9 +14880,79 @@ model Ups {
     // The last state the watcher saw, so alerts are raised on a change only.
     lastStatus              String?
     lastTestResult          String?
+    // The raw ups.status flags last seen (`OL CHRG`), so every flag that rises
+    // is one event; and since when the UPS has not answered.
+    lastFlags               String?
+    commLostAt              DateTime?
+    // Energy: the price of a kWh in `currency` (null: no cost shown), and the
+    // UPS's real power rating for one that does not report it.
+    currency                String      @default("EUR")
+    pricePerKwh             Float?
+    nominalPowerW           Int?
+    // How many days of minute readings are kept (rollups are kept longer).
+    retentionDays           Int         @default(30)
+    // The event kinds that notify; the rest are only logged.
+    notifyKinds             String[]    @default(["ONBATT", "LOWBATT", "ONLINE", "REPLBATT", "TEST", "COMMBAD", "FSD", "SHUTDOWN", "OVERLOAD"])
+    // Standard NUT name -> this UPS's own name for it, for odd firmware.
+    variableMap             Json        @default("{}")
+    // off | daily | weekly | monthly, and when the last one was made.
+    reportSchedule          String      @default("off")
+    reportLastAt            DateTime?
+    // Offer this UPS to other machines' upsmon through its machine's daemon.
+    netserverEnabled        Boolean     @default(false)
     createdAt               DateTime    @default(now())
     updatedAt               DateTime    @updatedAt
     samples                 UpsSample[]
+    events                  UpsEvent[]
+    energy                  UpsEnergyHour[]
+    actions                 UpsAction[]
+}
+
+// Something a UPS did: a status flag that rose, a test, a lost link, a
+// shutdown Polaris sent. Kept a year; somebody can mark one as seen.
+model UpsEvent {
+    id               String    @id @default(uuid(7)) @db.Uuid
+    upsId            String    @db.Uuid
+    ts               DateTime  @default(now())
+    // ONLINE | ONBATT | LOWBATT | ... (see lib/ups/ups-events.ts)
+    kind             String
+    detail           String?
+    acknowledgedAt   DateTime?
+    acknowledgedById String?   @db.Uuid
+    ups              Ups       @relation(fields: [upsId], references: [id], onDelete: Cascade)
+
+    @@index([upsId, ts])
+    @@index([ts])
+}
+
+// Energy a UPS delivered in one hour, and what it cost at the price then.
+model UpsEnergyHour {
+    upsId    String   @db.Uuid
+    hour     DateTime
+    wh       Float    @default(0)
+    cost     Float    @default(0)
+    currency String
+    ups      Ups      @relation(fields: [upsId], references: [id], onDelete: Cascade)
+
+    @@id([upsId, hour])
+    @@index([hour])
+}
+
+// An instant command run or a variable set on a UPS, by whom and how it went.
+model UpsAction {
+    id      String   @id @default(uuid(7)) @db.Uuid
+    upsId   String   @db.Uuid
+    ts      DateTime @default(now())
+    actorId String?  @db.Uuid
+    // command | variable
+    kind    String
+    name    String
+    value   String?
+    outcome String
+    ups     Ups      @relation(fields: [upsId], references: [id], onDelete: Cascade)
+
+    @@index([upsId, ts])
+    @@index([ts])
 }
 
 // One reading a minute of each UPS, for its history chart; 30 days are kept.
@@ -14893,6 +14963,11 @@ model UpsSample {
     runtimeS Float?
     load     Float?
     inputV   Float?
+    inputHz  Float?
+    outputV  Float?
+    batteryV Float?
+    // Real power drawn, measured or worked out from the load and the rating.
+    powerW   Float?
     ups      Ups      @relation(fields: [upsId], references: [id], onDelete: Cascade)
 
     @@id([upsId, ts])
