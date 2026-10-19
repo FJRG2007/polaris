@@ -18,8 +18,8 @@
     "dependencies": {
         "@polaris/core": "0.1.0",
         "@polaris/vault-crypto": "0.1.0",
-        "react": "19.0.0",
-        "react-dom": "19.0.0"
+        "react": "19.0.8",
+        "react-dom": "19.0.8"
     },
     "devDependencies": {
         "@types/react": "19.0.7",
