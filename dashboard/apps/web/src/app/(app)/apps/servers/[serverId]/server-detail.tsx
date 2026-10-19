@@ -23,6 +23,7 @@ import { ServerUsage } from "../server-usage";
 import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
 import { environmentWords } from "../environment-meta";
+import { usePolarContext } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { ServerSshKeys } from "../server-ssh-keys";
@@ -109,6 +110,7 @@ export function ServerDetail({
     const [asRoot, setAsRoot] = useState(false);
     const [location, setLocation] = useState<EnvironmentTarget | null>(null);
     const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+    usePolarContext({ record: { kind: "server", id: server.id, name: server.name } });
 
     const { data: live } = useLiveResource<ServerStatusPayload>({
         url: "/api/servers/status",

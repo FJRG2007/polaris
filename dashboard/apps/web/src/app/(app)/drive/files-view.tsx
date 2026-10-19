@@ -26,6 +26,7 @@ import type { DriveAbilities } from "@/lib/drive-authz";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { ArchiveDialog } from "./archive-dialog";
 import { EntryThumbnail } from "./entry-thumbnail";
+import { usePolarContext } from "@/components/polar/polar-panel";
 import * as flying from "@/components/image-flight";
 import { useDriveInsights } from "./use-drive-insights";
 import { SelectionZipMenu } from "./selection-zip-menu";
@@ -1020,6 +1021,10 @@ export function FilesView({
      *  drawn, so it can be seen going, but is not part of a selection. */
     const selectable = visible.filter((entry) => !leaving.has(entry.path));
     const selectedEntries = selectable.filter((entry) => selected.has(entry.path));
+    usePolarContext({
+        record: { kind: "drive folder", id: path || "/" },
+        selection: selectedEntries.length > 0 ? selectedEntries.slice(0, 20).map((entry) => entry.name) : undefined
+    });
     const allSelected = selectable.length > 0 && selectedEntries.length === selectable.length;
     // How many downloads the server has not answered yet, so the button that
     // asked for one says it is working instead of looking like it missed the

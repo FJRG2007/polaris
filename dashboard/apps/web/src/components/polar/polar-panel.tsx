@@ -57,6 +57,7 @@ import {
     PromptInputTools
 } from "@/components/polar/elements/prompt-input";
 import {
+    cleanContextText,
     MAX_QUEUE,
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
@@ -103,17 +104,37 @@ export function pageContextFrom(pathname: string, title: string, extra: ExtraCon
     const segments = pathname.split("/").filter(Boolean);
     const ids: Record<string, string> = {};
     for (let index = 1; index < segments.length; index++) {
-        const value = decodeURIComponent(segments[index] ?? "");
-        if (/^[0-9a-f-]{8,}$|^\d+$|^[a-z0-9][a-z0-9_.-]{1,63}$/i.test(value) && index > 0) {
-            ids[segments[index - 1] ?? `part${index}`] = value;
+        let value: string;
+        try {
+            value = decodeURIComponent(segments[index] ?? "");
+        } catch {
+            continue;
+        }
+        // An id carries a digit (a uuid, a number, `lirio-0`); a word such as
+        // `settings` is a section, which the route already says.
+        if (/^[a-z0-9][a-z0-9_.-]{0,63}$/i.test(value) && /\d/.test(value)) {
+            ids[(segments[index - 1] ?? `part${index}`).slice(0, 40)] = value;
         }
     }
+    // Cleaned here as the route cleans it, so a name made only of characters it
+    // strips drops out of the context instead of refusing the whole message.
+    const recordId = extra?.record ? cleanContextText(extra.record.id) : "";
+    const recordKind = extra?.record ? cleanContextText(extra.record.kind) : "";
+    const selection = (extra?.selection ?? []).map(cleanContextText).filter(Boolean).slice(0, 20);
     return {
         route: pathname,
-        title: title.trim() || undefined,
+        title: cleanContextText(title) || undefined,
         ids: Object.keys(ids).length ? ids : undefined,
-        ...(extra ?? {})
-    } as PageContext;
+        record:
+            recordId && recordKind
+                ? {
+                      kind: recordKind,
+                      id: recordId,
+                      name: cleanContextText(extra?.record?.name ?? "") || undefined
+                  }
+                : undefined,
+        selection: selection.length ? selection : undefined
+    };
 }
 
 const OPEN_KEY = "polar.open";

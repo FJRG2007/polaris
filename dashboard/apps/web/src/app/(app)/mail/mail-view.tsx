@@ -36,6 +36,7 @@ import { forwardSeed, replySeed } from "./answering";
 import { missingFolderRole, refusalOf } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
+import { usePolarContext } from "@/components/polar/polar-panel";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
@@ -409,6 +410,10 @@ export function MailView({
     }, [firstPage, firstCursor]);
 
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
+    const openSubject = threads.find((thread) => thread.id === openThreadId)?.subject;
+    usePolarContext(
+        openThreadId ? { record: { kind: "mail conversation", id: openThreadId, name: openSubject || undefined } } : null
+    );
 
     /**
      * The conversation being read, and what is in it.
