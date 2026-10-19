@@ -764,7 +764,7 @@
         "back": "All UPSes",
         "empty": {
             "title": "No UPS yet",
-            "body": "Add one plugged into a machine by USB, served by a NUT server, or read over SNMP."
+            "body": "One plugged in by USB shows up here by itself. Add one on a NUT server or read over SNMP."
         },
         "columns": {
             "name": "Name",
@@ -796,7 +796,7 @@
             "noAnswer": "The UPS did not answer. Check that it is on and that the address and name are right."
         },
         "found": {
-            "title": "Found on USB",
+            "title": "Removed, still plugged in",
             "add": "Add",
             "on": "on {machine}",
             "updateNeeded": "Update Polaris from Settings to find a UPS plugged in by USB.",
