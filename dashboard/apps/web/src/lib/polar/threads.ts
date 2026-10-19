@@ -10,34 +10,164 @@
  */
 
 import type { UIMessage } from "ai";
-import { prisma, type Prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import {
     discardPolarAttachments,
     linkPolarAttachments,
     threadAttachments
 } from "@/lib/polar/attachments";
 import {
+    POLAR_SEARCH_PAGE,
     POLAR_THREAD_PAGE,
     queueSchema,
     type ModelChoice,
-    type QueuedMessage
+    type PolarProjectRow,
+    type PolarThreadRow,
+    type QueuedMessage,
+    type ThreadView
 } from "@/lib/polar/shared";
 
-export interface PolarThreadRow {
+export type { PolarThreadRow } from "@/lib/polar/shared";
+
+const ROW_SELECT = {
+    id: true,
+    title: true,
+    updatedAt: true,
+    pinnedAt: true,
+    archivedAt: true,
+    projectId: true
+} as const;
+
+type StoredRow = {
     id: string;
     title: string;
-    updatedAt: string;
+    updatedAt: Date;
+    pinnedAt: Date | null;
+    archivedAt: Date | null;
+    projectId: string | null;
+};
+
+function toRow(row: StoredRow): PolarThreadRow {
+    return {
+        id: row.id,
+        title: row.title,
+        updatedAt: row.updatedAt.toISOString(),
+        pinnedAt: row.pinnedAt?.toISOString() ?? null,
+        archivedAt: row.archivedAt?.toISOString() ?? null,
+        projectId: row.projectId
+    };
 }
 
-export async function listPolarThreads(userId: string, cursor?: string): Promise<PolarThreadRow[]> {
+/** What each list reads, by the rule `threadPlace` (shared.ts) sorts rows with:
+ *  recents leave out pinned, archived and filed chats; a project's list keeps
+ *  its pinned chats. */
+export function viewQuery(
+    userId: string,
+    view: ThreadView,
+    projectId?: string
+): {
+    where: Prisma.PolarThreadWhereInput;
+    orderBy: Prisma.PolarThreadOrderByWithRelationInput[];
+} {
+    switch (view) {
+        case "pinned":
+            return {
+                where: { userId, archivedAt: null, pinnedAt: { not: null } },
+                orderBy: [{ pinnedAt: "desc" }, { id: "desc" }]
+            };
+        case "archived":
+            return {
+                where: { userId, archivedAt: { not: null } },
+                orderBy: [{ archivedAt: "desc" }, { id: "desc" }]
+            };
+        case "project":
+            return {
+                where: { userId, archivedAt: null, projectId: projectId ?? "" },
+                orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
+            };
+        default:
+            return {
+                where: { userId, archivedAt: null, pinnedAt: null, projectId: null },
+                orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
+            };
+    }
+}
+
+export async function listPolarThreads(
+    userId: string,
+    cursor?: string,
+    view: ThreadView = "recent",
+    projectId?: string
+): Promise<PolarThreadRow[]> {
     const rows = await prisma.polarThread.findMany({
-        where: { userId },
-        select: { id: true, title: true, updatedAt: true },
-        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        ...viewQuery(userId, view, projectId),
+        select: ROW_SELECT,
         take: POLAR_THREAD_PAGE,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
     });
-    return rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() }));
+    return rows.map(toRow);
+}
+
+/** Everything the sidebar opens on, in one round trip: the first page of
+ *  recents, the pinned chats and the projects. */
+export async function polarSidebar(userId: string): Promise<{
+    threads: PolarThreadRow[];
+    pinned: PolarThreadRow[];
+    projects: PolarProjectRow[];
+}> {
+    const [threads, pinned, projects] = await Promise.all([
+        listPolarThreads(userId),
+        listPolarThreads(userId, undefined, "pinned"),
+        prisma.polarProject.findMany({
+            where: { ownerId: userId },
+            select: { id: true, name: true, instructions: true },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
+        })
+    ]);
+    return { threads, pinned, projects };
+}
+
+/** Escapes what ILIKE reads as a wildcard, so a search is for the text typed. */
+export function likePattern(text: string): string {
+    return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
+}
+
+/**
+ * The signed-in person's conversations whose title or message text holds the
+ * words, newest first, archived ones included (that is how an archived chat is
+ * found again). `page` counts from 0; `more` says whether another page exists.
+ */
+export async function searchPolarThreads(
+    userId: string,
+    text: string,
+    page = 0
+): Promise<{ results: PolarThreadRow[]; more: boolean }> {
+    const pattern = likePattern(text);
+    const rows = await prisma.$queryRaw<StoredRow[]>(Prisma.sql`
+        SELECT t."id", t."title", t."updatedAt", t."pinnedAt", t."archivedAt", t."projectId"
+        FROM "PolarThread" AS t
+        WHERE t."userId" = ${userId}::uuid
+          AND (
+            t."title" ILIKE ${pattern}
+            OR EXISTS (
+              SELECT 1
+              FROM "PolarMessage" AS m,
+                   jsonb_array_elements(
+                     CASE WHEN jsonb_typeof(m."parts") = 'array' THEN m."parts" ELSE '[]'::jsonb END
+                   ) AS part
+              WHERE m."threadId" = t."id"
+                AND part->>'type' = 'text'
+                AND part->>'text' ILIKE ${pattern}
+            )
+          )
+        ORDER BY t."updatedAt" DESC, t."id" DESC
+        LIMIT ${POLAR_SEARCH_PAGE + 1}
+        OFFSET ${page * POLAR_SEARCH_PAGE}
+    `);
+    return {
+        results: rows.slice(0, POLAR_SEARCH_PAGE).map(toRow),
+        more: rows.length > POLAR_SEARCH_PAGE
+    };
 }
 
 export interface PolarStoredMessage extends UIMessage {
@@ -47,6 +177,8 @@ export interface PolarStoredMessage extends UIMessage {
 export interface PolarThreadView {
     id: string;
     title: string;
+    projectId: string | null;
+    archivedAt: string | null;
     choice: ModelChoice | null;
     queue: QueuedMessage[];
     messages: PolarStoredMessage[];
@@ -61,6 +193,8 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
         select: {
             id: true,
             title: true,
+            projectId: true,
+            archivedAt: true,
             choice: true,
             queue: true,
             messages: {
@@ -79,6 +213,8 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
     return {
         id: thread.id,
         title: thread.title,
+        projectId: thread.projectId,
+        archivedAt: thread.archivedAt?.toISOString() ?? null,
         choice: (thread.choice as ModelChoice | null) ?? null,
         queue: queue.success ? queue.data : [],
         messages: rows.map((row) => ({
@@ -98,12 +234,19 @@ export function titleFrom(text: string): string {
     return line.length > 80 ? `${line.slice(0, 79)}...` : line || "New conversation";
 }
 
-/** The thread, made if it is new. Null when the id belongs to somebody else. */
+/** Whether the project is this person's. */
+async function ownsProject(userId: string, projectId: string): Promise<boolean> {
+    return (await prisma.polarProject.count({ where: { id: projectId, ownerId: userId } })) > 0;
+}
+
+/** The thread, made if it is new - filed under `projectId` when that project is
+ *  the person's. False when the id belongs to somebody else. */
 export async function ensurePolarThread(
     userId: string,
     id: string,
     firstText: string,
-    choice: ModelChoice
+    choice: ModelChoice,
+    projectId: string | null = null
 ): Promise<boolean> {
     const existing = await prisma.polarThread.findUnique({
         where: { id },
@@ -123,6 +266,7 @@ export async function ensurePolarThread(
             userId,
             title: titleFrom(firstText),
             titleSource: "placeholder",
+            projectId: projectId && (await ownsProject(userId, projectId)) ? projectId : null,
             choice: choice as unknown as Prisma.InputJsonValue
         }
     });
@@ -180,6 +324,58 @@ export async function renamePolarThread(
         data: { title, titleSource: "user" }
     });
     return count > 0;
+}
+
+/** What the menu changes on a conversation: pinned, archived, its project. */
+export interface PolarThreadChange {
+    pinned?: boolean;
+    archived?: boolean;
+    /** Null takes it out of its project. */
+    projectId?: string | null;
+}
+
+/**
+ * False when the thread, or the project it is moved to, is not this person's.
+ * None of these counts as activity: the chat keeps its place among the recents,
+ * so `updatedAt` is written back as it was.
+ */
+export async function changePolarThread(
+    userId: string,
+    id: string,
+    change: PolarThreadChange
+): Promise<boolean> {
+    if (change.projectId && !(await ownsProject(userId, change.projectId))) return false;
+    const current = await prisma.polarThread.findFirst({
+        where: { id, userId },
+        select: { pinnedAt: true, archivedAt: true, updatedAt: true }
+    });
+    if (!current) return false;
+    const now = new Date();
+    const data: Prisma.PolarThreadUncheckedUpdateManyInput = { updatedAt: current.updatedAt };
+    if (change.pinned !== undefined) {
+        data.pinnedAt = change.pinned ? (current.pinnedAt ?? now) : null;
+    }
+    if (change.archived !== undefined) {
+        data.archivedAt = change.archived ? (current.archivedAt ?? now) : null;
+        // An archived chat stops being pinned.
+        if (change.archived) data.pinnedAt = null;
+    }
+    if (change.projectId !== undefined) data.projectId = change.projectId;
+    const { count } = await prisma.polarThread.updateMany({ where: { id, userId }, data });
+    return count > 0;
+}
+
+/** The instructions of the project a thread is filed under, or null. */
+export async function polarThreadInstructions(
+    userId: string,
+    threadId: string
+): Promise<string | null> {
+    const thread = await prisma.polarThread.findFirst({
+        where: { id: threadId, userId },
+        select: { project: { select: { instructions: true } } }
+    });
+    const text = thread?.project?.instructions.trim();
+    return text ? text : null;
 }
 
 export async function setPolarQueue(

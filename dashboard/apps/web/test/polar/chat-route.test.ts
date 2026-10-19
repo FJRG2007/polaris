@@ -45,6 +45,7 @@ vi.mock("@/lib/polar/attachments", () => ({
 }));
 vi.mock("@/lib/polar/threads", () => ({
     ensurePolarThread: async () => state.owned,
+    polarThreadInstructions: async () => null,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
 }));
 vi.mock("@/lib/polar/titles", () => ({
