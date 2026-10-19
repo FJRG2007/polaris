@@ -1,6 +1,6 @@
 /**
  * A service's environment variables, managed without ever showing a value:
- * `plr env ls`, `plr env set`, `plr env rm`.
+ * `plr env list`, `plr env set`, `plr env remove`.
  *
  * `ls` prints names, whether each is secret and when it changed - never a value,
  * plain or secret, and nothing derived from one. `set` reads the value from a
@@ -164,7 +164,7 @@ async function remove(
         const answer = await context.prompt(`Remove ${name} from ${refOf(found)}? [y/N] `);
         if (answer === null)
             throw usage(
-                `Run plr env rm ${refOf(found)} ${name} --yes to remove it without being asked.`
+                `Run plr env remove ${refOf(found)} ${name} --yes to remove it without being asked.`
             );
         if (!/^y(es)?$/i.test(answer)) {
             line(context.io, "Nothing was removed.");

@@ -26,6 +26,7 @@
  */
 
 import type { Host } from "./paths.js";
+import { existsSync, readFileSync } from "node:fs";
 import { posix, win32 } from "node:path";
 
 /** How the guard reads the disk, so a test can hand it a fixture filesystem. */
@@ -92,3 +93,15 @@ export function serverInstallMessage(found: ServerInstall): string {
         "Use the CLI from another computer, or manage this server with its own `polaris` command (try `polaris help`)."
     ].join("\n");
 }
+
+/** The real disk. */
+export const diskProbe: Probe = {
+    exists: (path) => existsSync(path),
+    read: (path) => {
+        try {
+            return readFileSync(path, "utf8");
+        } catch {
+            return null;
+        }
+    }
+};

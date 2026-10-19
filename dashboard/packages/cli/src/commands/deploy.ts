@@ -84,7 +84,7 @@ export async function projects(context: Context, flags: Flags): Promise<void> {
     if (rows.length === 0) {
         line(
             context.io,
-            "No services you can reach yet. Create one under Deploy in the dashboard (plr open deploy)."
+            "No services you can reach yet. Create one under Deploy in the dashboard (plr dashboard open deploy)."
         );
         return;
     }
@@ -136,7 +136,7 @@ export async function deployments(
     if (list.length === 0) {
         line(
             context.io,
-            `${refOf(found)} has not been deployed yet. Run plr deploy ${refOf(found)}.`
+            `${refOf(found)} has not been deployed yet. Run plr service deploy ${refOf(found)}.`
         );
         return;
     }
@@ -217,7 +217,7 @@ async function followBuild(
     }
     if (!response.body)
         throw new CliError(
-            `Polaris sent no log for ${deploymentId}. Read it with plr build-log ${deploymentId}.`
+            `Polaris sent no log for ${deploymentId}. Read it with plr deployment logs ${deploymentId}.`
         );
     const decoder = new TextDecoder();
     for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
@@ -231,7 +231,7 @@ export async function buildLog(
     flags: Flags,
     deploymentId: string | undefined
 ): Promise<void> {
-    if (!deploymentId) throw usage("Name a deployment id; plr deployments <service> lists them.");
+    if (!deploymentId) throw usage("Name a deployment id; plr deployment list <service> lists them.");
     const session = await requireSession(context, flags);
     if (flags.follow) return followBuild(context, session, deploymentId);
     const found = await call(
@@ -263,7 +263,7 @@ export async function deploy(
     if (flags.json) return printJson(context.io, { deploymentId });
     line(context.io, `Deploying ${refOf(found)}: deployment ${deploymentId}.`);
     if (flags.follow) return followBuild(context, session, deploymentId);
-    line(context.io, `Watch it with plr build-log ${deploymentId} --follow`);
+    line(context.io, `Watch it with plr deployment logs ${deploymentId} --follow`);
 }
 
 export async function restart(

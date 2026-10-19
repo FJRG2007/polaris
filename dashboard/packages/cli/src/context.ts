@@ -12,7 +12,6 @@ import { normalizeUrl, type Flags } from "./args.js";
 import type { Connection, Fetch } from "./api.js";
 import { readSecret } from "./secret-input.js";
 import { secrets, type Secrets } from "./secrets.js";
-import { createInterface } from "node:readline/promises";
 import { canOpenBrowser, openBrowser } from "./browser.js";
 import { timed } from "./timing.js";
 import { configDir, currentHost, type Host } from "./paths.js";
@@ -63,6 +62,7 @@ export function processContext(): Context {
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         async prompt(question) {
             if (!interactive) return null;
+            const { createInterface } = await import("node:readline/promises");
             const reader = createInterface({ input: process.stdin, output: process.stdout });
             try {
                 return (await reader.question(question)).trim();

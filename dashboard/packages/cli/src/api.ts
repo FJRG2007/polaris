@@ -87,7 +87,7 @@ export function refusalMessage(
     }
     if (refusal?.error) return refusal.error;
     if (status === 404)
-        return "Polaris does not have that. Check the name; plr projects lists what you can reach.";
+        return "Polaris does not have that. Check the name; plr project list lists what you can reach.";
     if (status >= 500) return `Polaris could not answer (HTTP ${status}). Try again in a moment.`;
     return `Polaris refused the request (HTTP ${status}).`;
 }
@@ -177,7 +177,7 @@ export async function call<Schema extends z.ZodTypeAny>(
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) {
         throw new CliError(
-            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update.`
+            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr cli update.`
         );
     }
     return parsed.data;

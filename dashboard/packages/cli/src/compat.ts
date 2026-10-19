@@ -33,10 +33,10 @@ export function compatibilityProblem(
     const oldest = Number(range[1]);
     const newest = Number(range[2]);
     if (protocol < oldest) {
-        return `This CLI is too old for Polaris at ${url}. Update it with plr update, then try again.`;
+        return `This CLI is too old for Polaris at ${url}. Update it with plr cli update, then try again.`;
     }
     if (protocol > newest) {
-        return `Polaris at ${url} is older than this CLI. Update Polaris from Settings > Update, or install the CLI it serves with plr update --url ${url}.`;
+        return `Polaris at ${url} is older than this CLI. Update Polaris from Settings > Update, or install the CLI it serves with plr cli update --url ${url}.`;
     }
     return null;
 }

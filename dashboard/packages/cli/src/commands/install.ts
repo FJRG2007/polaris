@@ -1,5 +1,5 @@
 /**
- * The installed copy looking after itself: `plr update` and `plr uninstall`.
+ * The installed copy looking after itself: `plr cli update` and `plr cli uninstall`.
  *
  * `update` fetches the newest CLI release from the project's GitHub repository
  * (the one the install line used), checks it against the digest GitHub
@@ -32,7 +32,7 @@ import { CLI_MARKER, INSTALL_MARKER_FILE, binDir, installDir, launcherNames } fr
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
 
 /** What the installer writes beside the bundle. */
-interface InstallMarker {
+export interface InstallMarker {
     readonly marker: string;
     /** Where the bundle came from: the repository's page, or a Polaris address
      *  for a copy installed from (or updated with --url against) a server. */
@@ -199,7 +199,7 @@ export async function uninstall(
             `Remove the Polaris CLI from this computer${names.length ? ` and sign out ${names.length} profile(s)` : ""}? [y/N] `
         );
         if (answer === null)
-            throw usage("Run plr uninstall --yes to remove it without being asked.");
+            throw usage("Run plr cli uninstall --yes to remove it without being asked.");
         if (!/^y(es)?$/i.test(answer)) {
             line(context.io, "Nothing was removed.");
             return;
