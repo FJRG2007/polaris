@@ -3734,6 +3734,13 @@ function typeIntoFocused(value: string, mode: "password" | "code" | "text"): boo
         const boxes = [...document.querySelectorAll<HTMLInputElement>("input[type=password]")];
         const next = boxes[boxes.indexOf(active) + 1];
         if (next && next.value === "" && next.form === active.form) put(next, value);
+        // Tell the page script, which runs in this same extension world where a
+        // site was granted: the password is then the one its generator shows on
+        // this box, and offered for saving straight away. The name is
+        // `GENERATED_HOOK` in `lib/submit-signals.ts`, written out because this
+        // function is sent to the page on its own.
+        const told = (globalThis as Record<string, unknown>)["polarisGeneratedIn"];
+        if (typeof told === "function") told(active, value);
     }
     return true;
 }
