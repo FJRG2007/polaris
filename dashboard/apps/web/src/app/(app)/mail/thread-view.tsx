@@ -66,7 +66,12 @@ import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
-import { actOnAction, applyLabelAction, setConversationStateAction } from "./actions";
+import {
+    actOnAction,
+    applyLabelAction,
+    discardDraftAction,
+    setConversationStateAction
+} from "./actions";
 import {
     Button,
     DropdownMenu,
@@ -312,6 +317,15 @@ export function ThreadView({
         [newest, openComposer, self, toast]
     );
 
+    /** Counted on the reply to all the reaction is sent as, the way the queue counts it. */
+    const reactable = useCallback(
+        (target: MailMessageView) => {
+            const seed = replySeed(target, self, true, "");
+            return seed.to.length + seed.cc.length <= core.MAIL_REACTION_MOST_RECIPIENTS;
+        },
+        [self]
+    );
+
     /**
      * React to one message with an emoji.
      *
@@ -356,6 +370,7 @@ export function ThreadView({
                                 const undone = await outbox.undoSend(outcome.draftId);
                                 if (outbox.isRefused(undone)) return mailRefusalText(t, undone.error);
                                 if (!undone.undone) return t("view.reactionGone");
+                                await discardDraftAction(outcome.draftId);
                                 drop();
                                 refreshMailbox();
                                 return null;
@@ -618,6 +633,7 @@ export function ThreadView({
                                 )}
                                 answering={answering}
                                 onAnswer={(kind) => answer(kind, entry.message)}
+                                reactable={reactable(entry.message)}
                                 onReact={(emoji) => react(entry.message, emoji)}
                                 onAct={(action) => actOnOne(entry.message, action)}
                                 open={open.includes(entry.message.id)}
@@ -973,6 +989,7 @@ function MessageCard({
     reactions,
     answering,
     onAnswer,
+    reactable,
     onReact,
     onAct
 }: {
@@ -992,6 +1009,9 @@ function MessageCard({
     /** Whether a reply is being opened, so its buttons wait for it. */
     answering: boolean;
     onAnswer: (kind: "reply" | "reply-all" | "forward") => void;
+    /** Gmail offers no reaction past this many people, and treats one sent to
+     *  more as an ordinary reply, so neither does Polaris. */
+    reactable: boolean;
     onReact: (emoji: string) => void;
     /** Acts on this message alone; answers whether the server took it. */
     onAct: (action: MailAction) => Promise<boolean>;
@@ -1152,10 +1172,6 @@ function MessageCard({
             if (!held) setStarred(!next);
         });
     };
-    /** Gmail offers no reaction past this many people, and treats one sent to
-     *  more as an ordinary reply, so neither does Polaris. */
-    const reactable =
-        message.to.length + message.cc.length <= core.MAIL_REACTION_MOST_RECIPIENTS;
     const several = message.to.length + message.cc.length > 1;
 
     return (
