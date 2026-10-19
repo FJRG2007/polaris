@@ -193,7 +193,7 @@ export function UpsBatteryPanel({
                 ) : tests.data.events.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("ups.battery.noResults")}</p>
                 ) : (
-                    <ul className="flex max-h-60 flex-col divide-y overflow-auto rounded-md border">
+                    <ul className="flex max-h-60 flex-col divide-y overflow-auto overscroll-contain rounded-md border">
                         {tests.data.events.map((event) => {
                             const outcome = upsReading.testOutcome(event.detail);
                             return (

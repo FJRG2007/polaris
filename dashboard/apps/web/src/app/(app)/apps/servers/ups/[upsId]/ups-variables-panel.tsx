@@ -259,7 +259,7 @@ function UpsRawVariables({ vars }: { vars: Record<string, string> | null }) {
             ) : rows.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("ups.variables.noMatch")}</p>
             ) : (
-                <div className="max-h-96 overflow-auto rounded-md border">
+                <div className="max-h-96 overflow-auto overscroll-contain rounded-md border">
                     <table className="w-full table-fixed text-sm">
                         <tbody>
                             {rows.map(([name, value]) => (

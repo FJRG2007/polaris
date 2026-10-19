@@ -177,7 +177,7 @@ export function UpsActionHistory({ answer }: { answer: UpsActionsAnswer | null }
     if (answer.actions.length === 0)
         return <p className="text-sm text-muted-foreground">{t("ups.commands.noHistory")}</p>;
     return (
-        <ul className="flex max-h-72 flex-col divide-y overflow-auto rounded-md border">
+        <ul className="flex max-h-72 flex-col divide-y overflow-auto overscroll-contain rounded-md border">
             {answer.actions.map((action) => (
                 <li key={action.id} className="flex min-w-0 items-center gap-3 px-3 py-2 text-sm">
                     <code

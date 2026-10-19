@@ -193,7 +193,7 @@ export function UpsEnergyPanel({ ups, reading }: { ups: UpsView; reading: UpsRea
                 />
             )}
             {answer && answer.buckets.length > 0 ? (
-                <div className="max-h-64 overflow-auto rounded-md border">
+                <div className="max-h-64 overflow-auto overscroll-contain rounded-md border">
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-background text-left text-xs text-muted-foreground">
                             <tr>

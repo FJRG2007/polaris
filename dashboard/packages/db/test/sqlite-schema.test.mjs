@@ -31,6 +31,14 @@ describe("toSqliteSchema", () => {
         expect(out).toContain("    replies  Reply[]\n");
     });
 
+    it("keeps a non-empty list default as the JSON array it is stored as", () => {
+        const out = toSqliteSchema(
+            ['    kinds  String[] @default(["ONBATT", "LOWBATT"])', "    roles  Role[] @default([ADMIN])"].join("\n")
+        );
+        expect(out).toContain(`    kinds  Json @default(dbgenerated("'[\\"ONBATT\\",\\"LOWBATT\\"]'"))`);
+        expect(out).toContain("    roles  Role[] @default([ADMIN])");
+    });
+
     it("gives a Json default as a quoted SQL literal", () => {
         const out = toSqliteSchema(['    counted  Json  @default("{}")', '    note     Json? @default("it\'s")'].join("\n"));
         expect(out).toContain(`    counted  Json  @default(dbgenerated("'{}'"))`);
