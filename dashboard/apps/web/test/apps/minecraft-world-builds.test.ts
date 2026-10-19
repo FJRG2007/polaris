@@ -165,16 +165,60 @@ describe("converting a Sponge schematic", () => {
             ...format.decodeCells(convert.convertSponge(source, "stairs", "halloween"))
         ]).toEqual([1, 2, 0, 0]);
     });
+});
 
-    it("refuses an MCEdit schematic by name instead of guessing its numeric ids", () => {
+describe("converting an MCEdit schematic", () => {
+    // 2 x 1 x 3, x fastest then z: granite, south-facing oak stairs, stone with a
+    // data value the table lacks, an id past 255 nobody knows, still water, air.
+    const ids = [1, 53, 1, 5, 9, 0];
+    const data = [1, 2, 15, 0, 0, 0];
+
+    function legacy(fields: Field[] = []): Buffer {
+        return file("Schematic", [
+            [2, "Width", short(2)],
+            [2, "Height", short(1)],
+            [2, "Length", short(3)],
+            [8, "Materials", nbtString("Alpha")],
+            [7, "Blocks", bytes(ids)],
+            [7, "Data", bytes(data)],
+            ...fields
+        ]);
+    }
+
+    it("turns numeric ids and data values into today's block states", () => {
+        // AddBlocks: two cells to a byte, the odd cell in the high nibble, so
+        // 0x10 in byte 1 lifts cell 3 to id 256 + 5.
+        const { build, report } = convert.convertSchematic(
+            legacy([[7, "AddBlocks", bytes([0, 0x10, 0])]]),
+            "old",
+            "winter"
+        );
+        expect(build.palette).toEqual([
+            format.AIR,
+            "minecraft:granite",
+            "minecraft:oak_stairs[half=bottom,shape=straight,facing=south]",
+            "minecraft:stone"
+        ]);
+        expect([...format.decodeCells(build)]).toEqual([1, 2, 3, 0, 0, 0]);
+        expect(report).toEqual({ substituted: { "1:15": 1 }, unknown: { "261:0": 1 } });
+    });
+
+    it("reads ids under 256 without AddBlocks", () => {
+        const { build, report } = convert.convertSchematic(legacy(), "old", "winter");
+        expect(build.palette).toContain("minecraft:oak_planks");
+        expect(report.unknown).toEqual({});
+    });
+
+    it("refuses a schematic of blocks other than the Alpha set", () => {
         const source = file("Schematic", [
             [2, "Width", short(1)],
             [2, "Height", short(1)],
             [2, "Length", short(1)],
-            [8, "Materials", nbtString("Alpha")],
-            [7, "Blocks", bytes([1])]
+            [8, "Materials", nbtString("Pocket")],
+            [7, "Blocks", bytes([1])],
+            [7, "Data", bytes([0])]
         ]);
-        expect(() => convert.convertSponge(source, "old", "winter")).toThrow(/MCEdit/);
+        expect(() => convert.convertSponge(source, "old", "winter")).toThrow(/Pocket/);
     });
 });
 
