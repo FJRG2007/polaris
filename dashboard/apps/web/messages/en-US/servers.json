@@ -756,5 +756,180 @@
         "more": "And {count} more.",
         "history": "GPU history",
         "unread": "Polaris could not read the cards just now."
+    },
+    "ups": {
+        "heading": "UPS",
+        "description": "Battery backups, their charge and the machines they protect",
+        "add": "Add a UPS",
+        "back": "All UPSes",
+        "empty": {
+            "title": "No UPS yet",
+            "body": "Add one plugged into a machine by USB, served by a NUT server, or read over SNMP."
+        },
+        "columns": {
+            "name": "Name",
+            "status": "Status",
+            "charge": "Charge",
+            "runtime": "Runtime",
+            "load": "Load",
+            "connection": "Connection"
+        },
+        "connection": {
+            "usb": "USB",
+            "nut": "NUT server",
+            "snmp": "SNMP"
+        },
+        "status": {
+            "online": "On mains",
+            "onBattery": "On battery",
+            "lowBattery": "Low battery",
+            "charging": "Charging",
+            "replaceBattery": "Replace battery",
+            "overloaded": "Overloaded",
+            "unknown": "No reading"
+        },
+        "unreachable": {
+            "fullEditionNeeded": "USB and SNMP are read by the Polaris service on the machine, which this edition does not have. A UPS on a network NUT server works here.",
+            "updateNeeded": "The Polaris service on this machine predates UPS support. Update Polaris from Settings and it is read here.",
+            "machineUnreachable": "For now only the machine Polaris runs on can read a UPS by USB or SNMP. Plug the cable in there, or use a NUT server.",
+            "notFound": "The UPS is no longer on that machine's USB. Check the cable, or edit the connection.",
+            "noAnswer": "The UPS did not answer. Check that it is on and that the address and name are right."
+        },
+        "found": {
+            "title": "Found on USB",
+            "add": "Add",
+            "on": "on {machine}",
+            "updateNeeded": "Update Polaris from Settings to find a UPS plugged in by USB.",
+            "fullEditionNeeded": "Finding a UPS plugged in by USB needs the full edition. A NUT server on the network works in this one."
+        },
+        "units": {
+            "minutes": "{count} min",
+            "percent": "{value}%",
+            "volts": "{value} V",
+            "hertz": "{value} Hz",
+            "celsius": "{value} °C"
+        },
+        "regions": {
+            "now": "Now",
+            "history": "History",
+            "controls": "Controls",
+            "shutdown": "Protected machines",
+            "connection": "Connection"
+        },
+        "metrics": {
+            "charge": "Charge",
+            "runtime": "Runtime",
+            "load": "Load",
+            "input": "Input",
+            "output": "Output",
+            "battery": "Battery",
+            "temperature": "Temperature",
+            "model": "Model",
+            "manufacturer": "Manufacturer",
+            "serial": "Serial"
+        },
+        "ranges": {
+            "h6": "6 h",
+            "h24": "24 h",
+            "d7": "7 d",
+            "d30": "30 d"
+        },
+        "chart": {
+            "percent": "Charge and load",
+            "voltage": "Mains voltage",
+            "empty": "No history yet. One reading is kept every minute."
+        },
+        "beeper": {
+            "label": "Beeper",
+            "enable": "Turn on",
+            "disable": "Turn off",
+            "mute": "Mute",
+            "state": {
+                "enabled": "On",
+                "disabled": "Off",
+                "muted": "Muted"
+            }
+        },
+        "test": {
+            "label": "Battery test",
+            "quick": "Quick test",
+            "deep": "Deep test",
+            "stop": "Stop test",
+            "result": "Result",
+            "none": "No test run yet",
+            "outcome": {
+                "passed": "Passed",
+                "failed": "Failed",
+                "running": "Running"
+            }
+        },
+        "noCommands": "This UPS does not offer these controls.",
+        "commandResult": {
+            "ok": "Sent to the UPS",
+            "unsupported": "This UPS does not support that.",
+            "refused": "The UPS refused that.",
+            "unreachable": "The UPS could not be reached.",
+            "loginNeeded": "Controls through a NUT server need its user and password. Add them to the connection."
+        },
+        "shutdown": {
+            "intro": "When the power is out and the battery runs low, Polaris shuts these machines down cleanly. The machine Polaris runs on goes last.",
+            "enabled": "Shut down on low battery",
+            "belowCharge": "Below charge (%)",
+            "belowRuntime": "Below runtime (min)",
+            "machines": "Machines",
+            "noMachines": "There are no machines to protect yet.",
+            "save": "Save",
+            "saved": "Saved",
+            "incomplete": "Pick at least one machine and one threshold.",
+            "sent": "The shutdown was sent during this outage. It is armed again once the power is back.",
+            "confirm": {
+                "title": "Shut machines down on low battery?",
+                "body": "{count, plural, one {# machine is} other {# machines are}} powered off without asking when this UPS is on battery and below a threshold. Whatever runs on them stops.",
+                "action": "Turn on"
+            }
+        },
+        "form": {
+            "titleAdd": "Add a UPS",
+            "titleEdit": "Edit connection",
+            "name": "Name",
+            "type": "Connection",
+            "machine": "Machine",
+            "device": "USB device",
+            "host": "Address",
+            "port": "Port",
+            "upsName": "UPS name",
+            "username": "User",
+            "password": "Password",
+            "community": "Community",
+            "version": "SNMP version",
+            "authPassword": "Authentication key",
+            "privPassword": "Privacy key",
+            "secretKept": "Saved. Leave empty to keep it.",
+            "nutLoginHint": "Only needed for the beeper and the battery test.",
+            "noDevices": "No UPS that is not added yet was found on USB.",
+            "pickMachine": "Pick a machine",
+            "pickDevice": "Pick a device",
+            "submitAdd": "Add UPS",
+            "submitEdit": "Save",
+            "cancel": "Cancel"
+        },
+        "edit": "Edit connection",
+        "remove": "Remove",
+        "removeKind": "UPS",
+        "removeBody": "Its history and protected machines are forgotten. The UPS itself is not touched.",
+        "errors": {
+            "required": "Required",
+            "tooLong": "Too long",
+            "invalidAddress": "Not a host name or IP address.",
+            "invalidSecret": "Use printable characters, without quotes or backslashes.",
+            "invalidUpsName": "Letters, numbers, dots, dashes and underscores only.",
+            "invalidUser": "Letters, numbers, dots, dashes and underscores only.",
+            "invalidDevice": "Pick a device.",
+            "unknownMachine": "That machine is not one of yours.",
+            "shutdownIncomplete": "Pick at least one machine and one threshold.",
+            "notFound": "This UPS was removed.",
+            "failed": "That did not work. Try again.",
+            "invalid": "Check the highlighted fields."
+        }
     }
 }

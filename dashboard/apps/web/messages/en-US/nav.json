@@ -344,7 +344,8 @@
         "Compare": "Compare",
         "Insights": "Insights",
         "Rollouts": "Rollouts",
-        "Activity sharing": "Activity sharing"
+        "Activity sharing": "Activity sharing",
+        "UPS": "UPS"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

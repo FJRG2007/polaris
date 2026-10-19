@@ -9,6 +9,7 @@
 
 import type { OrgPermission, Permission } from "@polaris/core";
 import {
+    BatteryCharging,
     Activity,
     Archive,
     Bell,
@@ -791,6 +792,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Rocket,
             group: MACHINES_GROUP,
             keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"]
+        },
+        {
+            label: "UPS", // i18n-ignore
+            href: "/apps/servers/ups",
+            needs: "system.manage",
+            icon: BatteryCharging,
+            group: MACHINES_GROUP,
+            keywords: ["ups", "sai", "battery", "power", "outage", "nut", "snmp", "shutdown"]
         },
         {
             // Part of Servers on every Polaris (see `native-apps`); the same

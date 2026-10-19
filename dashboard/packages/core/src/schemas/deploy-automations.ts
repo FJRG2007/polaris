@@ -19,7 +19,14 @@ export const DEPLOY_AUTOMATION_EVENTS = [
     "deploy.succeeded",
     "deploy.failed",
     "domain.down",
-    "domain.up"
+    "domain.up",
+    // A UPS's power events. They are not about one project, so a rule in any
+    // project can follow them (to stop what can wait while on battery, say).
+    "ups.onBattery",
+    "ups.online",
+    "ups.lowBattery",
+    "ups.test",
+    "ups.replaceBattery"
 ] as const;
 export type DeployAutomationEvent = (typeof DEPLOY_AUTOMATION_EVENTS)[number];
 

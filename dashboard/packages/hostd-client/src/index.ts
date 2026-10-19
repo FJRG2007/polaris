@@ -4,5 +4,13 @@
  * keep the shared edition state current.
  */
 
-export { HostdClient, type MountSpec, type MountResult } from "./client.js";
+export {
+    HostdClient,
+    type HostdSnmpSource,
+    type HostdUpsDevice,
+    type HostdUpsList,
+    type HostdUpsReading,
+    type MountResult,
+    type MountSpec
+} from "./client.js";
 export { refreshCapabilities, startCapabilityRefresh } from "./capabilities.js";

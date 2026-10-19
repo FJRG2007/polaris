@@ -285,6 +285,50 @@ export class HostdClient {
     }
 
     /**
+     * Every UPS on this host's USB bus with its NUT variables. Null from a
+     * daemon that predates the call; `available: false` from one whose image
+     * has no NUT yet.
+     */
+    public async ups(): Promise<HostdUpsList | null> {
+        const response = await this.call("GET", "/v1/ups");
+        if (response.status === 404) return null;
+        if (response.status !== 200) throw new Error(`hostd ups listing failed (${response.status})`);
+        return JSON.parse(response.body) as HostdUpsList;
+    }
+
+    /** The reading of an SNMP UPS, its driver started by the daemon on first ask. */
+    public async upsSnmp(source: HostdSnmpSource): Promise<HostdUpsReading | null> {
+        const response = await this.call("POST", "/v1/ups/snmp", JSON.stringify(source));
+        if (response.status === 404) return null;
+        if (response.status !== 200) {
+            throw new Error(`hostd snmp ups reading failed (${response.status})`);
+        }
+        return JSON.parse(response.body) as HostdUpsReading;
+    }
+
+    /** Run one allow-listed instant command (beeper, battery test) on a UPS. */
+    public async upsCommand(
+        id: string,
+        command: string
+    ): Promise<{ ok: boolean; error?: string } | null> {
+        const response = await this.call("POST", "/v1/ups/command", JSON.stringify({ id, command }));
+        if (response.status === 404) return null;
+        if (response.status !== 200) throw new Error(`hostd ups command failed (${response.status})`);
+        return JSON.parse(response.body) as { ok: boolean; error?: string };
+    }
+
+    /** Power this host off cleanly. True once started; null from an older daemon. */
+    public async hostPowerOff(): Promise<boolean | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/poweroff",
+            JSON.stringify({ confirm: true })
+        );
+        if (response.status === 404) return null;
+        return response.status === 202;
+    }
+
+    /**
      * Save an image on this host into a short-lived `polaris-secscan-image-*`
      * volume as `/in/image.tar`, for a scan to read. Null from a daemon that
      * predates the call; otherwise the archive's size or why it was not made.
@@ -791,4 +835,38 @@ function isHealth(value: unknown): value is HostdHealth {
         "systemd",
         "autoUpdate"
     ].every((key) => typeof flags[key] === "boolean");
+}
+
+/** One UPS a host daemon found on its USB bus. */
+export interface HostdUpsDevice {
+    id: string;
+    vendorId: string;
+    productId: string;
+    manufacturer: string;
+    product: string;
+    serial: string;
+}
+
+/** A UPS's NUT variables and the commands it accepts, or why there are none yet. */
+export interface HostdUpsReading {
+    available?: boolean;
+    id?: string;
+    vars?: Record<string, string>;
+    commands?: string[];
+    error?: string;
+}
+
+export interface HostdUpsList {
+    available: boolean;
+    devices: (HostdUpsReading & { device: HostdUpsDevice })[];
+}
+
+/** An SNMP UPS for the daemon to run `snmp-ups` for. */
+export interface HostdSnmpSource {
+    address: string;
+    version: "v1" | "v2c" | "v3";
+    community?: string;
+    user?: string;
+    authPassword?: string;
+    privPassword?: string;
 }

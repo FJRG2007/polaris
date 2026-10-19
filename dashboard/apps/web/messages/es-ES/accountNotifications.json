@@ -467,6 +467,26 @@
         "webhookDisabled": {
             "label": "Se desactivó un webhook",
             "description": "Uno de tus webhooks falló cinco entregas seguidas, así que Polaris dejó de enviarle."
+        },
+        "upsOnBattery": {
+            "label": "Se fue la luz",
+            "description": "Un SAI está funcionando con su batería."
+        },
+        "upsOnline": {
+            "label": "Volvió la luz",
+            "description": "Un SAI que estaba con batería vuelve a funcionar con la red."
+        },
+        "upsLowBattery": {
+            "label": "La batería de un SAI se agota",
+            "description": "Un SAI con batería está a punto de agotarse y las máquinas que protege pueden apagarse."
+        },
+        "upsTest": {
+            "label": "Terminó un test de batería",
+            "description": "El resultado de un test de batería del SAI."
+        },
+        "upsReplaceBattery": {
+            "label": "Un SAI pide batería nueva",
+            "description": "Un SAI indica que su batería está gastada."
         }
     },
     "groups": {

@@ -375,7 +375,12 @@
             "deploySucceeded": "A deploy finished",
             "deployFailed": "A deploy failed",
             "domainDown": "A domain went down",
-            "domainUp": "A domain came back"
+            "domainUp": "A domain came back",
+            "upsOnBattery": "The power went out",
+            "upsOnline": "The power came back",
+            "upsLowBattery": "A UPS ran low",
+            "upsTest": "A UPS test finished",
+            "upsReplaceBattery": "A UPS needs a battery"
         },
         "actions": {
             "redeploy": "Redeploy",

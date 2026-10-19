@@ -375,7 +375,12 @@
             "deploySucceeded": "Acabó un despliegue",
             "deployFailed": "Falló un despliegue",
             "domainDown": "Cayó un dominio",
-            "domainUp": "Volvió un dominio"
+            "domainUp": "Volvió un dominio",
+            "upsOnBattery": "Se fue la luz",
+            "upsOnline": "Volvió la luz",
+            "upsLowBattery": "Un SAI se agota",
+            "upsTest": "Acabó un test de SAI",
+            "upsReplaceBattery": "Un SAI pide batería"
         },
         "actions": {
             "redeploy": "Redesplegar",

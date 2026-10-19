@@ -20,6 +20,7 @@ use crate::host_security;
 use crate::http::{Request, Response};
 use crate::networks;
 use crate::security::{self, PathError};
+use crate::ups;
 
 /// Body cap for control endpoints (JSON). `fs` PUT is streamed and not bound by
 /// this. 16 MiB is far more than any control payload needs while still refusing
@@ -75,6 +76,8 @@ fn capabilities(config: &Config) -> serde_json::Value {
         "kubernetes": kubernetes,
         "systemd": path_exists("/run/systemd/system"),
         "autoUpdate": config.auto_update,
+        // NUT is in this image: `/v1/ups` can find and drive a UPS.
+        "ups": ups::nut_installed(),
     })
 }
 
@@ -268,6 +271,10 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/dirs/remove") => deploy_dirs_remove(state, req, body),
         ("POST", "/v1/host/security") => host_security_run(req, body),
         ("GET", "/v1/host/gpu") => host_gpu(),
+        ("GET", "/v1/ups") => ups_list(),
+        ("POST", "/v1/ups/snmp") => ups_snmp(req, body),
+        ("POST", "/v1/ups/command") => ups_command(req, body),
+        ("POST", "/v1/host/poweroff") => host_poweroff(req, body),
         ("POST", "/v1/host/security/image") => host_security_image(req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -1371,6 +1378,117 @@ fn host_gpu() -> Response {
             Response::text(504, "Gateway Timeout", "the GPU reading took too long")
         }
         Err(_) => Response::text(502, "Bad Gateway", "could not read the GPU"),
+    }
+}
+
+/// Every UPS on this host's USB bus with its NUT variables. `available: false`
+/// from an image that predates NUT, so the dashboard can say an update adds it.
+fn ups_list() -> Response {
+    if !ups::nut_installed() {
+        return Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "available": false, "devices": [] }),
+        );
+    }
+    match ups::list_usb(std::path::Path::new("/sys/bus/usb/devices")) {
+        Ok(found) => {
+            let devices: Vec<serde_json::Value> = found
+                .into_iter()
+                .map(|(device, reading)| match reading {
+                    Ok(r) => serde_json::json!({ "device": device, "vars": r.vars, "commands": r.commands }),
+                    Err(e) => serde_json::json!({ "device": device, "error": e }),
+                })
+                .collect();
+            Response::json(
+                200,
+                "OK",
+                &serde_json::json!({ "available": true, "devices": devices }),
+            )
+        }
+        Err(e) => {
+            eprintln!("polaris-hostd: ups supervision failed: {e}");
+            Response::text(502, "Bad Gateway", "could not start the UPS service")
+        }
+    }
+}
+
+/// The reading of an SNMP UPS, its driver started here on first ask.
+fn ups_snmp<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let Ok(source) = serde_json::from_slice::<ups::SnmpSource>(&raw) else {
+        return Response::bad_request("invalid SNMP source");
+    };
+    if let Err(why) = source.validate() {
+        return Response::bad_request(why);
+    }
+    if !ups::nut_installed() {
+        return Response::json(200, "OK", &serde_json::json!({ "available": false }));
+    }
+    let name = source.name();
+    match ups::read_snmp(source) {
+        Ok(Ok(r)) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "available": true, "id": name, "vars": r.vars, "commands": r.commands }),
+        ),
+        Ok(Err(e)) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "available": true, "id": name, "error": e }),
+        ),
+        Err(e) => {
+            eprintln!("polaris-hostd: snmp ups supervision failed: {e}");
+            Response::text(502, "Bad Gateway", "could not start the UPS service")
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpsCommandRequest {
+    id: String,
+    command: String,
+}
+
+/// Run one allow-listed instant command on a UPS this daemon drives.
+fn ups_command<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let Ok(request) = serde_json::from_slice::<UpsCommandRequest>(&raw) else {
+        return Response::bad_request("invalid UPS command");
+    };
+    match ups::command(&request.id, &request.command) {
+        Ok(()) => Response::json(200, "OK", &serde_json::json!({ "ok": true })),
+        Err(why) => Response::json(200, "OK", &serde_json::json!({ "ok": false, "error": why })),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PowerOffRequest {
+    /// Must be exactly true: a typo or an empty body never powers a host off.
+    confirm: bool,
+}
+
+/// Power this host off cleanly, for a UPS whose battery is running out.
+fn host_poweroff<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    match serde_json::from_slice::<PowerOffRequest>(&raw) {
+        Ok(PowerOffRequest { confirm: true }) => {}
+        _ => return Response::bad_request("invalid power-off request"),
+    }
+    match ups::power_off() {
+        Ok(()) => Response::json(202, "Accepted", &serde_json::json!({ "status": "started" })),
+        Err(_) => Response::text(502, "Bad Gateway", "could not start the power-off"),
     }
 }
 

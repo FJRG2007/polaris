@@ -333,5 +333,27 @@
             "disk": "Disk",
             "network": "Network traffic"
         }
+    },
+    "ups": {
+        "onBattery": {
+            "title": "{name} is on battery",
+            "body": "The power went out. {charge}% charge, about {minutes} min left."
+        },
+        "online": {
+            "title": "{name} is back on mains",
+            "body": "The power is back. Charge at {charge}%."
+        },
+        "lowBattery": {
+            "title": "{name} battery is nearly empty",
+            "body": "{charge}% charge, about {minutes} min left. Protected machines may shut down."
+        },
+        "test": {
+            "title": "{name} finished a battery test",
+            "body": "Result: {result}"
+        },
+        "replaceBattery": {
+            "title": "{name} needs a new battery",
+            "body": "The UPS reports a worn battery. Replace it before the next outage."
+        }
     }
 }

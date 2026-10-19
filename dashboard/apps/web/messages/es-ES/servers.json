@@ -756,5 +756,180 @@
         "more": "Y {count} más.",
         "history": "Historial GPU",
         "unread": "Polaris no ha podido leer las tarjetas ahora mismo."
+    },
+    "ups": {
+        "heading": "SAI",
+        "description": "Sistemas de alimentación, su carga y las máquinas que protegen",
+        "add": "Añadir SAI",
+        "back": "Los SAI",
+        "empty": {
+            "title": "Sin SAI aún",
+            "body": "Añade uno conectado por USB a una máquina, servido por un servidor NUT o leído por SNMP."
+        },
+        "columns": {
+            "name": "Nombre",
+            "status": "Estado",
+            "charge": "Carga",
+            "runtime": "Autonomía",
+            "load": "Uso",
+            "connection": "Conexión"
+        },
+        "connection": {
+            "usb": "USB",
+            "nut": "Servidor NUT",
+            "snmp": "SNMP"
+        },
+        "status": {
+            "online": "Con red",
+            "onBattery": "Con batería",
+            "lowBattery": "Batería baja",
+            "charging": "Cargando",
+            "replaceBattery": "Cambiar batería",
+            "overloaded": "Sobrecarga",
+            "unknown": "Sin lectura"
+        },
+        "unreachable": {
+            "fullEditionNeeded": "El USB y el SNMP los lee el servicio de Polaris en la máquina, y esta edición no lo tiene. Un SAI en un servidor NUT de la red sí funciona aquí.",
+            "updateNeeded": "El servicio de Polaris de esta máquina es anterior al soporte de SAI. Actualiza Polaris desde Ajustes y se leerá aquí.",
+            "machineUnreachable": "Por ahora solo la máquina donde corre Polaris puede leer un SAI por USB o SNMP. Conecta el cable ahí o usa un servidor NUT.",
+            "notFound": "El SAI ya no está en el USB de esa máquina. Revisa el cable o edita la conexión.",
+            "noAnswer": "El SAI no respondió. Comprueba que está encendido y que la dirección y el nombre son correctos."
+        },
+        "found": {
+            "title": "Visto por USB",
+            "add": "Añadir",
+            "on": "en {machine}",
+            "updateNeeded": "Actualiza Polaris desde Ajustes para encontrar un SAI conectado por USB.",
+            "fullEditionNeeded": "Encontrar un SAI conectado por USB necesita la edición completa. Un servidor NUT de la red sí funciona en esta."
+        },
+        "units": {
+            "minutes": "{count} min",
+            "percent": "{value} %",
+            "volts": "{value} V",
+            "hertz": "{value} Hz",
+            "celsius": "{value} °C"
+        },
+        "regions": {
+            "now": "Ahora",
+            "history": "Historial",
+            "controls": "Controles",
+            "shutdown": "Máquinas protegidas",
+            "connection": "Conexión"
+        },
+        "metrics": {
+            "charge": "Carga",
+            "runtime": "Autonomía",
+            "load": "Uso",
+            "input": "Entrada",
+            "output": "Salida",
+            "battery": "Batería",
+            "temperature": "Temperatura",
+            "model": "Modelo",
+            "manufacturer": "Fabricante",
+            "serial": "Serie"
+        },
+        "ranges": {
+            "h6": "6 h",
+            "h24": "24 h",
+            "d7": "7 d",
+            "d30": "30 d"
+        },
+        "chart": {
+            "percent": "Carga y uso",
+            "voltage": "Tensión de red",
+            "empty": "Aún no hay historial. Se guarda una lectura por minuto."
+        },
+        "beeper": {
+            "label": "Pitido",
+            "enable": "Activar",
+            "disable": "Desactivar",
+            "mute": "Callar",
+            "state": {
+                "enabled": "Sí",
+                "disabled": "No",
+                "muted": "Callado"
+            }
+        },
+        "test": {
+            "label": "Test de batería",
+            "quick": "Test rápido",
+            "deep": "Test largo",
+            "stop": "Parar test",
+            "result": "Resultado",
+            "none": "Sin pruebas aún",
+            "outcome": {
+                "passed": "Superada",
+                "failed": "Fallida",
+                "running": "En curso"
+            }
+        },
+        "noCommands": "Este SAI no ofrece estos controles.",
+        "commandResult": {
+            "ok": "Enviado al SAI",
+            "unsupported": "Este SAI no admite eso.",
+            "refused": "El SAI lo rechazó.",
+            "unreachable": "No se pudo contactar con el SAI.",
+            "loginNeeded": "Los controles a través de un servidor NUT necesitan su usuario y contraseña. Añádelos a la conexión."
+        },
+        "shutdown": {
+            "intro": "Cuando se va la luz y la batería se agota, Polaris apaga estas máquinas de forma ordenada. La máquina donde corre Polaris se apaga la última.",
+            "enabled": "Apagar con batería baja",
+            "belowCharge": "Bajo carga (%)",
+            "belowRuntime": "Bajo autonomía (min)",
+            "machines": "Máquinas",
+            "noMachines": "Aún no hay máquinas que proteger.",
+            "save": "Guardar",
+            "saved": "Guardado",
+            "incomplete": "Elige al menos una máquina y un umbral.",
+            "sent": "El apagado se envió durante este corte. Se rearma cuando vuelve la luz.",
+            "confirm": {
+                "title": "¿Apagar máquinas con batería baja?",
+                "body": "{count, plural, one {# máquina se apaga} other {# máquinas se apagan}} sin preguntar cuando este SAI está con batería y por debajo de un umbral. Lo que corra en ellas se detiene.",
+                "action": "Activar"
+            }
+        },
+        "form": {
+            "titleAdd": "Añadir SAI",
+            "titleEdit": "Editar conexión",
+            "name": "Nombre",
+            "type": "Conexión",
+            "machine": "Máquina",
+            "device": "Dispositivo",
+            "host": "Dirección",
+            "port": "Puerto",
+            "upsName": "Nombre SAI",
+            "username": "Usuario",
+            "password": "Contraseña",
+            "community": "Comunidad",
+            "version": "Versión SNMP",
+            "authPassword": "Clave de autenticación",
+            "privPassword": "Clave privada",
+            "secretKept": "Guardada. Déjala vacía para conservarla.",
+            "nutLoginHint": "Solo hace falta para el pitido y el test de batería.",
+            "noDevices": "No se encontró por USB ningún SAI sin añadir.",
+            "pickMachine": "Elige máquina",
+            "pickDevice": "Elige dispositivo",
+            "submitAdd": "Añadir SAI",
+            "submitEdit": "Guardar",
+            "cancel": "Cancelar"
+        },
+        "edit": "Editar conexión",
+        "remove": "Quitar",
+        "removeKind": "SAI",
+        "removeBody": "Se olvidan su historial y sus máquinas protegidas. El SAI en sí no se toca.",
+        "errors": {
+            "required": "Obligatorio",
+            "tooLong": "Muy largo",
+            "invalidAddress": "No es un nombre de host ni una IP.",
+            "invalidSecret": "Usa caracteres imprimibles, sin comillas ni barras invertidas.",
+            "invalidUpsName": "Solo letras, números, puntos, guiones y guiones bajos.",
+            "invalidUser": "Solo letras, números, puntos, guiones y guiones bajos.",
+            "invalidDevice": "Elige un dispositivo.",
+            "unknownMachine": "Esa máquina no es tuya.",
+            "shutdownIncomplete": "Elige al menos una máquina y un umbral.",
+            "notFound": "Este SAI se quitó.",
+            "failed": "No funcionó. Inténtalo de nuevo.",
+            "invalid": "Revisa los campos marcados."
+        }
     }
 }

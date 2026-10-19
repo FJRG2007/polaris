@@ -467,6 +467,26 @@
         "webhookDisabled": {
             "label": "A webhook was switched off",
             "description": "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it."
+        },
+        "upsOnBattery": {
+            "label": "The power went out",
+            "description": "A UPS is running on its battery."
+        },
+        "upsOnline": {
+            "label": "The power is back",
+            "description": "A UPS that was on battery runs from the mains again."
+        },
+        "upsLowBattery": {
+            "label": "A UPS battery is nearly empty",
+            "description": "A UPS on battery is about to run out, and the machines it protects may be shut down."
+        },
+        "upsTest": {
+            "label": "A UPS battery test finished",
+            "description": "The result of a battery self-test."
+        },
+        "upsReplaceBattery": {
+            "label": "A UPS battery needs replacing",
+            "description": "A UPS reports that its battery is worn out."
         }
     },
     "groups": {

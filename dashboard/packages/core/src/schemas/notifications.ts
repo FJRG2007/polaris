@@ -639,6 +639,46 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "ups.onBattery",
+        group: "deploy",
+        label: "The power went out",
+        description: "A UPS is running on its battery.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "ups.online",
+        group: "deploy",
+        label: "The power is back",
+        description: "A UPS that was on battery runs from the mains again.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "ups.lowBattery",
+        group: "deploy",
+        label: "A UPS battery is nearly empty",
+        description: "A UPS on battery is about to run out, and the machines it protects may be shut down.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "ups.test",
+        group: "deploy",
+        label: "A UPS battery test finished",
+        description: "The result of a battery self-test.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "ups.replaceBattery",
+        group: "deploy",
+        label: "A UPS battery needs replacing",
+        description: "A UPS reports that its battery is worn out.",
+        level: "warning",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "mailserver.inbound",
         group: "mail",
         label: "Mail matched a rule",
