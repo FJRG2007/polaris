@@ -49,3 +49,39 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
         )
     };
 });
+
+vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
+    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1)
+}));
+
+vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
+    sessionScreen: forward(
+        () => import("@/app/(app)/apps/agents/sessions/actions"),
+        "sessionScreenAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/apps/dns-blocker/dns-blocker-polls", () => {
+    const actions = () => import("@/app/(app)/apps/dns-blocker/actions");
+    return {
+        dnsInsights: forward(actions, "dnsInsightsAction", 2),
+        dnsTail: forward(actions, "dnsTailAction", 1)
+    };
+});
+
+vi.mock("@/app/(app)/apps/tunnels/tunnels-polls", () => ({
+    // The action takes `{ ids }`; the poll takes the ids.
+    tunnelStatuses: async (ids: readonly string[]) => {
+        const actions = await import("@/app/(app)/apps/tunnels/actions");
+        return actions.tunnelStatusesAction({ ids: [...ids] });
+    }
+}));
+
+vi.mock("@/app/(app)/home/home-polls", () => ({
+    appWidgets: forward(
+        () => import("@/app/(app)/home/app-widget-actions"),
+        "readAppWidgetsAction",
+        0
+    )
+}));

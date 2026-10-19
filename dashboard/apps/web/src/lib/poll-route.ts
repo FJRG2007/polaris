@@ -58,3 +58,20 @@ export function pollRoute<Q extends z.ZodTypeAny>(
         }
     };
 }
+
+/** A query parameter carrying JSON, for a read whose action takes an object;
+ *  pipe it into that object's own schema. */
+export const jsonParam = z
+    .string()
+    .max(8192)
+    .transform((text, context) => {
+        try {
+            return JSON.parse(text) as unknown;
+        } catch {
+            context.addIssue({ code: z.ZodIssueCode.custom, message: "Not JSON" });
+            return z.NEVER;
+        }
+    });
+
+/** A query parameter carrying a comma-separated list. */
+export const listParam = z.string().transform((text) => (text ? text.split(",") : []));
