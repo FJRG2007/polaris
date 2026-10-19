@@ -59,6 +59,13 @@ import {
 } from "@/lib/page-scan";
 import { CLIPBOARD_CLEAR_MS } from "@/lib/generator";
 import {
+    GENERATED_HOOK,
+    generatedPasswords,
+    onOrigin,
+    requestSendsForm,
+    stillHolds
+} from "@/lib/submit-signals";
+import {
     askBackground,
     speakRepliesIn,
     type IdentityValues,
@@ -364,14 +371,9 @@ async function start(): Promise<void> {
         open = true;
         try {
             if (role === "generate") {
-                offerGenerated(field, await savedOptions(), (value) => {
-                    put(field, value);
-                    // And the box beside it, which is the one somebody would
-                    // otherwise have to paste into from a password they cannot see.
-                    const confirm = at(seen.fields.confirmPassword);
-                    if (confirm && confirm !== field) put(confirm, value);
-                    keep(value);
-                });
+                offerGenerated(field, await savedOptions(), made.inBox(field), (value) =>
+                    useGenerated(field, value)
+                );
                 return;
             }
             const before = field.value;
@@ -504,12 +506,9 @@ async function start(): Promise<void> {
             const options = await savedOptions();
             offered.push(
                 choice(t("inline.makePassword"), t("inline.makePasswordDetail"), () =>
-                    offerGenerated(passwordBox, options, (value) => {
-                        put(passwordBox, value);
-                        const confirm = at(fields.confirmPassword);
-                        if (confirm && confirm !== passwordBox) put(confirm, value);
-                        keep(value);
-                    })
+                    offerGenerated(passwordBox, options, made.inBox(passwordBox), (value) =>
+                        useGenerated(passwordBox, value)
+                    )
                 )
             );
         }
@@ -605,6 +604,40 @@ async function start(): Promise<void> {
         send(at(seen.fields.username)?.value ?? "", value, seen.fields.purpose !== "change");
     };
 
+    /**
+     * The passwords made here, per box. Opening the generator again on a box
+     * that holds one shows that one: a fresh password there would be copied in
+     * place of the one the form is about to be sent with.
+     */
+    const made = generatedPasswords();
+
+    /** A password made here going into its box - and the confirmation beside
+     *  it, which is the one somebody would otherwise have to paste into from a
+     *  password they cannot see - and offered for saving straight away. */
+    const useGenerated = (field: HTMLInputElement, value: string): void => {
+        put(field, value);
+        made.remember(field, value);
+        const confirm = at(seen.fields.confirmPassword);
+        if (confirm && confirm !== field) {
+            put(confirm, value);
+            made.remember(confirm, value);
+        }
+        keep(value);
+    };
+
+    // The right-click menu's new password is made and typed by the worker, into
+    // whichever box was clicked. It tells this script here, in the extension's
+    // own world, so that password is the one the generator shows on that box and
+    // it is offered for saving like one made from the mark.
+    (globalThis as Record<string, unknown>)[GENERATED_HOOK] = (box: unknown, value: unknown) => {
+        if (!isInput(box) || typeof value !== "string" || box.value !== value) return;
+        look();
+        made.remember(box, value);
+        const confirm = at(seen.fields.confirmPassword);
+        if (confirm && confirm !== box && confirm.value === value) made.remember(confirm, value);
+        keep(value);
+    };
+
     /** Before saving from the bar: what the form says now, which may have a
      *  username typed after the password was generated. */
     const recapture = async (): Promise<void> => {
@@ -630,6 +663,9 @@ async function start(): Promise<void> {
      */
     let typed: { username: string; password: string; newAccount: boolean } | null = null;
     let pressedAt = 0;
+    /** The last press that belongs with the login's boxes, which is all a
+     *  request the page sends after it can be taken as the form going. */
+    let formPressedAt = 0;
     const remember = (event: Event): void => {
         const box = origin(event);
         const { fields } = seen;
@@ -649,10 +685,10 @@ async function start(): Promise<void> {
     const noticeGone = (): void => {
         if (!typed) return;
         const held = typed;
-        const still = [at(seen.fields.newPassword), at(seen.fields.password)].some(
-            (box) => box !== null && box.isConnected && box.value === held.password
-        );
-        if (still) return;
+        // Hidden is gone as well: the next step of a sign-up often keeps the
+        // finished one in the page, password and all, out of sight.
+        if (stillHolds([at(seen.fields.newPassword), at(seen.fields.password)], held.password))
+            return;
         if (Date.now() - pressedAt > GONE_AFTER_PRESS_MS) return;
         typed = null;
         send(held.username, held.password, held.newAccount);
@@ -660,13 +696,38 @@ async function start(): Promise<void> {
 
     // The page going away right after a press - `location.assign` once a script
     // has posted the login - is the last moment to hand it over.
-    window.addEventListener("pagehide", () => {
+    const sendTyped = (): void => {
         if (typed && Date.now() - pressedAt <= GONE_AFTER_PRESS_MS) {
             const held = typed;
             typed = null;
             send(held.username, held.password, held.newAccount);
         }
-    });
+    };
+    window.addEventListener("pagehide", sendTyped);
+
+    // A request the page sends by script right after the form's button is
+    // pressed, to the page's own origin, and that is not refused: a sign-up
+    // posted with `fetch` whose page keeps the boxes where they were. Only the
+    // request's kind, address, start and status are read - never what it carried.
+    try {
+        new PerformanceObserver((list) => {
+            if (!typed) return;
+            for (const entry of list.getEntries() as PerformanceResourceTiming[]) {
+                const request = {
+                    initiatorType: entry.initiatorType,
+                    startedAt: performance.timeOrigin + entry.startTime,
+                    sameOrigin: onOrigin(entry.name, location.origin),
+                    responseStatus: (entry as { responseStatus?: number }).responseStatus
+                };
+                if (requestSendsForm(request, formPressedAt, GONE_AFTER_PRESS_MS)) {
+                    sendTyped();
+                    return;
+                }
+            }
+        }).observe({ type: "resource", buffered: false });
+    } catch {
+        // A browser without resource timing still has the other three signs.
+    }
 
     // A real form going, and a button pressed on a page that submits by script.
     // Both, because either one alone misses about half the web.
@@ -704,8 +765,9 @@ async function start(): Promise<void> {
         pressedAt = Date.now();
         // Only a press that belongs with the login's boxes: a cookie banner's
         // button is not somebody signing in.
-        if (pressed.nodeName === "A" || !pressed.matches(BUTTON) || !sharesForm(pressed, box))
-            return;
+        if (!sharesForm(pressed, box)) return;
+        formPressedAt = pressedAt;
+        if (pressed.nodeName === "A" || !pressed.matches(BUTTON)) return;
         submitted();
     };
     // Enter in a login box that no form submits, which neither of the two
@@ -719,8 +781,10 @@ async function start(): Promise<void> {
             repeat: event.repeat,
             target: origin(event)
         };
-        if (sending.key === "Enter" && boxes.includes(sending.target as HTMLInputElement))
+        if (sending.key === "Enter" && boxes.includes(sending.target as HTMLInputElement)) {
             pressedAt = Date.now();
+            formPressedAt = pressedAt;
+        }
         if (enterSendsLogin(sending, boxes)) submitted();
     };
 
@@ -1103,10 +1167,13 @@ async function savedOptions(): Promise<GeneratorOptions> {
 function offerGenerated(
     field: HTMLInputElement,
     options: GeneratorOptions,
+    current: string | null,
     use: (value: string) => void
 ): void {
     const { panel, close } = floating(field);
-    let value = generatePassword(options);
+    // The one already in the box, when it was made here: "copy" is then the
+    // password the form holds, not a new one nobody has used.
+    let value = current ?? generatePassword(options);
 
     const shown = document.createElement("code");
     shown.style.cssText = `
