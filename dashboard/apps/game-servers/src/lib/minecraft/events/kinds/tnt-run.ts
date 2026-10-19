@@ -218,6 +218,21 @@ const HALF_WIDTH = 0.3;
 
 const FUSE = `@e[type=minecraft:armor_stand,tag=${FUSE_TAG}]`;
 
+/**
+ * What an arena from a build (`world-builds/arenas`) lays over its TNT: a
+ * player runs on it, and a fuse on it takes the block and the TNT under it
+ * together, so nothing is left hanging. A generated floor is bare TNT.
+ */
+export const TOPPINGS = ["minecraft:sand", "minecraft:red_sand", "minecraft:gravel"] as const;
+
+/** Each corner of a player's feet, as offsets from their middle. */
+const FEET: readonly [number, number][] = [
+    [HALF_WIDTH, HALF_WIDTH],
+    [HALF_WIDTH, -HALF_WIDTH],
+    [-HALF_WIDTH, HALF_WIDTH],
+    [-HALF_WIDTH, -HALF_WIDTH]
+];
+
 function score(name: string): string {
     return `#${name} ${OBJECTIVE}`;
 }
@@ -249,9 +264,12 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         "execute in minecraft:overworld as @e[type=minecraft:tnt,distance=0..] run function polaris:tntrun/primed"
     ],
     // As a fuse whose count ran out, at the middle of its block: the block gone
-    // only if it is still the arena's TNT, and the fuse with it.
+    // only if it is still the arena's TNT or topping - a topping with the TNT
+    // under it - and the fuse with it.
     drop: [
         "fill ~ ~ ~ ~ ~ ~ minecraft:air replace minecraft:tnt",
+        ...TOPPINGS.map((block) => `fill ~ ~ ~ ~ ~ ~ minecraft:air replace ${block}`),
+        "fill ~ ~-1 ~ ~ ~-1 ~ minecraft:air replace minecraft:tnt",
         "particle minecraft:poof ~ ~0.5 ~ 0.25 0.1 0.25 0.02 3",
         "kill @s"
     ],
@@ -263,17 +281,15 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `execute unless score @s ${OBJECTIVE} matches 1.. if score ${score("py")} < ${score("fy")} store result score @s ${OBJECTIVE} run time query gametime`,
         `execute ${within("")} at @s run function polaris:tntrun/under`
     ],
-    // At a player's feet: each corner's block, if it is TNT and has no fuse yet,
+    // At a player's feet: each corner's block, if it is TNT or a build's
+    // topping over it and has no fuse yet,
     // gets one; then every fuse just lit is given its count.
     under: [
-        ...[
-            [HALF_WIDTH, HALF_WIDTH],
-            [HALF_WIDTH, -HALF_WIDTH],
-            [-HALF_WIDTH, HALF_WIDTH],
-            [-HALF_WIDTH, -HALF_WIDTH]
-        ].map(
-            ([dx, dz]) =>
-                `execute positioned ~${dx} ~-0.5 ~${dz} align xyz positioned ~0.5 ~0.5 ~0.5 if block ~ ~ ~ minecraft:tnt unless entity @e[type=minecraft:armor_stand,tag=${FUSE_TAG},distance=..0.5] run summon minecraft:armor_stand ~ ~ ~ {Tags:["${FUSE_TAG}","${NEW_TAG}"],Marker:1b,Invisible:1b,NoGravity:1b,Invulnerable:1b}`
+        ...["minecraft:tnt", ...TOPPINGS].flatMap((block) =>
+            FEET.map(
+                ([dx, dz]) =>
+                    `execute positioned ~${dx} ~-0.5 ~${dz} align xyz positioned ~0.5 ~0.5 ~0.5 if block ~ ~ ~ ${block} unless entity @e[type=minecraft:armor_stand,tag=${FUSE_TAG},distance=..0.5] run summon minecraft:armor_stand ~ ~ ~ {Tags:["${FUSE_TAG}","${NEW_TAG}"],Marker:1b,Invisible:1b,NoGravity:1b,Invulnerable:1b}`
+            )
         ),
         `scoreboard players set @e[type=minecraft:armor_stand,tag=${NEW_TAG}] ${OBJECTIVE} ${FUSE_TICKS}`,
         `tag @e[type=minecraft:armor_stand,tag=${NEW_TAG}] remove ${NEW_TAG}`

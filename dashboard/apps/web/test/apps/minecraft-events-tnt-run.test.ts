@@ -163,7 +163,9 @@ describe("the TNT run's data pack", () => {
             "execute if score #px polaris_tntrun >= #x1 polaris_tntrun if score #px polaris_tntrun <= #x2 polaris_tntrun if score #py polaris_tntrun >= #y1 polaris_tntrun if score #py polaris_tntrun <= #y2 polaris_tntrun if score #pz polaris_tntrun >= #z1 polaris_tntrun if score #pz polaris_tntrun <= #z2 polaris_tntrun at @s run function polaris:tntrun/under"
         );
         const under = fn("under");
-        const corners = under.filter((line) => line.includes("summon"));
+        const corners = under.filter(
+            (line) => line.includes("summon") && line.includes(" if block ~ ~ ~ minecraft:tnt ")
+        );
         expect(corners.map((line) => /positioned (~\S+ ~\S+ ~\S+) align/.exec(line)![1])).toEqual([
             "~0.3 ~-0.5 ~0.3",
             "~0.3 ~-0.5 ~-0.3",
@@ -239,6 +241,22 @@ describe("the TNT run's data pack", () => {
         );
         expect(fn("drop")[0]).toBe("fill ~ ~ ~ ~ ~ ~ minecraft:air replace minecraft:tnt");
         expect(fn("drop").at(-1)).toBe("kill @s");
+    });
+
+    it("takes a build's sand or gravel with the TNT under it, so a topped floor runs too", () => {
+        const under = fn("under").filter((line) => line.includes("summon"));
+        for (const block of tntRun.TOPPINGS)
+            expect(under.filter((line) => line.includes(` if block ~ ~ ~ ${block} `))).toHaveLength(
+                4
+            );
+        const drop = fn("drop");
+        for (const block of tntRun.TOPPINGS)
+            expect(drop).toContain(`fill ~ ~ ~ ~ ~ ~ minecraft:air replace ${block}`);
+        // Only ever TNT under it: never anything a player built.
+        expect(drop).toContain("fill ~ ~-1 ~ ~ ~-1 ~ minecraft:air replace minecraft:tnt");
+        expect(
+            drop.indexOf("fill ~ ~-1 ~ ~ ~-1 ~ minecraft:air replace minecraft:tnt")
+        ).toBeLessThan(drop.indexOf("kill @s"));
     });
 
     it("puts out any TNT lit near the arena, and never sets one off or places one", () => {

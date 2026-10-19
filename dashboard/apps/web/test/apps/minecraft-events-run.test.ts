@@ -2080,6 +2080,19 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     ) => work(server)
 }));
 
+/** The build a spleef or TNT run is drawn to be played on: none - the arena
+ *  Polaris generates - unless a test sets one (`world-builds/arenas`). */
+const arenaLayout = vi.hoisted(() => ({ id: null as string | null }));
+vi.mock(
+    "@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas",
+    async (importOriginal) => ({
+        ...(await importOriginal<
+            typeof import("@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas")
+        >()),
+        layoutIdFor: () => arenaLayout.id
+    })
+);
+
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-display-service", () => ({
     holdSidebar: (id: string) => held.push(id),
     releaseSidebar: (_owner: string, id: string) => released.push(id)
@@ -2328,6 +2341,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+    arenaLayout.id = null;
     for (const id of events.runningEvents()) {
         await events.cancelEvent("owner", id).catch(() => undefined);
     }
@@ -6131,6 +6145,7 @@ describe("a meteor shower", () => {
 
 const parkour = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour");
 const spleef = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef");
+const arenaBuilds = await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/arenas");
 const snowballPack = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack"
 );
@@ -6967,6 +6982,123 @@ describe("spleef", () => {
         expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
         expect(world.inside.size).toBe(0);
         keptTheRules();
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("plays on a build when one is drawn: pasted into air over a catch net, started on its own spots, swept away after", async () => {
+        arenaLayout.id = "spleef-tower";
+        world.online = ["Ana", "Ben"];
+        setUp([floor()]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        const run = state().run!;
+        expect(run.stage?.layout).toBe("spleef-tower");
+        expect(run.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben"]);
+        const origin = run.stage!.origin!;
+        const entry = arenaBuilds.floorEntryOf("spleef", "spleef-tower")!;
+        const built = arenaBuilds.floorArena(entry, origin, origin.y);
+        // The net under the whole of it, at the bottom of the volume proved empty.
+        const [net] = built.arena.boxes;
+        expect(net!.block).toBe(arenaBuilds.NET_BLOCK);
+        expect(net!.y1).toBe(origin.y - arenaBuilds.NET_DROP);
+        expect(net!.y1).toBe(built.arena.volume.y1);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run fill ${net!.x1} ${net!.y1} ${net!.z1} ${net!.x2} ${net!.y2} ${net!.z2} ${net!.block} keep`
+        );
+        // Every piece of the build pasted, into air only, inside what was proved.
+        for (const piece of built.paste) {
+            expect(world.sent).toContain(piece.line);
+            expect(piece.line.endsWith(" keep")).toBe(true);
+        }
+        const proved = run.stage!.proved!;
+        expect(proved).toEqual(built.arena.volume);
+        // Started on the build's own spots, on its top floor.
+        const starts = built.arena.starts!;
+        for (const name of ["Ana", "Ben"])
+            expect(
+                world.sent.some((line) => {
+                    const tp = new RegExp(` tp ${name} (\\S+) (\\S+) (\\S+) `).exec(line);
+                    return (
+                        tp !== null &&
+                        starts.some(
+                            (at) =>
+                                Number(tp[1]) === at.x + 0.5 &&
+                                Number(tp[2]) === at.y &&
+                                Number(tp[3]) === at.z + 0.5
+                        )
+                    );
+                }),
+                name
+            ).toBe(true);
+        await play(8_000);
+        // Off the side of the build, past its every block: still over the net,
+        // so caught there, out, and sent home like a fall through the floors.
+        const pasted = built.paste.map((piece) =>
+            / (?:setblock|fill) (-?\d+) /.exec(piece.line)!.slice(1).map(Number)
+        );
+        const westmost = Math.min(...pasted.map(([x]) => x!));
+        expect(net!.x1).toBe(Math.min(westmost, built.arena.center.x - built.arena.size - 1) - arenaBuilds.NET_MARGIN);
+        const homeFrom = world.sent.length;
+        world.at.Ben = [net!.x1 + 1, net!.y1 + 1, built.arena.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(false);
+        expect(
+            world.sent
+                .slice(homeFrom)
+                .some((line) => line.startsWith("execute in minecraft:overworld run tp Ben "))
+        ).toBe(true);
+        await play(2_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        // The build taken down with the volume it was proved in: swept whole.
+        expect(world.sent.some((line) => sweptInProved(line))).toBe(true);
+        expect(world.inside.size).toBe(0);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("plays a TNT run on a build: its pack armed and switched off by the build's own marks, the build pasted and swept", async () => {
+        arenaLayout.id = "tnt-run-temple";
+        world.online = ["Ana", "Ben"];
+        setUp([
+            {
+                ...newPreset("tnt-run", "tnt"),
+                minutes: 5,
+                options: { place: { mode: "players" as const }, size: 6, layers: 3, height: 30 }
+            }
+        ]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        const run = state().run!;
+        expect(run.stage?.layout).toBe("tnt-run-temple");
+        expect(run.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben"]);
+        const origin = run.stage!.origin!;
+        const entry = arenaBuilds.floorEntryOf("tnt-run", "tnt-run-temple")!;
+        const built = arenaBuilds.floorArena(entry, origin, origin.y);
+        // No generated TNT floor: the build's own, pasted into air over the net.
+        expect(
+            world.sent.some((line) => / fill .* minecraft:tnt keep$/.test(line) && !built.paste.some((piece) => piece.line === line))
+        ).toBe(false);
+        for (const piece of built.paste) expect(world.sent).toContain(piece.line);
+        await play(8_000);
+        for (const line of tntRun.armLines(built.arena)) expect(world.sent).toContain(line);
+        // Through the last floor is out, onto the net.
+        world.at.Ben = [built.arena.center.x, built.arena.floors.at(-1)! - 1, built.arena.center.z];
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        // Switched off by the marks it was armed with: the floors' low corner.
+        for (const line of tntRun.stopLines(built.marks)) expect(world.sent).toContain(line);
+        expect(tntRun.stopLines(built.marks)[0]).toContain(
+            `matches ${(built.arena.center.x - built.arena.size) * 64}`
+        );
+        expect(world.sent.some((line) => sweptInProved(line))).toBe(true);
+        expect(world.inside.size).toBe(0);
         expect(after.stageLeftovers).toEqual([]);
     });
 

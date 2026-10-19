@@ -12,6 +12,7 @@
 import * as stage from "./stage";
 import * as outsiders from "./outsiders";
 import * as spleef from "./spleef";
+import * as arenaBuilds from "../../world-builds/arenas";
 import * as snowballPack from "./snowball-pack";
 import * as snowballPackService from "./snowball-pack-service";
 import * as parkour from "./parkour";
@@ -164,6 +165,10 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+          /** Played on a build (`world-builds/arenas`): what pastes it after the
+           *  boxes - its catch net - are up, and the marks its event pack is told
+           *  apart by, written down with the boxes but never built. */
+          readonly build?: arenaBuilds.FloorBuild;
       }
     | {
           readonly kind: "dropper";
@@ -313,6 +318,23 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             reach: shaft.reach
         };
     }
+    // A build drawn for the run (`arenas.layoutIdFor`) - kept as it was placed,
+    // so a run from before builds were offered keeps the arena it was built as.
+    const layoutId = run.stage?.origin
+        ? run.stage.layout
+        : arenaBuilds.layoutIdFor(run.preset.kind, run.id);
+    const entry = layoutId ? arenaBuilds.floorEntryOf(run.preset.kind, layoutId) : null;
+    if (entry) {
+        const build = arenaBuilds.floorArena(entry, site, y);
+        return {
+            kind: run.preset.kind === "tnt-run" ? "tnt-run" : "spleef",
+            arena: build.arena,
+            boxes: build.arena.boxes,
+            volume: build.arena.volume,
+            reach: build.arena.reach,
+            build
+        };
+    }
     const floor =
         run.preset.kind === "tnt-run"
             ? tntRun.arena(run.preset.options as catalog.EventOptions<"tnt-run">, site, y)
@@ -335,10 +357,14 @@ function decorOf(layout: Layout): { spots: decor.Spot[]; rules: decor.Rules } {
     switch (layout.kind) {
         case "parkour":
             return { spots: parkour.decorSpots(layout.course), rules: { exposed: true } };
+        // A build is dressed as it was made: no piece over what it has there.
         case "spleef":
-            return { spots: spleef.decorSpots(layout.arena), rules: {} };
+            return { spots: layout.build ? [] : spleef.decorSpots(layout.arena), rules: {} };
         case "tnt-run":
-            return { spots: tntRun.decorSpots(layout.arena), rules: { fireproof: true } };
+            return {
+                spots: layout.build ? [] : tntRun.decorSpots(layout.arena),
+                rules: { fireproof: true }
+            };
         case "dropper":
             return { spots: dropper.decorSpots(layout.shaft), rules: { exposed: true } };
         case "boat-race":
@@ -389,8 +415,8 @@ export function stageBoxes(
 
 /** Which of a structure's own blocks only frame the game (`arena-decor.Trim`). */
 function trimOf(layout: Layout): decor.Trim | undefined {
-    if (layout.kind === "spleef") return spleef.TRIM;
-    if (layout.kind === "tnt-run") return tntRun.TRIM;
+    if (layout.kind === "spleef" && !layout.build) return spleef.TRIM;
+    if (layout.kind === "tnt-run" && !layout.build) return tntRun.TRIM;
     return undefined;
 }
 
@@ -774,6 +800,7 @@ async function raise(
                             ? elytraRace.DESIGN
                             : parkour.DESIGN,
             area,
+            layout: arenaBuilds.layoutIdFor(preset.kind, loop.run.id),
             waits: 0
         });
         await tools.persist();
@@ -799,10 +826,18 @@ async function raise(
         outer && tools.sceneryEra
             ? stageScenery(loop.run, origin, await tools.sceneryEra().catch(() => OLDEST_SCENERY))
             : [];
+    // A build's marks (`spleef.floorMarks`) are written down with its boxes, so
+    // whatever ends it switches its event pack off; never built. The build
+    // itself goes in after the boxes, into air only, and is taken out with the
+    // volume the probe proved (`proved`), which holds the whole of it.
+    const marks =
+        (layout.kind === "spleef" || layout.kind === "tnt-run") && layout.build
+            ? layout.build.marks
+            : [];
     // Written down first, then built - into air only.
     const before = state(loop).boxes;
     change(loop, {
-        boxes: [...before, ...boxes, ...pieces.map(decorBox), ...surround]
+        boxes: [...before, ...boxes, ...marks, ...pieces.map(decorBox), ...surround]
     });
     loop.run = { ...loop.run, season: dressing };
     await tools.persist();
@@ -817,9 +852,21 @@ async function raise(
         boxes.map((box) => stage.buildLine(box)),
         pace.buildPacer()
     );
-    const whole = boxes.every(
-        (box, index) => stage.fillCount(counts[index]!) === stage.volumeOf(box)
-    );
+    const paste =
+        (layout.kind === "spleef" || layout.kind === "tnt-run") && layout.build
+            ? layout.build.paste
+            : [];
+    const pasted =
+        paste.length > 0
+            ? await pace.answered(
+                  server,
+                  paste.map((piece) => piece.line),
+                  pace.buildPacer()
+              )
+            : [];
+    const whole =
+        boxes.every((box, index) => stage.fillCount(counts[index]!) === stage.volumeOf(box)) &&
+        paste.every((piece, index) => pieceIn(pasted[index] ?? "", piece.blocks));
     change(loop, { built: true });
     const timing = raising.get(loop.run.id);
     raising.delete(loop.run.id);
@@ -844,6 +891,11 @@ async function raise(
     }
     arrival.open(loop.run.id, Date.now());
     await tools.persist();
+}
+
+/** Whether a build's piece went in whole: a `fill` counted, a `setblock` changed. */
+function pieceIn(answer: string, blocks: number): boolean {
+    return blocks === 1 ? /changed the block/i.test(answer) : stage.fillCount(answer) === blocks;
 }
 
 /**
@@ -2362,9 +2414,9 @@ async function spleefTick(
     if (dirty) await tools.persist();
     if (!state(loop).armed || standing.length > 1) return null;
     const winner = standing[0];
-    if (packed) lines.push(...snowballPack.stopLines(floor.boxes));
+    if (packed) lines.push(...snowballPack.stopLines(spleef.floorMarks(floor, spleef.FLOOR)));
     if (variant) lines.push("effect clear @a[tag=pe_in] minecraft:glowing");
-    if (tnt) lines.push(...tntRun.stopLines(floor.boxes));
+    if (tnt) lines.push(...tntRun.stopLines(spleef.floorMarks(floor, tntRun.FLOOR)));
     if (!winner) {
         lines.push(commands.say(messages.tag(language) + messages.nobodyStanding(language)));
         return "Nobody was left standing";

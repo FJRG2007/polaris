@@ -22,43 +22,64 @@ const BLOCK_STATE =
 
 /** The largest side a build may have: a site has to be found for it near spawn. */
 export const SIDE_MAX = 64;
+/** The largest side of an event arena from a build (`arenas.ts`): one floats over
+ *  its site like a generated arena, so it needs no level ground, only air. */
+export const ARENA_SIDE_MAX = 72;
+
+const sides = (max: number) =>
+    z.object({
+        x: z.number().int().min(1).max(max),
+        y: z.number().int().min(1).max(max),
+        z: z.number().int().min(1).max(max)
+    });
+
+const body = {
+    format: z.literal("polaris-build"),
+    version: z.literal(1),
+    id: z.string().regex(/^[a-z0-9-]{1,48}$/),
+    palette: z.array(z.string().regex(BLOCK_STATE)).min(1).max(4096),
+    blocks: z.array(z.number().int().min(0))
+};
+
+/** Air first, whole runs, every index in the palette, and every cell covered. */
+function checkRuns(
+    build: { palette: string[]; blocks: number[]; size: { x: number; y: number; z: number } },
+    context: z.RefinementCtx
+): void {
+    if (build.palette[0] !== AIR)
+        context.addIssue({ code: "custom", message: "palette[0] is not air" });
+    if (build.blocks.length % 2 !== 0)
+        context.addIssue({ code: "custom", message: "runs are not pairs" });
+    let cells = 0;
+    for (let at = 0; at < build.blocks.length; at += 2) {
+        if (build.blocks[at]! >= build.palette.length)
+            context.addIssue({
+                code: "custom",
+                message: `index ${build.blocks[at]} outside the palette`
+            });
+        cells += build.blocks[at + 1]!;
+    }
+    if (cells !== build.size.x * build.size.y * build.size.z)
+        context.addIssue({ code: "custom", message: "runs do not cover the build" });
+}
 
 export const polarisBuildSchema = z
-    .object({
-        format: z.literal("polaris-build"),
-        version: z.literal(1),
-        id: z.string().regex(/^[a-z0-9-]{1,48}$/),
-        season: z.enum(DECORATIONS),
-        size: z.object({
-            x: z.number().int().min(1).max(SIDE_MAX),
-            y: z.number().int().min(1).max(SIDE_MAX),
-            z: z.number().int().min(1).max(SIDE_MAX)
-        }),
-        palette: z.array(z.string().regex(BLOCK_STATE)).min(1).max(4096),
-        blocks: z.array(z.number().int().min(0))
-    })
-    .superRefine((build, context) => {
-        if (build.palette[0] !== AIR)
-            context.addIssue({ code: "custom", message: "palette[0] is not air" });
-        if (build.blocks.length % 2 !== 0)
-            context.addIssue({ code: "custom", message: "runs are not pairs" });
-        let cells = 0;
-        for (let at = 0; at < build.blocks.length; at += 2) {
-            if (build.blocks[at]! >= build.palette.length)
-                context.addIssue({
-                    code: "custom",
-                    message: `index ${build.blocks[at]} outside the palette`
-                });
-            cells += build.blocks[at + 1]!;
-        }
-        if (cells !== build.size.x * build.size.y * build.size.z)
-            context.addIssue({ code: "custom", message: "runs do not cover the build" });
-    });
+    .object({ ...body, season: z.enum(DECORATIONS), size: sides(SIDE_MAX) })
+    .superRefine(checkRuns);
+
+/** An event arena's build: the same format with no season, as it is no decoration. */
+export const arenaBuildSchema = z
+    .object({ ...body, size: sides(ARENA_SIDE_MAX) })
+    .superRefine(checkRuns);
+
+export type ArenaBuild = z.infer<typeof arenaBuildSchema>;
+/** What decoding and pasting a build reads, whatever it is for. */
+export type BuildCells = Pick<ArenaBuild, "size" | "palette" | "blocks">;
 
 export type PolarisBuild = z.infer<typeof polarisBuildSchema>;
 
 /** Every cell's palette index, x fastest, then z, then y. */
-export function decodeCells(build: PolarisBuild): Uint16Array {
+export function decodeCells(build: BuildCells): Uint16Array {
     const cells = new Uint16Array(build.size.x * build.size.y * build.size.z);
     let at = 0;
     for (let run = 0; run < build.blocks.length; run += 2) {

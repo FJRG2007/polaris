@@ -247,6 +247,10 @@ export const stageSchema = z.object({
     area: areaSchema.nullable().default(null),
     /** Parkour: how the course was laid out when placed (`parkour.DESIGN`). */
     design: z.number().int().default(1),
+    /** Spleef and TNT run: the build it is played on (`world-builds/arenas`),
+     *  drawn as it is placed; null for the arena Polaris generates, and for a
+     *  run from before builds were offered. */
+    layout: z.string().nullable().default(null),
     /** Every box filled so far, in the order it was filled - written down first. */
     boxes: z.array(boxSchema).default([]),
     built: z.boolean().default(false),

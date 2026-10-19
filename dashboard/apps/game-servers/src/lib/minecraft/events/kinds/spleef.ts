@@ -90,6 +90,9 @@ export interface Arena {
     readonly boxes: readonly Box[];
     readonly volume: Volume;
     readonly reach: number;
+    /** Where players start, on the top floor, for an arena from a build
+     *  (`world-builds/arenas`): its own starts, not the generated ring. */
+    readonly starts?: readonly { readonly x: number; readonly y: number; readonly z: number }[];
 }
 
 export function arena(
@@ -168,6 +171,20 @@ export function arena(
  * top floor, facing the middle, on top of the snow.
  */
 export function spots(arena: Arena, count: number): Spot[] {
+    if (arena.starts && arena.starts.length > 0) {
+        const starts = arena.starts;
+        return Array.from({ length: count }, (_, index) => {
+            const at = starts[index % starts.length]!;
+            const dx = at.x - arena.center.x;
+            const dz = at.z - arena.center.z;
+            return {
+                x: at.x + 0.5,
+                y: at.y,
+                z: at.z + 0.5,
+                yaw: Math.round((Math.atan2(dx, -dz) * 180) / Math.PI)
+            };
+        });
+    }
     const ring = Math.max(1, Math.round(arena.size * 0.6));
     return Array.from({ length: count }, (_, index) => {
         const angle = (index / Math.max(1, count)) * Math.PI * 2;
@@ -181,6 +198,27 @@ export function spots(arena: Arena, count: number): Spot[] {
             yaw
         };
     });
+}
+
+/**
+ * One cell of `block` at each floor's low corner: the corner the event pack is
+ * switched on with (`snowball-pack.armLines`, `tnt-run.armLines`), which is
+ * what its `stopLines` read to tell this arena's switch from a newer one's.
+ * Exactly the generated floors' own corners; an arena from a build, whose
+ * floors are pasted rather than boxes, is told apart by these.
+ */
+export function floorMarks(arena: Arena, block: Box["block"]): Box[] {
+    const r = arena.size;
+    const { x, z } = arena.center;
+    return arena.floors.map((at) => ({
+        x1: x - r,
+        y1: at,
+        z1: z - r,
+        x2: x - r,
+        y2: at,
+        z2: z - r,
+        block
+    }));
 }
 
 /** Fell through the last floor: below the top of the lowest one. */

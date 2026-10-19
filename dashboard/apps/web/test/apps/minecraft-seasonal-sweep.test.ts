@@ -106,6 +106,12 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/state", async (impor
     readEventState: () => ({ run: eventRunning ? { id: "run" } : null })
 }));
 
+// The builds placed in the world have their own tests (minecraft-world-builds):
+// here the sweep is only asked about the season it tells the jar.
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog", () => ({
+    WORLD_BUILDS: []
+}));
+
 /** A fresh copy of the service per test: it remembers what each server took. */
 async function service() {
     vi.resetModules();
