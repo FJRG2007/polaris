@@ -116,24 +116,24 @@ Every command is `plr <noun> <verb>`, the way `gh pr list` is: the first word
 names what is acted on, the second what is done to it. `plr <noun>` alone (or
 `plr help <noun>`) prints that group's commands; `plr help` prints them all.
 
-| Command                                    | What it does                                        |
-| ------------------------------------------ | --------------------------------------------------- |
-| `plr auth login [--url URL] [--browserless]` | Sign in from your browser, or with a code (`plr login` too) |
-| `plr auth logout`                          | Sign out and revoke this computer's key (`plr logout` too) |
-| `plr auth whoami`                          | Who you are signed in as, and what you may do       |
-| `plr auth status`                          | CLI version, Polaris, sign-in, update available     |
-| `plr profile list\|use NAME\|remove NAME`   | Your profiles; switch between them                  |
-| `plr project list`                         | Every service you can reach                         |
-| `plr service view shop/web`                | Status, source, domains                             |
-| `plr service deploy shop/web --follow`     | Deploy again and watch the build                    |
-| `plr service logs shop/web --follow --tail 100` | Its runtime log                                |
-| `plr service restart shop/web`             | Restart it                                          |
-| `plr deployment list shop/web`             | Recent deployments                                  |
-| `plr deployment logs DEPLOYMENT --follow`  | A deployment's build log                            |
-| `plr env list\|set\|remove ...`             | Environment variables, below                        |
-| `plr dashboard open [home\|deploy\|keys\|downloads]` | Open the dashboard in your browser          |
-| `plr cli update [--url URL]`               | Get the newest CLI, or the one a Polaris serves     |
-| `plr cli uninstall [--yes]`                | Sign out everywhere and remove the CLI              |
+| Command                                              | What it does                                                |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| `plr auth login [--url URL] [--browserless]`         | Sign in from your browser, or with a code (`plr login` too) |
+| `plr auth logout`                                    | Sign out and revoke this computer's key (`plr logout` too)  |
+| `plr auth whoami`                                    | Who you are signed in as, and what you may do               |
+| `plr auth status`                                    | CLI version, Polaris, sign-in, update available             |
+| `plr profile list\|use NAME\|remove NAME`            | Your profiles; switch between them                          |
+| `plr project list`                                   | Every service you can reach                                 |
+| `plr service view shop/web`                          | Status, source, domains                                     |
+| `plr service deploy shop/web --follow`               | Deploy again and watch the build                            |
+| `plr service logs shop/web --follow --tail 100`      | Its runtime log                                             |
+| `plr service restart shop/web`                       | Restart it                                                  |
+| `plr deployment list shop/web`                       | Recent deployments                                          |
+| `plr deployment logs DEPLOYMENT --follow`            | A deployment's build log                                    |
+| `plr env list\|set\|remove ...`                      | Environment variables, below                                |
+| `plr dashboard open [home\|deploy\|keys\|downloads]` | Open the dashboard in your browser                          |
+| `plr cli update [--url URL]`                         | Get the newest CLI, or the one a Polaris serves             |
+| `plr cli uninstall [--yes]`                          | Sign out everywhere and remove the CLI                      |
 
 `ls` works for `list` and `rm` for `remove`.
 
@@ -142,21 +142,21 @@ names what is acted on, the second what is done to it. `plr <noun>` alone (or
 The names from before this layout still work and print one line on stderr with
 the new name, so scripts keep running and their output is unchanged:
 
-| Before                 | Now                       |
-| ---------------------- | ------------------------- |
-| `plr whoami`           | `plr auth whoami`         |
-| `plr status`           | `plr auth status`         |
-| `plr profiles`         | `plr profile`             |
-| `plr projects`         | `plr project list`        |
-| `plr service SERVICE`  | `plr service view SERVICE` |
-| `plr deploy`, `plr redeploy` | `plr service deploy` |
-| `plr logs`             | `plr service logs`        |
-| `plr restart`          | `plr service restart`     |
-| `plr deployments`      | `plr deployment list`     |
-| `plr build-log`        | `plr deployment logs`     |
-| `plr open`             | `plr dashboard open`      |
-| `plr update`           | `plr cli update`          |
-| `plr uninstall`        | `plr cli uninstall`       |
+| Before                       | Now                        |
+| ---------------------------- | -------------------------- |
+| `plr whoami`                 | `plr auth whoami`          |
+| `plr status`                 | `plr auth status`          |
+| `plr profiles`               | `plr profile`              |
+| `plr projects`               | `plr project list`         |
+| `plr service SERVICE`        | `plr service view SERVICE` |
+| `plr deploy`, `plr redeploy` | `plr service deploy`       |
+| `plr logs`                   | `plr service logs`         |
+| `plr restart`                | `plr service restart`      |
+| `plr deployments`            | `plr deployment list`      |
+| `plr build-log`              | `plr deployment logs`      |
+| `plr open`                   | `plr dashboard open`       |
+| `plr update`                 | `plr cli update`           |
+| `plr uninstall`              | `plr cli uninstall`        |
 
 Commands for another Polaris app go under a noun of their own, so they never
 take a name another app uses; the CLI's tests refuse a noun, verb or alias used

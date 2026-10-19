@@ -289,8 +289,7 @@ export function resolve(words: readonly string[], env: NodeJS.ProcessEnv = {}): 
     }
 
     const group = byNoun.get(first);
-    if (!group)
-        return { kind: "unknown", message: `"${first}" is not a plr command.` };
+    if (!group) return { kind: "unknown", message: `"${first}" is not a plr command.` };
 
     const [verb, ...args] = rest;
     const command = find(group, verb);

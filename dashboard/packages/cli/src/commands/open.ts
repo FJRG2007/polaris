@@ -26,7 +26,8 @@ export async function open(
     page: string | undefined
 ): Promise<void> {
     const path = PAGES[page ?? "home"];
-    if (path === undefined) throw usage(`plr dashboard open knows ${Object.keys(PAGES).join(", ")}.`);
+    if (path === undefined)
+        throw usage(`plr dashboard open knows ${Object.keys(PAGES).join(", ")}.`);
 
     let url = flags.url
         ? normalizeUrl(flags.url)

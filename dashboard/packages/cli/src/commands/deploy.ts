@@ -231,7 +231,8 @@ export async function buildLog(
     flags: Flags,
     deploymentId: string | undefined
 ): Promise<void> {
-    if (!deploymentId) throw usage("Name a deployment id; plr deployment list <service> lists them.");
+    if (!deploymentId)
+        throw usage("Name a deployment id; plr deployment list <service> lists them.");
     const session = await requireSession(context, flags);
     if (flags.follow) return followBuild(context, session, deploymentId);
     const found = await call(

@@ -31,11 +31,7 @@ function localAnswer(parsed: Parsed, resolved: Resolved): string | null {
 }
 
 /** Run one command line. Separate from `main` so a test can drive it. */
-export async function run(
-    argv: readonly string[],
-    context: Context,
-    probe?: Probe
-): Promise<void> {
+export async function run(argv: readonly string[], context: Context, probe?: Probe): Promise<void> {
     const parsed = parse(argv);
     const resolved = resolve(parsed.positionals, context.host.env);
     const answer = localAnswer(parsed, resolved);
