@@ -13,9 +13,15 @@
  * wrapped into this vault by mistake.
  *
  * A wrap holds the vault key itself, not the master key, so changing the
- * master password (which re-wraps that same vault key) leaves every passkey
- * working with nothing to redo. The vault key only changes when the vault is
- * deleted and made again, and the rows here cascade away with the old one.
+ * master password here (which re-wraps that same vault key) leaves every
+ * passkey working with nothing to redo. A change made from a Bitwarden-compatible
+ * client cannot vouch for that, so it removes every passkey and they are added
+ * again. The vault key otherwise only changes when the vault is deleted and made
+ * again, and the rows here cascade away with the old one.
+ *
+ * A row only answers while its credential is still one of the account's sign-in
+ * passkeys: removing that passkey removes the row, and the list leaves out any
+ * row whose passkey went another way.
  */
 
 import { prisma } from "@polaris/db";
@@ -39,7 +45,7 @@ export type PasskeyChangeResult =
 /** The passkeys that unlock this account's vault, oldest first. */
 export async function listVaultPasskeys(userId: string): Promise<VaultPasskeyEntry[]> {
     const rows = await prisma.vaultPasskey.findMany({
-        where: { userId },
+        where: { userId, credentialId: { in: await signInCredentialIds(userId) } },
         orderBy: { createdAt: "asc" },
         take: VAULT_PASSKEYS_MAX,
         select: {

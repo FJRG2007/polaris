@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const prisma = vi.hoisted(() => ({
     passkey: { findFirst: vi.fn(), findMany: vi.fn() },
     vaultPasskey: {
+        findMany: vi.fn(),
         findUnique: vi.fn(),
         findFirst: vi.fn(),
         count: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock("@/lib/vault/account", () => ({ verifyMasterPassword }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
 
-const { enrollVaultPasskey, removeVaultPasskey } = await import("@/lib/vault/passkeys");
+const { enrollVaultPasskey, removeVaultPasskey, listVaultPasskeys } = await import("@/lib/vault/passkeys");
 const { vaultPasskeyEnrollSchema } = await import("@/lib/vault/passkey-schema");
 const { buildEnrollment, toBase64Url } = await import("@/lib/vault/passkey-client");
 
@@ -148,5 +149,16 @@ describe("removeVaultPasskey", () => {
         prisma.vaultPasskey.findFirst.mockResolvedValue(null);
         expect(await removeVaultPasskey("u1", "row-2")).toEqual({ ok: false, reason: "not_found" });
         expect(prisma.vaultPasskey.deleteMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("listVaultPasskeys", () => {
+    it("only lists rows whose sign-in passkey still exists", async () => {
+        prisma.passkey.findMany.mockResolvedValue([{ credentialID: CREDENTIAL }]);
+        prisma.vaultPasskey.findMany.mockResolvedValue([]);
+        await listVaultPasskeys("u1");
+        expect(prisma.vaultPasskey.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { userId: "u1", credentialId: { in: [CREDENTIAL] } } })
+        );
     });
 });

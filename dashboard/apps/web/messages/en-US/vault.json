@@ -688,7 +688,7 @@
         "name": "Name",
         "namePlaceholder": "e.g. Work laptop",
         "nameTooLong": "A name is at most {count} characters.",
-        "masterHint": "Needed to add a passkey. It is checked here and never sent.",
+        "masterHint": "Needed to add a passkey.",
         "needsAccountPasskey": "Add a passkey to your Polaris account first, then come back here.",
         "openSecurity": "Open security settings",
         "add": "Add passkey",

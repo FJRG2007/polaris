@@ -3338,9 +3338,6 @@ model VaultSend {
     @@index([userId])
 }
 
-// A client that has signed in to the vault. Bitwarden clients identify
-// themselves with an id they generate and keep, which is what makes "this phone"
-// a thing an owner can recognize and end.
 // A passkey that unlocks this vault in the browser, through the WebAuthn PRF
 // extension. The credential is one of the account's own sign-in passkeys (the
 // `Passkey` table); this row is only what the vault needs on top of it. The
@@ -3370,6 +3367,9 @@ model VaultPasskey {
     @@index([userId])
 }
 
+// A client that has signed in to the vault. Bitwarden clients identify
+// themselves with an id they generate and keep, which is what makes "this phone"
+// a thing an owner can recognize and end.
 model VaultDevice {
     id           String   @id @default(uuid(7)) @db.Uuid
     userId       String   @db.Uuid

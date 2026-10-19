@@ -688,7 +688,7 @@
         "name": "Nombre",
         "namePlaceholder": "p. ej. Portátil",
         "nameTooLong": "Un nombre tiene como mucho {count} caracteres.",
-        "masterHint": "Hace falta para añadir una llave. Se comprueba aquí y nunca se envía.",
+        "masterHint": "Hace falta para añadir una llave.",
         "needsAccountPasskey": "Añade antes una llave de acceso a tu cuenta de Polaris y vuelve.",
         "openSecurity": "Abrir seguridad",
         "add": "Añadir llave",

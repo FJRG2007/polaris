@@ -96,7 +96,16 @@ export async function removePasskeyAction(passkeyId: unknown): Promise<{ error?:
     if (blocked) return localized({ error: blocked });
     if (typeof passkeyId !== "string") return { error: (await getTranslations("accountSecurity"))("errors.unknownPasskey") };
     // Scoped to the owner, so an id from somewhere else deletes nothing.
-    const removed = await prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } });
+    const passkey = await prisma.passkey.findFirst({
+        where: { id: passkeyId, userId: user.id },
+        select: { credentialID: true }
+    });
+    const [removed] = await prisma.$transaction([
+        prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } }),
+        prisma.vaultPasskey.deleteMany({
+            where: passkey ? { userId: user.id, credentialId: passkey.credentialID } : { id: { in: [] } }
+        })
+    ]);
     if (removed.count === 0) return { error: (await getTranslations("accountSecurity"))("errors.passkeyGone") };
     await recordAudit({ actorId: user.id, action: "account.passkey.removed", targetType: "passkey" });
     return {};
