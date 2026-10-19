@@ -9,17 +9,24 @@
  * portal with collision handling) instead of a dialog with a command list,
  * with the intelligence and payer sections Polar needs, and only the models
  * the server says this person can use - it never offers one of its own.
+ *
+ * A search field sits on top: a long list of models is found by a name half
+ * remembered, so the match is fuzzy (Fuse) over the model's name, its id and
+ * its provider, and what survives keeps its provider heading.
  */
 
+import Fuse from "fuse.js";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
-    DropdownMenuTrigger
+    DropdownMenuTrigger,
+    MenuSearch
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { INTELLIGENCE_LEVELS, type ModelChoice, type Payer } from "@/lib/polar/shared";
@@ -35,6 +42,44 @@ export interface ModelSelectorProvider {
         reasoning: boolean;
         attachment?: boolean;
     }>;
+}
+
+type ModelEntry = ModelSelectorProvider["models"][number] & { providerName: string };
+
+/** How loose a match may be: enough for a typo or a dropped letter, not so
+ *  loose that every model answers every query. */
+const FUSE_THRESHOLD = 0.35;
+
+/**
+ * The providers with only the models that match `query`, best match first
+ * within each provider, in the providers' own order. Everything when the query
+ * is blank.
+ */
+export function searchModels(
+    providers: ModelSelectorProvider[],
+    index: Fuse<ModelEntry>,
+    query: string
+): ModelSelectorProvider[] {
+    const term = query.trim();
+    if (!term) return providers;
+    const found = index.search(term).map((result) => result.item);
+    return providers
+        .map((entry) => ({
+            ...entry,
+            models: found
+                .filter((model) => model.provider === entry.provider)
+                .map(({ providerName: _name, ...model }) => model)
+        }))
+        .filter((entry) => entry.models.length > 0);
+}
+
+export function modelIndex(providers: ModelSelectorProvider[]): Fuse<ModelEntry> {
+    return new Fuse(
+        providers.flatMap((entry) =>
+            entry.models.map((model) => ({ ...model, providerName: entry.name }))
+        ),
+        { keys: ["name", "model", "providerName"], threshold: FUSE_THRESHOLD, ignoreLocation: true }
+    );
 }
 
 function Mark({ on }: { on: boolean }) {
@@ -57,8 +102,12 @@ export function ModelSelector({
     const t = useTranslations("polar");
     const provider = providers.find((entry) => entry.provider === choice?.provider);
     const model = provider?.models.find((entry) => entry.model === choice?.model);
+    const [query, setQuery] = useState("");
+    const index = useMemo(() => modelIndex(providers), [providers]);
+    const searching = query.trim().length > 0;
+    const shown = useMemo(() => searchModels(providers, index, query), [providers, index, query]);
     return (
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => (open ? undefined : setQuery(""))}>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
@@ -75,9 +124,24 @@ export function ModelSelector({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="start"
-                className="max-h-96 w-72 overflow-y-auto overscroll-contain"
+                className="max-h-96 w-72 overflow-y-auto overscroll-contain pt-2"
+                // Escape empties a search first and closes the menu only once
+                // there is nothing left to clear.
+                onEscapeKeyDown={(event) => {
+                    if (!query) return;
+                    event.preventDefault();
+                    setQuery("");
+                }}
             >
-                {providers.map((entry) => (
+                {providers.length > 0 ? (
+                    <MenuSearch value={query} onChange={setQuery} placeholder={t("picker.search")} />
+                ) : null}
+                {searching && shown.length === 0 ? (
+                    <p className="px-2 py-3 text-center text-xs text-muted-foreground">
+                        {t("picker.noMatch")}
+                    </p>
+                ) : null}
+                {shown.map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel>{entry.name}</DropdownMenuLabel>
                         {entry.models.map((option) => (
@@ -106,7 +170,7 @@ export function ModelSelector({
                         ))}
                     </div>
                 ))}
-                {choice ? (
+                {choice && !searching ? (
                     <>
                         <DropdownMenuSeparator />
                         <DropdownMenuLabel>{t("picker.intelligence")}</DropdownMenuLabel>
@@ -137,10 +201,14 @@ export function ModelSelector({
                         </DropdownMenuItem>
                     </>
                 ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                    <Link href="/account/ai-keys">{t("picker.manage")}</Link>
-                </DropdownMenuItem>
+                {searching ? null : (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href="/account/ai-keys">{t("picker.manage")}</Link>
+                        </DropdownMenuItem>
+                    </>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     );
