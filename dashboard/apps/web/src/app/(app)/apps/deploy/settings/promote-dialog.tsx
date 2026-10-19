@@ -12,6 +12,7 @@
 import { useRouter } from "next/navigation";
 import { SettingsCard } from "../project-settings";
 import { useEffect, useState, useTransition } from "react";
+import * as polls from "../deploy-polls";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectEnvironmentView } from "@/lib/deploy-project-service";
@@ -25,11 +26,7 @@ import {
     Input,
     Select
 } from "@polaris/ui";
-import {
-    listPromotionsAction,
-    previewPromotionAction,
-    promoteEnvironmentAction
-} from "../project-actions";
+import { previewPromotionAction, promoteEnvironmentAction } from "../project-actions";
 
 export function PromoteDialog({
     environments,
@@ -290,23 +287,31 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
 
     useEffect(() => {
         let current = true;
+        const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
         const load = () => {
-            void listPromotionsAction(projectId).then((result) => {
-                if (!current) return;
-                if (result.error) {
-                    setError(result.error);
-                    return;
+            void polls.promotions(projectId, controller.signal).then(
+                (result) => {
+                    if (!current) return;
+                    if (result.error) {
+                        setError(result.error);
+                        return;
+                    }
+                    const rows = result.promotions ?? [];
+                    setPromotions(rows);
+                    // Follow one that is still running, and stop once none is.
+                    if (rows.some((row) => row.status === "running"))
+                        timer = setTimeout(load, 5000);
+                },
+                () => {
+                    if (current) timer = setTimeout(load, 5000);
                 }
-                const rows = result.promotions ?? [];
-                setPromotions(rows);
-                // Follow one that is still running, and stop once none is.
-                if (rows.some((row) => row.status === "running")) timer = setTimeout(load, 5000);
-            });
+            );
         };
         load();
         return () => {
             current = false;
+            controller.abort();
             if (timer) clearTimeout(timer);
         };
     }, [projectId, version]);

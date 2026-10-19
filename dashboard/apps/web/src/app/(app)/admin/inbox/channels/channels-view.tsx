@@ -20,18 +20,14 @@ import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, useTransition, type ComponentType } from "react";
+import * as polls from "../inbox-polls";
 import {
     CHANNEL_STATUS_TONE,
     EMAIL_CHANNEL_MARK,
     PLATFORM_LOGO,
     platformLabel
 } from "../platform-meta";
-import {
-    channelStateAction,
-    deleteChannelAction,
-    reconnectChannelAction,
-    updateChannelAction
-} from "../actions";
+import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
 import {
     CheckCircle2,
     Loader2,
@@ -133,7 +129,9 @@ export function ChannelsView({
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxChannels.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("inboxChannels.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("inboxChannels.intro")}</p>
                 </div>
                 <Button asChild>
@@ -187,7 +185,11 @@ export function ChannelsView({
                                 ]
                                     .filter(Boolean)
                                     .join(" - ")}
-                                ready={channel.status === "connected" ? t("inboxChannels.connected") : null}
+                                ready={
+                                    channel.status === "connected"
+                                        ? t("inboxChannels.connected")
+                                        : null
+                                }
                                 onManage={() => setManaging(channel)}
                             />
                         );
@@ -352,8 +354,9 @@ function ChannelManageDialog({
     useEffect(() => {
         if (!linking) return;
         let active = true;
+        const controller = new AbortController();
         const poll = async () => {
-            const state = await channelStateAction(channel.id);
+            const state = await polls.channelState(channel.id, controller.signal);
             if (!active) return;
             setQrStatus(state.status);
             if (state.qr) setQr(state.qr);
@@ -373,6 +376,7 @@ function ChannelManageDialog({
         const timer = setInterval(() => void poll(), 2500);
         return () => {
             active = false;
+            controller.abort();
             clearInterval(timer);
         };
         // onUpdated is a fresh closure each render; re-subscribing would reset the poll.
@@ -468,7 +472,10 @@ function ChannelManageDialog({
                             {t.rich("inboxChannels.manage.status", {
                                 status: t("inboxChannels.status", { status: channel.status }),
                                 tone: (chunks) => (
-                                    <span key="tone" className={cn(CHANNEL_STATUS_TONE[channel.status])}>
+                                    <span
+                                        key="tone"
+                                        className={cn(CHANNEL_STATUS_TONE[channel.status])}
+                                    >
                                         {chunks}
                                     </span>
                                 )
@@ -488,7 +495,9 @@ function ChannelManageDialog({
                             ) : (
                                 <RefreshCw className="size-4" />
                             )}
-                            {isWeb ? t("inboxChannels.manage.relink") : t("inboxChannels.manage.reconnect")}
+                            {isWeb
+                                ? t("inboxChannels.manage.relink")
+                                : t("inboxChannels.manage.reconnect")}
                         </Button>
                     </div>
 

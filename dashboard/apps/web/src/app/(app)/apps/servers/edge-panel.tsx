@@ -23,8 +23,10 @@
 import { Button, cn } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { useCallback, useEffect, useState } from "react";
+import * as polls from "./servers-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import type { ServerEdgeState } from "@/lib/deploy/server-edge";
-import { prepareServerEdgeAction, serverEdgeAction } from "./actions";
+import { prepareServerEdgeAction } from "./actions";
 import { CircleAlert, CircleCheck, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -34,9 +36,10 @@ export function EdgePanel({ hostId }: { hostId: string }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [log, setLog] = useState("");
+    const signal = useUnmountSignal();
 
     const ask = useCallback(async () => {
-        const answer = await serverEdgeAction(hostId).catch(() => null);
+        const answer = await polls.serverEdge(hostId, signal()).catch(() => null);
         if (answer) setState(answer);
     }, [hostId]);
 

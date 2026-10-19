@@ -29,7 +29,8 @@ import {
 import { Check, CheckCircle2, Copy, Terminal, TriangleAlert } from "lucide-react";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { cancelEnrollmentAction, enrollmentStatusAction, openEnrollmentAction } from "./actions";
+import { cancelEnrollmentAction, openEnrollmentAction } from "./actions";
+import * as polls from "./servers-polls";
 
 /** How often the page asks whether the machine has called home. Frequent enough
  *  to feel immediate, slow enough that a forgotten open dialog is not a load. */
@@ -96,8 +97,11 @@ export function QuickEnroll({
     useEffect(() => {
         if (!opened) return;
         let live = true;
+        const controller = new AbortController();
         const timer = setInterval(async () => {
-            const status = await enrollmentStatusAction(opened.id);
+            const status = await polls
+                .enrollmentStatus(opened.id, controller.signal)
+                .catch(() => null);
             if (!live || !status) return;
             setProgress(status.progress);
             if (status.state === "claimed") {
@@ -143,6 +147,7 @@ export function QuickEnroll({
         }, POLL_MS);
         return () => {
             live = false;
+            controller.abort();
             clearInterval(timer);
         };
     }, [opened, onDone, router, t]);

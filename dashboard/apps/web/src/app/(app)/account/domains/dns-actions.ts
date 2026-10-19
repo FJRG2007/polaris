@@ -18,7 +18,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
-import { domainCallerFor } from "@/lib/owner-domain-caller";
+import { dnsScopeSchema as scopeSchema, domainCallerFor } from "@/lib/owner-domain-caller";
 import { dnsRecordDraftSchema } from "@/lib/dns/record-schema";
 import type { PropagationReport } from "@/lib/dns/propagation";
 import { CloudflareApiError } from "@/lib/integrations/cloudflare-api";
@@ -33,18 +33,6 @@ import {
     type DnsRecordView,
     type ZoneRecords
 } from "@/lib/dns/zone-records";
-
-const scopeSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("instance"), zoneId: z.string().max(64) }),
-    z.object({
-        kind: z.literal("owner"),
-        ref: z.discriminatedUnion("kind", [
-            z.object({ kind: z.literal("user") }),
-            z.object({ kind: z.literal("org"), orgId: z.string().uuid() })
-        ]),
-        domainId: z.string().uuid()
-    })
-]);
 
 /** What the editor sends to say which zone it is looking at. */
 export type DnsScopeRef = z.infer<typeof scopeSchema>;
@@ -61,11 +49,16 @@ async function resolve(input: unknown): Promise<Resolved> {
     const ref = parsed.data;
     if (ref.kind === "instance") {
         const user = await requireUser();
-        if (!user.isAdmin) throw new DnsEditError("Only an administrator can edit this Polaris's DNS zones");
+        if (!user.isAdmin)
+            throw new DnsEditError("Only an administrator can edit this Polaris's DNS zones");
         return { scope: { kind: "instance", zoneId: ref.zoneId }, userId: user.id, orgId: null };
     }
     const caller = await domainCallerFor(ref.ref);
-    return { scope: { kind: "owner", owner: caller.owner, domainId: ref.domainId }, userId: caller.userId, orgId: caller.orgId };
+    return {
+        scope: { kind: "owner", owner: caller.owner, domainId: ref.domainId },
+        userId: caller.userId,
+        orgId: caller.orgId
+    };
 }
 
 type DnsFailure =
@@ -75,7 +68,10 @@ type DnsFailure =
     | "dns.errors.removeRecord"
     | "dns.errors.askResolvers";
 
-async function failure(caught: unknown, key: DnsFailure): Promise<{ error: string; problems?: Record<string, string> }> {
+async function failure(
+    caught: unknown,
+    key: DnsFailure
+): Promise<{ error: string; problems?: Record<string, string> }> {
     if (caught instanceof DnsEditError) return { error: caught.message, problems: caught.problems };
     // Cloudflare's own refusal is worth showing: it names the field it disliked.
     if (caught instanceof CloudflareApiError) return { error: caught.message.slice(0, 300) };
@@ -85,17 +81,23 @@ async function failure(caught: unknown, key: DnsFailure): Promise<{ error: strin
 }
 
 /** The zones an administrator can pick from. */
-export async function listDnsZonesAction(): Promise<{ zones?: { id: string; name: string }[]; error?: string }> {
+export async function listDnsZonesAction(): Promise<{
+    zones?: { id: string; name: string }[];
+    error?: string;
+}> {
     try {
         const user = await requireUser();
-        if (!user.isAdmin) return { error: (await getTranslations("account"))("dns.errors.adminOnly") };
+        if (!user.isAdmin)
+            return { error: (await getTranslations("account"))("dns.errors.adminOnly") };
         return { zones: await editableZones() };
     } catch (caught) {
         return failure(caught, "dns.errors.readZones");
     }
 }
 
-export async function zoneRecordsAction(scope: DnsScopeRef): Promise<{ zone?: ZoneRecords; error?: string }> {
+export async function zoneRecordsAction(
+    scope: DnsScopeRef
+): Promise<{ zone?: ZoneRecords; error?: string }> {
     try {
         const resolved = await resolve(scope);
         return { zone: await zoneRecords(resolved.scope) };
@@ -112,7 +114,8 @@ export async function saveDnsRecordAction(
     try {
         const resolved = await resolve(scope);
         const parsed = dnsRecordDraftSchema.safeParse(draft);
-        if (!parsed.success) return { error: (await getTranslations("account"))("dns.errors.unreadable") };
+        if (!parsed.success)
+            return { error: (await getTranslations("account"))("dns.errors.unreadable") };
         if (recordId !== null && typeof recordId !== "string") {
             return { error: (await getTranslations("account"))("dns.errors.unreadable") };
         }
@@ -133,7 +136,10 @@ export async function saveDnsRecordAction(
     }
 }
 
-export async function deleteDnsRecordAction(scope: DnsScopeRef, recordId: string): Promise<{ error?: string }> {
+export async function deleteDnsRecordAction(
+    scope: DnsScopeRef,
+    recordId: string
+): Promise<{ error?: string }> {
     try {
         const resolved = await resolve(scope);
         await deleteZoneRecord(resolved.scope, String(recordId));

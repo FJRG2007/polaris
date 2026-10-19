@@ -7,7 +7,8 @@
  */
 
 import { Card, CardBody } from "@polaris/ui";
-import { listActivityAction } from "../actions";
+import * as polls from "../inbox-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { ActivityView } from "@/lib/messaging-service";
@@ -35,8 +36,10 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
     const t = useTranslations("admin");
     const [activity, setActivity] = useState(initialActivity);
 
+    const signal = useUnmountSignal();
     const load = useCallback(() => {
-        void listActivityAction()
+        void polls
+            .activity(signal())
             .then(setActivity)
             .catch(() => undefined);
     }, []);
@@ -49,7 +52,9 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("inboxLogs.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("inboxLogs.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("inboxLogs.intro")}</p>
             </div>
             <Card>
@@ -62,7 +67,10 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
                                 const outbound = item.direction === "outbound";
                                 const Arrow = outbound ? ArrowUpRight : ArrowDownLeft;
                                 return (
-                                    <li key={item.id} className="flex items-start gap-3 px-4 py-2 text-sm">
+                                    <li
+                                        key={item.id}
+                                        className="flex items-start gap-3 px-4 py-2 text-sm"
+                                    >
                                         <Arrow
                                             className={`mt-0.5 size-4 shrink-0 ${
                                                 outbound ? "text-primary" : "text-muted-foreground"
@@ -73,11 +81,14 @@ export function LogsView({ initialActivity }: { initialActivity: ActivityView[] 
                                                 <span className="font-medium">{item.peer}</span>
                                                 <span className="text-muted-foreground">
                                                     {" - "}
-                                                    {item.body ?? item.selection ?? t("inboxLogs.noText")}
+                                                    {item.body ??
+                                                        item.selection ??
+                                                        t("inboxLogs.noText")}
                                                 </span>
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {PLATFORM_LABEL[item.platform] ?? item.platform} / {item.channelName}
+                                                {PLATFORM_LABEL[item.platform] ?? item.platform} /{" "}
+                                                {item.channelName}
                                                 {" - "}
                                                 {stamp(item.createdAt)}
                                                 {outbound && item.ack ? (

@@ -20,6 +20,8 @@ import { sizeLabel } from "./widget-names";
 import { AppWidgetBody, withPressed } from "./app-widget-card";
 import type { AppWidgetInput } from "@/lib/app-extensions/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as polls from "./home-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AppWidgetSetup, type AppWidgetSetupSubject } from "./app-widget-setup";
 import type { AppWidgetKind, AppWidgetReadout } from "@/lib/overview/app-widgets";
@@ -30,11 +32,7 @@ import {
     type AppWidgetPreference,
     type OverviewWidgetSize
 } from "@polaris/core";
-import {
-    actOnAppWidgetAction,
-    readAppWidgetsAction,
-    saveAppWidgetsAction
-} from "./app-widget-actions";
+import { actOnAppWidgetAction, saveAppWidgetsAction } from "./app-widget-actions";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -150,9 +148,10 @@ export function AppWidgetGridItems({
     // Read again whenever what the cards watch changes, not on every render.
     const watching = shown.map((card) => `${card.id}=${card.targets.join(",")}`).join("|");
 
+    const signal = useUnmountSignal();
     const read = useCallback(async () => {
         try {
-            const answer = await readAppWidgetsAction();
+            const answer = await polls.appWidgets(signal());
             kept = { at: Date.now(), cards: answer.cards };
             setReadouts(answer.cards);
         } catch {

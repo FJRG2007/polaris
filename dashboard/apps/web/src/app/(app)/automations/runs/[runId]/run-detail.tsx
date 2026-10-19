@@ -11,15 +11,11 @@ import { took } from "../runs-view";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import * as polls from "../../automations-polls";
 import { nodeLabel } from "@/app/(app)/automations/[id]/canvas-editor";
 import { ArrowLeft, ChevronDown, FlaskConical, RotateCcw, X } from "lucide-react";
 import type { RunDetail, StepView } from "@/lib/automations/history";
-import {
-    cancelRunAction,
-    getRunAction,
-    pinRunDataAction,
-    rerunAction
-} from "@/app/(app)/automations/actions";
+import { cancelRunAction, pinRunDataAction, rerunAction } from "@/app/(app)/automations/actions";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
     CanvasBoard,
@@ -54,16 +50,17 @@ import {
 export function RunDetailView({ runId }: { runId: string }) {
     const t = useTranslations("automations");
     const { data, error, refresh } = useCachedAction(`polaris.automations.run.${runId}`, () =>
-        getRunAction(runId)
+        polls.run(runId)
     );
     const run = data?.run;
 
     // A run still going is refetched until it ends.
+    const going = !!run && !core.runFinished(run.status);
     useEffect(() => {
-        if (!run || core.runFinished(run.status)) return;
-        const timer = setTimeout(() => void refresh(), 2000);
-        return () => clearTimeout(timer);
-    }, [run, refresh]);
+        if (!going) return;
+        const timer = setInterval(() => void refresh(), 2000);
+        return () => clearInterval(timer);
+    }, [going, refresh]);
 
     return (
         <div className="space-y-4">

@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import * as polls from "./dns-blocker-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import {
     Ban,
     ChevronLeft,
@@ -54,10 +56,8 @@ import {
     type QueryTimeline
 } from "@/lib/dns-blocker/query-log";
 import {
-    dnsInsightsAction,
     dnsListsAction,
     refreshDnsListsAction,
-    dnsTailAction,
     pauseDnsBlockingAction,
     resumeDnsBlockingAction,
     ruleFromLogAction,
@@ -153,10 +153,11 @@ export function DnsInsightsCard({
             await loadMetrics();
         });
 
+    const signal = useUnmountSignal();
     const load = useCallback(async (next: QueryFilter, fresh = false) => {
         const request = ++latest.current;
         setLoading(true);
-        const result = await dnsInsightsAction(next, fresh);
+        const result = await polls.dnsInsights(next, fresh, signal());
         if (request !== latest.current) return;
         setLoading(false);
         if (result.error !== undefined) {
@@ -188,8 +189,9 @@ export function DnsInsightsCard({
             return;
         }
         let stopped = false;
+        const controller = new AbortController();
         const read = async () => {
-            const result = await dnsTailAction(filter);
+            const result = await polls.dnsTail(filter, controller.signal);
             if (stopped) return;
             if (result.error !== undefined) setError(result.error);
             else setTail(result.rows);
@@ -200,6 +202,7 @@ export function DnsInsightsCard({
         }, LIVE_EVERY_MS);
         return () => {
             stopped = true;
+            controller.abort();
             clearInterval(timer);
         };
     }, [live, filter]);

@@ -14,6 +14,8 @@ import * as core from "@polaris/core";
 import { CopyRow } from "./deploy-view";
 import { LikelyCause } from "./likely-cause";
 import * as actions from "./database-actions";
+import * as polls from "./deploy-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useProjectCan } from "./access-context";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
@@ -100,8 +102,9 @@ export function DatabaseManageDialog({
     const [confirmError, setConfirmError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    const signal = useUnmountSignal();
     const load = useCallback(async () => {
-        const result = await actions.databaseOverviewAction(database.id);
+        const result = await polls.databaseOverview(database.id, signal());
         if (result.overview) {
             setOverview(result.overview);
             setError(null);

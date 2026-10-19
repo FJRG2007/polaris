@@ -15,7 +15,7 @@ import { rankedDomains } from "./domain-rank";
 import { useEffect, useMemo, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { projectGlanceAction } from "./glance-actions";
+import * as polls from "./deploy-polls";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { deployOutcome } from "@/lib/deploy/run-state";
 import { RelativeTime } from "@/components/relative-time";
@@ -49,9 +49,11 @@ export function useProjectGlance(
     );
     useEffect(() => {
         let active = true;
+        const controller = new AbortController();
         function refresh(): void {
             if (document.hidden) return;
-            void projectGlanceAction(projectId)
+            void polls
+                .projectGlance(projectId, controller.signal)
                 .catch(() => null)
                 .then((next) => {
                     if (active && next) setGlance(next);
@@ -61,6 +63,7 @@ export function useProjectGlance(
         document.addEventListener("visibilitychange", refresh);
         return () => {
             active = false;
+            controller.abort();
             clearInterval(timer);
             document.removeEventListener("visibilitychange", refresh);
         };

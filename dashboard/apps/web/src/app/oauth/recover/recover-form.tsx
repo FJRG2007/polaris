@@ -14,15 +14,11 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { passwordIsBreached } from "@/lib/pwned-passwords";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import * as polls from "./recover-polls";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
 import { SECURITY_QUESTION_COUNT, type AccountRecoveryStatus } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    completeRecoveryAction,
-    lookupRecoveryAction,
-    recoveryStatusAction,
-    requestRecoveryAction
-} from "./actions";
+import { completeRecoveryAction, lookupRecoveryAction, requestRecoveryAction } from "./actions";
 
 /**
  * How often the waiting screen asks whether a decision has been made.
@@ -113,11 +109,13 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
         if (step !== "waiting" || !ticket) return;
         let current = true;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        const controller = new AbortController();
         const opened = Date.now();
 
         const check = async () => {
-            const next = await recoveryStatusAction(ticket);
-            if (!current) return;
+            // A failed ask keeps the wait going; the next one may land.
+            const next = await polls.recoveryStatus(ticket, controller.signal).catch(() => null);
+            if (!current || next === null) return;
             setStatus(next);
             if (next === "approved") setStep("reset");
             if (next === "used") setStep("done");
@@ -143,6 +141,7 @@ export function RecoverForm({ initialTicket }: { initialTicket: string }) {
         document.addEventListener("visibilitychange", onVisible);
         return () => {
             current = false;
+            controller.abort();
             clearTimeout(timer);
             document.removeEventListener("visibilitychange", onVisible);
         };
