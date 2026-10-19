@@ -28,7 +28,9 @@ vi.mock("@/lib/vault/account", () => ({ verifyMasterPassword }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
 
-const { enrollVaultPasskey, removeVaultPasskey, listVaultPasskeys } = await import("@/lib/vault/passkeys");
+const { enrollVaultPasskey, removeVaultPasskey, listVaultPasskeys } = await import(
+    "@/lib/vault/passkeys"
+);
 const { vaultPasskeyEnrollSchema } = await import("@/lib/vault/passkey-schema");
 const { buildEnrollment, toBase64Url } = await import("@/lib/vault/passkey-client");
 
@@ -78,7 +80,9 @@ describe("what the browser sends", () => {
             "wrappedKey"
         ]);
         // What was sent opens with the PRF output, which stayed in the tab.
-        expect(await vaultCrypto.unwrapVaultKeyWithPasskey(parsed.wrappedKey, PRF, SALT)).not.toBeNull();
+        expect(
+            await vaultCrypto.unwrapVaultKeyWithPasskey(parsed.wrappedKey, PRF, SALT)
+        ).not.toBeNull();
     });
 
     it("refuses a body that tries to carry the PRF output or a key", async () => {
@@ -86,7 +90,9 @@ describe("what the browser sends", () => {
         const prfOutput = vaultCrypto.toBase64(PRF);
         expect(vaultPasskeyEnrollSchema.safeParse({ ...body, prfOutput }).success).toBe(false);
         expect(vaultPasskeyEnrollSchema.safeParse({ ...body, vaultKey: "x" }).success).toBe(false);
-        expect(vaultPasskeyEnrollSchema.safeParse({ ...body, wrappedKey: "plain" }).success).toBe(false);
+        expect(vaultPasskeyEnrollSchema.safeParse({ ...body, wrappedKey: "plain" }).success).toBe(
+            false
+        );
     });
 });
 

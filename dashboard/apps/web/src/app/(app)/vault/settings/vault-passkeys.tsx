@@ -196,7 +196,9 @@ export function VaultPasskeys({ confirm }: { confirm: Confirm }) {
                 ) : null}
                 {unavailable ? (
                     <p className="text-sm text-muted-foreground" data-testid="passkey-unavailable">
-                        {support === "no-prf" ? t("passkeys.noPrfBrowser") : t("passkeys.noWebAuthn")}
+                        {support === "no-prf"
+                            ? t("passkeys.noPrfBrowser")
+                            : t("passkeys.noWebAuthn")}
                     </p>
                 ) : support === null ? null : (
                     <form onSubmit={onAdd} className="flex flex-col gap-3">
@@ -245,7 +247,9 @@ export function VaultPasskeys({ confirm }: { confirm: Confirm }) {
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
                         <div className="flex justify-end">
                             <Button type="submit" disabled={!canAdd} aria-disabled={!canAdd}>
-                                {pending === "add" ? <Loader2 className="size-4 animate-spin" /> : null}
+                                {pending === "add" ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                ) : null}
                                 {t("passkeys.add")}
                             </Button>
                         </div>

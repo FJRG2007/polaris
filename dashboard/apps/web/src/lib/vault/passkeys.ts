@@ -28,7 +28,11 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { verifyMasterPassword } from "@/lib/vault/account";
-import { VAULT_PASSKEYS_MAX, type VaultPasskeyEnrollInput, type VaultPasskeyEntry } from "@/lib/vault/passkey-schema";
+import {
+    VAULT_PASSKEYS_MAX,
+    type VaultPasskeyEnrollInput,
+    type VaultPasskeyEntry
+} from "@/lib/vault/passkey-schema";
 
 /** Enrolls and removals one account may make in a window. */
 const CHANGES_PER_WINDOW = 10;
@@ -77,8 +81,14 @@ export async function signInCredentialIds(userId: string): Promise<string[]> {
 }
 
 async function underLimit(userId: string): Promise<PasskeyChangeResult | null> {
-    const allowed = await rateLimit(`vault-passkey:${userId}`, CHANGES_PER_WINDOW, CHANGE_WINDOW_MS);
-    return allowed.ok ? null : { ok: false, reason: "rate_limited", retryAfterMs: allowed.retryAfterMs };
+    const allowed = await rateLimit(
+        `vault-passkey:${userId}`,
+        CHANGES_PER_WINDOW,
+        CHANGE_WINDOW_MS
+    );
+    return allowed.ok
+        ? null
+        : { ok: false, reason: "rate_limited", retryAfterMs: allowed.retryAfterMs };
 }
 
 /**
@@ -105,7 +115,10 @@ export async function enrollVaultPasskey(
         where: { userId_credentialId: { userId, credentialId: input.credentialId } },
         select: { id: true }
     });
-    if (!existing && (await prisma.vaultPasskey.count({ where: { userId } })) >= VAULT_PASSKEYS_MAX) {
+    if (
+        !existing &&
+        (await prisma.vaultPasskey.count({ where: { userId } })) >= VAULT_PASSKEYS_MAX
+    ) {
         return { ok: false, reason: "too_many" };
     }
     const data = {
@@ -155,5 +168,8 @@ export async function removeVaultPasskey(userId: string, id: string): Promise<Pa
 
 /** When a passkey last opened the vault, as the tab that opened it reports. */
 export async function markVaultPasskeyUsed(userId: string, id: string): Promise<void> {
-    await prisma.vaultPasskey.updateMany({ where: { id, userId }, data: { lastUsedAt: new Date() } });
+    await prisma.vaultPasskey.updateMany({
+        where: { id, userId },
+        data: { lastUsedAt: new Date() }
+    });
 }

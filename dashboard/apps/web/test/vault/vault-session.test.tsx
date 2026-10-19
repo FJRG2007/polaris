@@ -19,7 +19,9 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/(app)/vault/vault-actions", () => ({ createAccountVaultAction: vi.fn() }));
-vi.mock("@/app/(app)/vault/passkey-actions", () => ({ vaultPasskeyUsedAction: async () => undefined }));
+vi.mock("@/app/(app)/vault/passkey-actions", () => ({
+    vaultPasskeyUsedAction: async () => undefined
+}));
 vi.mock("@/app/(app)/vault/share-actions", () => ({
     vaultListAction: vi.fn(async () => [])
 }));

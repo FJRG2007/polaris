@@ -21,13 +21,19 @@ describe("passkey wrap", () => {
         const wrapped = await wrapVaultKeyWithPasskey(key, PRF, SALT);
         expect(wrapped.startsWith("2.")).toBe(true);
         const opened = await unwrapVaultKeyWithPasskey(wrapped, PRF, SALT);
-        expect(opened && Array.from(symmetricKeyBytes(opened))).toEqual(Array.from(symmetricKeyBytes(key)));
+        expect(opened && Array.from(symmetricKeyBytes(opened))).toEqual(
+            Array.from(symmetricKeyBytes(key))
+        );
     });
 
     it("fails closed on another PRF output, another salt, or a tampered wrap", async () => {
         const wrapped = await wrapVaultKeyWithPasskey(generateSymmetricKey(), PRF, SALT);
-        expect(await unwrapVaultKeyWithPasskey(wrapped, new Uint8Array(32).fill(8), SALT)).toBeNull();
-        expect(await unwrapVaultKeyWithPasskey(wrapped, PRF, new Uint8Array(32).fill(4))).toBeNull();
+        expect(
+            await unwrapVaultKeyWithPasskey(wrapped, new Uint8Array(32).fill(8), SALT)
+        ).toBeNull();
+        expect(
+            await unwrapVaultKeyWithPasskey(wrapped, PRF, new Uint8Array(32).fill(4))
+        ).toBeNull();
         expect(await unwrapVaultKeyWithPasskey(wrapped, new Uint8Array(16), SALT)).toBeNull();
         const [head, body, mac] = wrapped.split("|");
         const flipped = `${head}|${body!.slice(0, -2)}${body!.endsWith("A=") ? "B=" : "A="}|${mac}`;

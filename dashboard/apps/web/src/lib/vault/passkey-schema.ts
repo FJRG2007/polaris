@@ -39,10 +39,7 @@ export const vaultPasskeyEnrollSchema = z
         ),
         prfSalt: z.string().regex(SALT),
         wrappedKey: z.string().max(1024).regex(ENC_STRING),
-        name: z.preprocess(
-            normalizePasskeyName,
-            z.string().min(1).max(VAULT_PASSKEY_NAME_MAX)
-        )
+        name: z.preprocess(normalizePasskeyName, z.string().min(1).max(VAULT_PASSKEY_NAME_MAX))
     })
     .strict();
 

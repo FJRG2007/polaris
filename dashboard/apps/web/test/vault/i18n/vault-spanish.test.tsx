@@ -12,10 +12,16 @@ import { withMessages } from "../../setup/i18n";
 import { translatorFor } from "@/lib/i18n/translate";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DEFAULT_KDF_SETTINGS, VAULT_LOCK_ON_TAB_CLOSE } from "@polaris/core";
-import { importRefusalText, unlockTimeoutLabel, vaultSchemaText } from "@/app/(app)/vault/vault-labels";
+import {
+    importRefusalText,
+    unlockTimeoutLabel,
+    vaultSchemaText
+} from "@/app/(app)/vault/vault-labels";
 
 vi.mock("@/app/(app)/vault/vault-actions", () => ({ createAccountVaultAction: async () => ({}) }));
-vi.mock("@/app/(app)/vault/passkey-actions", () => ({ vaultPasskeyUsedAction: async () => undefined }));
+vi.mock("@/app/(app)/vault/passkey-actions", () => ({
+    vaultPasskeyUsedAction: async () => undefined
+}));
 
 const { VaultUnlock } = await import("@/app/(app)/vault/vault-unlock");
 const { VaultSetup } = await import("@/app/(app)/vault/vault-setup");
@@ -46,7 +52,10 @@ describe("the lock screen", () => {
 describe("setting a vault up", () => {
     it("is drawn in Spanish, with the length it asks for", () => {
         const markup = renderToStaticMarkup(
-            withMessages(<VaultSetup email="ana@example.com" name="Ana" onCreated={() => undefined} />, "es-ES")
+            withMessages(
+                <VaultSetup email="ana@example.com" name="Ana" onCreated={() => undefined} />,
+                "es-ES"
+            )
         );
         expect(markup).toContain("Configura tu bóveda");
         expect(markup).toMatch(/Al menos \d+ caracteres/);
@@ -62,11 +71,17 @@ describe("words core keeps in English", () => {
 
     it("turns a schema's complaint into Spanish, length and all", () => {
         expect(vaultSchemaText(t, tv, "Give it a name")).toBe("Ponle un nombre");
-        expect(vaultSchemaText(t, tv, "Use at least 12 characters.")).toBe("Usa al menos 12 caracteres.");
+        expect(vaultSchemaText(t, tv, "Use at least 12 characters.")).toBe(
+            "Usa al menos 12 caracteres."
+        );
     });
 
     it("says why a file could not be imported, and leaves a parser's own words alone", () => {
-        expect(importRefusalText(t, "That XML is not a KeePass export.")).toBe("Ese XML no es una exportación de KeePass.");
-        expect(importRefusalText(t, "Unexpected token < in JSON")).toBe("Unexpected token < in JSON");
+        expect(importRefusalText(t, "That XML is not a KeePass export.")).toBe(
+            "Ese XML no es una exportación de KeePass."
+        );
+        expect(importRefusalText(t, "Unexpected token < in JSON")).toBe(
+            "Unexpected token < in JSON"
+        );
     });
 });

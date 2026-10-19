@@ -492,7 +492,10 @@ export function generatePasskeyPrfSalt(): Uint8Array {
 }
 
 /** The key a passkey's PRF output wraps the vault key under. */
-export async function derivePasskeyKey(prfOutput: Uint8Array, prfSalt: Uint8Array): Promise<SymmetricKey> {
+export async function derivePasskeyKey(
+    prfOutput: Uint8Array,
+    prfSalt: Uint8Array
+): Promise<SymmetricKey> {
     if (prfOutput.length < PASSKEY_PRF_BYTES) throw new Error("A passkey's PRF output is 32 bytes");
     const ikm = await crypto.subtle.importKey("raw", prfOutput, "HKDF", false, ["deriveBits"]);
     const bits = await crypto.subtle.deriveBits(
