@@ -50,9 +50,20 @@ export function MessageContent({ className, from, ...props }: MessageContentProp
     );
 }
 
-/** The model's Markdown, drawn the way every other text in Polaris is read. */
+/**
+ * The model's Markdown, drawn the way every other text in Polaris is read,
+ * except that a picture from another site is a link: the model reads mail and
+ * tasks somebody else wrote, and an image address it was talked into writing
+ * would otherwise carry what it read to that site the moment it is drawn.
+ */
 export const MessageResponse = memo(function MessageResponse({ children }: { children: string }) {
-    return <RichText value={children} className="min-w-0 text-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" />;
+    return (
+        <RichText
+            value={children}
+            remoteImages={false}
+            className="min-w-0 text-sm [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+        />
+    );
 });
 
 export function MessageActions({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

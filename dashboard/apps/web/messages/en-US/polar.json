@@ -1,6 +1,6 @@
 {
     "toggle": {
-        "title": "Ask Polar (Ctrl+J)",
+        "title": "Ask Polar ({keys})",
         "label": "Ask Polar"
     },
     "mood": {
@@ -14,7 +14,8 @@
     "history": {
         "title": "Conversations",
         "empty": "No conversations yet.",
-        "delete": "Delete conversation"
+        "delete": "Delete conversation",
+        "more": "Show more"
     },
     "actions": {
         "new": "New conversation",

@@ -53,4 +53,14 @@ describe("reading rich text", () => {
         expect(render("")).toBe("");
         expect(render("   ")).toBe("");
     });
+
+    it("draws a picture from another site, unless told to keep it to a link", () => {
+        const source = "![chart](https://elsewhere.example/c.png?d=secret) and ![own](/api/polar/attachments/x)";
+        expect(render(source)).toContain('<img src="https://elsewhere.example/c.png?d=secret"');
+        const kept = renderToStaticMarkup(<RichText value={source} remoteImages={false} />);
+        expect(kept).not.toContain('<img src="https://elsewhere.example');
+        expect(kept).toContain('href="https://elsewhere.example/c.png?d=secret"');
+        expect(kept).toContain(">chart</a>");
+        expect(kept).toContain('<img src="/api/polar/attachments/x"');
+    });
 });

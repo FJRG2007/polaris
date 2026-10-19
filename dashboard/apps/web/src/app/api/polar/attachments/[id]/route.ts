@@ -5,13 +5,16 @@
  *
  * Served as an attachment unless it is a picture a browser shows safely, and
  * never sniffed, so a text file cannot be turned into a page.
+ *
+ * DELETE takes back a file still in the composer; once a saved message carries
+ * it, it goes with its thread instead.
  */
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
-import { readPolarAttachment } from "@/lib/polar/attachments";
+import { readPolarAttachment, removeUnsentAttachment } from "@/lib/polar/attachments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,4 +49,20 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
             ...downloadTicketHeaders(request)
         }
     });
+}
+
+export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
+    const user = await apiUser();
+    if (user instanceof NextResponse) return user;
+    if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
+    const id = idSchema.safeParse((await params).id);
+    if (!id.success) return NextResponse.json({ error: "not_found" }, { status: 404 });
+    try {
+        return (await removeUnsentAttachment(user.id, id.data))
+            ? NextResponse.json({ ok: true })
+            : NextResponse.json({ error: "not_found" }, { status: 404 });
+    } catch (error) {
+        console.error("polar: could not remove an attachment", error);
+        return NextResponse.json({ error: "storage_failed" }, { status: 503 });
+    }
 }

@@ -11,7 +11,8 @@
 
 import type { UIMessage } from "ai";
 import { prisma, type Prisma } from "@polaris/db";
-import { queueSchema, type ModelChoice, type QueuedMessage } from "@/lib/polar/shared";
+import { discardPolarAttachments, linkPolarAttachments, threadAttachments } from "@/lib/polar/attachments";
+import { POLAR_THREAD_PAGE, queueSchema, type ModelChoice, type QueuedMessage } from "@/lib/polar/shared";
 
 export interface PolarThreadRow {
     id: string;
@@ -19,15 +20,12 @@ export interface PolarThreadRow {
     updatedAt: string;
 }
 
-/** Most threads one list returns. */
-const LIST_LIMIT = 50;
-
 export async function listPolarThreads(userId: string, cursor?: string): Promise<PolarThreadRow[]> {
     const rows = await prisma.polarThread.findMany({
         where: { userId },
         select: { id: true, title: true, updatedAt: true },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-        take: LIST_LIMIT,
+        take: POLAR_THREAD_PAGE,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
     });
     return rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() }));
@@ -45,7 +43,7 @@ export interface PolarThreadView {
     messages: PolarStoredMessage[];
 }
 
-/** Most messages one thread loads. */
+/** Most messages one thread loads: the newest ones. */
 const MESSAGE_LIMIT = 500;
 
 export async function getPolarThread(userId: string, id: string): Promise<PolarThreadView | null> {
@@ -58,21 +56,25 @@ export async function getPolarThread(userId: string, id: string): Promise<PolarT
             queue: true,
             messages: {
                 select: { id: true, parentId: true, role: true, parts: true, metadata: true },
-                orderBy: { createdAt: "asc" },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
                 take: MESSAGE_LIMIT
             }
         }
     });
     if (!thread) return null;
     const queue = queueSchema.safeParse(thread.queue);
+    const rows = thread.messages.reverse();
+    // A message whose parent is older than the newest MESSAGE_LIMIT starts the
+    // part of the tree that was loaded.
+    const loaded = new Set(rows.map((row) => row.id));
     return {
         id: thread.id,
         title: thread.title,
         choice: (thread.choice as ModelChoice | null) ?? null,
         queue: queue.success ? queue.data : [],
-        messages: thread.messages.map((row) => ({
+        messages: rows.map((row) => ({
             id: row.id,
-            parentId: row.parentId,
+            parentId: row.parentId && loaded.has(row.parentId) ? row.parentId : null,
             role: row.role as UIMessage["role"],
             parts: (Array.isArray(row.parts) ? row.parts : []) as UIMessage["parts"],
             metadata: row.metadata ?? undefined
@@ -109,9 +111,11 @@ export async function ensurePolarThread(
 }
 
 /**
- * Writes the messages of a finished turn. A message already stored is
- * rewritten (an approval changes a tool part in place); a new one is added
- * after the message before it.
+ * Writes the messages of a finished turn. A message already stored in this
+ * thread is rewritten (an approval changes a tool part in place); a new one is
+ * added after the message before it. An id already used in any other thread is
+ * left alone: ids come from the browser, and one never reaches another thread.
+ * The files the messages carry become this thread's, so they go with it.
  */
 export async function savePolarMessages(
     userId: string,
@@ -122,18 +126,21 @@ export async function savePolarMessages(
     const owned = await prisma.polarThread.count({ where: { id: threadId, userId } });
     if (!owned) return;
     await prisma.$transaction([
-        ...messages.map((message, index) =>
-            prisma.polarMessage.upsert({
-                where: { id: message.id },
-                create: {
-                    id: message.id,
-                    threadId,
-                    parentId: parentOf(index),
-                    role: message.role,
-                    parts: message.parts as unknown as Prisma.InputJsonValue,
-                    metadata: (message.metadata ?? undefined) as Prisma.InputJsonValue | undefined
-                },
-                update: {
+        prisma.polarMessage.createMany({
+            data: messages.map((message, index) => ({
+                id: message.id,
+                threadId,
+                parentId: parentOf(index),
+                role: message.role,
+                parts: message.parts as unknown as Prisma.InputJsonValue,
+                metadata: (message.metadata ?? undefined) as Prisma.InputJsonValue | undefined
+            })),
+            skipDuplicates: true
+        }),
+        ...messages.map((message) =>
+            prisma.polarMessage.updateMany({
+                where: { id: message.id, threadId },
+                data: {
                     parts: message.parts as unknown as Prisma.InputJsonValue,
                     metadata: (message.metadata ?? undefined) as Prisma.InputJsonValue | undefined
                 }
@@ -141,6 +148,7 @@ export async function savePolarMessages(
         ),
         prisma.polarThread.update({ where: { id: threadId }, data: { updatedAt: new Date() } })
     ]);
+    await linkPolarAttachments(userId, threadId, messages);
 }
 
 export async function renamePolarThread(userId: string, id: string, title: string): Promise<boolean> {
@@ -157,6 +165,8 @@ export async function setPolarQueue(userId: string, id: string, queue: QueuedMes
 }
 
 export async function deletePolarThread(userId: string, id: string): Promise<boolean> {
+    const files = await threadAttachments(userId, id);
     const { count } = await prisma.polarThread.deleteMany({ where: { id, userId } });
+    if (count > 0) await discardPolarAttachments(files);
     return count > 0;
 }

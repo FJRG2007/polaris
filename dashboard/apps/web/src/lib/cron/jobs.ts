@@ -33,6 +33,7 @@ import { compactOutages } from "@/lib/connectivity/outage-tracker";
 import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
+import { sweepUnsentPolarAttachments } from "@/lib/polar/attachments";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
 import { probeAllDomains } from "@/lib/watch/health-probe";
@@ -401,6 +402,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepUploads
+    },
+    {
+        key: "polar-unsent-files",
+        // A file given to Polar that no saved message carries: taken out of the
+        // composer, or left there when the tab closed. Hourly; it only reclaims disk.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: sweepUnsentPolarAttachments
     },
     {
         key: "chat-empty-groups",

@@ -26,6 +26,7 @@ import {
     useState,
     type ReactNode
 } from "react";
+import { useShortcutText } from "@polaris/ui";
 import { Copy, History, Maximize2, Pencil, Plus, Reply, RotateCcw, Trash2, X } from "lucide-react";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { Reasoning } from "@/components/polar/elements/reasoning";
@@ -62,6 +63,8 @@ import {
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
+    POLAR_THREAD_PAGE,
+    sendableTail,
     type ModelChoice,
     type PageContext,
     type QueuedMessage
@@ -187,18 +190,19 @@ export function PolarProvider({ children }: { children: ReactNode }) {
 export function PolarToggle() {
     const t = useTranslations("polar");
     const { open, setOpen } = usePolar();
+    const shortcut = useShortcutText();
     return (
         <button
             type="button"
             aria-pressed={open}
-            title={t("toggle.title")}
+            title={t("toggle.title", { keys: shortcut("Mod+J") })}
             onClick={() => setOpen(!open)}
             className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground aria-pressed:bg-card-hover aria-pressed:text-foreground"
         >
             <PolarMascot size={20} />
             <span className="hidden lg:inline">{t("toggle.label")}</span>
             <kbd className="hidden rounded border border-border px-1 font-mono text-[10px] text-foreground-subtle xl:inline">
-                Ctrl J
+                {shortcut("Mod+J")}
             </kbd>
         </button>
     );
@@ -314,6 +318,8 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
     const [files, setFiles] = useState<AttachmentData[]>([]);
     const [fileError, setFileError] = useState<string | null>(null);
     const [threads, setThreads] = useState<ThreadRow[] | null>(null);
+    const [moreThreads, setMoreThreads] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [showHistory, setShowHistory] = useState(fullPage);
     const [lastApproved, setLastApproved] = useState(false);
     const tree = useRef<VersionTree>(new Map());
@@ -337,7 +343,7 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                 prepareSendMessagesRequest: ({ messages }) => ({
                     body: {
                         threadId: live.current.threadId,
-                        messages,
+                        messages: sendableTail(messages),
                         choice: live.current.choice,
                         context: live.current.context,
                         parentId: messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
@@ -422,6 +428,7 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
             .then((data: { threads: ThreadRow[] } | null) => {
                 if (!data) return;
                 setThreads(data.threads);
+                setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
                 try {
                     window.sessionStorage.setItem(THREADS_KEY, JSON.stringify(data.threads));
                 } catch {
@@ -433,6 +440,23 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
     useEffect(() => {
         if (showHistory) loadThreads();
     }, [showHistory, loadThreads]);
+    const loadMoreThreads = () => {
+        const cursor = threads?.at(-1)?.id;
+        if (!cursor || loadingMore) return;
+        setLoadingMore(true);
+        fetch(`/api/polar/threads?cursor=${encodeURIComponent(cursor)}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { threads: ThreadRow[] } | null) => {
+                if (!data) return;
+                setThreads((current) => {
+                    const known = new Set((current ?? []).map((row) => row.id));
+                    return [...(current ?? []), ...data.threads.filter((row) => !known.has(row.id))];
+                });
+                setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
+            })
+            .catch(() => undefined)
+            .finally(() => setLoadingMore(false));
+    };
 
     const saveQueue = useCallback(
         (next: QueuedMessage[]) => {
@@ -515,6 +539,15 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
             } else {
                 setFiles((current) => current.map((entry) => (entry.id === key ? stored : entry)));
             }
+        }
+    };
+
+    const removeFile = (file: AttachmentData) => {
+        setFiles((current) => current.filter((entry) => entry.id !== file.id));
+        if (!file.pending) {
+            void fetch(`/api/polar/attachments/${encodeURIComponent(file.id)}`, { method: "DELETE" }).catch(
+                () => undefined
+            );
         }
     };
 
@@ -616,24 +649,36 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                     ) : threads.length === 0 ? (
                         <p className="p-2 text-sm text-muted-foreground">{t("history.empty")}</p>
                     ) : (
-                        threads.map((row) => (
-                            <div
-                                key={row.id}
-                                className={`group flex min-w-0 items-center rounded-md hover:bg-card-hover ${row.id === threadId ? "bg-card-hover" : ""}`}
-                            >
+                        <>
+                            {threads.map((row) => (
+                                <div
+                                    key={row.id}
+                                    className={`group flex min-w-0 items-center rounded-md hover:bg-card-hover ${row.id === threadId ? "bg-card-hover" : ""}`}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => void openThread(row.id)}
+                                        title={row.title}
+                                        className="min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm text-foreground"
+                                    >
+                                        {row.title}
+                                    </button>
+                                    <MessageAction label={t("history.delete")} onClick={() => void removeThread(row.id)}>
+                                        <Trash2 />
+                                    </MessageAction>
+                                </div>
+                            ))}
+                            {moreThreads ? (
                                 <button
                                     type="button"
-                                    onClick={() => void openThread(row.id)}
-                                    title={row.title}
-                                    className="min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm text-foreground"
+                                    onClick={loadMoreThreads}
+                                    disabled={loadingMore}
+                                    className="mt-1 rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
                                 >
-                                    {row.title}
+                                    {t("history.more")}
                                 </button>
-                                <MessageAction label={t("history.delete")} onClick={() => void removeThread(row.id)}>
-                                    <Trash2 />
-                                </MessageAction>
-                            </div>
-                        ))
+                            ) : null}
+                        </>
                     )}
                 </nav>
             ) : null}
@@ -841,7 +886,7 @@ export function PolarChat({ onClose, fullPage = false }: { onClose?: () => void;
                                         key={file.id}
                                         file={file}
                                         removeLabel={t("files.remove", { name: file.filename ?? "" })}
-                                        onRemove={() => setFiles((current) => current.filter((entry) => entry.id !== file.id))}
+                                        onRemove={() => removeFile(file)}
                                     />
                                 ))}
                             </Attachments>

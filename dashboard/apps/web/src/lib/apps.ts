@@ -14,6 +14,7 @@ import {
     Archive,
     Bell,
     Bot,
+    BotMessageSquare,
     Blocks,
     BookOpen,
     Bug,
@@ -398,7 +399,7 @@ export const POLARIS_APPS: AppEntry[] = [
     {
         /**
          * Polar, the assistant. It lives in a panel on every page (the header
-         * button, Ctrl+J); this is the same chat as a page, with the
+         * button, Ctrl/Cmd+J); this is the same chat as a page, with the
          * conversation list beside it. No permission of its own: it acts with
          * exactly what the person can already do, and asks before any change.
          */
@@ -406,7 +407,7 @@ export const POLARIS_APPS: AppEntry[] = [
         category: "work",
         label: "Polar", // i18n-ignore
         description: "Ask about any page, and have things done with your access", // i18n-ignore
-        icon: Sparkles,
+        icon: BotMessageSquare,
         href: "/polar"
     },
     {

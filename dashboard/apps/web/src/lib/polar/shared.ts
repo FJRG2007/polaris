@@ -114,6 +114,22 @@ export function polarAttachmentId(url: string): string | null {
 export const MAX_QUEUE = 20;
 export const queueSchema = z.array(queuedMessageSchema).max(MAX_QUEUE);
 
+/** Conversations one page of the history list carries. */
+export const POLAR_THREAD_PAGE = 50;
+/** Most messages of the path one turn sends the model. */
+export const POLAR_SEND_MOST = 100;
+
+/**
+ * The newest part of a path that one turn sends: at most `POLAR_SEND_MOST`
+ * messages, starting at a message of the person's so the model never reads an
+ * answer without its question. A conversation of any length keeps going.
+ */
+export function sendableTail<T extends { role: string }>(messages: readonly T[]): T[] {
+    const tail = messages.slice(-POLAR_SEND_MOST);
+    const start = tail.findIndex((message) => message.role === "user");
+    return start > 0 ? tail.slice(start) : tail;
+}
+
 /**
  * The context as the model reads it: inside a fence, labelled as data. Text a
  * page shows can be written by anybody - a container name, a mail subject - so

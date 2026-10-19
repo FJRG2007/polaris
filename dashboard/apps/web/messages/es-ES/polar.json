@@ -1,6 +1,6 @@
 {
     "toggle": {
-        "title": "Pide a Polar (Ctrl+J)",
+        "title": "Pide a Polar ({keys})",
         "label": "Preguntar"
     },
     "mood": {
@@ -13,8 +13,9 @@
     },
     "history": {
         "title": "Conversaciones",
-        "empty": "Sin conversaciónes aún.",
-        "delete": "Borrar conversación"
+        "empty": "Sin conversaciones aún.",
+        "delete": "Borrar conversación",
+        "more": "Ver más"
     },
     "actions": {
         "new": "Nueva conversación",

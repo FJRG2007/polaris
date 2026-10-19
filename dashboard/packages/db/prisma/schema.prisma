@@ -14894,19 +14894,20 @@ model UpsSample {
 // A conversation with Polar, the dashboard's assistant. Always one person's:
 // every query is scoped by userId, and nothing else reads it.
 model PolarThread {
-    id        String         @id @default(uuid(7)) @db.Uuid
-    userId    String         @db.Uuid
-    user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-    title     String
+    id          String            @id @default(uuid(7)) @db.Uuid
+    userId      String            @db.Uuid
+    user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    title       String
     // The model choice the thread was last sent with ({ provider, model,
     // intelligence, payer }), so reopening it picks up where it was.
-    choice    Json?
+    choice      Json?
     // Messages typed while a turn was still running, in the order they will be
     // sent. Kept on the thread so a reload does not lose them.
-    queue     Json           @default("[]")
-    createdAt DateTime       @default(now())
-    updatedAt DateTime       @updatedAt
-    messages  PolarMessage[]
+    queue       Json              @default("[]")
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+    messages    PolarMessage[]
+    attachments PolarAttachment[]
 
     @@index([userId, updatedAt(sort: Desc)])
 }
@@ -14931,16 +14932,21 @@ model PolarMessage {
 // uploads go to; the row records which one, so moving that setting later does
 // not lose what was already written. One person's: only its owner reads it.
 model PolarAttachment {
-    id           String   @id @default(uuid(7)) @db.Uuid
-    userId       String   @db.Uuid
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id           String       @id @default(uuid(7)) @db.Uuid
+    userId       String       @db.Uuid
+    user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // The thread whose saved message first carried it; null while it is only in
+    // the composer, which is what the sweep of unsent files looks for.
+    threadId     String?      @db.Uuid
+    thread       PolarThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
     name         String
     mediaType    String
     size         Int
     // Null when the file is on this server rather than on a connected storage.
     connectionId String?
     path         String
-    createdAt    DateTime @default(now())
+    createdAt    DateTime     @default(now())
 
     @@index([userId, createdAt])
+    @@index([threadId, createdAt])
 }
