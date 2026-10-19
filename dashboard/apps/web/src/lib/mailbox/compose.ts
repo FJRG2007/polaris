@@ -18,7 +18,7 @@ import { findFolderForRole } from "./folder-roles";
 import { prisma } from "@polaris/db";
 import { publishMail } from "./live";
 import * as core from "@polaris/core";
-import { refreshThreads } from "./sync";
+import { refreshThreads, syncFolderNow } from "./sync";
 import type { ImapFlow } from "imapflow";
 import type { Prisma } from "@polaris/db";
 import { readMailPreferences } from "./prefs";
@@ -282,6 +282,7 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
      * draft the sweep sends a second time, to the same people.
      */
     let gone = false;
+    let sentCopy: { readonly messageId: string; readonly copy: MailSentCopy } | null = null;
     try {
         const message = await outgoingFromDraft(draft, account, { signature: true });
         const composed = await composeMime(message);
@@ -298,7 +299,11 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             refused: outcome.refused,
             probe: draft.probe
         });
-        await recordSentCopy(deliveryId, account.id, await fileInSent(account, composed.mime));
+        sentCopy = {
+            messageId: composed.messageId,
+            copy: await fileInSent(account, composed.mime)
+        };
+        await recordSentCopy(deliveryId, account.id, sentCopy.copy);
         // The quietest way to lose mail: the server took the message for
         // somebody, so it is in Sent and the composer closed, and the people it
         // refused are in a list nobody read.
@@ -323,6 +328,7 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
         if (draft.inReplyToHeader) await markAnswered(account.id, draft.inReplyToHeader);
         await refreshThreads(account.id);
         publishMail({ accountId: account.id, kind: "sending", actorId: account.userId });
+        pickUpSentCopy(account.id, sentCopy);
         return true;
     } catch (caught) {
         if (gone) {
@@ -331,6 +337,7 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
             console.warn("polaris: a message went, and tidying up after it failed:", caught);
             await prisma.mailDraft.deleteMany({ where: { id: draft.id } }).catch(() => undefined);
             publishMail({ accountId: draft.accountId, kind: "sending", actorId: account.userId });
+            pickUpSentCopy(account.id, sentCopy);
             return true;
         }
         const auth = caught instanceof MailAuthError;
@@ -477,6 +484,56 @@ export async function outgoingFromDraft(
         references: stringsFrom(draft.references),
         requestReceipt: draft.requestReceipt
     };
+}
+
+/**
+ * The pause before each read of the Sent folder after a send.
+ *
+ * The first read is at once, which is all a copy Polaris filed itself needs. A
+ * provider that files its own copy (Gmail) usually has it there within a second
+ * or two, but not always by the time the first read arrives, so the folder is
+ * read a few more times until the message is in it - and then left to the
+ * ordinary passes, which find it anyway, just later.
+ */
+export const SENT_COPY_READS_MS: readonly number[] = [0, 2_000, 6_000, 15_000];
+
+/**
+ * Bring the message just sent into its conversation now, in the background.
+ *
+ * The listener that makes new mail instant only watches the inbox, so a sent
+ * message used to wait for the next whole pass to be read out of Sent: a
+ * reply showed up in the recipient's mailbox - and in a copied mailbox here -
+ * before it showed up in the conversation it was written in. This reads Sent
+ * alone through `syncFolderNow`, the same code a pass runs, so the row is the
+ * one a pass would store (keyed on folder and uid, never written twice), the
+ * thread is joined the same way, and the open tabs are told the same way.
+ *
+ * Never awaited by the send and never throws: the message has already gone,
+ * and nothing here may hold up or undo that.
+ */
+function pickUpSentCopy(
+    accountId: string,
+    sent: { readonly messageId: string; readonly copy: MailSentCopy } | null
+): void {
+    // Without a copy there is nothing in Sent to find: none was filed, or the
+    // mailbox has no Sent folder.
+    if (!sent || (sent.copy !== "filed" && sent.copy !== "automatic")) return;
+    void (async () => {
+        const folder = await findFolderForRole(accountId, "sent");
+        if (!folder) return;
+        for (const wait of SENT_COPY_READS_MS) {
+            if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+            await syncFolderNow(accountId, folder.id);
+            if (!sent.messageId) return;
+            const held = await prisma.mailMessage.findFirst({
+                where: { accountId, folderId: folder.id, messageId: sent.messageId },
+                select: { id: true }
+            });
+            if (held) return;
+        }
+    })().catch((caught) => {
+        console.warn("polaris: a sent message could not be read back from Sent:", caught);
+    });
 }
 
 /**
