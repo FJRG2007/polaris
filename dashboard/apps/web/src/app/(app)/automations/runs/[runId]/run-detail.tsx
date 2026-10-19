@@ -55,11 +55,12 @@ export function RunDetailView({ runId }: { runId: string }) {
     const run = data?.run;
 
     // A run still going is refetched until it ends.
+    const going = !!run && !core.runFinished(run.status);
     useEffect(() => {
-        if (!run || core.runFinished(run.status)) return;
-        const timer = setTimeout(() => void refresh(), 2000);
-        return () => clearTimeout(timer);
-    }, [run, refresh]);
+        if (!going) return;
+        const timer = setInterval(() => void refresh(), 2000);
+        return () => clearInterval(timer);
+    }, [going, refresh]);
 
     return (
         <div className="space-y-4">

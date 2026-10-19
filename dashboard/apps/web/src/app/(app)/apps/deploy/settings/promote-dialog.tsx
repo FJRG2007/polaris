@@ -290,17 +290,23 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
         const controller = new AbortController();
         let timer: ReturnType<typeof setTimeout> | undefined;
         const load = () => {
-            void polls.promotions(projectId, controller.signal).then((result) => {
-                if (!current) return;
-                if (result.error) {
-                    setError(result.error);
-                    return;
+            void polls.promotions(projectId, controller.signal).then(
+                (result) => {
+                    if (!current) return;
+                    if (result.error) {
+                        setError(result.error);
+                        return;
+                    }
+                    const rows = result.promotions ?? [];
+                    setPromotions(rows);
+                    // Follow one that is still running, and stop once none is.
+                    if (rows.some((row) => row.status === "running"))
+                        timer = setTimeout(load, 5000);
+                },
+                () => {
+                    if (current) timer = setTimeout(load, 5000);
                 }
-                const rows = result.promotions ?? [];
-                setPromotions(rows);
-                // Follow one that is still running, and stop once none is.
-                if (rows.some((row) => row.status === "running")) timer = setTimeout(load, 5000);
-            });
+            );
         };
         load();
         return () => {
