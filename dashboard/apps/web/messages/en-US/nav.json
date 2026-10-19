@@ -157,6 +157,9 @@
         },
         "crm": {
             "description": "Companies, people and the deals you are working"
+        },
+        "polar": {
+            "description": "Ask about any page, and have things done with your access"
         }
     },
     "labels": {
@@ -345,7 +348,8 @@
         "Insights": "Insights",
         "Rollouts": "Rollouts",
         "Activity sharing": "Activity sharing",
-        "UPS": "UPS"
+        "UPS": "UPS",
+        "Polar": "Polar"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

@@ -157,6 +157,9 @@
         },
         "crm": {
             "description": "Empresas, personas y los tratos que llevas"
+        },
+        "polar": {
+            "description": "Pregunta por cualquier página y haz cosas con tu acceso"
         }
     },
     "labels": {
@@ -345,7 +348,8 @@
         "Insights": "Tendencias",
         "Rollouts": "Despliegues",
         "Activity sharing": "Compartir actividad",
-        "UPS": "SAI"
+        "UPS": "SAI",
+        "Polar": "Polar"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

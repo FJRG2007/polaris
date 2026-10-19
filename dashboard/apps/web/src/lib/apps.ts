@@ -397,6 +397,20 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         /**
+         * Polar, the assistant. It lives in a panel on every page (the header
+         * button, Ctrl+J); this is the same chat as a page, with the
+         * conversation list beside it. No permission of its own: it acts with
+         * exactly what the person can already do, and asks before any change.
+         */
+        id: "polar",
+        category: "work",
+        label: "Polar", // i18n-ignore
+        description: "Ask about any page, and have things done with your access", // i18n-ignore
+        icon: Sparkles,
+        href: "/polar"
+    },
+    {
+        /**
          * When something happens, do something: one engine every app plugs its
          * triggers and actions into. Core, not installable - the engine is what
          * the apps' own automation screens become windows onto.
@@ -1416,6 +1430,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/automations/secrets",
             icon: KeyRound,
             keywords: ["tokens", "webhook urls", "credentials", "passwords"]
+        }
+    ],
+    polar: [
+        {
+            label: "Conversations", // i18n-ignore
+            href: "/polar",
+            icon: MessagesSquare,
+            keywords: ["assistant", "ai", "ask", "chat", "history", "polar"]
         }
     ],
     notes: [
