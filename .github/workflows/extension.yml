@@ -34,6 +34,10 @@ defaults:
   run:
     working-directory: dashboard
 
+env:
+  # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+
 jobs:
   build:
     runs-on: ubuntu-latest

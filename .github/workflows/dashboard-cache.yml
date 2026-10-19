@@ -47,6 +47,8 @@ env:
   # The same two downloads Dashboard CI skips, for the same reasons.
   PUPPETEER_SKIP_DOWNLOAD: "true"
   ONNXRUNTIME_NODE_INSTALL: "skip"
+  # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
 
 jobs:
   warm:

@@ -28,6 +28,8 @@ env:
   # each one has taken `npm ci` down on a commit that touched nothing near it.
   PUPPETEER_SKIP_DOWNLOAD: "true"
   ONNXRUNTIME_NODE_INSTALL: "skip"
+  # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
 
 defaults:
   run:
