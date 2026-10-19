@@ -7,9 +7,10 @@
  * and because somebody who has just deployed to the wrong shelf needs to be able
  * to see which one is open without going looking for it.
  *
- * It renders nothing at all for an account that belongs to no organization. A
- * switch with one position is furniture: it takes room in a bar that has little
- * of it and teaches nothing, and the moment they join something it appears.
+ * It is also where another account signed in on this browser is picked: which
+ * account and which shelf are the same question - who am I working as - so they
+ * are answered in one place. That is why it is drawn for an account in no
+ * organization too: the shelf has one position, but the accounts do not.
  */
 
 import Link from "next/link";
@@ -18,7 +19,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { OrgAvatar } from "@/components/avatar";
 import { PERSONAL_SCOPE, formatScope } from "@polaris/core";
 import { setWorkspaceScopeAction } from "@/app/(app)/scope-actions";
-import { Check, ChevronsUpDown, Settings2, UserRound } from "lucide-react";
+import { AccountSwitcherDialog } from "@/components/device-accounts";
+import { Check, ChevronsUpDown, Settings2, UserRound, Users } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -51,8 +53,7 @@ export function ScopeSwitcher({
     const t = useTranslations("components");
     const [open, setOpen] = useState(false);
     const [pending, setPending] = useState(false);
-
-    if (organizations.length === 0) return null;
+    const [switching, setSwitching] = useState(false);
 
     /**
      * Move to another shelf.
@@ -77,53 +78,68 @@ export function ScopeSwitcher({
     };
 
     return (
-        <DropdownMenu open={open} onOpenChange={setOpen}>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    aria-label={t("scope.workingIn", { name: current?.name ?? personalName })}
-                    className="max-w-40 gap-1.5 px-2"
-                >
-                    {current ? (
-                        <OrgAvatar org={current} size={18} />
-                    ) : (
-                        <UserRound className="text-muted-foreground size-4 shrink-0" />
-                    )}
-                    <span className="truncate text-sm" title={current?.name ?? personalName}>
-                        {current?.name ?? personalName}
-                    </span>
-                    <ChevronsUpDown className="text-muted-foreground size-3.5 shrink-0" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-56">
-                <DropdownMenuLabel>{t("scope.heading")}</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={() => choose(PERSONAL_SCOPE)}>
-                    <UserRound className="size-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate" title={personalName}>{personalName}</span>
-                    {current === null && <Check className="size-4 shrink-0" />}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {organizations.map((org) => (
-                    <DropdownMenuItem key={org.id} onSelect={() => choose(formatScope({ kind: "org", orgId: org.id }))}>
-                        <OrgAvatar org={org} size={18} />
-                        <span className="min-w-0 flex-1 truncate" title={org.name}>{org.name}</span>
-                        {current?.id === org.id && <Check className="size-4 shrink-0" />}
+        <>
+            <DropdownMenu open={open} onOpenChange={setOpen}>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pending}
+                        aria-label={t("scope.workingIn", { name: current?.name ?? personalName })}
+                        className="max-w-40 gap-1.5 px-2"
+                    >
+                        {current ? (
+                            <OrgAvatar org={current} size={18} />
+                        ) : (
+                            <UserRound className="text-muted-foreground size-4 shrink-0" />
+                        )}
+                        <span className="truncate text-sm" title={current?.name ?? personalName}>
+                            {current?.name ?? personalName}
+                        </span>
+                        <ChevronsUpDown className="text-muted-foreground size-3.5 shrink-0" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-56">
+                    <DropdownMenuLabel>{t("scope.heading")}</DropdownMenuLabel>
+                    <DropdownMenuItem onSelect={() => choose(PERSONAL_SCOPE)}>
+                        <UserRound className="size-4 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate" title={personalName}>
+                            {personalName}
+                        </span>
+                        {current === null && <Check className="size-4 shrink-0" />}
                     </DropdownMenuItem>
-                ))}
-                {current && (
-                    <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                            <Link href={`/account/organizations/${current.slug}`}>
-                                <Settings2 className="size-4 shrink-0" />
-                                {t("scope.manage", { name: current.name })}
-                            </Link>
+                    {organizations.length > 0 && <DropdownMenuSeparator />}
+                    {organizations.map((org) => (
+                        <DropdownMenuItem
+                            key={org.id}
+                            onSelect={() => choose(formatScope({ kind: "org", orgId: org.id }))}
+                        >
+                            <OrgAvatar org={org} size={18} />
+                            <span className="min-w-0 flex-1 truncate" title={org.name}>
+                                {org.name}
+                            </span>
+                            {current?.id === org.id && <Check className="size-4 shrink-0" />}
                         </DropdownMenuItem>
-                    </>
-                )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    ))}
+                    {current && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                                <Link href={`/account/organizations/${current.slug}`}>
+                                    <Settings2 className="size-4 shrink-0" />
+                                    {t("scope.manage", { name: current.name })}
+                                </Link>
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setSwitching(true)}>
+                        <Users className="size-4 shrink-0" />
+                        {t("scope.switchAccounts")}
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <AccountSwitcherDialog open={switching} onOpenChange={setSwitching} />
+        </>
     );
 }

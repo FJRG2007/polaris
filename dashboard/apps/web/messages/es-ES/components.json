@@ -557,7 +557,8 @@
         "failed": "No se pudo cambiar. Inténtalo de nuevo.",
         "workingIn": "Trabajando en {name}",
         "heading": "Trabajando en",
-        "manage": "Gestionar {name}"
+        "manage": "Gestionar {name}",
+        "switchAccounts": "Cambiar de cuenta"
     },
     "share": {
         "capabilities": {

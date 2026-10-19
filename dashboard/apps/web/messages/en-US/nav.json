@@ -51,7 +51,7 @@
         "getApps": "Get the apps",
         "sharedLinks": "Shared links",
         "signOut": "Sign out",
-        "switchAccounts": "Switch accounts",
+        "friends": "Friends",
         "switcher": {
             "title": "Switch accounts",
             "description": "The accounts signed in on this browser. Choose one to use it.",

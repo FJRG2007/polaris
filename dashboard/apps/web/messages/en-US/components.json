@@ -557,7 +557,8 @@
         "failed": "That could not be switched. Try again.",
         "workingIn": "Working in {name}",
         "heading": "Working in",
-        "manage": "Manage {name}"
+        "manage": "Manage {name}",
+        "switchAccounts": "Switch accounts"
     },
     "share": {
         "capabilities": {

@@ -12,7 +12,6 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
-import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import {
     presenceNowAction,
@@ -150,7 +149,6 @@ export function AccountMenu({
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
     /** Whether the list of accounts on this browser is open. */
-    const [switching, setSwitching] = useState(false);
     /**
      * When this face was last pressed, for recognising the second press of a
      * double without the browser's help.
@@ -616,11 +614,13 @@ export function AccountMenu({
                         {tTours("menu")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    {/* Where Discord keeps it: beside signing out, since both are
-                    about which account this browser is. */}
-                    <DropdownMenuItem onSelect={() => setSwitching(true)}>
-                        <Users className="size-4" />
-                        {t("account.switchAccounts")}
+                    {/* Switching accounts moved to the shelf switch beside the
+                        app switcher, where who you are working as is chosen. */}
+                    <DropdownMenuItem asChild>
+                        <Link href="/account/friends">
+                            <Users className="size-4" />
+                            {t("account.friends")}
+                        </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
@@ -628,8 +628,6 @@ export function AccountMenu({
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-
-            <AccountSwitcherDialog open={switching} onOpenChange={setSwitching} />
 
             {/* The exact end of a chosen state. Its own dialog rather than a field
             in the menu, because a menu that has to stay open while somebody
