@@ -36,7 +36,6 @@ import {
     cn,
     Dialog,
     CopyIcon,
-    useToast,
     useCopied,
     DialogTitle,
     DialogContent,
@@ -60,7 +59,8 @@ import {
     Wrench,
     X
 } from "lucide-react";
-import { PolarThreads, type ThreadRow } from "@/components/polar/polar-threads";
+import { PolarThreads } from "@/components/polar/polar-threads";
+import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
 import {
     firstPickable,
     stepPickable,
@@ -118,7 +118,6 @@ import {
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
-    POLAR_THREAD_PAGE,
     sendableTail,
     type ModelChoice,
     type PageContext,
@@ -329,7 +328,6 @@ export function PolarAside() {
 // ---------------------------------------------------------------------------
 
 const CHOICE_KEY = "polar.choice";
-const THREADS_KEY = "polar.threads";
 
 function newId(): string {
     return crypto.randomUUID();
@@ -483,10 +481,15 @@ export function PolarChat({
     const picked = useRef(new Map<string, File>());
     const filesNow = useRef(files);
     filesNow.current = files;
-    const [threads, setThreads] = useState<ThreadRow[] | null>(null);
-    const [moreThreads, setMoreThreads] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
+    // The project a new chat is filed under when its first message is sent.
+    const [newProject, setNewProject] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(fullPage);
+    // A deleted conversation that is open is replaced by a new one.
+    const removed = useRef<(id: string) => void>(() => undefined);
+    const sidebar = usePolarSidebar({
+        enabled: showHistory,
+        onRemoved: (id) => removed.current(id)
+    });
     const [lastApproved, setLastApproved] = useState(false);
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
@@ -499,7 +502,6 @@ export function PolarChat({
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
-    const toast = useToast();
 
     const context = useMemo(
         () =>
@@ -512,8 +514,8 @@ export function PolarChat({
                 : null,
         [withPage, pathname, state?.extra]
     );
-    const live = useRef({ threadId, choice, context });
-    live.current = { threadId, choice, context };
+    const live = useRef({ threadId, choice, context, newProject });
+    live.current = { threadId, choice, context, newProject };
 
     const transport = useMemo(
         () =>
@@ -525,6 +527,7 @@ export function PolarChat({
                         messages: sendableTail(messages),
                         choice: live.current.choice,
                         context: live.current.context,
+                        projectId: live.current.newProject,
                         parentId:
                             messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
                     }
@@ -597,58 +600,14 @@ export function PolarChat({
         if (choice) writeStored(CHOICE_KEY, JSON.stringify(choice));
     }, [choice]);
 
-    // History: last known list instantly, refreshed behind it.
-    // `keep` puts the fresh first page over the rows already loaded, so the
-    // pages read with "Show more" stay where they are.
-    const loadThreads = useCallback((keep = false) => {
-        try {
-            const cached = keep ? null : window.sessionStorage.getItem(THREADS_KEY);
-            if (cached) setThreads(JSON.parse(cached) as ThreadRow[]);
-        } catch {
-            // No cache.
-        }
-        fetch("/api/polar/threads")
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { threads: ThreadRow[] } | null) => {
-                if (!data) return;
-                if (!keep) {
-                    setThreads(data.threads);
-                    setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
-                    return;
-                }
-                setThreads((current) => {
-                    const fresh = new Set(data.threads.map((row) => row.id));
-                    return [
-                        ...data.threads,
-                        ...(current ?? []).filter((row) => !fresh.has(row.id))
-                    ];
-                });
-            })
-            .catch(() => undefined);
-    }, []);
-    useEffect(() => {
-        if (showHistory) loadThreads();
-    }, [showHistory, loadThreads]);
-    // The cache follows every change, a rename or a delete included.
-    useEffect(() => {
-        if (!threads) return;
-        try {
-            window.sessionStorage.setItem(
-                THREADS_KEY,
-                JSON.stringify(threads.slice(0, POLAR_THREAD_PAGE))
-            );
-        } catch {
-            // No cache.
-        }
-    }, [threads]);
     // A finished turn moves its conversation to the top of the list, or puts a
     // new one there, so the list is read again once the turn ends.
     const wasBusy = useRef(busy);
     useEffect(() => {
         const ended = wasBusy.current && !busy;
         wasBusy.current = busy;
-        if (ended && showHistory) loadThreads(true);
-    }, [busy, showHistory, loadThreads]);
+        if (ended && showHistory) sidebar.refresh(true);
+    }, [busy, showHistory, sidebar.refresh]);
     const settled = !busy && chat.messages.length > 0;
     // A new thread is named by its model after the first answer; its title is
     // asked for once, and the placeholder in the list is swapped for it.
@@ -662,13 +621,7 @@ export function PolarChat({
             .then((response) => (response.ok ? response.json() : null))
             .then((data: { title?: unknown } | null) => {
                 const title = typeof data?.title === "string" ? data.title : null;
-                if (!title) return;
-                setThreads(
-                    (current) =>
-                        current?.map((row) =>
-                            row.id === id && row.title !== title ? { ...row, title } : row
-                        ) ?? null
-                );
+                if (title) sidebar.retitle(id, title);
             })
             .catch(() => undefined);
     }, [settled, threadId]);
@@ -683,26 +636,6 @@ export function PolarChat({
         setSlashActive(0);
         if (!input.startsWith("/")) setSlashDismissed(false);
     }, [input]);
-    const loadMoreThreads = () => {
-        const cursor = threads?.at(-1)?.id;
-        if (!cursor || loadingMore) return;
-        setLoadingMore(true);
-        fetch(`/api/polar/threads?cursor=${encodeURIComponent(cursor)}`)
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { threads: ThreadRow[] } | null) => {
-                if (!data) return;
-                setThreads((current) => {
-                    const known = new Set((current ?? []).map((row) => row.id));
-                    return [
-                        ...(current ?? []),
-                        ...data.threads.filter((row) => !known.has(row.id))
-                    ];
-                });
-                setMoreThreads(data.threads.length >= POLAR_THREAD_PAGE);
-            })
-            .catch(() => undefined)
-            .finally(() => setLoadingMore(false));
-    };
 
     const saveQueue = useCallback(
         (next: QueuedMessage[]) => {
@@ -731,6 +664,7 @@ export function PolarChat({
         const { thread } = (await response.json()) as {
             thread: {
                 id: string;
+                projectId: string | null;
                 messages: StoredMessage[];
                 queue: QueuedMessage[];
                 choice: ModelChoice | null;
@@ -749,6 +683,7 @@ export function PolarChat({
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
         setThreadId(thread.id);
+        setNewProject(thread.projectId);
         chat.setMessages(newestRoot ? pathThrough(next, [], 0, newestRoot.id) : []);
         setQueue(thread.queue);
         if (thread.choice) setChoice(thread.choice);
@@ -772,8 +707,14 @@ export function PolarChat({
         []
     );
 
-    const startNew = () => {
+    removed.current = (id) => {
+        if (id === threadId) startNew();
+    };
+
+    const startNew = (projectId: string | null = null) => {
         void chat.stop();
+        setNewProject(projectId);
+        if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
         setThreadId(newId());
         chat.setMessages([]);
@@ -788,34 +729,6 @@ export function PolarChat({
         textarea.current?.focus();
     };
 
-    const renameThread = async (id: string, title: string) => {
-        const before = threads?.find((row) => row.id === id)?.title ?? title;
-        setThreads(
-            (current) => current?.map((row) => (row.id === id ? { ...row, title } : row)) ?? null
-        );
-        const response = await fetch(`/api/polar/threads/${id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ title })
-        }).catch(() => null);
-        if (response?.ok) return;
-        setThreads(
-            (current) =>
-                current?.map((row) =>
-                    row.id === id && row.title === title ? { ...row, title: before } : row
-                ) ?? null
-        );
-        toast.show({ title: t("history.renameFailed") });
-    };
-
-    const removeThread = async (id: string) => {
-        setThreads((current) => current?.filter((row) => row.id !== id) ?? null);
-        const response = await fetch(`/api/polar/threads/${id}`, { method: "DELETE" }).catch(
-            () => null
-        );
-        if (!response?.ok) loadThreads();
-        if (id === threadId) startNew();
-    };
 
     /** Uploads one staged file, drawing its progress, and leaves it ready or failed. */
     const upload = async (key: string, file: File) => {
@@ -1037,15 +950,10 @@ export function PolarChat({
     );
     const threadList = (hide: Parameters<typeof PolarThreads>[0]["hide"]) => (
         <PolarThreads
-            threads={threads}
+            sidebar={sidebar}
             activeId={threadId}
-            more={moreThreads}
-            loadingMore={loadingMore}
             onOpen={(id) => void openThread(id)}
             onNew={startNew}
-            onRename={(id, title) => void renameThread(id, title)}
-            onDelete={(id) => void removeThread(id)}
-            onLoadMore={loadMoreThreads}
             hide={hide}
         />
     );
@@ -1279,13 +1187,13 @@ export function PolarChat({
                     <span className="flex-1" />
                     {fullPage ? (
                         !wide || collapsed ? (
-                            <MessageAction label={t("actions.new")} onClick={startNew}>
+                            <MessageAction label={t("actions.new")} onClick={() => startNew()}>
                                 <SquarePen />
                             </MessageAction>
                         ) : null
                     ) : (
                         <>
-                            <MessageAction label={t("actions.new")} onClick={startNew}>
+                            <MessageAction label={t("actions.new")} onClick={() => startNew()}>
                                 <Plus />
                             </MessageAction>
                             <MessageAction

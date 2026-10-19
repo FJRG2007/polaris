@@ -142,7 +142,8 @@ describe("the /polar sidebar", () => {
         await screen.findByText("Fresh one");
         const groups = screen
             .getAllByRole("group")
-            .map((group) => group.getAttribute("aria-labelledby"));
+            .map((group) => group.getAttribute("aria-labelledby"))
+            .filter((id) => id?.startsWith("polar-group-"));
         expect(groups).toEqual(["polar-group-today", "polar-group-yesterday", "polar-group-older"]);
         expect(
             within(screen.getByRole("group", { name: "Today" })).getByText("Fresh one")
