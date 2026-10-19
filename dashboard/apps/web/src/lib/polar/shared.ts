@@ -167,7 +167,8 @@ export type ThreadGroup = (typeof THREAD_GROUPS)[number];
  * twenty-four hours before now. A date in the future (a skewed clock) is today.
  */
 export function threadGroup(updatedAt: string, now: Date = new Date()): ThreadGroup {
-    const day = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const day = (date: Date) =>
+        new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     const then = new Date(updatedAt);
     if (Number.isNaN(then.getTime())) return "older";
     const days = Math.round((day(now) - day(then)) / 86_400_000);

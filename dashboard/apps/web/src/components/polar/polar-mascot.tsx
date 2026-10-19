@@ -91,11 +91,7 @@ export function PolarMascot({
             {plate ? <rect x="0" y="0" width="64" height="64" rx="15" fill={VIOLET} /> : null}
             <g transform={plate ? "translate(6.4 7) scale(0.8)" : undefined}>
                 <g opacity={mood === "trouble" ? 0.4 : 1}>
-                    <g
-                        className={
-                            mood === "idle" || mood === "done" ? "polar-twinkle" : undefined
-                        }
-                    >
+                    <g className={mood === "idle" || mood === "done" ? "polar-twinkle" : undefined}>
                         <path
                             className={mood === "thinking" ? "polar-star-spin" : undefined}
                             d={STAR}

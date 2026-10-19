@@ -41,9 +41,21 @@ const PROVIDERS = [
 const DAY = 86_400_000;
 const now = Date.now();
 const THREADS = [
-    { id: "00000000-0000-4000-8000-000000000001", title: "Fresh one", updatedAt: new Date(now).toISOString() },
-    { id: "00000000-0000-4000-8000-000000000002", title: "From yesterday", updatedAt: new Date(now - DAY).toISOString() },
-    { id: "00000000-0000-4000-8000-000000000003", title: "Long ago", updatedAt: new Date(now - 90 * DAY).toISOString() }
+    {
+        id: "00000000-0000-4000-8000-000000000001",
+        title: "Fresh one",
+        updatedAt: new Date(now).toISOString()
+    },
+    {
+        id: "00000000-0000-4000-8000-000000000002",
+        title: "From yesterday",
+        updatedAt: new Date(now - DAY).toISOString()
+    },
+    {
+        id: "00000000-0000-4000-8000-000000000003",
+        title: "Long ago",
+        updatedAt: new Date(now - 90 * DAY).toISOString()
+    }
 ];
 
 const calls: Array<{ url: string; method: string; body?: unknown }> = [];
@@ -66,8 +78,13 @@ beforeEach(() => {
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
             const method = init?.method ?? "GET";
-            calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-            if (url === "/api/polar/models") return Response.json({ providers: PROVIDERS, tools: {}, isAdmin: false });
+            calls.push({
+                url,
+                method,
+                body: init?.body ? JSON.parse(String(init.body)) : undefined
+            });
+            if (url === "/api/polar/models")
+                return Response.json({ providers: PROVIDERS, tools: {}, isAdmin: false });
             if (url === "/api/polar/threads") return Response.json({ threads });
             if (method === "PATCH" && refuseRename) return Response.json({}, { status: 500 });
             return Response.json({ ok: true });
@@ -123,11 +140,19 @@ describe("the /polar sidebar", () => {
     it("groups conversations by their last update", async () => {
         mountPage();
         await screen.findByText("Fresh one");
-        const groups = screen.getAllByRole("group").map((group) => group.getAttribute("aria-labelledby"));
+        const groups = screen
+            .getAllByRole("group")
+            .map((group) => group.getAttribute("aria-labelledby"));
         expect(groups).toEqual(["polar-group-today", "polar-group-yesterday", "polar-group-older"]);
-        expect(within(screen.getByRole("group", { name: "Today" })).getByText("Fresh one")).toBeTruthy();
-        expect(within(screen.getByRole("group", { name: "Yesterday" })).getByText("From yesterday")).toBeTruthy();
-        expect(within(screen.getByRole("group", { name: "Older" })).getByText("Long ago")).toBeTruthy();
+        expect(
+            within(screen.getByRole("group", { name: "Today" })).getByText("Fresh one")
+        ).toBeTruthy();
+        expect(
+            within(screen.getByRole("group", { name: "Yesterday" })).getByText("From yesterday")
+        ).toBeTruthy();
+        expect(
+            within(screen.getByRole("group", { name: "Older" })).getByText("Long ago")
+        ).toBeTruthy();
     });
 
     it("says so in one line when there are no conversations", async () => {
@@ -181,7 +206,9 @@ describe("the /polar sidebar", () => {
         const field = (await screen.findByLabelText("Conversation name")) as HTMLInputElement;
         fireEvent.change(field, { target: { value: "Renamed chat" } });
         fireEvent.keyDown(field, { key: "Enter" });
-        expect(await screen.findByText("Couldn't rename the conversation. Try again.")).toBeTruthy();
+        expect(
+            await screen.findByText("Couldn't rename the conversation. Try again.")
+        ).toBeTruthy();
         expect(screen.getByText("Fresh one")).toBeTruthy();
         expect(screen.queryByText("Renamed chat")).toBeNull();
         expect(screen.getByText("Long ago")).toBeTruthy();

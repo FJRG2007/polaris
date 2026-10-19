@@ -149,8 +149,9 @@ describe("an empty panel", () => {
 describe("the / commands", () => {
     const options = () => screen.queryAllByRole("option").map((option) => option.textContent);
     const highlighted = () =>
-        screen.getAllByRole("option").find((option) => option.getAttribute("aria-selected") === "true")
-            ?.textContent;
+        screen
+            .getAllByRole("option")
+            .find((option) => option.getAttribute("aria-selected") === "true")?.textContent;
     const slash = (text: string) =>
         fireEvent.change(screen.getByLabelText("Message Polar"), { target: { value: text } });
 
@@ -207,16 +208,16 @@ describe("the / commands", () => {
         mount();
         await ready();
         slash("/");
-        const call = screen.getAllByRole("option").find((option) =>
-            option.textContent?.startsWith("/call")
-        )!;
+        const call = screen
+            .getAllByRole("option")
+            .find((option) => option.textContent?.startsWith("/call"))!;
         expect(call.getAttribute("aria-disabled")).toBe("true");
         expect(call.textContent).toContain("Coming in a later update");
         fireEvent.mouseDown(call);
         expect(screen.getByRole("listbox")).toBeTruthy();
-        const tools = screen.getAllByRole("option").find((option) =>
-            option.textContent?.startsWith("/tools")
-        )!;
+        const tools = screen
+            .getAllByRole("option")
+            .find((option) => option.textContent?.startsWith("/tools"))!;
         fireEvent.mouseEnter(tools);
         expect(highlighted()).toMatch(/^\/tools/);
         fireEvent.mouseDown(tools);

@@ -145,7 +145,11 @@ export function ModelSelector({
                 }}
             >
                 {providers.length > 0 ? (
-                    <MenuSearch value={query} onChange={setQuery} placeholder={t("picker.search")} />
+                    <MenuSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("picker.search")}
+                    />
                 ) : null}
                 {searching && shown.length === 0 ? (
                     <p className="px-2 py-3 text-center text-xs text-muted-foreground">

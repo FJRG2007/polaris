@@ -69,7 +69,9 @@ function CopyButton({ code }: { code: string }) {
             onClick={() => void copy(code)}
             className={cn(
                 "shrink-0 rounded p-1 transition-colors",
-                copied ? "text-success" : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                copied
+                    ? "text-success"
+                    : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
             )}
         >
             <CopyIcon copied={copied} />

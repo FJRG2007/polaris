@@ -62,7 +62,15 @@ export function CopyIcon({ copied, className }: { copied: boolean; className?: s
     );
 }
 
-export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
+export function CopyButton({
+    value,
+    label,
+    className
+}: {
+    value: string;
+    label?: string;
+    className?: string;
+}) {
     const words = useUiStrings();
     const { copied, copy } = useCopied();
 
@@ -71,7 +79,10 @@ export function CopyButton({ value, label, className }: { value: string; label?:
             type="button"
             aria-label={words.copyNamed(label ?? value)}
             title={words.copy}
-            className={cn("text-muted-foreground transition-colors hover:text-foreground", className)}
+            className={cn(
+                "text-muted-foreground transition-colors hover:text-foreground",
+                className
+            )}
             onClick={() => void copy(value)}
         >
             <CopyIcon copied={copied} />

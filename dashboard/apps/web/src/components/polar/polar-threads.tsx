@@ -86,11 +86,16 @@ export function PolarThreads({
                 {threads === null ? (
                     <div className="space-y-2 p-2">
                         {[0, 1, 2].map((key) => (
-                            <div key={key} className="h-6 rounded bg-muted motion-safe:animate-pulse" />
+                            <div
+                                key={key}
+                                className="h-6 rounded bg-muted motion-safe:animate-pulse"
+                            />
                         ))}
                     </div>
                 ) : threads.length === 0 ? (
-                    <p className="px-2 py-1.5 text-sm text-muted-foreground">{t("history.empty")}</p>
+                    <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                        {t("history.empty")}
+                    </p>
                 ) : (
                     <>
                         {groupThreads(threads).map(({ group, rows }) => (

@@ -844,9 +844,8 @@ export function PolarChat({
         disabled: LATER.has(command)
     }));
     const slashOpen = !slashDismissed && slashItems.length > 0;
-    const slashHighlight = slashItems[slashActive]?.disabled === false
-        ? slashActive
-        : firstPickable(slashItems);
+    const slashHighlight =
+        slashItems[slashActive]?.disabled === false ? slashActive : firstPickable(slashItems);
     const ids = fullPage
         ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
         : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
@@ -1171,7 +1170,9 @@ export function PolarChat({
                     <>
                         <Conversation>
                             <ConversationContent
-                                className={fullPage ? "mx-auto w-full max-w-3xl px-4 py-6" : undefined}
+                                className={
+                                    fullPage ? "mx-auto w-full max-w-3xl px-4 py-6" : undefined
+                                }
                             >
                                 {noKeys ? (
                                     <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
