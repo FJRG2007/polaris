@@ -6,7 +6,8 @@
     "description": "Cloud servers: create, run, resize and destroy servers at eight cloud providers, each enrolled as a Polaris server on first boot, with what they cost. A section of Servers on every Polaris.",
     "polaris": {
         "id": "cloud-servers",
-        "extension": "src/lib/cloud-extension.ts#cloudServersExtension"
+        "extension": "src/lib/cloud-extension.ts#cloudServersExtension",
+        "slot": "src/screens/extension-slot.tsx#CloudServersSlot"
     },
     "dependencies": {
         "@polaris/app-host": "0.1.0",

@@ -40,6 +40,12 @@ vi.mock("@/lib/connections/store", () => ({
     connectionLimit: async () => 1,
     connectionSignInAllowed: async () => false
 }));
+// The apps' sections and the organizations offered below are their own tests.
+vi.mock("../../src/app/(app)/account/connections/app-sections", () => ({
+    hubSearch: () => "",
+    hubAppSections: async () => ({ node: null, ids: [] })
+}));
+vi.mock("@/lib/connections/org-scope", () => ({ managedConnectionOrgs: async () => [] }));
 vi.mock("@/lib/presence-activity/lastfm-poll", () => ({ lastfmApiKey: async () => null }));
 vi.mock("@/lib/connections/attention", () => ({
     connectionFailure: async (provider: string) =>

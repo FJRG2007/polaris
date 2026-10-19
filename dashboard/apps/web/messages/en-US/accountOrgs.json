@@ -427,5 +427,11 @@
             "cpus": "This would take your organization past its limit of {limit} CPU cores. Ask an admin to raise it.",
             "memoryMb": "This would take your organization past its limit of {limit} MB of memory. Ask an admin to raise it."
         }
+    },
+    "connections": {
+        "title": "Connected accounts",
+        "intro": "Accounts connected for this organization rather than for one person. Who can connect, use and remove them depends on each app.",
+        "readOnly": "Accounts connected for this organization. Only people who manage the organization can connect or remove them.",
+        "empty": "None of this Polaris's apps connect accounts for an organization yet."
     }
 }

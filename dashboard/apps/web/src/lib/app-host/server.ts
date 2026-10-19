@@ -43,6 +43,7 @@ import type {
     AppWidgetView,
     AppSlot,
     ChatGameLink,
+    ConnectionsViewer,
     RelayedChannelMessage
 } from "@/lib/app-extensions/types";
 import type { InstallConfig } from "@/lib/apps/install-config";
@@ -310,7 +311,9 @@ export const serverHost = {
     // What Cloud servers reaches: its credentials sealed with the master key,
     // and the same enrollment a server added by hand goes through.
     cloudServersHost: {
+        cloudConnectionOrgs: later(load.cloudServersHost, "cloudConnectionOrgs"),
         cloudEnrollmentStatus: later(load.cloudServersHost, "cloudEnrollmentStatus"),
+        managesCloudOrg: later(load.cloudServersHost, "managesCloudOrg"),
         openCloudEnrollment: later(load.cloudServersHost, "openCloudEnrollment"),
         openCloudSecret: later(load.cloudServersHost, "openCloudSecret"),
         removeCloudHost: later(load.cloudServersHost, "removeCloudHost"),
@@ -568,6 +571,7 @@ declare module "@polaris/app-host" {
         AppWidgetDefinition: AppWidgetDefinition;
         AppWidgetView: AppWidgetView;
         AppSlot: AppSlot;
+        ConnectionsViewer: ConnectionsViewer;
         AppStorageView: AppStorageView;
         BackupSource: BackupSource;
         CalendarLink: CalendarLink;

@@ -648,6 +648,10 @@
                 "refused": "Spotify no aceptó ese client id y secreto. Cópialos de nuevo desde Basic Information de la app.",
                 "unreachable": "No se pudo contactar con Spotify. Inténtalo de nuevo en un momento."
             }
+        },
+        "orgHub": {
+            "title": "Para una organización",
+            "intro": "Una cuenta conectada para una organización es suya. Abre sus conexiones para conectar una allí."
         }
     },
     "details": {

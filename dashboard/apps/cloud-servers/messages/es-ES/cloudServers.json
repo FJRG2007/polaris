@@ -25,7 +25,8 @@
             "clientId": "ID de aplicación (cliente)",
             "clientSecret": "Secreto cliente",
             "serviceAccountJson": "Clave de servicio (JSON)"
-        }
+        },
+        "forOrg": "{provider} - para {org}"
     },
     "servers": {
         "title": "Servidores",
@@ -112,6 +113,14 @@
         "goneAtProvider": "El proveedor ya no tiene este servidor.",
         "noResize": "Este proveedor no cambia el tamaño de los servidores desde su API.",
         "unknownSize": "Ese tamaño no se ofrece en esta región.",
-        "confirmName": "El nombre escrito no coincide."
+        "confirmName": "El nombre escrito no coincide.",
+        "orgNotManaged": "Solo quien gestiona esa organización puede conectarle cuentas."
+    },
+    "hub": {
+        "intro": "Cuentas en proveedores de nube donde se crean los servidores.",
+        "orgIntro": "Cuentas en proveedores de nube conectadas para {org}. Quien la gestiona y usa Servidores cloud crea servidores en ellas.",
+        "readOnly": "Solo quien gestiona {org} y usa Servidores cloud puede conectar o quitar estas cuentas.",
+        "failing": "Esta cuenta ha dejado de responder. Los administradores ya lo saben.",
+        "open": "Abrir Servidores cloud"
     }
 }

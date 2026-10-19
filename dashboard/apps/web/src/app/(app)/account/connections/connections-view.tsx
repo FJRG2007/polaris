@@ -145,12 +145,20 @@ export function linkHref(slug: string, returnTo: string | null): string {
 
 export function ConnectionsView({
     providers,
-    initialSearch = ""
+    initialSearch = "",
+    appSections = null,
+    appSectionIds = []
 }: {
+    /** Empty on an organization's hub: the services here link a person, and an
+     *  organization only owns what its apps connect for it. */
     providers: ConnectionProviderCard[];
     /** The page's query string, so the first render already knows where it came
      *  from and which service it was sent for. */
     initialSearch?: string;
+    /** What the installed apps connect themselves, drawn after the services. */
+    appSections?: ReactNode;
+    /** The app ids among those sections, so `?provider=<app>` can point at one. */
+    appSectionIds?: readonly string[];
 }) {
     const t = useTranslations("account");
     const [notice, setNotice] = useState<{ provider: string; text: string; bad: boolean } | null>(
@@ -161,7 +169,10 @@ export function ConnectionsView({
     const [returnTo] = useState<string | null>(() => readReturnTo(initialSearch));
     const [focused] = useState<string | null>(() => {
         const wanted = new URLSearchParams(initialSearch).get("provider");
-        return wanted && providers.some((entry) => entry.slug === wanted) ? wanted : null;
+        return wanted &&
+            (providers.some((entry) => entry.slug === wanted) || appSectionIds.includes(wanted))
+            ? wanted
+            : null;
     });
 
     // `?provider=` is an app pointing at one service: that card is scrolled to
@@ -220,49 +231,51 @@ export function ConnectionsView({
                     </Button>
                 </div>
             ) : null}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative min-w-0 flex-1">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder={t("connections.hub.search")}
-                        aria-label={t("connections.hub.search")}
-                        className="pl-8"
-                    />
-                </div>
-                <div
-                    role="group"
-                    aria-label={t("connections.hub.categories")}
-                    className="flex flex-wrap gap-1"
-                >
-                    {[null, ...CONNECTION_CATEGORIES.map((entry) => entry.id)].map((id) => (
-                        <Button
-                            key={id ?? "all"}
-                            size="sm"
-                            variant={category === id ? "secondary" : "ghost"}
-                            aria-pressed={category === id}
-                            onClick={() => setCategory(id)}
-                        >
-                            {t(`connections.hub.category.${id ?? "all"}` as const)}
-                            <span
-                                className="text-xs text-muted-foreground tabular-nums"
-                                title={t("connections.hub.connectedCount")}
+            {providers.length > 0 ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={t("connections.hub.search")}
+                            aria-label={t("connections.hub.search")}
+                            className="pl-8"
+                        />
+                    </div>
+                    <div
+                        role="group"
+                        aria-label={t("connections.hub.categories")}
+                        className="flex flex-wrap gap-1"
+                    >
+                        {[null, ...CONNECTION_CATEGORIES.map((entry) => entry.id)].map((id) => (
+                            <Button
+                                key={id ?? "all"}
+                                size="sm"
+                                variant={category === id ? "secondary" : "ghost"}
+                                aria-pressed={category === id}
+                                onClick={() => setCategory(id)}
                             >
-                                {
-                                    providers.filter(
-                                        (entry) =>
-                                            (id === null || entry.category === id) &&
-                                            entry.accounts.length > 0
-                                    ).length
-                                }
-                            </span>
-                        </Button>
-                    ))}
+                                {t(`connections.hub.category.${id ?? "all"}` as const)}
+                                <span
+                                    className="text-xs text-muted-foreground tabular-nums"
+                                    title={t("connections.hub.connectedCount")}
+                                >
+                                    {
+                                        providers.filter(
+                                            (entry) =>
+                                                (id === null || entry.category === id) &&
+                                                entry.accounts.length > 0
+                                        ).length
+                                    }
+                                </span>
+                            </Button>
+                        ))}
+                    </div>
                 </div>
-            </div>
-            {sections.length === 0 ? (
+            ) : null}
+            {providers.length > 0 && sections.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                     {t("connections.hub.noMatch", { query: query.trim() })}
                 </p>
@@ -290,6 +303,7 @@ export function ConnectionsView({
                     ))}
                 </section>
             ))}
+            {appSections}
         </div>
     );
 }

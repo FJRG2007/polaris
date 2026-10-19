@@ -14,6 +14,10 @@ const MINUTE = 60_000;
 
 export const cloudServersExtension: AppExtension = {
     id: "cloud-servers",
+    // Its accounts are connected from the connections hubs, a person's own or
+    // an organization's, rather than from its own screen.
+    connectionsSlot: async (viewer) =>
+        (await import("./connections-slot")).cloudConnectionsSlot(viewer),
     jobs: () => [
         {
             key: "cloud-servers-refresh",

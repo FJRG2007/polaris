@@ -25,7 +25,8 @@
             "clientId": "Application (client) ID",
             "clientSecret": "Client secret",
             "serviceAccountJson": "Service account key (JSON)"
-        }
+        },
+        "forOrg": "{provider} - for {org}"
     },
     "servers": {
         "title": "Servers",
@@ -112,6 +113,14 @@
         "goneAtProvider": "The provider no longer has this server.",
         "noResize": "This provider does not resize servers through its API.",
         "unknownSize": "That size is not offered in this region.",
-        "confirmName": "The name typed does not match."
+        "confirmName": "The name typed does not match.",
+        "orgNotManaged": "Only people who manage that organization can connect accounts for it."
+    },
+    "hub": {
+        "intro": "Accounts at cloud providers that servers are created at.",
+        "orgIntro": "Accounts at cloud providers connected for {org}. Its managers who use Cloud servers create servers at them.",
+        "readOnly": "Only people who manage {org} and use Cloud servers can connect or remove these.",
+        "failing": "This account stopped answering. The administrators know.",
+        "open": "Open Cloud servers"
     }
 }

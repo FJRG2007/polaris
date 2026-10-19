@@ -2728,6 +2728,14 @@ export function orgSubapp(slug: string): AppSubapp {
                 keywords: ["dns", "deploys", "hostnames", "custom domain", "wildcard"]
             },
             {
+                // Everybody on the roster sees what the organization has
+                // connected; only its managers are offered Connect and Remove.
+                label: "Connected accounts", // i18n-ignore
+                href: `${base}/connections`,
+                icon: Link2,
+                keywords: ["connections", "cloud", "accounts", "providers", "api token"]
+            },
+            {
                 label: "Billing", // i18n-ignore
                 href: `${base}/billing`,
                 icon: Wallet,

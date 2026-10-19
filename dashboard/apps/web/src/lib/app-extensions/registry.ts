@@ -26,6 +26,7 @@ import type {
     AppRecordHit,
     AppSlot,
     AppWidgetDefinition,
+    ConnectionsViewer,
     ChatCommandSpec,
     ChatGameLink,
     ExtensionInstall,
@@ -573,6 +574,28 @@ export async function channelRelayer(): Promise<
 export async function appReaches(appId: string, userId: string): Promise<boolean> {
     const extension = extensions().find((entry) => entry.id === appId);
     return extension?.reaches ? extension.reaches(userId) : false;
+}
+
+/**
+ * What the installed apps add to a connections hub, in registry order. One
+ * app failing to answer leaves its section out and never anybody else's.
+ */
+export async function connectionsSlots(viewer: ConnectionsViewer): Promise<AppSlot[]> {
+    const offering = await installedWith("connectionsSlot");
+    const answers = await Promise.all(
+        offering.map((extension) =>
+            (extension.connectionsSlot?.(viewer) ?? Promise.resolve(null)).catch(
+                (caught: unknown) => {
+                    console.error(
+                        `polaris: ${extension.id} could not draw its connections:`,
+                        caught
+                    );
+                    return null;
+                }
+            )
+        )
+    );
+    return answers.filter((slot): slot is AppSlot => slot !== null).map(withBundleSlot);
 }
 
 /** The panel an app draws on one of its installs' pages. */

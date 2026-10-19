@@ -11,9 +11,10 @@
 
 import Link from "next/link";
 import { useCloudT } from "./i18n";
+import { CONNECT_HREF } from "../lib/cloud-routes";
 import * as actions from "../actions/cloud";
 import type { Overview } from "../actions/cloud";
-import type { ServerView } from "../lib/service";
+import type { AccountView, ServerView } from "../lib/service";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cloud, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -41,6 +42,7 @@ import {
     DropdownMenuTrigger,
     EmptyState,
     Input,
+    Select,
     Skeleton,
     Textarea
 } from "@polaris/ui";
@@ -98,7 +100,6 @@ export function CloudServersScreen() {
     const t = useCloudT();
     const [data, setData] = useState<Overview | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [connectOpen, setConnectOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [resizing, setResizing] = useState<ServerView | null>(null);
     const [destroying, setDestroying] = useState<ServerView | null>(null);
@@ -160,9 +161,13 @@ export function CloudServersScreen() {
                     <p className="text-sm text-muted-foreground">{t("intro")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => setConnectOpen(true)}>
-                        <Plus className="size-4" />
-                        {t("accounts.connect")}
+                    {/* Accounts are connected in Profile > Connections, or an
+                        organization's, which bring the reader back here. */}
+                    <Button asChild variant="outline">
+                        <Link href={CONNECT_HREF}>
+                            <Plus className="size-4" />
+                            {t("accounts.connect")}
+                        </Link>
                     </Button>
                     <Button
                         onClick={() => setCreateOpen(true)}
@@ -238,14 +243,6 @@ export function CloudServersScreen() {
                 )}
             </section>
 
-            <ConnectDialog
-                open={connectOpen}
-                onOpenChange={setConnectOpen}
-                onConnected={() => {
-                    setConnectOpen(false);
-                    void load();
-                }}
-            />
             {createOpen && (
                 <CreateDialog
                     accounts={accounts}
@@ -308,7 +305,14 @@ function AccountCard({
                 <p className="truncate font-medium" title={account.name}>
                     {account.name}
                 </p>
-                <p className="text-xs text-muted-foreground">{PROVIDER_NAMES[account.provider]}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                    {account.organization
+                        ? t("accounts.forOrg", {
+                              provider: PROVIDER_NAMES[account.provider],
+                              org: account.organization.name
+                          })
+                        : PROVIDER_NAMES[account.provider]}
+                </p>
                 <p className="mt-1 text-sm">
                     {t("accounts.monthTotal")}:{" "}
                     {sums.length === 0
@@ -585,14 +589,17 @@ function Field({
     );
 }
 
-function ConnectDialog({
+export function ConnectDialog({
     open,
+    orgId = null,
     onOpenChange,
     onConnected
 }: {
     open: boolean;
+    /** The organization it is connected for; null for the reader's own. */
+    orgId?: string | null;
     onOpenChange: (open: boolean) => void;
-    onConnected: () => void;
+    onConnected: (account: AccountView) => void;
 }) {
     const t = useCloudT();
     const [provider, setProvider] = useState<ProviderId>("hetzner");
@@ -613,13 +620,14 @@ function ConnectDialog({
         const answer = await actions.connectAccountAction({
             provider,
             name: name.trim(),
-            credentials
+            credentials,
+            orgId
         });
         setBusy(false);
         if (!answer.ok) return setError(answer.error);
         setValues({});
         setName("");
-        onConnected();
+        onConnected(answer.account);
     }
 
     return (
@@ -630,20 +638,15 @@ function ConnectDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <Field label={t("accounts.provider")}>
-                        <select
-                            className={SELECT}
+                        <Select
                             value={provider}
-                            onChange={(e) => {
-                                setProvider(e.target.value as ProviderId);
+                            aria-label={t("accounts.provider")}
+                            options={PROVIDERS.map((p) => ({ value: p, label: PROVIDER_NAMES[p] }))}
+                            onValueChange={(value) => {
+                                setProvider(value as ProviderId);
                                 setValues({});
                             }}
-                        >
-                            {PROVIDERS.map((p) => (
-                                <option key={p} value={p}>
-                                    {PROVIDER_NAMES[p]}
-                                </option>
-                            ))}
-                        </select>
+                        />
                     </Field>
                     <Field label={`${t("accounts.name")} *`}>
                         <Input
@@ -1114,7 +1117,7 @@ function DestroyDialog({
     );
 }
 
-function RemoveAccountDialog({
+export function RemoveAccountDialog({
     account,
     onClose,
     onDone
