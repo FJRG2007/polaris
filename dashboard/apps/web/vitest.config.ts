@@ -29,7 +29,11 @@ export default defineConfig({
         // What an installable app takes from the dashboard, provided before any
         // test loads one. Every service in it loads on first use, so a test that
         // replaces a dashboard module replaces it for the apps too.
-        setupFiles: ["./test/setup/app-host.ts", "./test/setup/chat-polls.ts"],
+        setupFiles: [
+            "./test/setup/app-host.ts",
+            "./test/setup/chat-polls.ts",
+            "./test/setup/app-polls.ts"
+        ],
         testTimeout: 30_000,
         hookTimeout: 30_000
     }

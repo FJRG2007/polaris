@@ -11,6 +11,8 @@ import Link from "next/link";
 import { CronPanel } from "./cron-panel";
 import { FilesPanel } from "./files-panel";
 import * as deployActions from "./actions";
+import * as polls from "./deploy-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { VolumesTab } from "./volumes-panel";
 import { SettingsTab } from "./service-settings";
 import { SettingsSection } from "./settings-kit";
@@ -762,8 +764,12 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
     const [successOpen, setSuccessOpen] = useState(false);
     const [busy, startTransition] = useTransition();
 
+    const signal = useUnmountSignal();
     function reload() {
-        void deployActions.listDeploymentsAction(app.id).then(setItems);
+        void polls
+            .deployments(app.id, signal())
+            .then(setItems)
+            .catch(() => undefined);
     }
     useEffect(reload, [app.id]);
 

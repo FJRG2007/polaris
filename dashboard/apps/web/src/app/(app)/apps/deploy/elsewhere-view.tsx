@@ -28,6 +28,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as actions from "@/app/(app)/apps/deploy/external-actions";
+import * as polls from "@/app/(app)/apps/deploy/deploy-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import type { ProviderChoice } from "@/lib/deploy/providers/contract";
 import type { ExternalServiceView } from "@/lib/deploy/external-services";
 import {
@@ -136,9 +138,10 @@ export function ElsewhereView({
         );
     }, []);
 
+    const signal = useUnmountSignal();
     const refresh = useCallback(
         async (id: string) => {
-            const result = await actions.refreshExternalServiceAction(projectId, id);
+            const result = await polls.externalServiceStatus(projectId, id, signal());
             if (result.service) settle(result.service);
         },
         [projectId, settle]

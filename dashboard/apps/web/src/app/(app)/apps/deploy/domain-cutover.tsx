@@ -11,6 +11,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import * as polls from "./deploy-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import type { CutoverFailure, CutoverPhase, CutoverView } from "@/lib/deploy/dns-cutover";
 import {
     ArrowRightLeft,
@@ -22,7 +24,6 @@ import {
     XCircle
 } from "lucide-react";
 import {
-    cutoverPanelAction,
     rollbackCutoverAction,
     startCutoverAction,
     switchCutoverAction,
@@ -123,11 +124,12 @@ export function DomainCutoverButton({
         [domainId]
     );
 
+    const signal = useUnmountSignal();
     const refresh = useCallback(async () => {
         if (asking.current) return;
         asking.current = true;
         try {
-            take(await cutoverPanelAction(domainId));
+            take(await polls.cutoverPanel(domainId, signal()));
         } finally {
             asking.current = false;
             setLoading(false);

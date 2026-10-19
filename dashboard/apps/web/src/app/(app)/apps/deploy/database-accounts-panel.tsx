@@ -13,6 +13,8 @@
 import * as core from "@polaris/core";
 import { CopyRow } from "./deploy-view";
 import * as actions from "./database-actions";
+import * as polls from "./deploy-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { Badge, Button, Input, Select, Skeleton } from "@polaris/ui";
@@ -430,8 +432,9 @@ export function ProcessesSection({
     const [processes, setProcesses] = useState<Process[] | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    const signal = useUnmountSignal();
     const load = useCallback(async () => {
-        const result = await actions.listDatabaseProcessesAction(databaseId);
+        const result = await polls.databaseProcesses(databaseId, signal());
         if (result.processes) {
             setProcesses(result.processes);
             setError(null);
