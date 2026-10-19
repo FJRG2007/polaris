@@ -107,7 +107,11 @@ export function PersonDialog({
 
         if (refused.length > 0) {
             setError(
-                t("people.refused", { count: refused.length, total: chosen.length, first: refused[0] ?? "" })
+                t("people.refused", {
+                    count: refused.length,
+                    total: chosen.length,
+                    first: refused[0] ?? ""
+                })
             );
             // The person exists either way, so the list is told about them.
             onSaved({ ...created.person, faces: chosen.length - refused.length });
@@ -121,15 +125,14 @@ export function PersonDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("people.add")}</DialogTitle>
-                    <DialogDescription>
-                        {t("people.addIntro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("people.addIntro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            {t("placeDialog.name")}<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
@@ -184,9 +187,7 @@ export function PersonDialog({
                             {chosen.length > 0 ? t("people.addMore") : t("people.choose")}
                         </Button>
                         <span className="text-[0.6875rem] text-foreground-subtle">
-                            {recognizerReady
-                                ? t("people.photosHint")
-                                : t("people.facesOff")}
+                            {recognizerReady ? t("people.photosHint") : t("people.facesOff")}
                         </span>
                         {chooser}
                     </div>

@@ -23,7 +23,9 @@ export function ReportsTab({ serverId }: { serverId: string }) {
     const t = useTranslations("mailServer");
     const format = useDisplayFormat();
     const [range, setRange] = useState<Range>("30");
-    const panel = usePanelData(`dmarc:${serverId}:${range}`, () => dmarcAction({ serverId, days: Number(range) }));
+    const panel = usePanelData(`dmarc:${serverId}:${range}`, () =>
+        dmarcAction({ serverId, days: Number(range) })
+    );
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
     const [chooseFiles, chooser] = useChooseFiles();
@@ -35,7 +37,10 @@ export function ReportsTab({ serverId }: { serverId: string }) {
         setBusy(false);
         if (answer.error) setMessage({ tone: "error", text: answer.error });
         else if ("filed" in answer) {
-            setMessage({ tone: "ok", text: t("reports.collected", { messages: answer.messages, filed: answer.filed }) });
+            setMessage({
+                tone: "ok",
+                text: t("reports.collected", { messages: answer.messages, filed: answer.filed })
+            });
             await panel.reload();
         }
     }
@@ -45,13 +50,22 @@ export function ReportsTab({ serverId }: { serverId: string }) {
         setMessage(null);
         const body = new FormData();
         body.append("file", chosen);
-        const response = await fetch(`/api/mail-server/${serverId}/reports`, { method: "POST", body }).catch(() => null);
-        const answer = (await response?.json().catch(() => null)) as { error?: string; filed?: number; ignored?: number } | null;
+        const response = await fetch(`/api/mail-server/${serverId}/reports`, {
+            method: "POST",
+            body
+        }).catch(() => null);
+        const answer = (await response?.json().catch(() => null)) as {
+            error?: string;
+            filed?: number;
+            ignored?: number;
+        } | null;
         setBusy(false);
         if (!response?.ok || !answer || answer.error) {
             setMessage({
                 tone: "error",
-                text: answer?.error ? mailServerRefusalText(t, answer.error) : t("reports.uploadFailed")
+                text: answer?.error
+                    ? mailServerRefusalText(t, answer.error)
+                    : t("reports.uploadFailed")
             });
             return;
         }
@@ -83,26 +97,46 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                     ]}
                 />
                 <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void collect()} disabled={busy}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void collect()}
+                        disabled={busy}
+                    >
                         <RefreshCw className={busy ? "animate-spin" : undefined} />
                         {t("reports.read")}
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() =>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
                             void chooseFiles({
                                 accept: ".xml,.gz,.zip,.eml,application/xml,application/gzip,application/zip,message/rfc822",
                                 onFailed: (text) => setMessage({ tone: "error", text })
                             }).then(([chosen]) => {
                                 if (chosen) void upload(chosen);
                             })
-                        } disabled={busy}>
+                        }
+                        disabled={busy}
+                    >
                         <Upload />
                         {t("reports.upload")}
                     </Button>
                     {chooser}
                 </div>
             </div>
-            {message ? <p className={message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"}>{message.text}</p> : null}
-            {panel.error && !overview ? <PanelError message={panel.error} onRetry={() => void panel.reload()} /> : null}
+            {message ? (
+                <p
+                    className={
+                        message.tone === "error" ? "text-xs text-danger" : "text-xs text-success"
+                    }
+                >
+                    {message.text}
+                </p>
+            ) : null}
+            {panel.error && !overview ? (
+                <PanelError message={panel.error} onRetry={() => void panel.reload()} />
+            ) : null}
             {overview ? (
                 <p className="text-xs text-muted-foreground">
                     {t.rich("reports.address", {
@@ -113,7 +147,10 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                         ? t("reports.lastRead", { when: format.dateTime(overview.checkedAt) })
                         : t("reports.notRead")}
                     {overview.error ? (
-                        <span className="text-danger"> {mailServerRefusalText(t, overview.error)}</span>
+                        <span className="text-danger">
+                            {" "}
+                            {mailServerRefusalText(t, overview.error)}
+                        </span>
                     ) : null}
                 </p>
             ) : null}
@@ -147,23 +184,26 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                                     <td className="py-2 pr-3">{source.messages}</td>
                                     <td className="py-2 pr-3 text-success">{source.passed}</td>
                                     <td className="py-2 pr-3 text-danger">{source.failed}</td>
-                                    <td className="py-2 pr-3 text-xs text-muted-foreground">{source.reporters.join(", ")}</td>
+                                    <td className="py-2 pr-3 text-xs text-muted-foreground">
+                                        {source.reporters.join(", ")}
+                                    </td>
                                     <td className="py-2">
-                                        <VerdictBadge verdict={source.verdict} label={
+                                        <VerdictBadge
+                                            verdict={source.verdict}
+                                            label={
                                                 source.verdict === "pass"
                                                     ? t("reports.passes")
                                                     : source.verdict === "fail"
                                                       ? t("reports.fails")
                                                       : t("reports.someFail")
-                                            } />
+                                            }
+                                        />
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                        {t("reports.failHint")}
-                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">{t("reports.failHint")}</p>
                 </div>
             ) : null}
             {overview && overview.reports.length > 0 ? (
@@ -173,14 +213,20 @@ export function ReportsTab({ serverId }: { serverId: string }) {
                     </summary>
                     <ul className="mt-2 flex flex-col divide-y divide-border">
                         {overview.reports.map((report) => (
-                            <li key={report.id} className="flex flex-wrap items-center gap-2 py-1.5">
+                            <li
+                                key={report.id}
+                                className="flex flex-wrap items-center gap-2 py-1.5"
+                            >
                                 <span className="text-foreground">{report.orgName}</span>
                                 <span className="text-muted-foreground">{report.domain}</span>
                                 <span className="text-xs text-foreground-subtle">
                                     {format.date(report.beginAt)} - {format.date(report.endAt)}
                                 </span>
                                 <span className="ml-auto text-xs text-muted-foreground">
-                                    {t("reports.reportLine", { messages: report.messages, failed: report.failed })}
+                                    {t("reports.reportLine", {
+                                        messages: report.messages,
+                                        failed: report.failed
+                                    })}
                                 </span>
                             </li>
                         ))}

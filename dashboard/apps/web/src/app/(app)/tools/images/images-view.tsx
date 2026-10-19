@@ -84,7 +84,9 @@ export function ImagesView() {
                 });
                 if (!answer.ok) {
                     // The server says which: too large, or not a picture at all.
-                    const said = (await answer.json().catch(() => null)) as { error?: unknown } | null;
+                    const said = (await answer.json().catch(() => null)) as {
+                        error?: unknown;
+                    } | null;
                     throw new Error(typeof said?.error === "string" ? said.error : "");
                 }
                 setFacts((await answer.json()) as Facts);
@@ -217,7 +219,11 @@ export function ImagesView() {
                                 </Fact>
                                 <Fact label={t("images.now")}>
                                     {made
-                                        ? t("images.size", { width: made.width, height: made.height, weight: weigh(made.bytes) })
+                                        ? t("images.size", {
+                                              width: made.width,
+                                              height: made.height,
+                                              weight: weigh(made.bytes)
+                                          })
                                         : "-"}
                                 </Fact>
                                 <Fact label={t("images.saved")}>
@@ -230,7 +236,9 @@ export function ImagesView() {
                                         {made ? `${Math.round(saved * 100)}%` : "-"}
                                     </span>
                                 </Fact>
-                                <Fact label={t("images.taken")}>{facts.taken ?? t("images.notRecorded")}</Fact>
+                                <Fact label={t("images.taken")}>
+                                    {facts.taken ?? t("images.notRecorded")}
+                                </Fact>
                             </dl>
                         ) : null}
 
@@ -294,7 +302,9 @@ export function ImagesView() {
                         <label className="flex items-start justify-between gap-3 text-sm">
                             <span className="flex flex-col">
                                 {t("images.keepInfo")}
-                                <span className="text-xs text-foreground-subtle">{t("images.keepInfoHint")}</span>
+                                <span className="text-xs text-foreground-subtle">
+                                    {t("images.keepInfoHint")}
+                                </span>
                             </span>
                             <Switch
                                 checked={keepMetadata}
