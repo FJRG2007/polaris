@@ -596,7 +596,15 @@ export function Composer() {
                                             onValueChange={(next) => {
                                                 const [kind, id] = next.split(":");
                                                 if (kind === "identity") {
-                                                    setIdentityId(id ?? "");
+                                                    const owner = Object.keys(identities).find(
+                                                        (account) =>
+                                                            identities[account]?.some(
+                                                                (alias) => alias.id === id
+                                                            )
+                                                    );
+                                                    if (!owner || !id) return;
+                                                    setAccountId(owner);
+                                                    setIdentityId(id);
                                                     return;
                                                 }
                                                 setAccountId(id ?? "");

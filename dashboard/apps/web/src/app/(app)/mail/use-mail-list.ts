@@ -180,7 +180,10 @@ export function useMailList(
         // not written back: it is older than what the device may already hold.
         async (signal: AbortSignal) => {
             const requestedAt = Date.now();
-            const fetched = await readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal);
+            const fetched = await readJson<MailListAnswer>(
+                `/api/mail/threads?${params}&shelf=${encodeURIComponent(shelf)}`,
+                signal
+            );
             const answer: MailListAnswer = { ...fetched, requestedAt };
             mailCache.write("list", keptId, answer, mailbox);
             return answer;

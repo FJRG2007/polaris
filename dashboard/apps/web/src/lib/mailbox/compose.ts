@@ -30,7 +30,13 @@ import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
 import { composeMime, sendMime, MailRejectedError, type OutgoingMessage } from "./send";
-import { announcePartial, announceUnsent, recordSend, recordSentCopy, type MailSentCopy } from "./delivery";
+import {
+    announcePartial,
+    announceUnsent,
+    recordSend,
+    recordSentCopy,
+    type MailSentCopy
+} from "./delivery";
 
 /** What the composer sends up. */
 export interface ComposeInput {
@@ -62,6 +68,16 @@ export interface ComposeInput {
  */
 export async function saveDraft(userId: string, input: ComposeInput): Promise<string> {
     await ownedAccount(userId, input.accountId);
+    // The address it goes from belongs to the mailbox it goes through: an
+    // identity of another mailbox would put one address on the From line of a
+    // message sent by a different one.
+    if (input.identityId) {
+        const identity = await prisma.mailIdentity.findFirst({
+            where: { id: input.identityId, accountId: input.accountId },
+            select: { id: true }
+        });
+        if (!identity) throw new MailAccessError();
+    }
     const ancestry = await ancestryFor(userId, input.inReplyToId);
 
     const data = {

@@ -115,7 +115,7 @@ describe("what a live frame does", () => {
         expect(route).toContain('sessionCan(session, "mail.use")');
         // Through Mail's own resolver, which is the shelf in the header unless
         // somebody asked Mail to show every mailbox at once.
-        expect(route).toContain("mailShelfFor(session.id)");
+        expect(route).toContain("mailShelfOfTab(session.id, asked)");
     });
 
     it("validates what comes back rather than blanking the rail on a shape it does not know", () => {

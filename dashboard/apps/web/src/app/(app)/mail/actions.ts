@@ -43,7 +43,7 @@ import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
 import * as mailNotices from "@/lib/mailbox/mail-notices";
 import * as contacts from "@/lib/mailbox/contacts";
-import { mailShelfFor } from "@/lib/mailbox/shelf";
+import { mailShelfOfTab } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as attachFrom from "@/lib/mailbox/attach-from";
@@ -407,11 +407,11 @@ export async function syncAccountAction(accountId: string) {
 }
 
 /** Every mailbox at once, for the refresh on the unified view. */
-export async function syncAllAction() {
+export async function syncAllAction(shelf?: string) {
     const userId = await actorId();
     // The shelf being looked at, because this is the refresh button on a rail:
     // it syncs what is in front of somebody, not every mailbox they have.
-    const ids = await ownedAccountIds(userId, await mailShelfFor(userId));
+    const ids = await ownedAccountIds(userId, await mailShelfOfTab(userId, shelf));
     for (const id of ids) await syncAccount(id).catch(() => undefined);
     refresh();
     return {};
@@ -599,11 +599,11 @@ export async function fileDraftOnServerAction(draftId: string) {
 }
 
 /** Who to offer as somebody types a recipient. */
-export async function suggestContactsAction(query: string) {
+export async function suggestContactsAction(query: string, shelf?: string) {
     const userId = await actorId();
     // The people this shelf writes to. A company address suggesting a personal
     // contact is the wrong recipient offered on the wrong letterhead.
-    const accountIds = await ownedAccountIds(userId, await mailShelfFor(userId));
+    const accountIds = await ownedAccountIds(userId, await mailShelfOfTab(userId, shelf));
     return { suggestions: await contacts.suggestContacts(accountIds, query) };
 }
 
