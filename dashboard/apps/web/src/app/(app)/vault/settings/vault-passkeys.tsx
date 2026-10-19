@@ -44,7 +44,6 @@ export function VaultPasskeys() {
     const [loadFailed, setLoadFailed] = useState(false);
     const [support, setSupport] = useState<passkeyClient.PasskeySupport | null>(null);
     const [host, setHost] = useState("");
-    const [proved, setProved] = useState(false);
     const [asking, setAsking] = useState<VaultPasskeyChoice | null>(null);
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -64,11 +63,6 @@ export function VaultPasskeys() {
         setHost(window.location.hostname);
         void load();
         void passkeyClient.passkeySupport().then((value) => live && setSupport(value));
-        // A proof given a minute ago on this screen is still good; asking for it
-        // again would be asking for nothing.
-        void stepUpRemainingAction(PURPOSE)
-            .then((result) => live && setProved(result.remainingMs > 0))
-            .catch(() => undefined);
         return () => {
             live = false;
         };
@@ -106,7 +100,6 @@ export function VaultPasskeys() {
             const saved = await enrollVaultPasskeyAction(result.enrollment);
             if (saved.needsProof) {
                 // The two minutes ran out between the proof and the save.
-                setProved(false);
                 setError(saved.error ?? null);
                 setAsking(choice);
                 return;
@@ -158,7 +151,18 @@ export function VaultPasskeys() {
             void turnOff(choice);
             return;
         }
-        if (proved) void turnOn(choice);
+        void proveThenTurnOn(choice);
+    }
+
+    async function proveThenTurnOn(choice: VaultPasskeyChoice) {
+        // A proof given a minute ago on this screen is still good; asking for it
+        // again would be asking for nothing.
+        setPending(choice.passkeyId);
+        const { remainingMs } = await stepUpRemainingAction(PURPOSE).catch(() => ({
+            remainingMs: 0
+        }));
+        setPending(null);
+        if (remainingMs > 0) await turnOn(choice);
         else setAsking(choice);
     }
 
@@ -282,7 +286,6 @@ export function VaultPasskeys() {
                     description={t("passkeys.stepUp")}
                     onOpenChange={(open) => !open && setAsking(null)}
                     onProved={() => {
-                        setProved(true);
                         const choice = asking;
                         setAsking(null);
                         if (choice) void turnOn(choice);

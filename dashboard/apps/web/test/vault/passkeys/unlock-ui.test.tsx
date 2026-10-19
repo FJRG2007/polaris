@@ -150,10 +150,30 @@ describe("the passkeys card in settings", () => {
 
     it("asks for the step-up proof, not the master password, before turning one on", async () => {
         render(<VaultPasskeys />, { wrapper: MessagesWrapper });
-        await waitFor(() => expect(stepUp.stepUpRemainingAction).toHaveBeenCalled());
         fireEvent.click(await screen.findByRole("switch"));
         expect(await screen.findByRole("dialog")).toBeTruthy();
+        expect(stepUp.stepUpRemainingAction).toHaveBeenCalledWith("vault-passkeys");
         expect(enrollWithPasskey).not.toHaveBeenCalled();
+    });
+
+    it("asks again, before any ceremony, once an earlier proof has run out", async () => {
+        const other = { ...CHOICE, passkeyId: `${CHOICE.passkeyId.slice(0, -2)}bb`, name: "Phone" };
+        actions.vaultPasskeyChoicesAction.mockResolvedValue([CHOICE, other]);
+        stepUp.stepUpRemainingAction
+            .mockResolvedValueOnce({ remainingMs: 1_000 })
+            .mockResolvedValue({ remainingMs: 0 });
+        enrollWithPasskey.mockResolvedValue({
+            enrollment: { credentialId: CHOICE.credentialId, prfSalt: "s", wrappedKey: "w" }
+        });
+        actions.enrollVaultPasskeyAction.mockResolvedValue({});
+        render(<VaultPasskeys />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("switch", { name: /work laptop/i }));
+        await waitFor(() => expect(actions.enrollVaultPasskeyAction).toHaveBeenCalled());
+        const phone = screen.getByRole("switch", { name: /phone/i });
+        await waitFor(() => expect((phone as HTMLButtonElement).disabled).toBe(false));
+        fireEvent.click(phone);
+        expect(await screen.findByRole("dialog")).toBeTruthy();
+        expect(enrollWithPasskey).toHaveBeenCalledTimes(1);
     });
 
     it("runs the ceremony with that one passkey when this session already proved itself", async () => {
@@ -162,11 +182,7 @@ describe("the passkeys card in settings", () => {
         enrollWithPasskey.mockResolvedValue({ enrollment });
         actions.enrollVaultPasskeyAction.mockResolvedValue({});
         render(<VaultPasskeys />, { wrapper: MessagesWrapper });
-        await waitFor(() => expect(stepUp.stepUpRemainingAction).toHaveBeenCalled());
-        const toggle = await screen.findByRole("switch");
-        // Let the remaining-proof answer land before the switch is pressed.
-        await act(async () => undefined);
-        fireEvent.click(toggle);
+        fireEvent.click(await screen.findByRole("switch"));
         await waitFor(() => expect(enrollWithPasskey).toHaveBeenCalled());
         expect(enrollWithPasskey).toHaveBeenCalledWith({
             vaultKey: session.key,

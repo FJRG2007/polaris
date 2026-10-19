@@ -1142,6 +1142,7 @@
         "web/src/app/(app)/vault/settings/page.tsx",
         "web/src/app/(app)/vault/settings/vault-export.tsx",
         "web/src/app/(app)/vault/settings/vault-import.tsx",
+        "web/src/app/(app)/vault/settings/vault-passkeys.tsx",
         "web/src/app/(app)/vault/settings/vault-settings.tsx",
         "web/src/app/(app)/vault/share-actions.ts",
         "web/src/app/(app)/vault/share-item-dialog.tsx",
