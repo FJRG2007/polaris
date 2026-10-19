@@ -420,10 +420,28 @@ export async function playSound(seat: MeetingSeat, ref: string): Promise<void> {
         from: seat.participantId,
         userId
     };
-    if (!(await sendToRoom(seat.meetingId, message, rules.SOUNDBOARD_TOPIC))) {
+    const sent = await sendToRoom(seat.meetingId, message, rules.SOUNDBOARD_TOPIC);
+    if (sent !== "sent") {
         await resetRateLimit(`soundboard:${userId}`);
-        throw new ChatRuleError({ key: "errors.soundboardUnreachable" });
+        throw new ChatRuleError({
+            key: sent === "absent" ? "errors.soundboardNobody" : "errors.soundboardUnreachable"
+        });
     }
+}
+
+/**
+ * Stop the sound this seat is playing, for everybody in the call.
+ *
+ * Nothing to refuse beyond the seat itself: stopping a sound takes nothing from
+ * anybody. A room nobody is connected to has nothing playing, so that is not an
+ * error either. Rate-limited only so a held key is one message, not a stream.
+ */
+export async function stopSound(seat: MeetingSeat): Promise<void> {
+    const allowed = await rateLimit(`soundboard-stop:${seat.participantId}`, 1, 500);
+    if (!allowed.ok) return;
+    const message: rules.SoundStopped = { kind: "stop", from: seat.participantId };
+    const sent = await sendToRoom(seat.meetingId, message, rules.SOUNDBOARD_TOPIC);
+    if (sent === "failed") throw new ChatRuleError({ key: "errors.soundboardUnreachable" });
 }
 
 // ---------------------------------------------------------------------------

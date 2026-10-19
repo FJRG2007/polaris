@@ -55,7 +55,8 @@ export const SOUNDBOARD_TOPIC = "polaris.soundboard";
 /**
  * The sounds every call has, whoever is in it.
  *
- * Real recordings, each released into the public domain under CC0, shipped
+ * Real recordings - and one air horn synthesized here, `scripts/make-air-horn.mjs`
+ * - each released into the public domain under CC0, shipped
  * beside the app in `public/sounds/soundboard` as the same 16-bit PCM WAV an
  * upload becomes. Where each one came from is in `sources.json` there. The name
  * each one is shown under lives in the catalogs, under `soundboard.defaults`.
@@ -71,7 +72,7 @@ export const DEFAULT_SOUNDS = [
     { id: "fanfare", emoji: "\u{1F389}" },
     { id: "boing", emoji: "\u{1F300}" },
     { id: "whoosh", emoji: "\u{1F4A8}" },
-    { id: "horn", emoji: "\u{1F4EF}" }
+    { id: "horn", emoji: "\u{1F4E2}" }
 ] as const;
 
 export type DefaultSoundId = (typeof DEFAULT_SOUNDS)[number]["id"];
@@ -423,6 +424,20 @@ export const soundPlayedSchema = z.object({
 });
 
 export type SoundPlayed = z.infer<typeof soundPlayedSchema>;
+
+/**
+ * What the call server hands every browser when somebody stops the sound they
+ * played. Only ever about the seat that asked - `from` is stamped by the server
+ * from the seat, never taken from the request - so nobody can silence somebody
+ * else's sound for the room; each listener can still stop anything for
+ * themselves.
+ */
+export const soundStoppedSchema = z.object({
+    kind: z.literal("stop"),
+    from: z.string().uuid()
+});
+
+export type SoundStopped = z.infer<typeof soundStoppedSchema>;
 
 /** How loud one play is for one listener: the sound's own volume times theirs,
  *  and nothing at all from somebody they muted. */

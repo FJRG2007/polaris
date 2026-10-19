@@ -241,6 +241,19 @@ here are vanilla, plugin and modded, with mods that conflict and blocks nothing
 in our tables knows: an unknown id is skipped, never fatal, and a guess about
 modded content never sets back, kicks or freezes a player.
 
+## Calls
+
+- **A closed room is not a lost server.** The call lets its own room go on
+  purpose (resting while alone, after 45 s), and the media server logs that as
+  `CLIENT_REQUEST_LEAVE`. Map the client's `DisconnectReason` through
+  `roomClosed()` (`chat/call-diagnosis.ts`); only a real loss may say "lost the
+  call server". A notice that blames the server for something this page did is
+  the bug, however the timing looks next to an update.
+- **Anything a long-lived tab calls on a timer is a route, never a server
+  action** - an update renames every action under an open tab. The seat
+  heartbeat (`chat/call-seat.ts`) is the model, and a 410 from it re-seats the
+  tab instead of giving up.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started

@@ -5,8 +5,8 @@
  *
  * With the camera off a tile is a face in the middle of a card, and the crossed
  * microphone - or the crossed headphones - used to be a badge on that face's
- * circle. It is in the name plate now, ahead of the name, camera on or off, the
- * way a voice channel's tile carries it.
+ * circle. It is in the name plate now, after the name, camera on or off, so
+ * muting never pushes the name sideways.
  */
 
 import { CallRoom } from "@/app/(app)/chat/call-room";
@@ -96,11 +96,11 @@ function room(state: { muted?: boolean; deafened?: boolean }) {
 const plate = () => screen.getByText("Alan", { selector: "span.truncate" }).parentElement;
 
 describe("a tile with the camera off", () => {
-    it("says a muted microphone ahead of the name, not on the face", () => {
+    it("says a muted microphone after the name, not on the face", () => {
         room({ muted: true });
         const icon = screen.getByLabelText("chat.callRoom.microphoneOff");
         expect(icon.parentElement).toBe(plate());
-        expect(icon.nextSibling?.textContent).toBe("Alan");
+        expect(icon.previousSibling?.textContent).toBe("Alan");
         expect(screen.queryByLabelText("components.avatar.microphoneOff")).toBeNull();
     });
 

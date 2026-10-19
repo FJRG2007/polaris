@@ -1,5 +1,5 @@
 {
-    "about": "The soundboard's built-in sounds. Every one is a recording released into the public domain under CC0 1.0, so it needs no attribution and may be redistributed. Each was cut to the second or two that carries the idea, faded in and out, mixed to mono, resampled to 22.05 kHz and brought to the same gated RMS level (-20 dBFS, peaks under -1 dBFS), then written as 16-bit PCM WAV.",
+    "about": "The soundboard's built-in sounds. Every one is a recording (or, for the horn, a synthesis made in this repository) released into the public domain under CC0 1.0, so it needs no attribution and may be redistributed. Each was cut to the second or two that carries the idea, faded in and out, mixed to mono, resampled to 22.05 kHz and brought to the same gated RMS level (-20 dBFS, peaks under -1 dBFS), then written as 16-bit PCM WAV.",
     "sounds": {
         "applause": {
             "source": "https://freesound.org/s/277021/",
@@ -37,7 +37,8 @@
             "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         },
         "horn": {
-            "source": "https://commons.wikimedia.org/wiki/File:Cruise_ship_Albatros_ship_horn.ogg",
+            "source": "https://github.com/FJRG2007/polaris/blob/main/dashboard/apps/web/scripts/make-air-horn.mjs",
+            "note": "Synthesized for Polaris by scripts/make-air-horn.mjs rather than recorded.",
             "license": "CC0-1.0",
             "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
         }

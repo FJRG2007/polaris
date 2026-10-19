@@ -43,6 +43,7 @@ import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
 import { callServerUrl } from "./call-address";
+import { holdSeat, keepSeat, leaveSeat, type VoiceState } from "./call-seat";
 import { NEARBY_SLOTS, nearbyEnabled, scanNearby } from "./call-nearby";
 // What somebody says about their own controls, and why muting has to be said
 // out loud at all rather than read off the publication.
@@ -59,11 +60,12 @@ import {
 } from "./call-signals";
 import { useToast } from "@polaris/ui";
 import { useVoiceGate } from "./voice-gate";
-import { playClip } from "./soundboard-player";
+import { playClip, stopClips } from "./soundboard-player";
 import { soundboardPrefs } from "./soundboard-prefs";
 import {
     playbackVolume,
     soundPlayedSchema,
+    soundStoppedSchema,
     SOUNDBOARD_TOPIC,
     type SoundPlayed
 } from "@/lib/chat/soundboard";
@@ -117,6 +119,7 @@ import {
     carriedSound,
     diagnoseCall,
     SERVER_LOST,
+    roomClosed,
     settlingFor,
     UNKNOWN_AUDIO,
     type CallAudioFacts,
@@ -157,43 +160,6 @@ const ARRIVAL_BATCH_MS = 600;
  * on the next beat; anything longer is a tab that has lost its server or its seat.
  */
 const KEEPALIVE_GIVE_UP = 3;
-
-/** Where this browser holds its seat in a call: POST to keep it, DELETE to give
- *  it back. */
-function seatUrl(meetingId: string): string {
-    return `/api/chat/meetings/${encodeURIComponent(meetingId)}/seat`;
-}
-
-/** Whether this person can be heard and can hear, and whether they are
- *  sharing a screen, as the seat reports it. */
-interface VoiceState {
-    readonly muted: boolean;
-    readonly deafened: boolean;
-    readonly streaming: boolean;
-}
-
-/**
- * Keep the seat, failing on anything but a success so the beat can count it.
- *
- * Carries the controls too: the people outside the call are never connected to
- * the media server, so the seat is where they read who is muted or deafened, and
- * who is sharing a screen.
- */
-async function keepSeat(meetingId: string, voice: VoiceState): Promise<void> {
-    const response = await fetch(seatUrl(meetingId), {
-        method: "POST",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(voice)
-    });
-    if (!response.ok) throw new Error(`seat ${response.status}`);
-}
-
-/** Give the seat back. `keepalive`, so it is still sent from a tab that is
- *  closing. */
-function leaveSeat(meetingId: string): void {
-    void fetch(seatUrl(meetingId), { method: "DELETE", keepalive: true }).catch(() => undefined);
-}
 
 /**
  * The client for the media server, fetched at the moment a call needs it.
@@ -323,13 +289,6 @@ const frameSchema = z.discriminatedUnion("kind", [
     /** A moderator muted, deafened or disconnected this seat, or undid it. */
     z.object({ kind: z.literal("moderated"), action: z.enum(CALL_MODERATIONS) })
 ]);
-
-/**
- * Why the media server closed a connection, when it was a moderator showing the
- * seat out. The value of the media client's own enum, spelled out for the reason
- * `MICROPHONE` is below.
- */
-const PARTICIPANT_REMOVED = 4;
 
 /** Whether two verdicts say the same thing, so a call that has not changed does
  *  not re-render every screen drawing one every few seconds. */
@@ -1790,10 +1749,21 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // reported here. Not on the way out, where a disconnection is
                     // what leaving is.
                     if (stopped) return;
+                    const closed = roomClosed(reason, restingRef.current);
+                    // This page let the room go - resting while alone, which is
+                    // the call working as designed. Nothing to say.
+                    if (closed === "ours" && !removed.current) return;
+                    // The same seat joined somewhere else, which is the other
+                    // device taking the call, not this one losing it.
+                    if (closed === "elsewhere" && !removed.current) {
+                        displaced.current = true;
+                        setEnded(true);
+                        return;
+                    }
                     // Shown out by a moderator, which is not the call server
                     // going away. Usually already said by the stream; said here
                     // too for the case it arrived second.
-                    if (removed.current || reason === PARTICIPANT_REMOVED) {
+                    if (removed.current || closed === "removed") {
                         if (!removed.current) {
                             removed.current = true;
                             toastRef.current.show({
@@ -1932,6 +1902,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (participant) return;
                 const played = soundPlayedSchema.safeParse(raw);
                 if (played.success) heardSound.current?.(played.data);
+                // Whoever played it stopped it - for this listener too.
+                const stopped = soundStoppedSchema.safeParse(raw);
+                if (stopped.success) stopClips(stopped.data.from);
                 return;
             }
             if (!participant) return;
@@ -2136,7 +2109,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
             let missed = 0;
             beat = setInterval(() => {
-                void keepSeat(inCall, voiceRef.current)
+                void holdSeat(
+                    inCall,
+                    voiceRef.current,
+                    () => !stopped && !removed.current && !displaced.current
+                )
                     .then(() => {
                         missed = 0;
                     })

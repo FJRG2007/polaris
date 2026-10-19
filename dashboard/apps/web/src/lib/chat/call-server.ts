@@ -393,16 +393,18 @@ function notConnected(caught: unknown): boolean {
  * a soundboard play, which the server decided was allowed - and drop the same
  * shape from anybody in the call.
  *
- * True when the media server took it. False when none could be asked, which
- * the caller says out loud rather than pretending.
+ * `sent` when the media server took it. `absent` when it answered but has no
+ * room by that name - nobody is connected to the call, typically somebody
+ * alone whose browser let the room go while it waits - which is not the server
+ * failing and must not be said as if it were. `failed` when none could be asked.
  */
 export async function sendToRoom(
     meetingId: string,
     payload: unknown,
     topic: string
-): Promise<boolean> {
+): Promise<"sent" | "absent" | "failed"> {
     const endpoint = await callServer();
-    if (!endpoint) return false;
+    if (!endpoint) return "failed";
     const hosts = endpoint.shipped
         ? INTERNAL_CALL_SERVER
         : [endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:")];
@@ -416,16 +418,20 @@ export async function sendToRoom(
         });
         try {
             await rooms.sendData(meetingId, data, DataPacket_Kind.RELIABLE, { topic });
-            return true;
+            return "sent";
         } catch (caught) {
             failure = caught;
         }
+        // Answered, but refused. Whether the room exists at all is the
+        // difference between an empty call and a broken server.
+        const open = await rooms.listRooms([meetingId]).catch(() => null);
+        if (open && open.length === 0) return "absent";
     }
     console.error(
         "polaris: the call server did not take a message for a room:",
         failure instanceof Error ? failure.message : failure
     );
-    return false;
+    return "failed";
 }
 
 /** The compose service the media server runs as. What a screen looks for when

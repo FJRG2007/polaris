@@ -52,26 +52,29 @@ export function LiveBadge({ className }: { className?: string }) {
 }
 
 /** The same mark as icons after a name, for a row too small to badge a face. */
-export function VoiceStateIcons({ person }: { person: Seated }) {
+export function VoiceStateIcons({ person, className }: { person: Seated; className?: string }) {
+    const t = useTranslations("chat");
     // A moderator's mark outranks the person's own, and is drawn in the danger
     // colour the way every voice client draws it: it is the one they cannot
     // take off themselves.
     if (person.serverDeafened || person.serverMuted) {
         const Icon = person.serverDeafened ? HeadphoneOff : MicOff;
-        const words = person.serverDeafened ? "Deafened by a moderator" : "Muted by a moderator";
+        const words = person.serverDeafened
+            ? t("roster.deafenedByModerator")
+            : t("roster.mutedByModerator");
         return (
             <span role="img" aria-label={words} title={words} className="ml-auto shrink-0">
-                <Icon className="size-3 text-danger" />
+                <Icon className={cn("size-3 text-danger", className)} />
             </span>
         );
     }
     const badge = callBadgeOf(person);
     if (!badge) return null;
     const Icon = badge === "deafened" ? HeadphoneOff : MicOff;
-    const words = badge === "deafened" ? "Not listening" : "Microphone off";
+    const words = badge === "deafened" ? t("roster.notListening") : t("roster.microphoneOff");
     return (
         <span role="img" aria-label={words} title={words} className="ml-auto shrink-0">
-            <Icon className="size-3 text-muted-foreground" />
+            <Icon className={cn("size-3 text-muted-foreground", className)} />
         </span>
     );
 }

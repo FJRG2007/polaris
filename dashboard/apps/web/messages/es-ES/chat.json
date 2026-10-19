@@ -220,6 +220,7 @@
         "soundboardExternal": "Este espacio solo reproduce sus propios sonidos",
         "soundboardCooldown": "Espera {seconds} s antes del siguiente sonido",
         "soundboardUnreachable": "El servidor de llamadas no respondió. Inténtalo de nuevo.",
+        "soundboardNobody": "No hay nadie más conectado a la llamada para oírlo.",
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
         "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
         "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s."
@@ -1630,7 +1631,11 @@
     "roster": {
         "sharingAScreen": "Comparte pantalla",
         "live": "Directo",
-        "inTheCall": "En la llamada"
+        "inTheCall": "En la llamada",
+        "notListening": "No escucha",
+        "microphoneOff": "Micro apagado",
+        "deafenedByModerator": "Ensordecido por moderador",
+        "mutedByModerator": "Silenciado por moderador"
     },
     "muteMenu": {
         "unmute": "Activar",
@@ -1795,6 +1800,8 @@
     },
     "soundboard": {
         "button": "Botonera",
+        "stop": "Parar sonidos",
+        "stopHint": "Para tu sonido para todos, y cualquier otro solo para ti.",
         "search": "Buscar sonidos",
         "sections": "Secciones",
         "favorites": "Favoritos",
@@ -1820,7 +1827,7 @@
             "fanfare": "Fanfarria",
             "boing": "Muelle",
             "whoosh": "Zas",
-            "horn": "Bocina"
+            "horn": "Bocinazo"
         }
     },
     "soundboardSettings": {

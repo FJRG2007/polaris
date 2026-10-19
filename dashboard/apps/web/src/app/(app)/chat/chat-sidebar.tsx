@@ -1079,7 +1079,10 @@ function ChannelRows({
                             }
                         />
                         {inside.length > 0 && (
-                            <ul className="mb-1 ml-7 flex flex-col gap-0.5">
+                            // Each person on a row of their own, indented under
+                            // the channel's name the way Discord draws a voice
+                            // room - never squeezed against the row above.
+                            <ul className="mb-1 ml-6 mt-0.5 flex flex-col gap-0.5">
                                 {inside.map((person) => (
                                     <VoicePerson
                                         key={person.id}
@@ -1220,11 +1223,11 @@ function VoicePerson({
             as="li"
             personId={person.userId}
             plate="never"
-            className="flex items-center gap-1.5 rounded px-1 text-xs text-muted-foreground data-[state=open]:bg-card-hover"
+            className="flex h-8 min-w-0 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground data-[state=open]:bg-card-hover"
             title={person.name}
         >
             <Avatar
-                size={16}
+                size={24}
                 person={{
                     // A guest has no account behind them, so no picture to ask
                     // for: the initials of the name they gave is all there is.
@@ -1232,11 +1235,15 @@ function VoicePerson({
                     name: person.name
                 }}
             />
-            <span className="truncate" title={person.name}>
+            {/* Takes the rest of the row, so the marks after it are pinned
+                to the right edge and appearing never moves the name. Normal
+                weight; a name look the person chose still applies, as it does
+                everywhere in Chat. */}
+            <span className="min-w-0 flex-1 truncate font-normal" title={person.name}>
                 <PersonName id={person.userId} name={person.name} />
             </span>
             {person.streaming && <LiveBadge />}
-            <VoiceStateIcons person={person} />
+            <VoiceStateIcons person={person} className="size-3.5" />
         </PersonRow>
     );
     return (

@@ -57,7 +57,7 @@ interface State {
     heldRoles: Record<string, string>;
     channels: { id: string; private: boolean; members: string[] }[];
     allowed: boolean;
-    reachable: boolean;
+    reachable: boolean | "empty";
 }
 
 let state: State;
@@ -115,9 +115,10 @@ vi.mock("@polaris/config", () => ({
 
 vi.mock("@/lib/chat/call-server", () => ({
     sendToRoom: async (meetingId: string, payload: unknown, topic: string) => {
-        if (!state.reachable) return false;
+        if (state.reachable === "empty") return "absent";
+        if (!state.reachable) return "failed";
         sent.push({ meetingId, payload, topic });
-        return true;
+        return "sent";
     }
 }));
 
@@ -247,9 +248,8 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { playSound, setSoundDenial, setChannelSoundboard, spaceSoundboard } = await import(
-    "@/lib/chat/soundboard-service"
-);
+const { playSound, stopSound, setSoundDenial, setChannelSoundboard, spaceSoundboard } =
+    await import("@/lib/chat/soundboard-service");
 const { ChatAccessError } = await import("@/lib/chat/access");
 
 const seat = { meetingId: MEETING, participantId: SEAT, admission: "admitted" } as never;
@@ -433,6 +433,15 @@ describe("a play that is refused sends nothing", () => {
         expect(await refusalOf(SOUND)).toBe("errors.soundboardUnreachable");
         expect(refunded).toBe(1);
     });
+
+    // Alone in a call, the browser lets the room go while it waits, so the media
+    // server has no room to deliver to. That is nobody listening, not a server
+    // that failed to answer.
+    it("and a call with nobody connected says so rather than blaming the server", async () => {
+        state.reachable = "empty";
+        expect(await refusalOf(SOUND)).toBe("errors.soundboardNobody");
+        expect(refunded).toBe(1);
+    });
 });
 
 describe("a play of the call's own space's sound", () => {
@@ -440,6 +449,37 @@ describe("a play of the call's own space's sound", () => {
         state.access[SPACE] = null;
         expect(await refusalOf(SOUND)).toBeNull();
         expect(sent).toHaveLength(1);
+    });
+});
+
+describe("stopping a sound", () => {
+    it("tells the room to stop this seat's sound, stamped from the seat", async () => {
+        await stopSound(seat);
+        expect(sent).toEqual([
+            {
+                meetingId: MEETING,
+                payload: { kind: "stop", from: SEAT },
+                topic: "polaris.soundboard"
+            }
+        ]);
+    });
+
+    it("is no error when nobody is connected to the room", async () => {
+        state.reachable = "empty";
+        await expect(stopSound(seat)).resolves.toBeUndefined();
+    });
+
+    it("says the call server failed when it did", async () => {
+        state.reachable = false;
+        await expect(stopSound(seat)).rejects.toMatchObject({
+            text: { key: "errors.soundboardUnreachable" }
+        });
+    });
+
+    it("a held key sends nothing more once the limiter says so", async () => {
+        state.allowed = false;
+        await expect(stopSound(seat)).resolves.toBeUndefined();
+        expect(sent).toHaveLength(0);
     });
 });
 

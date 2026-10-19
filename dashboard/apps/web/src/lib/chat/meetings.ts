@@ -419,6 +419,63 @@ export async function join(
     return seat;
 }
 
+/**
+ * Take back the seat a browser still in the call had closed under it - a
+ * reload whose departure landed after the new page joined, a sweep while the
+ * machine slept - or null when it may not.
+ *
+ * The same row is reopened rather than a new one added: the browser is still on
+ * the media server under that row's id, and a second id would leave a
+ * moderator's mute or disconnect aimed at nobody. Never a seat a moderator
+ * showed out, or one a host removed, and every rule a join asks about who may be
+ * in the room is asked again.
+ */
+export async function retakeSeat(
+    actor: ChatActor & { name: string },
+    meetingId: string
+): Promise<MeetingSeat | null> {
+    const open = await seatForUser(actor.id, meetingId);
+    if (open) return open;
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true, endedAt: true }
+    });
+    if (!meeting || meeting.endedAt) return null;
+    const last = await prisma.meetingParticipant.findFirst({
+        where: { meetingId, userId: actor.id },
+        orderBy: { joinedAt: "desc" },
+        select: { id: true, admission: true, shownOut: true }
+    });
+    if (!last || last.admission !== "admitted" || last.shownOut) return null;
+
+    let pastLimit = false;
+    if (meeting.channelId) {
+        pastLimit = (await requireChannel(actor, meeting.channelId)).mayModerate;
+    } else {
+        const removed = await prisma.meetingParticipant.findFirst({
+            where: { meetingId, userId: actor.id, admission: "denied" },
+            select: { id: true }
+        });
+        if (removed) return null;
+    }
+    await requireRoom(meetingId, pastLimit);
+
+    const reopened = await prisma.meetingParticipant.updateMany({
+        where: {
+            id: last.id,
+            leftAt: { not: null },
+            admission: "admitted",
+            shownOut: false,
+            meeting: { endedAt: null }
+        },
+        data: { leftAt: null, lastSeenAt: new Date() }
+    });
+    if (!reopened.count) return seatForUser(actor.id, meetingId);
+    publishMeetingEvent({ meetingId, kind: "roster" });
+    if (meeting.channelId) await announceCall(meetingId, "moved", actor.id, actor.name);
+    return { meetingId, participantId: last.id, admission: "admitted" };
+}
+
 /** Where a missed-call alert about a conversation leads. */
 export function missedCallHref(channelId: string): string {
     return `/chat/c/${channelId}`;

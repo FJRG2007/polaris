@@ -10645,6 +10645,10 @@ model MeetingParticipant {
     // leaving and walking back in does not lift it.
     serverMuted    Boolean @default(false)
     serverDeafened Boolean @default(false)
+    // Closed by a moderator showing them out rather than by their own browser or
+    // a sweep. A browser still carrying the call may take a closed seat back
+    // after a reload; never one a moderator closed.
+    shownOut       Boolean @default(false)
 
     meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]

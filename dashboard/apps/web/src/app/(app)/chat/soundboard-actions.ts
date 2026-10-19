@@ -47,6 +47,17 @@ export async function playSoundAction(input: unknown): Promise<{ error?: string 
     return result.error ? { error: result.error } : {};
 }
 
+/** Stop the sound this seat played, for everybody in the call. */
+export async function stopSoundAction(meetingId: unknown): Promise<{ error?: string }> {
+    const t = await getTranslations("chat");
+    const id = rules.soundPlaySchema.shape.meetingId.safeParse(meetingId);
+    if (!id.success) return { error: t("errors.notInCall") };
+    const seat = await resolveSeat(id.data);
+    if (!seat) return { error: t("errors.notInCall") };
+    const result = await guardChat(() => soundboard.stopSound(seat));
+    return result.error ? { error: result.error } : {};
+}
+
 export async function favoriteSoundAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = rules.soundFavoriteSchema.safeParse(input);
