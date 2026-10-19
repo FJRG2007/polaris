@@ -101,6 +101,10 @@ export async function moderateSeat(
         // The seat is given up rather than refused, which is the difference from
         // a host removing somebody from a meeting: shown out of a voice channel,
         // anybody may walk back in, as they can everywhere else.
+        await prisma.meetingParticipant.update({
+            where: { id: seat.id },
+            data: { shownOut: true }
+        });
         await leave({ meetingId: seat.meetingId, participantId: seat.id });
         const enforced = await applyToSeat(seat.meetingId, seat.id, { kind: "remove" });
         return { unconfirmed: !enforced };

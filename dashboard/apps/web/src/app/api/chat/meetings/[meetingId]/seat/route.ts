@@ -51,19 +51,18 @@ async function seatFor(params: Params["params"]) {
  * closed under it - a reload whose departure landed after the new page joined,
  * a sweep while the machine slept. Without it the tab went on carrying the call
  * on the media server while the roster said it had left, and nothing it did
- * could put it back. Accounts only, through the same join a click makes, so
- * every rule about who may be in the call is asked again.
+ * could put it back. Accounts only, and the same row the browser's media
+ * connection is under, never one a moderator or a host closed.
  */
-async function reseat(meetingId: string): Promise<boolean> {
+async function reseat(meetingId: string): Promise<meetings.MeetingSeat | null> {
     const user = await backgroundUser();
-    if (!user) return false;
-    if (!(await sessionCan(user, "chat.use")) || !(await sessionCan(user, "chat.call"))) return false;
-    if (await callsUnavailable()) return false;
+    if (!user) return null;
+    if (!(await sessionCan(user, "chat.use")) || !(await sessionCan(user, "chat.call"))) return null;
+    if (await callsUnavailable()) return null;
     try {
-        await meetings.join({ id: user.id, name: user.name }, meetingId);
-        return true;
+        return await meetings.retakeSeat({ id: user.id, name: user.name }, meetingId);
     } catch {
-        return false;
+        return null;
     }
 }
 
@@ -94,7 +93,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     let seat = await seatFor(params);
     if (!seat && rejoin) {
         const parsed = meetingIdSchema.safeParse((await params).meetingId);
-        if (parsed.success && (await reseat(parsed.data))) seat = await seatFor(params);
+        if (parsed.success) seat = await reseat(parsed.data);
     }
     // Gone rather than not found: the seat was swept or left, and the browser
     // asking should stop rather than keep trying a path that exists.

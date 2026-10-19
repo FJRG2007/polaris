@@ -204,7 +204,8 @@ describe("disconnecting somebody", () => {
         expect(applied).toEqual([
             { meetingId: "m1", participantId: "seat-1", change: { kind: "remove" } }
         ]);
-        // Nothing stored about the seat's voice: it is not a mute.
-        expect(updates).toHaveLength(0);
+        // Nothing stored about the seat's voice: it is not a mute. Only that a
+        // moderator closed it, so a heartbeat cannot take it back.
+        expect(updates).toEqual([{ shownOut: true }]);
     });
 });
