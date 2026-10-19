@@ -16,6 +16,7 @@ import { execCommand } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
 import { usersWithPermission } from "@polaris/auth";
 import { prisma } from "@polaris/db";
+import { getSetting, setSetting } from "@/lib/setting-store";
 import { nutCommand, nutRead, nutSetVar } from "./nut-client";
 import { getHostConnection } from "@/lib/host-service";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
@@ -225,6 +226,15 @@ function columnsFor(input: upsReading.UpsConnectionInput, stored: UpsSecret) {
 }
 
 export async function createUps(input: upsReading.UpsConnectionInput): Promise<string> {
+    if (input.connection === "usb") {
+        const key = `${input.machineId}/${input.deviceId}`;
+        return serialUsb(async () => {
+            const row = await prisma.ups.create({ data: columnsFor(input, {}) });
+            // Added by hand after being removed: watched again from now on.
+            await forgetDismissed(key);
+            return row.id;
+        });
+    }
     const row = await prisma.ups.create({ data: columnsFor(input, {}) });
     if (input.connection === "snmp") await syncSnmp();
     return row.id;
@@ -277,7 +287,17 @@ export async function updateUpsVariableMap(
 }
 
 export async function removeUps(id: string): Promise<boolean> {
-    const removed = await prisma.ups.deleteMany({ where: { id } });
+    const row = await prisma.ups.findUnique({
+        where: { id },
+        select: { connection: true, machineId: true, deviceId: true }
+    });
+    const removed = await serialUsb(async () => {
+        const gone = await prisma.ups.deleteMany({ where: { id } });
+        // A USB UPS somebody removed is not added back by itself while it stays plugged in.
+        if (gone.count > 0 && row?.connection === "usb")
+            await rememberDismissed(`${row.machineId}/${row.deviceId}`);
+        return gone;
+    });
     if (removed.count > 0) await syncSnmp();
     return removed.count > 0;
 }
@@ -499,6 +519,98 @@ export async function usbOffers(
                         .trim() || `${one.device.vendorId}:${one.device.productId}`,
                 serial: one.device.serial
             }))
+    };
+}
+
+/** USB UPSes somebody removed, as `machine/device`: offered again, never added by themselves. */
+const DISMISSED_KEY = "ups.usb.dismissed";
+const DISMISSED_MOST = 200;
+const dismissedSchema = z.array(z.string().max(300)).max(DISMISSED_MOST);
+
+let usbQueue: Promise<unknown> = Promise.resolve();
+
+/** One change to the USB rows or the removed list at a time, so none reads what another is writing. */
+function serialUsb<T>(work: () => Promise<T>): Promise<T> {
+    const run = usbQueue.then(work, work);
+    usbQueue = run.catch(() => undefined);
+    return run;
+}
+
+async function readDismissed(): Promise<Set<string>> {
+    const raw = await getSetting(DISMISSED_KEY);
+    if (!raw) return new Set();
+    try {
+        const parsed = dismissedSchema.safeParse(JSON.parse(raw));
+        return new Set(parsed.success ? parsed.data : []);
+    } catch {
+        return new Set();
+    }
+}
+
+async function rememberDismissed(key: string): Promise<void> {
+    const dismissed = await readDismissed();
+    if (dismissed.has(key)) return;
+    await setSetting(DISMISSED_KEY, JSON.stringify([...dismissed, key].slice(-DISMISSED_MOST)));
+}
+
+async function forgetDismissed(key: string): Promise<void> {
+    const dismissed = await readDismissed();
+    if (!dismissed.delete(key)) return;
+    await setSetting(DISMISSED_KEY, dismissed.size > 0 ? JSON.stringify([...dismissed]) : null);
+}
+
+let adopting: Promise<number> | null = null;
+
+/**
+ * Start watching every UPS the local daemon sees on USB that is not watched yet,
+ * the way a NUT install picks up a UPS on its own: plugging one in is the whole
+ * setup. One somebody removed stays offered instead. The number added; one pass
+ * at a time, so the watcher and an open list never add the same UPS twice.
+ */
+export function adoptUsb(listUsb: UsbListing = usbListing()): Promise<number> {
+    adopting ??= serialUsb(async () => {
+        try {
+            const seen = await usbOffers([], listUsb);
+            if (seen.state !== "ok" || seen.offers.length === 0) return 0;
+            const watched = await prisma.ups.findMany({
+                where: {
+                    connection: "usb",
+                    machineId: LOCAL_HOST_SUBJECT,
+                    deviceId: { in: seen.offers.map((one) => one.deviceId) }
+                },
+                select: { deviceId: true }
+            });
+            const taken = new Set(watched.map((one) => one.deviceId));
+            const dismissed = await readDismissed();
+            let added = 0;
+            for (const offer of seen.offers) {
+                if (taken.has(offer.deviceId)) continue;
+                if (dismissed.has(`${offer.machineId}/${offer.deviceId}`)) continue;
+                const input = upsReading.upsConnectionSchema.safeParse({
+                    connection: "usb",
+                    name: offer.name.slice(0, 80),
+                    machineId: offer.machineId,
+                    deviceId: offer.deviceId
+                });
+                if (!input.success) continue;
+                await prisma.ups.create({ data: columnsFor(input.data, {}) });
+                added += 1;
+            }
+            return added;
+        } finally {
+            adopting = null;
+        }
+    });
+    return adopting;
+}
+
+/** The offers a list shows: only the USB UPSes somebody removed, since the rest are added by themselves. */
+export async function dismissedOffers(discovery: UsbDiscovery): Promise<UsbDiscovery> {
+    if (discovery.state !== "ok") return discovery;
+    const dismissed = await readDismissed();
+    return {
+        state: "ok",
+        offers: discovery.offers.filter((one) => dismissed.has(`${one.machineId}/${one.deviceId}`))
     };
 }
 
@@ -987,9 +1099,12 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
 /** One pass over every UPS, a few read side by side. */
 export async function watchUpsOnce(now = Date.now()): Promise<void> {
     await syncSnmp();
+    const listUsb = usbListing();
+    await adoptUsb(listUsb).catch((error: unknown) =>
+        console.error("polaris: a UPS on USB could not be added:", error)
+    );
     const rows = await prisma.ups.findMany({ take: 200 });
     await syncNetserver(rows);
-    const listUsb = usbListing();
     const queue = [...rows];
     await Promise.all(
         Array.from({ length: Math.min(READ_CONCURRENCY, queue.length) }, async () => {

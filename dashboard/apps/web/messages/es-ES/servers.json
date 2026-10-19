@@ -764,7 +764,7 @@
         "back": "Los SAI",
         "empty": {
             "title": "Sin SAI aún",
-            "body": "Añade uno conectado por USB a una máquina, servido por un servidor NUT o leído por SNMP."
+            "body": "Uno conectado por USB sale aquí solo. Añade uno de un servidor NUT o leído por SNMP."
         },
         "columns": {
             "name": "Nombre",
@@ -796,7 +796,7 @@
             "noAnswer": "El SAI no respondió. Comprueba que está encendido y que la dirección y el nombre son correctos."
         },
         "found": {
-            "title": "Visto por USB",
+            "title": "Quitado, sigue conectado",
             "add": "Añadir",
             "on": "en {machine}",
             "updateNeeded": "Actualiza Polaris desde Ajustes para encontrar un SAI conectado por USB.",

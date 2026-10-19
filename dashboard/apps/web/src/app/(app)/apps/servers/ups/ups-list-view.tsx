@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Every UPS Polaris watches, with what each says now, and the ones a machine
- * sees on USB that are not added yet - each one click from being watched.
+ * Every UPS Polaris watches, with what each says now. One a machine sees on USB
+ * is watched by itself; one somebody removed is offered here, one click back.
  *
  * The heading, the Add button and the table's headings paint at once; only
  * the rows wait on `/api/servers/ups`, which is read again every few seconds
