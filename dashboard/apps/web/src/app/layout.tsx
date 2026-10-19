@@ -7,6 +7,7 @@ import localFont from "next/font/local";
 import { DropGuard } from "@/components/drop-guard";
 import { themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
+import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
@@ -197,6 +198,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             style={{ "--app-text-size": `${textSize}px` } as CSSProperties}
             suppressHydrationWarning
         >
+            <head>
+                {/* First in the document, so it is listening before any chunk can
+                    fail - see recoverMissingChunks. */}
+                <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
+            </head>
             <body>
                 <I18nProvider locale={locale} messages={pickMessages(locale, ["common", "components"])}>
                     <LocaleSync locale={locale} signedIn={session !== null} />
