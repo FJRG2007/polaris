@@ -93,6 +93,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/in-server", () => ({
     forgetCapabilities: () => undefined
 }));
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog", () => ({
+    WORLD_BUILDS: []
+}));
+
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/speech-service", () => ({
     homeLanguage: async () => "en"
 }));

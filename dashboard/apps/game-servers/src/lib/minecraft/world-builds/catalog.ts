@@ -1,12 +1,17 @@
 /**
- * The seasonal builds Polaris places in a server's world, converted offline
- * (`convert.ts`) and shipped here as Polaris builds.
+ * The seasonal builds Polaris places in a server's world, shipped here as
+ * Polaris builds (`format.ts`).
  *
- * Empty until a build has been converted: the sources Polaris may use need a
- * signed-in download, so each file is converted from a copy the operator
- * provides and added as `builds/<id>.json`, imported and listed below.
+ * Polaris's own small builds come first. One from elsewhere is converted
+ * offline (`convert.ts`) from a copy the operator provides - the sources Polaris
+ * may use need a signed-in download - and added as `builds/<id>.json`,
+ * imported and listed below.
  */
 
-import type { PolarisBuild } from "./format";
+import snowman from "./builds/snowman.json";
+import pumpkinPatch from "./builds/pumpkin-patch.json";
+import { polarisBuildSchema, type PolarisBuild } from "./format";
 
-export const WORLD_BUILDS: readonly PolarisBuild[] = [];
+export const WORLD_BUILDS: readonly PolarisBuild[] = [snowman, pumpkinPatch].map((one) =>
+    polarisBuildSchema.parse(one)
+);

@@ -20,12 +20,21 @@ import type { Decoration } from "../seasonal";
 import * as commands from "../events/commands";
 import * as arena from "../events/kinds/arena";
 import type { ServerContainer } from "../service";
-import { build, cancelBatch } from "../events/in-server";
+import { build, cancelBatch, capabilities } from "../events/in-server";
 
 /** Sites surveyed for one build in one pass: each costs a handful of trips. */
 const SITES_PER_PASS = 6;
 /** Paste chunks run for one build in one pass; the rest go in on the next. */
 const CHUNKS_PER_PASS = 8;
+/** On a server without the Polaris jar every command is its own: one chunk a
+ *  pass, sent a few at a time with a pause between, so the server keeps up. */
+const PLAIN_CHUNKS_PER_PASS = 1;
+const PLAIN_LINES_PER_TRIP = 64;
+const PLAIN_PAUSE_MS = 250;
+
+/** The survey's own markers: unmarked, so an event's survey or mark on the same
+ *  server at the same moment neither reads nor clears them. */
+const SAMPLE_TAG = "pw_samp";
 
 /** Servers whose builds are being worked on: a pass never overlaps the last. */
 const busy = new Set<string>();
@@ -40,12 +49,35 @@ async function writePlaced(
     change: (list: plan.Placed[]) => plan.Placed[]
 ): Promise<void> {
     await host.appsInstallConfig.patchInstallConfig(installedAppId, (config) => ({
-        [plan.WORLD_BUILDS_KEY]: change(plan.readPlaced(config))
+        [plan.WORLD_BUILDS_KEY]: [...change(plan.readPlaced(config)), ...plan.unreadPlaced(config)]
     }));
 }
 
 const same = (one: plan.Placed, other: plan.Placed) =>
     one.id === other.id && one.season === other.season;
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** `lines` sent the way a server without the jar keeps up with: a few at a time. */
+async function paced(server: ServerContainer, lines: readonly string[]): Promise<void> {
+    for (let at = 0; at < lines.length; at += PLAIN_LINES_PER_TRIP) {
+        if (at > 0) await pause(PLAIN_PAUSE_MS);
+        await server.sayAll(lines.slice(at, at + PLAIN_LINES_PER_TRIP));
+    }
+}
+
+/** `lines` run in chunks, each through the jar's batch or paced: false once one did not finish. */
+async function runChunks(
+    server: ServerContainer,
+    chunks: readonly (readonly string[])[],
+    key?: string
+): Promise<boolean> {
+    for (const chunk of chunks) {
+        if (!(await build(server, chunk, (lines) => paced(server, lines), undefined, key)))
+            return false;
+    }
+    return true;
+}
 
 /** Run `work` with the box's chunks held loaded, and let them go after. */
 async function loaded<T>(server: ServerContainer, box: Box, work: () => Promise<T>): Promise<T> {
@@ -84,7 +116,7 @@ async function builtOn(server: ServerContainer): Promise<number> {
     for (const names of commands.GROUND_NAMES) {
         const answers: Set<string>[] = [];
         let refused = false;
-        for (const line of commands.builtUnderSamples(names)) {
+        for (const line of commands.builtUnderSamples(names, SAMPLE_TAG)) {
             const output = await server.say([line]);
             if (commands.nameRefused(output)) {
                 refused = true;
@@ -109,14 +141,12 @@ async function surveySite(
 ): Promise<plan.Point | null> {
     const columns = commands.footprintColumns(center, plan.radiusOf(wanted));
     try {
-        await server.sayAll(commands.topLines(columns));
-        const tops = commands.samplesIn(await server.say([commands.READ_SAMPLES]));
+        await server.sayAll(commands.topLines(columns, SAMPLE_TAG, false));
+        const tops = commands.samplesIn(await server.say([commands.readSamples(SAMPLE_TAG)]));
         let covered = await builtOn(server);
-        for (const line of [
-            ...commands.SAMPLES_ON_TREES,
-            commands.SAMPLES_ON_WATER,
-            commands.SAMPLES_ON_LAVA
-        ])
+        for (const line of [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"].map(
+            (block) => commands.samplesOn(block, SAMPLE_TAG)
+        ))
             covered += commands.samplesIn(await server.say([line])).length;
         const verdict = plan.judgeSite(columns.length, tops, covered, wanted);
         if (!("y" in verdict)) return null;
@@ -127,7 +157,7 @@ async function surveySite(
         }
         return origin;
     } finally {
-        await server.sayAll([commands.CLEAR_SAMPLES]);
+        await server.sayAll([commands.clearSamples(SAMPLE_TAG)]);
     }
 }
 
@@ -160,10 +190,13 @@ async function paste(
     const key = placed.arena.batch ?? batchKeyFor(server.installedAppId, wanted.id);
     // One this process stopped waiting for - restarted half way - is called off first.
     await cancelBatch(server, key);
+    const perPass = (await capabilities(server)).has("batch")
+        ? CHUNKS_PER_PASS
+        : PLAIN_CHUNKS_PER_PASS;
     await loaded(server, box, async () => {
         let done = placed.pasted;
-        for (const chunk of chunks.slice(done, done + CHUNKS_PER_PASS)) {
-            if (!(await build(server, chunk, undefined, undefined, key))) return;
+        for (const chunk of chunks.slice(done, done + perPass)) {
+            if (!(await runChunks(server, [chunk], key))) return;
             done += 1;
             const up = done >= chunks.length;
             const pasted = done;
@@ -175,11 +208,16 @@ async function paste(
 }
 
 /** A build taken down, and forgotten once it is. */
-async function takeDown(server: ServerContainer, placed: plan.Placed): Promise<void> {
+async function takeDown(
+    server: ServerContainer,
+    placed: plan.Placed,
+    catalog: readonly PolarisBuild[]
+): Promise<void> {
     if (placed.arena.batch) await cancelBatch(server, placed.arena.batch);
-    const gone = await loaded(server, placed.arena.box, () =>
-        build(server, plan.restoreLines(placed))
-    );
+    const from = catalog.find((one) => one.id === placed.id && one.season === placed.season);
+    const lines = plan.restoreLines(placed, from);
+    const chunks = plan.pasteChunks(lines.map((line) => ({ line, blocks: 0 })));
+    const gone = await loaded(server, placed.arena.box, () => runChunks(server, chunks));
     if (!gone) return;
     await writePlaced(server.installedAppId, (list) => list.filter((one) => !same(one, placed)));
 }
@@ -199,7 +237,7 @@ export async function reconcileWorldBuilds(
     try {
         const placed = plan.readPlaced(config);
         for (const one of placed.filter((p) => p.season !== decoration))
-            await takeDown(server, one);
+            await takeDown(server, one, catalog);
         if (!decoration) return;
         for (const wanted of catalog.filter((one) => one.season === decoration)) {
             const existing = placed.find(

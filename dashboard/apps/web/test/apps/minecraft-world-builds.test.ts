@@ -271,28 +271,91 @@ describe("pasting", () => {
 });
 
 describe("taking it down", () => {
-    it("gives back air for every kind it placed, inside its own box only, and no sweep", () => {
-        const placed = plan.placedFor(tinyBuild(), { x: 10, y: 64, z: 20 }, "pwkey");
+    it("empties only the cells it filled, top layer first, and no sweep", () => {
+        const build = tinyBuild();
+        const placed = plan.placedFor(build, { x: 10, y: 64, z: 20 }, "pwkey");
         expect(placed.arena.blocks).toEqual(["minecraft:lantern", "minecraft:stone"]);
-        const lines = plan.restoreLines(placed);
+        const lines = plan.restoreLines(placed, build);
         expect(lines).toContain(
+            "execute in minecraft:overworld run fill 10 64 20 12 64 20 minecraft:air replace minecraft:stone"
+        );
+        expect(lines).toContain(
+            "execute in minecraft:overworld run fill 11 65 20 11 65 20 minecraft:air replace minecraft:lantern"
+        );
+        expect(lines).not.toContain(
             "execute in minecraft:overworld run fill 10 64 20 12 65 21 minecraft:air replace minecraft:stone"
         );
-        expect(lines).toContain(
-            "execute in minecraft:overworld run fill 10 64 20 12 65 21 minecraft:air replace minecraft:lantern"
-        );
-        for (const line of lines.filter((one) => one.includes(" fill "))) {
-            expect(line).toMatch(/ fill 10 64 20 12 65 21 minecraft:air replace /);
-        }
         expect(lines.indexOf(lines.find((one) => one.endsWith("minecraft:lantern"))!)).toBeLessThan(
             lines.indexOf(lines.find((one) => one.endsWith("minecraft:stone"))!)
         );
+        expect(
+            lines.every(
+                (one) => !/ fill [^ ]+ [^ ]+ [^ ]+ [^ ]+ [^ ]+ [^ ]+ minecraft:air$/.test(one)
+            )
+        ).toBe(true);
     });
 
-    it("forgets a written-down build only when it parses", () => {
+    it("leaves a block a player put in its box: a cell the build left empty is never touched", () => {
+        const build = tinyBuild();
+        const placed = plan.placedFor(build, { x: 10, y: 64, z: 20 });
+        const lines = plan.restoreLines(placed, build);
+        const touches = (x: number, y: number, z: number) =>
+            lines.some((line) => {
+                const match =
+                    / fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) minecraft:air replace (\S+)/.exec(
+                        line
+                    );
+                if (!match || match[7] === "minecraft:snow") return false;
+                const [x1, y1, z1, x2, y2, z2] = match.slice(1, 7).map(Number);
+                return x >= x1! && x <= x2! && y >= y1! && y <= y2! && z >= z1! && z <= z2!;
+            });
+        expect(touches(10, 65, 20)).toBe(false);
+        expect(touches(12, 65, 21)).toBe(false);
+        expect(touches(11, 65, 20)).toBe(true);
+    });
+
+    it("falls back to every kind inside its box when the build is no longer the one it pasted", () => {
+        const build = tinyBuild();
+        const placed = plan.placedFor(build, { x: 10, y: 64, z: 20 });
+        const changed = { ...build, palette: [...build.palette.slice(0, 2), "minecraft:torch"] };
+        for (const lines of [plan.restoreLines(placed), plan.restoreLines(placed, changed)]) {
+            expect(lines).toContain(
+                "execute in minecraft:overworld run fill 10 64 20 12 65 21 minecraft:air replace minecraft:stone"
+            );
+        }
+    });
+
+    it("forgets a written-down build only when it parses, and keeps the rest as written", () => {
         const placed = plan.placedFor(tinyBuild(), { x: 0, y: 64, z: 0 });
-        expect(plan.readPlaced({ [plan.WORLD_BUILDS_KEY]: [placed, { id: 3 }] })).toEqual([placed]);
+        const config = { [plan.WORLD_BUILDS_KEY]: [placed, { id: 3 }] };
+        expect(plan.readPlaced(config)).toEqual([placed]);
+        expect(plan.unreadPlaced(config)).toEqual([{ id: 3 }]);
         expect(plan.readPlaced({})).toEqual([]);
+    });
+});
+
+describe("the catalog", () => {
+    it("ships a build for every season, each small enough to site near a home", async () => {
+        const { WORLD_BUILDS } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
+        );
+        const { DECORATIONS } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/seasonal"
+        );
+        for (const season of DECORATIONS)
+            expect(WORLD_BUILDS.some((one) => one.season === season)).toBe(true);
+        for (const build of WORLD_BUILDS) {
+            // A carved pumpkin set on two snow blocks turns into a snow golem, however it got there.
+            const cells = format.decodeCells(build);
+            const layer = build.size.x * build.size.z;
+            const head = (index: number) =>
+                /carved_pumpkin|jack_o_lantern/.test(build.palette[index]!);
+            const snow = (at: number) => build.palette[cells[at] ?? 0] === "minecraft:snow_block";
+            cells.forEach((index, at) => {
+                if (head(index)) expect(snow(at - layer) && snow(at - 2 * layer)).toBe(false);
+            });
+            expect(plan.radiusOf(build)).toBeLessThanOrEqual(8);
+        }
     });
 });
 
@@ -390,9 +453,56 @@ describe("the season's builds in the world", () => {
         const { server, sent } = fakeServer();
         await reconcileWorldBuilds(server, config, null, [tinyBuild()]);
         expect(sent).toContain(
-            `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:stone`
+            `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y1} ${box.z1} minecraft:air replace minecraft:stone`
         );
         expect(sent.some((line) => line.endsWith(" keep"))).toBe(false);
         expect(plan.readPlaced(config)).toEqual([]);
     });
+
+    it("surveys with markers of its own, which an event's mark or survey never reads or clears", async () => {
+        const { server, sent, said } = fakeServer();
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const markers = [...sent, ...said].filter((line) => line.includes("@e[tag="));
+        expect(markers.length).toBeGreaterThan(0);
+        expect(markers.every((line) => line.includes("@e[tag=pw_samp]"))).toBe(true);
+        const summoned = sent.filter((line) => line.includes(" summon minecraft:armor_stand "));
+        expect(summoned.length).toBeGreaterThan(0);
+        expect(summoned.every((line) => line.includes('Tags:["pw_samp"]'))).toBe(true);
+    });
+
+    it("keeps a written-down build it cannot read when it writes the list again", async () => {
+        const kept = { id: "from-later", season: "spring", arena: {}, pasted: 0, up: true };
+        config = { [plan.WORLD_BUILDS_KEY]: [kept] };
+        const { server } = fakeServer();
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toHaveLength(1);
+        expect(config[plan.WORLD_BUILDS_KEY]).toContainEqual(kept);
+    });
+
+    it("pastes one chunk a pass, a few commands a trip, on a server without the Polaris jar", async () => {
+        const wide = format.polarisBuildSchema.parse({
+            format: "polaris-build",
+            version: 1,
+            id: "checkers",
+            season: "winter",
+            size: { x: 40, y: 1, z: 40 },
+            palette: [format.AIR, "minecraft:stone", "minecraft:dirt"],
+            blocks: format.encodeCells(
+                Array.from({ length: 1600 }, (_, at) => 1 + ((at + Math.floor(at / 40)) % 2))
+            )
+        });
+        const placed = plan.placedFor(wide, { x: 40, y: 70, z: 40 }, "pwwide");
+        config = { [plan.WORLD_BUILDS_KEY]: [placed] };
+        const trips: number[] = [];
+        const { server, sent } = fakeServer();
+        const sayAll = server.sayAll.bind(server);
+        server.sayAll = async (lines) => {
+            if (lines.some((line) => line.endsWith(" keep"))) trips.push(lines.length);
+            await sayAll(lines);
+        };
+        await reconcileWorldBuilds(server, config, "winter", [wide]);
+        expect(sent.filter((line) => line.endsWith(" keep"))).toHaveLength(plan.PASTE_CHUNK_LINES);
+        expect(Math.max(...trips)).toBeLessThanOrEqual(64);
+        expect(plan.readPlaced(config)[0]).toMatchObject({ pasted: 1, up: false });
+    }, 30_000);
 });

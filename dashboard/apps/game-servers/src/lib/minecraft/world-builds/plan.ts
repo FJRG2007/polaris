@@ -8,16 +8,19 @@
  *   world's own, level, dry and off any tree or build, and the build's whole box
  *   above it counts as nothing but air; every block then goes in with `keep`.
  * - Taking it down gives back exactly what was there - air - for every block it
- *   placed and nothing else: each kind it used replaced with air inside its own
- *   box. Something a player put down in it meanwhile, a chest in the house, is
- *   theirs and stays.
+ *   placed and nothing else: each cell it filled, top layer first, emptied only
+ *   while it still holds what went there (or what that turned into by itself).
+ *   Something a player put down in it meanwhile - a chest in the house, planks
+ *   of the same wood beside a wall - is theirs and stays.
  * - Pasted bottom layer first, in chunks the server takes a few ticks each.
  */
 
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { DECORATIONS } from "../seasonal";
 import * as arena from "../events/kinds/arena";
 import { arenaSchema, type Box } from "../events/state";
+import { falls, fallingGone } from "../events/kinds/stage";
 import { blockOf, decodeCells, type PolarisBuild } from "./format";
 
 /** Install-config key the builds a server has up are written under. */
@@ -25,6 +28,8 @@ export const WORLD_BUILDS_KEY = "seasonalWorldBuilds";
 
 /** Blocks a single paste chunk may cover: a few ticks of `polaris batch`. */
 export const PASTE_CHUNK_BLOCKS = 32_768;
+/** Commands a single paste chunk may hold, for a server that takes them one by one. */
+export const PASTE_CHUNK_LINES = 1_024;
 
 /** How far a build may stand above the lowest column it covers: a gap of one
  *  under an edge reads as part of the ground, more floats. */
@@ -47,11 +52,16 @@ const DIRECTIONS = [
 
 const IN_OVERWORLD = "execute in minecraft:overworld run";
 
+/** The snow that falls on whatever stands in the open: nobody placed it. */
+const SNOW = "minecraft:snow";
+
 export const placedSchema = z.object({
     id: z.string(),
     season: z.enum(DECORATIONS),
     /** The box and kinds a teardown needs; written before the first block. */
     arena: arenaSchema,
+    /** Which build was pasted, block for block: a teardown cell by cell only follows the same one. */
+    digest: z.string().optional(),
     /** Paste chunks already run: a restart goes on from the next one. */
     pasted: z.number().int().min(0),
     up: z.boolean()
@@ -67,6 +77,13 @@ export function readPlaced(config: Readonly<Record<string, unknown>>): Placed[] 
         const parsed = placedSchema.safeParse(one);
         return parsed.success ? [parsed.data] : [];
     });
+}
+
+/** The entries `readPlaced` left out, kept as written: a later version may read one, and it is the only record of a build still standing. */
+export function unreadPlaced(config: Readonly<Record<string, unknown>>): unknown[] {
+    const list = config[WORLD_BUILDS_KEY];
+    if (!Array.isArray(list)) return [];
+    return list.filter((one) => !placedSchema.safeParse(one).success);
 }
 
 export interface Point {
@@ -157,10 +174,13 @@ export function judgeSite(
     return { y: high };
 }
 
-/** One paste command and how many blocks it covers. */
+/** One paste command, the run it fills, and how many blocks it covers. */
 export interface PastePiece {
     readonly line: string;
     readonly blocks: number;
+    readonly state: string;
+    readonly from: Point;
+    readonly to: Point;
 }
 
 /**
@@ -181,15 +201,19 @@ export function pastePieces(build: PolarisBuild, origin: Point): PastePiece[] {
                 while (end + 1 < width && cells[row + end + 1] === index) end += 1;
                 if (index !== 0) {
                     const state = build.palette[index]!;
-                    const at = `${origin.x + x} ${origin.y + y} ${origin.z + z}`;
-                    pieces.push(
-                        end === x
-                            ? { line: `${IN_OVERWORLD} setblock ${at} ${state} keep`, blocks: 1 }
-                            : {
-                                  line: `${IN_OVERWORLD} fill ${at} ${origin.x + end} ${origin.y + y} ${origin.z + z} ${state} keep`,
-                                  blocks: end - x + 1
-                              }
-                    );
+                    const from = { x: origin.x + x, y: origin.y + y, z: origin.z + z };
+                    const to = { ...from, x: origin.x + end };
+                    const at = `${from.x} ${from.y} ${from.z}`;
+                    pieces.push({
+                        line:
+                            end === x
+                                ? `${IN_OVERWORLD} setblock ${at} ${state} keep`
+                                : `${IN_OVERWORLD} fill ${at} ${to.x} ${to.y} ${to.z} ${state} keep`,
+                        blocks: end - x + 1,
+                        state,
+                        from,
+                        to
+                    });
                 }
                 x = end + 1;
             }
@@ -198,16 +222,17 @@ export function pastePieces(build: PolarisBuild, origin: Point): PastePiece[] {
     return pieces;
 }
 
-/** The pieces grouped into chunks of at most `budget` blocks, in order. */
+/** The pieces grouped into chunks of at most `budget` blocks and `lines` commands, in order. */
 export function pasteChunks(
-    pieces: readonly PastePiece[],
-    budget = PASTE_CHUNK_BLOCKS
+    pieces: readonly Pick<PastePiece, "line" | "blocks">[],
+    budget = PASTE_CHUNK_BLOCKS,
+    lines = PASTE_CHUNK_LINES
 ): string[][] {
     const chunks: string[][] = [];
     let current: string[] = [];
     let blocks = 0;
     for (const piece of pieces) {
-        if (current.length > 0 && blocks + piece.blocks > budget) {
+        if (current.length > 0 && (blocks + piece.blocks > budget || current.length >= lines)) {
             chunks.push(current);
             current = [];
             blocks = 0;
@@ -233,12 +258,63 @@ export function placedFor(build: PolarisBuild, origin: Point, batch?: string): P
         id: build.id,
         season: build.season,
         arena: { box: boxFor(build, origin), blocks: kinds, ...(batch ? { batch } : {}) },
+        digest: digestOf(build),
         pasted: 0,
         up: false
     };
 }
 
-/** The build taken down: every kind it used back to air, inside its box only. */
-export function restoreLines(placed: Placed): string[] {
-    return arena.teardown(placed.arena);
+/** The build block for block: one changed since it was pasted is another build. */
+export function digestOf(build: PolarisBuild): string {
+    return createHash("sha256")
+        .update(JSON.stringify([build.size, build.palette, build.blocks]))
+        .digest("hex")
+        .slice(0, 32);
+}
+
+/** Whether `build` is exactly the one `placed` wrote down. */
+function placedIs(placed: Placed, build: PolarisBuild): boolean {
+    return (
+        build.id === placed.id &&
+        build.season === placed.season &&
+        placed.digest !== undefined &&
+        placed.digest === digestOf(build)
+    );
+}
+
+/**
+ * The build taken down: every cell it filled back to air, the top layer first,
+ * and only while the cell still holds what went there or what that turns into
+ * by itself - a block a player put anywhere else in its box stays. The snow
+ * that fell on it comes down first, and whatever fell while it came down after.
+ * Without the build it was pasted from (one since dropped from the catalog),
+ * every kind it used back to air inside its box.
+ */
+export function restoreLines(placed: Placed, build?: PolarisBuild): string[] {
+    if (!build || !placedIs(placed, build)) return arena.teardown(placed.arena);
+    const { box } = placed.arena;
+    const take = (from: Point, to: Point, block: string) =>
+        `${IN_OVERWORLD} fill ${from.x} ${from.y} ${from.z} ${to.x} ${to.y} ${to.z} minecraft:air replace ${block}`;
+    const cells = pastePieces(build, { x: box.x1, y: box.y1, z: box.z1 })
+        .reverse()
+        .flatMap((piece) => {
+            const block = blockOf(piece.state);
+            return arena
+                .withDecayed([block])
+                .filter((one) => one !== SNOW)
+                .map((one) => take(piece.from, piece.to, one));
+        });
+    return [
+        ...[...arena.slices(box)]
+            .reverse()
+            .map((piece) =>
+                take(
+                    { x: piece.x1, y: piece.y1, z: piece.z1 },
+                    { x: piece.x2, y: piece.y2, z: piece.z2 },
+                    SNOW
+                )
+            ),
+        ...cells,
+        ...(placed.arena.blocks.some(falls) ? [fallingGone(box)] : [])
+    ];
 }
