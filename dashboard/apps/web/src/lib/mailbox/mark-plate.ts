@@ -31,6 +31,31 @@ const SOLID_ENOUGH = 128;
  *  thing would describe the emptiness rather than the logo. */
 const MIN_SOLID_FRACTION = 0.02;
 
+/** How much of an image may be see-through before it counts as having a
+ *  background of its own to show. A photograph is solid edge to edge; a logo on
+ *  transparency is empty at least in its corners, which is a fifth of a circle's
+ *  bounding square. A few anti-aliased pixels at the rim are neither. */
+const OPAQUE_ENOUGH = 0.97;
+
+/**
+ * Whether an image covers its whole square.
+ *
+ * A picture with no transparency brings its own background - a photograph, or a
+ * logo already drawn on its plate - so nothing behind it is ever seen, and a
+ * plate under it only shows as a ring round the edge. It is what made somebody's
+ * own photo in a conversation sit inside a white border: a portrait averages
+ * dark, and a dark "mark" was given a white plate it could not need.
+ */
+export function coversWhole(pixels: Uint8ClampedArray): boolean {
+    const total = Math.floor(pixels.length / 4);
+    if (total === 0) return false;
+    let solid = 0;
+    for (let index = 3; index < pixels.length; index += 4) {
+        if ((pixels[index] ?? 0) >= SOLID_ENOUGH) solid += 1;
+    }
+    return solid / total >= OPAQUE_ENOUGH;
+}
+
 /**
  * The average colour of what is actually drawn in an image, as hex.
  *
