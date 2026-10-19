@@ -226,5 +226,43 @@
         "summary": "Summarize what changed today",
         "tools": "What can you do here?"
     },
-    "welcome": "How can I help?"
+    "welcome": "How can I help?",
+    "voice": {
+        "dictate": "Dictate",
+        "dictateStop": "Stop and transcribe",
+        "dictateCancel": "Discard recording",
+        "recording": "Recording {time}",
+        "silent": "Polar can't hear anything. Check your microphone.",
+        "transcribing": "Transcribing",
+        "call": "Voice mode",
+        "unavailable": "Speaking to Polar needs an OpenAI or Google AI key.",
+        "micDenied": "Polar can't use your microphone. Allow it for this site in your browser, then try again.",
+        "cannotRecord": "This browser can't record audio.",
+        "errors": {
+            "transcribe_failed": "That didn't come through. Try again.",
+            "rate_limited": "Too many tries. Wait a minute.",
+            "too_large": "That recording is too long.",
+            "speak_failed": "Polar couldn't say this answer out loud. It's on screen.",
+            "no_speech_provider": "Polar can't speak without an OpenAI or Google AI key. Its answers stay on screen."
+        },
+        "callTitle": "Voice mode",
+        "callDescription": "Speak, and Polar answers out loud. Talk over it to stop it.",
+        "phase": {
+            "listening": "Listening",
+            "hearing": "Hearing you",
+            "transcribing": "Transcribing",
+            "thinking": "Thinking",
+            "speaking": "Speaking",
+            "approval": "Waiting for you"
+        },
+        "muted": "Microphone off",
+        "mute": "Mute microphone",
+        "unmute": "Turn microphone on",
+        "end": "End call",
+        "interrupt": "Interrupt",
+        "you": "You",
+        "polar": "Polar",
+        "captions": "Live captions",
+        "dismiss": "Dismiss"
+    }
 }

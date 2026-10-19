@@ -226,5 +226,43 @@
         "summary": "Resume qué ha cambiado hoy",
         "tools": "¿Qué puedes hacer aquí?"
     },
-    "welcome": "¿En qué te ayudo?"
+    "welcome": "¿En qué te ayudo?",
+    "voice": {
+        "dictate": "Dictar",
+        "dictateStop": "Parar y transcribir",
+        "dictateCancel": "Descartar audio",
+        "recording": "Grabando {time}",
+        "silent": "Polar no oye nada. Revisa tu micrófono.",
+        "transcribing": "Transcribiendo",
+        "call": "Modo de voz",
+        "unavailable": "Hablar con Polar requiere una clave de OpenAI o Google AI.",
+        "micDenied": "Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.",
+        "cannotRecord": "Este navegador no puede grabar audio.",
+        "errors": {
+            "transcribe_failed": "No se ha entendido. Vuelve a probar.",
+            "rate_limited": "Demasiados intentos. Espera un minuto.",
+            "too_large": "La grabación es demasiado larga.",
+            "speak_failed": "Polar no ha podido leer esta respuesta. Está en pantalla.",
+            "no_speech_provider": "Polar no puede hablar sin una clave de OpenAI o Google AI. Sus respuestas siguen en pantalla."
+        },
+        "callTitle": "Modo de voz",
+        "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
+        "phase": {
+            "listening": "Escuchando",
+            "hearing": "Te escucho",
+            "transcribing": "Transcribiendo",
+            "thinking": "Pensando",
+            "speaking": "Hablando",
+            "approval": "Esperándote"
+        },
+        "muted": "Micrófono apagado",
+        "mute": "Silenciar micro",
+        "unmute": "Activar micrófono",
+        "end": "Colgar",
+        "interrupt": "Interrumpir",
+        "you": "Tú",
+        "polar": "Polar",
+        "captions": "Subtítulos",
+        "dismiss": "Cerrar"
+    }
 }
