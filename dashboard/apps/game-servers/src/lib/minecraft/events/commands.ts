@@ -1068,12 +1068,30 @@ export const CLEAR_SAMPLES = clearSamples();
  * line's answer.
  */
 export function builtUnderSamples(names: GroundNames, tag = SAMPLE_TAG): string[] {
+    return samplesUnlessAt(GROUND[names], "~ ~-1 ~", tag);
+}
+
+/**
+ * The markers whose own cell - `dy` over where each stands - holds something
+ * other than air or what grows on the ground by itself (`GROUND`): a rail, a
+ * torch, a carpet somebody laid. Each line answers the markers none of its
+ * names matched, and one with such a thing is in every line's answer.
+ */
+export function strayAtSamples(names: GroundNames, dy: number, tag = SAMPLE_TAG): string[] {
+    return samplesUnlessAt(
+        ["air", "cave_air", ...GROUND[names]],
+        `~ ~${dy === 0 ? "" : dy} ~`,
+        tag
+    );
+}
+
+function samplesUnlessAt(ids: readonly string[], at: string, tag: string): string[] {
     const prefix = `execute as @e[tag=${tag}] at @s`;
     const suffix = " run data get entity @s Pos";
     const lines: string[] = [];
     let line = prefix;
-    for (const id of GROUND[names]) {
-        const check = ` unless block ~ ~-1 ~ ${id.startsWith("#") ? id : `minecraft:${id}`}`;
+    for (const id of ids) {
+        const check = ` unless block ${at} ${id.startsWith("#") ? id : `minecraft:${id}`}`;
         if (
             line !== prefix &&
             commandBytes(line + check + suffix) > COMMAND_BYTES_MAX - NAMESPACE.length * 2

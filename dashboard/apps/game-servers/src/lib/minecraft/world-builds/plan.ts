@@ -5,13 +5,27 @@
  * The guarantees are the arena's (`events/kinds/arena.ts`):
  *
  * - Only air is ever changed. A site is taken only when its ground is the
- *   world's own, level, dry and off any tree or build, and the build's whole box
- *   above it counts as nothing but air; every block then goes in with `keep`.
+ *   world's own, dry and off any tree or build, and the build's whole box above
+ *   it counts as nothing but air; every block then goes in with `keep`.
+ * - Ground as players leave it - a slope, a dip, a hummock - takes a build
+ *   too: it stands level with the highest column it covers, never cut into
+ *   the ground, on a foundation of dirt that fills the air down to the ground
+ *   in each lower column (the pedestal structure placers such as
+ *   BetterStructures put under theirs). Every column of the footprint is read,
+ *   not a sample of them, so the foundation's cells are known one by one and
+ *   none of them is ground: they sit above the heightmap's top in their
+ *   column, where only air or what grows can be, and only the air is filled.
+ * - Grass and flowers do not turn a site down; nothing that grows is replaced.
+ *   A build over them is lifted a block or two instead, and the foundation
+ *   goes in round them with `keep`, so taking it down leaves them as they
+ *   were. Trees, water and lava still turn a site down: nothing is cut,
+ *   drained or bridged.
  * - Taking it down gives back exactly what was there - air - for every block it
  *   placed and nothing else: each cell it filled, top layer first, emptied only
  *   while it still holds what went there (or what that turned into by itself).
  *   Something a player put down in it meanwhile - a chest in the house, planks
- *   of the same wood beside a wall - is theirs and stays.
+ *   of the same wood beside a wall - is theirs and stays. The foundation comes
+ *   down the same way, cell by cell, after the build.
  * - Pasted bottom layer first, in chunks the server takes a few ticks each.
  */
 
@@ -31,29 +45,47 @@ export const PASTE_CHUNK_BLOCKS = 32_768;
 /** Commands a single paste chunk may hold, for a server that takes them one by one. */
 export const PASTE_CHUNK_LINES = 1_024;
 
-/** How far a build may stand above the lowest column it covers: a gap of one
- *  under an edge reads as part of the ground, more floats. */
-export const GROUND_SPREAD_MAX = 1;
+/** The most a build's foundation may raise it over the lowest column it
+ *  covers, however wide it is: past that it is a tower, not a build on a hill. */
+export const GROUND_SPREAD_MAX = 8;
 
-/** Nearest and farthest a build is put from a player's home, and the step. */
-const RING_FIRST = 24;
-const RING_LAST = 72;
-const RING_STEP = 16;
-const DIRECTIONS = [
-    [1, 0],
-    [1, 1],
-    [0, 1],
-    [-1, 1],
-    [-1, 0],
-    [-1, -1],
-    [0, -1],
-    [1, -1]
-] as const;
+/** How far a build may stand above the lowest column it covers: as far as its
+ *  longer side - a foundation no taller than the build is wide - two at least,
+ *  `GROUND_SPREAD_MAX` at most. */
+export function spreadAllowed(build: PolarisBuild): number {
+    return Math.min(GROUND_SPREAD_MAX, Math.max(2, build.size.x, build.size.z));
+}
+
+/** How far a build is lifted over grass or flowers in its way, the tallest of
+ *  which (a sunflower, tall grass) are two blocks. */
+export const LIFT_MAX = 2;
+
+/** What the foundation is made of: grass from the ground round it grows over
+ *  it, and it never spreads onto anything that is not ours, as grass would. */
+export const FOUNDATION_BLOCK = "minecraft:dirt";
+
+/** How far from a player's home a build is put, nearest first: every 16 blocks
+ *  near, every 32 further out, to well past where anybody's base usually ends. */
+const RINGS = [24, 40, 56, 72, 96, 128, 160, 192] as const;
+/** About how far apart a ring's sites lie: a far ring gets more of them. */
+const RING_SPACING = 64;
 
 const IN_OVERWORLD = "execute in minecraft:overworld run";
 
 /** The snow that falls on whatever stands in the open: nobody placed it. */
 const SNOW = "minecraft:snow";
+
+/** One run of foundation along x: the cells from `y1` to `y2` in each column,
+ *  as `[x1, x2, z, y1, y2]`. */
+const foundationRunSchema = z.tuple([
+    z.number().int(),
+    z.number().int(),
+    z.number().int(),
+    z.number().int(),
+    z.number().int()
+]);
+
+export type FoundationRun = z.infer<typeof foundationRunSchema>;
 
 export const placedSchema = z.object({
     id: z.string(),
@@ -62,6 +94,10 @@ export const placedSchema = z.object({
     arena: arenaSchema,
     /** Which build was pasted, block for block: a teardown cell by cell only follows the same one. */
     digest: z.string().optional(),
+    /** The foundation's cells, none of them ground when it was written down;
+     *  pasted before the build and taken down after it. None on a build placed
+     *  before there were foundations. */
+    foundation: z.array(foundationRunSchema).optional(),
     /** Paste chunks already run: a restart goes on from the next one. */
     pasted: z.number().int().min(0),
     up: z.boolean()
@@ -190,9 +226,69 @@ export function boxFor(build: PolarisBuild, origin: Point): Box {
     };
 }
 
-/** Half the longer side: the radius the ground survey covers. */
+/** Half the longer side: how far a site's chunks are held loaded round it. */
 export function radiusOf(build: PolarisBuild): number {
     return Math.ceil(Math.max(build.size.x, build.size.z) / 2);
+}
+
+/** Every column the build covers for a site centered on `center`: each is read. */
+export function footprintOf(
+    build: PolarisBuild,
+    center: { x: number; z: number }
+): { x: number; z: number }[] {
+    const origin = originFor(build, center, 0);
+    const columns: { x: number; z: number }[] = [];
+    for (let dz = 0; dz < build.size.z; dz += 1)
+        for (let dx = 0; dx < build.size.x; dx += 1)
+            columns.push({ x: origin.x + dx, z: origin.z + dz });
+    return columns;
+}
+
+/** Columns read about in one answer: a marker's line is about seventy bytes,
+ *  and RCON hands back 4096 of an answer at most. */
+export const STRIP_COLUMNS = 48;
+
+/** A footprint cut into strips of whole rows (or of a row, when one is wider
+ *  than a strip) of at most `STRIP_COLUMNS` columns, each read on its own. */
+export function stripsOf(build: PolarisBuild, center: { x: number; z: number }): Box[] {
+    const origin = originFor(build, center, 0);
+    const width = Math.min(build.size.x, STRIP_COLUMNS);
+    const rows = Math.max(1, Math.floor(STRIP_COLUMNS / width));
+    const strips: Box[] = [];
+    for (let dz = 0; dz < build.size.z; dz += rows) {
+        for (let dx = 0; dx < build.size.x; dx += width) {
+            strips.push({
+                x1: origin.x + dx,
+                y1: 0,
+                z1: origin.z + dz,
+                x2: origin.x + Math.min(build.size.x, dx + width) - 1,
+                y2: 0,
+                z2: origin.z + Math.min(build.size.z, dz + rows) - 1
+            });
+        }
+    }
+    return strips;
+}
+
+/** A marker tag narrowed to one strip's columns, from the bottom of the world
+ *  to the top, for any selector that takes a tag (`@e[tag=...]`). */
+export function stripTag(tag: string, strip: Box): string {
+    const volume = `dx=${strip.x2 - strip.x1},dy=384,dz=${strip.z2 - strip.z1}`;
+    return `${tag},x=${strip.x1},y=-64,z=${strip.z1},${volume}`;
+}
+
+/** The sites of one ring round a point: eight, and more the further out it is,
+ *  starting due east and going round. */
+function ringSites(ring: number, reach: number): { x: number; z: number }[] {
+    const count = 8 * Math.max(1, Math.round((2 * Math.PI * ring) / (8 * RING_SPACING)));
+    const out = ring + reach;
+    return Array.from({ length: count }, (_, at) => {
+        const angle = (at / count) * 2 * Math.PI;
+        return {
+            x: Math.round(Math.cos(angle) * out) || 0,
+            z: Math.round(Math.sin(angle) * out) || 0
+        };
+    });
 }
 
 /**
@@ -207,14 +303,11 @@ export function candidateCenters(
     const reach = radiusOf(build);
     const seen = new Set<string>();
     const found: { x: number; z: number }[] = [];
-    for (let ring = RING_FIRST; ring <= RING_LAST; ring += RING_STEP) {
+    for (const ring of RINGS) {
+        const sites = ringSites(ring, reach);
         for (const home of homes) {
-            for (const [dx, dz] of DIRECTIONS) {
-                const step = (ring + reach) / Math.hypot(dx, dz);
-                const spot = {
-                    x: Math.round(home.x + dx * step),
-                    z: Math.round(home.z + dz * step)
-                };
+            for (const site of sites) {
+                const spot = { x: home.x + site.x, z: home.z + site.z };
                 const key = `${spot.x},${spot.z}`;
                 if (seen.has(key)) continue;
                 seen.add(key);
@@ -232,9 +325,10 @@ export type SiteVerdict =
 
 /**
  * Whether the ground the survey read is a site: a marker came down on every
- * column (none missing to water or lava), none on a tree, the sea or a build,
- * and all within `GROUND_SPREAD_MAX` of each other. The build stands on the
- * highest of them.
+ * column, none on a tree, the sea or a build, and all within `spreadAllowed`
+ * of each other. The build stands on the highest of them - over the ground of
+ * every column, never in it - lifted by `LIFT_MAX` at most, so that much room
+ * is kept under the top of the world.
  */
 export function judgeSite(
     columns: number,
@@ -247,9 +341,42 @@ export function judgeSite(
     if (covered > 0) return { why: "covered" };
     const ys = tops.map((one) => one.y);
     const high = Math.max(...ys);
-    if (high - Math.min(...ys) > GROUND_SPREAD_MAX) return { why: "uneven" };
-    if (high + build.size.y - 1 > worldTop) return { why: "too-high" };
+    if (high - Math.min(...ys) > spreadAllowed(build)) return { why: "uneven" };
+    if (high + LIFT_MAX + build.size.y - 1 > worldTop) return { why: "too-high" };
     return { y: high };
+}
+
+/**
+ * The foundation under a build standing at `level`: in every column it covers,
+ * the cells from the top the survey read (the first one over the ground) up to
+ * the build, as runs along x of columns that start at the same height. A
+ * column whose ground reaches the build has none.
+ */
+export function foundationRuns(
+    tops: readonly { x: number; y: number; z: number }[],
+    level: number
+): FoundationRun[] {
+    const rows = new Map<number, { x: number; y: number }[]>();
+    for (const one of tops) {
+        if (one.y >= level) continue;
+        rows.set(one.z, [...(rows.get(one.z) ?? []), { x: one.x, y: one.y }]);
+    }
+    const runs: FoundationRun[] = [];
+    for (const z of [...rows.keys()].sort((one, other) => one - other)) {
+        const row = rows.get(z)!.sort((one, other) => one.x - other.x);
+        for (let at = 0; at < row.length; ) {
+            let end = at;
+            while (
+                end + 1 < row.length &&
+                row[end + 1]!.x === row[end]!.x + 1 &&
+                row[end + 1]!.y === row[at]!.y
+            )
+                end += 1;
+            runs.push([row[at]!.x, row[end]!.x, z, row[at]!.y, level - 1]);
+            at = end + 1;
+        }
+    }
+    return runs;
 }
 
 /** One paste command, the run it fills, and how many blocks it covers. */
@@ -300,6 +427,30 @@ export function pastePieces(build: BuildCells, origin: Point): PastePiece[] {
     return pieces;
 }
 
+/** The commands that put the foundation in, only into air like the build's,
+ *  the lowest runs first. */
+export function foundationPieces(runs: readonly FoundationRun[]): PastePiece[] {
+    return [...runs]
+        .sort((one, other) => one[3] - other[3])
+        .map(([x1, x2, z, y1, y2]) => ({
+            line: `${IN_OVERWORLD} fill ${x1} ${y1} ${z} ${x2} ${y2} ${z} ${FOUNDATION_BLOCK} keep`,
+            blocks: (x2 - x1 + 1) * (y2 - y1 + 1),
+            state: FOUNDATION_BLOCK,
+            from: { x: x1, y: y1, z },
+            to: { x: x2, y: y2, z }
+        }));
+}
+
+/** Everything a placed build pastes, in order: its foundation, then itself.
+ *  The chunks a restart counts in (`pasted`) are cut from this. */
+export function piecesOf(build: BuildCells, placed: Placed): PastePiece[] {
+    const { box } = placed.arena;
+    return [
+        ...foundationPieces(placed.foundation ?? []),
+        ...pastePieces(build, { x: box.x1, y: box.y1, z: box.z1 })
+    ];
+}
+
 /** The pieces grouped into chunks of at most `budget` blocks and `lines` commands, in order. */
 export function pasteChunks(
     pieces: readonly Pick<PastePiece, "line" | "blocks">[],
@@ -324,7 +475,12 @@ export function pasteChunks(
 
 /** What is written down before the first block goes in: the box, and every kind
  *  the build uses in the order a teardown takes them. */
-export function placedFor(build: PolarisBuild, origin: Point, batch?: string): Placed {
+export function placedFor(
+    build: PolarisBuild,
+    origin: Point,
+    batch?: string,
+    foundation: readonly FoundationRun[] = []
+): Placed {
     // What went in last comes down first: a lantern before the floor it stands on.
     const last = new Map<number, number>();
     decodeCells(build).forEach((index, at) => {
@@ -337,6 +493,7 @@ export function placedFor(build: PolarisBuild, origin: Point, batch?: string): P
         season: build.season,
         arena: { box: boxFor(build, origin), blocks: kinds, ...(batch ? { batch } : {}) },
         digest: digestOf(build),
+        ...(foundation.length > 0 ? { foundation: [...foundation] } : {}),
         pasted: 0,
         up: false
     };
@@ -360,28 +517,35 @@ function placedIs(placed: Placed, build: PolarisBuild): boolean {
     );
 }
 
+const take = (from: Point, to: Point, block: string) =>
+    `${IN_OVERWORLD} fill ${from.x} ${from.y} ${from.z} ${to.x} ${to.y} ${to.z} minecraft:air replace ${block}`;
+
+/** Each piece's cells back to air, the last pasted first, only where a cell
+ *  still holds what went there or what that turned into by itself. */
+function emptied(pieces: readonly PastePiece[]): string[] {
+    return [...pieces].reverse().flatMap((piece) =>
+        arena
+            .withDecayed([blockOf(piece.state)])
+            .filter((one) => one !== SNOW)
+            .map((one) => take(piece.from, piece.to, one))
+    );
+}
+
 /**
  * The build taken down: every cell it filled back to air, the top layer first,
  * and only while the cell still holds what went there or what that turns into
  * by itself - a block a player put anywhere else in its box stays. The snow
  * that fell on it comes down first, and whatever fell while it came down after.
  * Without the build it was pasted from (one since dropped from the catalog),
- * every kind it used back to air inside its box.
+ * every kind it used back to air inside its box. The foundation last, cell by
+ * cell the same way - its dirt, or the grass that grew over it - whichever
+ * build it held up.
  */
 export function restoreLines(placed: Placed, build?: PolarisBuild): string[] {
-    if (!build || !placedIs(placed, build)) return arena.teardown(placed.arena);
+    const foundation = emptied(foundationPieces(placed.foundation ?? []));
+    if (!build || !placedIs(placed, build)) return [...arena.teardown(placed.arena), ...foundation];
     const { box } = placed.arena;
-    const take = (from: Point, to: Point, block: string) =>
-        `${IN_OVERWORLD} fill ${from.x} ${from.y} ${from.z} ${to.x} ${to.y} ${to.z} minecraft:air replace ${block}`;
-    const cells = pastePieces(build, { x: box.x1, y: box.y1, z: box.z1 })
-        .reverse()
-        .flatMap((piece) => {
-            const block = blockOf(piece.state);
-            return arena
-                .withDecayed([block])
-                .filter((one) => one !== SNOW)
-                .map((one) => take(piece.from, piece.to, one));
-        });
+    const cells = emptied(pastePieces(build, { x: box.x1, y: box.y1, z: box.z1 }));
     return [
         ...[...arena.slices(box)]
             .reverse()
@@ -393,6 +557,7 @@ export function restoreLines(placed: Placed, build?: PolarisBuild): string[] {
                 )
             ),
         ...cells,
-        ...(placed.arena.blocks.some(falls) ? [fallingGone(box)] : [])
+        ...(placed.arena.blocks.some(falls) ? [fallingGone(box)] : []),
+        ...foundation
     ];
 }

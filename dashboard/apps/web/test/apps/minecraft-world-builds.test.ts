@@ -1,7 +1,8 @@
 /**
  * Seasonal builds placed in a server's world: the Polaris build format, the
- * offline converter, where a build may go, the paced paste, and the teardown
- * that gives back exactly what was there.
+ * offline converter, where a build may go - uneven ground on a foundation, out
+ * to the far rings - the paced paste, and the teardown that gives back exactly
+ * what was there.
  */
 
 import { gzipSync } from "node:zlib";
@@ -230,18 +231,93 @@ describe("where a build goes", () => {
         expect(centers[0]).toEqual({ x: 26, z: 0 });
     });
 
-    it("takes level, open ground only", () => {
+    it("goes on out to the far rings, with more sites round them", () => {
+        const centers = plan.candidateCenters([{ x: 0, z: 0 }], tinyBuild(), Infinity);
+        const distances = centers.map((spot) => Math.hypot(spot.x, spot.z));
+        const ring = (from: number, to: number) =>
+            distances.filter((one) => one >= from && one < to).length;
+        expect(ring(24, 30)).toBe(8);
+        expect(ring(190, 200)).toBeGreaterThan(8);
+        expect(Math.max(...distances)).toBeLessThan(200);
+        // Nearest first: each ring after the one before it.
+        distances.forEach((one, at) => {
+            if (at > 0) expect(one).toBeGreaterThan(distances[at - 1]! - 2);
+        });
+    });
+
+    it("takes uneven ground up to as far as the build is wide, never more than eight", () => {
         const build = tinyBuild();
         const level = [{ y: 64 }, { y: 64 }, { y: 65 }, { y: 64 }];
         expect(plan.judgeSite(4, level, 0, build)).toEqual({ y: 65 });
+        expect(plan.spreadAllowed(build)).toBe(3);
         expect(plan.judgeSite(4, [...level.slice(0, 3), { y: 62 }], 0, build)).toEqual({
+            y: 65
+        });
+        expect(plan.judgeSite(4, [...level.slice(0, 3), { y: 61 }], 0, build)).toEqual({
             why: "uneven"
         });
+        const wide = { ...build, size: { x: 40, y: 2, z: 40 } };
+        expect(plan.spreadAllowed(wide)).toBe(plan.GROUND_SPREAD_MAX);
+        expect(plan.spreadAllowed({ ...build, size: { x: 1, y: 2, z: 1 } })).toBe(2);
         expect(plan.judgeSite(4, level, 1, build)).toEqual({ why: "covered" });
         expect(plan.judgeSite(4, level.slice(0, 3), 0, build)).toEqual({ why: "unloaded" });
         expect(
             plan.judgeSite(4, [{ y: 319 }, { y: 319 }, { y: 319 }, { y: 319 }], 0, build)
         ).toEqual({ why: "too-high" });
+    });
+});
+
+describe("the foundation", () => {
+    it("fills each lower column from its ground to the build, and nothing in a column that reaches it", () => {
+        const tops = [
+            { x: 0, y: 64, z: 0 },
+            { x: 1, y: 64, z: 0 },
+            { x: 2, y: 66, z: 0 },
+            { x: 0, y: 61, z: 1 },
+            { x: 1, y: 63, z: 1 },
+            { x: 2, y: 63, z: 1 }
+        ];
+        expect(plan.foundationRuns(tops, 66)).toEqual([
+            [0, 1, 0, 64, 65],
+            [0, 0, 1, 61, 65],
+            [1, 2, 1, 63, 65]
+        ]);
+        expect(plan.foundationRuns(tops.slice(2, 3), 66)).toEqual([]);
+    });
+
+    it("goes in before the build, lowest first, only into air", () => {
+        const build = tinyBuild();
+        const runs: plan.FoundationRun[] = [
+            [10, 12, 20, 63, 63],
+            [10, 12, 21, 60, 63]
+        ];
+        const placed = plan.placedFor(build, { x: 10, y: 64, z: 20 }, "pwkey", runs);
+        expect(placed.foundation).toEqual(runs);
+        const lines = plan.piecesOf(build, placed).map((one) => one.line);
+        expect(lines.slice(0, 2)).toEqual([
+            "execute in minecraft:overworld run fill 10 60 21 12 63 21 minecraft:dirt keep",
+            "execute in minecraft:overworld run fill 10 63 20 12 63 20 minecraft:dirt keep"
+        ]);
+        expect(lines.slice(2)).toEqual(
+            plan.pastePieces(build, { x: 10, y: 64, z: 20 }).map((one) => one.line)
+        );
+        expect(plan.placedFor(build, { x: 10, y: 64, z: 20 })).not.toHaveProperty("foundation");
+    });
+
+    it("comes down after the build, cell by cell, its dirt or the grass that grew on it", () => {
+        const build = tinyBuild();
+        const runs: plan.FoundationRun[] = [[10, 12, 21, 60, 63]];
+        const placed = plan.placedFor(build, { x: 10, y: 64, z: 20 }, "pwkey", runs);
+        const lines = plan.restoreLines(placed, build);
+        const under = [
+            "execute in minecraft:overworld run fill 10 60 21 12 63 21 minecraft:air replace minecraft:dirt",
+            "execute in minecraft:overworld run fill 10 60 21 12 63 21 minecraft:air replace minecraft:grass_block"
+        ];
+        expect(lines.slice(-2)).toEqual(under);
+        expect(lines.filter((one) => one.includes(" 60 "))).toEqual(under);
+        // A build no longer in the catalog still takes its foundation with it.
+        const gone = plan.restoreLines(placed);
+        expect(gone.slice(-2)).toEqual(under);
     });
 });
 
@@ -450,12 +526,39 @@ describe("the catalog", () => {
 
 let ids = 0;
 
+/** What else a fake world holds: a block over the ground (`solid`), a tree
+ *  on a column, something somebody left `dy` over a column's ground. */
+interface FakeWorld {
+    solid?: (x: number, y: number, z: number) => boolean;
+    tree?: (x: number, z: number) => boolean;
+    stray?: (x: number, z: number, dy: number) => boolean;
+}
+
 /** A vanilla server on level ground at y 64 with nobody's builds on it, or the
- *  ground `heightAt` says. */
-function fakeServer(heightAt: (x: number, z: number) => number = () => 64) {
+ *  ground `heightAt` says (the first air over it) and what `world` adds. */
+function fakeServer(heightAt: (x: number, z: number) => number = () => 64, world: FakeWorld = {}) {
     const said: string[] = [];
     const sent: string[] = [];
     const columns: { x: number; z: number }[] = [];
+    const filled = (x: number, y: number, z: number) =>
+        y < heightAt(x, z) || (world.solid?.(x, y, z) ?? false);
+    /** The markers a selector's volume takes in, all of them without one. */
+    const selected = (command: string) => {
+        const volume =
+            /@e\[tag=[^,\]]+,x=(-?\d+),y=-?\d+,z=(-?\d+),dx=(\d+),dy=\d+,dz=(\d+)\]/.exec(command);
+        if (!volume) return columns;
+        const [x, z, dx, dz] = volume.slice(1).map(Number) as [number, number, number, number];
+        return columns.filter(
+            (one) => one.x >= x && one.x <= x + dx && one.z >= z && one.z <= z + dz
+        );
+    };
+    const answer = (found: readonly { x: number; z: number }[]) =>
+        found
+            .map(
+                (one) =>
+                    `Marker has the following entity data: [${one.x + 0.5}d, ${heightAt(one.x, one.z)}.0d, ${one.z + 0.5}d]`
+            )
+            .join("\n");
     const server = {
         installedAppId: `world-${(ids += 1)}`,
         edition: "java",
@@ -466,19 +569,31 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64) {
                 return "No force loaded chunks were found in minecraft:overworld";
             if (command!.includes("@a[distance=0..]"))
                 return "Steve has the following entity data: [0.5d, 64.0d, 0.5d]";
-            if (
-                command!.startsWith("execute as @e[tag=") &&
-                command!.endsWith("run data get entity @s Pos") &&
-                !command!.includes(" if block ") &&
-                !command!.includes(" unless block ")
-            )
-                return columns
-                    .map(
-                        (one) =>
-                            `Marker has the following entity data: [${one.x + 0.5}d, ${heightAt(one.x, one.z)}.0d, ${one.z + 0.5}d]`
-                    )
-                    .join("\n");
-            if (command!.includes(" if blocks ")) return "Test passed, count: 0";
+            if (command!.startsWith("execute as @e[tag=") && command!.endsWith("@s Pos")) {
+                const markers = selected(command!);
+                if (command!.includes(" if block ~ ~-1 ~ #minecraft:logs"))
+                    return answer(markers.filter((one) => world.tree?.(one.x, one.z)));
+                // Every line of the check over the ground answers the same markers.
+                const stray = / unless block ~ ~(\d*) ~ /.exec(command!);
+                if (stray)
+                    return answer(
+                        markers.filter((one) => world.stray?.(one.x, one.z, Number(stray[1] || 0)))
+                    );
+                if (command!.includes(" if block ") || command!.includes(" unless block "))
+                    return "";
+                return answer(markers);
+            }
+            const blocks = / if blocks (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) /.exec(
+                command!
+            );
+            if (blocks) {
+                const [x1, y1, z1, x2, y2, z2] = blocks.slice(1).map(Number) as number[];
+                let count = 0;
+                for (let x = x1!; x <= x2!; x++)
+                    for (let y = y1!; y <= y2!; y++)
+                        for (let z = z1!; z <= z2!; z++) if (filled(x, y, z)) count++;
+                return `Test passed, count: ${count}`;
+            }
             return "";
         },
         sayAll: async (lines: readonly string[]) => {
@@ -493,6 +608,25 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64) {
         }
     } as unknown as ServerContainer;
     return { server, said, sent };
+}
+
+/** Cliffs twenty high between every pair of columns: no build stands on them. */
+const cliffs = (x: number) => 64 + 20 * Math.abs(x % 2);
+
+/** The cells a fill or setblock line covers, and the block it puts there or takes away. */
+function cellsOf(line: string): { cells: string[]; block: string } {
+    const at = "(-?\\d+) (-?\\d+) (-?\\d+)";
+    const match = new RegExp(String.raw` (?:fill ${at} ${at}|setblock ${at}) (\S+)`).exec(line)!;
+    const numbers = match
+        .slice(1, 10)
+        .filter((one) => one !== undefined)
+        .map(Number);
+    const [x1, y1, z1, x2 = x1, y2 = y1, z2 = z1] = numbers as number[];
+    const cells: string[] = [];
+    for (let x = x1!; x <= x2!; x++)
+        for (let y = y1!; y <= y2!; y++)
+            for (let z = z1!; z <= z2!; z++) cells.push(`${x},${y},${z}`);
+    return { cells, block: match[10]! };
 }
 
 describe("the season's builds in the world", () => {
@@ -550,9 +684,8 @@ describe("the season's builds in the world", () => {
     });
 
     it("goes on round the rings on the next pass when every site it tried was uneven", async () => {
-        // Built up out to 40 blocks from the player: steps of two everywhere nearer.
-        const stepped = (x: number, z: number) =>
-            Math.hypot(x, z) < 40 ? 64 + 2 * Math.abs(Math.floor(x / 4) % 2) : 64;
+        // Cliffs out to 40 blocks from the player: no site anywhere nearer.
+        const stepped = (x: number, z: number) => (Math.hypot(x, z) < 40 ? cliffs(x) : 64);
         const first = fakeServer(stepped);
         await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
         expect(plan.readPlaced(config)).toEqual([]);
@@ -604,7 +737,7 @@ describe("the season's builds in the world", () => {
         await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
         const markers = [...sent, ...said].filter((line) => line.includes("@e[tag="));
         expect(markers.length).toBeGreaterThan(0);
-        expect(markers.every((line) => line.includes("@e[tag=pw_samp]"))).toBe(true);
+        expect(markers.every((line) => /@e\[tag=pw_samp[,\]]/.test(line))).toBe(true);
         const summoned = sent.filter((line) => line.includes(" summon minecraft:armor_stand "));
         expect(summoned.length).toBeGreaterThan(0);
         expect(summoned.every((line) => line.includes('Tags:["pw_samp"]'))).toBe(true);
@@ -647,11 +780,144 @@ describe("the season's builds in the world", () => {
     }, 30_000);
 });
 
+describe("a site as players leave the world", () => {
+    let logged: string[] = [];
+    beforeEach(() => {
+        config = {};
+        logged = [];
+        vi.spyOn(console, "info").mockImplementation((line: unknown) => {
+            logged.push(String(line));
+        });
+    });
+
+    /** A hummocky hillside: a block higher every column east and every row
+     *  south, falling back every few. */
+    const slope = (x: number, z: number) => 64 + (((x % 4) + 4) % 4) + (((z % 2) + 2) % 2);
+
+    it("stands a build on a slope, level with its highest column, on a foundation of air cells", async () => {
+        const { server, sent } = fakeServer(slope);
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        expect(placed).toMatchObject({ up: true });
+        const { box } = placed!.arena;
+        let highest = 0;
+        for (let x = box.x1; x <= box.x2; x++)
+            for (let z = box.z1; z <= box.z2; z++) highest = Math.max(highest, slope(x, z));
+        expect(box.y1).toBe(highest);
+        const paste = sent.filter((line) => line.endsWith(" keep"));
+        const under = paste.filter((line) => line.includes(" minecraft:dirt keep"));
+        expect(under.length).toBeGreaterThan(0);
+        // The foundation goes in first, and only above the ground in each column.
+        expect(paste.slice(0, under.length)).toEqual(under);
+        const foundation = new Set(under.flatMap((line) => cellsOf(line).cells));
+        for (const cell of foundation) {
+            const [x, y, z] = cell.split(",").map(Number) as [number, number, number];
+            expect(y).toBeGreaterThanOrEqual(slope(x, z));
+            expect(y).toBeLessThan(box.y1);
+        }
+        // Down to the ground in every column under the build: nothing floats.
+        for (let x = box.x1; x <= box.x2; x++)
+            for (let z = box.z1; z <= box.z2; z++)
+                for (let y = slope(x, z); y < box.y1; y++)
+                    expect(foundation.has(`${x},${y},${z}`)).toBe(true);
+        expect(
+            logged.some((line) => /: site, origin .+, foundation of \d+ blocks$/.test(line))
+        ).toBe(true);
+    });
+
+    it("takes the foundation and the build down, and nothing else", async () => {
+        const first = fakeServer(slope);
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        const placed = plan.readPlaced(config)[0]!;
+        const pasted = new Set(
+            first.sent
+                .filter((line) => line.endsWith(" keep"))
+                .flatMap((line) => cellsOf(line).cells)
+        );
+        const { server, sent } = fakeServer(slope);
+        await reconcileWorldBuilds(server, config, null, [tinyBuild()]);
+        const { box } = placed.arena;
+        const takes = sent.filter((line) => line.includes(" minecraft:air replace "));
+        expect(takes.some((line) => line.endsWith(" minecraft:dirt"))).toBe(true);
+        for (const line of takes) {
+            for (const cell of cellsOf(line).cells) {
+                const [x, y, z] = cell.split(",").map(Number) as [number, number, number];
+                // Never a cell of the ground, and only cells it pasted - or, for
+                // the snow that fell on it, its own box.
+                expect(y).toBeGreaterThanOrEqual(slope(x, z));
+                if (!line.endsWith(" minecraft:snow")) expect(pasted.has(cell)).toBe(true);
+                else expect(y).toBeGreaterThanOrEqual(box.y1);
+            }
+        }
+        // Every cell it pasted is given back.
+        const taken = new Set(takes.flatMap((line) => cellsOf(line).cells));
+        for (const cell of pasted) expect(taken.has(cell)).toBe(true);
+        expect(plan.readPlaced(config)).toEqual([]);
+    });
+
+    it("lifts a build over the grass in its way, which stays under the foundation", async () => {
+        // Short grass on every column: the first layer over the ground is not air.
+        const grass = (x: number, y: number, z: number) => y === 64;
+        const { server, sent } = fakeServer(() => 64, { solid: grass });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        expect(placed!.arena.box.y1).toBe(65);
+        const under = sent.filter((line) => line.includes(" minecraft:dirt keep"));
+        // Round the grass, with keep: it is never replaced.
+        expect(under.length).toBeGreaterThan(0);
+        expect(
+            under.every((line) => / 64 -?\d+ -?\d+ 64 -?\d+ minecraft:dirt keep$/.test(line))
+        ).toBe(true);
+    });
+
+    it("turns a site down while ground or anything else is in the build's box", async () => {
+        // Something three high on every column: more than any lift gets over.
+        const tall = (x: number, y: number, z: number) => y >= 64 && y < 67;
+        const { server, sent } = fakeServer(() => 64, { solid: tall });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        expect(sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        const verdicts = logged.filter((line) => line.includes(" site "));
+        expect(verdicts.length).toBe(6);
+        expect(verdicts.every((line) => line.endsWith(": not-air"))).toBe(true);
+    });
+
+    it("never builds over a tree, nor over something somebody left on the ground", async () => {
+        const near = (x: number, z: number) => Math.hypot(x, z) < 60;
+        for (const world of [
+            { tree: near, why: "covered" },
+            { stray: (x: number, z: number, dy: number) => dy === 0 && near(x, z), why: "occupied" }
+        ] as const) {
+            config = {};
+            logged = [];
+            const { server, sent } = fakeServer(() => 64, world);
+            await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+            expect(plan.readPlaced(config)).toEqual([]);
+            expect(sent.some((line) => line.endsWith(" keep"))).toBe(false);
+            const verdicts = logged.filter((line) => line.includes(" site "));
+            expect(verdicts.every((line) => line.endsWith(`: ${world.why}`))).toBe(true);
+        }
+    });
+
+    it("reaches the far rings when nothing nearer will do", async () => {
+        const rugged = (x: number, z: number) => (Math.hypot(x, z) < 150 ? cliffs(x) : 64);
+        const fake = fakeServer(rugged);
+        for (let pass = 0; pass < 40 && plan.readPlaced(config).length === 0; pass++)
+            await reconcileWorldBuilds(fake.server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        expect(placed).toMatchObject({ up: true });
+        const { box } = placed!.arena;
+        expect(Math.hypot((box.x1 + box.x2) / 2, (box.z1 + box.z2) / 2)).toBeGreaterThanOrEqual(
+            150
+        );
+    });
+});
+
 // ------------------------------------------------------------ site search
 
 describe("the search for a site", () => {
-    /** Steps of two everywhere: no site anywhere, every one surveyed is uneven. */
-    const stepped = (x: number) => 64 + 2 * Math.abs(Math.floor(x / 4) % 2);
+    /** Cliffs everywhere: no site anywhere, every one surveyed is uneven. */
+    const stepped = cliffs;
 
     /** `fakeServer` with a bed at `bed` and a player standing at `standing`. */
     function bedServer(bed: { x: number; z: number }, standing = { x: 0.5, z: 0.5 }) {
