@@ -145,7 +145,8 @@ export function fillKeep(box: Box, block: string): string {
  * mycelium and podzol with a solid block on top go to dirt over the game's
  * random ticks - grass under a garden's tree trunk, say - dirt beside grass
  * grows over, water open to the sky freezes in a cold place and ice by a light
- * melts. Nobody placed that dirt, so no arena lists it, and a teardown that
+ * melts, and a cauldron open to the sky fills with rain or powder snow.
+ * Nobody placed that dirt, so no arena lists it, and a teardown that
  * took only what it listed left it floating in the sky.
  *
  * Only what any arena's blocks do on their own is here; what a kind's own kit
@@ -157,7 +158,8 @@ const DECAYS_TO: Readonly<Record<string, readonly string[]>> = {
     "minecraft:podzol": ["minecraft:dirt"],
     "minecraft:dirt": ["minecraft:grass_block"],
     "minecraft:water": ["minecraft:ice"],
-    "minecraft:ice": ["minecraft:water"]
+    "minecraft:ice": ["minecraft:water"],
+    "minecraft:cauldron": ["minecraft:water_cauldron", "minecraft:powder_snow_cauldron"]
 };
 
 /** What falls on any arena in a cold place: a layer of snow on whatever is on

@@ -1,0 +1,23 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "gift-pile",
+    "season": "winter",
+    "size": { "x": 5, "y": 3, "z": 5 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:red_wool",
+        "minecraft:yellow_wool",
+        "minecraft:lime_wool",
+        "minecraft:light_blue_wool",
+        "minecraft:purple_wool",
+        "minecraft:red_carpet",
+        "minecraft:white_carpet",
+        "minecraft:yellow_carpet"
+    ],
+    "blocks": [
+        1, 1, 2, 1, 1, 1, 0, 2, 2, 3, 0, 1, 3, 1, 1, 1, 2, 1, 1, 1, 0, 5, 4, 2, 5, 1, 0, 2, 4, 2, 1,
+        1, 2, 1, 1, 1, 0, 2, 2, 3, 0, 1, 6, 1, 1, 1, 2, 1, 1, 1, 0, 5, 7, 2, 8, 1, 0, 2, 7, 2, 0, 6,
+        8, 1, 0, 18
+    ]
+}

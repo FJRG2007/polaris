@@ -1,0 +1,30 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "graveyard-corner",
+    "season": "halloween",
+    "size": { "x": 7, "y": 3, "z": 5 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:spruce_fence[east=true,north=false,south=true,west=false]",
+        "minecraft:spruce_fence[east=true,north=false,south=false,west=true]",
+        "minecraft:spruce_fence[east=false,north=false,south=false,west=true]",
+        "minecraft:spruce_fence[east=false,north=true,south=true,west=false]",
+        "minecraft:mossy_stone_brick_wall[up=true]",
+        "minecraft:chiseled_stone_bricks",
+        "minecraft:coarse_dirt",
+        "minecraft:podzol[snowy=false]",
+        "minecraft:cracked_stone_bricks",
+        "minecraft:spruce_fence[east=false,north=true,south=false,west=false]",
+        "minecraft:moss_carpet",
+        "minecraft:soul_lantern[hanging=false]",
+        "minecraft:stone_brick_slab[type=bottom]",
+        "minecraft:mossy_stone_brick_slab[type=bottom]",
+        "minecraft:dead_bush"
+    ],
+    "blocks": [
+        1, 1, 2, 5, 3, 1, 4, 1, 0, 1, 5, 1, 0, 1, 6, 1, 0, 2, 4, 1, 0, 1, 7, 1, 0, 1, 8, 1, 0, 1, 9,
+        1, 4, 1, 0, 1, 7, 1, 0, 1, 8, 1, 0, 2, 10, 1, 0, 4, 11, 1, 0, 1, 12, 1, 0, 8, 13, 1, 0, 1,
+        13, 1, 0, 8, 14, 1, 0, 4, 15, 1, 0, 44
+    ]
+}

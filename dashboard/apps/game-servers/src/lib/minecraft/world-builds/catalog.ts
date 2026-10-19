@@ -9,9 +9,22 @@
  */
 
 import snowman from "./builds/snowman.json";
+import giftPile from "./builds/gift-pile.json";
+import scarecrow from "./builds/scarecrow.json";
+import snowBench from "./builds/snow-bench.json";
 import pumpkinPatch from "./builds/pumpkin-patch.json";
+import winterSpruce from "./builds/winter-spruce.json";
+import witchCauldron from "./builds/witch-cauldron.json";
+import graveyardCorner from "./builds/graveyard-corner.json";
 import { polarisBuildSchema, type PolarisBuild } from "./format";
 
-export const WORLD_BUILDS: readonly PolarisBuild[] = [snowman, pumpkinPatch].map((one) =>
-    polarisBuildSchema.parse(one)
-);
+export const WORLD_BUILDS: readonly PolarisBuild[] = [
+    snowman,
+    winterSpruce,
+    giftPile,
+    snowBench,
+    pumpkinPatch,
+    graveyardCorner,
+    witchCauldron,
+    scarecrow
+].map((one) => polarisBuildSchema.parse(one));

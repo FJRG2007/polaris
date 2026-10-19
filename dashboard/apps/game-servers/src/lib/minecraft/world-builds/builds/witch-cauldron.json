@@ -1,0 +1,22 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "witch-cauldron",
+    "season": "halloween",
+    "size": { "x": 5, "y": 2, "z": 5 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:podzol[snowy=false]",
+        "minecraft:spruce_log[axis=y]",
+        "minecraft:campfire[facing=south,lit=true,signal_fire=false]",
+        "minecraft:brown_mushroom",
+        "minecraft:red_mushroom",
+        "minecraft:lantern[hanging=false]",
+        "minecraft:cauldron",
+        "minecraft:purple_candle[candles=3,lit=true]"
+    ],
+    "blocks": [
+        0, 3, 1, 2, 2, 1, 0, 6, 3, 1, 0, 6, 2, 1, 0, 1, 1, 1, 0, 6, 4, 1, 5, 1, 6, 1, 0, 6, 7, 1, 0,
+        6, 8, 1, 0, 1, 5, 1, 0, 3
+    ]
+}
