@@ -273,7 +273,7 @@ export function VaultSettings() {
                 </CardBody>
             </Card>
 
-            <VaultPasskeys confirm={confirm} />
+            <VaultPasskeys />
 
             <Card>
                 <CardHeader>

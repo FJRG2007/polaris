@@ -3338,26 +3338,26 @@ model VaultSend {
     @@index([userId])
 }
 
-// A passkey that unlocks this vault in the browser, through the WebAuthn PRF
-// extension. The credential is one of the account's own sign-in passkeys (the
-// `Passkey` table); this row is only what the vault needs on top of it. The
+// A sign-in passkey (the `Passkey` table) turned on to unlock this vault in the
+// browser, through the WebAuthn PRF extension. This row is only what the vault
+// needs on top of that credential: its name, its address and its device type
+// are read from the `Passkey` row it names, never copied here. The
 // authenticator turns `prfSalt` into 32 bytes the browser derives a key from,
 // and that key wraps the user's vault key into `wrappedKey`. Neither the PRF
 // output nor the derived key is ever sent here, so nothing in this row opens
-// the vault - it is as blind as `protectedKey`. The master password stays: it
-// is what enrolls a passkey and the way back in when every passkey is gone.
+// the vault - it is as blind as `protectedKey`. Turning one on asks for the
+// account's step-up proof; the master password stays the way back in when
+// every passkey is gone.
 model VaultPasskey {
     id           String    @id @default(uuid(7)) @db.Uuid
     userId       String    @db.Uuid
-    // Base64url, as WebAuthn reports it and as the `Passkey` row stores it.
+    // Base64url, as WebAuthn reports it and as the `Passkey` row stores it. The
+    // join to that row, which is what decides whether this one still answers.
     credentialId String
-    // The address the credential belongs to. A passkey only answers there.
-    rpId         String
     // Base64 of the 32 random bytes the PRF is evaluated with. Not a secret.
     prfSalt      String
     // The vault key as a type-2 enc string under the PRF-derived key.
     wrappedKey   String
-    name         String
     createdAt    DateTime  @default(now())
     lastUsedAt   DateTime?
 

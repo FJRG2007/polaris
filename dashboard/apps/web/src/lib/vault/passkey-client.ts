@@ -106,57 +106,50 @@ async function evaluatePrf(
 }
 
 /**
- * Everything the server is sent to enroll a passkey: the wrap, the salt, the
- * credential id and the master password hash. The PRF output is used here and
- * dropped; there is no field for it.
+ * Everything the server is sent to turn a passkey on: the wrap, the salt and
+ * the credential id. The PRF output is used here and dropped; there is no field
+ * for it.
  */
 export async function buildEnrollment(input: {
     vaultKey: crypto.SymmetricKey;
     credentialId: string;
     prfOutput: Uint8Array;
     prfSalt: Uint8Array;
-    rpId: string;
-    name: string;
-    masterPasswordHash: string;
 }): Promise<VaultPasskeyEnrollInput> {
     return {
-        masterPasswordHash: input.masterPasswordHash,
         credentialId: input.credentialId,
-        rpId: input.rpId,
         prfSalt: crypto.toBase64(input.prfSalt),
         wrappedKey: await crypto.wrapVaultKeyWithPasskey(
             input.vaultKey,
             input.prfOutput,
             input.prfSalt
-        ),
-        name: input.name
+        )
     };
 }
 
-/** Ask one of the account's passkeys for a PRF output and wrap the vault key under it. */
+/**
+ * Ask one of the account's passkeys - that one and no other, through
+ * `allowCredentials` - for a PRF output, and wrap the vault key under it.
+ */
 export async function enrollWithPasskey(input: {
     vaultKey: crypto.SymmetricKey;
-    candidates: readonly string[];
-    name: string;
-    masterPasswordHash: string;
+    credentialId: string;
 }): Promise<{ enrollment: VaultPasskeyEnrollInput } | { failure: PasskeyFailure }> {
-    if (input.candidates.length === 0) return { failure: "failed" };
-    // One salt for whichever passkey answers: it is drawn before anybody knows
-    // which one that will be, and stored against the one that did.
     const salt = crypto.generatePasskeyPrfSalt();
-    const result = await evaluatePrf(new Map(input.candidates.map((id) => [id, salt])));
+    const result = await evaluatePrf(new Map([[input.credentialId, salt]]));
     if ("failure" in result) return result;
+    if (result.credentialId !== input.credentialId) {
+        result.output.fill(0);
+        return { failure: "wrong" };
+    }
     const enrollment = await buildEnrollment({
         vaultKey: input.vaultKey,
         credentialId: result.credentialId,
         prfOutput: result.output,
-        prfSalt: salt,
-        rpId: window.location.hostname,
-        name: input.name,
-        masterPasswordHash: input.masterPasswordHash
+        prfSalt: salt
     });
     // Proved before it is sent: a wrap this tab cannot open again is a passkey
-    // that would sit in the list and never unlock anything.
+    // that would show as on and never unlock anything.
     const check = await crypto.unwrapVaultKeyWithPasskey(
         enrollment.wrappedKey,
         result.output,
@@ -166,7 +159,7 @@ export async function enrollWithPasskey(input: {
     return check ? { enrollment } : { failure: "failed" };
 }
 
-/** The enrolled passkeys this address can use: a passkey only answers on its own. */
+/** The vault passkeys this address can use: a passkey only answers on its own. */
 export function usablePasskeys(
     entries: readonly VaultPasskeyEntry[] | undefined
 ): VaultPasskeyEntry[] {
@@ -174,7 +167,7 @@ export function usablePasskeys(
     return entries.filter((entry) => entry.rpId === window.location.hostname);
 }
 
-/** Open the vault with whichever enrolled passkey the person picks. */
+/** Open the vault with whichever of its passkeys the person picks. */
 export async function unlockWithPasskey(
     entries: readonly VaultPasskeyEntry[]
 ): Promise<{ key: crypto.SymmetricKey; id: string } | { failure: PasskeyFailure }> {
