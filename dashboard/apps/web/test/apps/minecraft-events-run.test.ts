@@ -7086,6 +7086,9 @@ describe("spleef", () => {
         for (const piece of built.paste) expect(world.sent).toContain(piece.line);
         await play(8_000);
         for (const line of tntRun.armLines(built.arena)) expect(world.sent).toContain(line);
+        // A build's floors lie further apart than a generated one's: nobody
+        // inside takes the falls through them.
+        expect(world.sent).toContain(spleef.FALL_PROOF);
         // Through the last floor is out, onto the net.
         world.at.Ben = [built.arena.center.x, built.arena.floors.at(-1)! - 1, built.arena.center.z];
         await play(4_100);
@@ -7178,6 +7181,7 @@ describe("spleef", () => {
         const run = state().run!;
         const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
         expect(world.sent).toContain(spleef.GLOW);
+        expect(world.sent).not.toContain(spleef.FALL_PROOF);
         const closing = () =>
             world.sent.filter((line) => visible(line).includes("The floors are closing in"));
         expect(closing()).toHaveLength(0);

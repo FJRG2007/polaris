@@ -207,6 +207,22 @@ describe("spleef and TNT run played on a build", () => {
                 expect(Math.abs(at.x - 0.5 - center.x)).toBeLessThanOrEqual(size);
                 expect(Math.abs(at.z - 0.5 - center.z)).toBeLessThanOrEqual(size);
             }
+            // More players than starts: each still on a cell of their own,
+            // every one with footing on the top floor.
+            const starts = arenas.floorStarts(entry);
+            expect(starts.length).toBeGreaterThan(
+                entry.contract.kind === "spleef" || entry.contract.kind === "tnt-run"
+                    ? entry.contract.spawns.length
+                    : 0
+            );
+            expect(
+                arenas.contractProblems(entry.build, {
+                    ...entry.contract,
+                    spawns: [...starts]
+                } as never)
+            ).toEqual([]);
+            const cells = spleef.spots(built.arena, starts.length).map((at) => `${at.x},${at.z}`);
+            expect(new Set(cells).size).toBe(starts.length);
             // Out once under the last floor, over the net.
             expect(spleef.fell(built.arena, built.arena.floors.at(-1)! + 1)).toBe(false);
             expect(spleef.fell(built.arena, net!.y1 + 1)).toBe(true);

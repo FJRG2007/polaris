@@ -255,8 +255,8 @@ const DECLARED: readonly { build: unknown; contract: ArenaContract }[] = [
     }
 ];
 
-/** Why an entry's build does not keep its contract; empty when it does. */
-export function contractProblems(build: ArenaBuild, contract: ArenaContract): string[] {
+/** The block at a cell of `build`, and whether a player stands at a cell. */
+function reader(build: ArenaBuild) {
     const cells = decodeCells(build);
     const { x: width, y: height, z: depth } = build.size;
     const block = (x: number, y: number, z: number): string =>
@@ -269,6 +269,12 @@ export function contractProblems(build: ArenaBuild, contract: ArenaContract): st
         !NOT_GROUND.test(block(one.x, one.y - 1, one.z)) &&
         block(one.x, one.y, one.z) === AIR &&
         block(one.x, one.y + 1, one.z) === AIR;
+    return { block, stands };
+}
+
+/** Why an entry's build does not keep its contract; empty when it does. */
+export function contractProblems(build: ArenaBuild, contract: ArenaContract): string[] {
+    const { block, stands } = reader(build);
     const problems: string[] = [];
     const startsOn = (label: string, list: readonly Cell[]) => {
         for (const one of list)
@@ -322,7 +328,10 @@ export function contractProblems(build: ArenaBuild, contract: ArenaContract): st
                 x: team.reduce((sum, at) => sum + at.x, 0) / team.length,
                 z: team.reduce((sum, at) => sum + at.z, 0) / team.length
             }));
-            if (Math.hypot(one!.x - other!.x, one!.z - other!.z) < Math.max(width, depth) / 3)
+            if (
+                Math.hypot(one!.x - other!.x, one!.z - other!.z) <
+                Math.max(build.size.x, build.size.z) / 3
+            )
                 problems.push("the teams do not start at opposite ends");
             break;
         }
@@ -421,6 +430,46 @@ export function floorEntryOf(kind: EventKind, id: string): ArenaEntry | null {
     );
 }
 
+/** Where on the way from one start to the next each further lap of players
+ *  goes once every start is taken: halfway first, then the quarters, then the
+ *  eighths. */
+const LAPS = [1 / 2, 1 / 4, 3 / 4, 1 / 8, 5 / 8, 3 / 8, 7 / 8] as const;
+const spread = new WeakMap<ArenaEntry, readonly Cell[]>();
+
+/**
+ * Every cell a spleef's or TNT run's build starts a player on, in the order
+ * they are taken: its own starts, then the cells between one and the next
+ * (`LAPS`) that stand on the top floor's breakable blocks - so more players
+ * than it has starts are not put on a cell another already holds.
+ */
+export function floorStarts(entry: ArenaEntry): readonly Cell[] {
+    const { contract, build } = entry;
+    if (contract.kind !== "spleef" && contract.kind !== "tnt-run") return [];
+    const known = spread.get(entry);
+    if (known) return known;
+    const { block, stands } = reader(build);
+    const breakable = new Set(contract.breakable);
+    const top = contract.floors[0]!.y;
+    const starts = contract.spawns;
+    const taken = new Set(starts.map((one) => `${one.x},${one.z}`));
+    const cells: Cell[] = [...starts];
+    for (const lap of LAPS)
+        starts.forEach((from, index) => {
+            const to = starts[(index + 1) % starts.length]!;
+            const one = t(
+                Math.round(from.x + (to.x - from.x) * lap),
+                top + 1,
+                Math.round(from.z + (to.z - from.z) * lap)
+            );
+            const key = `${one.x},${one.z}`;
+            if (taken.has(key) || !stands(one) || !breakable.has(block(one.x, top, one.z))) return;
+            taken.add(key);
+            cells.push(one);
+        });
+    spread.set(entry, cells);
+    return cells;
+}
+
 /** How far under a build played in the air its catch net is. */
 export const NET_DROP = 2;
 /** How far the net reaches past the build on every side: a build has no walls
@@ -490,7 +539,7 @@ export function floorArena(
             z2
         },
         reach: Math.ceil(Math.SQRT2 * Math.max(site.x - x1, x2 - site.x, site.z - z1, z2 - site.z)),
-        starts: contract.spawns.map((one) => ({
+        starts: floorStarts(entry).map((one) => ({
             x: one.x + origin.x,
             y: one.y + origin.y,
             z: one.z + origin.z

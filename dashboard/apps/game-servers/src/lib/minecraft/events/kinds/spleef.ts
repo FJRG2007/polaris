@@ -67,6 +67,11 @@ export const SHRINK_EVERY_MS = 4_000;
 /** Glowing for whoever is inside, given again on every look and gone a moment
  *  after the last, so nobody keeps it once they are out - online or not. */
 export const GLOW = "effect give @a[tag=pe_in] minecraft:glowing 4 0 true";
+/** Resistance V for whoever is inside an arena from a build, given again on
+ *  every look like `GLOW`: a build's floors and its net lie further apart than
+ *  a generated arena's, and the falls through them add up to more than a
+ *  player's health (`stage.fallProof`). */
+export const FALL_PROOF = "effect give @a[tag=pe_in] minecraft:resistance 4 4 true";
 
 export const VARIANTS = SPLEEF_VARIANTS;
 export type Variant = (typeof VARIANTS)[number];

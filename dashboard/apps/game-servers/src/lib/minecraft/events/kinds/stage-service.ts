@@ -2345,6 +2345,8 @@ async function spleefTick(
         lines.push(...spleef.shrinkLines(floor, rings));
     }
 
+    if (floor.starts) lines.push(spleef.FALL_PROOF);
+
     const out: string[] = [];
     for (const racer of state(loop).racers) {
         if (racer.outAt !== null) continue;
