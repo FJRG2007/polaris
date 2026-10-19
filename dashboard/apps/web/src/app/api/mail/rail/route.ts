@@ -28,9 +28,16 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
-    if (!session) return NextResponse.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!session)
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
     if (!(await sessionCan(session, "mail.use"))) {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
     // The shelf the asking tab is showing, checked the way the layout checks
     // the header's: a rail holds somebody's own mailboxes or an organization's,

@@ -30,7 +30,13 @@ import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
 import { composeMime, sendMime, MailRejectedError, type OutgoingMessage } from "./send";
-import { announcePartial, announceUnsent, recordSend, recordSentCopy, type MailSentCopy } from "./delivery";
+import {
+    announcePartial,
+    announceUnsent,
+    recordSend,
+    recordSentCopy,
+    type MailSentCopy
+} from "./delivery";
 
 /** What the composer sends up. */
 export interface ComposeInput {
