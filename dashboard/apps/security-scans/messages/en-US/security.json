@@ -42,7 +42,8 @@
         "changes": "{added} added, {removed} removed, {changed} changed",
         "added": "Added",
         "removed": "Removed",
-        "changed": "Changed"
+        "changed": "Changed",
+        "volume": "Volume"
     },
     "host": {
         "hint": "Audits the server's own settings against hardening checks. The host is only read.",
