@@ -4,9 +4,10 @@
  * asks `/gen_title/:id` for the result. Until then the thread carries its first
  * message, cut short, so the list shows something at once.
  *
- * The title never costs more than one small call per thread, never replaces a
- * title somebody chose, and a failure keeps the placeholder without a word on
- * screen: a missing title is not worth an error.
+ * The title costs one small call per thread, asked with the least reasoning the
+ * model takes, never replaces a title somebody chose, and a failure keeps the
+ * placeholder without a word on screen - the next turn asks again: a missing
+ * title is not worth an error.
  *
  * Server-only.
  */
@@ -18,6 +19,8 @@ import { generateText, type LanguageModel, type UIMessage } from "ai";
 
 /** Where a thread's title came from (`PolarThread.titleSource`). */
 export type TitleSource = "placeholder" | "generating" | "model" | "user";
+
+type TitleReasoning = Parameters<typeof generateText>[0]["reasoning"];
 
 /** How much of the conversation the model reads to name it. */
 const EXCERPT_MAX = 2000;
@@ -81,42 +84,43 @@ const running = new Map<string, Promise<void>>();
 /**
  * Names the thread from its first exchange, if it still carries its
  * placeholder. The claim and the write are each conditional on the source, so
- * a second turn never asks again and a rename in between always wins.
+ * a second turn never asks again once it is named, a rename in between always
+ * wins, and a turn with nothing to name it from claims nothing.
  */
 export async function titlePolarThread(
     userId: string,
     threadId: string,
     model: LanguageModel,
-    messages: readonly UIMessage[]
+    messages: readonly UIMessage[],
+    reasoning?: TitleReasoning
 ): Promise<void> {
+    const asked = textOf(messages.find((message) => message.role === "user"));
+    if (!asked) return;
     const { count } = await prisma.polarThread.updateMany({
         where: { id: threadId, userId, titleSource: "placeholder" },
         data: { titleSource: "generating" }
     });
     if (!count) return;
-    const asked = textOf(messages.find((message) => message.role === "user"));
     const answered = textOf(messages.find((message) => message.role === "assistant"));
-    if (!asked) return;
+    let title: string | null = null;
     try {
         const { text } = await generateText({
             model,
             system: SYSTEM,
             prompt: `User:\n${asked}${answered ? `\n\nAssistant:\n${answered}` : ""}`,
             maxOutputTokens: OUTPUT_MAX,
+            reasoning,
             abortSignal: AbortSignal.timeout(TIMEOUT_MS)
         });
-        const title = sanitizeTitle(text);
-        if (!title) {
-            console.warn("polar: the model gave no usable title", { threadId });
-            return;
-        }
-        await prisma.polarThread.updateMany({
-            where: { id: threadId, userId, titleSource: "generating" },
-            data: { title, titleSource: "model" }
-        });
+        title = sanitizeTitle(text);
+        if (!title) console.warn("polar: the model gave no usable title", { threadId });
     } catch (error) {
         console.error("polar: could not name the thread", error);
     }
+    await prisma.polarThread.updateMany({
+        where: { id: threadId, userId, titleSource: "generating" },
+        data: title ? { title, titleSource: "model" } : { titleSource: "placeholder" }
+    });
 }
 
 /** Starts naming the thread without holding anything up. */
@@ -124,10 +128,11 @@ export function startPolarTitle(
     userId: string,
     threadId: string,
     model: LanguageModel,
-    messages: readonly UIMessage[]
+    messages: readonly UIMessage[],
+    reasoning?: TitleReasoning
 ): void {
     if (running.has(threadId)) return;
-    const job = titlePolarThread(userId, threadId, model, messages)
+    const job = titlePolarThread(userId, threadId, model, messages, reasoning)
         .catch((error) => console.error("polar: could not name the thread", error))
         .finally(() => running.delete(threadId));
     running.set(threadId, job);

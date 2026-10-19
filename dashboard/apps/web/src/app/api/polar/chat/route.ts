@@ -157,7 +157,13 @@ export async function POST(request: Request): Promise<Response> {
             }
             // A new thread is named by its model once the first answer is in,
             // behind the reply; the screen asks for the title when it is ready.
-            startPolarTitle(user.id, body.data.threadId, resolved.model, finished);
+            startPolarTitle(
+                user.id,
+                body.data.threadId,
+                resolved.model,
+                finished,
+                reasoningFor("fast", resolved.option)
+            );
         },
         onError: () => "polar_failed"
     });

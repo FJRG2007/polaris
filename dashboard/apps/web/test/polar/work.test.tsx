@@ -167,4 +167,12 @@ describe("an answer's work", () => {
         expect(await screen.findByText("List deployments...")).toBeTruthy();
         expect(screen.queryAllByText("List deployments")).toHaveLength(0);
     });
+
+    it("stops saying it thinks once the answer is being written", async () => {
+        chat.status = "streaming";
+        answer([done("c1"), { type: "step-start" }, { type: "text", text: "One app" }], {});
+        mount();
+        expect(await screen.findByRole("button", { name: "Used 1 tool" })).toBeTruthy();
+        expect(screen.queryByText(/Thinking/)).toBeNull();
+    });
 });

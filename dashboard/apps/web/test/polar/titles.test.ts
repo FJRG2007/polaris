@@ -161,8 +161,35 @@ describe("titlePolarThread", () => {
         await expect(
             titlePolarThread(OWNER, THREAD, answering(answer).model, exchange)
         ).resolves.toBeUndefined();
-        expect(state.rows[0]?.title).toBe(PLACEHOLDER);
-        expect(state.rows[0]?.titleSource).not.toBe("model");
+        expect(state.rows[0]).toMatchObject({ title: PLACEHOLDER, titleSource: "placeholder" });
+    });
+
+    it("asks again on a later turn after a failed one", async () => {
+        await titlePolarThread(OWNER, THREAD, answering("").model, exchange);
+        await titlePolarThread(OWNER, THREAD, answering("Second try").model, exchange);
+        expect(state.rows[0]).toMatchObject({ title: "Second try", titleSource: "model" });
+    });
+
+    it("claims nothing when the first message has no words", async () => {
+        const { model, calls } = answering("Model title");
+        const attachment: UIMessage[] = [
+            {
+                id: "u1",
+                role: "user",
+                parts: [{ type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" }]
+            }
+        ];
+        await titlePolarThread(OWNER, THREAD, model, attachment);
+        expect(calls).toHaveLength(0);
+        expect(state.rows[0]?.titleSource).toBe("placeholder");
+        await titlePolarThread(OWNER, THREAD, model, exchange);
+        expect(state.rows[0]).toMatchObject({ title: "Model title", titleSource: "model" });
+    });
+
+    it("asks with the reasoning it is given", async () => {
+        const { model, calls } = answering("Model title");
+        await titlePolarThread(OWNER, THREAD, model, exchange, "low");
+        expect(JSON.stringify(calls[0])).toContain('"low"');
     });
 });
 

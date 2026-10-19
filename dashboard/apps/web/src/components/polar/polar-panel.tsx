@@ -315,7 +315,7 @@ export function PolarAside() {
                 role="separator"
                 aria-orientation="vertical"
                 onPointerDown={startResize}
-                className="absolute inset-y-0 left-0 hidden w-1.5 -translate-x-1/2 cursor-col-resize hover:bg-primary/30 sm:block"
+                className="absolute inset-y-0 left-0 hidden w-1.5 cursor-col-resize hover:bg-primary/30 sm:block"
             />
             {/* Its own width from xl, so growing the panel uncovers it instead of
                 squeezing it. */}
@@ -616,8 +616,8 @@ export function PolarChat({
     const titled = useRef(new Set<string>());
     useEffect(() => {
         if (!settled || titled.current.has(threadId)) return;
-        titled.current.add(threadId);
         if (!chat.messages.some((message) => message.role === "assistant")) return;
+        titled.current.add(threadId);
         const id = threadId;
         fetch(`/api/polar/threads/${id}/title`)
             .then((response) => (response.ok ? response.json() : null))
@@ -1405,6 +1405,9 @@ function MessageView({
         .filter((part) => folded(part) || toolOf(part)?.tool.state === "output-error")
         .at(-1);
     const lastTool = lastWork ? toolOf(lastWork) : null;
+    const answering = message.parts
+        .slice(lastWork ? message.parts.indexOf(lastWork) + 1 : 0)
+        .some((part) => part.type === "text" && part.text.trim() !== "");
     const current =
         lastTool && (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
             ? toolName(lastTool.name)
@@ -1447,7 +1450,7 @@ function MessageView({
                         <Work
                             key={`work-${index}`}
                             messageId={message.id}
-                            streaming={streaming}
+                            streaming={streaming && !answering}
                             current={current}
                             tools={toolParts.length}
                             failed={failed}
