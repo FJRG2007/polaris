@@ -14,7 +14,7 @@ const sent = vi.hoisted(() => ({
     requests: [] as { url: string; init: RequestInit }[],
     statuses: [] as number[]
 }));
-const notify = vi.hoisted(() => vi.fn(async (_input: { title: string }) => undefined));
+const notify = vi.hoisted(() => vi.fn(async (_input: { title: string }) => ({ inapp: "sent" })));
 
 vi.mock("@polaris/db", async () => {
     const { createFakeDb: make } = await import("./fixtures/fake-prisma");

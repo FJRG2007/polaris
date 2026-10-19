@@ -352,6 +352,9 @@ function StepItem({
                 <div className="space-y-2 border-t border-border p-3">
                     {showData ? (
                         <>
+                            {node && NOTICE_NODES.has(node.type) ? (
+                                <NoticeReport output={step.output} />
+                            ) : null}
                             <DataBlock title={t("runView.input")} value={step.input} />
                             <DataBlock title={t("runView.output")} value={step.output} />
                         </>
@@ -378,6 +381,72 @@ function DataBlock({ title, value }: { title: string; value: unknown }) {
                     {JSON.stringify(value, null, 2)}
                 </pre>
             )}
+        </div>
+    );
+}
+
+/** The nodes whose output is an automation notice's report (`lib/automations/notice.ts`). */
+const NOTICE_NODES = new Set(["core.notify", "home.action.notify"]);
+const NOTICE_CHANNELS = ["bell", "email", "destination", "chat"] as const;
+const NOTICE_REASONS = {
+    "bell.read": "bellRead",
+    "bell.off": "bellOff",
+    "bell.refused": "bellRefused",
+    quietHours: "quietHours",
+    noMailChannel: "noMailChannel",
+    noAddress: "noAddress",
+    destinationGone: "destinationGone",
+    messageRefused: "messageRefused",
+    webhookGone: "webhookGone",
+    webhookReset: "webhookReset",
+    webhookForbidden: "webhookForbidden",
+    webhookLimited: "webhookLimited",
+    failed: "failed"
+} as const;
+
+type NoticeChannel = (typeof NOTICE_CHANNELS)[number];
+
+function isNoticeChannel(value: unknown): value is NoticeChannel {
+    return (NOTICE_CHANNELS as readonly unknown[]).includes(value);
+}
+
+/** Where a "tell somebody" step delivered and what missed, in words. */
+function NoticeReport({ output }: { output: unknown }) {
+    const t = useTranslations("automations");
+    if (!output || typeof output !== "object") return null;
+    const report = output as { delivered?: unknown; missed?: unknown };
+    if (!Array.isArray(report.missed)) return null;
+    const delivered = Array.isArray(report.delivered)
+        ? [...new Set(report.delivered.filter(isNoticeChannel))]
+        : [];
+    const missed = report.missed.flatMap((entry: unknown) => {
+        const miss = entry as { channel?: unknown; reason?: unknown } | null;
+        if (!miss || !isNoticeChannel(miss.channel)) return [];
+        const reason =
+            typeof miss.reason === "string" && Object.hasOwn(NOTICE_REASONS, miss.reason)
+                ? NOTICE_REASONS[miss.reason as keyof typeof NOTICE_REASONS]
+                : "failed";
+        return [{ channel: miss.channel, reason }];
+    });
+    return (
+        <div className="min-w-0 space-y-0.5 text-xs">
+            <p className="break-words">
+                {delivered.length > 0
+                    ? t("delivery.delivered", {
+                          channels: delivered
+                              .map((channel) => t(`delivery.channels.${channel}`))
+                              .join(", ")
+                      })
+                    : t("delivery.deliveredNone")}
+            </p>
+            {missed.map((miss, index) => (
+                <p key={index} className="break-words text-muted-foreground">
+                    {t("delivery.missed", {
+                        channel: t(`delivery.channels.${miss.channel}`),
+                        reason: t(`delivery.reasons.${miss.reason}`)
+                    })}
+                </p>
+            ))}
         </div>
     );
 }

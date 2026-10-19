@@ -22,6 +22,7 @@ import {
     behaviourSchema,
     blockBaseShape,
     isTimeZone,
+    noticeDeliverySchema,
     offsetSchema,
     durationSeconds,
     quantifierSchema,
@@ -736,7 +737,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         message: z
             .string()
             .min(1, "automations.errors.message")
-            .max(LIMITS.message, "automations.errors.tooLong")
+            .max(LIMITS.message, "automations.errors.tooLong"),
+        /** Where it is delivered; left out, the bell, as before there was a choice. */
+        delivery: noticeDeliverySchema.optional()
     }),
     z.object({
         id: nodeId,

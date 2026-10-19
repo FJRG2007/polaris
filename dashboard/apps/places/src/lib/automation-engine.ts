@@ -29,6 +29,7 @@
  */
 
 import * as auto from "./automation-kinds";
+import type { NoticeDelivery } from "@polaris/core";
 import type { DeviceAction, DeviceCommand } from "./device-kinds";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
@@ -293,7 +294,9 @@ export interface EnginePorts {
     readonly notify: (
         automation: AutomationRecord,
         message: string,
-        runId: string
+        runId: string,
+        /** The step's channels; left out, the bell as it always was. */
+        delivery?: NoticeDelivery
     ) => Promise<void>;
     /** The place's devices by room and its rooms by floor, which a block naming
      *  a room or a floor is read against each time it is looked at - so a
@@ -1312,7 +1315,7 @@ export function createEngine(ports: EnginePorts) {
 
             if (step.kind === "notify") {
                 try {
-                    await ports.notify(automation, step.message, run.id);
+                    await ports.notify(automation, step.message, run.id, step.delivery);
                     log("ok");
                 } catch (error) {
                     fault(`automation ${automation.id} could not notify`, error);

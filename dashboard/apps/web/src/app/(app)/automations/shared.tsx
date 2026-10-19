@@ -220,6 +220,7 @@ const RUN_ERRORS = [
     "webhookReset",
     "webhookForbidden",
     "webhookLimited",
+    "noticeNotDelivered",
     "announceLimited",
     "announceFailed"
 ] as const;

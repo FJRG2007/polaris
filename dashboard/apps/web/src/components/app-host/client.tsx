@@ -58,6 +58,14 @@ const FilePickerDialog = dynamic(
     { ssr: false }
 );
 
+const NoticeDeliveryFields = dynamic(
+    () =>
+        import("@/components/automations/notice-delivery-fields").then(
+            (module) => module.NoticeDeliveryFields
+        ),
+    { ssr: false }
+);
+
 const ChooseFilesDialog = dynamic(
     () =>
         import("@/components/file-picker/choose-files-dialog").then(
@@ -163,6 +171,7 @@ export const clientHost = {
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
     appFavorites: { refreshAppFavorites },
     automationsList: { AutomationsList },
+    automationsNotice: { NoticeDeliveryFields },
     avatar: { Avatar },
     brandIcons: { TpLinkMark },
     confirmDialog: { useConfirm },

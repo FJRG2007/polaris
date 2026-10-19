@@ -151,6 +151,7 @@ const load = {
     networkService: once(() => import("@/lib/network-service")),
     notificationService: once(() => import("@/lib/notification-service")),
     notificationsDispatch: once(() => import("@/lib/notifications/dispatch")),
+    automationsNotice: once(() => import("@/lib/automations/notice")),
     notificationsPreferences: once(() => import("@/lib/notifications/preferences")),
     rateLimitService: once(() => import("@/lib/rate-limit-service")),
     registry: once(() => import("@/lib/registry")),
@@ -486,6 +487,9 @@ export const serverHost = {
     },
     notificationsDispatch: {
         notify: later(load.notificationsDispatch, "notify")
+    },
+    automationsNotice: {
+        deliverAutomationNotice: later(load.automationsNotice, "deliverAutomationNotice")
     },
     notificationsPreferences: {
         ruleFor: later(load.notificationsPreferences, "ruleFor")

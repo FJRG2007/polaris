@@ -675,3 +675,55 @@ export async function chatWebhooksAction(): Promise<
         return failure(caught);
     }
 }
+
+/** One of the account's own notification destinations, as a notice step lists it. */
+export interface NoticeDestinationChoice {
+    readonly id: string;
+    readonly name: string;
+    readonly targetHint: string;
+    readonly enabled: boolean;
+}
+
+/**
+ * Where a "tell somebody" step can deliver for the signed-in account: whether
+ * this Polaris has an email channel to send from, the account's own
+ * destinations, and the chat webhooks it may post through.
+ */
+export async function noticeChannelsAction(): Promise<
+    Result<{
+        mail: boolean;
+        /** Whether this account may set up the email channel itself. */
+        canSetUpMail: boolean;
+        destinations: readonly NoticeDestinationChoice[];
+        webhooks: readonly ChatWebhookChoice[];
+    }>
+> {
+    try {
+        const who = await actor();
+        const [{ getAuthMailStatus }, { listDestinations }, { webhooksToPostThrough }] =
+            await Promise.all([
+                import("@/lib/auth-mail"),
+                import("@/lib/notifications/destinations"),
+                import("@/lib/chat/webhooks")
+            ]);
+        const [mail, destinations, webhooks] = await Promise.all([
+            getAuthMailStatus(),
+            listDestinations(who.id),
+            webhooksToPostThrough(who)
+        ]);
+        return {
+            ok: true,
+            mail: mail.channelId !== null,
+            canSetUpMail: who.isAdmin,
+            destinations: destinations.map((entry) => ({
+                id: entry.id,
+                name: entry.name,
+                targetHint: entry.targetHint,
+                enabled: entry.enabled
+            })),
+            webhooks
+        };
+    } catch (caught) {
+        return failure(caught);
+    }
+}

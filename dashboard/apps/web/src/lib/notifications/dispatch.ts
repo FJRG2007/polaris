@@ -60,6 +60,33 @@ export interface NotifyInput {
      * there cannot explain.
      */
     shelf?: { readonly orgId: string | null };
+    /**
+     * Write the bell row and nothing else the account's rule names (its email
+     * and destinations). For a caller that was told exactly where to deliver,
+     * such as an automation step with its own channels, and delivers the rest
+     * itself through `emailNotice` and `deliverToDestination`.
+     */
+    bellOnly?: boolean;
+}
+
+/** What one attempt came to, as the delivery log recorded it. */
+export interface DeliveryOutcome {
+    status: "sent" | "failed" | "skipped";
+    detail: string | null;
+}
+
+/**
+ * What became of the bell row. `read`: written, but already marked read because
+ * the page it points at was open; `off`: the account turned this event off;
+ * `refused`: the event is not in the catalogue, so nothing was written.
+ */
+export interface NotifyReport {
+    inapp: "sent" | "read" | "off" | "refused";
+    /**
+     * The channels of the account's rule the alert was handed to in the
+     * background (never with `bellOnly`). Left out when there were none.
+     */
+    handedOff?: ReadonlyArray<"email" | "destination">;
 }
 
 /** Log one attempt. Best effort: a history row is never worth failing over. */
@@ -129,17 +156,18 @@ async function mailTarget(userId: string): Promise<string | null> {
     return alternate?.email ?? null;
 }
 
-async function deliverEmail(input: NotifyInput, level: NotificationLevel): Promise<void> {
+async function deliverEmail(
+    input: NotifyInput,
+    level: NotificationLevel
+): Promise<DeliveryOutcome> {
     const address = await mailTarget(input.userId);
     if (!address) {
-        await record({
-            userId: input.userId,
-            event: input.event,
-            kind: "email",
+        const outcome: DeliveryOutcome = {
             status: "skipped",
             detail: "No confirmed address on the account."
-        });
-        return;
+        };
+        await record({ userId: input.userId, event: input.event, kind: "email", ...outcome });
+        return outcome;
     }
     const link = await absoluteHref(input.href);
     const { text, html } = emailBody(input, link);
@@ -150,13 +178,12 @@ async function deliverEmail(input: NotifyInput, level: NotificationLevel): Promi
         text,
         html
     });
-    await record({
-        userId: input.userId,
-        event: input.event,
-        kind: "email",
+    const outcome: DeliveryOutcome = {
         status: result.error ? "failed" : "sent",
         detail: result.error ?? null
-    });
+    };
+    await record({ userId: input.userId, event: input.event, kind: "email", ...outcome });
+    return outcome;
 }
 
 async function deliverDestination(
@@ -164,33 +191,36 @@ async function deliverDestination(
     level: NotificationLevel,
     destinationId: string,
     critical: boolean
-): Promise<void> {
+): Promise<DeliveryOutcome> {
     const destination = await resolveDestination(input.userId, destinationId);
     if (!destination) {
         const summary = await destinationSummary(input.userId, destinationId);
+        const outcome: DeliveryOutcome = {
+            status: "skipped",
+            detail: "The destination is switched off, deleted, or its target cannot be read."
+        };
         await record({
             userId: input.userId,
             event: input.event,
             kind: summary?.kind ?? "webhook",
             destinationId,
             destinationHint: summary?.targetHint ?? null,
-            status: "skipped",
-            detail: "The destination is switched off, deleted, or its target cannot be read."
+            ...outcome
         });
-        return;
+        return outcome;
     }
 
     if (!clearsMinLevel(level, destination.minLevel, critical)) {
+        const outcome: DeliveryOutcome = { status: "skipped", detail: QUIET_SEVERITY };
         await record({
             userId: input.userId,
             event: input.event,
             kind: destination.kind,
             destinationId: destination.id,
             destinationHint: destination.targetHint,
-            status: "skipped",
-            detail: QUIET_SEVERITY
+            ...outcome
         });
-        return;
+        return outcome;
     }
 
     const result =
@@ -217,15 +247,19 @@ async function deliverDestination(
               );
 
     await recordDestinationResult(destination.id, result.error ?? null);
+    const outcome: DeliveryOutcome = {
+        status: result.error ? "failed" : "sent",
+        detail: result.error ?? null
+    };
     await record({
         userId: input.userId,
         event: input.event,
         kind: destination.kind,
         destinationId: destination.id,
         destinationHint: destination.targetHint,
-        status: result.error ? "failed" : "sent",
-        detail: result.error ?? null
+        ...outcome
     });
+    return outcome;
 }
 
 /** The delivery log's reasons for an alert held back on purpose. Matched back
@@ -291,7 +325,7 @@ async function fanOut(
         await Promise.allSettled(held);
         return;
     }
-    const work: Array<Promise<void>> = [];
+    const work: Array<Promise<unknown>> = [];
     if (rule.email) work.push(deliverEmail(input, level));
     for (const destinationId of rule.destinations) {
         work.push(deliverDestination(input, level, destinationId, critical));
@@ -307,11 +341,11 @@ async function fanOut(
  * texts are handed off and left running: they talk to other people's servers,
  * and none of them is worth holding a deploy or an alarm sweep open for.
  */
-export async function notify(input: NotifyInput): Promise<void> {
+export async function notify(input: NotifyInput): Promise<NotifyReport> {
     const event = notificationEvent(input.event);
     if (!event) {
         console.error(`polaris: refusing to raise undeclared notification event "${input.event}"`);
-        return;
+        return { inapp: "refused" };
     }
     const level = input.level ?? event.level;
 
@@ -323,6 +357,7 @@ export async function notify(input: NotifyInput): Promise<void> {
         rule = { inapp: true, email: false, destinations: [] };
     }
 
+    let watching = false;
     if (rule.inapp) {
         // Somebody with the page open has already been told by the page. The
         // record still belongs in their history, so it is written and marked
@@ -333,7 +368,12 @@ export async function notify(input: NotifyInput): Promise<void> {
         // the bell however the account's rules are set, because they are what a
         // break-in looks like - and whoever is holding the session is also
         // whoever would be reporting the page as watched.
-        const watching = !event.critical && isViewing(input.userId, input.href);
+        //
+        // Nor for one the page does not show (`unreadWhenViewing`): an
+        // automation's message links to the automation, and somebody pressing
+        // Test in its editor is looking at the editor, not at the message.
+        watching =
+            !event.critical && !event.unreadWhenViewing && isViewing(input.userId, input.href);
         await createNotification({
             userId: input.userId,
             type: input.event,
@@ -365,7 +405,8 @@ export async function notify(input: NotifyInput): Promise<void> {
         });
     }
 
-    void fanOut(input, level, rule, event.critical === true).catch((error) => {
+    const extras = input.bellOnly ? { ...rule, email: false, destinations: [] } : rule;
+    void fanOut(input, level, extras, event.critical === true).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
     });
 
@@ -382,6 +423,55 @@ export async function notify(input: NotifyInput): Promise<void> {
         }))().catch((error) => {
         console.error("polaris: queueing signed webhooks failed:", error);
     });
+
+    const handedOff: Array<"email" | "destination"> = [];
+    if (extras.email) handedOff.push("email");
+    if (extras.destinations.length > 0) handedOff.push("destination");
+    const inapp = !rule.inapp ? "off" : watching ? "read" : "sent";
+    return handedOff.length > 0 ? { inapp, handedOff } : { inapp };
+}
+
+/**
+ * Email one alert to the account's confirmed address now, recorded in the
+ * delivery log like the rule's own email, and held back during quiet hours as
+ * that one is. For a caller that names its channels (see `bellOnly`).
+ */
+export async function emailNotice(input: NotifyInput): Promise<DeliveryOutcome> {
+    const event = notificationEvent(input.event);
+    if (!event) return { status: "skipped", detail: "Undeclared event." };
+    if (await quietNow(input.userId, event.critical === true)) {
+        const outcome: DeliveryOutcome = { status: "skipped", detail: QUIET_HOURS };
+        await record({ userId: input.userId, event: input.event, kind: "email", ...outcome });
+        return outcome;
+    }
+    return deliverEmail(input, input.level ?? event.level);
+}
+
+/**
+ * Send one alert to one of the account's own destinations now. The caller
+ * chose it by name, so its lowest-severity setting does not hold it back;
+ * quiet hours still do.
+ */
+export async function deliverToDestination(
+    input: NotifyInput,
+    destinationId: string
+): Promise<DeliveryOutcome> {
+    const event = notificationEvent(input.event);
+    if (!event) return { status: "skipped", detail: "Undeclared event." };
+    if (await quietNow(input.userId, event.critical === true)) {
+        const summary = await destinationSummary(input.userId, destinationId);
+        const outcome: DeliveryOutcome = { status: "skipped", detail: QUIET_HOURS };
+        await record({
+            userId: input.userId,
+            event: input.event,
+            kind: summary?.kind ?? "webhook",
+            destinationId,
+            destinationHint: summary?.targetHint ?? null,
+            ...outcome
+        });
+        return outcome;
+    }
+    return deliverDestination(input, input.level ?? event.level, destinationId, true);
 }
 
 /**

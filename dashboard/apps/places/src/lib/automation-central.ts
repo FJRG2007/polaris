@@ -30,7 +30,7 @@ type ServerNode = Awaited<
 >[number];
 
 const { StepError, StepRefusal } = host.automations;
-const { notify } = host.notificationsDispatch;
+const { deliverAutomationNotice } = host.automationsNotice;
 
 /** The wait key a Places "wait until" step rechecks under; woken on every device change. */
 export const RECHECK_KEY = "recheck:home";
@@ -296,15 +296,16 @@ const notifyNode: ServerNode<NotifyConfig> = {
     run: async (config, context, io) => {
         await requireRight(io.actor.id, "run");
         const t = await placesTFor(io.actor.id);
-        await notify({
+        const output = await deliverAutomationNotice({
             userId: io.actor.id,
             event: "places.automation",
             title: t("automations.notice.title", { name: context.automation.name }),
             body: config.message,
             href: `/automations/${io.automationId}`,
-            metadata: { automationId: io.automationId, runId: io.runId }
+            metadata: { automationId: io.automationId, runId: io.runId },
+            delivery: config.delivery
         });
-        return { output: { sent: true } };
+        return { output };
     }
 };
 

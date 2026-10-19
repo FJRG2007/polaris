@@ -37,7 +37,7 @@ import {
     type DeviceReadout
 } from "./automation-engine";
 
-const { notify } = host.notificationsDispatch;
+const { deliverAutomationNotice } = host.automationsNotice;
 const { sessionCan } = host.session;
 const { recordAudit } = host.auditService;
 
@@ -203,9 +203,9 @@ export function automationEngine(): AutomationEngine {
             }
         },
         mayOperate,
-        async notify(automation, message, runId) {
+        async notify(automation, message, runId, delivery) {
             const t = await placesTFor(automation.ownerId);
-            await notify({
+            await deliverAutomationNotice({
                 userId: automation.ownerId,
                 event: "places.automation",
                 title: t("automations.notice.title", { name: automation.name }),
@@ -213,7 +213,8 @@ export function automationEngine(): AutomationEngine {
                 href: automation.central
                     ? `/automations/${automation.central.automationId}`
                     : automationHref(automation.id),
-                metadata: { automationId: automation.id, runId }
+                metadata: { automationId: automation.id, runId },
+                delivery
             });
         },
         wake(ms) {
