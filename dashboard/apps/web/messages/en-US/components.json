@@ -1437,5 +1437,12 @@
             "removeOriginal": "Remove original",
             "askAdmin": "An administrator can remove it in Storage."
         }
+    },
+    "linkWarning": {
+        "flaggedBy": "Flagged by {provider}",
+        "title": "This link may be unsafe",
+        "description": "{provider} flagged this address as malicious or fraudulent. Only open it if you trust where it goes.",
+        "goBack": "Go back",
+        "continue": "Continue anyway"
     }
 }

@@ -196,10 +196,15 @@ async function activeProviders(): Promise<LinkSafetyProvider[]> {
     if (!settings.enabled) return [];
     const active: LinkSafetyProvider[] = [];
     for (const provider of settings.providers) {
-        const state = await getIntegrationState(provider);
-        if (state?.enabled) active.push(provider);
+        if (await providerConfigured(provider)) active.push(provider);
     }
     return active;
+}
+
+/** Whether a provider is switched on with a key in Integrations. */
+async function providerConfigured(provider: LinkSafetyProvider): Promise<boolean> {
+    const state = await getIntegrationState(provider);
+    return Boolean(state?.enabled && state.hasSecret);
 }
 
 /** Ask every active provider about one link. The first that flags it is the
@@ -295,14 +300,20 @@ export function checkLinksLater(messageId: string): void {
 /**
  * The flagged links of a page of messages, in one query. Messages with none are
  * absent from the map.
+ *
+ * Only what the providers active right now said: turning link safety off, or a
+ * provider off, takes its warnings off every message at once rather than leaving
+ * the ones already written to be read under a switch that says otherwise.
  */
 export async function flaggedLinksFor(
     messageIds: readonly string[]
 ): Promise<Map<string, FlaggedLink[]>> {
     const byMessage = new Map<string, FlaggedLink[]>();
     if (messageIds.length === 0) return byMessage;
+    const providers = await activeProviders();
+    if (providers.length === 0) return byMessage;
     const rows = await prisma.chatMessageLinkFlag.findMany({
-        where: { messageId: { in: [...messageIds] } },
+        where: { messageId: { in: [...messageIds] }, provider: { in: providers } },
         select: { messageId: true, url: true, provider: true, reason: true }
     });
     for (const row of rows) {
@@ -315,4 +326,30 @@ export async function flaggedLinksFor(
         byMessage.set(row.messageId, list);
     }
     return byMessage;
+}
+
+/** One provider as the settings screen draws it. */
+export interface LinkSafetyProviderState {
+    readonly provider: LinkSafetyProvider;
+    /** Chosen for chat by the administrator. */
+    readonly chosen: boolean;
+    /** Switched on with a key in Integrations, without which choosing it does
+     *  nothing. */
+    readonly configured: boolean;
+}
+
+/** The setting and, per provider, whether it can actually answer. */
+export async function linkSafetyOverview(): Promise<{
+    enabled: boolean;
+    providers: LinkSafetyProviderState[];
+}> {
+    const settings = await linkSafetySettings();
+    const providers = await Promise.all(
+        LINK_SAFETY_PROVIDERS.map(async (provider) => ({
+            provider,
+            chosen: settings.providers.includes(provider),
+            configured: await providerConfigured(provider)
+        }))
+    );
+    return { enabled: settings.enabled, providers };
 }

@@ -1437,5 +1437,12 @@
             "removeOriginal": "Borrar original",
             "askAdmin": "Un administrador puede borrarlo en Almacenamiento."
         }
+    },
+    "linkWarning": {
+        "flaggedBy": "Marcado por {provider}",
+        "title": "Enlace posiblemente inseguro",
+        "description": "{provider} ha marcado esta dirección como maliciosa o fraudulenta. Ábrela solo si confías en su destino.",
+        "goBack": "Volver",
+        "continue": "Abrir igualmente"
     }
 }

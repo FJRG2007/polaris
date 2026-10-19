@@ -320,6 +320,15 @@
             },
             "saved": "Guardado",
             "ownServer": "Ya tengo el mío"
+        },
+        "linkSafety": {
+            "label": "Revisar enlaces de mensajes",
+            "hint": "Tras enviar un mensaje, sus enlaces se consultan en los servicios de abajo. Un enlace marcado muestra un aviso y pregunta antes de abrirse. Los enlaces se envían a esos servicios, así que sigue desactivado hasta que lo actives.",
+            "virustotal": "Revisa el sitio web al que apunta",
+            "dymo": "Revisa la propia página por fraude",
+            "notSetUp": "Sin configurar. Añade su clave en Integraciones.",
+            "nothingSetUp": "Aún no hay ningún servicio configurado, así que no se revisa nada.",
+            "openIntegrations": "Abrir Integraciones"
         }
     },
     "consumption": {

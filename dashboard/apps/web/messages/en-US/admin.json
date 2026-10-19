@@ -320,6 +320,15 @@
             },
             "saved": "Saved",
             "ownServer": "I already run my own"
+        },
+        "linkSafety": {
+            "label": "Check links in messages",
+            "hint": "After a message is sent, its links are looked up with the services below. A flagged link shows a warning and asks before it opens. Links are sent to those services, so this stays off until you turn it on.",
+            "virustotal": "Checks the website a link points to",
+            "dymo": "Checks the page itself for known fraud",
+            "notSetUp": "Not set up. Add its key in Integrations to use it.",
+            "nothingSetUp": "No link checking service is set up yet, so nothing is checked.",
+            "openIntegrations": "Open Integrations"
         }
     },
     "consumption": {

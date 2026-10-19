@@ -160,6 +160,7 @@ function isWatchable(contentType: string): boolean {
 }
 import { useDisplayFormat } from "@/components/display-format";
 import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
+import { linkProviderName } from "@/components/rich-text/link-providers";
 import {
     cn,
     DropdownMenu,
@@ -182,6 +183,7 @@ import {
     Paperclip,
     Pencil,
     Pin,
+    ShieldAlert,
     SmilePlus,
     Star,
     Trash2,
@@ -1052,6 +1054,7 @@ function Message({
                                     references={referenced(message)}
                                     customEmoji={emojiSet}
                                     jumboEmoji
+                                    flaggedLinks={message.flaggedLinks}
                                 />
                                 {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
@@ -1092,6 +1095,10 @@ function Message({
                                 canEnd={mine || canModerate}
                                 onError={onError}
                             />
+                        )}
+
+                        {!message.deleted && (mine || canModerate) && (
+                            <FlaggedNotice message={message} mine={mine} />
                         )}
 
                         <Spoiler kind="link" covered={coverAll}>
@@ -1883,6 +1890,39 @@ function QuotedMessageCard({
 }
 
 /**
+ * A quiet line under a message with a flagged link, for the two people who can
+ * do something about it: the one who sent it, who may not know, and whoever
+ * moderates the room, who can take it down from the message's menu. Everybody
+ * else meets the warning on the link itself.
+ */
+function FlaggedNotice({ message, mine }: { message: ChatMessageView; mine: boolean }) {
+    const t = useTranslations("chat");
+    // Optional on read: a message view held from before this field existed (a
+    // cached page, a test fixture) has none, and none is what it means.
+    const first = message.flaggedLinks?.[0];
+    if (!first) return null;
+    const provider = linkProviderName(first.provider);
+    return (
+        <p className="mt-1 flex min-w-0 items-start gap-1.5 text-xs text-warning-ink">
+            <ShieldAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+            <span className="min-w-0">
+                {mine
+                    ? t("messageList.linkFlagged.yours", { provider })
+                    : t("messageList.linkFlagged.moderator", { provider })}
+            </span>
+        </p>
+    );
+}
+
+/** Whether a link is one of the message's flagged ones. */
+function isFlagged(message: ChatMessageView, url: string): boolean {
+    const flags = message.flaggedLinks ?? [];
+    if (flags.length === 0) return false;
+    const normalized = core.normalizeLink(url);
+    return normalized !== null && flags.some((flag) => flag.url === normalized);
+}
+
+/**
  * The card under a message with a link in it, once there is one to draw.
  *
  * Three states, and the middle one is the reason this exists. Polaris may
@@ -1916,13 +1956,15 @@ function LinkArea({ message }: { message: ChatMessageView }) {
         };
     }, [message.id, message.preview, message.previewPending]);
 
-    if (found) return <LinkCard preview={found} />;
+    // A flagged link is not given a card. The card opens the page in one press
+    // and would be the way round the warning the link in the text carries.
+    if (found) return isFlagged(message, found.url) ? null : <LinkCard preview={found} />;
 
     // Nothing came back, but this is something with a player. YouTube and its
     // like routinely refuse to describe themselves to anything that is not a
     // browser, and "the site said nothing" is no reason not to offer the video
     // somebody posted.
-    if (message.link && embedFor(message.link)) {
+    if (message.link && embedFor(message.link) && !isFlagged(message, message.link)) {
         return (
             <LinkCard
                 preview={{

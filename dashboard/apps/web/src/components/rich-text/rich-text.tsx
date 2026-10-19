@@ -17,7 +17,14 @@ import { cn } from "@polaris/ui";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { Chip, TaskBox } from "./rich-text-client";
-import { customEmojiAsText, emojiOnlyCount, JUMBO_EMOJI_MOST, splitSpoilers } from "@polaris/core";
+import {
+    customEmojiAsText,
+    emojiOnlyCount,
+    JUMBO_EMOJI_MOST,
+    normalizeLink,
+    splitSpoilers
+} from "@polaris/core";
+import { FlaggedAnchor } from "./flagged-link";
 import { EmojiRun, type CustomEmojiSet } from "./custom-emoji";
 import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
@@ -59,7 +66,8 @@ export function RichText({
     origin = null,
     references,
     customEmoji = null,
-    jumboEmoji = false
+    jumboEmoji = false,
+    flaggedLinks
 }: {
     value: string;
     className?: string;
@@ -82,6 +90,13 @@ export function RichText({
     customEmoji?: CustomEmojiSet | null;
     /** Draw a line that is nothing but emoji large, the way a chat does. */
     jumboEmoji?: boolean;
+    /**
+     * Links in this text that a reputation service flagged, as
+     * `normalizeLink` writes them. One of these warns where it is drawn and asks
+     * before it opens; every other link opens as it always has - nothing here
+     * ever marks a link as safe.
+     */
+    flaggedLinks?: readonly FlaggedLinkMark[];
 }) {
     if (!value.trim()) return null;
     const doc = references
@@ -91,9 +106,12 @@ export function RichText({
     // blank line that would otherwise sit above the card is not worth a div.
     if ((doc.content ?? []).length === 0) return null;
     const jumbo = jumboEmoji && onlyEmoji(doc);
+    const flagged = flaggedLinks?.length
+        ? new Map(flaggedLinks.map((flag) => [flag.url, flag.provider]))
+        : null;
     return (
         <div className={cn(RICH_TEXT_PROSE, className, jumbo && "text-[2.75rem] leading-[1.15]")}>
-            {blocks(doc.content, { set: customEmoji, jumbo })}
+            {blocks(doc.content, { set: customEmoji, jumbo, flagged })}
         </div>
     );
 }
@@ -106,9 +124,17 @@ export function RichText({
 interface EmojiScope {
     readonly set: CustomEmojiSet | null;
     readonly jumbo: boolean;
+    /** Flagged links by normalized address, to the provider that flagged them. */
+    readonly flagged: ReadonlyMap<string, string> | null;
 }
 
-const NO_EMOJI: EmojiScope = { set: null, jumbo: false };
+/** A link a reputation service flagged, as far as drawing it goes. */
+export interface FlaggedLinkMark {
+    readonly url: string;
+    readonly provider: string;
+}
+
+const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null };
 
 /**
  * Whether the message is one line of nothing but emoji, at most Discord's
@@ -344,7 +370,11 @@ function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         else if (mark.type === "strike") content = <s>{content}</s>;
         else if (mark.type === "code") content = <code>{content}</code>;
         else if (mark.type === "link")
-            content = <Anchor href={String(mark.attrs?.href ?? "")}>{content}</Anchor>;
+            content = (
+                <Anchor href={String(mark.attrs?.href ?? "")} flagged={scope.flagged}>
+                    {content}
+                </Anchor>
+            );
     }
     return <>{content}</>;
 }
@@ -364,11 +394,28 @@ function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
  * sees what was written, which is the honest outcome: something was there and it
  * was not something to click.
  */
-function Anchor({ href, children }: { href: string; children: React.ReactNode }) {
+function Anchor({
+    href,
+    flagged = null,
+    children
+}: {
+    href: string;
+    flagged?: ReadonlyMap<string, string> | null;
+    children: React.ReactNode;
+}) {
     // A path inside Polaris. Never protocol-relative - `//evil.example` is a
     // different site wearing a leading slash.
     if (href.startsWith("/") && !href.startsWith("//")) return <Link href={href}>{children}</Link>;
     if (!isSafeHref(href)) return <>{children}</>;
+    const normalized = flagged ? normalizeLink(href) : null;
+    const provider = normalized ? flagged?.get(normalized) : undefined;
+    if (provider) {
+        return (
+            <FlaggedAnchor href={href} provider={provider}>
+                {children}
+            </FlaggedAnchor>
+        );
+    }
     return (
         <a href={href} target="_blank" rel="noopener noreferrer nofollow">
             {children}
