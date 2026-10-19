@@ -364,11 +364,16 @@ export async function callSoundboard(seat: MeetingSeat): Promise<CallSoundboard>
  *
  * Everything is checked again, in the order a reader would want to be told
  * about it, and only then does the cooldown count the play - a refusal costs
- * nobody their next three seconds. Returns once the call server took it; the
- * browser that pressed the button hears it back the same way everybody else
- * does, which is what makes "it played" mean that the room heard it.
+ * nobody their next three seconds. Returns null once the call server took it;
+ * the browser that pressed the button hears it back the same way everybody
+ * else does, which is what makes "it played" mean that the room heard it.
+ *
+ * Alone in a call, the browser lets the room go while it waits, so there is no
+ * room to deliver to and nobody else to hear it. That is not a refusal: the
+ * play is handed back for the presser's own browser to sound, the way a voice
+ * client plays a sound to somebody alone in a channel.
  */
-export async function playSound(seat: MeetingSeat, ref: string): Promise<void> {
+export async function playSound(seat: MeetingSeat, ref: string): Promise<rules.SoundPlayed | null> {
     const { facts, userId, spaceId } = await seatFacts(seat);
     const refusal = rules.soundboardRefusal(facts);
     if (refusal) throw new ChatRuleError(REFUSAL_TEXT[refusal]);
@@ -421,12 +426,10 @@ export async function playSound(seat: MeetingSeat, ref: string): Promise<void> {
         userId
     };
     const sent = await sendToRoom(seat.meetingId, message, rules.SOUNDBOARD_TOPIC);
-    if (sent !== "sent") {
-        await resetRateLimit(`soundboard:${userId}`);
-        throw new ChatRuleError({
-            key: sent === "absent" ? "errors.soundboardNobody" : "errors.soundboardUnreachable"
-        });
-    }
+    if (sent === "sent") return null;
+    if (sent === "absent") return message;
+    await resetRateLimit(`soundboard:${userId}`);
+    throw new ChatRuleError({ key: "errors.soundboardUnreachable" });
 }
 
 /**

@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { useCallHold } from "./call-session";
 import { Phone, PhoneOff } from "lucide-react";
 import { useChatStream } from "./use-chat-stream";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 // The shape from the module that defines it: a "use server" file exports only
 // the actions themselves.
 import type { CallElsewhere as Found } from "@/lib/chat/meetings";
@@ -37,6 +37,11 @@ import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
  * a reload, and only a different call asks again.
  */
 const ASKED = "polaris.call.elsewhere.dismissed";
+
+/** How long a call this browser just hung up is not offered back to it: long
+ *  enough for the leave to land on the server, short enough that rejoining it
+ *  from another device a moment later is still noticed here. */
+const LEAVE_WINDOW_MS = 10_000;
 
 /** The call dismissed in this browser, or null. Storage can be refused (a
  *  private window, blocked site data), and then nothing was dismissed. */
@@ -57,6 +62,27 @@ export function CallElsewhere() {
     const [moving, setMoving] = useState(false);
     const [failed, setFailed] = useState("");
 
+    // The call this browser just hung up. The seat it held is still on the
+    // server for the moment the leave takes to land, and asking in that moment
+    // found it and offered to "move" the call that was just left - a card that
+    // flashed in the corner after every hang-up.
+    const left = useRef<string | null>(null);
+    const held = useRef<string | null>(null);
+    useEffect(() => {
+        if (session) {
+            held.current = session.meetingId;
+            left.current = null;
+        } else if (held.current) {
+            const meetingId = held.current;
+            left.current = meetingId;
+            held.current = null;
+            const timer = window.setTimeout(() => {
+                if (left.current === meetingId) left.current = null;
+            }, LEAVE_WINDOW_MS);
+            return () => window.clearTimeout(timer);
+        }
+    }, [session]);
+
     const look = useCallback(() => {
         // A browser that is in a call is the device holding it. Asking would
         // only ever find its own seat.
@@ -64,7 +90,10 @@ export function CallElsewhere() {
             setFound(null);
             return;
         }
-        void askCallElsewhere().then(setFound);
+        void askCallElsewhere().then((call) => {
+            if (call?.meetingId !== left.current) left.current = null;
+            setFound(call && call.meetingId === left.current ? null : call);
+        });
     }, [session]);
 
     useEffect(() => {

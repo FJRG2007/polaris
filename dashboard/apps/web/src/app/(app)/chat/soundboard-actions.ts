@@ -23,28 +23,19 @@ async function actor(): Promise<{ id: string }> {
     return { id: user.id };
 }
 
-/** What the picker in this call offers this seat. */
-export async function callSoundboardAction(
-    meetingId: unknown
-): Promise<{ board?: soundboard.CallSoundboard; error?: string }> {
-    const t = await getTranslations("chat");
-    const id = rules.soundPlaySchema.shape.meetingId.safeParse(meetingId);
-    if (!id.success) return { error: t("errors.notInCall") };
-    const seat = await resolveSeat(id.data);
-    if (!seat) return { error: t("errors.notInCall") };
-    const result = await guardChat(() => soundboard.callSoundboard(seat));
-    return result.error ? { error: result.error } : { board: result.value };
-}
-
-/** Play one sound into the call. */
-export async function playSoundAction(input: unknown): Promise<{ error?: string }> {
+/** Play one sound into the call. `alone` is a play nobody else is connected to
+ *  hear, handed back for this browser to sound itself. */
+export async function playSoundAction(
+    input: unknown
+): Promise<{ error?: string; alone?: rules.SoundPlayed }> {
     const t = await getTranslations("chat");
     const parsed = rules.soundPlaySchema.safeParse(input);
     if (!parsed.success) return { error: t("errors.soundGone") };
     const seat = await resolveSeat(parsed.data.meetingId);
     if (!seat) return { error: t("errors.notInCall") };
     const result = await guardChat(() => soundboard.playSound(seat, parsed.data.sound));
-    return result.error ? { error: result.error } : {};
+    if (result.error) return { error: result.error };
+    return result.value ? { alone: result.value } : {};
 }
 
 /** Stop the sound this seat played, for everybody in the call. */

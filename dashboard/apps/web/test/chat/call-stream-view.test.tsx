@@ -25,7 +25,6 @@ import {
 } from "@/app/(app)/chat/call-stream-audio";
 
 vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
-    callSoundboardAction: async () => ({}),
     favoriteSoundAction: async () => ({}),
     playSoundAction: async () => ({})
 }));
@@ -130,7 +129,12 @@ beforeEach(() => {
         configurable: true,
         value: () => Promise.resolve()
     });
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({ error: "Not in this call." }, { status: 410 }))
+    );
 });
+
 afterEach(cleanup);
 
 describe("a stream in a direct message", () => {

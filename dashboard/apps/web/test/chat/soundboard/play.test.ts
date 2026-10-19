@@ -437,10 +437,12 @@ describe("a play that is refused sends nothing", () => {
     // Alone in a call, the browser lets the room go while it waits, so the media
     // server has no room to deliver to. That is nobody listening, not a server
     // that failed to answer.
-    it("and a call with nobody connected says so rather than blaming the server", async () => {
+    it("and a call with nobody connected hands the play back to sound here", async () => {
         state.reachable = "empty";
-        expect(await refusalOf(SOUND)).toBe("errors.soundboardNobody");
-        expect(refunded).toBe(1);
+        const played = await playSound(seat, SOUND);
+        expect(played).toMatchObject({ kind: "sound" });
+        // A play that sounded counts toward the cooldown like any other.
+        expect(refunded).toBe(0);
     });
 });
 
