@@ -1,0 +1,16 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "snow-bench",
+    "season": "winter",
+    "size": { "x": 5, "y": 3, "z": 2 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:snow_block",
+        "minecraft:smooth_quartz_slab[type=top]",
+        "minecraft:packed_ice",
+        "minecraft:lantern[hanging=false]",
+        "minecraft:blue_ice"
+    ],
+    "blocks": [1, 1, 2, 3, 1, 1, 0, 1, 3, 3, 0, 1, 4, 1, 0, 3, 4, 1, 0, 1, 3, 3, 0, 8, 5, 1, 0, 2]
+}

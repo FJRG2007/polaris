@@ -1,0 +1,23 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "scarecrow",
+    "season": "halloween",
+    "size": { "x": 5, "y": 5, "z": 3 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:pumpkin",
+        "minecraft:spruce_fence[east=false,north=false,south=false,west=false]",
+        "minecraft:hay_block[axis=x]",
+        "minecraft:spruce_fence[east=true,north=false,south=false,west=false]",
+        "minecraft:spruce_fence[east=true,north=false,south=false,west=true]",
+        "minecraft:hay_block[axis=y]",
+        "minecraft:spruce_fence[east=false,north=false,south=false,west=true]",
+        "minecraft:carved_pumpkin[facing=south]",
+        "minecraft:black_carpet"
+    ],
+    "blocks": [
+        0, 4, 1, 1, 0, 2, 2, 1, 0, 2, 3, 1, 0, 11, 2, 1, 0, 12, 4, 1, 5, 1, 6, 1, 5, 1, 7, 1, 0, 12,
+        8, 1, 0, 14, 9, 1, 0, 7
+    ]
+}

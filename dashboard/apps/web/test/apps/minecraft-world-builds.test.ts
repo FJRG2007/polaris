@@ -357,6 +357,92 @@ describe("the catalog", () => {
             expect(plan.radiusOf(build)).toBeLessThanOrEqual(8);
         }
     });
+
+    it("pastes only blocks that stay put: no fluids, containers, entities or decaying leaves", async () => {
+        const { WORLD_BUILDS } = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
+        );
+        // Every block here sits still once pasted: nothing flows, falls, decays,
+        // holds loot or spawns anything (no water, lava, sand, chests, spawners,
+        // skulls or iron blocks for a golem).
+        const allowed = new Set([
+            "air",
+            "snow_block",
+            "packed_ice",
+            "blue_ice",
+            "spruce_fence",
+            "spruce_log",
+            "spruce_leaves",
+            "black_wool",
+            "red_wool",
+            "yellow_wool",
+            "light_blue_wool",
+            "lime_wool",
+            "purple_wool",
+            "black_carpet",
+            "white_carpet",
+            "red_carpet",
+            "yellow_carpet",
+            "moss_carpet",
+            "red_concrete",
+            "glowstone",
+            "gold_block",
+            "smooth_quartz_slab",
+            "pumpkin",
+            "carved_pumpkin",
+            "jack_o_lantern",
+            "hay_block",
+            "coarse_dirt",
+            "podzol",
+            "dead_bush",
+            "red_mushroom",
+            "brown_mushroom",
+            "mossy_stone_brick_wall",
+            "stone_brick_slab",
+            "mossy_stone_brick_slab",
+            "chiseled_stone_bricks",
+            "cracked_stone_bricks",
+            "campfire",
+            "cauldron",
+            "purple_candle",
+            "lantern",
+            "soul_lantern"
+        ]);
+        // What pops off without a block under it, and what that block must be.
+        const floor: Record<string, RegExp> = {
+            lantern: /./,
+            soul_lantern: /./,
+            purple_candle: /./,
+            dead_bush: /coarse_dirt|podzol/,
+            red_mushroom: /podzol/,
+            brown_mushroom: /podzol/,
+            black_carpet: /./,
+            white_carpet: /./,
+            red_carpet: /./,
+            yellow_carpet: /./
+        };
+        for (const build of WORLD_BUILDS) {
+            const cells = format.decodeCells(build);
+            const layer = build.size.x * build.size.z;
+            for (const state of build.palette) {
+                const block = format.blockOf(state).replace(/^minecraft:/, "");
+                expect(allowed.has(block), `${build.id}: ${state}`).toBe(true);
+                if (block.endsWith("_leaves")) expect(state).toContain("persistent=true");
+                if (block.endsWith("lantern") && block !== "jack_o_lantern")
+                    expect(state).toContain("hanging=false");
+            }
+            cells.forEach((index, at) => {
+                const block = format.blockOf(build.palette[index]!).replace(/^minecraft:/, "");
+                if (!floor[block]) return;
+                // The bottom layer stands on the site's own ground, which is only
+                // known to be solid: a plant there brings its own soil instead.
+                const below = at < layer ? "ground" : build.palette[cells[at - layer]!]!;
+                expect(below === format.AIR ? "" : below, `${build.id}: ${block}`).toMatch(
+                    floor[block]
+                );
+            });
+        }
+    });
 });
 
 // ------------------------------------------------------------------ service
