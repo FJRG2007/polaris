@@ -16,6 +16,7 @@ import { useCustomFields, fieldLabel, optionLabel } from "./custom-fields";
 import { cn } from "@polaris/ui";
 import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
+import { morePages } from "./use-records";
 import type { RowGroup } from "./use-groups";
 import type { ViewColumn } from "../model/views";
 import type { InputValue } from "../model/values";
@@ -398,7 +399,7 @@ export function Board(props: BoardProps) {
                             {over && target?.beforeId === null ? (
                                 <span aria-hidden className="h-0.5 shrink-0 rounded bg-primary" />
                             ) : null}
-                            {group.rows.length < group.total ? (
+                            {morePages(group) ? (
                                 <Button
                                     variant="ghost"
                                     size="sm"

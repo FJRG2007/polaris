@@ -938,7 +938,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onColumns={setColumns}
                 onAggregate={aggregate}
                 draft={drafting ? { onCreate: create, onCancel: () => setDrafting(false) } : null}
-                hasMore={rows.length < flat.total}
+                hasMore={flat.hasMore}
                 loadingMore={flat.loadingMore}
                 onLoadMore={flat.loadMore}
                 onOpen={setPeek}
@@ -1074,9 +1074,11 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             size="sm"
                             disabled={shaping}
                             onClick={() => setFieldsOpen(true)}
+                            title={t("customFields.manage")}
+                            aria-label={t("customFields.manage")}
                         >
                             <SlidersHorizontal className="size-4" />
-                            {t("customFields.manage")}
+                            <span className="hidden sm:inline">{t("customFields.manage")}</span>
                         </Button>
                     ) : null}
                     {kind === "table" || views.groupFields(object, custom).length > 1 ? (
@@ -1092,9 +1094,15 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     ) : null}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" disabled={shaping}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={shaping}
+                                title={t("columns.fields")}
+                                aria-label={t("columns.fields")}
+                            >
                                 <Columns3 className="size-4" />
-                                {t("columns.fields")}
+                                <span className="hidden sm:inline">{t("columns.fields")}</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
@@ -1133,9 +1141,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         disabled={shaping || exporting}
                         onClick={() => void exportCsv()}
                         title={t("export.hint")}
+                        aria-label={t("export.button")}
                     >
                         <Download className="size-4" />
-                        {t("export.button")}
+                        <span className="hidden sm:inline">{t("export.button")}</span>
                     </Button>
                     {canEdit ? (
                         <Button
@@ -1143,9 +1152,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             size="sm"
                             onClick={() => setImportOpen(true)}
                             title={t("import.hint")}
+                            aria-label={t("import.button")}
                         >
                             <Upload className="size-4" />
-                            {t("import.button")}
+                            <span className="hidden sm:inline">{t("import.button")}</span>
                         </Button>
                     ) : null}
                     {canEdit ? (

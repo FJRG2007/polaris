@@ -58,7 +58,7 @@ export function TrashDialog(props: TrashDialogProps) {
             )
                 .then((page) => {
                     setRows((before) => [...(offset > 0 ? (before ?? []) : []), ...page.records]);
-                    setTotal(page.total);
+                    if (page.total !== null) setTotal(page.total);
                 })
                 .catch((caught) => setError(messageOf(caught)))
                 .finally(() => setLoading(false));

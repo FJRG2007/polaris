@@ -22,6 +22,8 @@ import { HeaderCell } from "./table-header";
 import Link from "next/link";
 import { recordHref } from "../model/related";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { morePages } from "./use-records";
 import type { RowGroup } from "./use-groups";
 import { CellDisplay, OptionChip } from "./cell-display";
 import type { InputValue } from "../model/values";
@@ -40,6 +42,13 @@ import {
 
 /** The tick box column's width, and so where the name column is pinned. */
 const BOX_WIDTH = 36;
+
+/** Every row is this tall (`h-9`), so the rows off screen are measured, not drawn. */
+const ROW_HEIGHT = 36;
+
+/** From how many rows the table draws only the ones in sight: a list scrolled
+ *  thousands of rows down keeps a page or two of rows in the document. */
+const VIRTUAL_FROM = 120;
 
 /** What `openInPanel` reads of a press. */
 interface Press {
@@ -155,6 +164,18 @@ export function RecordTable(props: TableProps) {
                 .filter((one) => one.field),
         [columns, object, props.locked]
     );
+    const virtual = !grouping && rows.length >= VIRTUAL_FROM;
+    // The heading row, and the new record's row when one is being typed, sit
+    // above the first row in the scrolled box.
+    const above = ROW_HEIGHT * (props.draft ? 2 : 1);
+    const rowWindow = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => scroller.current,
+        estimateSize: () => ROW_HEIGHT,
+        scrollMargin: above,
+        overscan: 16,
+        enabled: virtual
+    });
     const primary = primaryField(object);
     const allChosen =
         order.length > 0 &&
@@ -248,7 +269,7 @@ export function RecordTable(props: TableProps) {
                             }}
                             aria-label={t("record.open")}
                             title={t("record.open")}
-                            className="ml-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
+                            className="ml-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:opacity-100 md:opacity-0 md:group-hover/row:opacity-100"
                         >
                             <ArrowUpRight className="size-3.5" />
                         </Link>
@@ -313,6 +334,29 @@ export function RecordTable(props: TableProps) {
                 </td>
                 {fields.map(({ field }) => cell(record, field))}
             </tr>
+        );
+    };
+
+    /** The rows in sight, with the height of the ones above and below kept as
+     *  two empty rows so the scroll bar and the sticky headings stay true. */
+    const windowed = () => {
+        const items = rowWindow.getVirtualItems();
+        const before = (items[0]?.start ?? above) - above;
+        const after = rowWindow.getTotalSize() - ((items[items.length - 1]?.end ?? above) - above);
+        return (
+            <>
+                {before > 0 ? (
+                    <tr aria-hidden style={{ height: before }}>
+                        <td colSpan={fields.length + 1} className="p-0" />
+                    </tr>
+                ) : null}
+                {items.map((item) => row(rows[item.index]!))}
+                {after > 0 ? (
+                    <tr aria-hidden style={{ height: after }}>
+                        <td colSpan={fields.length + 1} className="p-0" />
+                    </tr>
+                ) : null}
+            </>
         );
     };
 
@@ -435,7 +479,7 @@ export function RecordTable(props: TableProps) {
                                           </td>
                                       </tr>
                                       {closed ? null : group.rows.map(row)}
-                                      {!closed && group.rows.length < group.total ? (
+                                      {!closed && morePages(group) ? (
                                           <tr>
                                               <td
                                                   colSpan={fields.length + 1}
@@ -462,7 +506,9 @@ export function RecordTable(props: TableProps) {
                                   </Fragment>
                               );
                           })
-                        : rows.map(row)}
+                        : virtual
+                          ? windowed()
+                          : rows.map(row)}
                     <tr ref={sentinel} aria-hidden>
                         <td colSpan={fields.length + 1} className="h-px p-0">
                             {loadingMore ? (

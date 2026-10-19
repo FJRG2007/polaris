@@ -93,7 +93,10 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                         <caption className="sr-only">{t("forecast.flow.title")}</caption>
                         <thead className="text-left text-muted-foreground">
                             <tr className="border-b border-border">
-                                <th scope="col" className="px-3 py-2 font-medium">
+                                <th
+                                    scope="col"
+                                    className="sticky left-0 bg-card px-3 py-2 font-medium"
+                                >
                                     {t("forecast.flow.stage")}
                                 </th>
                                 <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -121,7 +124,7 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                                           >
                                               <th
                                                   scope="row"
-                                                  className="px-3 py-2 text-left font-normal"
+                                                  className="sticky left-0 bg-card px-3 py-2 text-left font-normal"
                                               >
                                                   {optionLabel(
                                                       t,

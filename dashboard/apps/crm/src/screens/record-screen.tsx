@@ -232,10 +232,10 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         return (
             <div
                 key={field.key}
-                className="grid min-w-0 grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-3 border-b border-border last:border-b-0"
+                className="grid min-w-0 grid-cols-1 items-center border-b border-border last:border-b-0 sm:grid-cols-[minmax(0,9rem)_minmax(0,1fr)] sm:gap-3"
             >
                 <span
-                    className="truncate py-2 pl-3 text-[0.8125rem] text-muted-foreground"
+                    className="truncate pl-3 pt-2 text-[0.8125rem] text-muted-foreground sm:py-2"
                     title={fieldLabel(t, object, field)}
                 >
                     {fieldLabel(t, object, field)}
