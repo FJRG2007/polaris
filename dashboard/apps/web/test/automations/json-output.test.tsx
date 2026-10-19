@@ -6,13 +6,14 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/app/(app)/automations/actions", () => ({}));
 
 const { MessagesWrapper } = await import("../setup/i18n");
 const { DataBlock } = await import("@/app/(app)/automations/runs/[runId]/run-detail");
+const { JsonEditor } = await import("@/components/json-view");
 
 afterEach(cleanup);
 
@@ -35,5 +36,28 @@ describe("a step's data", () => {
             </MessagesWrapper>
         );
         expect(container.querySelector("[class^='hljs-']")).toBeNull();
+    });
+});
+
+describe("the pinned-sample editor", () => {
+    it("shows the caller's reason once and marks the field invalid", () => {
+        render(
+            <MessagesWrapper>
+                <JsonEditor label="Pin" value="{" onChange={() => {}} error="Too large" />
+            </MessagesWrapper>
+        );
+        fireEvent.blur(screen.getByLabelText("Pin"));
+        expect(screen.getAllByText("Too large")).toHaveLength(1);
+        expect(screen.getAllByText((_, node) => node?.tagName === "P")).toHaveLength(1);
+        expect(screen.getByLabelText("Pin").getAttribute("aria-invalid")).toBe("true");
+    });
+
+    it("is not marked invalid while the caller accepts a valid document", () => {
+        render(
+            <MessagesWrapper>
+                <JsonEditor label="Pin" value="{}" onChange={() => {}} error={null} />
+            </MessagesWrapper>
+        );
+        expect(screen.getByLabelText("Pin").getAttribute("aria-invalid")).toBe("false");
     });
 });

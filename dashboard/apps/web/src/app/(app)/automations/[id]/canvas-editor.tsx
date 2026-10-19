@@ -1038,12 +1038,14 @@ function NodePanel({
                                 label={t("canvas.editPin")}
                                 value={pinText}
                                 onChange={setPinText}
+                                error={
+                                    pinJson === undefined
+                                        ? t("canvas.pinInvalid")
+                                        : pinTooLarge
+                                          ? t("canvas.pinTooLarge")
+                                          : null
+                                }
                             />
-                            {pinJson === undefined ? (
-                                <p className="text-xs text-danger">{t("canvas.pinInvalid")}</p>
-                            ) : pinTooLarge ? (
-                                <p className="text-xs text-danger">{t("canvas.pinTooLarge")}</p>
-                            ) : null}
                             <div className="flex flex-wrap justify-end gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setPinText(null)}>
                                     {t("canvas.cancel")}
@@ -1064,7 +1066,11 @@ function NodePanel({
                     ) : shownSample !== undefined && shownSample !== null ? (
                         <JsonView
                             className="max-h-64"
-                            label={t("canvas.lastOutput")}
+                            label={
+                                node.pinned !== undefined
+                                    ? t("canvas.pinnedSample")
+                                    : t("canvas.lastOutput")
+                            }
                             value={JSON.stringify(shownSample)}
                         />
                     ) : (

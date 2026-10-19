@@ -108,6 +108,7 @@ export function JsonEditor({
     onChange,
     label,
     disabled = false,
+    error = null,
     className
 }: {
     value: string;
@@ -115,11 +116,14 @@ export function JsonEditor({
     /** Names the field for assistive technology. */
     label: string;
     disabled?: boolean;
+    /** The caller's own reason the document is refused; shown instead of the parse error. */
+    error?: string | null;
     className?: string;
 }) {
     const t = useTranslations("components");
     const [touched, setTouched] = useState(false);
-    const invalid = touched && !isValidJson(value);
+    const message = error ?? (touched && !isValidJson(value) ? t("json.invalid") : null);
+    const invalid = message !== null;
 
     return (
         <div className="flex flex-col gap-1">
@@ -154,7 +158,7 @@ export function JsonEditor({
                     />
                 </div>
             </div>
-            {invalid ? <p className="text-xs text-danger">{t("json.invalid")}</p> : null}
+            {invalid ? <p className="text-xs text-danger">{message}</p> : null}
         </div>
     );
 }
