@@ -1,6 +1,6 @@
 /**
  * The CLI's official releases: the newest `cli-v*` release of the project's
- * GitHub repository, which is where the install scripts and `plr update` get
+ * GitHub repository, which is where the install scripts and `plr cli update` get
  * the bundle.
  *
  * Found by walking the release list rather than asking for `releases/latest`:

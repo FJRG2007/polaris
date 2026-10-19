@@ -60,7 +60,7 @@ describe("an answer in the wrong shape", () => {
             call(connection, "GET", "/api/v1/deploy/services?ref=a/b", serviceSchema, { fetch })
         );
         expect(error.message).toContain("does not understand");
-        expect(error.message).toContain("plr update");
+        expect(error.message).toContain("plr cli update");
     });
 
     it("treats an HTML page (a proxy, a captive portal) the same way", async () => {

@@ -18,7 +18,7 @@ function serving(body: Uint8Array, digest: string | null) {
     }).fetch;
 }
 
-describe("plr update's download", () => {
+describe("plr cli update's download", () => {
     it("is taken when it matches the digest the server sent", async () => {
         const { context } = await testContext({ fetch: serving(BUNDLE, sha256(BUNDLE)) });
         expect(await fetchBundle(context, "https://polaris.example.com")).toEqual(BUNDLE);

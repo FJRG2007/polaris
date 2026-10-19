@@ -26,7 +26,6 @@
 import { join } from "node:path";
 import { CliError } from "./errors.js";
 import type { Host } from "./paths.js";
-import { spawn } from "node:child_process";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
 /** The keychain entry's service name. Its own, never the server's. */
@@ -53,8 +52,10 @@ export type Runner = (
 
 /** Starts a program with an argument array, no shell, a bounded wait, and
  *  stdin closed after `input`. */
-export const spawnRunner: Runner = (command, args, options = {}) =>
-    new Promise((resolve) => {
+export const spawnRunner: Runner = async (command, args, options = {}) => {
+    // Loaded on first use: most commands never start a program.
+    const { spawn } = await import("node:child_process");
+    return new Promise((resolve) => {
         let stdout = "";
         let child;
         try {
@@ -76,6 +77,7 @@ export const spawnRunner: Runner = (command, args, options = {}) =>
         child.stdin?.on("error", () => undefined);
         child.stdin?.end(options.input ?? "");
     });
+};
 
 export interface SecretStore {
     readonly kind: "keychain" | "file";
@@ -289,7 +291,7 @@ export function secrets(host: Host, dir: string, run: Runner = spawnRunner): Sec
         async save(account, token) {
             if (!TOKEN_SHAPE.test(token)) {
                 throw new CliError(
-                    "Polaris answered with a credential this CLI does not recognise. Run plr update, then plr login."
+                    "Polaris answered with a credential this CLI does not recognise. Run plr cli update, then plr login."
                 );
             }
             if (keychain && (await keychain.set(account, token).catch(() => false))) {

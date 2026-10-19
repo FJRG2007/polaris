@@ -32,10 +32,10 @@ It needs Node.js 20 or newer. Nothing needs root or Administrator:
 | macOS, Linux | `~/.local/share/polaris-cli/polaris.mjs`          | `~/.local/bin/plr`, `polaris`      |
 | Windows      | `%LOCALAPPDATA%\Programs\polaris-cli\polaris.mjs` | `plr.cmd`, `polaris.cmd` beside it |
 
-`plr update` replaces it with the newest release, checked the same way.
-`plr update --url https://your-polaris` takes the CLI built into that Polaris
+`plr cli update` replaces it with the newest release, checked the same way.
+`plr cli update --url https://your-polaris` takes the CLI built into that Polaris
 instead (checked against the SHA-256 the server sends), for a Polaris older than
-the newest CLI or a computer that cannot reach GitHub. `plr uninstall` signs
+the newest CLI or a computer that cannot reach GitHub. `plr cli uninstall` signs
 every profile out, revokes their keys, and removes the CLI.
 
 ### Versions
@@ -43,8 +43,8 @@ every profile out, revokes their keys, and removes the CLI.
 The CLI and your Polaris are updated separately, so every call checks that they
 speak the same API: Polaris names the CLI protocol versions it accepts in the
 `X-Polaris-Cli-Protocol` header. When they do not match, the command stops and
-says what to run: `plr update` when the CLI is too old, or updating Polaris from
-**Settings > Update** (or `plr update --url` for the CLI it serves) when Polaris
+says what to run: `plr cli update` when the CLI is too old, or updating Polaris from
+**Settings > Update** (or `plr cli update --url` for the CLI it serves) when Polaris
 is older than the CLI.
 
 ### Not on a Polaris server
@@ -104,7 +104,7 @@ after the address unless `--profile NAME` names it.
 ```sh
 plr profile list
 plr profile use work
-plr projects --profile home     # one command, without switching
+plr project list --profile home  # one command, without switching
 ```
 
 `POLARIS_PROFILE` picks a profile the same way. For CI, `POLARIS_TOKEN` (an API
@@ -112,27 +112,64 @@ key with Deploy scopes) and `POLARIS_URL` take the place of a profile.
 
 ## Commands
 
-```text
-plr whoami                         who you are signed in as, and what you may do
-plr status                         CLI version, Polaris, sign-in, update available
-plr projects                       every service you can reach
-plr service shop/web               status, source, domains
-plr deployments shop/web           recent deployments
-plr deploy shop/web --follow       deploy again and watch the build
-plr build-log DEPLOYMENT --follow
-plr logs shop/web --follow --tail 100
-plr restart shop/web
-plr open [home|deploy|keys|downloads]
-```
+Every command is `plr <noun> <verb>`, the way `gh pr list` is: the first word
+names what is acted on, the second what is done to it. `plr <noun>` alone (or
+`plr help <noun>`) prints that group's commands; `plr help` prints them all.
+
+| Command                                              | What it does                                                |
+| ---------------------------------------------------- | ----------------------------------------------------------- |
+| `plr auth login [--url URL] [--browserless]`         | Sign in from your browser, or with a code (`plr login` too) |
+| `plr auth logout`                                    | Sign out and revoke this computer's key (`plr logout` too)  |
+| `plr auth whoami`                                    | Who you are signed in as, and what you may do               |
+| `plr auth status`                                    | CLI version, Polaris, sign-in, update available             |
+| `plr profile list\|use NAME\|remove NAME`            | Your profiles; switch between them                          |
+| `plr project list`                                   | Every service you can reach                                 |
+| `plr service view shop/web`                          | Status, source, domains                                     |
+| `plr service deploy shop/web --follow`               | Deploy again and watch the build                            |
+| `plr service logs shop/web --follow --tail 100`      | Its runtime log                                             |
+| `plr service restart shop/web`                       | Restart it                                                  |
+| `plr deployment list shop/web`                       | Recent deployments                                          |
+| `plr deployment logs DEPLOYMENT --follow`            | A deployment's build log                                    |
+| `plr env list\|set\|remove ...`                      | Environment variables, below                                |
+| `plr dashboard open [home\|deploy\|keys\|downloads]` | Open the dashboard in your browser                          |
+| `plr cli update [--url URL]`                         | Get the newest CLI, or the one a Polaris serves             |
+| `plr cli uninstall [--yes]`                          | Sign out everywhere and remove the CLI                      |
+
+`ls` works for `list` and `rm` for `remove`.
+
+### Older names
+
+The names from before this layout still work and print one line on stderr with
+the new name, so scripts keep running and their output is unchanged:
+
+| Before                       | Now                        |
+| ---------------------------- | -------------------------- |
+| `plr whoami`                 | `plr auth whoami`          |
+| `plr status`                 | `plr auth status`          |
+| `plr profiles`               | `plr profile`              |
+| `plr projects`               | `plr project list`         |
+| `plr service SERVICE`        | `plr service view SERVICE` |
+| `plr deploy`, `plr redeploy` | `plr service deploy`       |
+| `plr logs`                   | `plr service logs`         |
+| `plr restart`                | `plr service restart`      |
+| `plr deployments`            | `plr deployment list`      |
+| `plr build-log`              | `plr deployment logs`      |
+| `plr open`                   | `plr dashboard open`       |
+| `plr update`                 | `plr cli update`           |
+| `plr uninstall`              | `plr cli uninstall`        |
+
+Commands for another Polaris app go under a noun of their own, so they never
+take a name another app uses; the CLI's tests refuse a noun, verb or alias used
+twice.
 
 ## Environment variables
 
 ```text
-plr env ls shop/web                     names, whether each is secret, when it changed
-plr env set shop/web DATABASE_URL       type the value at a prompt that does not echo
+plr env list shop/web                     names, whether each is secret, when it changed
+plr env set shop/web DATABASE_URL         type the value at a prompt that does not echo
 plr env set shop/web DATABASE_URL < url.txt
 plr env set shop/web TLS_KEY --from-file key.txt --restart
-plr env rm shop/web DATABASE_URL        asks first; --yes skips the question
+plr env remove shop/web DATABASE_URL      asks first; --yes skips the question
 ```
 
 No command prints a value, and none takes one on the command line, where it

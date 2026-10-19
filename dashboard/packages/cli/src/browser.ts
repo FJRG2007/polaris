@@ -8,7 +8,6 @@
  */
 
 import type { Host } from "./paths.js";
-import { spawn } from "node:child_process";
 
 /** Whether a browser can plausibly be opened on this machine. */
 export function canOpenBrowser(host: Host): boolean {
@@ -28,8 +27,10 @@ export function openerFor(host: Host, url: string): { command: string; args: str
 }
 
 /** Open it, and say whether the opener started. */
-export function openBrowser(host: Host, url: string): Promise<boolean> {
+export async function openBrowser(host: Host, url: string): Promise<boolean> {
     const { command, args } = openerFor(host, url);
+    // Loaded on first use: only sign-in and open start a browser.
+    const { spawn } = await import("node:child_process");
     return new Promise((resolve) => {
         try {
             const child = spawn(command, args, {

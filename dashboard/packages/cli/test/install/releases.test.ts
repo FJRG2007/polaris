@@ -1,5 +1,5 @@
 /**
- * Where `plr update` and the install scripts get the CLI: the newest `cli-v*`
+ * Where `plr cli update` and the install scripts get the CLI: the newest `cli-v*`
  * release of the repository, never the dashboard's or the extension's, and only
  * a bundle that matches the digest GitHub published for it.
  */

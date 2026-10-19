@@ -1,5 +1,5 @@
 /**
- * `plr status`: everything worth knowing before filing "it does not work" -
+ * `plr auth status`: everything worth knowing before filing "it does not work" -
  * which CLI this is, which Polaris and account it is pointed at, whether that
  * sign-in still works, and whether a newer CLI has been released.
  *
@@ -15,7 +15,7 @@ import { configFile } from "../config.js";
 import { CLI_VERSION } from "../version.js";
 import { line, printJson } from "../output.js";
 import { DEFAULT_REPO, isNewerVersion, newestRelease } from "../releases.js";
-import { bundlePath, readMarker } from "./install.js";
+import { bundlePath, readMarker, type InstallMarker } from "./install.js";
 import { requireSession, type Context, type Session } from "../context.js";
 
 interface Report {
@@ -29,9 +29,10 @@ interface Report {
 
 /** Whether a newer CLI release is out than this copy; null when it cannot be
  *  told (not installed with the install line, or GitHub could not be asked). */
-async function updateAvailable(context: Context): Promise<boolean | null> {
-    const bundle = bundlePath();
-    const marker = await readMarker(bundle);
+async function updateAvailable(
+    context: Context,
+    marker: InstallMarker | null
+): Promise<boolean | null> {
     if (!marker) return null;
     try {
         const release = await newestRelease(context.fetch, marker.repo ?? DEFAULT_REPO);
@@ -42,11 +43,14 @@ async function updateAvailable(context: Context): Promise<boolean | null> {
 }
 
 export async function status(context: Context, flags: Flags): Promise<void> {
+    const marker = await readMarker(bundlePath());
+    // Asked of GitHub while the sign-in is read and Polaris answers, not after.
+    const update = updateAvailable(context, marker);
     const report: Report = {
         cli: {
             version: CLI_VERSION,
             path: bundlePath(),
-            installed: Boolean(await readMarker(bundlePath())),
+            installed: Boolean(marker),
             updateAvailable: null
         },
         config: configFile(context.configDir),
@@ -77,7 +81,7 @@ export async function status(context: Context, flags: Flags): Promise<void> {
             report.problem = caught.message;
         }
     }
-    report.cli.updateAvailable = await updateAvailable(context);
+    report.cli.updateAvailable = await update;
 
     if (flags.json) return printJson(context.io, report);
 
@@ -95,6 +99,6 @@ export async function status(context: Context, flags: Flags): Promise<void> {
         line(context.io, `Signed in as ${who}`);
         line(context.io, `Allowed to: ${report.signedIn.scopes.join(", ") || "nothing"}`);
     }
-    if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr update.");
+    if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr cli update.");
     if (report.problem) line(context.io, report.problem);
 }

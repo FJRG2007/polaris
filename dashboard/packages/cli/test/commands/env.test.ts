@@ -62,7 +62,7 @@ function envServer(options: { created?: boolean; refuse?: string } = {}) {
     });
 }
 
-describe("plr env ls", () => {
+describe("plr env list", () => {
     it("prints names, secrecy and dates, and nothing else", async () => {
         const { fetch } = envServer();
         const { context, stdout } = await testContext({ fetch, env });
@@ -178,7 +178,7 @@ describe("plr env set", () => {
     });
 });
 
-describe("plr env rm", () => {
+describe("plr env remove", () => {
     it("asks first and removes on yes, redeploying with --restart", async () => {
         const { fetch, seen } = envServer();
         const { context, stdout } = await testContext({ fetch, env, answers: ["y"] });

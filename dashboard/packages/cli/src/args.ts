@@ -2,7 +2,7 @@
  * Reading the command line.
  *
  * Node's own `parseArgs`, strict: an option nobody defined is an error naming
- * it, not something silently ignored - `plr deploy web --folow` should not
+ * it, not something silently ignored - `plr service deploy web --folow` should not
  * deploy without following. Every option is global; a command reads the ones
  * that mean something to it.
  */
@@ -16,7 +16,7 @@ export interface Flags {
     readonly browserless: boolean;
     readonly help: boolean;
     readonly version: boolean;
-    /** Answers yes to the one question the CLI asks (`plr uninstall`). */
+    /** Answers yes to the one question the CLI asks (`plr cli uninstall`). */
     readonly yes: boolean;
     /** `plr env set|rm`: redeploy the service so it picks the change up. */
     readonly restart: boolean;

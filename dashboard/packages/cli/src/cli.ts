@@ -4,167 +4,78 @@
  * Sign in once with `plr login` (in the browser, or with a code on a machine
  * that has none) and every command after that uses that sign-in. One file, run
  * by the developer's own Node, installed from the project's GitHub releases.
+ *
+ * Commands are `plr <noun> <verb>` (`commands.ts`). Only what the command line
+ * names is evaluated: this file imports nothing heavy, and each command's module,
+ * the sign-in code and the server-install guard are loaded when first needed.
  */
 
-import { env } from "./commands/env.js";
-import { open } from "./commands/open.js";
+import { parse, type Parsed } from "./args.js";
 import { CLI_VERSION } from "./version.js";
 import { CliError, usage } from "./errors.js";
-import { parse, type Flags } from "./args.js";
-import { status } from "./commands/status.js";
-import { profile } from "./commands/profile.js";
-import { existsSync, readFileSync } from "node:fs";
-import { update, uninstall } from "./commands/install.js";
-import { login, logout, whoami } from "./commands/auth.js";
-import { processContext, type Context } from "./context.js";
+import type { Probe } from "./guard.js";
+import type { Context } from "./context.js";
 import { mark, timed, timingReport } from "./timing.js";
-import { detectServerInstall, serverInstallMessage, type Probe } from "./guard.js";
-import {
-    buildLog,
-    deploy,
-    deployments,
-    logs,
-    projects,
-    restart,
-    service
-} from "./commands/deploy.js";
+import { helpText, resolve, type Resolved } from "./commands.js";
 
-export const HELP = `plr - the Polaris command line (also installed as polaris)
+/** The whole help, grouped by noun. */
+export const HELP = helpText();
 
-Signing in
-  plr login [--url URL] [--profile NAME] [--browserless]
-                         Sign in from your browser, or with a code on another device
-  plr logout             Sign out and revoke this computer's key
-  plr whoami             Who you are signed in as, and what you may do
-  plr status             CLI version, Polaris, sign-in, and whether an update is out
-  plr profile [list|use NAME|remove NAME]
-                         One profile per Polaris or account; switch between them
-
-Deploy
-  plr projects           Every service you can reach
-  plr service SERVICE    Status, source and domains
-  plr deployments SERVICE
-                         Recent deployments
-  plr deploy SERVICE [--follow]
-                         Deploy it again, and watch the build
-  plr build-log DEPLOYMENT [--follow] [--tail N]
-  plr logs SERVICE [--follow] [--tail N]
-  plr restart SERVICE
-
-Environment variables (values are never shown)
-  plr env ls SERVICE     Names, whether each is secret, and when it changed
-  plr env set SERVICE NAME [--from-file PATH] [--plain] [--restart]
-                         Create or replace one; type the value at a hidden
-                         prompt or pipe it in, never on the command line
-  plr env rm SERVICE NAME [--yes] [--restart]
-                         Remove one. --restart redeploys so the change applies
-
-Other
-  plr open [home|deploy|keys|downloads]
-                         Open the dashboard in your browser
-  plr update [--url URL] Get the newest CLI, or the one a Polaris serves
-  plr uninstall [--yes]  Sign out everywhere and remove the CLI
-
-SERVICE is project/service, project/environment/service, or its id.
---json prints read commands as JSON. --profile (or POLARIS_PROFILE) picks a
-profile for one command. POLARIS_TOKEN with POLARIS_URL uses an API key instead
-of a sign-in, for CI.
-`;
-
-/** The real disk, for the server-install guard. */
-const diskProbe: Probe = {
-    exists: (path) => existsSync(path),
-    read: (path) => {
-        try {
-            return readFileSync(path, "utf8");
-        } catch {
-            return null;
-        }
-    }
-};
+/** What `--version` and the help print: answered without a sign-in, a context
+ *  or any command's code. Null for everything else. */
+function localAnswer(parsed: Parsed, resolved: Resolved): string | null {
+    if (parsed.flags.version || parsed.positionals[0] === "version") return `${CLI_VERSION}\n`;
+    if (parsed.flags.help || resolved.kind === "help")
+        return helpText(resolved.kind === "unknown" ? undefined : resolved.group);
+    return null;
+}
 
 /** Run one command line. Separate from `main` so a test can drive it. */
-export async function run(
-    argv: readonly string[],
-    context: Context,
-    probe: Probe = diskProbe
-): Promise<void> {
-    const { positionals, flags } = parse(argv);
-    const [command = "help", ...args] = positionals;
-
-    if (flags.version || command === "version") {
-        context.io.out(`${CLI_VERSION}\n`);
+export async function run(argv: readonly string[], context: Context, probe?: Probe): Promise<void> {
+    const parsed = parse(argv);
+    const resolved = resolve(parsed.positionals, context.host.env);
+    const answer = localAnswer(parsed, resolved);
+    if (answer !== null) {
+        context.io.out(answer);
         return;
     }
-    if (flags.help || command === "help") {
-        context.io.out(HELP);
-        return;
-    }
+    if (resolved.kind === "unknown") throw usage(resolved.message);
+    if (resolved.kind !== "run") return;
+    const { flags } = parsed;
+    if (resolved.notice) context.io.err(resolved.notice);
 
     // Before anything that reads or writes a sign-in: on a machine with a
     // Polaris server, this CLI is the one that steps aside.
+    const guard = await import("./guard.js");
     const server = await timed("server-install check", async () =>
-        detectServerInstall(context.host, probe)
+        guard.detectServerInstall(context.host, probe ?? guard.diskProbe)
     );
-    if (server.found) throw new CliError(serverInstallMessage(server));
+    if (server.found) throw new CliError(guard.serverInstallMessage(server));
 
-    await dispatch(command, args, flags, context);
-}
-
-async function dispatch(
-    command: string,
-    args: readonly string[],
-    flags: Flags,
-    context: Context
-): Promise<void> {
-    const [first] = args;
-    switch (command) {
-        case "login":
-            return login(context, flags);
-        case "logout":
-            return logout(context, flags);
-        case "whoami":
-            return whoami(context, flags);
-        case "status":
-            return status(context, flags);
-        case "profile":
-        case "profiles":
-            return profile(context, flags, args);
-        case "projects":
-            return projects(context, flags);
-        case "service":
-            return service(context, flags, first);
-        case "deployments":
-            return deployments(context, flags, first);
-        case "deploy":
-        case "redeploy":
-            return deploy(context, flags, first);
-        case "build-log":
-            return buildLog(context, flags, first);
-        case "logs":
-            return logs(context, flags, first);
-        case "restart":
-            return restart(context, flags, first);
-        case "env":
-            return env(context, flags, args);
-        case "open":
-            return open(context, flags, first);
-        case "update":
-            return update(context, flags);
-        case "uninstall":
-            return uninstall(context, flags);
-        default:
-            throw usage(`"${command}" is not a plr command.`);
-    }
+    await resolved.command.run(context, flags, resolved.args);
 }
 
 /** The process entry: run argv, print a failure as a sentence, set the exit code. */
 export async function main(): Promise<void> {
     // From the process starting to here: Node itself and loading the bundle.
     mark("startup (node and the bundle)", 0);
-    const context = processContext();
+    const argv = process.argv.slice(2);
+    // The help and --version need none of the rest of the CLI loaded. A line
+    // that does not parse is left to `run`, which says what is wrong with it.
     try {
-        await run(process.argv.slice(2), context);
+        const parsed = parse(argv);
+        const answer = localAnswer(parsed, resolve(parsed.positionals, process.env));
+        if (answer !== null) {
+            process.stdout.write(answer);
+            process.stderr.write(timingReport());
+            return;
+        }
+    } catch {
+        // Reported by `run` below.
+    }
+    const context = (await import("./context.js")).processContext();
+    try {
+        await run(argv, context);
     } catch (caught) {
         if (caught instanceof CliError) {
             context.io.err(`plr: ${caught.message}\n`);

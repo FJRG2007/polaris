@@ -1,5 +1,5 @@
 /**
- * `plr open [page]`: the dashboard of the Polaris in use, in the browser.
+ * `plr dashboard open [page]`: the dashboard of the Polaris in use, in the browser.
  *
  * The address is printed as well, so it can be opened by hand where there is no
  * browser - which is also why this never needs a token.
@@ -12,7 +12,7 @@ import { loadConfig } from "../config.js";
 import { normalizeUrl } from "../args.js";
 import { chosenProfileName, type Context } from "../context.js";
 
-/** The pages `plr open` knows by name. */
+/** The pages `plr dashboard open` knows by name. */
 export const PAGES: Readonly<Record<string, string>> = {
     home: "/",
     deploy: "/apps/deploy",
@@ -26,7 +26,8 @@ export async function open(
     page: string | undefined
 ): Promise<void> {
     const path = PAGES[page ?? "home"];
-    if (path === undefined) throw usage(`plr open knows ${Object.keys(PAGES).join(", ")}.`);
+    if (path === undefined)
+        throw usage(`plr dashboard open knows ${Object.keys(PAGES).join(", ")}.`);
 
     let url = flags.url
         ? normalizeUrl(flags.url)

@@ -22,15 +22,15 @@ describe("the protocol check", () => {
         expect(compatibilityProblem(URL, "latest")).toBeNull();
     });
 
-    it("says to run plr update when the CLI is too old", () => {
+    it("says to run plr cli update when the CLI is too old", () => {
         expect(compatibilityProblem(URL, "2-3", 1)).toBe(
-            `This CLI is too old for Polaris at ${URL}. Update it with plr update, then try again.`
+            `This CLI is too old for Polaris at ${URL}. Update it with plr cli update, then try again.`
         );
     });
 
     it("says to update Polaris, or take its CLI, when the CLI is too new", () => {
         expect(compatibilityProblem(URL, "1-1", 2)).toBe(
-            `Polaris at ${URL} is older than this CLI. Update Polaris from Settings > Update, or install the CLI it serves with plr update --url ${URL}.`
+            `Polaris at ${URL} is older than this CLI. Update Polaris from Settings > Update, or install the CLI it serves with plr cli update --url ${URL}.`
         );
     });
 });
@@ -51,7 +51,7 @@ describe("every call", () => {
                 fetch: answering(`${CLI_PROTOCOL + 1}-${CLI_PROTOCOL + 2}`, status)
             }).catch((caught: unknown) => caught);
             expect(failed).toBeInstanceOf(CliError);
-            expect((failed as CliError).message).toContain("plr update");
+            expect((failed as CliError).message).toContain("plr cli update");
         }
     });
 
