@@ -364,7 +364,8 @@ describe("the catalog", () => {
         );
         // Every block here sits still once pasted: nothing flows, falls, decays,
         // holds loot or spawns anything (no water, lava, sand, chests, spawners,
-        // skulls or iron blocks for a golem).
+        // skulls or iron blocks for a golem). A cauldron fills with rain, which
+        // the teardown takes too.
         const allowed = new Set([
             "air",
             "snow_block",

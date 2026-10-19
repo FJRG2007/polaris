@@ -141,6 +141,9 @@ describe("what an arena's teardown takes", () => {
         expect(arena.withDecayed(["minecraft:dirt"])).toContain("minecraft:grass_block");
         expect(arena.withDecayed(["minecraft:ice"])).toContain("minecraft:water");
         expect(arena.withDecayed(["minecraft:grass_block"])).toContain("minecraft:dirt");
+        expect(arena.withDecayed(["minecraft:cauldron"])).toEqual(
+            expect.arrayContaining(["minecraft:water_cauldron", "minecraft:powder_snow_cauldron"])
+        );
         expect(arena.withDecayed([])).toEqual([]);
     });
 });
