@@ -333,5 +333,31 @@
             "disk": "Disco",
             "network": "Tráfico de red"
         }
+    },
+    "ups": {
+        "onBattery": {
+            "title": "{name} funciona con batería",
+            "body": "Se fue la luz. Carga del {charge} %, quedan unos {minutes} min."
+        },
+        "online": {
+            "title": "{name} vuelve a tener red",
+            "body": "Volvió la luz. Carga al {charge} %."
+        },
+        "lowBattery": {
+            "title": "La batería de {name} casi se agota",
+            "body": "Carga del {charge} %, quedan unos {minutes} min. Las máquinas protegidas pueden apagarse."
+        },
+        "test": {
+            "title": "{name} terminó un test de batería",
+            "body": "Resultado: {result}"
+        },
+        "replaceBattery": {
+            "title": "{name} necesita batería nueva",
+            "body": "El SAI indica que la batería está gastada. Cámbiala antes del próximo corte."
+        },
+        "shutdownFailed": {
+            "title": "{machine} no se apagó",
+            "body": "{name} funciona con batería y Polaris no pudo apagarla. Lo seguirá intentando hasta que vuelva la luz."
+        }
     }
 }

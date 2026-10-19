@@ -53,6 +53,12 @@ export async function register(): Promise<void> {
     const { startMetricsCollector } = await import("./lib/metrics-collector-service");
     void afterPredecessor().then(startMetricsCollector);
 
+    // Watch every UPS: its history, its alerts and the shutdown of the machines
+    // it protects. After the predecessor, like the collector, so an update's
+    // overlap never sends one shutdown twice.
+    const { startUpsWatch } = await import("./lib/ups/ups-service");
+    void afterPredecessor().then(startUpsWatch);
+
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
     const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import(

@@ -22,6 +22,7 @@ mod http;
 mod networks;
 mod security;
 mod server;
+mod ups;
 
 use std::sync::Arc;
 

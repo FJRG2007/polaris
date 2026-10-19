@@ -629,6 +629,31 @@ export async function raiseAutomationEvent(input: {
 }
 
 /**
+ * An event that is not about one project (a UPS's power events): started in
+ * every project that has a rule following it. Never throws, like the above.
+ */
+export async function raiseAutomationEventEverywhere(
+    event: core.DeployAutomationEvent
+): Promise<number> {
+    try {
+        const projects = await prisma.deployAutomation.findMany({
+            where: { enabled: true, trigger: "event", event },
+            select: { projectId: true },
+            distinct: ["projectId"],
+            take: 500
+        });
+        let started = 0;
+        for (const { projectId } of projects) {
+            started += await raiseAutomationEvent({ projectId, event, applicationId: null });
+        }
+        return started;
+    } catch (error) {
+        console.error("polaris: an automation could not be started:", error);
+        return 0;
+    }
+}
+
+/**
  * The rule a webhook address names, or null. The secret is compared in constant
  * time against its hash, and an unknown id and a wrong secret are the same null.
  */

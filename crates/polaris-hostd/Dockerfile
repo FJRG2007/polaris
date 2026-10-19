@@ -33,9 +33,11 @@ ARG TARGETARCH
 ARG NIXPACKS_VERSION=1.29.0
 # docker-cli-compose is REQUIRED: deploys run `docker compose up`. Without the
 # plugin the daemon has no `compose` subcommand and every deploy fails.
+# nut provides usbhid-ups/snmp-ups/upsd for /v1/ups: the daemon finds a UPS on
+# the USB bus and runs NUT for it, with upsd bound to 127.0.0.1 only.
 # cifs-utils/nfs-utils provide mount.cifs/mount.nfs so the daemon can kernel-mount
 # NAS shares (SMB/NFS) for nas volumes; without them `mount -t cifs` fails.
-RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx tar ca-certificates cifs-utils nfs-utils \
+RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx tar ca-certificates cifs-utils nfs-utils nut \
     && case "$TARGETARCH" in \
         arm64) NARCH=aarch64 ;; \
         *) NARCH=x86_64 ;; \

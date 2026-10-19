@@ -14826,3 +14826,58 @@ model AutomationFolder {
     @@index([orgId])
     @@index([userId])
 }
+
+// A UPS Polaris watches. It is its own thing, not a part of a machine: the
+// machine named in `machineId` is only how it is reached today (its daemon has
+// the USB cable, or runs the SNMP driver), and can change.
+model Ups {
+    id                      String      @id @default(uuid(7)) @db.Uuid
+    name                    String
+    // usb | nut | snmp
+    connection              String
+    // usb and snmp: the machine whose daemon reaches the UPS (a metric subject id).
+    machineId               String?     @db.Uuid
+    // usb: the device id that daemon reports for the cable.
+    deviceId                String?
+    // nut and snmp: where the UPS (or its NUT server) answers.
+    host                    String?
+    port                    Int?
+    // nut: the UPS's name on that server.
+    upsName                 String?
+    // nut: the login for commands; snmp v3: the security name.
+    username                String?
+    // snmp: v1 | v2c | v3
+    snmpVersion             String?
+    // Sealed JSON: the NUT password, or the SNMP community / v3 passwords.
+    // Write-only: never sent back to a browser.
+    encryptedSecret         Bytes?
+    secretNonce             Bytes?
+    secretKeyId             String?
+    // Graceful shutdown of the protected machines. Off until somebody turns it on.
+    shutdownEnabled         Boolean     @default(false)
+    shutdownBelowCharge     Int?
+    shutdownBelowRuntimeMin Int?
+    protectedMachineIds     String[]    @default([]) @db.Uuid
+    // When the shutdown was last sent, so one outage sends it once.
+    shutdownSentAt          DateTime?
+    // The last state the watcher saw, so alerts are raised on a change only.
+    lastStatus              String?
+    lastTestResult          String?
+    createdAt               DateTime    @default(now())
+    updatedAt               DateTime    @updatedAt
+    samples                 UpsSample[]
+}
+
+// One reading a minute of each UPS, for its history chart; 30 days are kept.
+model UpsSample {
+    upsId    String   @db.Uuid
+    ts       DateTime @default(now())
+    charge   Float?
+    runtimeS Float?
+    load     Float?
+    inputV   Float?
+    ups      Ups      @relation(fields: [upsId], references: [id], onDelete: Cascade)
+
+    @@id([upsId, ts])
+    @@index([ts])
+}

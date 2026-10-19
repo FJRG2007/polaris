@@ -344,7 +344,8 @@
         "Compare": "Comparar",
         "Insights": "Tendencias",
         "Rollouts": "Despliegues",
-        "Activity sharing": "Compartir actividad"
+        "Activity sharing": "Compartir actividad",
+        "UPS": "SAI"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

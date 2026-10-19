@@ -86,7 +86,12 @@ const EVENT_LABELS = {
     "deploy.succeeded": "automations.events.deploySucceeded",
     "deploy.failed": "automations.events.deployFailed",
     "domain.down": "automations.events.domainDown",
-    "domain.up": "automations.events.domainUp"
+    "domain.up": "automations.events.domainUp",
+    "ups.onBattery": "automations.events.upsOnBattery",
+    "ups.online": "automations.events.upsOnline",
+    "ups.lowBattery": "automations.events.upsLowBattery",
+    "ups.test": "automations.events.upsTest",
+    "ups.replaceBattery": "automations.events.upsReplaceBattery"
 } as const satisfies Record<core.DeployAutomationEvent, Key>;
 
 const ACTION_LABELS = {
