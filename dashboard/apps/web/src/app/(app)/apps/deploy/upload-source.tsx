@@ -24,6 +24,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
 import type { UploadedSource } from "@/lib/deploy/source-upload";
 import { useEffect, useRef, useState, useTransition, type DragEvent, type ReactNode } from "react";
+import type { KeptPick } from "@/components/file-picker/as-files";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The largest zip the server takes, and the most a folder may hold before it. */
@@ -31,9 +32,10 @@ const MAX_ZIP = 200 * 1024 ** 2;
 const MAX_FOLDER = 1024 ** 3;
 const SKIPPED = new Set(["node_modules", ".git", "__MACOSX"]);
 
-/** What is about to be sent: the zip, the folder's name, and how much is in it. */
+/** What is about to be sent: the zip - or where it lies on a storage, for the
+ *  server to read there - the folder's name, and how much is in it. */
 export interface PickedSource {
-    readonly blob: Blob;
+    readonly blob: Blob | KeptPick;
     readonly name: string;
     readonly files: number;
 }
@@ -83,7 +85,7 @@ async function zipped(
 }
 
 /** A single dropped or chosen zip, taken as it is. */
-function asZip(file: File): PickedSource {
+function asZip(file: File | KeptPick): PickedSource {
     if (file.size > MAX_ZIP) throw new Error(`That zip is larger than ${formatBytes(MAX_ZIP)}.`);
     return { blob: file, name: file.name.replace(/\.zip$/i, ""), files: 0 };
 }
@@ -101,10 +103,17 @@ export async function sendSource(
         {
             method: "POST",
             headers: {
-                "content-type": "application/zip",
+                "content-type":
+                    picked.blob instanceof Blob ? "application/zip" : "application/json",
                 "x-polaris-name": encodeURIComponent(picked.name)
             },
-            body: picked.blob
+            body:
+                picked.blob instanceof Blob
+                    ? picked.blob
+                    : JSON.stringify({
+                          connectionId: picked.blob.connectionId,
+                          path: picked.blob.path
+                      })
         }
     ).catch(() => null);
     if (!response) return { error: words.unreachable };
@@ -264,7 +273,10 @@ export function SourceDropZone({
                     onClick={() =>
                         void chooseFiles({
                             accept: ".zip,application/zip",
-                            onFailed: (message) => onPicked(null, message)
+                            onFailed: (message) => onPicked(null, message),
+                            onDrive: ([kept]) => {
+                                if (kept) void take(async () => asZip(kept));
+                            }
                         }).then(([file]) => {
                             if (file) void take(async () => asZip(file));
                         })

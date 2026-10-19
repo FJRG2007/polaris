@@ -223,6 +223,16 @@ describe("the Philips Air+ app step", () => {
         return onConnected;
     }
 
+    /** The app, chosen from this computer through the shared picker. */
+    async function chooseApp(file: File) {
+        fireEvent.click(screen.getByRole("button", { name: /^Philips Air\+ app file/ }));
+        await screen.findByRole("button", { name: "Recent" });
+        fireEvent.click(screen.getAllByRole("button", { name: "Upload" }).at(-1)!);
+        const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+        fireEvent.change(input, { target: { files: [file] } });
+        await waitFor(() => expect(screen.queryByRole("button", { name: "Recent" })).toBeNull());
+    }
+
     it("says why the app is needed, with what each list held, and where to get it", async () => {
         await toFileStep();
         expect(screen.getByText(/Air\+: 0; HomeID: 0; HomeID app: HTTP 500/)).toBeTruthy();
@@ -239,10 +249,7 @@ describe("the Philips Air+ app step", () => {
 
     it("refuses a file that is not an app before sending it", async () => {
         await toFileStep();
-        const input = screen.getByLabelText("Philips Air+ app file");
-        fireEvent.change(input, {
-            target: { files: [new File(["x"], "photo.jpg", { type: "image/jpeg" })] }
-        });
+        await chooseApp(new File(["x"], "photo.jpg", { type: "image/jpeg" }));
         expect(screen.getByText("Choose an .apk, .apkm, .xapk file.")).toBeTruthy();
         expect(screen.getByRole("button", { name: "Upload" }).getAttribute("aria-disabled")).toBe(
             "true"
@@ -252,6 +259,7 @@ describe("the Philips Air+ app step", () => {
     it("streams the app to the server and connects with the handle it answers", async () => {
         const uploads: { url: string; init: RequestInit }[] = [];
         vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+            if (url.startsWith("/api/drive/")) return new Response("{}", { status: 404 });
             uploads.push({ url, init });
             return new Response(JSON.stringify({ state: { appSecret: "handle-2" } }), {
                 status: 200
@@ -259,9 +267,10 @@ describe("the Philips Air+ app step", () => {
         });
         const onConnected = await toFileStep();
         const file = new File(["PK"], "philips-air.apkm");
-        fireEvent.change(screen.getByLabelText("Philips Air+ app file"), {
-            target: { files: [file] }
-        });
+        await chooseApp(file);
+        expect(
+            screen.getByRole("button", { name: "Philips Air+ app file: philips-air.apkm" })
+        ).toBeTruthy();
         pollAnswer = { devices: [{ id: "am:d1" }], accounts: [] };
         fireEvent.click(screen.getByRole("button", { name: "Upload" }));
         await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1));
@@ -279,9 +288,7 @@ describe("the Philips Air+ app step", () => {
                 })
         );
         await toFileStep();
-        fireEvent.change(screen.getByLabelText("Philips Air+ app file"), {
-            target: { files: [new File(["x"], "other.apk")] }
-        });
+        await chooseApp(new File(["x"], "other.apk"));
         fireEvent.click(screen.getByRole("button", { name: "Upload" }));
         expect((await screen.findByRole("alert")).textContent).toBe(
             "That file is not an app file."

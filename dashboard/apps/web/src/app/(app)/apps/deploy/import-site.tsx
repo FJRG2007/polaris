@@ -24,6 +24,7 @@ import {
     DialogHeader,
     DialogTitle
 } from "@polaris/ui";
+import type { KeptPick } from "@/components/file-picker/as-files";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
 /** The largest backup the server takes (`MAX_BACKUP_UPLOAD` in the route). */
@@ -119,13 +120,17 @@ async function fetchJson(url: string): Promise<unknown> {
 
 /** Send the backup, reporting upload progress, and answer the server's verdict. */
 function sendBackup(
-    file: File,
+    file: File | KeptPick,
     onProgress: (percent: number) => void
 ): Promise<{ status: number; body: unknown }> {
     return new Promise((resolve) => {
         const request = new XMLHttpRequest();
         request.open("POST", ENDPOINT);
-        request.setRequestHeader("content-type", "application/gzip");
+        // A backup already on a storage is named, and the server reads it there.
+        request.setRequestHeader(
+            "content-type",
+            file instanceof File ? "application/gzip" : "application/json"
+        );
         request.upload.onprogress = (event) => {
             if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
         };
@@ -139,7 +144,11 @@ function sendBackup(
             resolve({ status: request.status, body });
         };
         request.onerror = () => resolve({ status: 0, body: null });
-        request.send(file);
+        request.send(
+            file instanceof File
+                ? file
+                : JSON.stringify({ connectionId: file.connectionId, path: file.path })
+        );
     });
 }
 
@@ -150,7 +159,7 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
     const router = useRouter();
     const [chooseFiles, chooser] = useChooseFiles();
     const [open, setOpen] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
+    const [file, setFile] = useState<File | KeptPick | null>(null);
     const [pickError, setPickError] = useState<string | null>(null);
     const [over, setOver] = useState(false);
     const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -215,7 +224,7 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
         });
     }, []);
 
-    function pick(next: File | undefined) {
+    function pick(next: File | KeptPick | undefined) {
         if (!next || busy) return;
         if (job) markSeen(job.id);
         const parsed = backupFileSchema.safeParse({ name: next.name, size: next.size });
@@ -421,7 +430,8 @@ export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
                                     onClick={() =>
                                         void chooseFiles({
                                             accept: ".tar.gz,.tgz,application/gzip",
-                                            onFailed: setPickError
+                                            onFailed: setPickError,
+                                            onDrive: ([kept]) => pick(kept)
                                         }).then((files) => pick(files[0]))
                                     }
                                 >

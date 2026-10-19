@@ -4,7 +4,8 @@
  * GET - this person's imports of the last day, or one by `?id=`.
  *
  * The body is the archive itself, streamed to disk rather than read into memory,
- * at most `MAX_BACKUP_UPLOAD`. Once it is staged the import starts in the
+ * at most `MAX_BACKUP_UPLOAD` - or, as JSON, where the archive lies on one of this
+ * person's storages, read from there the same way. Once it is staged the import starts in the
  * background and the answer is its id (202); the import's own row carries its
  * progress and result (see `panel-import/jobs`). The project lands on the shelf
  * that is open, which takes being allowed to run that organization's services,
@@ -19,6 +20,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { stageBody, stagedPath, TooLarge } from "@/lib/deploy/staging";
+import { AttachRefused, openedDriveBody, type OpenedFile } from "@/lib/attachments/from-elsewhere";
 import {
     getImport,
     ImportBusy,
@@ -48,8 +50,10 @@ export async function POST(request: Request): Promise<Response> {
 
     const file = await stagedPath(".tar.gz");
     let started = false;
+    let opened: OpenedFile | null = null;
     try {
-        await stageBody(request.body, file, MAX_BACKUP_UPLOAD);
+        opened = await openedDriveBody(request, user.id, MAX_BACKUP_UPLOAD);
+        await stageBody(opened?.body ?? request.body, file, MAX_BACKUP_UPLOAD);
         const id = await startCpanelImport({
             archive: file,
             ownerId: user.id,
@@ -60,11 +64,14 @@ export async function POST(request: Request): Promise<Response> {
         return NextResponse.json({ id }, { status: 202 });
     } catch (caught) {
         if (caught instanceof TooLarge) return tooLarge();
+        if (caught instanceof AttachRefused)
+            return NextResponse.json({ error: caught.message }, { status: 400 });
         if (caught instanceof ImportBusy)
             return NextResponse.json({ error: words("importSite.busy") }, { status: 409 });
         console.error("polaris: could not start a cPanel import:", caught);
         return NextResponse.json({ error: words("importSite.failed") }, { status: 500 });
     } finally {
+        await opened?.done();
         // Once started, the archive is the import's to remove.
         if (!started) await rm(file, { force: true });
     }

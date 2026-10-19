@@ -1155,7 +1155,11 @@ export function ConnectDialog({
                                             size="sm"
                                             variant="outline"
                                             disabled={saving}
-                                            aria-label={fileWords.field}
+                                            aria-label={
+                                                chosenFile
+                                                    ? `${fileWords.field}: ${chosenFile.name}`
+                                                    : fileWords.field
+                                            }
                                             title={chosenFile?.name}
                                             className="min-w-0 max-w-full self-start"
                                             onClick={() =>

@@ -11,7 +11,7 @@
  */
 
 import { Loader2 } from "lucide-react";
-import { asFiles } from "./as-files";
+import { asFiles, type KeptPick } from "./as-files";
 import { useRef, useState } from "react";
 import type { PickedFile } from "./picked-file";
 import { Dialog, DialogContent } from "@polaris/ui";
@@ -22,6 +22,7 @@ export function ChooseFilesDialog({
     onFiles,
     onClose,
     onFailed,
+    onDrive,
     accept,
     multiple = false,
     title
@@ -30,6 +31,8 @@ export function ChooseFilesDialog({
     onClose: () => void;
     /** A pick that could not be fetched, in a sentence the screen can show. */
     onFailed?: (message: string) => void;
+    /** Picks off a storage, left where they are. When given, those are not fetched. */
+    onDrive?: (picks: KeptPick[]) => void;
     accept?: string;
     multiple?: boolean;
     title?: string;
@@ -40,6 +43,23 @@ export function ChooseFilesDialog({
     const cancelled = useRef(false);
 
     function take(picked: readonly PickedFile[]): void {
+        if (onDrive) {
+            const kept = picked.flatMap((one) =>
+                one.kind === "drive"
+                    ? [
+                          {
+                              connectionId: one.connectionId,
+                              path: one.path,
+                              name: one.name,
+                              size: one.size
+                          }
+                      ]
+                    : []
+            );
+            if (kept.length > 0) onDrive(kept);
+            picked = picked.filter((one) => one.kind !== "drive");
+            if (picked.length === 0) return;
+        }
         if (picked.every((one) => one.kind === "upload")) {
             onFiles(picked.map((one) => one.file));
             return;

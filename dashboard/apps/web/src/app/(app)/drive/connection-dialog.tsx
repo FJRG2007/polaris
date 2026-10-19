@@ -203,8 +203,10 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
     const t = useTranslations("drive");
     const ref = useRef<HTMLTextAreaElement>(null);
     const [chooseFiles, chooser] = useChooseFiles();
+    const [fileError, setFileError] = useState<string | null>(null);
     async function onFile() {
-        const [file] = await chooseFiles();
+        setFileError(null);
+        const [file] = await chooseFiles({ onFailed: setFileError });
         if (!file || !ref.current) return;
         ref.current.value = await file.text();
     }
@@ -229,6 +231,11 @@ function KeyFileField({ name, label }: { name: string; label: string }) {
                 placeholder={t("connection.keyPlaceholder")}
                 className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
             />
+            {fileError ? (
+                <p role="alert" className="text-xs text-danger">
+                    {fileError}
+                </p>
+            ) : null}
         </>
     );
 }

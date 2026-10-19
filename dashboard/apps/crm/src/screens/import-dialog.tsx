@@ -225,9 +225,11 @@ export function ImportDialog(props: ImportDialogProps) {
                 <button
                     type="button"
                     onClick={() =>
-                        void chooseFiles({ accept: ".csv,text/csv" }).then((files) => {
-                            if (files[0]) void read(files[0]);
-                        })
+                        void chooseFiles({ accept: ".csv,text/csv", onFailed: setFileError }).then(
+                            (files) => {
+                                if (files[0]) void read(files[0]);
+                            }
+                        )
                     }
                     onDragOver={(event) => {
                         event.preventDefault();

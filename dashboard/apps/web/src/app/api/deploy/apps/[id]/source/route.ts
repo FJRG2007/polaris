@@ -2,7 +2,8 @@
  * POST /api/deploy/apps/:id/source - a folder, zipped, as the service's source.
  *
  * The body is the zip itself, streamed to disk rather than read into memory, at
- * most `MAX_SOURCE_ZIP`. `X-Polaris-Name` carries the folder's name, URI-encoded;
+ * most `MAX_SOURCE_ZIP` - or, as JSON, where the zip lies on one of this person's
+ * storages, read from there the same way. `X-Polaris-Name` carries the folder's name, URI-encoded;
  * `?deploy=1` deploys what was uploaded straight away. Changing what a service is
  * built from is configuring it, so it asks for `service.configure`, and deploying
  * afterwards for `deploy.run` as well.
@@ -15,6 +16,7 @@ import { recordDeployAudit } from "@/lib/deploy-audit";
 import { deployApplication } from "@/lib/deploy-service";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { stageBody, stagedPath, TooLarge } from "@/lib/deploy/staging";
+import { AttachRefused, openedDriveBody, type OpenedFile } from "@/lib/attachments/from-elsewhere";
 import { MAX_SOURCE_ZIP, SourceRefusal, storeUploadedSource, type UploadedSource } from "@/lib/deploy/source-upload";
 import { readerWords } from "@/lib/i18n/reader-words";
 
@@ -53,16 +55,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const file = await stagedPath(".zip");
     let upload: UploadedSource;
+    let opened: OpenedFile | null = null;
     try {
-        await stageBody(request.body, file, MAX_SOURCE_ZIP);
+        opened = await openedDriveBody(request, user.id, MAX_SOURCE_ZIP);
+        await stageBody(opened?.body ?? request.body, file, MAX_SOURCE_ZIP);
         upload = await storeUploadedSource(id, ownerId, file, folderName(request.headers.get("x-polaris-name")));
     } catch (caught) {
         if (caught instanceof TooLarge) return NextResponse.json({ error: TOO_LARGE }, { status: 413 });
         // Worded for the sender; anything else names internals, so it stays in the log.
-        if (caught instanceof SourceRefusal) return NextResponse.json({ error: caught.message }, { status: 400 });
+        if (caught instanceof SourceRefusal || caught instanceof AttachRefused) return NextResponse.json({ error: caught.message }, { status: 400 });
         console.error("polaris: could not take an uploaded source:", caught);
         return NextResponse.json({ error: (await readerWords("api"))("errors.uploadFailed") }, { status: 500 });
     } finally {
+        await opened?.done();
         await rm(file, { force: true });
     }
     await recordDeployAudit({

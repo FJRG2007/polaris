@@ -10,6 +10,7 @@
  */
 
 import dynamic from "next/dynamic";
+import type { KeptPick } from "./as-files";
 import { useCallback, useState, type ReactNode, type SyntheticEvent } from "react";
 
 const ChooseFilesDialog = dynamic(
@@ -24,6 +25,10 @@ export interface ChooseFilesOptions {
     title?: string;
     /** A pick that could not be fetched, in a sentence the screen can show. */
     onFailed?: (message: string) => void;
+    /** For a screen whose server can read a file where it lies: a pick off a
+     *  storage comes here as where it is, instead of being fetched into the
+     *  browser, so it is not held to what a browser can be handed. */
+    onDrive?: (picks: KeptPick[]) => void;
 }
 
 function stop(event: SyntheticEvent): void {
@@ -62,6 +67,7 @@ export function useChooseFiles(): [(options?: ChooseFilesOptions) => Promise<Fil
                 multiple={asked.options.multiple ?? false}
                 title={asked.options.title}
                 onFailed={asked.options.onFailed}
+                onDrive={asked.options.onDrive}
                 onFiles={(files) => asked.answer(files)}
                 onClose={() => {
                     asked.answer([]);
