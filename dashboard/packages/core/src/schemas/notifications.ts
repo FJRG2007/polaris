@@ -658,7 +658,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "ups.lowBattery",
         group: "deploy",
         label: "A UPS battery is nearly empty",
-        description: "A UPS on battery is about to run out, and the machines it protects may be shut down.",
+        description:
+            "A UPS on battery is about to run out, and the machines it protects may be shut down.",
         level: "danger",
         defaults: { inapp: true, email: true }
     },

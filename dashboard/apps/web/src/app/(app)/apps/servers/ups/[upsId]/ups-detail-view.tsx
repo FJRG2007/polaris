@@ -38,7 +38,13 @@ import { UpsConnectionDialog } from "../ups-connection-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { removeUpsAction, runUpsCommandAction, updateUpsShutdownAction } from "../actions";
-import { minutesLeft, rounded, upsStatus, type UpsDetailAnswer, type UpsMachine } from "../ups-words";
+import {
+    minutesLeft,
+    rounded,
+    upsStatus,
+    type UpsDetailAnswer,
+    type UpsMachine
+} from "../ups-words";
 
 const POLL_MS = 10_000;
 const RANGES = { h6: 6, h24: 24, d7: 168, d30: 720 } as const;
@@ -142,7 +148,11 @@ export function UpsDetailView({ initial, machines }: { initial: UpsView; machine
                     <h2 id="ups-controls" className="text-sm font-medium">
                         {t("ups.regions.controls")}
                     </h2>
-                    {result === null ? <Skeleton className="h-16 w-full" /> : <UpsControls id={ups.id} reading={reading} />}
+                    {result === null ? (
+                        <Skeleton className="h-16 w-full" />
+                    ) : (
+                        <UpsControls id={ups.id} reading={reading} />
+                    )}
                 </section>
 
                 <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
@@ -228,7 +238,11 @@ function UpsNow({ reading }: { reading: upsReading.UpsReading | null }) {
             value: temperature === null ? null : t("ups.units.celsius", { value: temperature })
         },
         { key: "model", label: t("ups.metrics.model"), value: reading?.model ?? null },
-        { key: "manufacturer", label: t("ups.metrics.manufacturer"), value: reading?.manufacturer ?? null },
+        {
+            key: "manufacturer",
+            label: t("ups.metrics.manufacturer"),
+            value: reading?.manufacturer ?? null
+        },
         { key: "serial", label: t("ups.metrics.serial"), value: reading?.serial ?? null }
     ];
     return (
@@ -239,7 +253,10 @@ function UpsNow({ reading }: { reading: upsReading.UpsReading | null }) {
                 .map((tile) => (
                     <div key={tile.key} className="min-w-0 rounded-md bg-muted/50 px-3 py-2">
                         <dt className="text-xs text-muted-foreground">{tile.label}</dt>
-                        <dd className="truncate text-sm font-medium tabular-nums" title={tile.value ?? undefined}>
+                        <dd
+                            className="truncate text-sm font-medium tabular-nums"
+                            title={tile.value ?? undefined}
+                        >
                             {reading === null ? <Skeleton className="mt-1 h-4 w-14" /> : tile.value}
                         </dd>
                     </div>
@@ -277,7 +294,8 @@ function UpsHistory({ answer, hours }: { answer: UpsDetailAnswer | null; hours: 
         };
     }, [answer, t]);
     if (!charts) return <Skeleton className="h-48 w-full" />;
-    if (charts.empty) return <p className="text-sm text-muted-foreground">{t("ups.chart.empty")}</p>;
+    if (charts.empty)
+        return <p className="text-sm text-muted-foreground">{t("ups.chart.empty")}</p>;
     const to = Date.now();
     const from = to - hours * 3_600_000;
     return (
@@ -370,7 +388,11 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
                                 {outcome ? (
                                     <Badge
                                         variant={
-                                            outcome === "passed" ? "success" : outcome === "failed" ? "danger" : "neutral"
+                                            outcome === "passed"
+                                                ? "success"
+                                                : outcome === "failed"
+                                                  ? "danger"
+                                                  : "neutral"
                                         }
                                     >
                                         {t(`ups.test.outcome.${outcome}`)}
@@ -402,8 +424,12 @@ function UpsShutdown({
     const t = useTranslations("servers");
     const [saved, setSaved] = useState(ups.shutdown);
     const [draft, setDraft] = useState(ups.shutdown);
-    const [charge, setCharge] = useState(saved.belowCharge === null ? "" : String(saved.belowCharge));
-    const [runtime, setRuntime] = useState(saved.belowRuntimeMin === null ? "" : String(saved.belowRuntimeMin));
+    const [charge, setCharge] = useState(
+        saved.belowCharge === null ? "" : String(saved.belowCharge)
+    );
+    const [runtime, setRuntime] = useState(
+        saved.belowRuntimeMin === null ? "" : String(saved.belowRuntimeMin)
+    );
     const [confirming, setConfirming] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -500,7 +526,9 @@ function UpsShutdown({
                         <label key={machine.id} className="flex min-w-0 items-center gap-2 text-sm">
                             <Checkbox
                                 checked={draft.protectedMachineIds.includes(machine.id)}
-                                onChange={(event) => toggleMachine(machine.id, event.target.checked)}
+                                onChange={(event) =>
+                                    toggleMachine(machine.id, event.target.checked)
+                                }
                             />
                             <span className="truncate" title={machine.name}>
                                 {machine.name}
@@ -524,7 +552,9 @@ function UpsShutdown({
                 >
                     {t("ups.shutdown.save")}
                 </Button>
-                {done && !dirty ? <span className="text-sm text-muted-foreground">{t("ups.shutdown.saved")}</span> : null}
+                {done && !dirty ? (
+                    <span className="text-sm text-muted-foreground">{t("ups.shutdown.saved")}</span>
+                ) : null}
             </div>
 
             <Dialog open={confirming} onOpenChange={setConfirming}>

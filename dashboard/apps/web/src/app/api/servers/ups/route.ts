@@ -18,10 +18,16 @@ export async function GET(): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!user.isAdmin && !(await sessionCan(user, "system.manage"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
     const listUsb = upsService.usbListing();
     const ups = await upsService.upsSnapshot(listUsb);
-    const usb = await upsService.usbOffers(ups.map((entry) => entry.ups), listUsb);
+    const usb = await upsService.usbOffers(
+        ups.map((entry) => entry.ups),
+        listUsb
+    );
     return Response.json({ ups, usb });
 }

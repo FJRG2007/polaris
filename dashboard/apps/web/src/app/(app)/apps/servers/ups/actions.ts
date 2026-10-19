@@ -35,7 +35,10 @@ async function knownMachines(userId: string): Promise<Set<string>> {
     return new Set((await listServerRows(userId)).map((row) => hostSubject(row.id)));
 }
 
-async function parseConnection(raw: unknown, userId: string): Promise<upsReading.UpsConnectionInput> {
+async function parseConnection(
+    raw: unknown,
+    userId: string
+): Promise<upsReading.UpsConnectionInput> {
     const input = upsReading.upsConnectionSchema.parse(upsReading.normalizeUpsInput(raw));
     if (input.connection !== "nut" && !(await knownMachines(userId)).has(input.machineId)) {
         throw new z.ZodError([{ code: "custom", path: ["machineId"], message: "unknownMachine" }]);
@@ -61,12 +64,16 @@ export async function createUpsAction(raw: unknown): Promise<UpsActionResult<str
     }
 }
 
-export async function updateUpsConnectionAction(id: string, raw: unknown): Promise<UpsActionResult> {
+export async function updateUpsConnectionAction(
+    id: string,
+    raw: unknown
+): Promise<UpsActionResult> {
     const user = await requirePermission("system.manage");
     try {
         const upsId = idSchema.parse(id);
         const input = await parseConnection(raw, user.id);
-        if (!(await upsService.updateUpsConnection(upsId, input))) return { ok: false, error: "notFound" };
+        if (!(await upsService.updateUpsConnection(upsId, input)))
+            return { ok: false, error: "notFound" };
         await recordAudit({
             actorId: user.id,
             action: "ups.update",
@@ -89,7 +96,8 @@ export async function updateUpsShutdownAction(id: string, raw: unknown): Promise
         if (input.protectedMachineIds.some((machineId) => !known.has(machineId))) {
             return { ok: false, error: "unknownMachine" };
         }
-        if (!(await upsService.updateUpsShutdown(upsId, input))) return { ok: false, error: "notFound" };
+        if (!(await upsService.updateUpsShutdown(upsId, input)))
+            return { ok: false, error: "notFound" };
         await recordAudit({
             actorId: user.id,
             action: "ups.shutdown",
@@ -113,7 +121,12 @@ export async function removeUpsAction(id: string): Promise<UpsActionResult> {
     try {
         const upsId = idSchema.parse(id);
         if (!(await upsService.removeUps(upsId))) return { ok: false, error: "notFound" };
-        await recordAudit({ actorId: user.id, action: "ups.remove", targetType: "ups", targetId: upsId });
+        await recordAudit({
+            actorId: user.id,
+            action: "ups.remove",
+            targetType: "ups",
+            targetId: upsId
+        });
         return { ok: true, value: undefined };
     } catch (error) {
         return refused(error);

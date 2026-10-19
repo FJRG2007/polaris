@@ -84,8 +84,7 @@ export async function nutRead(
         target,
         [`LIST VAR ${name}`, `LIST CMD ${name}`],
         (text) =>
-            /^ERR /m.test(text) ||
-            (text.includes("END LIST VAR") && text.includes("END LIST CMD"))
+            /^ERR /m.test(text) || (text.includes("END LIST VAR") && text.includes("END LIST CMD"))
     );
     const error = /^ERR (\S+)/m.exec(answer)?.[1];
     if (error && !answer.includes("END LIST VAR")) throw new Error(error);

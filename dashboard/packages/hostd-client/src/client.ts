@@ -292,7 +292,8 @@ export class HostdClient {
     public async ups(): Promise<HostdUpsList | null> {
         const response = await this.call("GET", "/v1/ups");
         if (response.status === 404) return null;
-        if (response.status !== 200) throw new Error(`hostd ups listing failed (${response.status})`);
+        if (response.status !== 200)
+            throw new Error(`hostd ups listing failed (${response.status})`);
         return JSON.parse(response.body) as HostdUpsList;
     }
 
@@ -310,10 +311,13 @@ export class HostdClient {
      * Every SNMP UPS the daemon should drive; it stops and forgets any other.
      * Null from a daemon that predates the call.
      */
-    public async upsSnmpSet(sources: readonly HostdSnmpSource[]): Promise<{ available: boolean } | null> {
+    public async upsSnmpSet(
+        sources: readonly HostdSnmpSource[]
+    ): Promise<{ available: boolean } | null> {
         const response = await this.call("POST", "/v1/ups/snmp/set", JSON.stringify({ sources }));
         if (response.status === 404) return null;
-        if (response.status !== 200) throw new Error(`hostd snmp ups set failed (${response.status})`);
+        if (response.status !== 200)
+            throw new Error(`hostd snmp ups set failed (${response.status})`);
         return JSON.parse(response.body) as { available: boolean };
     }
 
@@ -322,9 +326,14 @@ export class HostdClient {
         id: string,
         command: string
     ): Promise<{ ok: boolean; error?: string } | null> {
-        const response = await this.call("POST", "/v1/ups/command", JSON.stringify({ id, command }));
+        const response = await this.call(
+            "POST",
+            "/v1/ups/command",
+            JSON.stringify({ id, command })
+        );
         if (response.status === 404) return null;
-        if (response.status !== 200) throw new Error(`hostd ups command failed (${response.status})`);
+        if (response.status !== 200)
+            throw new Error(`hostd ups command failed (${response.status})`);
         return JSON.parse(response.body) as { ok: boolean; error?: string };
     }
 

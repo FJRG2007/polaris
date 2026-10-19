@@ -68,7 +68,12 @@ function initialValues(editing: UpsView | null, offers: readonly UsbOffer[]): Fo
 export function connectionInput(values: FormValues): Record<string, unknown> {
     const port = values.port.trim() === "" ? undefined : values.port;
     if (values.connection === "usb") {
-        return { connection: "usb", name: values.name, machineId: values.machineId, deviceId: values.deviceId };
+        return {
+            connection: "usb",
+            name: values.name,
+            machineId: values.machineId,
+            deviceId: values.deviceId
+        };
     }
     if (values.connection === "nut") {
         return {
@@ -112,7 +117,9 @@ const ERROR_KEYS = [
 type ErrorKey = (typeof ERROR_KEYS)[number];
 
 function errorKey(message: string | undefined): ErrorKey {
-    return (ERROR_KEYS as readonly string[]).includes(message ?? "") ? (message as ErrorKey) : "invalid";
+    return (ERROR_KEYS as readonly string[]).includes(message ?? "")
+        ? (message as ErrorKey)
+        : "invalid";
 }
 
 export function UpsConnectionDialog({
@@ -142,7 +149,10 @@ export function UpsConnectionDialog({
     };
 
     const parsed = useMemo(
-        () => upsReading.upsConnectionSchema.safeParse(upsReading.normalizeUpsInput(connectionInput(values))),
+        () =>
+            upsReading.upsConnectionSchema.safeParse(
+                upsReading.normalizeUpsInput(connectionInput(values))
+            ),
         [values]
     );
     const errors = useMemo(() => {
@@ -171,7 +181,8 @@ export function UpsConnectionDialog({
         label: `${offer.name} (${machineName(offer.machineId)})`
     }));
     const usbLocked = editing?.connection === "usb";
-    const keepsSecret = editing !== null && editing.connection === values.connection && editing.hasSecret;
+    const keepsSecret =
+        editing !== null && editing.connection === values.connection && editing.hasSecret;
     const kept = { community: keepsSecret, authPassword: keepsSecret, privPassword: keepsSecret };
     const missing = parsed.success ? upsReading.missingSnmpField(parsed.data, kept) : null;
     const ready = parsed.success && missing === null;
@@ -208,7 +219,10 @@ export function UpsConnectionDialog({
             </label>
         );
     };
-    const secretField = (key: "password" | "community" | "authPassword" | "privPassword", label: string) =>
+    const secretField = (
+        key: "password" | "community" | "authPassword" | "privPassword",
+        label: string
+    ) =>
         field(key, label, {
             type: "password",
             autoComplete: "new-password",
@@ -219,7 +233,9 @@ export function UpsConnectionDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{editing ? t("ups.form.titleEdit") : t("ups.form.titleAdd")}</DialogTitle>
+                    <DialogTitle>
+                        {editing ? t("ups.form.titleEdit") : t("ups.form.titleAdd")}
+                    </DialogTitle>
                     <DialogDescription>{t("ups.description")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="flex min-w-0 flex-col gap-3">
@@ -239,7 +255,9 @@ export function UpsConnectionDialog({
 
                     {values.connection === "usb" && !usbLocked ? (
                         offers.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("ups.form.noDevices")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("ups.form.noDevices")}
+                            </p>
                         ) : (
                             <label className="flex min-w-0 flex-col gap-1 text-sm">
                                 <span>{t("ups.form.device")} *</span>
@@ -280,7 +298,10 @@ export function UpsConnectionDialog({
 
                     {values.connection !== "usb" ? (
                         <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
-                            {field("host", `${t("ups.form.host")} *`, { placeholder: "192.168.1.20", required: true })}
+                            {field("host", `${t("ups.form.host")} *`, {
+                                placeholder: "192.168.1.20",
+                                required: true
+                            })}
                             {field("port", t("ups.form.port"), {
                                 inputMode: "numeric",
                                 placeholder: values.connection === "nut" ? "3493" : "161"
@@ -290,12 +311,17 @@ export function UpsConnectionDialog({
 
                     {values.connection === "nut" ? (
                         <>
-                            {field("upsName", `${t("ups.form.upsName")} *`, { placeholder: "ups", required: true })}
+                            {field("upsName", `${t("ups.form.upsName")} *`, {
+                                placeholder: "ups",
+                                required: true
+                            })}
                             <div className="grid grid-cols-2 gap-2">
                                 {field("username", t("ups.form.username"), { autoComplete: "off" })}
                                 {secretField("password", t("ups.form.password"))}
                             </div>
-                            <p className="text-xs text-muted-foreground">{t("ups.form.nutLoginHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("ups.form.nutLoginHint")}
+                            </p>
                         </>
                     ) : null}
 
@@ -313,7 +339,9 @@ export function UpsConnectionDialog({
                             />
                             {values.snmpVersion === "v3" ? (
                                 <>
-                                    {field("username", `${t("ups.form.username")} *`, { autoComplete: "off" })}
+                                    {field("username", `${t("ups.form.username")} *`, {
+                                        autoComplete: "off"
+                                    })}
                                     <div className="grid grid-cols-2 gap-2">
                                         {secretField(
                                             "authPassword",
@@ -327,7 +355,9 @@ export function UpsConnectionDialog({
                             ) : (
                                 secretField(
                                     "community",
-                                    keepsSecret ? t("ups.form.community") : `${t("ups.form.community")} *`
+                                    keepsSecret
+                                        ? t("ups.form.community")
+                                        : `${t("ups.form.community")} *`
                                 )
                             )}
                         </>
@@ -343,11 +373,7 @@ export function UpsConnectionDialog({
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("ups.form.cancel")}
                         </Button>
-                        <Button
-                            type="submit"
-                            aria-disabled={!ready || pending}
-                            disabled={pending}
-                        >
+                        <Button type="submit" aria-disabled={!ready || pending} disabled={pending}>
                             {editing ? t("ups.form.submitEdit") : t("ups.form.submitAdd")}
                         </Button>
                     </DialogFooter>

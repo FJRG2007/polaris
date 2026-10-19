@@ -10,5 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function UpsPage() {
     const user = await requirePermission("system.manage");
     const rows = await listServerRows(user.id);
-    return <UpsListView machines={rows.map((row) => ({ id: hostSubject(row.id), name: row.name }))} />;
+    return (
+        <UpsListView machines={rows.map((row) => ({ id: hostSubject(row.id), name: row.name }))} />
+    );
 }

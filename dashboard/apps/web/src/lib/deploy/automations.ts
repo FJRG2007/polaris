@@ -632,7 +632,9 @@ export async function raiseAutomationEvent(input: {
  * An event that is not about one project (a UPS's power events): started in
  * every project that has a rule following it. Never throws, like the above.
  */
-export async function raiseAutomationEventEverywhere(event: core.DeployAutomationEvent): Promise<number> {
+export async function raiseAutomationEventEverywhere(
+    event: core.DeployAutomationEvent
+): Promise<number> {
     try {
         const projects = await prisma.deployAutomation.findMany({
             where: { enabled: true, trigger: "event", event },

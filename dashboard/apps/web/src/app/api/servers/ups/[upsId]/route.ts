@@ -24,10 +24,16 @@ export async function GET(
     if (!user.isAdmin && !(await sessionCan(user, "system.manage"))) {
         return Response.json({ error: t("errors.forbidden") }, { status: 403 });
     }
-    const id = z.string().uuid().safeParse((await params).upsId);
+    const id = z
+        .string()
+        .uuid()
+        .safeParse((await params).upsId);
     const row = id.success ? await upsService.getUps(id.data) : null;
     if (!row) return Response.json({ error: t("errors.notFound") }, { status: 404 });
     const hours = hoursSchema.parse(new URL(request.url).searchParams.get("hours") ?? undefined);
-    const [result, history] = await Promise.all([upsService.readUps(row), upsService.upsHistory(row.id, hours)]);
+    const [result, history] = await Promise.all([
+        upsService.readUps(row),
+        upsService.upsHistory(row.id, hours)
+    ]);
     return Response.json({ ups: upsService.toView(row), result, history });
 }

@@ -197,7 +197,10 @@ export async function createUps(input: upsReading.UpsConnectionInput): Promise<s
     return row.id;
 }
 
-export async function updateUpsConnection(id: string, input: upsReading.UpsConnectionInput): Promise<boolean> {
+export async function updateUpsConnection(
+    id: string,
+    input: upsReading.UpsConnectionInput
+): Promise<boolean> {
     const row = await getUps(id);
     if (!row) return false;
     await prisma.ups.update({
@@ -208,7 +211,10 @@ export async function updateUpsConnection(id: string, input: upsReading.UpsConne
     return true;
 }
 
-export async function updateUpsShutdown(id: string, input: upsReading.UpsShutdownInput): Promise<boolean> {
+export async function updateUpsShutdown(
+    id: string,
+    input: upsReading.UpsShutdownInput
+): Promise<boolean> {
     const result = await prisma.ups.updateMany({
         where: { id },
         data: {
@@ -230,7 +236,15 @@ export async function removeUps(id: string): Promise<boolean> {
 export async function upsHistory(
     id: string,
     hours: number
-): Promise<{ ts: string; charge: number | null; load: number | null; runtimeS: number | null; inputV: number | null }[]> {
+): Promise<
+    {
+        ts: string;
+        charge: number | null;
+        load: number | null;
+        runtimeS: number | null;
+        inputV: number | null;
+    }[]
+> {
     const rows = await prisma.upsSample.findMany({
         where: { upsId: id, ts: { gte: new Date(Date.now() - hours * 3_600_000) } },
         orderBy: { ts: "asc" },
@@ -258,7 +272,9 @@ export function usbListing(): UsbListing {
 }
 
 /** What the local daemon sees on its USB bus; null without one. */
-export async function discoverUsb(listUsb: UsbListing = usbListing()): Promise<HostdUpsList | "updateNeeded" | null> {
+export async function discoverUsb(
+    listUsb: UsbListing = usbListing()
+): Promise<HostdUpsList | "updateNeeded" | null> {
     try {
         const list = await listUsb();
         if (list === null || !list.available) return "updateNeeded";
@@ -309,11 +325,18 @@ export async function syncSnmp(): Promise<void> {
     }
 }
 
-export async function readUps(row: UpsRow, listUsb: UsbListing = usbListing()): Promise<UpsReadResult> {
+export async function readUps(
+    row: UpsRow,
+    listUsb: UsbListing = usbListing()
+): Promise<UpsReadResult> {
     try {
         if (row.connection === "nut") {
             if (!row.host || !row.upsName) return { ok: false, reason: "notFound" };
-            const answer = await nutRead({ host: row.host, port: row.port ?? 3493, upsName: row.upsName });
+            const answer = await nutRead({
+                host: row.host,
+                port: row.port ?? 3493,
+                upsName: row.upsName
+            });
             return { ok: true, reading: upsReading.readingFromVars(answer.vars, answer.commands) };
         }
         const daemon = daemonFor(row.machineId);
@@ -324,12 +347,19 @@ export async function readUps(row: UpsRow, listUsb: UsbListing = usbListing()): 
             const found = list.devices.find((one) => one.device.id === row.deviceId);
             if (!found) return { ok: false, reason: "notFound" };
             if (!found.vars) return { ok: false, reason: "noAnswer" };
-            return { ok: true, reading: upsReading.readingFromVars(found.vars, found.commands ?? []) };
+            return {
+                ok: true,
+                reading: upsReading.readingFromVars(found.vars, found.commands ?? [])
+            };
         }
         const reading = await daemon.upsSnmp(snmpSource(row));
-        if (reading === null || reading.available === false) return { ok: false, reason: "updateNeeded" };
+        if (reading === null || reading.available === false)
+            return { ok: false, reason: "updateNeeded" };
         if (!reading.vars) return { ok: false, reason: "noAnswer" };
-        return { ok: true, reading: upsReading.readingFromVars(reading.vars, reading.commands ?? []) };
+        return {
+            ok: true,
+            reading: upsReading.readingFromVars(reading.vars, reading.commands ?? [])
+        };
     } catch {
         // No daemon at all is the limited edition.
         if (row.connection !== "nut" && !(await daemonAnswers())) {
@@ -357,7 +387,9 @@ export interface UpsSnapshotEntry {
 /** Every UPS read at once; one that does not answer is its reason, not a failure. */
 export async function upsSnapshot(listUsb: UsbListing = usbListing()): Promise<UpsSnapshotEntry[]> {
     const rows = await prisma.ups.findMany({ orderBy: { createdAt: "asc" }, take: 200 });
-    return Promise.all(rows.map(async (row) => ({ ups: toView(row), result: await readUps(row, listUsb) })));
+    return Promise.all(
+        rows.map(async (row) => ({ ups: toView(row), result: await readUps(row, listUsb) }))
+    );
 }
 
 /** A UPS on a machine's USB bus that is not added yet, offered in one click. */
@@ -381,7 +413,9 @@ export async function usbOffers(
     if (list === null) return { state: "fullEditionNeeded", offers: [] };
     if (list === "updateNeeded") return { state: "updateNeeded", offers: [] };
     const added = new Set(
-        known.filter((one) => one.connection === "usb").map((one) => `${one.machineId}/${one.deviceId}`)
+        known
+            .filter((one) => one.connection === "usb")
+            .map((one) => `${one.machineId}/${one.deviceId}`)
     );
     return {
         state: "ok",
@@ -391,8 +425,10 @@ export async function usbOffers(
                 machineId: LOCAL_HOST_SUBJECT,
                 deviceId: one.device.id,
                 name:
-                    [one.device.manufacturer, one.device.product].filter(Boolean).join(" ").trim() ||
-                    `${one.device.vendorId}:${one.device.productId}`,
+                    [one.device.manufacturer, one.device.product]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() || `${one.device.vendorId}:${one.device.productId}`,
                 serial: one.device.serial
             }))
     };
@@ -400,7 +436,10 @@ export async function usbOffers(
 
 export type UpsCommandResult = "ok" | "unsupported" | "refused" | "unreachable" | "loginNeeded";
 
-export async function runUpsCommand(row: UpsRow, command: upsReading.UpsCommand): Promise<UpsCommandResult> {
+export async function runUpsCommand(
+    row: UpsRow,
+    command: upsReading.UpsCommand
+): Promise<UpsCommandResult> {
     try {
         if (row.connection === "nut") {
             const { password } = open(row);
@@ -416,9 +455,7 @@ export async function runUpsCommand(row: UpsRow, command: upsReading.UpsCommand)
         const daemon = daemonFor(row.machineId);
         if (!daemon) return "unreachable";
         const id =
-            row.connection === "usb"
-                ? row.deviceId
-                : (await daemon.upsSnmp(snmpSource(row)))?.id;
+            row.connection === "usb" ? row.deviceId : (await daemon.upsSnmp(snmpSource(row)))?.id;
         if (!id) return "unreachable";
         const answer = await daemon.upsCommand(id, command);
         if (answer === null) return "unreachable";
@@ -438,8 +475,12 @@ export async function runUpsCommand(row: UpsRow, command: upsReading.UpsCommand)
 /** Power one machine off: through its daemon, or over its SSH login. */
 export async function powerOffMachine(machineId: string): Promise<boolean> {
     try {
-        if (machineId === LOCAL_HOST_SUBJECT) return (await new HostdClient().hostPowerOff()) === true;
-        const host = await prisma.host.findUnique({ where: { id: machineId }, select: { ownerId: true } });
+        if (machineId === LOCAL_HOST_SUBJECT)
+            return (await new HostdClient().hostPowerOff()) === true;
+        const host = await prisma.host.findUnique({
+            where: { id: machineId },
+            select: { ownerId: true }
+        });
         if (!host) return false;
         const connection = await getHostConnection(machineId, host.ownerId);
         const lease = await borrowSsh("exec", machineId, {
@@ -455,7 +496,7 @@ export async function powerOffMachine(machineId: string): Promise<boolean> {
             // through passwordless sudo. The connection drops as it goes down.
             await execCommand(
                 lease.client,
-                "sh -c 'if [ \"$(id -u)\" = 0 ]; then p=; else p=\"sudo -n\"; fi; $p systemctl poweroff || $p shutdown -h now'",
+                'sh -c \'if [ "$(id -u)" = 0 ]; then p=; else p="sudo -n"; fi; $p systemctl poweroff || $p shutdown -h now\'',
                 {}
             ).catch(() => undefined);
         } finally {
@@ -496,7 +537,11 @@ const EVENT_WORDS = {
     "ups.replaceBattery": { title: "ups.replaceBattery.title", body: "ups.replaceBattery.body" }
 } as const satisfies Record<upsReading.UpsEvent, { title: string; body: string }>;
 
-async function announce(row: UpsRow, event: upsReading.UpsEvent, reading: upsReading.UpsReading): Promise<void> {
+async function announce(
+    row: UpsRow,
+    event: upsReading.UpsEvent,
+    reading: upsReading.UpsReading
+): Promise<void> {
     const outcome = upsReading.testOutcome(reading.testResult);
     await notifyOperators({
         permission: UPS_PERMISSION,
@@ -541,7 +586,9 @@ async function reportPowerOffFailed(row: UpsRow, machineId: string): Promise<voi
         actionRequired: true,
         href: `/apps/servers/ups/${row.id}`,
         metadata: { upsId: row.id, machineId }
-    }).catch((error: unknown) => console.error("polaris: could not report a failed UPS shutdown:", error));
+    }).catch((error: unknown) =>
+        console.error("polaris: could not report a failed UPS shutdown:", error)
+    );
 }
 
 /**
@@ -585,7 +632,10 @@ async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<
             .catch(() => undefined);
     }
     const memory = upsReading.memoryOf(reading);
-    const events = upsReading.upsTransitions(upsReading.decodeMemory(row.lastStatus, row.lastTestResult), memory);
+    const events = upsReading.upsTransitions(
+        upsReading.decodeMemory(row.lastStatus, row.lastTestResult),
+        memory
+    );
     const due = upsReading.shutdownDue(reading, {
         enabled: row.shutdownEnabled,
         belowCharge: row.shutdownBelowCharge,

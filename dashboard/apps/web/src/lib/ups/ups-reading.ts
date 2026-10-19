@@ -108,8 +108,7 @@ export function readingFromVars(
         status: {
             ...status,
             // Some firmware says it in the test result instead of the flags.
-            replaceBattery:
-                status.replaceBattery || /replace/i.test(testResult ?? "")
+            replaceBattery: status.replaceBattery || /replace/i.test(testResult ?? "")
         },
         charge: num(vars, "battery.charge"),
         runtimeS: num(vars, "battery.runtime"),
@@ -157,14 +156,20 @@ export function memoryOf(reading: UpsReading): UpsMemory {
     };
 }
 
-export function encodeMemory(memory: UpsMemory): { lastStatus: string; lastTestResult: string | null } {
+export function encodeMemory(memory: UpsMemory): {
+    lastStatus: string;
+    lastTestResult: string | null;
+} {
     return {
         lastStatus: `${memory.power}${memory.replaceBattery ? "+rb" : ""}`,
         lastTestResult: memory.testResult
     };
 }
 
-export function decodeMemory(lastStatus: string | null, lastTestResult: string | null): UpsMemory | null {
+export function decodeMemory(
+    lastStatus: string | null,
+    lastTestResult: string | null
+): UpsMemory | null {
     if (!lastStatus) return null;
     const [power, flag] = lastStatus.split("+");
     if (power !== "online" && power !== "battery" && power !== "low") return null;
@@ -215,7 +220,11 @@ export interface ShutdownPolicy {
 export function shutdownDue(reading: UpsReading, policy: ShutdownPolicy): boolean {
     if (!policy.enabled || !reading.status.onBattery) return false;
     if (reading.status.lowBattery) return true;
-    if (policy.belowCharge !== null && reading.charge !== null && reading.charge <= policy.belowCharge)
+    if (
+        policy.belowCharge !== null &&
+        reading.charge !== null &&
+        reading.charge <= policy.belowCharge
+    )
         return true;
     return (
         policy.belowRuntimeMin !== null &&
@@ -266,8 +275,16 @@ export const upsConnectionSchema = z.discriminatedUnion("connection", [
         name,
         host: address,
         port: z.coerce.number().int().min(1).max(65535).default(3493),
-        upsName: z.string().min(1, "required").max(64).regex(/^[A-Za-z0-9._-]+$/, "invalidUpsName"),
-        username: z.string().max(64).regex(/^[A-Za-z0-9._-]*$/, "invalidUser").default(""),
+        upsName: z
+            .string()
+            .min(1, "required")
+            .max(64)
+            .regex(/^[A-Za-z0-9._-]+$/, "invalidUpsName"),
+        username: z
+            .string()
+            .max(64)
+            .regex(/^[A-Za-z0-9._-]*$/, "invalidUser")
+            .default(""),
         /** Empty keeps the stored password; write-only, never read back. */
         password: secret.default("")
     }),
@@ -278,7 +295,11 @@ export const upsConnectionSchema = z.discriminatedUnion("connection", [
         host: address,
         port: z.coerce.number().int().min(1).max(65535).default(161),
         snmpVersion: z.enum(["v1", "v2c", "v3"]),
-        username: z.string().max(64).regex(/^[A-Za-z0-9._-]*$/, "invalidUser").default(""),
+        username: z
+            .string()
+            .max(64)
+            .regex(/^[A-Za-z0-9._-]*$/, "invalidUser")
+            .default(""),
         /** v1/v2c: the community. Empty keeps the stored one. */
         community: secret.default(""),
         authPassword: secret.default(""),

@@ -37,7 +37,8 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
     });
     const data = live.data;
     const offers: UsbOffer[] = data?.usb.offers ?? [];
-    const machineName = (id: string | null) => machines.find((machine) => machine.id === id)?.name ?? "";
+    const machineName = (id: string | null) =>
+        machines.find((machine) => machine.id === id)?.name ?? "";
 
     async function addOffer(offer: UsbOffer) {
         const key = `${offer.machineId}/${offer.deviceId}`;
@@ -89,11 +90,19 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                                     key={key}
                                     className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2"
                                 >
-                                    <Usb className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                    <span className="min-w-0 flex-1 truncate text-sm" title={offer.name}>
+                                    <Usb
+                                        className="size-4 shrink-0 text-muted-foreground"
+                                        aria-hidden
+                                    />
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-sm"
+                                        title={offer.name}
+                                    >
                                         {offer.name}{" "}
                                         <span className="text-muted-foreground">
-                                            {t("ups.found.on", { machine: machineName(offer.machineId) })}
+                                            {t("ups.found.on", {
+                                                machine: machineName(offer.machineId)
+                                            })}
                                         </span>
                                     </span>
                                     <Button
@@ -128,9 +137,15 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                             <tr>
                                 <th className="py-2 pr-3 font-medium">{t("ups.columns.name")}</th>
                                 <th className="py-2 pr-3 font-medium">{t("ups.columns.status")}</th>
-                                <th className="py-2 pr-3 text-right font-medium">{t("ups.columns.charge")}</th>
-                                <th className="py-2 pr-3 text-right font-medium">{t("ups.columns.runtime")}</th>
-                                <th className="py-2 pr-3 text-right font-medium">{t("ups.columns.load")}</th>
+                                <th className="py-2 pr-3 text-right font-medium">
+                                    {t("ups.columns.charge")}
+                                </th>
+                                <th className="py-2 pr-3 text-right font-medium">
+                                    {t("ups.columns.runtime")}
+                                </th>
+                                <th className="py-2 pr-3 text-right font-medium">
+                                    {t("ups.columns.load")}
+                                </th>
                                 <th className="py-2 font-medium">{t("ups.columns.connection")}</th>
                             </tr>
                         </thead>
@@ -164,20 +179,30 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                                                   <Badge
                                                       variant={status.tone}
                                                       title={
-                                                          result.ok ? undefined : t(`ups.unreachable.${result.reason}`)
+                                                          result.ok
+                                                              ? undefined
+                                                              : t(
+                                                                    `ups.unreachable.${result.reason}`
+                                                                )
                                                       }
                                                   >
                                                       {t(`ups.status.${status.key}`)}
                                                   </Badge>
                                               </td>
                                               <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {charge === null ? "-" : t("ups.units.percent", { value: charge })}
+                                                  {charge === null
+                                                      ? "-"
+                                                      : t("ups.units.percent", { value: charge })}
                                               </td>
                                               <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {minutes === null ? "-" : t("ups.units.minutes", { count: minutes })}
+                                                  {minutes === null
+                                                      ? "-"
+                                                      : t("ups.units.minutes", { count: minutes })}
                                               </td>
                                               <td className="py-2.5 pr-3 text-right tabular-nums">
-                                                  {load === null ? "-" : t("ups.units.percent", { value: load })}
+                                                  {load === null
+                                                      ? "-"
+                                                      : t("ups.units.percent", { value: load })}
                                               </td>
                                               <td className="py-2.5 text-muted-foreground">
                                                   {t(`ups.connection.${ups.connection}`)}
