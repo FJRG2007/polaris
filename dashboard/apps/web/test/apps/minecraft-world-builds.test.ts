@@ -646,3 +646,168 @@ describe("the season's builds in the world", () => {
         expect(plan.readPlaced(config)[0]).toMatchObject({ pasted: 1, up: false });
     }, 30_000);
 });
+
+// ------------------------------------------------------------ site search
+
+describe("the search for a site", () => {
+    /** Steps of two everywhere: no site anywhere, every one surveyed is uneven. */
+    const stepped = (x: number) => 64 + 2 * Math.abs(Math.floor(x / 4) % 2);
+
+    /** `fakeServer` with a bed at `bed` and a player standing at `standing`. */
+    function bedServer(bed: { x: number; z: number }, standing = { x: 0.5, z: 0.5 }) {
+        const fake = fakeServer(stepped);
+        const say = fake.server.say.bind(fake.server);
+        fake.server.say = async (argv) => {
+            if (argv[0]!.endsWith("respawn.pos"))
+                return `Steve has the following entity data: [I; ${bed.x}, 64, ${bed.z}]`;
+            if (argv[0]!.includes("@a[distance=0..]"))
+                return `Steve has the following entity data: [${standing.x}d, 64.0d, ${standing.z}d]`;
+            return say(argv);
+        };
+        return fake;
+    }
+
+    let logged: string[] = [];
+    beforeEach(() => {
+        config = {};
+        logged = [];
+        vi.spyOn(console, "info").mockImplementation((line: unknown) => {
+            logged.push(String(line));
+        });
+    });
+
+    const searchOf = () => plan.readSiteSearches(config)["test-build"];
+    const surveyed = () =>
+        logged
+            .filter((line) => line.includes(" site "))
+            .map((line) => /site (\d+)\//.exec(line)![1]);
+
+    it("searches round the same homes in the same order, wherever the players stand", () => {
+        const beds = [
+            { x: 100, z: 5 },
+            { x: -20, z: 7 },
+            { x: 100, z: 5 }
+        ];
+        expect(plan.stableHomes(beds, [{ x: 3, z: 9 }])).toEqual([
+            { x: -20, z: 7 },
+            { x: 100, z: 5 }
+        ]);
+        expect(plan.stableHomes([], [{ x: 3.5, z: 47 }])).toEqual([{ x: 0, z: 32 }]);
+        expect(plan.stableHomes([], [{ x: 10, z: 40 }])).toEqual([{ x: 0, z: 32 }]);
+    });
+
+    it("writes where it stopped, and logs the verdict of every site it surveyed", async () => {
+        const { server } = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(searchOf()).toMatchObject({ next: 6 });
+        expect(surveyed()).toEqual(["1", "2", "3", "4", "5", "6"]);
+        expect(logged.every((line) => line.startsWith("[minecraft-seasonal] "))).toBe(true);
+        expect(logged.every((line) => line.endsWith(": uneven"))).toBe(true);
+    });
+
+    it("goes on where it stopped after a restart, from what the config says", async () => {
+        const first = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        vi.resetModules();
+        const fresh = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/world-builds/service"
+        );
+        logged = [];
+        const again = bedServer({ x: 0, z: 0 });
+        again.server.installedAppId = first.server.installedAppId;
+        await fresh.reconcileWorldBuilds(again.server, config, "winter", [tinyBuild()]);
+        expect(surveyed()).toEqual(["7", "8", "9", "10", "11", "12"]);
+        expect(searchOf()).toMatchObject({ next: 12 });
+    });
+
+    it("keeps its place while the players walk about: only their beds make the list", async () => {
+        const first = bedServer({ x: 0, z: 0 }, { x: 0.5, z: 0.5 });
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        const list = searchOf()!.list;
+        const moved = bedServer({ x: 0, z: 0 }, { x: 300.5, z: -90.5 });
+        moved.server.installedAppId = first.server.installedAppId;
+        await reconcileWorldBuilds(moved.server, config, "winter", [tinyBuild()]);
+        expect(searchOf()).toMatchObject({ list, next: 12 });
+    });
+
+    it("goes on after the last site it surveyed when somebody with a bed comes online", async () => {
+        const first = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        const { last } = searchOf()!;
+        const two = fakeServer(stepped);
+        two.server.installedAppId = first.server.installedAppId;
+        const say = two.server.say.bind(two.server);
+        two.server.say = async (argv) =>
+            argv[0]!.endsWith("respawn.pos")
+                ? [
+                      "Steve has the following entity data: [I; 0, 64, 0]",
+                      "Alex has the following entity data: [I; 500, 64, 500]"
+                  ].join("\n")
+                : say(argv);
+        logged = [];
+        await reconcileWorldBuilds(two.server, config, "winter", [tinyBuild()]);
+        const centers = plan.candidateCenters(
+            [
+                { x: 0, z: 0 },
+                { x: 500, z: 500 }
+            ],
+            tinyBuild(),
+            Number.POSITIVE_INFINITY
+        );
+        const after = centers.findIndex((one) => one.x === last!.x && one.z === last!.z) + 1;
+        expect(after).toBeGreaterThan(0);
+        expect(surveyed()[0]).toBe(String(after + 1));
+        expect(searchOf()).toMatchObject({ list: plan.listDigest(centers), next: after + 6 });
+    });
+
+    it("starts again from the nearest when somebody sleeps somewhere else", async () => {
+        const first = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
+        const list = searchOf()!.list;
+        logged = [];
+        const elsewhere = bedServer({ x: 500, z: 500 });
+        elsewhere.server.installedAppId = first.server.installedAppId;
+        await reconcileWorldBuilds(elsewhere.server, config, "winter", [tinyBuild()]);
+        expect(surveyed()[0]).toBe("1");
+        expect(searchOf()!.list).not.toBe(list);
+        expect(searchOf()!.next).toBe(6);
+    });
+
+    it("forgets the search once a site is found, and says where the build went", async () => {
+        // Level from 40 blocks out: the first pass finds nothing, a later one does.
+        const far = (x: number, z: number) => (Math.hypot(x, z) < 40 ? stepped(x) : 64);
+        const fake = fakeServer(far);
+        await reconcileWorldBuilds(fake.server, config, "winter", [tinyBuild()]);
+        expect(searchOf()).toMatchObject({ next: 6 });
+        for (let pass = 0; pass < 8 && plan.readPlaced(config).length === 0; pass++)
+            await reconcileWorldBuilds(fake.server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toHaveLength(1);
+        expect(searchOf()).toBeUndefined();
+        expect(logged.some((line) => /: site, origin -?\d+ 64 -?\d+$/.test(line))).toBe(true);
+        expect(logged.some((line) => line.includes(": placing test-build at "))).toBe(true);
+    });
+
+    it("works on a config written before the search was, or one it cannot read", async () => {
+        config = { somethingElse: true };
+        const { server } = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(config.somethingElse).toBe(true);
+        expect(searchOf()).toMatchObject({ next: 6 });
+        config = { ...config, [plan.SITE_SEARCH_KEY]: "garbled" };
+        logged = [];
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(surveyed()[0]).toBe("1");
+        expect(plan.readSiteSearches({ [plan.SITE_SEARCH_KEY]: [1, 2] })).toEqual({});
+        expect(
+            plan.readSiteSearches({ [plan.SITE_SEARCH_KEY]: { a: { list: "x", next: -1 } } })
+        ).toEqual({});
+    });
+
+    it("drops the searches of a season that is over", async () => {
+        const { server } = bedServer({ x: 0, z: 0 });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(searchOf()).toBeDefined();
+        await reconcileWorldBuilds(server, config, null, [tinyBuild()]);
+        expect(config[plan.SITE_SEARCH_KEY]).toEqual({});
+    });
+});

@@ -86,6 +86,84 @@ export function unreadPlaced(config: Readonly<Record<string, unknown>>): unknown
     return list.filter((one) => !placedSchema.safeParse(one).success);
 }
 
+/** Install-config key each build's site search is written under: where the
+ *  next pass goes on from, so a restart does not start again at the nearest. */
+export const SITE_SEARCH_KEY = "seasonalWorldBuildSearch";
+
+/** Where a build's search stands: the candidate list it walks (as a digest),
+ *  the next one in it to survey, and the last one surveyed. */
+export const siteSearchSchema = z.object({
+    list: z.string(),
+    next: z.number().int().min(0),
+    last: z.object({ x: z.number().int(), z: z.number().int() }).optional()
+});
+
+export type SiteSearch = z.infer<typeof siteSearchSchema>;
+
+/** Every build's search the config holds; one that does not parse is a search not started. */
+export function readSiteSearches(
+    config: Readonly<Record<string, unknown>>
+): Record<string, SiteSearch> {
+    const stored = config[SITE_SEARCH_KEY];
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+    const found: Record<string, SiteSearch> = {};
+    for (const [id, one] of Object.entries(stored)) {
+        const parsed = siteSearchSchema.safeParse(one);
+        if (parsed.success) found[id] = parsed.data;
+    }
+    return found;
+}
+
+/** A short digest of a candidate list: a cursor only means something in the list it was taken in. */
+export function listDigest(centers: readonly { x: number; z: number }[]): string {
+    return createHash("sha256")
+        .update(centers.map((one) => `${one.x},${one.z}`).join(";"))
+        .digest("hex")
+        .slice(0, 16);
+}
+
+/**
+ * The index a search goes on from in `centers`. In the list it was taken in,
+ * where it stopped; in another (a player online or gone with a bed of their
+ * own), the one after the last site it surveyed, when that is still in it -
+ * so the far rings are reached however often people come and go - and the
+ * nearest otherwise.
+ */
+export function searchStart(
+    search: SiteSearch | undefined,
+    centers: readonly { x: number; z: number }[]
+): number {
+    if (!search) return 0;
+    if (search.list === listDigest(centers)) return search.next < centers.length ? search.next : 0;
+    const last = search.last;
+    const at = last ? centers.findIndex((one) => one.x === last.x && one.z === last.z) : -1;
+    return at < 0 || at + 1 >= centers.length ? 0 : at + 1;
+}
+
+/** Grid a player's standing position is rounded to before it is searched round:
+ *  walking about does not make a new list on every pass. */
+export const STANDING_GRID = 32;
+
+/**
+ * What a build is searched round, the same on every pass while nothing about
+ * where people live changes: the beds and anchors, deduplicated and in a fixed
+ * order. Where they stand is only used when nobody has one, rounded to a grid.
+ */
+export function stableHomes(
+    beds: readonly { x: number; z: number }[],
+    standing: readonly { x: number; z: number }[]
+): { x: number; z: number }[] {
+    const snap = (value: number) => Math.round(value / STANDING_GRID) * STANDING_GRID || 0;
+    const from =
+        beds.length > 0 ? beds : standing.map((one) => ({ x: snap(one.x), z: snap(one.z) }));
+    const unique = new Map<string, { x: number; z: number }>();
+    for (const one of from) {
+        const home = { x: Math.floor(one.x), z: Math.floor(one.z) };
+        unique.set(`${home.x},${home.z}`, home);
+    }
+    return [...unique.values()].sort((one, other) => one.x - other.x || one.z - other.z);
+}
+
 export interface Point {
     readonly x: number;
     readonly y: number;
