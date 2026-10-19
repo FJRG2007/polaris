@@ -31,8 +31,12 @@ const ROOTS = readdirSync(APPS)
  */
 const HEARD_IN: Readonly<Record<string, readonly string[]>> = {
     "web/src/app/(app)/chat/message-menu.tsx": ["web/src/app/(app)/chat/message-list.tsx"],
-    "web/src/app/(app)/office/p/[id]/format-bar.tsx": ["web/src/app/(app)/office/p/[id]/slides-editor.tsx"],
-    "web/src/app/(app)/office/p/[id]/slide-list.tsx": ["web/src/app/(app)/office/p/[id]/slides-editor.tsx"]
+    "web/src/app/(app)/office/p/[id]/format-bar.tsx": [
+        "web/src/app/(app)/office/p/[id]/slides-editor.tsx"
+    ],
+    "web/src/app/(app)/office/p/[id]/slide-list.tsx": [
+        "web/src/app/(app)/office/p/[id]/slides-editor.tsx"
+    ]
 };
 
 function sources(root: string): string[] {
@@ -48,7 +52,8 @@ function sources(root: string): string[] {
 const key = (path: string) => relative(APPS, path).replaceAll("\\", "/");
 
 /** The string literals inside a bracketed list. */
-const literals = (list: string) => [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] as string);
+const literals = (list: string) =>
+    [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1] as string);
 
 /**
  * Every action id a file listens for: `shortcutPressed(event, "id")`, a local

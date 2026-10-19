@@ -551,7 +551,8 @@ export function CanvasEditor({
             toggleEnabled(selection.nodes);
         else if (key === "p" && !mod && !event.shiftKey && !readOnly && single())
             togglePin(single()!);
-        else if (shortcutPressed(event, "general.rename") && !readOnly && single()) setRenaming(single()!.id);
+        else if (shortcutPressed(event, "general.rename") && !readOnly && single())
+            setRenaming(single()!.id);
         else if (shortcutPressed(event, "general.delete") && !readOnly) remove();
         else if (key === "n" && !mod && !readOnly && !event.shiftKey) {
             placeAt.current = center();
