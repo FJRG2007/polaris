@@ -82,9 +82,6 @@ function useMoney() {
     );
 }
 
-const SELECT =
-    "h-9 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm disabled:opacity-60";
-
 type StatusTone = "neutral" | "success" | "warning" | "danger" | "primary";
 const TONE: Readonly<Record<string, StatusTone>> = {
     running: "success",
@@ -814,23 +811,21 @@ function CreateDialog({
                 ) : (
                     <div className="flex flex-col gap-3">
                         <Field label={`${t("create.account")} *`}>
-                            <select
-                                className={SELECT}
+                            <Select
                                 value={accountId}
-                                onChange={(e) => {
-                                    setAccountId(e.target.value);
+                                placeholder={t("create.chooseAccount")}
+                                aria-label={t("create.account")}
+                                onValueChange={(value) => {
+                                    setAccountId(value);
                                     setRegion("");
                                     setSize("");
                                     setImage("");
                                 }}
-                            >
-                                <option value="">{t("create.chooseAccount")}</option>
-                                {accounts.map((a) => (
-                                    <option key={a.id} value={a.id}>
-                                        {a.name} ({PROVIDER_NAMES[a.provider]})
-                                    </option>
-                                ))}
-                            </select>
+                                options={accounts.map((a) => ({
+                                    value: a.id,
+                                    label: `${a.name} (${PROVIDER_NAMES[a.provider]})`
+                                }))}
+                            />
                         </Field>
                         <Field label={`${t("servers.name")} *`} hint={t("create.nameHint")}>
                             <Input
@@ -841,68 +836,47 @@ function CreateDialog({
                             />
                         </Field>
                         <Field label={`${t("servers.region")} *`}>
-                            <select
-                                className={SELECT}
+                            <Select
                                 value={region}
                                 disabled={!accountId || regions.loading}
-                                onChange={(e) => {
-                                    setRegion(e.target.value);
+                                placeholder={
+                                    regions.loading ? t("create.loading") : t("create.chooseRegion")
+                                }
+                                aria-label={t("servers.region")}
+                                onValueChange={(value) => {
+                                    setRegion(value);
                                     setSize("");
                                     setImage("");
                                 }}
-                            >
-                                <option value="">
-                                    {regions.loading
-                                        ? t("create.loading")
-                                        : t("create.chooseRegion")}
-                                </option>
-                                {regions.regions.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.label}
-                                    </option>
-                                ))}
-                            </select>
+                                options={regions.regions.map((r) => ({ value: r.id, label: r.label }))}
+                            />
                         </Field>
                         <Field label={`${t("servers.size")} *`}>
-                            <select
-                                className={SELECT}
+                            <Select
                                 value={size}
                                 disabled={!region || regional.loading}
-                                onChange={(e) => setSize(e.target.value)}
-                            >
-                                <option value="">
-                                    {regional.loading
-                                        ? t("create.loading")
-                                        : t("create.chooseSize")}
-                                </option>
-                                {regional.sizes.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.label}
-                                        {money(s.priceMonthly, s.currency)
-                                            ? ` - ${money(s.priceMonthly, s.currency)}`
-                                            : ""}
-                                    </option>
-                                ))}
-                            </select>
+                                placeholder={
+                                    regional.loading ? t("create.loading") : t("create.chooseSize")
+                                }
+                                aria-label={t("servers.size")}
+                                onValueChange={setSize}
+                                options={regional.sizes.map((s) => {
+                                    const price = money(s.priceMonthly, s.currency);
+                                    return { value: s.id, label: price ? `${s.label} - ${price}` : s.label };
+                                })}
+                            />
                         </Field>
                         <Field label={`${t("servers.image")} *`}>
-                            <select
-                                className={SELECT}
+                            <Select
                                 value={image}
                                 disabled={!region || regional.loading}
-                                onChange={(e) => setImage(e.target.value)}
-                            >
-                                <option value="">
-                                    {regional.loading
-                                        ? t("create.loading")
-                                        : t("create.chooseImage")}
-                                </option>
-                                {regional.images.map((i) => (
-                                    <option key={i.id} value={i.id}>
-                                        {i.label}
-                                    </option>
-                                ))}
-                            </select>
+                                placeholder={
+                                    regional.loading ? t("create.loading") : t("create.chooseImage")
+                                }
+                                aria-label={t("servers.image")}
+                                onValueChange={setImage}
+                                options={regional.images.map((i) => ({ value: i.id, label: i.label }))}
+                            />
                         </Field>
                         {chosenSize && (
                             <p className="text-xs text-muted-foreground">
@@ -1013,26 +987,19 @@ function ResizeDialog({
                     {mustStop && <DialogDescription>{t("resize.stoppedFirst")}</DialogDescription>}
                 </DialogHeader>
                 <Field label={`${t("servers.size")} *`}>
-                    <select
-                        className={SELECT}
+                    <Select
                         value={size}
                         disabled={options.loading || mustStop}
-                        onChange={(e) => setSize(e.target.value)}
-                    >
-                        <option value="">
-                            {options.loading ? t("create.loading") : t("create.chooseSize")}
-                        </option>
-                        {options.sizes
+                        placeholder={options.loading ? t("create.loading") : t("create.chooseSize")}
+                        aria-label={t("servers.size")}
+                        onValueChange={setSize}
+                        options={options.sizes
                             .filter((s) => s.id !== server.size)
-                            .map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.label}
-                                    {money(s.priceMonthly, s.currency)
-                                        ? ` - ${money(s.priceMonthly, s.currency)}`
-                                        : ""}
-                                </option>
-                            ))}
-                    </select>
+                            .map((s) => {
+                                const price = money(s.priceMonthly, s.currency);
+                                return { value: s.id, label: price ? `${s.label} - ${price}` : s.label };
+                            })}
+                    />
                 </Field>
                 {(error || options.error) && (
                     <p role="alert" className="text-sm text-danger-ink">

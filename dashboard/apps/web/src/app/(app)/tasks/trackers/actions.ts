@@ -12,6 +12,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
+import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
 import * as access from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import { syncTracker } from "@/lib/tasks/trackers/sync";
@@ -19,7 +20,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { trackerSentence } from "./tracker-sentence";
 import * as trackers from "@/lib/tasks/trackers/service";
 
-const TRACKERS_PATH = "/tasks/trackers";
+// Trackers are connected from Connected accounts; that is the screen to redraw.
+const TRACKERS_PATH = CONNECTIONS_HUB;
 
 const saveSchema = z.object({
     id: z.string().uuid().nullable().default(null),

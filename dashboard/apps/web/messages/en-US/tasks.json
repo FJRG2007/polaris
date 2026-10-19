@@ -418,7 +418,7 @@
         "pulled": "Brought in {added} and updated {updated}.",
         "connect": "Connect a tracker",
         "emptyTitle": "Nothing connected",
-        "emptyDescription": "Connect Linear or Jira and their issues appear as tasks here, keeping their reference. Move one on this board and it moves there too.",
+        "emptyDescription": "Connect Linear or Jira and their issues appear as tasks on your board, keeping their reference. Move one there and it moves in the tracker too.",
         "summary": "{provider} into {space} / {list} - {linked} linked",
         "summaryNeverPulled": "{provider} into {space} / {list} - {linked} linked, never pulled",
         "twoWay": "Two-way",

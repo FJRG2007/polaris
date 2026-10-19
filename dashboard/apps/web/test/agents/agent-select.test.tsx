@@ -121,7 +121,8 @@ describe("SignInNotice", () => {
 
         expect(screen.getByText(/Nothing here signs Codex in/i)).not.toBeNull();
         const link = screen.getByRole("link", { name: /sign in under ai keys/i });
-        expect(link.getAttribute("href")).toBe("/account/ai-keys");
+        // Connected accounts, at its AI keys section.
+        expect(link.getAttribute("href")).toBe("/account/connections?provider=ai-keys");
         // The credential's own label from the catalogue, not a name invented
         // here. Read out of the sentence rather than as its own node: it is
         // named in a line of prose now, since the notice sends people to the

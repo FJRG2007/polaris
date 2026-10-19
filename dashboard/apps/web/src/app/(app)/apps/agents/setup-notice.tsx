@@ -4,6 +4,7 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
 import { permissionList } from "@/lib/integrations/github-permission-copy";
 import { getTranslations } from "@/lib/i18n/request";
+import { AI_KEYS_SECTION, connectionsHref } from "@/lib/connections/hub-href";
 
 /**
  * The one thing standing between here and a working agent, when there is one.
@@ -152,7 +153,7 @@ export async function SetupNotice() {
     }
 
     if (providers.length === 0) {
-        return <Notice>{t.rich("notice.noProvider", { link: link("/account/ai-keys") })}</Notice>;
+        return <Notice>{t.rich("notice.noProvider", { link: link(connectionsHref(AI_KEYS_SECTION, "/apps/agents")) })}</Notice>;
     }
 
     return null;

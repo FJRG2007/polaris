@@ -1,23 +1,16 @@
-import { PageHeader } from "@polaris/ui";
-import { TrackersView } from "./trackers-view";
+/**
+ * Connected trackers (/tasks/trackers): Linear and Jira are connected from
+ * Connected accounts now, beside every other account. The address stays, for
+ * the Tasks menu and anybody who saved it, and sends them there and back.
+ */
+
+import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/session";
-import { getTranslations } from "@/lib/i18n/request";
-import { listTrackers } from "@/lib/tasks/trackers/service";
+import { connectionsHref, TASK_TRACKERS_SECTION } from "@/lib/connections/hub-href";
 
 export const dynamic = "force-dynamic";
 
 export default async function TaskTrackersPage() {
-    const user = await requirePermission("tasks.manage");
-    const trackers = await listTrackers(user.id);
-    const t = await getTranslations("tasks");
-
-    return (
-        <>
-            <PageHeader
-                title={t("trackers.title")}
-                description={t("trackers.description")}
-            />
-            <TrackersView trackers={trackers} />
-        </>
-    );
+    await requirePermission("tasks.manage");
+    redirect(connectionsHref(TASK_TRACKERS_SECTION, "/tasks"));
 }

@@ -45,6 +45,9 @@ vi.mock("../../src/app/(app)/account/connections/app-sections", () => ({
     hubSearch: () => "",
     hubAppSections: async () => ({ node: null, ids: [] })
 }));
+vi.mock("../../src/app/(app)/account/connections/core-sections", () => ({
+    hubCoreSections: async () => ({ node: null, ids: [] })
+}));
 vi.mock("@/lib/connections/org-scope", () => ({ managedConnectionOrgs: async () => [] }));
 vi.mock("@/lib/presence-activity/lastfm-poll", () => ({ lastfmApiKey: async () => null }));
 vi.mock("@/lib/connections/attention", () => ({

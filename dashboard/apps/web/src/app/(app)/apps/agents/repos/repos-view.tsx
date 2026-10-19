@@ -11,6 +11,8 @@ import { Check, Plus, Settings2, TriangleAlert, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, Switch } from "@polaris/ui";
 import { AGENT_WORKFLOW_PATH, needsWorkflowFile } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useConnectionsHref } from "@/components/use-connections-href";
+import { AI_KEYS_SECTION } from "@/lib/connections/hub-href";
 import { agentText, agentWord } from "@/lib/agents/words";
 
 /**
@@ -23,6 +25,7 @@ import { agentText, agentWord } from "@/lib/agents/words";
  */
 export function ReposView({ repos, providers }: { repos: AgentRepoView[]; providers: string[] }) {
     const t = useTranslations("agents");
+    const keysLink = useConnectionsHref(AI_KEYS_SECTION);
     const [adding, setAdding] = useState(false);
     const [editing, setEditing] = useState<AgentRepoView | null>(null);
     const [removing, setRemoving] = useState<AgentRepoView | null>(null);
@@ -158,7 +161,7 @@ export function ReposView({ repos, providers }: { repos: AgentRepoView[]; provid
                 <p className="text-sm text-muted-foreground">
                     {t.rich("repos.noProvider", {
                         link: (chunks) => (
-                            <Link href="/account/ai-keys" className="underline">
+                            <Link href={keysLink} className="underline">
                                 {chunks}
                             </Link>
                         )
