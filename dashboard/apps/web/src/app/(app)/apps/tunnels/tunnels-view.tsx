@@ -15,7 +15,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Network, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
-import { removeTunnelAction, setTunnelPausedAction, tunnelStatusesAction } from "./actions";
+import { removeTunnelAction, setTunnelPausedAction } from "./actions";
+import * as polls from "./tunnels-polls";
+import { useUnmountSignal } from "@/lib/poll-fetch";
 import type {
     TunnelOptions,
     TunnelStatus,
@@ -50,6 +52,7 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
     const again = useRef(false);
     const queued = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    const signal = useUnmountSignal();
     const read = useCallback(async (): Promise<void> => {
         if (reading.current) {
             again.current = true;
@@ -59,7 +62,7 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
         if (ids.length === 0) return;
         reading.current = true;
         try {
-            const reply = await tunnelStatusesAction({ ids }).catch(() => ({
+            const reply = await polls.tunnelStatuses(ids, signal()).catch(() => ({
                 statuses: undefined
             }));
             for (const id of ids) listeners.current.get(id)?.(reply.statuses?.[id] ?? null);
