@@ -29,6 +29,7 @@ import {
 } from "../mailbox.js";
 import { z } from "zod";
 import { DEFAULT_MAIL_SORT, MAIL_SORTS } from "../mailbox-list.js";
+import { MAIL_REACTION_MOST_RECIPIENTS, isMailReaction } from "../mail-reaction.js";
 
 /** The trim-then-lowercase every address goes through before it is compared,
  *  stored, or sent. One function so the browser and the server agree on what
@@ -395,9 +396,34 @@ export const mailComposeSchema = z
          *  other people from doing. */
         requestReceipt: z.boolean().default(false),
         /** The draft this replaces, so sending it clears the saved copy. */
-        draftId: z.string().uuid().nullable().default(null)
+        draftId: z.string().uuid().nullable().default(null),
+        /** One emoji when this is a reaction to `inReplyToId` rather than a
+         *  reply - see `mail-reaction`. "" for everything anybody wrote. */
+        reaction: z
+            .string()
+            .trim()
+            .max(64)
+            .refine((value) => !value || isMailReaction(value), "Pick one emoji")
+            .default("")
     })
     .superRefine((value, context) => {
+        if (value.reaction && !value.inReplyToId) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["reaction"],
+                message: "Say which message this reacts to"
+            });
+        }
+        if (
+            value.reaction &&
+            value.to.length + value.cc.length + value.bcc.length > MAIL_REACTION_MOST_RECIPIENTS
+        ) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["reaction"],
+                message: "Too many people on this message to react to it"
+            });
+        }
         if (value.to.length + value.cc.length + value.bcc.length === 0) {
             context.addIssue({
                 code: z.ZodIssueCode.custom,

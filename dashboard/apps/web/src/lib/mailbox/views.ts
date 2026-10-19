@@ -489,6 +489,13 @@ export interface MailMessageView {
     readonly accountId: string;
     readonly folderId: string;
     readonly folderRole: core.MailFolderRole;
+    /** Its own Message-Id and the one it answers, bare, so a reaction can be
+     *  drawn under the message it reacts to. */
+    readonly messageId?: string;
+    readonly inReplyTo?: string;
+    /** The emoji, when this message is a reaction rather than a reply - see
+     *  `mail-reaction` in core. "" or absent for everything else. */
+    readonly reaction?: string;
     readonly subject: string;
     readonly from: readonly core.MailAddress[];
     readonly to: readonly core.MailAddress[];
@@ -540,6 +547,8 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
             accountId: true,
             folderId: true,
             messageId: true,
+            inReplyTo: true,
+            reaction: true,
             subject: true,
             fromJson: true,
             toJson: true,
@@ -587,6 +596,9 @@ export async function readThread(userId: string, threadId: string): Promise<Mail
         accountId: message.accountId,
         folderId: message.folderId,
         folderRole: message.folder.role as core.MailFolderRole,
+        messageId: message.messageId,
+        inReplyTo: message.inReplyTo ? core.bareMessageId(message.inReplyTo) : "",
+        reaction: message.reaction,
         subject: message.subject,
         from: addressesFrom(message.fromJson),
         to: addressesFrom(message.toJson),

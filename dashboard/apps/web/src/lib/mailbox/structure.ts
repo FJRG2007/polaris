@@ -22,6 +22,7 @@
  *   walk so it can never disagree with what the message then shows.
  */
 
+import * as core from "@polaris/core";
 import type { MessageStructureObject } from "imapflow";
 
 /** One part of a message that is a file. */
@@ -60,6 +61,9 @@ export interface MessageShape {
     /** Whether the paperclip is drawn: a file somebody attached, not a picture
      *  the message draws itself with. */
     readonly hasAttachments: boolean;
+    /** Whether it carries Gmail's reaction part - see `mail-reaction` in core.
+     *  The emoji itself is the text part, which is the snippet. */
+    readonly reaction: boolean;
 }
 
 /** IMAP's name for the body of a message that has no parts. */
@@ -73,7 +77,8 @@ const EMPTY: MessageShape = {
     textCoding: NO_CODING,
     htmlCoding: NO_CODING,
     attachments: [],
-    hasAttachments: false
+    hasAttachments: false,
+    reaction: false
 };
 
 function codingOf(node: MessageStructureObject): PartCoding {
@@ -91,6 +96,7 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
     let htmlPart = "";
     let textCoding = NO_CODING;
     let htmlCoding = NO_CODING;
+    let reaction = false;
 
     const walk = (node: MessageStructureObject, parent: string): void => {
         const type = (node.type ?? "").toLowerCase();
@@ -137,6 +143,10 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
             textCoding = codingOf(node);
             return;
         }
+        if (!isFile && type === core.MAIL_REACTION_TYPE) {
+            reaction = true;
+            return;
+        }
         if (!isFile && type === "text/html" && !htmlPart) {
             htmlPart = node.part ?? WHOLE_BODY;
             htmlCoding = codingOf(node);
@@ -180,7 +190,8 @@ export function readShape(structure: MessageStructureObject | undefined): Messag
         textCoding,
         htmlCoding,
         attachments,
-        hasAttachments: attachments.some((entry) => !entry.inline)
+        hasAttachments: attachments.some((entry) => !entry.inline),
+        reaction
     };
 }
 

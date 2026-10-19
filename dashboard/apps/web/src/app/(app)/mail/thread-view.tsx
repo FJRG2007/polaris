@@ -57,6 +57,8 @@ import { useBusy } from "./use-busy";
 import { SenderFace } from "./sender-face";
 import { readMessage } from "./message-store";
 import { DeliveryNote } from "./delivery-note";
+import * as outbox from "./outbox";
+import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailViewContext } from "./mail-view";
 import { keptMessage, peekMessage } from "./message-store";
 import type { MailAction } from "@/lib/mailbox/messages";
@@ -70,6 +72,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
     cn,
     useToast
@@ -91,6 +94,7 @@ import {
     Forward,
     Mail,
     MoreHorizontal,
+    MoreVertical,
     Paperclip,
     ShieldAlert,
     Star,
@@ -151,16 +155,45 @@ export function ThreadView({
     const t = useTranslations("mail");
     const [busy, startBusy] = useBusy();
     const [answering, startAnswering] = useBusy();
-    const newest = messages.at(-1);
+    /**
+     * The messages that are messages, and the reactions to them.
+     *
+     * A reaction is a reply on the wire - that is what lets a client that knows
+     * nothing of them show the emoji at all - but drawn as one it is a whole
+     * card holding one character, between the messages somebody came to read.
+     * So one that names a message of the same thread is drawn under it as a
+     * chip, the way Gmail draws it, and one whose message is not here stays a
+     * card: hiding it would lose it.
+     */
+    const { listed, reactionsTo } = useMemo(() => {
+        const here = new Set(messages.map((message) => message.messageId).filter(Boolean));
+        const reactionsTo = new Map<string, MailMessageView[]>();
+        const listed: MailMessageView[] = [];
+        for (const message of messages) {
+            const target = message.inReplyTo;
+            if (message.reaction && target && here.has(target)) {
+                reactionsTo.set(target, [...(reactionsTo.get(target) ?? []), message]);
+            } else {
+                listed.push(message);
+            }
+        }
+        return { listed, reactionsTo };
+    }, [messages]);
+    /** Reactions this tab has sent that the mailbox has not shown back yet. */
+    const [reacting, setReacting] = useState<PendingReaction[]>([]);
+    const newest = listed.at(-1);
     const [open, setOpen] = useState<string[]>(newest ? [newest.id] : []);
     const [expandAll, setExpandAll] = useState(false);
+    const self = useMemo(() => accounts.map((account) => account.address), [accounts]);
 
     // The conversation changed under the pane - a different row was clicked, or
     // a reply arrived. Whatever was open belonged to the old one.
     useEffect(() => {
-        setOpen(messages.at(-1) ? [messages[messages.length - 1]!.id] : []);
+        setOpen(listed.at(-1) ? [listed[listed.length - 1]!.id] : []);
         setExpandAll(false);
-    }, [thread.id, messages.length]);
+    }, [thread.id, listed.length]);
+
+    useEffect(() => setReacting([]), [thread.id]);
 
     /**
      * What the pane actually lists.
@@ -172,17 +205,17 @@ export function ThreadView({
      * anybody opening a long thread is looking for.
      */
     const shown = useMemo<Shown[]>(() => {
-        if (expandAll || messages.length <= KEPT_OPEN + KEPT_FIRST + 1) {
-            return messages.map((message) => ({ kind: "message" as const, message }));
+        if (expandAll || listed.length <= KEPT_OPEN + KEPT_FIRST + 1) {
+            return listed.map((message) => ({ kind: "message" as const, message }));
         }
-        const first = messages.slice(0, KEPT_FIRST);
-        const last = messages.slice(-KEPT_OPEN);
+        const first = listed.slice(0, KEPT_FIRST);
+        const last = listed.slice(-KEPT_OPEN);
         return [
             ...first.map((message) => ({ kind: "message" as const, message })),
-            { kind: "gap" as const, count: messages.length - first.length - last.length },
+            { kind: "gap" as const, count: listed.length - first.length - last.length },
             ...last.map((message) => ({ kind: "message" as const, message }))
         ];
-    }, [messages, expandAll]);
+    }, [listed, expandAll]);
 
     const act = useCallback(
         (action: MailAction) => {
@@ -246,13 +279,15 @@ export function ThreadView({
      * reading pane uses rather than growing a second path to a body.
      */
     const answer = useCallback(
-        (kind: "reply" | "reply-all" | "forward") => {
-            // Guarded here as well as by the early return below: this closure
-            // outlives the render that made it, and a conversation whose last
-            // message was just moved has none.
-            if (!newest) return;
+        (kind: "reply" | "reply-all" | "forward", target?: MailMessageView) => {
+            // The newest unless a message's own buttons named one. Guarded here
+            // as well as by the early return below: this closure outlives the
+            // render that made it, and a conversation whose last message was
+            // just moved has none.
+            const answered = target ?? newest;
+            if (!answered) return;
             startAnswering(async () => {
-                const opened = await readMessage(newest.id).catch((caught: unknown) => {
+                const opened = await readMessage(answered.id).catch((caught: unknown) => {
                     toast.show({
                         title:
                             caught instanceof Error && caught.message
@@ -269,17 +304,108 @@ export function ThreadView({
                 const body = readable?.text ?? "";
                 openComposer(
                     kind === "forward"
-                        ? forwardSeed(newest, body)
-                        : replySeed(
-                              newest,
-                              accounts.map((account) => account.address),
-                              kind === "reply-all",
-                              body
-                          )
+                        ? forwardSeed(answered, body)
+                        : replySeed(answered, self, kind === "reply-all", body)
                 );
             });
         },
-        [accounts, newest, openComposer, toast]
+        [newest, openComposer, self, toast]
+    );
+
+    /**
+     * React to one message with an emoji.
+     *
+     * Sent as a reaction in Gmail's format, to everybody a reply to all would
+     * reach, through the same queue as any message - so it waits out the
+     * reader's undo window, and the note it leaves can take it back. The chip
+     * is drawn now and stays until the copy in Sent comes back to replace it.
+     */
+    const react = useCallback(
+        (target: MailMessageView, emoji: string) => {
+            const seed = replySeed(target, self, true, "");
+            const key = `${target.id}:${emoji}:${Date.now()}`;
+            const drop = () => setReacting((held) => held.filter((one) => one.key !== key));
+            setReacting((held) => [...held, { key, targetId: target.id, emoji }]);
+            void (async () => {
+                const outcome = await outbox.queueMessage({
+                    accountId: target.accountId,
+                    identityId: null,
+                    to: seed.to,
+                    cc: seed.cc,
+                    bcc: [],
+                    subject: seed.subject,
+                    body: emoji,
+                    attachmentIds: [],
+                    inReplyToId: target.id,
+                    forward: false,
+                    sendAt: null,
+                    draftId: null,
+                    reaction: emoji
+                });
+                if (outbox.isRefused(outcome)) {
+                    drop();
+                    toast.show({ title: mailRefusalText(t, outcome.error) });
+                    return;
+                }
+                toast.show({
+                    title: t("view.reacted", { emoji }),
+                    actions: [
+                        {
+                            label: t("view.undoReaction"),
+                            run: async () => {
+                                const undone = await outbox.undoSend(outcome.draftId);
+                                if (outbox.isRefused(undone)) return mailRefusalText(t, undone.error);
+                                if (!undone.undone) return t("view.reactionGone");
+                                drop();
+                                refreshMailbox();
+                                return null;
+                            }
+                        }
+                    ]
+                });
+                refreshMailbox();
+            })();
+        },
+        [refreshMailbox, self, t, toast]
+    );
+
+    /**
+     * Do something to one message rather than to the conversation: its own star,
+     * marking it unread, throwing just that one away. Answers whether it held,
+     * so the card can put its star back when the server said no.
+     */
+    const actOnOne = useCallback(
+        async (target: MailMessageView, action: MailAction): Promise<boolean> => {
+            // The last message left is the conversation: thrown away from here
+            // it has to leave the pane the way the toolbar's delete does.
+            if (leavesTheView(action) && listed.length === 1) {
+                act(action);
+                return true;
+            }
+            let outcome: Awaited<ReturnType<typeof actOnAction>> | null = null;
+            try {
+                outcome = await actOnAction({ messageIds: [target.id], action, scope: "message" });
+            } catch {
+                outcome = null;
+            }
+            if (!outcome) {
+                toast.show({ title: t("view.messageActFailed") });
+                return false;
+            }
+            const missing = missingFolderRole(outcome);
+            if (missing) {
+                askFolderRole(missing, () => void actOnOne(target, action));
+                return false;
+            }
+            const said = refusalOf(outcome);
+            if (said) {
+                toast.show({ title: said });
+                return false;
+            }
+            refreshMailbox();
+            return true;
+        },
+        [act, askFolderRole, listed.length, refreshMailbox, t, toast]
     );
 
     if (!newest) {
@@ -484,6 +610,16 @@ export function ThreadView({
                                 accountId={thread.accountId}
                                 onBlock={onBlock}
                                 onRead={onRead}
+                                reactions={reactionChips(
+                                    entry.message,
+                                    reactionsTo,
+                                    reacting,
+                                    self
+                                )}
+                                answering={answering}
+                                onAnswer={(kind) => answer(kind, entry.message)}
+                                onReact={(emoji) => react(entry.message, emoji)}
+                                onAct={(action) => actOnOne(entry.message, action)}
                                 open={open.includes(entry.message.id)}
                                 onToggle={() =>
                                     setOpen((held) =>
@@ -707,6 +843,58 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
 const KEPT_OPEN = 3;
 const KEPT_FIRST = 1;
 
+/** A reaction this tab sent, drawn before the mailbox has it back. */
+interface PendingReaction {
+    readonly key: string;
+    readonly targetId: string;
+    readonly emoji: string;
+}
+
+/** One emoji under a message, with everybody who reacted with it. */
+interface ReactionChip {
+    readonly emoji: string;
+    readonly names: readonly string[];
+    /** Whether one of them is the reader, from any of their mailboxes. */
+    readonly mine: boolean;
+}
+
+/**
+ * The chips under one message: the reactions the mailbox holds, and the ones
+ * this tab sent that have not come back yet - until one from the reader with the
+ * same emoji arrives to stand in for it. Grouped by emoji, in the order each
+ * emoji was first used, the way every client with reactions draws them.
+ */
+function reactionChips(
+    message: MailMessageView,
+    reactionsTo: ReadonlyMap<string, readonly MailMessageView[]>,
+    reacting: readonly PendingReaction[],
+    self: readonly string[]
+): ReactionChip[] {
+    const own = new Set(self.map((address) => address.toLowerCase()));
+    const chips = new Map<string, { names: string[]; mine: boolean }>();
+    const add = (emoji: string, name: string, mine: boolean) => {
+        const chip = chips.get(emoji) ?? { names: [], mine: false };
+        if (!chip.names.includes(name)) chip.names.push(name);
+        chip.mine ||= mine;
+        chips.set(emoji, chip);
+    };
+    for (const reaction of message.messageId ? (reactionsTo.get(message.messageId) ?? []) : []) {
+        const sender = reaction.from[0];
+        if (!sender || !reaction.reaction) continue;
+        add(reaction.reaction, core.addressName(sender), own.has(sender.address.toLowerCase()));
+    }
+    for (const pending of reacting) {
+        if (pending.targetId !== message.id) continue;
+        if (chips.get(pending.emoji)?.mine) continue;
+        add(pending.emoji, "", true);
+    }
+    return [...chips].map(([emoji, chip]) => ({
+        emoji,
+        names: chip.names.filter(Boolean),
+        mine: chip.mine
+    }));
+}
+
 /** A row in the pane: a message, or the fold standing in for the ones between. */
 type Shown =
     | { readonly kind: "message"; readonly message: MailMessageView }
@@ -781,7 +969,12 @@ function MessageCard({
     accountId,
     onBlock,
     onToggle,
-    onRead
+    onRead,
+    reactions,
+    answering,
+    onAnswer,
+    onReact,
+    onAct
 }: {
     message: MailMessageView;
     open: boolean;
@@ -794,6 +987,14 @@ function MessageCard({
     onBlock?: (accountId: string, address: string) => void;
     onToggle: () => void;
     onRead?: () => ((accepted: boolean) => void) | void;
+    /** The emoji people reacted to this message with. */
+    reactions: readonly ReactionChip[];
+    /** Whether a reply is being opened, so its buttons wait for it. */
+    answering: boolean;
+    onAnswer: (kind: "reply" | "reply-all" | "forward") => void;
+    onReact: (emoji: string) => void;
+    /** Acts on this message alone; answers whether the server took it. */
+    onAct: (action: MailAction) => Promise<boolean>;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("mail");
@@ -937,16 +1138,40 @@ function MessageCard({
 
     const sender = message.from[0];
 
+    /**
+     * This message's own star, drawn the moment it is pressed and put back if
+     * the server said no. Followed from the row when the mailbox is read again,
+     * so a star set in another client shows up here too.
+     */
+    const [starred, setStarred] = useState(message.flagged);
+    useEffect(() => setStarred(message.flagged), [message.flagged]);
+    const star = () => {
+        const next = !starred;
+        setStarred(next);
+        void onAct(next ? "star" : "unstar").then((held) => {
+            if (!held) setStarred(!next);
+        });
+    };
+    /** Gmail offers no reaction past this many people, and treats one sent to
+     *  more as an ordinary reply, so neither does Polaris. */
+    const reactable =
+        message.to.length + message.cc.length <= core.MAIL_REACTION_MOST_RECIPIENTS;
+    const several = message.to.length + message.cc.length > 1;
+
     return (
         <li className="rounded-md border border-border bg-card">
             {/* Collapsed, a message is ONE line - who, a glimpse, when - because
                 a conversation is read by scanning down it. It was three lines
                 with the whole preview in the middle, so ten messages filled the
                 screen and the shape of the thread disappeared. */}
+            {/* The header and the message's own actions side by side, rather
+                than the actions inside the header: it is a button that folds
+                the message, and a button inside a button is not one. */}
+            <div className="flex w-full items-start">
             <button
                 type="button"
                 className={cn(
-                    "flex w-full items-baseline gap-2 px-3 text-left",
+                    "flex min-w-0 flex-1 items-baseline gap-2 px-3 text-left",
                     open ? "items-start py-2" : "py-1.5"
                 )}
                 aria-expanded={open}
@@ -1047,6 +1272,116 @@ function MessageCard({
                     aria-hidden
                 />
             </button>
+            {/* What Gmail puts on every open message: its star, a reaction,
+                Reply, and the rest behind a menu - aimed at this message, not
+                at the newest one, which is what the conversation's own
+                buttons answer. */}
+            {open ? (
+                <div className="flex shrink-0 items-center gap-0.5 py-1.5 pr-2">
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={starred ? t("view.unstarMessage") : t("view.starMessage")}
+                        title={starred ? t("view.unstarMessage") : t("view.starMessage")}
+                        aria-pressed={starred}
+                        onClick={star}
+                    >
+                        <Star
+                            className={cn("size-4 shrink-0", starred && "fill-current text-warning")}
+                            aria-hidden
+                        />
+                    </Button>
+                    {reactable ? (
+                        <EmojiPicker
+                            disabled={false}
+                            media={false}
+                            label={t("view.react")}
+                            triggerClassName="inline-flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            onEmoji={(emoji) => {
+                                // A space's own emoji is a token no other mail
+                                // client could draw, so only a real one is sent.
+                                if (core.isMailReaction(emoji)) onReact(emoji);
+                            }}
+                        />
+                    ) : null}
+                    <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={t("thread.reply")}
+                        title={t("thread.reply")}
+                        disabled={answering}
+                        onClick={() => onAnswer("reply")}
+                    >
+                        <Reply className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={t("view.messageMore")}
+                                title={t("view.messageMore")}
+                            >
+                                <MoreVertical className="size-4 shrink-0" aria-hidden />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem disabled={answering} onSelect={() => onAnswer("reply")}>
+                                <Reply className="size-3.5 shrink-0" aria-hidden />
+                                {t("thread.reply")}
+                            </DropdownMenuItem>
+                            {several ? (
+                                <DropdownMenuItem
+                                    disabled={answering}
+                                    onSelect={() => onAnswer("reply-all")}
+                                >
+                                    <ReplyAll className="size-3.5 shrink-0" aria-hidden />
+                                    {t("thread.replyAll")}
+                                </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuItem disabled={answering} onSelect={() => onAnswer("forward")}>
+                                <Forward className="size-3.5 shrink-0" aria-hidden />
+                                {t("thread.forward")}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => void onAct("unread")}>
+                                <Mail className="size-3.5 shrink-0" aria-hidden />
+                                {t("view.markMessageUnread")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    saveFile(
+                                        `/api/mail/export?messageId=${encodeURIComponent(message.id)}`,
+                                        "message.eml"
+                                    )
+                                }
+                            >
+                                <Download className="size-3.5 shrink-0" aria-hidden />
+                                {t("view.saveMessage")}
+                            </DropdownMenuItem>
+                            {sender && onBlock ? (
+                                <DropdownMenuItem
+                                    onSelect={() => onBlock(accountId, sender.address)}
+                                >
+                                    <UserRoundX className="size-3.5 shrink-0" aria-hidden />
+                                    {t("view.blockMessageSender", {
+                                        sender: core.addressName(sender)
+                                    })}
+                                </DropdownMenuItem>
+                            ) : null}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                className="text-danger"
+                                onSelect={() => void onAct("trash")}
+                            >
+                                <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                {t("view.trashMessage")}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            ) : null}
+            </div>
 
             {open ? (
                 <div className="border-t border-border px-3 py-3">
@@ -1255,6 +1590,42 @@ function MessageCard({
                                     ) : null}
                                 </ul>
                             ) : null}
+                            {reactions.length > 0 ? (
+                                <ul
+                                    className="mt-3 flex flex-wrap gap-1.5"
+                                    aria-label={t("view.reactions")}
+                                >
+                                    {reactions.map((chip) => (
+                                        <li key={chip.emoji}>
+                                            {/* Pressing someone else's reaction
+                                                adds yours, as in every client
+                                                with reactions. Yours is already
+                                                sent and cannot be unsent once it
+                                                has gone, so it is not a button. */}
+                                            <button
+                                                type="button"
+                                                disabled={chip.mine || !reactable}
+                                                onClick={() => onReact(chip.emoji)}
+                                                title={reactionWho(t, chip)}
+                                                aria-label={reactionWho(t, chip)}
+                                                className={cn(
+                                                    "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[13px] transition-colors",
+                                                    chip.mine
+                                                        ? "border-primary/60 bg-primary/15 text-foreground"
+                                                        : "border-border bg-muted text-muted-foreground hover:border-border-strong"
+                                                )}
+                                            >
+                                                <span aria-hidden>{chip.emoji}</span>
+                                                {chip.names.length > 1 ? (
+                                                    <span className="text-[11px]">
+                                                        {chip.names.length}
+                                                    </span>
+                                                ) : null}
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
                             {/* The message itself, as its server holds it.
                                 Not a convenience: a mail client that cannot
                                 hand a message back is one nobody should put
@@ -1319,6 +1690,16 @@ function MessageCard({
             ) : null}
         </li>
     );
+}
+
+/** Who reacted with one emoji, in words: the names when there are any, "You"
+ *  for the reader's own reaction still on its way. */
+function reactionWho(
+    t: ReturnType<typeof useTranslations>,
+    chip: ReactionChip
+): string {
+    const names = chip.names.length > 0 ? chip.names.join(", ") : t("view.you");
+    return t("view.reactedBy", { emoji: chip.emoji, names });
 }
 
 /** An attachment, as the viewer addresses it: by id, which `urlFor` turns into

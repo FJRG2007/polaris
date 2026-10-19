@@ -46,6 +46,10 @@ vi.mock("@/app/(app)/mail/message-store", () => ({
     keptMessage: async () => null
 }));
 
+// The reaction picker is chat's, which reaches the signed-in session through its
+// server actions; nothing here opens it.
+vi.mock("@/app/(app)/chat/emoji-picker", () => ({ EmojiPicker: () => null }));
+
 vi.mock("@/app/(app)/mail/actions", () => ({
     actOnAction: async () => ({}),
     applyLabelAction: async () => ({}),

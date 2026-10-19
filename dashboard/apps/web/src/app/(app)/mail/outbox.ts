@@ -19,6 +19,9 @@ export interface Outgoing extends DraftFields {
     readonly forward: boolean;
     readonly sendAt: Date | null;
     readonly draftId: string | null;
+    /** One emoji when this is a reaction to `inReplyToId` - see
+     *  `mail-reaction` in core. */
+    readonly reaction?: string;
 }
 
 /** A refusal, in words somebody can act on. */

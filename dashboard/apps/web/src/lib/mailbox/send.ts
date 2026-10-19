@@ -118,6 +118,24 @@ export interface OutgoingMessage {
     /** The conversation so far, oldest first, with angle brackets. */
     readonly references: readonly string[];
     readonly requestReceipt: boolean;
+    /** One emoji when this is a reaction to `inReplyTo` - see `mail-reaction`
+     *  in core. Absent or "" for an ordinary message. */
+    readonly reaction?: string;
+}
+
+/**
+ * The parts of a reaction, in the order Google asks for: the reaction between
+ * the plain text and the HTML, because some clients show the first part of an
+ * alternative and some the last, and either should land on the emoji itself.
+ * Passed as alternatives rather than as `text` and `html`, which nodemailer
+ * would put ahead of anything else.
+ */
+function reactionParts(emoji: string): Mail.Options["alternatives"] {
+    return [
+        { contentType: "text/plain; charset=utf-8", content: emoji },
+        { contentType: `${core.MAIL_REACTION_TYPE}; charset=utf-8`, content: core.mailReactionJson(emoji) },
+        { contentType: "text/html; charset=utf-8", content: htmlFrom(emoji) }
+    ];
 }
 
 /**
@@ -177,8 +195,9 @@ export async function composeMime(
         ...(message.bcc.length > 0 ? { bcc: message.bcc.map(core.formatAddress) } : {}),
         ...(message.replyTo ? { replyTo: message.replyTo } : {}),
         subject: message.subject,
-        text: textFrom(message.body),
-        html: htmlFrom(message.body),
+        ...(message.reaction
+            ? { alternatives: reactionParts(message.reaction) }
+            : { text: textFrom(message.body), html: htmlFrom(message.body) }),
         ...(message.inReplyTo ? { inReplyTo: message.inReplyTo } : {}),
         ...(message.references.length > 0 ? { references: [...message.references] } : {}),
         attachments: message.attachments.map((file) => ({

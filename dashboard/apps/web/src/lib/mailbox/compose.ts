@@ -48,6 +48,9 @@ export interface ComposeInput {
     readonly sendAt: Date | null;
     readonly requestReceipt: boolean;
     readonly draftId: string | null;
+    /** One emoji when this is a reaction to `inReplyToId` - see
+     *  `mail-reaction` in core. Absent for an ordinary message. */
+    readonly reaction?: string;
 }
 
 /**
@@ -78,6 +81,7 @@ export async function saveDraft(userId: string, input: ComposeInput): Promise<st
         references: asJson(ancestry.references),
         forward: input.forward,
         requestReceipt: input.requestReceipt,
+        reaction: input.reaction ?? "",
         state: "draft",
         failure: "",
         // Somebody editing a message the server refused has changed it, so the
@@ -402,6 +406,7 @@ export const DRAFT_COLUMNS = {
     inReplyToHeader: true,
     references: true,
     requestReceipt: true,
+    reaction: true,
     identity: { select: { address: true, displayName: true, signature: true } },
     attachments: { select: { id: true } }
 } as const;
@@ -449,7 +454,9 @@ export async function outgoingFromDraft(
         bcc: addressesFrom(draft.bccJson),
         replyTo: draft.replyTo,
         subject: draft.subject,
-        body: how.signature
+        // A reaction is one emoji and nothing else: a signature under it would
+        // be the whole of what a client that cannot draw reactions shows.
+        body: how.signature && !draft.reaction
             ? withSignature(draft.body, signature, {
                   above: account.signatureAboveQuote,
                   auto: account.signatureAuto,
@@ -459,7 +466,8 @@ export async function outgoingFromDraft(
         attachments,
         inReplyTo: draft.inReplyToHeader,
         references: stringsFrom(draft.references),
-        requestReceipt: draft.requestReceipt
+        requestReceipt: draft.requestReceipt,
+        reaction: draft.reaction
     };
 }
 

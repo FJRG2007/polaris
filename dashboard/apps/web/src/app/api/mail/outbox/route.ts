@@ -44,7 +44,8 @@ export async function POST(request: Request): Promise<Response> {
             forward: parsed.data.forward,
             sendAt: parsed.data.sendAt,
             requestReceipt: parsed.data.requestReceipt,
-            draftId: parsed.data.draftId
+            draftId: parsed.data.draftId,
+            reaction: parsed.data.reaction
         });
         return answer({ draftId: queued.draftId, sendAt: queued.sendAt.toISOString() });
     } catch (caught) {
