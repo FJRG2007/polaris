@@ -175,6 +175,9 @@ const EAGER_UI = [
     "appAppsInstalledIdUseRuntimeLog.useRuntimeLog",
     "confirmDialog.useConfirm",
     "copyButton.CopyButton",
+    // The picker asked for like a file input: a hook, so it cannot be drawn
+    // later, and the dialog it renders is itself loaded with `dynamic`.
+    "filePicker.useChooseFiles",
     "gameLogo.GameLogo",
     // The language a page is drawn in: a hook over a context the root layout
     // already provides.
