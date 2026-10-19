@@ -35,8 +35,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { sanitizeTitle, titlePolarThread, startPolarTitle, settledPolarTitle } =
-    await import("@/lib/polar/titles");
+const { sanitizeTitle, titlePolarThread, startPolarTitle, settledPolarTitle } = await import(
+    "@/lib/polar/titles"
+);
 
 const USAGE = {
     inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -155,7 +156,10 @@ describe("titlePolarThread", () => {
 
     it.each([
         ["the call fails", new Error("provider down")],
-        ["the model refuses", "I'm sorry, but I can't help with naming this conversation right now."],
+        [
+            "the model refuses",
+            "I'm sorry, but I can't help with naming this conversation right now."
+        ],
         ["the answer is empty", ""]
     ])("keeps the placeholder silently when %s", async (_name, answer) => {
         await expect(

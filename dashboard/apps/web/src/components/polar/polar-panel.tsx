@@ -1409,7 +1409,8 @@ function MessageView({
         .slice(lastWork ? message.parts.indexOf(lastWork) + 1 : 0)
         .some((part) => part.type === "text" && part.text.trim() !== "");
     const current =
-        lastTool && (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
+        lastTool &&
+        (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
             ? toolName(lastTool.name)
             : null;
     const workIndex = message.parts.findIndex(folded);
@@ -1462,7 +1463,10 @@ function MessageView({
                         >
                             {work.map((entry) =>
                                 entry.type === "reasoning" ? (
-                                    <Reasoning key={message.parts.indexOf(entry)} isStreaming={false}>
+                                    <Reasoning
+                                        key={message.parts.indexOf(entry)}
+                                        isStreaming={false}
+                                    >
                                         {entry.text}
                                     </Reasoning>
                                 ) : (

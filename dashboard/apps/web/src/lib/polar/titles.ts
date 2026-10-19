@@ -139,10 +139,7 @@ export function startPolarTitle(
 }
 
 /** The thread's title once any naming in flight has finished (or given up). */
-export async function settledPolarTitle(
-    userId: string,
-    threadId: string
-): Promise<string | null> {
+export async function settledPolarTitle(userId: string, threadId: string): Promise<string | null> {
     const job = running.get(threadId);
     if (job) {
         let timer: ReturnType<typeof setTimeout> | undefined;

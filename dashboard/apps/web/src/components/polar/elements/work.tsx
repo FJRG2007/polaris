@@ -87,7 +87,9 @@ export function Work({
                         {current ? t("work.running", { step: current }) : t("elements.thinking")}
                     </Shimmer>
                 ) : (
-                    <span className="min-w-0 truncate" title={summary}>{summary}</span>
+                    <span className="min-w-0 truncate" title={summary}>
+                        {summary}
+                    </span>
                 )}
                 {failed > 0 ? (
                     <span
