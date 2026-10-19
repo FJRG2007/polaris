@@ -3,6 +3,7 @@
  * CSV download (`?what=samples|events|energy|actions`).
  */
 
+import { Readable } from "node:stream";
 import * as upsData from "@/lib/ups/ups-data";
 import * as upsSettings from "@/lib/ups/ups-settings";
 import { badRequest, upsAdmin, upsFromPath } from "../../guard";
@@ -17,7 +18,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ upsI
     if (row instanceof Response) return row;
     const query = upsSettings.exportQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) return badRequest();
-    const csv = await upsData.exportCsv(row.id, query.data.what, query.data.days);
+    const csv = Readable.toWeb(
+        Readable.from(upsData.exportCsv(row.id, query.data.what, query.data.days), { objectMode: false })
+    ) as ReadableStream<Uint8Array>;
     const name = `${upsData.fileStem(row.name)}-${query.data.what}-${query.data.days}d.csv`;
     return new Response(csv, {
         headers: {

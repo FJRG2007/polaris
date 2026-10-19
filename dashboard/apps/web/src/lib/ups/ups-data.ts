@@ -163,6 +163,9 @@ export interface EnergyBucket {
     currency: string;
 }
 
+/** Most buckets one UPS adds to a rollup; above any span the query schema allows. */
+const ROLLUP_ROWS_PER_UPS = 20_000;
+
 /** Energy in hour, day or month buckets of the reader's own time zone. */
 export async function energyRollup(upsIds: string[], query: upsSettings.EnergyQuery) {
     if (upsIds.length === 0) return [];
@@ -178,7 +181,7 @@ export async function energyRollup(upsIds: string[], query: upsSettings.EnergyQu
         WHERE "upsId" = ANY(${upsIds}::uuid[]) AND "hour" >= ${query.from} AND "hour" < ${query.to}
         GROUP BY "upsId", bucket, "currency"
         ORDER BY bucket ASC
-        LIMIT 20000`;
+        LIMIT ${ROLLUP_ROWS_PER_UPS * upsIds.length}`;
     return rows.map((row) => ({
         upsId: row.upsId,
         ts: row.bucket.toISOString(),
@@ -257,40 +260,72 @@ export async function analytics(days: number, tz: string, now = Date.now()) {
 // CSV export
 // ---------------------------------------------------------------------------
 
-/** One UPS's records over the last `days` as CSV, bounded to 50 000 rows. */
-export async function exportCsv(upsId: string, what: upsSettings.ExportKind, days: number, now = Date.now()) {
+/** Rows one export query reads at a time. */
+const EXPORT_PAGE = 5_000;
+
+/** One UPS's records over the last `days` as CSV, read and yielded a page at a time. */
+export async function* exportCsv(upsId: string, what: upsSettings.ExportKind, days: number, now = Date.now()) {
     const since = new Date(now - days * DAY_MS);
-    const take = 50_000;
+    const take = EXPORT_PAGE;
+    const line = (row: readonly unknown[]) => `${row.map(upsSettings.csvCell).join(",")}\r\n`;
     if (what === "samples") {
-        const rows = await prisma.upsSample.findMany({ where: { upsId, ts: { gte: since } }, orderBy: { ts: "asc" }, take });
-        return upsSettings.toCsv(
-            ["time", "charge_pct", "runtime_s", "load_pct", "power_w", "input_v", "input_hz", "output_v", "battery_v"],
-            rows.map((r) => [r.ts, r.charge, r.runtimeS, r.load, r.powerW, r.inputV, r.inputHz, r.outputV, r.batteryV])
-        );
-    }
-    if (what === "events") {
-        const rows = await prisma.upsEvent.findMany({ where: { upsId, ts: { gte: since } }, orderBy: { ts: "asc" }, take });
-        return upsSettings.toCsv(
-            ["time", "event", "detail", "acknowledged_at"],
-            rows.map((r) => [r.ts, r.kind, r.detail, r.acknowledgedAt])
-        );
+        yield line(["time", "charge_pct", "runtime_s", "load_pct", "power_w", "input_v", "input_hz", "output_v", "battery_v"]);
+        for (let after = since, first = true; ; first = false) {
+            const rows = await prisma.upsSample.findMany({
+                where: { upsId, ts: first ? { gte: after } : { gt: after } },
+                orderBy: { ts: "asc" },
+                take
+            });
+            if (rows.length > 0) {
+                yield rows
+                    .map((r) => line([r.ts, r.charge, r.runtimeS, r.load, r.powerW, r.inputV, r.inputHz, r.outputV, r.batteryV]))
+                    .join("");
+            }
+            if (rows.length < take) return;
+            after = rows[rows.length - 1]!.ts;
+        }
     }
     if (what === "energy") {
-        const rows = await prisma.upsEnergyHour.findMany({
-            where: { upsId, hour: { gte: since } },
-            orderBy: { hour: "asc" },
-            take
-        });
-        return upsSettings.toCsv(
-            ["hour", "kwh", "cost", "currency"],
-            rows.map((r) => [r.hour, (r.wh / 1000).toFixed(4), r.cost.toFixed(4), r.currency])
-        );
+        yield line(["hour", "kwh", "cost", "currency"]);
+        for (let after = since, first = true; ; first = false) {
+            const rows = await prisma.upsEnergyHour.findMany({
+                where: { upsId, hour: first ? { gte: after } : { gt: after } },
+                orderBy: { hour: "asc" },
+                take
+            });
+            if (rows.length > 0) {
+                yield rows.map((r) => line([r.hour, (r.wh / 1000).toFixed(4), r.cost.toFixed(4), r.currency])).join("");
+            }
+            if (rows.length < take) return;
+            after = rows[rows.length - 1]!.hour;
+        }
     }
-    const rows = await prisma.upsAction.findMany({ where: { upsId, ts: { gte: since } }, orderBy: { ts: "asc" }, take });
-    return upsSettings.toCsv(
-        ["time", "kind", "name", "value", "outcome"],
-        rows.map((r) => [r.ts, r.kind, r.name, r.value, r.outcome])
-    );
+    if (what === "events") {
+        yield line(["time", "event", "detail", "acknowledged_at"]);
+        for (let cursor: string | undefined; ; ) {
+            const rows = await prisma.upsEvent.findMany({
+                where: { upsId, ts: { gte: since } },
+                orderBy: [{ ts: "asc" }, { id: "asc" }],
+                take,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+            });
+            if (rows.length > 0) yield rows.map((r) => line([r.ts, r.kind, r.detail, r.acknowledgedAt])).join("");
+            if (rows.length < take) return;
+            cursor = rows[rows.length - 1]!.id;
+        }
+    }
+    yield line(["time", "kind", "name", "value", "outcome"]);
+    for (let cursor: string | undefined; ; ) {
+        const rows = await prisma.upsAction.findMany({
+            where: { upsId, ts: { gte: since } },
+            orderBy: [{ ts: "asc" }, { id: "asc" }],
+            take,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+        });
+        if (rows.length > 0) yield rows.map((r) => line([r.ts, r.kind, r.name, r.value, r.outcome])).join("");
+        if (rows.length < take) return;
+        cursor = rows[rows.length - 1]!.id;
+    }
 }
 
 /** A file name safe on every storage: the UPS name's plain letters only. */
@@ -306,14 +341,26 @@ export function fileStem(name: string): string {
 
 export const DRIVE_FOLDER = "UPS";
 
+async function* utf8Chunks(content: string | AsyncIterable<string>) {
+    if (typeof content === "string") {
+        yield Buffer.from(content, "utf8");
+        return;
+    }
+    for await (const chunk of content) yield Buffer.from(chunk, "utf8");
+}
+
 /** Write a text file into this person's own drive, under `UPS/`. */
-export async function saveToDrive(userId: string, fileName: string, content: string): Promise<string> {
+export async function saveToDrive(
+    userId: string,
+    fileName: string,
+    content: string | AsyncIterable<string>
+): Promise<string> {
     const drive = await ensurePersonalDrive(userId);
     const driver = await requireDriveDriver(userId, drive.id, DRIVE_FOLDER, "write");
     try {
         await driver.mkdir(DRIVE_FOLDER).catch(() => undefined);
         const path = `${DRIVE_FOLDER}/${fileName}`;
-        const body = Readable.toWeb(Readable.from([Buffer.from(content, "utf8")])) as ReadableStream<Uint8Array>;
+        const body = Readable.toWeb(Readable.from(utf8Chunks(content))) as ReadableStream<Uint8Array>;
         await driver.writeStream(path, body);
         return path;
     } finally {

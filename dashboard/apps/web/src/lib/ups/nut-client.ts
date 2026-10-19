@@ -187,9 +187,10 @@ async function readWritable(session: NutSession, name: string): Promise<UpsRwVar
     return out;
 }
 
-/** A UPS's variables, the commands it accepts and what can be set on it. */
+/** A UPS's variables, the commands it accepts and, when asked for, what can be set on it. */
 export async function nutRead(
-    target: NutTarget
+    target: NutTarget,
+    { writable = false }: { writable?: boolean } = {}
 ): Promise<{ vars: Record<string, string>; commands: string[]; rw: UpsRwVar[] }> {
     const name = word(target.upsName);
     return withSession(target, async (session) => {
@@ -197,7 +198,7 @@ export async function nutRead(
         const error = errorOf(vars);
         if (error) throw new Error(error);
         const commands = await session.ask(`LIST CMD ${name}`);
-        const rw = await readWritable(session, name).catch(() => []);
+        const rw = writable ? await readWritable(session, name).catch(() => []) : [];
         return { vars: parseListVar(vars), commands: errorOf(commands) ? [] : parseListCmd(commands), rw };
     });
 }

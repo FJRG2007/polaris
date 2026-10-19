@@ -273,13 +273,21 @@ describe("the NUT protocol client", () => {
     });
 
     it("reads variables, commands and writable variables with their kinds", async () => {
-        const answer = await nut.nutRead({ host: "127.0.0.1", port, upsName: "ups" });
+        const answer = await nut.nutRead({ host: "127.0.0.1", port, upsName: "ups" }, { writable: true });
         expect(answer.vars).toEqual({ "battery.charge": "88", "ups.status": "OL" });
         expect(answer.commands).toEqual(["beeper.mute"]);
         expect(answer.rw).toEqual([
             { name: "input.transfer.low", value: "170", kind: "enum", options: ["160", "170"] },
             { name: "ups.id", value: "rack", kind: "string", maxLen: 8 }
         ]);
+    });
+
+    it("skips the writable variables unless asked for them", async () => {
+        seen.length = 0;
+        const answer = await nut.nutRead({ host: "127.0.0.1", port, upsName: "ups" });
+        expect(answer.commands).toEqual(["beeper.mute"]);
+        expect(answer.rw).toEqual([]);
+        expect(seen.some((line) => line.startsWith("LIST RW") || line.startsWith("GET TYPE"))).toBe(false);
     });
 
     it("sets a variable logged in, quoting the value, and reports a refusal", async () => {

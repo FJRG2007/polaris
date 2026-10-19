@@ -281,7 +281,7 @@ export async function saveUpsExportAction(id: string, raw: unknown): Promise<Ups
         const input = exportSchema.parse(raw);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
-        const csv = await upsData.exportCsv(upsId, input.what, input.days);
+        const csv = upsData.exportCsv(upsId, input.what, input.days);
         const name = `${upsData.fileStem(row.name)}-${input.what}-${new Date().toISOString().slice(0, 10)}.csv`;
         return { ok: true, value: await upsData.saveToDrive(user.id, name, csv) };
     } catch (error) {

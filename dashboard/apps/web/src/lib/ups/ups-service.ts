@@ -401,16 +401,16 @@ function answered(
 
 export async function readUps(
     row: UpsRow,
-    listUsb: UsbListing = usbListing()
+    listUsb: UsbListing = usbListing(),
+    { writable = false }: { writable?: boolean } = {}
 ): Promise<UpsReadResult> {
     try {
         if (row.connection === "nut") {
             if (!row.host || !row.upsName) return { ok: false, reason: "notFound" };
-            const answer = await nutRead({
-                host: row.host,
-                port: row.port ?? 3493,
-                upsName: row.upsName
-            });
+            const answer = await nutRead(
+                { host: row.host, port: row.port ?? 3493, upsName: row.upsName },
+                { writable }
+            );
             return answered(row, answer.vars, answer.commands, answer.rw);
         }
         const daemon = daemonFor(row.machineId);
@@ -545,7 +545,7 @@ export async function setUpsVar(
     value: string
 ): Promise<{ outcome: UpsSetResult; error?: string }> {
     try {
-        const now = await readUps(row);
+        const now = await readUps(row, usbListing(), { writable: true });
         if (!now.ok) return { outcome: "unreachable" };
         const rw = now.rw.find((one) => one.name === name);
         if (!rw) return { outcome: "unsupported" };
@@ -603,9 +603,7 @@ export function canOfferNetwork(row: Pick<UpsRow, "connection" | "machineId">): 
 
 /** Make the local daemon offer, or stop offering, its UPSes to the network. */
 async function syncNetserver(rows: readonly UpsRow[]): Promise<void> {
-    const local = rows.filter(canOfferNetwork);
-    if (local.length === 0) return;
-    const wanted = local.some((row) => row.netserverEnabled) ? netserverLogin() : null;
+    const wanted = rows.some((row) => canOfferNetwork(row) && row.netserverEnabled) ? netserverLogin() : null;
     await new HostdClient().upsNetserver(wanted).catch(() => undefined);
 }
 
@@ -888,7 +886,9 @@ async function prune(rows: readonly UpsRow[], now: number): Promise<void> {
 async function watchOne(row: UpsRow, now: number, listUsb: UsbListing): Promise<void> {
     const result = await readUps(row, listUsb);
     if (!result.ok) {
-        await watchUnreachable(row, now);
+        if (result.reason !== "fullEditionNeeded" && result.reason !== "updateNeeded") {
+            await watchUnreachable(row, now);
+        }
         return;
     }
     const reading = result.reading;
