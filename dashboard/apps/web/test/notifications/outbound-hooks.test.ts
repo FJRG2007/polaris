@@ -20,6 +20,10 @@ type Hook = {
     secretNonce: Uint8Array;
     secretKeyId: string | null;
     events: string[];
+    requestConfig?: unknown;
+    encryptedRequest?: Uint8Array | null;
+    requestNonce?: Uint8Array | null;
+    requestKeyId?: string | null;
     enabled: boolean;
     consecutiveFailures: number;
     disabledReason: string | null;
@@ -259,8 +263,10 @@ const {
     DISABLE_AFTER_FAILURES,
     listOutboundDeliveries,
     queueOutboundHooks,
+    listOutboundHooks,
     redeliverOutbound,
     RETRY_DELAYS_MS,
+    setOutboundHookRequest,
     runOutboundHooks,
     signPayload,
     testOutboundHook
@@ -522,5 +528,124 @@ describe("limits", () => {
             error: "rateLimited"
         });
         expect(await redeliverOutbound("u1", "x")).toEqual({ error: "rateLimited" });
+    });
+});
+
+describe("extra headers and sign-in", () => {
+    const sentHeaders = () => requests[requests.length - 1]!.init.headers;
+
+    it("sends a Bearer token and the extra headers, beside an unchanged signature", async () => {
+        const { id, secret } = await addHook();
+        const saved = await setOutboundHookRequest("u1", id, {
+            auth: { type: "bearer", token: "tok_live_123" },
+            headers: [
+                { name: "X-Team", secret: false, value: "ops" },
+                { name: "X-Api-Key", secret: true, value: "key_456" }
+            ]
+        });
+        expect("hook" in saved).toBe(true);
+        await queueOutboundHooks("u1", PAYLOAD);
+        const headers = sentHeaders();
+        expect(headers.Authorization).toBe("Bearer tok_live_123");
+        expect(headers["X-Team"]).toBe("ops");
+        expect(headers["X-Api-Key"]).toBe("key_456");
+        const timestamp = Number(headers["X-Polaris-Timestamp"]);
+        const body = requests[0]!.init.body;
+        const expected = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
+        expect(headers["X-Polaris-Signature"]).toBe(`sha256=${expected}`);
+    });
+
+    it("sends Basic as base64 of user:password", async () => {
+        const { id } = await addHook();
+        await setOutboundHookRequest("u1", id, {
+            auth: { type: "basic", username: "ana", password: "s3cret" },
+            headers: []
+        });
+        await queueOutboundHooks("u1", PAYLOAD);
+        expect(sentHeaders().Authorization).toBe(
+            `Basic ${Buffer.from("ana:s3cret").toString("base64")}`
+        );
+    });
+
+    it("sends a custom auth header by its own name", async () => {
+        const { id } = await addHook();
+        await setOutboundHookRequest("u1", id, {
+            auth: { type: "header", name: "X-Auth-Token", value: "abc" },
+            headers: []
+        });
+        await queueOutboundHooks("u1", PAYLOAD);
+        expect(sentHeaders()["X-Auth-Token"]).toBe("abc");
+        expect(sentHeaders().Authorization).toBeUndefined();
+    });
+
+    it("never returns a secret, and keeps the stored one when it is left out", async () => {
+        const { id } = await addHook();
+        await setOutboundHookRequest("u1", id, {
+            auth: { type: "bearer", token: "tok_live_123" },
+            headers: [{ name: "X-Api-Key", secret: true, value: "key_456" }]
+        });
+        const resaved = await setOutboundHookRequest("u1", id, {
+            auth: { type: "bearer" },
+            headers: [{ name: "X-Api-Key", secret: true }]
+        });
+        const listed = await listOutboundHooks("u1");
+        for (const shown of [JSON.stringify(resaved), JSON.stringify(listed)]) {
+            expect(shown).not.toContain("tok_live_123");
+            expect(shown).not.toContain("key_456");
+        }
+        expect(listed[0]!.request).toEqual({
+            auth: { type: "bearer", tokenSet: true },
+            headers: [{ name: "X-Api-Key", secret: true, value: null, set: true }]
+        });
+        // Stored encrypted, not in the shown half.
+        expect(JSON.stringify(hooks[0]!.requestConfig)).not.toContain("tok_live_123");
+        await queueOutboundHooks("u1", PAYLOAD);
+        expect(sentHeaders().Authorization).toBe("Bearer tok_live_123");
+        expect(sentHeaders()["X-Api-Key"]).toBe("key_456");
+    });
+
+    it("refuses a secret left out that was never stored", async () => {
+        const { id } = await addHook();
+        expect(
+            await setOutboundHookRequest("u1", id, { auth: { type: "bearer" }, headers: [] })
+        ).toEqual({ error: "missingSecret" });
+    });
+
+    it("clears the sign-in and the headers when set back to none", async () => {
+        const { id } = await addHook();
+        await setOutboundHookRequest("u1", id, {
+            auth: { type: "bearer", token: "tok_live_123" },
+            headers: [{ name: "X-Team", secret: false, value: "ops" }]
+        });
+        await setOutboundHookRequest("u1", id, { auth: { type: "none" }, headers: [] });
+        expect(hooks[0]!.encryptedRequest).toBeNull();
+        await queueOutboundHooks("u1", PAYLOAD);
+        expect(sentHeaders().Authorization).toBeUndefined();
+        expect(sentHeaders()["X-Team"]).toBeUndefined();
+    });
+
+    it("never lets a stored row displace Polaris's own headers", async () => {
+        const { id } = await addHook();
+        const row = hooks.find((hook) => hook.id === id)!;
+        row.requestConfig = {
+            auth: { type: "none" },
+            headers: [
+                { name: "X-Polaris-Signature", secret: false, value: "sha256=forged" },
+                { name: "Host", secret: false, value: "evil.test" },
+                { name: "X-Split", secret: false, value: "a\r\nX-Injected: 1" }
+            ]
+        };
+        await queueOutboundHooks("u1", PAYLOAD);
+        const headers = sentHeaders();
+        expect(headers["X-Polaris-Signature"]).not.toBe("sha256=forged");
+        expect(headers.Host).toBeUndefined();
+        expect(headers["X-Split"]).toBeUndefined();
+    });
+
+    it("does not touch another account's endpoint", async () => {
+        const { id } = await addHook();
+        expect(
+            await setOutboundHookRequest("u2", id, { auth: { type: "none" }, headers: [] })
+        ).toEqual({ error: "notFound" });
     });
 });

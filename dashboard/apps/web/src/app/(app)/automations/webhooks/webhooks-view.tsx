@@ -10,11 +10,21 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { DeliveryLogDialog } from "./delivery-log-dialog";
+import { RequestDialog } from "./request-dialog";
 import { deliveryReason } from "./delivery-reason";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OutboundHookView } from "@/lib/notifications/outbound-hooks";
 import { MAX_OUTBOUND_WEBHOOKS, outboundWebhookInputSchema } from "@polaris/core";
-import { KeyRound, ListChecks, Plus, ScrollText, Send, Trash2 } from "lucide-react";
+import {
+    KeyRound,
+    ListChecks,
+    Plus,
+    ScrollText,
+    Send,
+    SlidersHorizontal,
+    Trash2
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -43,6 +53,7 @@ export interface EventOption {
 type Open =
     | { kind: "add" }
     | { kind: "events"; hook: OutboundHookView }
+    | { kind: "request"; hook: OutboundHookView }
     | { kind: "secret"; secret: string }
     | { kind: "rotate"; hook: OutboundHookView }
     | { kind: "remove"; hook: OutboundHookView }
@@ -149,6 +160,9 @@ export function WebhooksView({
                                                 {t("webhooks.list.eventCount", {
                                                     count: hook.events.length
                                                 })}
+                                                {hook.request.auth.type !== "none"
+                                                    ? ` - ${authLabel(t, hook.request.auth.type)}`
+                                                    : null}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1">
@@ -189,6 +203,12 @@ export function WebhooksView({
                                                 onClick={() => setOpen({ kind: "events", hook })}
                                             >
                                                 <ListChecks className="size-4" />
+                                            </IconAction>
+                                            <IconAction
+                                                label={t("webhooks.list.request")}
+                                                onClick={() => setOpen({ kind: "request", hook })}
+                                            >
+                                                <SlidersHorizontal className="size-4" />
                                             </IconAction>
                                             <IconAction
                                                 label={t("webhooks.list.rotate")}
@@ -259,6 +279,16 @@ export function WebhooksView({
                     onCreated={close}
                 />
             ) : null}
+            {open?.kind === "request" ? (
+                <RequestDialog
+                    hook={open.hook}
+                    onClose={close}
+                    onSaved={() => {
+                        close();
+                        router.refresh();
+                    }}
+                />
+            ) : null}
             {open?.kind === "secret" ? <SecretDialog secret={open.secret} onClose={close} /> : null}
             {open?.kind === "log" ? <DeliveryLogDialog hook={open.hook} onClose={close} /> : null}
             {open?.kind === "rotate" ? (
@@ -308,6 +338,15 @@ export function WebhooksView({
             ) : null}
         </Card>
     );
+}
+
+function authLabel(
+    t: NamespaceTranslator<"accountNotifications">,
+    type: "bearer" | "basic" | "header"
+): string {
+    if (type === "bearer") return t("webhooks.request.authBearer");
+    if (type === "basic") return t("webhooks.request.authBasic");
+    return t("webhooks.request.authHeader");
 }
 
 function IconAction({

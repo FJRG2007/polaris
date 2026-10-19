@@ -7,6 +7,7 @@
  * scroll (see settings-kit.tsx for the pieces).
  */
 
+import { DeployHooksCard } from "./deploy-hooks-card";
 import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
@@ -761,6 +762,7 @@ export function SettingsTab({
                     <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
                 )}
                 <DeployBehaviourSection applicationId={app.id} canConfigure={configure} />
+                {can("deploy.run") && <DeployHooksCard applicationId={app.id} />}
                 {app.sourceType === "image" && (
                     <RegistryPickCard applicationId={app.id} canConfigure={configure} />
                 )}

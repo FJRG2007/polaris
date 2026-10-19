@@ -143,9 +143,13 @@ export async function redeployableServices(userId: string): Promise<Redeployable
         .map((app) => ({ id: app.id, name: app.name, project: app.environment.project.name }));
 }
 
-export async function listInboundHooks(userId: string): Promise<InboundHookView[]> {
+/** The account's hooks, or - given a service - only the ones that redeploy it. */
+export async function listInboundHooks(
+    userId: string,
+    applicationId?: string
+): Promise<InboundHookView[]> {
     const rows = await prisma.inboundWebhook.findMany({
-        where: { userId },
+        where: applicationId ? { userId, applicationId } : { userId },
         orderBy: { createdAt: "asc" },
         take: MAX_INBOUND_HOOKS,
         select: {
@@ -218,6 +222,24 @@ export async function setInboundHookEnabled(
         (await prisma.inboundWebhook.updateMany({ where: { id, userId }, data: { enabled } }))
             .count > 0
     );
+}
+
+/**
+ * Replace a hook's secret, keeping its URL: whoever held the old one can no
+ * longer sign for it. The new one is returned here and never again.
+ */
+export async function rotateInboundHookSecret(
+    userId: string,
+    id: string
+): Promise<{ secret: string } | { error: "rateLimited" | "notFound" }> {
+    const limited = await rateLimit(`inbound-hook:rotate:${userId}`, 10, 10 * 60_000);
+    if (!limited.ok) return { error: "rateLimited" };
+    const secret = newSigningSecret();
+    const result = await prisma.inboundWebhook.updateMany({
+        where: { id, userId },
+        data: sealed(secret)
+    });
+    return result.count > 0 ? { secret } : { error: "notFound" };
 }
 
 export async function deleteInboundHook(userId: string, id: string): Promise<boolean> {

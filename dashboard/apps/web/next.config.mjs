@@ -105,6 +105,9 @@ const nextConfig = {
     // at /home for the same reason - a path nobody's browser has a stale answer for.
     redirects: async () => [
         { source: "/notifications", destination: "/account/notifications", permanent: false },
+        // Signed webhooks moved into Automations; deploy hooks went to each
+        // service's settings in Deploy.
+        { source: "/account/webhooks", destination: "/automations/webhooks", permanent: false },
         { source: "/overview", destination: "/home", permanent: false },
         // Home's screens were at /house for one release. Temporary on purpose: a
         // permanent redirect is a 308 with no expiry, cached by every browser

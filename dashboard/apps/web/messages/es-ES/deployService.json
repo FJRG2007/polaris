@@ -740,5 +740,41 @@
         "notUsing": "Ahora mismo no ocupa memoria de GPU.",
         "saved": "Guardado. El servicio se está iniciando de nuevo con el cambio.",
         "noConfigure": "No puedes cambiar cómo se ejecuta este servicio."
+    },
+    "deployHooks": {
+        "title": "Hooks de deploy",
+        "description": "URLs firmadas que despliegan este servicio cuando tu CI o tu registro les envía algo.",
+        "guard": "La URL sola no basta: cada petición va firmada con el secreto, llega en menos de cinco minutos y se acepta una vez.",
+        "add": "Añadir hook",
+        "empty": "Este servicio aún no tiene hooks.",
+        "loadFailed": "No se pudieron cargar los hooks.",
+        "retry": "Reintentar",
+        "name": "Nombre",
+        "namePlaceholder": "CI en main",
+        "url": "URL de hook",
+        "lastUsed": "Usado {time}",
+        "neverUsed": "Sin usar aún",
+        "switchOn": "Activar",
+        "switchOff": "Desactivar",
+        "rotate": "Nuevo secreto de firma",
+        "rotateTitle": "¿Crear un secreto nuevo?",
+        "rotateQuestion": "Las peticiones a {name} se firman con el secreto nuevo desde ya. La URL no cambia.",
+        "rotateConfirm": "Crear secreto",
+        "remove": "Quitar hook de deploy",
+        "removeQuestion": "¿Quitar {name}? Lo que siga enviando a su URL se rechaza desde ahora.",
+        "removeConfirm": "Quitar hook",
+        "dialogTitle": "Añadir hook de deploy",
+        "dialogDescription": "Polaris despliega este servicio con cada petición bien firmada, mientras puedas desplegarlo.",
+        "secretTitle": "Secreto de firma",
+        "secretDescription": "Cópialo ahora. Solo se muestra esta vez; si lo pierdes, crea otro.",
+        "secretVerify": "Firma cada POST igual: X-Polaris-Timestamp (segundos unix, a menos de 5 minutos), un id único en X-Polaris-Delivery y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo.",
+        "done": "Ya lo he copiado",
+        "errors": {
+            "invalid": "Ponle un nombre al hook.",
+            "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
+            "limit": "Tienes el máximo de {max} hooks de deploy.",
+            "forbidden": "No puedes desplegar este servicio.",
+            "notFound": "Ese hook de deploy ya no existe."
+        }
     }
 }

@@ -3895,6 +3895,14 @@ model OutboundWebhook {
     secretKeyId         String?
     // Catalogue event ids this endpoint is sent.
     events              String[]
+    // Extra headers and the sign-in sent with every body: names, the auth type
+    // and every value not marked secret. Null is no extra headers, no sign-in.
+    requestConfig       Json?
+    // The secret half of that - tokens, passwords, secret header values - as one
+    // envelope-encrypted JSON object. Never read back to a client.
+    encryptedRequest    Bytes?
+    requestNonce        Bytes?
+    requestKeyId        String?
     enabled             Boolean   @default(true)
     // Deliveries in a row that ran out of attempts. Reset by any success.
     consecutiveFailures Int       @default(0)

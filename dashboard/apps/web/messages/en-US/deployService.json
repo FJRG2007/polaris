@@ -740,5 +740,41 @@
         "notUsing": "Not holding any GPU memory right now.",
         "saved": "Saved. The service is starting again with the change.",
         "noConfigure": "You cannot change how this service runs."
+    },
+    "deployHooks": {
+        "title": "Deploy hooks",
+        "description": "Signed URLs that redeploy this service when your CI or registry posts to them.",
+        "guard": "The URL alone is not enough: every request must be signed with the secret, sent within five minutes, and is accepted once.",
+        "add": "Add deploy hook",
+        "empty": "No deploy hooks for this service yet.",
+        "loadFailed": "Deploy hooks could not be loaded.",
+        "retry": "Try again",
+        "name": "Name",
+        "namePlaceholder": "CI on main",
+        "url": "Hook URL",
+        "lastUsed": "Last used {time}",
+        "neverUsed": "Not used yet",
+        "switchOn": "Switch on",
+        "switchOff": "Switch off",
+        "rotate": "New signing secret",
+        "rotateTitle": "Make a new signing secret?",
+        "rotateQuestion": "Requests to {name} must be signed with the new secret from now on. The URL stays the same.",
+        "rotateConfirm": "Make new secret",
+        "remove": "Remove deploy hook",
+        "removeQuestion": "Remove {name}? Anything still posting to its URL is refused from now on.",
+        "removeConfirm": "Remove hook",
+        "dialogTitle": "Add a deploy hook",
+        "dialogDescription": "Polaris redeploys this service each time a correctly signed request arrives, for as long as you may deploy it.",
+        "secretTitle": "Signing secret",
+        "secretDescription": "Copy it now. It is shown only this once; if you lose it, make a new one.",
+        "secretVerify": "Sign each POST the same way: X-Polaris-Timestamp (unix seconds, within 5 minutes), a unique X-Polaris-Delivery id, and X-Polaris-Signature: sha256= followed by the hex HMAC-SHA256 of the timestamp, a dot and the raw body.",
+        "done": "I have copied it",
+        "errors": {
+            "invalid": "Give the hook a name.",
+            "rateLimited": "Too many tries. Wait a few minutes and try again.",
+            "limit": "You have the maximum of {max} deploy hooks.",
+            "forbidden": "You cannot redeploy this service.",
+            "notFound": "That deploy hook no longer exists."
+        }
     }
 }
