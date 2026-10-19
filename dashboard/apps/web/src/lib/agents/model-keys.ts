@@ -546,6 +546,57 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
     }
 }
 
+/** One provider's credential for a chat call, and whose it is. */
+export interface ChatCredential {
+    provider: string;
+    source: KeySource;
+    secret: string;
+    /** Set for the gateway only: the endpoint the key belongs to. */
+    baseUrl: string | null;
+    /** Set for the gateway only: the one model it serves. */
+    gatewayModel: string | null;
+}
+
+/**
+ * The credential a chat with this person spends for one provider: their own key
+ * first, then the deployment's when it shares them - the order every run uses.
+ * `payer` narrows it to one of the two when the person picked who pays. Null
+ * when nothing usable is stored, or the store could not be read.
+ */
+export async function chatCredentialFor(
+    userId: string,
+    provider: string,
+    payer: KeySource | null = null
+): Promise<ChatCredential | null> {
+    try {
+        const owners: Array<[KeySource, KeyOwner]> = [];
+        if (payer !== "instance") owners.push(["own", userId]);
+        if (payer !== "own" && (await instanceKeysAreShared())) owners.push(["instance", INSTANCE]);
+        for (const [source, owner] of owners) {
+            const picked = firstUsable(await storedKeys(owner), provider);
+            if (!picked) continue;
+            if (provider === GATEWAY_SLUG) {
+                const config = readGatewayConfig(parseConfig(picked.row.config));
+                if (!config.baseUrl) continue;
+                await noteUsed([picked.row.id]);
+                return {
+                    provider,
+                    source,
+                    secret: picked.secret,
+                    baseUrl: config.baseUrl.replace(/\/+$/, ""),
+                    gatewayModel: config.model || null
+                };
+            }
+            if (!picked.secret) continue;
+            await noteUsed([picked.row.id]);
+            return { provider, source, secret: picked.secret, baseUrl: null, gatewayModel: null };
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 /** Best-effort, and after the fact: it is a note on a screen, not something a run
  *  should fail over. */
 async function noteUsed(ids: string[]): Promise<void> {

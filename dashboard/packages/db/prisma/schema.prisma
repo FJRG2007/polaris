@@ -32,6 +32,7 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
+    polarThreads      PolarThread[]
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
     automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
@@ -14887,4 +14888,40 @@ model UpsSample {
 
     @@id([upsId, ts])
     @@index([ts])
+}
+
+// A conversation with Polar, the dashboard's assistant. Always one person's:
+// every query is scoped by userId, and nothing else reads it.
+model PolarThread {
+    id        String         @id @default(uuid(7)) @db.Uuid
+    userId    String         @db.Uuid
+    user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    title     String
+    // The model choice the thread was last sent with ({ provider, model,
+    // intelligence, payer }), so reopening it picks up where it was.
+    choice    Json?
+    // Messages typed while a turn was still running, in the order they will be
+    // sent. Kept on the thread so a reload does not lose them.
+    queue     Json           @default("[]")
+    createdAt DateTime       @default(now())
+    updatedAt DateTime       @updatedAt
+    messages  PolarMessage[]
+
+    @@index([userId, updatedAt(sort: Desc)])
+}
+
+// One message of a thread, in the AI SDK's UI message shape. `parentId` is the
+// message it answers; an edited message is a sibling under the same parent, so
+// every version of a turn is kept and the screen can step between them.
+model PolarMessage {
+    id        String      @id
+    threadId  String      @db.Uuid
+    thread    PolarThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+    parentId  String?
+    role      String
+    parts     Json
+    metadata  Json?
+    createdAt DateTime    @default(now())
+
+    @@index([threadId, createdAt])
 }
