@@ -8,8 +8,10 @@
  * field on top, a column of sections down the side - favourites, recently
  * played, Polaris's own sounds, then this space's and every other space the
  * reader brought sounds from - and a grid of sounds, each its emoji and its
- * name. Pressing one plays it to the room. Hovering one offers a star and a
- * preview, which plays it only here.
+ * name. Pressing one plays it to the room. Hovering one offers its preview on
+ * the left, which plays it only here, and its star on the right. While
+ * anything plays, the stop at the bottom ends it: for everybody when it is the
+ * reader's own sound, and here alone for anybody else's.
  *
  * The button is drawn for every seat and disabled, with the reason, for one
  * that may not play - from the same answer the server gives a press
@@ -24,15 +26,20 @@ import { Button, cn } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import type { CallState } from "./call-state";
 import * as rules from "@/lib/chat/soundboard";
-import { previewSound } from "./soundboard-player";
+import { clipsPlaying, onClipsChanged, previewSound, stopClips } from "./soundboard-player";
 import type { SoundView } from "@/lib/chat/soundboard-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallSoundboard } from "@/lib/chat/soundboard-service";
 import { shownGlyph, SOUND_GLYPH, type ShownReaction } from "./call-signals";
-import { Clock, Loader2, Music2, Search, Sparkles, Star, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Clock, Loader2, Music2, Search, Sparkles, Square, Star, Volume2 } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { rememberPlayed, useSoundboardPrefs, useSoundboardVolume } from "./soundboard-prefs";
-import { callSoundboardAction, favoriteSoundAction, playSoundAction } from "./soundboard-actions";
+import {
+    callSoundboardAction,
+    favoriteSoundAction,
+    playSoundAction,
+    stopSoundAction
+} from "./soundboard-actions";
 
 /** One sound as the grid draws it, whatever it came from. */
 interface Tile {
@@ -224,6 +231,7 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
                     >
                         <SoundboardPanel
                             meetingId={meetingId}
+                            selfId={call.participantId}
                             board={board}
                             onFavorites={(favorites) => {
                                 setBoard((current) => {
@@ -248,10 +256,13 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
  */
 export function SoundboardPanel({
     meetingId,
+    selfId = null,
     board,
     onFavorites
 }: {
     meetingId: string;
+    /** This browser's seat, whose own sound the stop ends for everybody. */
+    selfId?: string | null;
     board: CallSoundboard | null;
     onFavorites: (favorites: readonly string[]) => void;
 }) {
@@ -266,6 +277,28 @@ export function SoundboardPanel({
     const [busy, setBusy] = useState<string | null>(null);
     const [jump, setJump] = useState<string | null>(null);
     const scroller = useRef<HTMLDivElement>(null);
+    const playingHere = useSyncExternalStore(onClipsChanged, () => clipsPlaying(), () => false);
+    // When this seat last played, so its sound can be stopped for the room
+    // even by a reader who turned their own soundboard volume to nothing.
+    const [playedAt, setPlayedAt] = useState(0);
+    useEffect(() => {
+        if (!playedAt) return;
+        const left = playedAt + rules.SOUND_MAX_MS - Date.now();
+        if (left <= 0) return;
+        const timer = window.setTimeout(() => setPlayedAt(0), left);
+        return () => window.clearTimeout(timer);
+    }, [playedAt]);
+    const stoppable = playingHere || playedAt > 0;
+
+    const stop = () => {
+        const mine = playedAt > 0 || (selfId !== null && clipsPlaying(selfId));
+        stopClips();
+        setPlayedAt(0);
+        if (!mine) return;
+        void runAction(() => stopSoundAction(meetingId), setError).then((answer) => {
+            if (answer?.error) setError(answer.error);
+        });
+    };
 
     useLayoutEffect(() => {
         if (!jump) return;
@@ -390,6 +423,7 @@ export function SoundboardPanel({
             return;
         }
         rememberPlayed(tile.ref);
+        setPlayedAt(Date.now());
         setCoolUntil(Date.now() + cooldownMs);
         setNow(Date.now());
     };
@@ -471,6 +505,10 @@ export function SoundboardPanel({
                                     const name = nameOf(tile.ref, tile.name);
                                     const starred = favorites.has(tile.ref);
                                     return (
+                                        // Discord's tile: the sound in the middle, its
+                                        // preview on the left and its star on the right.
+                                        // The middle is padded for both from the start,
+                                        // so showing them on hover moves nothing.
                                         <div
                                             key={`${section.id}:${tile.ref}`}
                                             className="group relative min-w-0"
@@ -481,63 +519,58 @@ export function SoundboardPanel({
                                                 onClick={() => void play(tile)}
                                                 aria-label={t("soundboard.play", { name })}
                                                 title={name}
-                                                className="flex h-10 w-full min-w-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 text-left group-focus-within:pr-12 group-hover:pr-12 text-xs transition-colors hover:border-border-strong hover:bg-card-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                                className="flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg bg-muted/70 px-7 text-xs font-medium transition-colors hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <span aria-hidden className="shrink-0 text-base">
+                                                <span
+                                                    aria-hidden
+                                                    className="flex size-5 shrink-0 items-center justify-center text-base leading-none"
+                                                >
                                                     {busy === tile.ref ? (
                                                         <Loader2 className="size-4 animate-spin" />
                                                     ) : (
                                                         tile.emoji || SOUND_GLYPH
                                                     )}
                                                 </span>
-                                                <span className="min-w-0 truncate" title={name}>
-                                                    {name}
-                                                </span>
+                                                <span className="min-w-0 truncate">{name}</span>
                                             </button>
-                                            {/* On hover and on focus, so a keyboard reaches them
-                                                too. Outside the play button, since a button
-                                                inside a button is not one anybody can press. */}
-                                            <span className="absolute inset-y-0 right-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        void previewSound(tile.ref, volume)
-                                                    }
-                                                    aria-label={t("soundboard.preview", { name })}
-                                                    title={t("soundboard.preview", { name })}
-                                                    className="flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-                                                >
-                                                    <Volume2 className="size-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => void star(tile.ref)}
-                                                    aria-pressed={starred}
-                                                    aria-label={
-                                                        starred
-                                                            ? t("soundboard.unfavorite", { name })
-                                                            : t("soundboard.favorite", { name })
-                                                    }
-                                                    title={
-                                                        starred
-                                                            ? t("soundboard.unfavorite", { name })
-                                                            : t("soundboard.favorite", { name })
-                                                    }
-                                                    className={cn(
-                                                        "flex size-5 items-center justify-center rounded hover:text-foreground",
-                                                        starred
-                                                            ? "text-warning"
-                                                            : "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <Star
-                                                        className={cn(
-                                                            "size-3.5",
-                                                            starred && "fill-current"
-                                                        )}
-                                                    />
-                                                </button>
-                                            </span>
+                                            {/* Outside the play button, since a button inside a
+                                                button is not one anybody can press. Shown on
+                                                hover and on focus, so a keyboard reaches them;
+                                                a star that is on stays shown. */}
+                                            <button
+                                                type="button"
+                                                onClick={() => void previewSound(tile.ref, volume)}
+                                                aria-label={t("soundboard.preview", { name })}
+                                                title={t("soundboard.preview", { name })}
+                                                className="absolute left-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                                            >
+                                                <Volume2 className="size-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => void star(tile.ref)}
+                                                aria-pressed={starred}
+                                                aria-label={
+                                                    starred
+                                                        ? t("soundboard.unfavorite", { name })
+                                                        : t("soundboard.favorite", { name })
+                                                }
+                                                title={
+                                                    starred
+                                                        ? t("soundboard.unfavorite", { name })
+                                                        : t("soundboard.favorite", { name })
+                                                }
+                                                className={cn(
+                                                    "absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md transition-opacity hover:bg-background/60 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+                                                    starred
+                                                        ? "text-warning opacity-100"
+                                                        : "text-muted-foreground opacity-0"
+                                                )}
+                                            >
+                                                <Star
+                                                    className={cn("size-3.5", starred && "fill-current")}
+                                                />
+                                            </button>
                                         </div>
                                     );
                                 })}
@@ -564,6 +597,19 @@ export function SoundboardPanel({
                 </p>
             )}
             <div className="flex shrink-0 items-center gap-3 border-t border-border px-3 py-2">
+                {/* Always drawn, so the footer does not jump when a sound
+                    starts; pressable only while there is something to stop. */}
+                <Button
+                    size="xs"
+                    variant="secondary"
+                    disabled={!stoppable}
+                    onClick={stop}
+                    title={t("soundboard.stopHint")}
+                    className="shrink-0"
+                >
+                    <Square className="fill-current" />
+                    {t("soundboard.stop")}
+                </Button>
                 <Volume2 aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
                 <input
                     type="range"

@@ -59,7 +59,11 @@ describe("the default sounds", () => {
         const entry = manifest.sounds[id];
         expect(entry).toBeDefined();
         expect(FREE.has(entry?.license ?? "")).toBe(true);
-        expect(entry?.source).toMatch(/^https:\/\/(freesound\.org|commons\.wikimedia\.org)\//);
+        // A recording names where it was published; the one Polaris made itself
+        // names the script that makes it, in this repository.
+        expect(entry?.source).toMatch(
+            /^https:\/\/(freesound\.org|commons\.wikimedia\.org|github\.com\/FJRG2007\/polaris\/blob\/main\/dashboard\/apps\/web\/scripts\/)/
+        );
     });
 
     it("ships nothing that is not one of them", () => {

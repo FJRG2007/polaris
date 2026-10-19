@@ -20,6 +20,8 @@ import { z } from "zod";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { resolveSeat } from "@/lib/chat/meeting-seat";
 import * as meetings from "@/lib/chat/meetings";
+import { backgroundUser, sessionCan } from "@/lib/session";
+import { callsUnavailable } from "@/lib/chat/call-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +31,12 @@ const meetingIdSchema = z.string().uuid();
 // `streaming` is optional because a tab opened before it existed does not send
 // it, and a beat from that tab must still keep the seat.
 const voiceSchema = z
-    .object({ muted: z.boolean(), deafened: z.boolean(), streaming: z.boolean().optional() })
+    .object({
+        muted: z.boolean(),
+        deafened: z.boolean(),
+        streaming: z.boolean().optional(),
+        rejoin: z.boolean().optional()
+    })
     .strict();
 
 type Params = { params: Promise<{ meetingId: string }> };
@@ -39,10 +46,33 @@ async function seatFor(params: Params["params"]) {
     return parsed.success ? resolveSeat(parsed.data) : null;
 }
 
+/**
+ * Take the seat again for a browser that is still in the call but whose row was
+ * closed under it - a reload whose departure landed after the new page joined,
+ * a sweep while the machine slept. Without it the tab went on carrying the call
+ * on the media server while the roster said it had left, and nothing it did
+ * could put it back. Accounts only, through the same join a click makes, so
+ * every rule about who may be in the call is asked again.
+ */
+async function reseat(meetingId: string): Promise<boolean> {
+    const user = await backgroundUser();
+    if (!user) return false;
+    if (!(await sessionCan(user, "chat.use")) || !(await sessionCan(user, "chat.call"))) return false;
+    if (await callsUnavailable()) return false;
+    try {
+        await meetings.join({ id: user.id, name: user.name }, meetingId);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+type Beat = meetings.VoiceState & { rejoin?: boolean };
+
 /** What the beat says about the person's controls, or undefined when it says
  *  nothing. Anything that is not the expected shape is refused rather than
  *  half-read. */
-async function voiceFrom(request: Request): Promise<meetings.VoiceState | undefined | null> {
+async function voiceFrom(request: Request): Promise<Beat | undefined | null> {
     const text = await request.text().catch(() => "");
     if (text.trim() === "") return undefined;
     let body: unknown;
@@ -57,14 +87,19 @@ async function voiceFrom(request: Request): Promise<meetings.VoiceState | undefi
 
 /** Still here. */
 export async function POST(request: Request, { params }: Params): Promise<Response> {
-    const seat = await seatFor(params);
+    const beat = await voiceFrom(request);
+    // i18n-ignore: a protocol answer the call client never shows
+    if (beat === null) return Response.json({ error: "Malformed call state" }, { status: 400 });
+    const { rejoin, ...voice } = beat ?? {};
+    let seat = await seatFor(params);
+    if (!seat && rejoin) {
+        const parsed = meetingIdSchema.safeParse((await params).meetingId);
+        if (parsed.success && (await reseat(parsed.data))) seat = await seatFor(params);
+    }
     // Gone rather than not found: the seat was swept or left, and the browser
     // asking should stop rather than keep trying a path that exists.
     if (!seat) return Response.json({ error: (await readerWords("chat"))("errors.notInCall") }, { status: 410 });
-    const voice = await voiceFrom(request);
-    // i18n-ignore: a protocol answer the call client never shows
-    if (voice === null) return Response.json({ error: "Malformed call state" }, { status: 400 });
-    await meetings.keepSeat(seat, voice);
+    await meetings.keepSeat(seat, beat ? (voice as meetings.VoiceState) : undefined);
     return new Response(null, { status: 204 });
 }
 

@@ -67,6 +67,35 @@ function clipFor(ref: string, url: string | null): Promise<string> | null {
  */
 const playing = new Map<string, HTMLAudioElement>();
 
+/** Whoever is drawing a stop control, told each time what is playing changes. */
+const listeners = new Set<() => void>();
+
+function changed(): void {
+    for (const listener of listeners) listener();
+}
+
+/** Be told when a clip starts or stops. Returns the way to stop being told. */
+export function onClipsChanged(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+/** Whether anything is playing here - from `channel` alone when one is named. */
+export function clipsPlaying(channel?: string): boolean {
+    return channel === undefined ? playing.size > 0 : playing.has(channel);
+}
+
+/** Stop what is playing here: one person's sound, or every sound when no
+ *  channel is named. Only this browser - see `stopSound` for the room. */
+export function stopClips(channel?: string): void {
+    for (const [key, element] of playing) {
+        if (channel !== undefined && key !== channel) continue;
+        element.pause();
+        playing.delete(key);
+    }
+    changed();
+}
+
 export async function playClip(
     ref: string,
     { url = null, volume, channel }: { url?: string | null; volume: number; channel: string }
@@ -79,9 +108,14 @@ export async function playClip(
     const element = new Audio(src);
     element.volume = Math.min(1, Math.max(0, volume));
     playing.set(channel, element);
-    element.addEventListener("ended", () => {
-        if (playing.get(channel) === element) playing.delete(channel);
-    });
+    changed();
+    const done = () => {
+        if (playing.get(channel) !== element) return;
+        playing.delete(channel);
+        changed();
+    };
+    element.addEventListener("ended", done);
+    element.addEventListener("error", done);
     await playThroughChosenSpeaker(element).catch(() => undefined);
     await element.play().catch(() => undefined);
 }

@@ -420,8 +420,10 @@ export function Avatar({
             : null;
 
     // In a call, the mark is whether they can be heard, and only when they
-    // cannot - see `callBadge`.
-    if (inRoom && callBadge && size >= PRESENCE_FLOOR) {
+    // cannot - see `callBadge`. The face sits in the same box either way, mark
+    // or none: wrapping it only once they muted nudged it on the line, the
+    // small jump a voice row must never make.
+    if (inRoom && size >= PRESENCE_FLOOR) {
         const Icon = callBadge === "deafened" ? HeadphoneOff : MicOff;
         const words =
             callBadge === "deafened" ? t("avatar.notListening") : t("avatar.microphoneOff");
@@ -429,14 +431,16 @@ export function Avatar({
             <span className="relative inline-flex h-fit shrink-0 align-middle">
                 {shown}
                 {viewer}
-                <span
-                    aria-label={words}
-                    title={words}
-                    className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
-                    style={{ width: dotSize(size) + 6, height: dotSize(size) + 6 }}
-                >
-                    <Icon className="size-[62%]" />
-                </span>
+                {callBadge && (
+                    <span
+                        aria-label={words}
+                        title={words}
+                        className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
+                        style={{ width: dotSize(size) + 6, height: dotSize(size) + 6 }}
+                    >
+                        <Icon className="size-[62%]" />
+                    </span>
+                )}
             </span>
         );
     }

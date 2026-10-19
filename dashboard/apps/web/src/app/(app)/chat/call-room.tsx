@@ -1680,7 +1680,7 @@ function Split({
                             aria-label={t("callRoom.deviceSettings", { device: devicesLabel })}
                             title={t("callRoom.deviceSettings", { device: devicesLabel })}
                             className={cn(
-                                "w-6 rounded-l-none border-l border-border-strong",
+                                "w-6 rounded-l-none",
                                 TINTS[variant]
                             )}
                         >
@@ -2060,7 +2060,18 @@ function Split({
 }
 
 /** The bar's groups: one rounded tray each, the buttons inside it touching. */
-const CLUSTER = "flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1";
+/**
+ * A group of controls on the call bar: one pill, and the buttons inside it draw
+ * no edge of their own - only a background, and a neutral one only on hover, the
+ * way voice clients draw it. Each button's own border was a second outline
+ * inside the pill's. Made transparent rather than removed, so the button keeps
+ * its size and nothing in the bar moves when it is hovered or changes state.
+ */
+const CLUSTER = cn(
+    "flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1",
+    "[&_button]:border-transparent [&_button]:shadow-none",
+    "[&_button.bg-muted]:bg-transparent [&_button.bg-muted:hover]:bg-card-hover [&_button.bg-muted:active]:bg-card-hover/80"
+);
 
 /** Below this the sharing group folds into its "more" menu. A phone, and the
  *  call drawn in a side panel, are both under it. */
@@ -2744,9 +2755,14 @@ function Tile({
             {/* One line, whatever the tile's width: a long name truncates
                 rather than wrapping into a plate that covers the picture. */}
             <span className="absolute bottom-1 left-1 flex min-w-0 max-w-[calc(100%-0.5rem)] items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
+                {screen && <Monitor className="size-3 shrink-0" aria-hidden />}
+                <span className="min-w-0 truncate" title={label ?? name}>
+                    {label ?? name}
+                </span>
                 {/* Drawn because this person cannot be heard, yours included,
-                    and ahead of the name the way a voice channel's tile carries
-                    it - camera on or off. It used to sit on the face when the
+                    camera on or off. After the name rather than ahead of it:
+                    ahead, muting pushed the name sideways every time, the jump
+                    a voice client never makes. It used to sit on the face when the
                     camera was off, a badge on the circle that read as part of
                     the picture. Deafened wins the space: somebody who is not
                     listening is not reached by talking louder, and their
@@ -2762,10 +2778,6 @@ function Tile({
                         aria-label={t("callRoom.microphoneOff")}
                     />
                 ) : null}
-                {screen && <Monitor className="size-3 shrink-0" aria-hidden />}
-                <span className="min-w-0 truncate" title={label ?? name}>
-                    {label ?? name}
-                </span>
                 {guest && (
                     <span className="shrink-0 text-muted-foreground">{t("callRoom.guest")}</span>
                 )}

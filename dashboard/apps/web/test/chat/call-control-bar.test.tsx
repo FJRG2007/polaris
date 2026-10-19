@@ -157,6 +157,23 @@ describe("the call's control bar", () => {
         expect(screen.queryByRole("button", { name: /deafen/i })).toBeNull();
     });
 
+    // One outline per group: the buttons inside draw none of their own (a
+    // second border inside the pill), and a neutral one shows a background only
+    // on hover. Transparent rather than removed, so nothing resizes on hover.
+    it("draws one border per group, none per button", () => {
+        barWidth(900);
+        room({ sharing: true });
+        for (const name of [/bar\.media/, /bar\.sharing/]) {
+            const cluster = group(name);
+            expect(cluster.className).toContain("[&_button]:border-transparent");
+            expect(cluster.className).toContain("[&_button.bg-muted]:bg-transparent");
+            expect(cluster.className).toContain("[&_button.bg-muted:hover]:bg-card-hover");
+        }
+        for (const chevron of screen.getAllByRole("button", { name: /deviceSettings/ })) {
+            expect(chevron.className).not.toMatch(/border-l/);
+        }
+    });
+
     it("tints a muted microphone red and a camera that is on green", () => {
         room({ micOn: false, cameraOn: true });
         const mic = screen.getByRole("button", { name: /unmute/ });

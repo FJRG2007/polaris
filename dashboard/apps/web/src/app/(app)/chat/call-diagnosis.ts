@@ -243,6 +243,29 @@ export function settlingFor(everHeard: boolean, farEnd: boolean): number {
 export const SERVER_LOST =
     "This call lost the call server. Nothing more will be heard until it is back.";
 
+/**
+ * What a closed room means, from the reason the media client gave for it.
+ *
+ * - `ours`: this page let the room go itself - resting alone, leaving. The
+ *   media server logs it as the client asking to leave. Saying "lost the call
+ *   server" for it was the lie this exists to stop: a person alone in a call
+ *   was told the server had gone forty-five seconds after joining, every time.
+ * - `removed`: a moderator showed them out.
+ * - `elsewhere`: the same seat joined from another tab or device, which closes
+ *   this one.
+ * - `lost`: anything else, once the client has given up reconnecting.
+ *
+ * The reasons are the media server's `DisconnectReason` numbers.
+ */
+export type RoomClosed = "ours" | "removed" | "elsewhere" | "lost";
+
+export function roomClosed(reason: number | undefined, resting: boolean): RoomClosed {
+    if (resting || reason === 1) return "ours";
+    if (reason === 4) return "removed";
+    if (reason === 2) return "elsewhere";
+    return "lost";
+}
+
 /** Before anything has been measured. Not a verdict: a call that has been up for
  *  half a second has not failed. */
 export const UNKNOWN_AUDIO: CallAudioReport = {

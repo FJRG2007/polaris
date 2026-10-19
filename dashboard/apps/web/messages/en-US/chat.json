@@ -220,6 +220,7 @@
         "soundboardExternal": "This space only plays its own sounds",
         "soundboardCooldown": "Wait {seconds} s before the next sound",
         "soundboardUnreachable": "The call server did not answer. Try again.",
+        "soundboardNobody": "Nobody else is connected to this call to hear it.",
         "soundboardOwner": "The owner of the space cannot be denied the soundboard",
         "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial",
         "inviteSendLimit": "Too many invites at once. Try again in {seconds} s."
@@ -1630,7 +1631,11 @@
     "roster": {
         "sharingAScreen": "Sharing a screen",
         "live": "Live",
-        "inTheCall": "In the call"
+        "inTheCall": "In the call",
+        "notListening": "Not listening",
+        "microphoneOff": "Microphone off",
+        "deafenedByModerator": "Deafened by a moderator",
+        "mutedByModerator": "Muted by a moderator"
     },
     "muteMenu": {
         "unmute": "Unmute",
@@ -1795,6 +1800,8 @@
     },
     "soundboard": {
         "button": "Soundboard",
+        "stop": "Stop sounds",
+        "stopHint": "Stops your sound for everybody, and any other sound just for you.",
         "search": "Search sounds",
         "sections": "Sound sections",
         "favorites": "Favorites",
@@ -1820,7 +1827,7 @@
             "fanfare": "Fanfare",
             "boing": "Boing",
             "whoosh": "Whoosh",
-            "horn": "Horn"
+            "horn": "Air horn"
         }
     },
     "soundboardSettings": {

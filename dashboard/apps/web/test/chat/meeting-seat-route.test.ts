@@ -15,9 +15,14 @@ const SEAT = { meetingId: MEETING, participantId: "p1", admission: "admitted" };
 const resolveSeat = vi.fn();
 const keepSeat = vi.fn(async () => undefined);
 const leave = vi.fn(async () => undefined);
+const join = vi.fn(async () => SEAT);
+const backgroundUser = vi.fn(async () => ({ id: "u1", name: "Ada" }) as { id: string; name: string } | null);
+const sessionCan = vi.fn(async () => true);
 
 vi.mock("@/lib/chat/meeting-seat", () => ({ resolveSeat }));
-vi.mock("@/lib/chat/meetings", () => ({ keepSeat, leave }));
+vi.mock("@/lib/chat/meetings", () => ({ keepSeat, leave, join }));
+vi.mock("@/lib/session", () => ({ backgroundUser, sessionCan }));
+vi.mock("@/lib/chat/call-server", () => ({ callsUnavailable: async () => null }));
 
 const route = await import("../../src/app/api/chat/meetings/[meetingId]/seat/route");
 const params = (meetingId: string) => ({ params: Promise.resolve({ meetingId }) });
@@ -67,6 +72,48 @@ describe("keeping a seat", () => {
         const response = await route.POST(request("POST"), params("../../admin"));
         expect(response.status).toBe(410);
         expect(resolveSeat).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * A reload's departure can land after the new page has joined, which closed the
+ * row under a tab that was still carrying the call: the roster said it had left
+ * and its heartbeat was told to stop. A beat that says it is still in the call
+ * takes the seat again through the ordinary join.
+ */
+describe("taking a closed seat back", () => {
+    const beat = JSON.stringify({ muted: false, deafened: false, rejoin: true });
+
+    it("re-seats a browser still in the call", async () => {
+        resolveSeat.mockResolvedValueOnce(null).mockResolvedValueOnce(SEAT);
+        const response = await route.POST(request("POST", beat), params(MEETING));
+        expect(response.status).toBe(204);
+        expect(join).toHaveBeenCalledWith({ id: "u1", name: "Ada" }, MEETING);
+        expect(keepSeat).toHaveBeenCalledWith(SEAT, { muted: false, deafened: false });
+    });
+
+    it("does not re-seat a plain beat", async () => {
+        resolveSeat.mockResolvedValue(null);
+        const body = JSON.stringify({ muted: false, deafened: false });
+        const response = await route.POST(request("POST", body), params(MEETING));
+        expect(response.status).toBe(410);
+        expect(join).not.toHaveBeenCalled();
+    });
+
+    it("still says gone when the join is refused", async () => {
+        resolveSeat.mockResolvedValue(null);
+        join.mockRejectedValueOnce(new Error("callEnded"));
+        const response = await route.POST(request("POST", beat), params(MEETING));
+        expect(response.status).toBe(410);
+        expect(keepSeat).not.toHaveBeenCalled();
+    });
+
+    it("never re-seats without an account", async () => {
+        resolveSeat.mockResolvedValue(null);
+        backgroundUser.mockResolvedValueOnce(null);
+        const response = await route.POST(request("POST", beat), params(MEETING));
+        expect(response.status).toBe(410);
+        expect(join).not.toHaveBeenCalled();
     });
 });
 
