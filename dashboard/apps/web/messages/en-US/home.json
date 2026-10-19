@@ -91,7 +91,7 @@
         },
         "dnsBlocker": {
             "label": "Ad blocker",
-            "description": "Today's lookups on your network, and how many were blocked."
+            "description": "The last 24 hours' lookups on your network, and how many were blocked."
         }
     },
     "picker": {

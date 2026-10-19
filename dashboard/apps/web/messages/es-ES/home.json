@@ -91,7 +91,7 @@
         },
         "dnsBlocker": {
             "label": "Antianuncios",
-            "description": "Las consultas de hoy en tu red y cuántas se han bloqueado."
+            "description": "Las consultas de las últimas 24 horas en tu red y cuántas se han bloqueado."
         }
     },
     "picker": {

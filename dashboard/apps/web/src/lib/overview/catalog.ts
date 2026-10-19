@@ -201,7 +201,7 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
     {
         id: "dnsBlocker",
         label: "Ad blocker", // i18n-ignore
-        description: "Today's lookups on your network, and how many were blocked.", // i18n-ignore
+        description: "The last 24 hours' lookups on your network, and how many were blocked.", // i18n-ignore
         icon: ShieldBan,
         adminOnly: true,
         href: "/apps/dns-blocker",

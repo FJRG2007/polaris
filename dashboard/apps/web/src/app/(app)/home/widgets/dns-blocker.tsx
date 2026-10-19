@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * The Overview's "Ad blocker" card: today's lookups on the network, how many
- * were blocked, the day hour by hour, and a quick pause. Administrators only,
- * like the app's own screen, so whoever sees the card may also pause it.
+ * The Overview's "Ad blocker" card: the last 24 hours' lookups on the network,
+ * how many were blocked, the day hour by hour, and a quick pause. Administrators
+ * only, like the app's own screen, so whoever sees the card may also pause it.
  */
 
 import Link from "next/link";
