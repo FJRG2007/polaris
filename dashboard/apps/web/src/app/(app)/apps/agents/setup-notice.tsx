@@ -36,9 +36,7 @@ export async function SetupNotice() {
     ]);
 
     if (github?.method !== "app") {
-        return (
-            <Notice>{t.rich("notice.needsApp", { link: link("/admin/integrations") })}</Notice>
-        );
+        return <Notice>{t.rich("notice.needsApp", { link: link("/admin/integrations") })}</Notice>;
     }
 
     // An App that gained permissions does not gain them on anything it is already
@@ -68,9 +66,7 @@ export async function SetupNotice() {
     // rows to set.
     if (gap.appMissing.length > 0) {
         if (!user.isAdmin) {
-            return (
-                <Notice>{t("notice.missingPermission")}</Notice>
-            );
+            return <Notice>{t("notice.missingPermission")}</Notice>;
         }
         return (
             <Notice>
@@ -101,9 +97,7 @@ export async function SetupNotice() {
 
     if (gap.installations.length > 0) {
         if (!user.isAdmin) {
-            return (
-                <Notice>{t("notice.awaitingAdmin")}</Notice>
-            );
+            return <Notice>{t("notice.awaitingAdmin")}</Notice>;
         }
         return (
             <Notice>
@@ -153,7 +147,13 @@ export async function SetupNotice() {
     }
 
     if (providers.length === 0) {
-        return <Notice>{t.rich("notice.noProvider", { link: link(connectionsHref(AI_KEYS_SECTION, "/apps/agents")) })}</Notice>;
+        return (
+            <Notice>
+                {t.rich("notice.noProvider", {
+                    link: link(connectionsHref(AI_KEYS_SECTION, "/apps/agents"))
+                })}
+            </Notice>
+        );
     }
 
     return null;
@@ -166,4 +166,3 @@ function Notice({ children }: { children: React.ReactNode }) {
         </div>
     );
 }
-

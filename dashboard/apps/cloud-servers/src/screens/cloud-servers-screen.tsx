@@ -848,7 +848,10 @@ function CreateDialog({
                                     setSize("");
                                     setImage("");
                                 }}
-                                options={regions.regions.map((r) => ({ value: r.id, label: r.label }))}
+                                options={regions.regions.map((r) => ({
+                                    value: r.id,
+                                    label: r.label
+                                }))}
                             />
                         </Field>
                         <Field label={`${t("servers.size")} *`}>
@@ -862,7 +865,10 @@ function CreateDialog({
                                 onValueChange={setSize}
                                 options={regional.sizes.map((s) => {
                                     const price = money(s.priceMonthly, s.currency);
-                                    return { value: s.id, label: price ? `${s.label} - ${price}` : s.label };
+                                    return {
+                                        value: s.id,
+                                        label: price ? `${s.label} - ${price}` : s.label
+                                    };
                                 })}
                             />
                         </Field>
@@ -875,7 +881,10 @@ function CreateDialog({
                                 }
                                 aria-label={t("servers.image")}
                                 onValueChange={setImage}
-                                options={regional.images.map((i) => ({ value: i.id, label: i.label }))}
+                                options={regional.images.map((i) => ({
+                                    value: i.id,
+                                    label: i.label
+                                }))}
                             />
                         </Field>
                         {chosenSize && (
@@ -997,7 +1006,10 @@ function ResizeDialog({
                             .filter((s) => s.id !== server.size)
                             .map((s) => {
                                 const price = money(s.priceMonthly, s.currency);
-                                return { value: s.id, label: price ? `${s.label} - ${price}` : s.label };
+                                return {
+                                    value: s.id,
+                                    label: price ? `${s.label} - ${price}` : s.label
+                                };
                             })}
                     />
                 </Field>

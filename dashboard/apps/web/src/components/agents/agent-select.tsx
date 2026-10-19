@@ -116,7 +116,11 @@ export function AgentSelect({
                 className="border-border bg-surface flex h-9 w-full items-center gap-2 rounded-md border px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
             >
                 {chosen ? (
-                    <AgentLogo id={chosen.cli} label={labelOf(t, chosen)} className="size-4 shrink-0" />
+                    <AgentLogo
+                        id={chosen.cli}
+                        label={labelOf(t, chosen)}
+                        className="size-4 shrink-0"
+                    />
                 ) : null}
                 <span
                     className="min-w-0 flex-1 truncate text-left"
@@ -184,7 +188,10 @@ export function AgentSelect({
                                         label={labelOf(t, option)}
                                         className="size-4 shrink-0"
                                     />
-                                    <span className="min-w-0 flex-1 truncate" title={labelOf(t, option)}>
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={labelOf(t, option)}
+                                    >
                                         {labelOf(t, option)}
                                     </span>
                                     {/* Whose account it would use, which is the
@@ -207,8 +214,12 @@ export function AgentSelect({
                                                 option.machine
                                                     ? t("agentSelect.machineHint")
                                                     : option.mine
-                                                      ? t("agentSelect.yourAccount", { account: option.account })
-                                                      : t("agentSelect.providedAccount", { account: option.account })
+                                                      ? t("agentSelect.yourAccount", {
+                                                            account: option.account
+                                                        })
+                                                      : t("agentSelect.providedAccount", {
+                                                            account: option.account
+                                                        })
                                             }
                                         >
                                             {option.account}

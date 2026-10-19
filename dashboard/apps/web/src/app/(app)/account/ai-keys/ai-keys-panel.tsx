@@ -66,7 +66,10 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                 copy={{
                     title: t("aiKeys.keys.title"),
                     hint: t("aiKeys.keys.hint"),
-                    empty: shared && covered.length > 0 ? t("aiKeys.keys.emptyShared") : t("aiKeys.keys.empty"),
+                    empty:
+                        shared && covered.length > 0
+                            ? t("aiKeys.keys.emptyShared")
+                            : t("aiKeys.keys.empty"),
                     adding: t("aiKeys.keys.adding")
                 }}
                 footer={<FallbackCard providers={covered} shared={shared} t={t} />}
@@ -92,7 +95,10 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                     title: t("aiKeys.accounts.title"),
                     action: t("aiKeys.accounts.add"),
                     hint: t("aiKeys.accounts.hint"),
-                    empty: fromPlatform.size > 0 ? t("aiKeys.accounts.emptyShared") : t("aiKeys.accounts.empty"),
+                    empty:
+                        fromPlatform.size > 0
+                            ? t("aiKeys.accounts.emptyShared")
+                            : t("aiKeys.accounts.empty"),
                     adding: t("aiKeys.accounts.adding")
                 }}
                 assist={{
@@ -126,7 +132,9 @@ function FallbackCard({
                 <h2 className="text-sm font-medium">{t("aiKeys.fallback.title")}</h2>
                 {shared && providers.length > 0 ? (
                     <>
-                        <p className="text-muted-foreground text-xs">{t("aiKeys.fallback.shared")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("aiKeys.fallback.shared")}
+                        </p>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {providers.map((name) => (
                                 <Badge key={name} variant="neutral">

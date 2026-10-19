@@ -17,7 +17,6 @@ import { sessionCan, type SessionUser } from "@/lib/session";
 import { AI_KEYS_SECTION, TASK_TRACKERS_SECTION } from "@/lib/connections/hub-href";
 import { TrackersView } from "@/app/(app)/tasks/trackers/trackers-view";
 
-
 export interface HubCoreSections {
     readonly node: ReactNode;
     readonly ids: readonly string[];

@@ -21,7 +21,9 @@ export default async function AiKeysPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("aiKeys.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("aiKeys.page.title")}
+                </h1>
                 <p className="text-muted-foreground text-sm">{t("aiKeys.page.intro")}</p>
             </div>
             <AiKeysPanel userId={user.id} />

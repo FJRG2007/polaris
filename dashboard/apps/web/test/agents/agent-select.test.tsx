@@ -55,7 +55,9 @@ describe("AgentSelect", () => {
     it("draws the vendor's own mark for the tool that is picked", () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
         const { container } = render(
-            <AgentSelect options={options} value="claude" onChange={() => {}} />, { wrapper: MessagesWrapper });
+            <AgentSelect options={options} value="claude" onChange={() => {}} />,
+            { wrapper: MessagesWrapper }
+        );
         // Anthropic's mark is inline SVG carrying its own path data; a
         // monogram (the fallback for a tool with no mark) draws a <span> of
         // initials instead, never an <svg>.
@@ -66,7 +68,9 @@ describe("AgentSelect", () => {
 
     it("opens on the trigger and lists every tool with its readiness", async () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
-        render(<AgentSelect options={options} value="" onChange={() => {}} />, { wrapper: MessagesWrapper });
+        render(<AgentSelect options={options} value="" onChange={() => {}} />, {
+            wrapper: MessagesWrapper
+        });
 
         await userEvent.click(screen.getByRole("button", { name: /pick an agent/i }));
 
@@ -83,7 +87,9 @@ describe("AgentSelect", () => {
 
     it("narrows the list by vendor, not only by the tool's own name", async () => {
         const options = choicesFor(new Set());
-        render(<AgentSelect options={options} value="" onChange={() => {}} />, { wrapper: MessagesWrapper });
+        render(<AgentSelect options={options} value="" onChange={() => {}} />, {
+            wrapper: MessagesWrapper
+        });
         await userEvent.click(screen.getByRole("button", { name: /pick an agent/i }));
 
         await userEvent.type(screen.getByPlaceholderText("Search agents"), "openai");
@@ -95,7 +101,9 @@ describe("AgentSelect", () => {
     it("picks the row and closes, without leaving the search behind", async () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
         let picked = "";
-        render(<AgentSelect options={options} value="" onChange={(id) => (picked = id)} />, { wrapper: MessagesWrapper });
+        render(<AgentSelect options={options} value="" onChange={(id) => (picked = id)} />, {
+            wrapper: MessagesWrapper
+        });
         await userEvent.click(screen.getByRole("button", { name: /pick an agent/i }));
 
         await userEvent.click(screen.getByRole("option", { name: /claude code/i }));
@@ -107,7 +115,9 @@ describe("AgentSelect", () => {
     it("captures the open picker as evidence of what a person actually sees", async () => {
         const options = choicesFor(new Set(["CLAUDE_CODE_OAUTH_TOKEN"]));
         const { container } = render(
-            <AgentSelect options={options} value="claude" onChange={() => {}} />, { wrapper: MessagesWrapper });
+            <AgentSelect options={options} value="claude" onChange={() => {}} />,
+            { wrapper: MessagesWrapper }
+        );
         await userEvent.click(screen.getByRole("button", { name: /claude code/i }));
 
         expect(screen.getByRole("listbox")).not.toBeNull();
@@ -128,6 +138,8 @@ describe("SignInNotice", () => {
         // named in a line of prose now, since the notice sends people to the
         // button that signs it in rather than listing places to go and get one.
         expect(codex.missing.length).toBeGreaterThan(0);
-        expect(container.textContent?.toLowerCase()).toContain(codex.missing[0]!.label.toLowerCase());
+        expect(container.textContent?.toLowerCase()).toContain(
+            codex.missing[0]!.label.toLowerCase()
+        );
     });
 });
