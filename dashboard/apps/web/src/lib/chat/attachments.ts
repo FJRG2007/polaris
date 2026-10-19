@@ -765,7 +765,9 @@ export function borrowedAttachment(
  * same folders, and there is no second way to remove them.
  */
 export async function removeStoredFiles(
-    files: readonly { readonly connectionId: string | null; readonly path: string }[]
+    files: readonly { readonly connectionId: string | null; readonly path: string }[],
+    /** Under POLARIS_DATA_DIR, for the files that stayed on this server. */
+    localFolder: string = LOCAL_FOLDER
 ): Promise<void> {
     if (files.length === 0) return;
 
@@ -777,7 +779,7 @@ export async function removeStoredFiles(
 
     await Promise.all(
         [...byTarget].map(async ([target, paths]) => {
-            const driver = await driverForTarget(target, LOCAL_FOLDER).catch(() => null);
+            const driver = await driverForTarget(target, localFolder).catch(() => null);
             if (!driver) return;
             try {
                 for (const path of paths) await driver.delete(path).catch(() => undefined);

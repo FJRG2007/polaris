@@ -22,6 +22,9 @@ export const ACCOUNT_HOME = "/account";
 /** The id of the landing app, which is only offered alongside something to look
  *  at. */
 export const OVERVIEW_APP = "overview";
+/** Apps that only work on the others - Overview shows them, Polar acts in them -
+ *  so an account reaching nothing else is not offered these either. */
+const COMPANION_APPS = new Set([OVERVIEW_APP, "polar"]);
 
 export interface AppAccessInput {
     isAdmin: boolean;
@@ -61,8 +64,8 @@ export interface AppAccessInput {
  *  permission without being an administrator, so the switcher offers them the one
  *  door they have rather than the app's own.
  *
- *  Overview is the exception to "an app with no permission is open to anyone": it
- *  is a view onto the other apps, so for an account that reaches none of them it
+ *  Overview (and Polar beside it) is the exception to "an app with no permission
+ *  is open to anyone": it is a view onto the other apps, so for an account that reaches none of them it
  *  is an empty grid offered as somewhere to be. Those accounts belong on their
  *  own account page, which is what dropping it here arranges. */
 export async function reachableApps({
@@ -97,7 +100,7 @@ export async function reachableApps({
         })
     );
     const reachable = decided.filter((app): app is AppEntry => app !== null);
-    return reachable.some((app) => app.id !== OVERVIEW_APP) ? reachable : [];
+    return reachable.some((app) => !COMPANION_APPS.has(app.id)) ? reachable : [];
 }
 
 /**
@@ -160,7 +163,9 @@ export async function installedSectionApps({ isInstalled }: AppAccessInput): Pro
         )
     ];
     if (!isInstalled) return named;
-    const verdicts = await Promise.all(named.map(async (one) => [one, await isInstalled(one)] as const));
+    const verdicts = await Promise.all(
+        named.map(async (one) => [one, await isInstalled(one)] as const)
+    );
     return verdicts.filter(([, present]) => present).map(([one]) => one);
 }
 

@@ -42,15 +42,19 @@ vi.mock("@polaris/db", () => ({
             // indistinguishable from returning exactly them. The owner it does
             // honour, because which list a read is against is the question half
             // of these ask, and so is the expiry filter.
-            findMany: vi.fn(async ({ where }: { where?: { userId?: string | null; OR?: unknown[] } } = {}) =>
-                (where?.userId ? state.ownKeys : state.instanceKeys)
-                    .filter((row) => !where?.OR || row.expiresAt === null || row.expiresAt > new Date())
-                    .map((row) => ({
-                        ...row,
-                        encryptedSecret: Buffer.from(row.id),
-                        secretNonce: Buffer.from("n"),
-                        secretKeyId: "k"
-                    }))
+            findMany: vi.fn(
+                async ({ where }: { where?: { userId?: string | null; OR?: unknown[] } } = {}) =>
+                    (where?.userId ? state.ownKeys : state.instanceKeys)
+                        .filter(
+                            (row) =>
+                                !where?.OR || row.expiresAt === null || row.expiresAt > new Date()
+                        )
+                        .map((row) => ({
+                            ...row,
+                            encryptedSecret: Buffer.from(row.id),
+                            secretNonce: Buffer.from("n"),
+                            secretKeyId: "k"
+                        }))
             ),
             findFirst: vi.fn(async () => null),
             updateMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => {
@@ -72,7 +76,11 @@ vi.mock("@polaris/storage", () => ({
     // The envelope is not what is under test; the resolution order is. Decrypt
     // hands back whatever the fake row carried, and refuses the way the real one
     // does when it cannot - which is a throw, not a null.
-    encryptSecret: (value: string) => ({ ciphertext: Buffer.from(value), nonce: Buffer.from("n"), keyId: "k" }),
+    encryptSecret: (value: string) => ({
+        ciphertext: Buffer.from(value),
+        nonce: Buffer.from("n"),
+        keyId: "k"
+    }),
     decryptSecret: (blob: { ciphertext: Buffer }) => {
         const secret = state.secrets.get(blob.ciphertext.toString());
         if (secret === undefined) throw new FakeDecryptError("wrong master key");
@@ -86,7 +94,9 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async () => undefined
 }));
 
-const { connectedProviders, keySourcesFor, runSecretsFor } = await import("@/lib/agents/model-keys");
+const { chatCredentialFor, connectedProviders, keySourcesFor, runSecretsFor } = await import(
+    "@/lib/agents/model-keys"
+);
 
 beforeEach(() => {
     state.ownKeys = [];
@@ -118,7 +128,12 @@ function instanceHas(slug: string, secret: string, config: Record<string, unknow
     return id;
 }
 
-function ownHas(id: string, slug: string, secret: string | null, config: Record<string, unknown> = {}): void {
+function ownHas(
+    id: string,
+    slug: string,
+    secret: string | null,
+    config: Record<string, unknown> = {}
+): void {
     add(state.ownKeys, id, slug, secret, config);
 }
 
@@ -242,7 +257,14 @@ describe("runSecretsFor", () => {
     it("stops handing over one of the deployment's past its end date", async () => {
         // The date means the same thing on either list, or an administrator has
         // entered one that does nothing.
-        add(state.instanceKeys, "i1", "openai", "sk-expired", {}, new Date(Date.now() - 86_400_000));
+        add(
+            state.instanceKeys,
+            "i1",
+            "openai",
+            "sk-expired",
+            {},
+            new Date(Date.now() - 86_400_000)
+        );
         expect(await runSecretsFor("user-1")).toEqual({});
     });
 
@@ -311,7 +333,11 @@ describe("keySourcesFor", () => {
         ownHas("k1", "groq", "gsk-mine");
         ownHas("k2", "anthropic", "sk-mine");
         instanceHas("openai", "sk-theirs");
-        expect([...(await keySourcesFor("user-1")).keys()]).toEqual(["groq", "anthropic", "openai"]);
+        expect([...(await keySourcesFor("user-1")).keys()]).toEqual([
+            "groq",
+            "anthropic",
+            "openai"
+        ]);
     });
 
     it("counts a provider once however many keys it has", async () => {
@@ -359,5 +385,48 @@ describe("connectedProviders", () => {
         state.shared = false;
         instanceHas("groq", "gsk-theirs");
         expect(await connectedProviders()).toEqual(["groq"]);
+    });
+});
+
+describe("chatCredentialFor", () => {
+    // Polar's order: the person's own key, then the deployment's when it is
+    // shared - and a choice of who pays narrows it to that one owner.
+    it("spends the person's own key first", async () => {
+        ownHas("k1", "anthropic", "sk-mine");
+        instanceHas("anthropic", "sk-theirs");
+        const credential = await chatCredentialFor("user-1", "anthropic");
+        expect(credential).toMatchObject({ source: "own", secret: "sk-mine" });
+    });
+
+    it("falls back to the deployment's when the person has none", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({
+            source: "instance",
+            secret: "sk-theirs"
+        });
+    });
+
+    it("does not spend the deployment's once sharing is off", async () => {
+        state.shared = false;
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
+    });
+
+    it("pays with the deployment's when that is the choice, even with an own key", async () => {
+        ownHas("k1", "anthropic", "sk-mine");
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic", "instance")).toMatchObject({
+            source: "instance"
+        });
+    });
+
+    it("pays only with the person's own key when that is the choice", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic", "own")).toBeNull();
+    });
+
+    it("answers null for a provider nobody holds a key for", async () => {
+        ownHas("k1", "openai", "sk-mine");
+        expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
     });
 });

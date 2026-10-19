@@ -67,7 +67,8 @@ export function RichText({
     references,
     customEmoji = null,
     jumboEmoji = false,
-    flaggedLinks
+    flaggedLinks,
+    remoteImages = true
 }: {
     value: string;
     className?: string;
@@ -97,6 +98,13 @@ export function RichText({
      * ever marks a link as safe.
      */
     flaggedLinks?: readonly FlaggedLinkMark[];
+    /**
+     * Load a picture from another site as it is drawn. False leaves only this
+     * Polaris's own pictures inline and shows any other one as a link, for text
+     * nobody here wrote - a model's answer, where an image address is a way to
+     * send what it read to whoever owns that address.
+     */
+    remoteImages?: boolean;
 }) {
     if (!value.trim()) return null;
     const doc = references
@@ -111,7 +119,7 @@ export function RichText({
         : null;
     return (
         <div className={cn(RICH_TEXT_PROSE, className, jumbo && "text-[2.75rem] leading-[1.15]")}>
-            {blocks(doc.content, { set: customEmoji, jumbo, flagged })}
+            {blocks(doc.content, { set: customEmoji, jumbo, flagged, remoteImages })}
         </div>
     );
 }
@@ -126,6 +134,8 @@ interface EmojiScope {
     readonly jumbo: boolean;
     /** Flagged links by normalized address, to the provider that flagged them. */
     readonly flagged: ReadonlyMap<string, string> | null;
+    /** Pictures from another site load inline; false makes them links. */
+    readonly remoteImages: boolean;
 }
 
 /** A link a reputation service flagged, as far as drawing it goes. */
@@ -134,7 +144,7 @@ export interface FlaggedLinkMark {
     readonly provider: string;
 }
 
-const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null };
+const NO_EMOJI: EmojiScope = { set: null, jumbo: false, flagged: null, remoteImages: true };
 
 /**
  * Whether the message is one line of nothing but emoji, at most Discord's
@@ -256,7 +266,7 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         case "horizontalRule":
             return <hr />;
         case "image":
-            return <Media node={node} />;
+            return <Media node={node} scope={scope} />;
         default:
             return <>{blocks(node.content, scope)}</>;
     }
@@ -284,7 +294,7 @@ function taskItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope)
     ));
 }
 
-function Media({ node }: { node: JSONContent }) {
+function Media({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     const src = typeof node.attrs?.src === "string" ? node.attrs.src.trim() : "";
     if (!src) return null;
     // Same rule as a link, for the same reason: the address was written by
@@ -292,10 +302,17 @@ function Media({ node }: { node: JSONContent }) {
     // and an unparseable one is not an image.
     const local = src.startsWith("/") && !src.startsWith("//");
     if (!local && !isSafeHref(src)) return null;
+    const alt = String(node.attrs?.alt ?? "");
+    if (!local && !scope.remoteImages) {
+        return (
+            <Anchor href={src} flagged={scope.flagged}>
+                {alt || src}
+            </Anchor>
+        );
+    }
     // Not next/image: these point at whatever somebody wrote, which is usually
     // an attachment on this Polaris but can be any address at all.
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} alt={String(node.attrs?.alt ?? "")} />;
+    return <img src={src} alt={alt} />;
 }
 
 function text(node: JSONContent): string {
@@ -308,7 +325,7 @@ function inline(nodes: readonly JSONContent[] | undefined, scope: EmojiScope): R
 
 function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     if (node.type === "hardBreak") return <br />;
-    if (node.type === "image") return <Media node={node} />;
+    if (node.type === "image") return <Media node={node} scope={scope} />;
     if (node.type === REFERENCE) return <Chip node={node} />;
     if (node.type !== "text") return <>{inline(node.content, scope)}</>;
 

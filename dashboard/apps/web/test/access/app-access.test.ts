@@ -14,7 +14,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { Permission } from "@polaris/core";
-import { ACCOUNT_HOME, homePathFor, reachableAppIds, reachableAppNav, reachableApps } from "@/lib/app-access";
+import {
+    ACCOUNT_HOME,
+    homePathFor,
+    reachableAppIds,
+    reachableAppNav,
+    reachableApps
+} from "@/lib/app-access";
 
 /** A person who holds exactly these permissions and is not an administrator. */
 function holding(...permissions: Permission[]) {
@@ -26,8 +32,16 @@ const ADMIN = { isAdmin: true, can: async () => true };
 
 describe("reachableAppIds", () => {
     it("offers only the apps the permissions open", async () => {
-        expect(await reachableAppIds(holding("drive.read"))).toEqual(["overview", "drive"]);
-        expect(await reachableAppIds(holding("tasks.read"))).toEqual(["overview", "tasks"]);
+        expect(await reachableAppIds(holding("drive.read"))).toEqual([
+            "overview",
+            "drive",
+            "polar"
+        ]);
+        expect(await reachableAppIds(holding("tasks.read"))).toEqual([
+            "overview",
+            "tasks",
+            "polar"
+        ]);
     });
 
     it("gives an administrator Management, and withholds it from everyone else", async () => {
@@ -36,12 +50,19 @@ describe("reachableAppIds", () => {
     });
 
     it("opens Watch on the same permission as Apps, since it reports on them", async () => {
-        expect(await reachableAppIds(holding("deploy.read"))).toEqual(["overview", "apps", "watch"]);
+        expect(await reachableAppIds(holding("deploy.read"))).toEqual([
+            "overview",
+            "apps",
+            "polar",
+            "watch"
+        ]);
     });
 
     it("offers nothing to a role that grants nothing, Overview included", async () => {
         // Overview asks for no permission, so it would otherwise be the one app
         // an account that reaches nothing is handed - an empty grid.
+        // Polar is the same: it acts in the other apps, so with none it has
+        // nothing to do.
         expect(await reachableAppIds(holding())).toEqual([]);
     });
 
@@ -59,7 +80,7 @@ describe("reachableAppIds", () => {
 describe("the Inbox door inside Management", () => {
     it("offers Management to a member, under Inbox's name and landing on it", async () => {
         const apps = await reachableApps(holding("inbox.read"));
-        expect(apps.map((app) => app.id)).toEqual(["overview", "admin"]);
+        expect(apps.map((app) => app.id)).toEqual(["overview", "polar", "admin"]);
         const app = apps.find((entry) => entry.id === "admin");
         expect(app?.label).toBe("Inbox");
         expect(app?.href).toBe("/admin/inbox");
@@ -81,7 +102,7 @@ describe("the Inbox door inside Management", () => {
 
     it("marks the guest entry for the switcher, and only the guest one", async () => {
         expect(await reachableAppNav(holding("inbox.read"))).toEqual({
-            ids: ["overview", "admin"],
+            ids: ["overview", "polar", "admin"],
             guestIds: ["admin"]
         });
         expect((await reachableAppNav(ADMIN)).guestIds).toEqual([]);

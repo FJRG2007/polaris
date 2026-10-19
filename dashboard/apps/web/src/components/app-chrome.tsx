@@ -46,6 +46,7 @@ import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
 import { MessageToasts } from "@/components/message-toasts";
 import { TransfersView } from "@/components/transfers/transfers-view";
 import { CommandPalette } from "@/components/command-palette";
+import { PolarAside, PolarProvider, PolarToggle } from "@/components/polar/polar-panel";
 import { PresenceProvider } from "@/components/presence-store";
 import { ProfileStyleProvider } from "@/components/profile-style-store";
 import { listNotifications } from "@/lib/notification-service";
@@ -436,6 +437,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                             }
                                                                                         />
                                                                                     }
+                                                                                    aside={
+                                                                                        <PolarAside />
+                                                                                    }
                                                                                     sidebar={
                                                                                         <AppSidebar
                                                                                             appIds={
@@ -469,6 +473,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                                     />
                                                                                                 )
                                                                                             )}
+                                                                                            <PolarToggle />
                                                                                             <NotificationBell />
                                                                                             <AccountMenu
                                                                                                 id={
@@ -554,5 +559,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
 
     // The frame's own words - the rail, the switcher, the account menu - for
     // every client component in it.
-    return <Messages namespaces={["nav", "chat", "shortcuts", "tours"]}>{frame}</Messages>;
+    return (
+        <Messages namespaces={["nav", "chat", "shortcuts", "tours", "polar"]}>
+            <PolarProvider>{frame}</PolarProvider>
+        </Messages>
+    );
 }

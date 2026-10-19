@@ -43,7 +43,9 @@ describe("reading rich text", () => {
     });
 
     it("renders markup in the source as text, never as markup", () => {
-        const markup = render("Careful: <img src=x onerror=alert(1)> and <script>alert(2)</script>");
+        const markup = render(
+            "Careful: <img src=x onerror=alert(1)> and <script>alert(2)</script>"
+        );
         expect(markup).not.toContain("<img");
         expect(markup).not.toContain("<script");
         expect(markup).toContain("&lt;script&gt;");
@@ -52,5 +54,16 @@ describe("reading rich text", () => {
     it("shows nothing at all for nothing at all", () => {
         expect(render("")).toBe("");
         expect(render("   ")).toBe("");
+    });
+
+    it("draws a picture from another site, unless told to keep it to a link", () => {
+        const source =
+            "![chart](https://elsewhere.example/c.png?d=secret) and ![own](/api/polar/attachments/x)";
+        expect(render(source)).toContain('<img src="https://elsewhere.example/c.png?d=secret"');
+        const kept = renderToStaticMarkup(<RichText value={source} remoteImages={false} />);
+        expect(kept).not.toContain('<img src="https://elsewhere.example');
+        expect(kept).toContain('href="https://elsewhere.example/c.png?d=secret"');
+        expect(kept).toContain(">chart</a>");
+        expect(kept).toContain('<img src="/api/polar/attachments/x"');
     });
 });

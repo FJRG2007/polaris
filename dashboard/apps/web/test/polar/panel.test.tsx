@@ -1,0 +1,226 @@
+// @vitest-environment jsdom
+/**
+ * Polar's chat as somebody uses it: what the empty panel offers, what it says
+ * with no key, and the queue of messages typed while a turn is still running -
+ * kept in order, editable, removable, saved with the thread so a reload brings
+ * it back, and sent one by one once the turn ends.
+ *
+ * `useChat` is replaced by a store the test drives; everything else is real.
+ */
+
+import { MessagesWrapper } from "../setup/i18n";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+
+const chat = {
+    status: "ready" as "ready" | "submitted" | "streaming" | "error",
+    messages: [] as Array<{
+        id: string;
+        role: string;
+        parts: Array<{ type: string; text?: string }>;
+    }>,
+    sent: [] as Array<{ text?: string }>,
+    stopped: 0,
+    rerender: () => undefined as void
+};
+
+vi.mock("@ai-sdk/react", () => ({
+    useChat: () => ({
+        status: chat.status,
+        messages: chat.messages,
+        error: undefined,
+        // As the SDK does: a send marks the turn submitted before it awaits anything.
+        sendMessage: async (message: { text?: string }) => {
+            chat.sent.push(message);
+            chat.status = "submitted";
+        },
+        stop: async () => void chat.stopped++,
+        setMessages: (next: typeof chat.messages) => {
+            chat.messages = next;
+        },
+        regenerate: async () => undefined,
+        addToolApprovalResponse: async () => undefined
+    })
+}));
+vi.mock("next/navigation", () => ({
+    usePathname: () => "/tasks",
+    useRouter: () => ({ push: () => undefined })
+}));
+
+const PROVIDERS = [
+    {
+        provider: "anthropic",
+        name: "Anthropic",
+        payers: ["own"],
+        models: [{ provider: "anthropic", model: "m-1", name: "Model One", reasoning: true }]
+    }
+];
+
+let providers: unknown[] = PROVIDERS;
+const patches: unknown[] = [];
+let storedThread: unknown = null;
+
+beforeEach(() => {
+    chat.status = "ready";
+    chat.messages = [];
+    chat.sent = [];
+    chat.stopped = 0;
+    providers = PROVIDERS;
+    patches.length = 0;
+    storedThread = null;
+    try {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+    } catch {
+        // No storage in this environment.
+    }
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init?: RequestInit) => {
+            if (url === "/api/polar/models") {
+                return Response.json({ providers, tools: {}, isAdmin: false });
+            }
+            if (url === "/api/polar/threads") {
+                return Response.json({
+                    threads: [{ id: "t-old", title: "Old chat", updatedAt: "2026-10-19T00:00:00Z" }]
+                });
+            }
+            if (url.startsWith("/api/polar/threads/") && init?.method === "PATCH") {
+                patches.push(JSON.parse(String(init.body)));
+                return Response.json({ ok: true });
+            }
+            if (url === "/api/polar/threads/t-old") return Response.json({ thread: storedThread });
+            return Response.json({});
+        })
+    );
+});
+
+afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+});
+
+const { PolarChat } = await import("@/components/polar/polar-panel");
+
+function mount() {
+    const view = render(<PolarChat />, { wrapper: MessagesWrapper });
+    return { ...view, again: () => view.rerender(<PolarChat />) };
+}
+
+async function type(text: string) {
+    const box = screen.getByLabelText("Message Polar");
+    fireEvent.change(box, { target: { value: text } });
+    fireEvent.keyDown(box, { key: "Enter" });
+}
+
+async function ready() {
+    // The model list arrives before anything can be sent.
+    await waitFor(() => expect(screen.getByText("Model One", { exact: false })).toBeTruthy());
+}
+
+describe("an empty panel", () => {
+    it("offers suggestions, shows the page it sees, and a composer", async () => {
+        mount();
+        await ready();
+        expect(screen.getByText("What's on this page?")).toBeTruthy();
+        expect(screen.getByTitle(/Polar sees this page/)).toBeTruthy();
+        expect(screen.getByLabelText("Message Polar")).toBeTruthy();
+    });
+
+    it("says in plain words that it needs a key, with the way to add one", async () => {
+        providers = [];
+        mount();
+        await waitFor(() =>
+            expect(screen.getByText("Polar needs an AI provider key")).toBeTruthy()
+        );
+        const link = screen.getByText("Add your own key").closest("a");
+        expect(link?.getAttribute("href")).toBe("/account/ai-keys");
+        expect(screen.queryByText("Manage this Polaris's keys")).toBeNull();
+    });
+
+    it("sends a message when the turn is free", async () => {
+        mount();
+        await ready();
+        await type("Hello");
+        expect(chat.sent.map((message) => message.text)).toEqual(["Hello"]);
+    });
+});
+
+describe("the queue", () => {
+    const busyThread = () => {
+        chat.status = "streaming";
+        chat.messages = [{ id: "u1", role: "user", parts: [{ type: "text", text: "First" }] }];
+    };
+
+    it("keeps what is typed during a turn, in order, and saves it with the thread", async () => {
+        busyThread();
+        mount();
+        await ready();
+        await type("second");
+        await type("third");
+        expect(chat.sent).toEqual([]);
+        const items = screen.getAllByLabelText("Queued message") as HTMLInputElement[];
+        expect(items.map((item) => item.value)).toEqual(["second", "third"]);
+        expect(patches.at(-1)).toMatchObject({ queue: [{ text: "second" }, { text: "third" }] });
+    });
+
+    it("lets a queued message be edited, moved and removed", async () => {
+        busyThread();
+        mount();
+        await ready();
+        await type("second");
+        await type("third");
+        const [first] = screen.getAllByLabelText("Queued message") as HTMLInputElement[];
+        fireEvent.change(first!, { target: { value: "second, edited" } });
+        fireEvent.blur(first!);
+        expect(patches.at(-1)).toMatchObject({
+            queue: [{ text: "second, edited" }, { text: "third" }]
+        });
+        fireEvent.click(screen.getAllByLabelText("Move down")[0]!);
+        expect(patches.at(-1)).toMatchObject({
+            queue: [{ text: "third" }, { text: "second, edited" }]
+        });
+        fireEvent.click(screen.getAllByLabelText("Remove from queue")[0]!);
+        expect(patches.at(-1)).toMatchObject({ queue: [{ text: "second, edited" }] });
+    });
+
+    it("sends the queue one message at a time once the turn ends, and stopping keeps it", async () => {
+        busyThread();
+        const view = mount();
+        await ready();
+        await type("second");
+        await type("third");
+        fireEvent.click(screen.getByLabelText("Stop"));
+        expect(chat.stopped).toBe(1);
+        expect(screen.getAllByLabelText("Queued message")).toHaveLength(2);
+        chat.status = "ready";
+        act(() => view.again());
+        await waitFor(() => expect(chat.sent.map((message) => message.text)).toEqual(["second"]));
+        expect(
+            (screen.getAllByLabelText("Queued message") as HTMLInputElement[]).map(
+                (item) => item.value
+            )
+        ).toEqual(["third"]);
+    });
+
+    it("comes back with the thread after a reload", async () => {
+        storedThread = {
+            id: "t-old",
+            messages: [
+                { id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Hi" }] }
+            ],
+            queue: [{ id: "q1", text: "waiting since before the reload" }],
+            choice: null
+        };
+        chat.status = "streaming";
+        mount();
+        await ready();
+        fireEvent.click(screen.getByLabelText("Conversations"));
+        fireEvent.click(await screen.findByText("Old chat"));
+        await waitFor(() =>
+            expect((screen.getByLabelText("Queued message") as HTMLInputElement).value).toBe(
+                "waiting since before the reload"
+            )
+        );
+    });
+});

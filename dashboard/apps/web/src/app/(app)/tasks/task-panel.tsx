@@ -25,6 +25,7 @@ import { useAutosave } from "./autosave";
 import { ShareDialog } from "./task-share";
 import { runAction } from "@/lib/run-action";
 import { TaskNameField } from "./task-name-field";
+import { usePolarContext } from "@/components/polar/polar-panel";
 import { CopyButton } from "@/components/copy-button";
 import { HandToAgent } from "./hand-to-agent";
 import type { TaskDetail } from "@/lib/tasks/task-service";
@@ -127,6 +128,17 @@ export function TaskPanel({
     const tt = useTranslations("tasks");
     const auto = useAutosave();
     const [detail, setDetail] = useState<TaskDetail | null>(null);
+    usePolarContext(
+        detail
+            ? {
+                  record: {
+                      kind: "task",
+                      id: detail.task.reference || detail.task.id,
+                      name: detail.task.name
+                  }
+              }
+            : null
+    );
     const [error, setError] = useState("");
 
     // A tag made in one of this panel's pickers is put on the task at once, so the

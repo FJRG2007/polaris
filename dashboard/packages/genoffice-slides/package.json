@@ -42,8 +42,8 @@
         "@polaris/project-store": "*",
         "acorn": "8.14.0",
         "konva": "9.3.16",
-        "react": "19.0.0",
-        "react-dom": "19.0.0",
+        "react": "19.0.8",
+        "react-dom": "19.0.8",
         "react-konva": "19.0.3"
     },
     "main": "./dist/App.js",
