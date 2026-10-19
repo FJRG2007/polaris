@@ -250,39 +250,37 @@ export async function getOverviewData(
         calendar,
         dnsBlocker
     ] = await Promise.all([
-            asked.has("services") && canDeploy
-                ? card(() => deployedServices(user))
-                : Promise.resolve(undefined),
-            watch ?? Promise.resolve(undefined),
-            asked.has("alarms") && canDeploy
-                ? card(() => listRecentAlarmEvents(user.id, CARD_ROWS))
-                : Promise.resolve(undefined),
-            asked.has("tasks") && canTasks
-                ? card(() => assignedWork(user))
-                : Promise.resolve(undefined),
-            asked.has("storage") && canDrive
-                ? card(() => storageUsage(user.id))
-                : Promise.resolve(undefined),
-            // The account's own two, which ask for no permission: everybody may read
-            // where their account is open and what was done with it.
-            asked.has("sessions") ? card(() => openSessions(user)) : Promise.resolve(undefined),
-            asked.has("activity")
-                ? card(() => recentActivity(user.id))
-                : Promise.resolve(undefined),
-            asked.has("games") && canGames
-                ? card(() => gameServers(user.id))
-                : Promise.resolve(undefined),
-            asked.has("calendar") && canCalendar
-                ? card(async () => {
-                      const upcoming = await upcomingEventsFor(user.id, CARD_ROWS);
-                      if (!upcoming) throw new Error("No installed app keeps calendars");
-                      return { events: upcoming };
-                  })
-                : Promise.resolve(undefined),
-            canDnsBlocker
-                ? card(async () => ({ today: await dnsBlockerSummary() }))
-                : Promise.resolve(undefined)
-        ]);
+        asked.has("services") && canDeploy
+            ? card(() => deployedServices(user))
+            : Promise.resolve(undefined),
+        watch ?? Promise.resolve(undefined),
+        asked.has("alarms") && canDeploy
+            ? card(() => listRecentAlarmEvents(user.id, CARD_ROWS))
+            : Promise.resolve(undefined),
+        asked.has("tasks") && canTasks
+            ? card(() => assignedWork(user))
+            : Promise.resolve(undefined),
+        asked.has("storage") && canDrive
+            ? card(() => storageUsage(user.id))
+            : Promise.resolve(undefined),
+        // The account's own two, which ask for no permission: everybody may read
+        // where their account is open and what was done with it.
+        asked.has("sessions") ? card(() => openSessions(user)) : Promise.resolve(undefined),
+        asked.has("activity") ? card(() => recentActivity(user.id)) : Promise.resolve(undefined),
+        asked.has("games") && canGames
+            ? card(() => gameServers(user.id))
+            : Promise.resolve(undefined),
+        asked.has("calendar") && canCalendar
+            ? card(async () => {
+                  const upcoming = await upcomingEventsFor(user.id, CARD_ROWS);
+                  if (!upcoming) throw new Error("No installed app keeps calendars");
+                  return { events: upcoming };
+              })
+            : Promise.resolve(undefined),
+        canDnsBlocker
+            ? card(async () => ({ today: await dnsBlockerSummary() }))
+            : Promise.resolve(undefined)
+    ]);
 
     const data: OverviewData = {};
     if (asked.has("services")) data.services = canDeploy ? (services ?? null) : null;
