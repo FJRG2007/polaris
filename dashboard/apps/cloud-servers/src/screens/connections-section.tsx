@@ -10,18 +10,17 @@ import Link from "next/link";
 import { useState } from "react";
 import { useCloudT } from "./i18n";
 import { PROVIDER_NAMES } from "../lib/providers/types";
-import type { AccountView } from "../lib/service";
 import { ArrowRight, Cloud, Plus, Trash2 } from "lucide-react";
 import { Button, EmptyState } from "@polaris/ui";
-import type { CloudConnectionsProps } from "../lib/connections-slot";
+import type { CloudConnectionsProps, HubAccount } from "../lib/connections-slot";
 import { CLOUD_PAGE } from "../lib/cloud-routes";
 import { ConnectDialog, RemoveAccountDialog } from "./cloud-servers-screen";
 
 export function CloudConnectionsSection(props: CloudConnectionsProps) {
     const t = useCloudT();
-    const [accounts, setAccounts] = useState<AccountView[]>(props.accounts);
+    const [accounts, setAccounts] = useState<HubAccount[]>(props.accounts);
     const [connectOpen, setConnectOpen] = useState(false);
-    const [removing, setRemoving] = useState<AccountView | null>(null);
+    const [removing, setRemoving] = useState<HubAccount | null>(null);
     const org = props.orgName;
 
     return (
@@ -85,6 +84,10 @@ export function CloudConnectionsSection(props: CloudConnectionsProps) {
                                     <p className="mt-1 break-words text-xs text-danger-ink">
                                         {t("accounts.refreshError", { error: account.lastError })}
                                     </p>
+                                ) : account.failing ? (
+                                    <p className="mt-1 text-xs text-danger-ink">
+                                        {t("hub.failing")}
+                                    </p>
                                 ) : null}
                             </div>
                             {props.canManage ? (
@@ -109,7 +112,10 @@ export function CloudConnectionsSection(props: CloudConnectionsProps) {
                     onOpenChange={setConnectOpen}
                     onConnected={(account) => {
                         setConnectOpen(false);
-                        setAccounts((current) => [...current, account]);
+                        setAccounts((current) => [
+                            ...current,
+                            { ...account, failing: account.lastError !== null }
+                        ]);
                     }}
                 />
             ) : null}

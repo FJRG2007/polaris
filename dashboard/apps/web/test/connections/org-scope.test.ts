@@ -6,17 +6,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 const access = vi.hoisted(() => new Map<string, string[]>());
+const asked = vi.hoisted(() => [] as { id: string; isAdmin: boolean }[]);
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/orgs/org-service", () => ({
-    orgIdsWhere: async () => [],
+    orgIdsWhere: async (actor: { id: string; isAdmin: boolean }) => {
+        asked.push(actor);
+        return [];
+    },
     resolveOrgAccess: async (_actor: unknown, orgId: string) => {
         const permissions = access.get(orgId);
         return permissions ? { permissions } : null;
     }
 }));
 
-const { managesOrgConnections, ORG_CONNECTIONS_PERMISSION } = await import(
+const { managedConnectionOrgs, managesOrgConnections, ORG_CONNECTIONS_PERMISSION } = await import(
     "../../src/lib/connections/org-scope"
 );
 
@@ -32,5 +36,10 @@ describe("managing an organization's connections", () => {
         access.set("org-b", ["servers.view"]);
         await expect(managesOrgConnections(actor, "org-b")).resolves.toBe(false);
         await expect(managesOrgConnections(actor, "org-c")).resolves.toBe(false);
+    });
+
+    it("lists an administrator's organizations by their roster place, not every one there is", async () => {
+        await expect(managedConnectionOrgs({ id: "admin-1", isAdmin: true })).resolves.toEqual([]);
+        expect(asked).toEqual([{ id: "admin-1", isAdmin: false }]);
     });
 });

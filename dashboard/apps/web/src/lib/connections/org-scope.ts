@@ -29,9 +29,14 @@ export interface ManagedConnectionOrg {
     readonly name: string;
 }
 
-/** The organizations whose connections this actor manages, by name. */
+/**
+ * The organizations whose connections this actor manages through their own
+ * place on the roster, by name. An instance administrator's reach into every
+ * organization is not counted: it would hand them every organization's accounts
+ * unasked. They still act on one organization from its own hub.
+ */
 export async function managedConnectionOrgs(actor: OrgActor): Promise<ManagedConnectionOrg[]> {
-    const ids = await orgIdsWhere(actor, ORG_CONNECTIONS_PERMISSION);
+    const ids = await orgIdsWhere({ ...actor, isAdmin: false }, ORG_CONNECTIONS_PERMISSION);
     if (ids.length === 0) return [];
     return prisma.organization.findMany({
         where: { id: { in: ids } },

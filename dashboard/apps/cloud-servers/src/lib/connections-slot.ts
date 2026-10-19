@@ -16,9 +16,15 @@ import { listScopedAccounts, type AccountView } from "./service";
 type AppSlot = AppHostTypes["AppSlot"];
 type ConnectionsViewer = AppHostTypes["ConnectionsViewer"];
 
+/** An account as the hub shows it. `lastError` is the provider's own words,
+ *  kept for whoever may act on them; everybody else only learns it `failing`. */
+export interface HubAccount extends AccountView {
+    readonly failing: boolean;
+}
+
 /** What the section is drawn from. */
 export interface CloudConnectionsProps {
-    readonly accounts: AccountView[];
+    readonly accounts: HubAccount[];
     readonly orgId: string | null;
     readonly orgName: string | null;
     readonly canManage: boolean;
@@ -36,7 +42,11 @@ export async function cloudConnectionsSlot(viewer: ConnectionsViewer): Promise<A
     const canManage = usesCloud && (org ? org.canManage : true);
     if (org && accounts.length === 0 && !canManage) return null;
     const props: CloudConnectionsProps = {
-        accounts,
+        accounts: accounts.map((account) => ({
+            ...account,
+            lastError: canManage ? account.lastError : null,
+            failing: account.lastError !== null
+        })),
         orgId: org?.orgId ?? null,
         orgName: org?.orgName ?? null,
         canManage,

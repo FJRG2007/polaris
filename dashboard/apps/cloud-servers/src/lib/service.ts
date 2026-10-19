@@ -1,9 +1,11 @@
 /**
  * Cloud accounts and the servers created through them.
  *
- * Every read and write is narrowed to the signed-in operator's own rows inside
- * the query. Provider calls happen only when somebody asks for something here,
- * and from the hourly job while the app is installed.
+ * Every read and write is narrowed to the accounts the signed-in operator may
+ * use - their own, and those of the organizations whose connections they
+ * manage - and to the servers created at them. Provider calls happen only when
+ * somebody asks for something here, and from the hourly job while the app is
+ * installed.
  *
  * Server-only.
  */
@@ -142,20 +144,38 @@ async function usableWhere(userId: string) {
     };
 }
 
-async function ownAccount(userId: string, accountId: string) {
-    const account = await prisma.cloudAccount.findFirst({
-        where: { id: accountId, ...(await usableWhere(userId)) },
-        select: accountSelect
-    });
-    return account ?? refuse("errors.accountNotFound");
+const scopedAccountSelect = { ...accountSelect, ownerId: true, organizationId: true } as const;
+
+/**
+ * Whether this person may use one account: their own, or an organization's
+ * they manage the connections of - the same answer that organization's hub
+ * offers Connect and Remove on.
+ */
+async function mayUse(
+    userId: string,
+    account: { ownerId: string; organizationId: string | null }
+): Promise<boolean> {
+    if (account.organizationId === null) return account.ownerId === userId;
+    return host.cloudServersHost.managesCloudOrg(userId, account.organizationId);
 }
 
+async function ownAccount(userId: string, accountId: string) {
+    const account = await prisma.cloudAccount.findFirst({
+        where: { id: accountId },
+        select: scopedAccountSelect
+    });
+    if (!account || !(await mayUse(userId, account))) return refuse("errors.accountNotFound");
+    return account;
+}
+
+/** A server is reachable exactly when the account it was created at is. */
 async function ownServer(userId: string, serverId: string) {
     const server = await prisma.cloudServer.findFirst({
-        where: { id: serverId, ownerId: userId },
-        include: { account: { select: accountSelect } }
+        where: { id: serverId },
+        include: { account: { select: scopedAccountSelect } }
     });
-    return server ?? refuse("errors.serverNotFound");
+    if (!server || !(await mayUse(userId, server.account))) return refuse("errors.serverNotFound");
+    return server;
 }
 
 // ---- Accounts --------------------------------------------------------------
@@ -346,7 +366,7 @@ export async function listServers(userId: string) {
     const now = new Date();
     const rows = await prisma.cloudServer.findMany({
         where: {
-            ownerId: userId,
+            account: await usableWhere(userId),
             OR: [{ destroyedAt: null }, { destroyedAt: { gte: monthStart(now) } }]
         },
         include: { account: { select: { provider: true } } },
@@ -439,7 +459,7 @@ export async function serverProgress(userId: string, serverId: string): Promise<
     if (!hostId && server.enrollmentId) {
         const enrollment = await host.cloudServersHost.cloudEnrollmentStatus(
             server.enrollmentId,
-            userId
+            server.ownerId
         );
         if (enrollment?.hostId) hostId = enrollment.hostId;
         else if (enrollment?.error) error = enrollment.error;
@@ -533,7 +553,12 @@ export async function destroyServer(
             .destroy({ providerId: server.providerId, region: server.region })
             .catch(providerRefusal);
     let warning: string | null = null;
-    if (server.hostId) warning = await host.cloudServersHost.removeCloudHost(userId, server.hostId);
+    if (server.hostId)
+        warning = await host.cloudServersHost.removeCloudHost(
+            server.ownerId,
+            server.hostId,
+            userId
+        );
     await prisma.cloudServer.update({
         where: { id: server.id },
         data: {

@@ -11,6 +11,7 @@
  * Server-only.
  */
 
+import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import {
     managedConnectionOrgs,
@@ -32,6 +33,36 @@ export async function cloudConnectionOrgs(userId: string): Promise<ManagedConnec
  *  accounts: the same check the organization's Connections screen draws from. */
 export async function managesCloudOrg(userId: string, orgId: string): Promise<boolean> {
     return managesOrgConnections(await orgActorFor(userId), orgId);
+}
+
+/**
+ * Before an account is deleted: the cloud accounts it connected for an
+ * organization pass to that organization's owner. They are the organization's,
+ * and its servers may still be running at them, so they outlive the person who
+ * happened to connect them. An organization this account owns goes with it.
+ */
+export async function handOverOrgCloudAccounts(userId: string): Promise<void> {
+    for (;;) {
+        const accounts = await prisma.cloudAccount.findMany({
+            where: {
+                ownerId: userId,
+                organization: { ownerId: { not: userId } }
+            },
+            select: { id: true, organization: { select: { ownerId: true } } },
+            take: 500
+        });
+        if (accounts.length === 0) return;
+        const byOwner = new Map<string, string[]>();
+        for (const account of accounts) {
+            const owner = account.organization!.ownerId;
+            byOwner.set(owner, [...(byOwner.get(owner) ?? []), account.id]);
+        }
+        await prisma.$transaction(
+            [...byOwner].map(([ownerId, ids]) =>
+                prisma.cloudAccount.updateMany({ where: { id: { in: ids } }, data: { ownerId } })
+            )
+        );
+    }
 }
 
 /** Seal a provider credential for storage. */
@@ -92,8 +123,12 @@ export async function cloudEnrollmentStatus(
 }
 
 /** Take a destroyed machine out of Polaris. Nothing is done on the machine: it
- *  is already gone. */
-export async function removeCloudHost(userId: string, hostId: string): Promise<string | null> {
-    const result = await removeServer(userId, hostId, userId, { mode: "disconnect" });
+ *  is already gone. `ownerId` is whoever enrolled it; `actorId` whoever asked. */
+export async function removeCloudHost(
+    ownerId: string,
+    hostId: string,
+    actorId: string = ownerId
+): Promise<string | null> {
+    const result = await removeServer(ownerId, hostId, actorId, { mode: "disconnect" });
     return result.error ?? null;
 }

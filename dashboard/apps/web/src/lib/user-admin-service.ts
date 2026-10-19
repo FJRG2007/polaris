@@ -607,6 +607,7 @@ export async function deleteUser(actorId: string, userId: string): Promise<{ err
     // that is away is named in the log rather than allowed to refuse a deletion.
     const driveLeft = await discardPersonalDrive(userId);
     if (driveLeft) leftBehind.push(driveLeft);
+    await (await import("@/lib/cloud-servers-host")).handOverOrgCloudAccounts(userId);
     await prisma.user.delete({ where: { id: userId } });
     await recordAudit({
         actorId,

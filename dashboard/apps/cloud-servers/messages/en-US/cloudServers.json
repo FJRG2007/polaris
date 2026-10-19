@@ -118,8 +118,9 @@
     },
     "hub": {
         "intro": "Accounts at cloud providers that servers are created at.",
-        "orgIntro": "Accounts at cloud providers connected for {org}. Its managers create servers at them.",
-        "readOnly": "Only people who manage {org} can connect or remove these.",
+        "orgIntro": "Accounts at cloud providers connected for {org}. Its managers who use Cloud servers create servers at them.",
+        "readOnly": "Only people who manage {org} and use Cloud servers can connect or remove these.",
+        "failing": "This account stopped answering. The administrators know.",
         "open": "Open Cloud servers"
     }
 }

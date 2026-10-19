@@ -430,7 +430,7 @@
     },
     "connections": {
         "title": "Cuentas conectadas",
-        "intro": "Cuentas conectadas para esta organización y no para una persona. Quien gestiona la organización puede usarlas y quitarlas.",
+        "intro": "Cuentas conectadas para esta organización y no para una persona. Quién puede conectarlas, usarlas y quitarlas depende de cada app.",
         "readOnly": "Cuentas conectadas para esta organización. Solo quien gestiona la organización puede conectarlas o quitarlas.",
         "empty": "Ninguna app de este Polaris conecta todavía cuentas para una organización."
     }

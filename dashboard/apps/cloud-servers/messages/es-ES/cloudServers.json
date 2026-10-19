@@ -118,8 +118,9 @@
     },
     "hub": {
         "intro": "Cuentas en proveedores de nube donde se crean los servidores.",
-        "orgIntro": "Cuentas en proveedores de nube conectadas para {org}. Quien la gestiona crea servidores en ellas.",
-        "readOnly": "Solo quien gestiona {org} puede conectar o quitar estas cuentas.",
+        "orgIntro": "Cuentas en proveedores de nube conectadas para {org}. Quien la gestiona y usa Servidores cloud crea servidores en ellas.",
+        "readOnly": "Solo quien gestiona {org} y usa Servidores cloud puede conectar o quitar estas cuentas.",
+        "failing": "Esta cuenta ha dejado de responder. Los administradores ya lo saben.",
         "open": "Abrir Servidores cloud"
     }
 }

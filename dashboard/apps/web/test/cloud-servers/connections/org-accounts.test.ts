@@ -11,6 +11,9 @@ const state = vi.hoisted(() => ({
     usesCloud: true,
     created: [] as Record<string, unknown>[],
     wheres: [] as unknown[],
+    serverWheres: [] as unknown[],
+    rows: [] as Record<string, unknown>[],
+    server: null as Record<string, unknown> | null,
     dialled: 0
 }));
 
@@ -19,7 +22,7 @@ vi.mock("@polaris/db", () => ({
         cloudAccount: {
             findMany: async ({ where }: { where: unknown }) => {
                 state.wheres.push(where);
-                return [];
+                return state.rows;
             },
             create: async ({ data }: { data: Record<string, unknown> }) => {
                 state.created.push(data);
@@ -30,6 +33,13 @@ vi.mock("@polaris/db", () => ({
                     lastError: null,
                     organization: null
                 };
+            }
+        },
+        cloudServer: {
+            findFirst: async () => state.server,
+            findMany: async ({ where }: { where: unknown }) => {
+                state.serverWheres.push(where);
+                return [];
             }
         }
     }
@@ -76,6 +86,9 @@ beforeEach(() => {
     state.usesCloud = true;
     state.created = [];
     state.wheres = [];
+    state.serverWheres = [];
+    state.rows = [];
+    state.server = null;
     state.dialled = 0;
 });
 
@@ -113,6 +126,51 @@ describe("which accounts somebody may use", () => {
     });
 });
 
+describe("the servers at an organization's account", () => {
+    const orgServer = () => ({
+        id: "server-1",
+        ownerId: "user-2",
+        name: "web",
+        destroyedAt: null,
+        account: { ownerId: "user-2", organizationId: ORG.id }
+    });
+
+    it("are listed through the accounts somebody may use, not by who created them", async () => {
+        state.managed = [ORG];
+        await service.listServers("user-1");
+        expect(state.serverWheres[0]).toMatchObject({
+            account: {
+                OR: [
+                    { ownerId: "user-1", organizationId: null },
+                    { organizationId: { in: [ORG.id] } }
+                ]
+            }
+        });
+    });
+
+    it("are reached by another of its managers", async () => {
+        state.managed = [ORG];
+        state.server = orgServer();
+        await expect(service.destroyServer("user-1", "server-1", "other")).rejects.toThrow(
+            /does not match/
+        );
+    });
+
+    it("are out of reach as soon as somebody stops managing it", async () => {
+        state.server = orgServer();
+        await expect(service.destroyServer("user-1", "server-1", "web")).rejects.toThrow(
+            /not here any more/
+        );
+    });
+
+    it("never reach another person's own account", async () => {
+        state.server = { ...orgServer(), account: { ownerId: "user-2", organizationId: null } };
+        await expect(service.destroyServer("user-1", "server-1", "web")).rejects.toThrow(
+            /not here any more/
+        );
+    });
+});
+
 describe("the Cloud servers section of a hub", () => {
     const org = (canManage: boolean) =>
         ({ kind: "org", orgId: ORG.id, orgSlug: ORG.slug, orgName: ORG.name, canManage }) as const;
@@ -138,6 +196,34 @@ describe("the Cloud servers section of a hub", () => {
         await expect(
             cloudConnectionsSlot({ userId: "user-1", scope: org(true), returnTo: null })
         ).resolves.toBeNull();
+    });
+
+    it("keeps the provider's refusal from a member who cannot act on it", async () => {
+        state.rows = [
+            {
+                id: "acc-1",
+                provider: "hetzner",
+                name: "Production",
+                lastError: "token 1234 revoked",
+                organization: { id: ORG.id, name: ORG.name }
+            }
+        ];
+        const member = await cloudConnectionsSlot({
+            userId: "user-1",
+            scope: org(false),
+            returnTo: null
+        });
+        expect(member?.props).toMatchObject({
+            accounts: [{ id: "acc-1", lastError: null, failing: true }]
+        });
+        const manager = await cloudConnectionsSlot({
+            userId: "user-1",
+            scope: org(true),
+            returnTo: null
+        });
+        expect(manager?.props).toMatchObject({
+            accounts: [{ id: "acc-1", lastError: "token 1234 revoked", failing: true }]
+        });
     });
 
     it("lists only that organization's accounts on its hub", async () => {
