@@ -31,6 +31,7 @@ interface SecurityChange {
 
 const SECURITY = "/account/security";
 const SESSIONS = "/account/sessions";
+const VAULT_SETTINGS = "/vault/settings";
 
 /**
  * The audit actions that change how an account is protected. An action that is
@@ -69,6 +70,9 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     },
     "account.passkey.removed": { key: "security.account_passkey_removed", href: SECURITY },
     "account.passkey.added": { key: "security.account_passkey_added", href: SECURITY },
+    "vault.passkey.added": { key: "security.vault_passkey_added", href: VAULT_SETTINGS },
+    "vault.passkey.removed": { key: "security.vault_passkey_removed", href: VAULT_SETTINGS },
+    "vault.passkeys.reset": { key: "security.vault_passkeys_reset", href: VAULT_SETTINGS },
     "account.login-approval.enabled": {
         key: "security.account_login_approval_enabled",
         href: SECURITY

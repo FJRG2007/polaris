@@ -146,6 +146,12 @@ export interface ChangePasswordInput {
     masterPasswordHint?: string | null;
     /** Set only when the KDF is being changed in the same step. */
     kdf?: core.KdfSettings;
+    /**
+     * True only from the Polaris screens, whose browser code re-wraps the very
+     * key it just unwrapped. A client of the compatible API may send a different
+     * key, so from there a new wrapping counts as a new key.
+     */
+    sameVaultKey?: boolean;
 }
 
 export type ChangePasswordResult =
@@ -167,7 +173,7 @@ export async function changeMasterPassword(
 ): Promise<ChangePasswordResult> {
     const account = await prisma.vaultAccount.findUnique({
         where: { userId },
-        select: { masterPasswordHash: true }
+        select: { masterPasswordHash: true, protectedKey: true }
     });
     if (!account) return { ok: false, reason: "no_vault" };
     if (!(await verifyVaultPassword(account.masterPasswordHash, input.currentHash))) {
@@ -176,8 +182,12 @@ export async function changeMasterPassword(
     if (input.kdf && !core.kdfSettingsValid(input.kdf)) return { ok: false, reason: "kdf" };
     if (!core.isEncString(input.newProtectedKey)) return { ok: false, reason: "keys" };
 
+    // A passkey wraps the vault key itself, so one the client may have replaced
+    // leaves every passkey wrap opening a key the vault no longer uses. Those go
+    // in the same transaction, and the person is told to add them again.
+    const keyChanged = !input.sameVaultKey && input.newProtectedKey !== account.protectedKey;
     const stamp = newSecurityStamp();
-    await prisma.$transaction([
+    const [, , dropped] = await prisma.$transaction([
         prisma.vaultAccount.update({
             where: { userId },
             data: {
@@ -202,7 +212,8 @@ export async function changeMasterPassword(
         prisma.vaultRefreshToken.updateMany({
             where: { userId, revokedAt: null },
             data: { revokedAt: new Date() }
-        })
+        }),
+        prisma.vaultPasskey.deleteMany({ where: keyChanged ? { userId } : { id: { in: [] } } })
     ]);
     await recordAudit({
         actorId: userId,
@@ -211,6 +222,15 @@ export async function changeMasterPassword(
         targetId: userId,
         metadata: { kdfChanged: Boolean(input.kdf) }
     });
+    if (dropped.count > 0) {
+        await recordAudit({
+            actorId: userId,
+            action: "vault.passkeys.reset",
+            targetType: "vault",
+            targetId: userId,
+            metadata: { removed: dropped.count }
+        });
+    }
     return { ok: true };
 }
 

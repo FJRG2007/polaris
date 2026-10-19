@@ -14,6 +14,7 @@ import * as core from "@polaris/core";
 import * as crypto from "@/lib/vault/crypto";
 import { VaultImport } from "./vault-import";
 import { VaultExport } from "./vault-export";
+import { VaultPasskeys } from "./vault-passkeys";
 import { type FormEvent, useEffect, useState } from "react";
 import { useVaultSession } from "../vault-session";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -22,16 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import { unlockTimeoutLabel } from "../vault-labels";
 import { Clock, Loader2, ShieldAlert, Trash2 } from "lucide-react";
-import {
-    Button,
-    Card,
-    CardBody,
-    CardHeader,
-    CardTitle,
-    Input,
-    Select,
-    Switch
-} from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Switch } from "@polaris/ui";
 import {
     changeMasterPasswordAction,
     deauthorizeVaultAction,
@@ -40,7 +32,6 @@ import {
 } from "../vault-actions";
 
 const MIN_LENGTH = 12;
-
 
 /** Where this browser's choice about site icons is kept. The same key the list
  *  reads - see `vault-app`. */
@@ -190,10 +181,10 @@ export function VaultSettings() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("settings.title")}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {t("settings.intro")}
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("settings.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t("settings.intro")}</p>
             </div>
 
             <Card>
@@ -282,14 +273,14 @@ export function VaultSettings() {
                 </CardBody>
             </Card>
 
+            <VaultPasskeys confirm={confirm} />
+
             <Card>
                 <CardHeader>
                     <CardTitle>{t("settings.icons")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {t("settings.iconsBody")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("settings.iconsBody")}</p>
                     <label className="flex items-center gap-3 text-sm">
                         <Switch
                             checked={favicons}
@@ -314,9 +305,7 @@ export function VaultSettings() {
                     <CardTitle>{t("settings.apps")}</CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {t("settings.appsBody")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("settings.appsBody")}</p>
                     <Button
                         variant="secondary"
                         onClick={async () => {
@@ -337,9 +326,7 @@ export function VaultSettings() {
                     </CardTitle>
                 </CardHeader>
                 <CardBody className="flex flex-col gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {t("settings.timeoutBody")}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{t("settings.timeoutBody")}</p>
                     <Select
                         value={lockAfter}
                         onValueChange={async (value) => {
@@ -364,9 +351,7 @@ export function VaultSettings() {
                             label: unlockTimeoutLabel(t, minutes)
                         }))}
                     />
-                    <p className="text-xs text-muted-foreground">
-                        {t("settings.timeoutNote")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("settings.timeoutNote")}</p>
                 </CardBody>
             </Card>
 

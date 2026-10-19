@@ -40,7 +40,9 @@ export async function listPasskeys(): Promise<PasskeyView[]> {
  * back, so nothing the browser holds can be replayed as one, and a prompt the
  * user dismissed and reopened does not ask again.
  */
-export async function confirmPasswordForPasskeyAction(password: unknown): Promise<{ error?: string }> {
+export async function confirmPasswordForPasskeyAction(
+    password: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
@@ -94,10 +96,27 @@ export async function removePasskeyAction(passkeyId: unknown): Promise<{ error?:
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
-    if (typeof passkeyId !== "string") return { error: (await getTranslations("accountSecurity"))("errors.unknownPasskey") };
+    if (typeof passkeyId !== "string")
+        return { error: (await getTranslations("accountSecurity"))("errors.unknownPasskey") };
     // Scoped to the owner, so an id from somewhere else deletes nothing.
-    const removed = await prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } });
-    if (removed.count === 0) return { error: (await getTranslations("accountSecurity"))("errors.passkeyGone") };
-    await recordAudit({ actorId: user.id, action: "account.passkey.removed", targetType: "passkey" });
+    const passkey = await prisma.passkey.findFirst({
+        where: { id: passkeyId, userId: user.id },
+        select: { credentialID: true }
+    });
+    const [removed] = await prisma.$transaction([
+        prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } }),
+        prisma.vaultPasskey.deleteMany({
+            where: passkey
+                ? { userId: user.id, credentialId: passkey.credentialID }
+                : { id: { in: [] } }
+        })
+    ]);
+    if (removed.count === 0)
+        return { error: (await getTranslations("accountSecurity"))("errors.passkeyGone") };
+    await recordAudit({
+        actorId: user.id,
+        action: "account.passkey.removed",
+        targetType: "passkey"
+    });
     return {};
 }

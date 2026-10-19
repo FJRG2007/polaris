@@ -324,6 +324,7 @@ export function VaultGate({ children }: { children: ReactNode }) {
                 email={state.email}
                 kdf={state.kdf}
                 protectedKey={state.protectedKey ?? ""}
+                passkeys={state.passkeys}
                 notice={lockNotice}
                 onUnlocked={hold}
             />
