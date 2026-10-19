@@ -146,6 +146,117 @@ describe("an empty panel", () => {
     });
 });
 
+describe("the / commands", () => {
+    const options = () => screen.queryAllByRole("option").map((option) => option.textContent);
+    const highlighted = () =>
+        screen.getAllByRole("option").find((option) => option.getAttribute("aria-selected") === "true")
+            ?.textContent;
+    const slash = (text: string) =>
+        fireEvent.change(screen.getByLabelText("Message Polar"), { target: { value: text } });
+
+    it("opens on a slash with the first command highlighted, and narrows as you type", async () => {
+        mount();
+        await ready();
+        slash("/");
+        expect(options()).toHaveLength(6);
+        expect(highlighted()).toMatch(/^\/new/);
+        const box = screen.getByLabelText("Message Polar");
+        expect(box.getAttribute("aria-activedescendant")).toBe(
+            screen.getAllByRole("option")[0]!.id
+        );
+        slash("/mo");
+        expect(options()).toHaveLength(1);
+        expect(options()[0]).toMatch(/^\/model/);
+        slash("/model now");
+        expect(screen.queryByRole("listbox")).toBeNull();
+        slash("");
+        expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("walks the commands with the arrows, skips the ones not ready, and runs one on Enter", async () => {
+        mount();
+        await ready();
+        slash("/");
+        const box = screen.getByLabelText("Message Polar");
+        fireEvent.keyDown(box, { key: "ArrowUp" });
+        // "/call" is last but not ready yet, so up from the first wraps past it.
+        expect(highlighted()).toMatch(/^\/tools/);
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(highlighted()).toMatch(/^\/new/);
+        fireEvent.keyDown(box, { key: "ArrowUp" });
+        fireEvent.keyDown(box, { key: "Enter" });
+        expect(chat.sent.map((message) => message.text)).toEqual([
+            "What can you do for me on this page? List the tools you have, briefly."
+        ]);
+        expect((box as HTMLTextAreaElement).value).toBe("");
+        expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("closes on Escape and leaves the text", async () => {
+        mount();
+        await ready();
+        slash("/to");
+        const box = screen.getByLabelText("Message Polar") as HTMLTextAreaElement;
+        fireEvent.keyDown(box, { key: "Escape" });
+        expect(screen.queryByRole("listbox")).toBeNull();
+        expect(box.value).toBe("/to");
+        expect(chat.sent).toEqual([]);
+    });
+
+    it("runs a command on click and says why one is not ready", async () => {
+        mount();
+        await ready();
+        slash("/");
+        const call = screen.getAllByRole("option").find((option) =>
+            option.textContent?.startsWith("/call")
+        )!;
+        expect(call.getAttribute("aria-disabled")).toBe("true");
+        expect(call.textContent).toContain("Coming in a later update");
+        fireEvent.mouseDown(call);
+        expect(screen.getByRole("listbox")).toBeTruthy();
+        const tools = screen.getAllByRole("option").find((option) =>
+            option.textContent?.startsWith("/tools")
+        )!;
+        fireEvent.mouseEnter(tools);
+        expect(highlighted()).toMatch(/^\/tools/);
+        fireEvent.mouseDown(tools);
+        expect(chat.sent).toHaveLength(1);
+    });
+});
+
+describe("a message's copy button", () => {
+    it("turns into a check once the text is in the clipboard", async () => {
+        const writeText = vi.fn(async () => undefined);
+        Object.defineProperty(navigator, "clipboard", {
+            value: { writeText },
+            configurable: true
+        });
+        chat.messages = [
+            { id: "a1", role: "assistant", parts: [{ type: "text", text: "Here you go" }] }
+        ];
+        mount();
+        await ready();
+        fireEvent.click(screen.getByLabelText("Copy message"));
+        expect(await screen.findByLabelText("Copied")).toBeTruthy();
+        expect(writeText).toHaveBeenCalledWith("Here you go");
+    });
+
+    it("stays a copy icon when the clipboard refuses", async () => {
+        Object.defineProperty(navigator, "clipboard", {
+            value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },
+            configurable: true
+        });
+        chat.messages = [
+            { id: "a1", role: "assistant", parts: [{ type: "text", text: "Here you go" }] }
+        ];
+        mount();
+        await ready();
+        fireEvent.click(screen.getByLabelText("Copy message"));
+        await act(async () => undefined);
+        expect(screen.queryByLabelText("Copied")).toBeNull();
+    });
+});
+
 describe("the queue", () => {
     const busyThread = () => {
         chat.status = "streaming";

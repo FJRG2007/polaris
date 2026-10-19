@@ -152,3 +152,45 @@ export function fencePageContext(context: PageContext | null | undefined): strin
         "</page_context>"
     ].join("\n");
 }
+
+/** A conversation's name, as the list shows it and the rename field takes it. */
+export const POLAR_TITLE_MAX = 120;
+export const threadTitleSchema = z.string().trim().min(1).max(POLAR_TITLE_MAX);
+
+/** The recency groups of the conversation list, newest first. */
+export const THREAD_GROUPS = ["today", "yesterday", "week", "month", "older"] as const;
+export type ThreadGroup = (typeof THREAD_GROUPS)[number];
+
+/**
+ * Which group a conversation falls in by its last update, counted in calendar
+ * days of the reader's own clock: "yesterday" is the day before today, not the
+ * twenty-four hours before now. A date in the future (a skewed clock) is today.
+ */
+export function threadGroup(updatedAt: string, now: Date = new Date()): ThreadGroup {
+    const day = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const then = new Date(updatedAt);
+    if (Number.isNaN(then.getTime())) return "older";
+    const days = Math.round((day(now) - day(then)) / 86_400_000);
+    if (days <= 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days <= 7) return "week";
+    if (days <= 30) return "month";
+    return "older";
+}
+
+/** Rows in their groups, each group keeping the rows' own order; empty groups
+ *  are left out. */
+export function groupThreads<T extends { updatedAt: string }>(
+    rows: readonly T[],
+    now: Date = new Date()
+): Array<{ group: ThreadGroup; rows: T[] }> {
+    const buckets = new Map<ThreadGroup, T[]>();
+    for (const row of rows) {
+        const group = threadGroup(row.updatedAt, now);
+        buckets.set(group, [...(buckets.get(group) ?? []), row]);
+    }
+    return THREAD_GROUPS.filter((group) => buckets.has(group)).map((group) => ({
+        group,
+        rows: buckets.get(group) ?? []
+    }));
+}
