@@ -40,11 +40,7 @@ const SAMPLE_TAG = "pw_samp";
 /** Servers whose builds are being worked on: a pass never overlaps the last. */
 const busy = new Set<string>();
 
-/** Per server and build, the site a search starts at next: each pass goes on
- *  round the rings where the last one stopped, so a home whose nearest ground
- *  is all built on still gets a site further out. Kept in memory: a restart
- *  starts again from the nearest. */
-const nextSite = new Map<string, number>();
+const LOG = "[minecraft-seasonal]";
 
 /** The batch key a build is pasted and cancelled under: the same across restarts. */
 function batchKeyFor(installedAppId: string, id: string): string {
@@ -104,26 +100,52 @@ async function loaded<T>(
     }
 }
 
-/** Where players live and stand in the overworld: what a build goes near. */
+/** Where players live in the overworld - where they stand only when nobody
+ *  has a bed - in the same order every pass: what a build goes near. */
 async function homesOf(server: ServerContainer): Promise<{ x: number; z: number }[]> {
     const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
         commands.HOMES.map((line) => server.say([line]).catch(() => ""))
     );
+    const beds = commands.readHomes(
+        spawnX ?? "",
+        spawnZ ?? "",
+        respawn ?? "",
+        spawnWorld ?? "",
+        respawnWorld ?? ""
+    );
+    if (beds.length > 0) return plan.stableHomes(beds, []);
     const standing = commands.readWhere(
         await server
             .say(["execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos"])
             .catch(() => "")
     );
-    return [
-        ...commands.readHomes(
-            spawnX ?? "",
-            spawnZ ?? "",
-            respawn ?? "",
-            spawnWorld ?? "",
-            respawnWorld ?? ""
-        ),
-        ...standing.map((one) => ({ x: Math.floor(one.x), z: Math.floor(one.z) }))
-    ];
+    return plan.stableHomes([], standing);
+}
+
+/** The searches the config holds, but only for `season`'s builds. */
+function searchesOf(
+    config: Readonly<Record<string, unknown>>,
+    season: readonly PolarisBuild[]
+): Record<string, plan.SiteSearch> {
+    return Object.fromEntries(
+        Object.entries(plan.readSiteSearches(config)).filter(([id]) =>
+            season.some((one) => one.id === id)
+        )
+    );
+}
+
+/** Write where a build's search stands, or forget it (`null`). */
+async function writeSearch(
+    installedAppId: string,
+    id: string,
+    search: plan.SiteSearch | null,
+    season: readonly PolarisBuild[]
+): Promise<void> {
+    await host.appsInstallConfig.patchInstallConfig(installedAppId, (config) => {
+        const kept = searchesOf(config, season);
+        delete kept[id];
+        return { [plan.SITE_SEARCH_KEY]: search ? { ...kept, [id]: search } : kept };
+    });
 }
 
 /** Markers standing on something somebody built; Infinity when the server would not say. */
@@ -148,12 +170,14 @@ async function builtOn(server: ServerContainer): Promise<number> {
     return Number.POSITIVE_INFINITY;
 }
 
-/** Whether the build fits at `center`: the origin it would take, or null. */
+type SiteAnswer = { readonly origin: plan.Point } | { readonly why: string };
+
+/** Whether the build fits at `center`: the origin it would take, or why not. */
 async function surveySite(
     server: ServerContainer,
     wanted: PolarisBuild,
     center: { x: number; z: number }
-): Promise<plan.Point | null> {
+): Promise<SiteAnswer> {
     const columns = commands.footprintColumns(center, plan.radiusOf(wanted));
     try {
         await server.sayAll(commands.topLines(columns, SAMPLE_TAG, false));
@@ -164,24 +188,39 @@ async function surveySite(
         ))
             covered += commands.samplesIn(await server.say([line])).length;
         const verdict = plan.judgeSite(columns.length, tops, covered, wanted);
-        if (!("y" in verdict)) return null;
+        if (!("y" in verdict)) return verdict;
         const origin = plan.originFor(wanted, center, verdict.y);
         // Its whole box nothing but air, or it is not built on.
         for (const piece of arena.slices(plan.boxFor(wanted, origin))) {
-            if (arena.readCount(await server.say([arena.solidCount(piece)])) !== 0) return null;
+            if (arena.readCount(await server.say([arena.solidCount(piece)])) !== 0)
+                return { why: "not-air" };
         }
-        return origin;
+        return { origin };
     } finally {
         await server.sayAll([commands.clearSamples(SAMPLE_TAG)]);
     }
 }
 
-/** A site for `wanted` near the players: its origin, or null when none of this pass's will do. */
-async function findSite(server: ServerContainer, wanted: PolarisBuild): Promise<plan.Point | null> {
+/**
+ * A site for `wanted` near the players: its origin, or null when none of this
+ * pass's will do. Each pass goes on round the rings where the last one stopped -
+ * written in the config, so a restart does too - and a home whose nearest
+ * ground is all built on still gets a site further out. A new list (somebody
+ * with a bed came or went) goes on after the last site surveyed when that is
+ * still in it, and from its nearest otherwise.
+ */
+async function findSite(
+    server: ServerContainer,
+    wanted: PolarisBuild,
+    config: Readonly<Record<string, unknown>>,
+    season: readonly PolarisBuild[]
+): Promise<plan.Point | null> {
     const centers = plan.candidateCenters(await homesOf(server), wanted, Number.POSITIVE_INFINITY);
-    const key = `${server.installedAppId}:${wanted.id}`;
-    const from = (nextSite.get(key) ?? 0) % Math.max(centers.length, 1);
-    nextSite.set(key, from + SITES_PER_PASS >= centers.length ? 0 : from + SITES_PER_PASS);
+    if (centers.length === 0) return null;
+    const list = plan.listDigest(centers);
+    const stored = plan.readSiteSearches(config)[wanted.id];
+    const from = plan.searchStart(stored, centers);
+    let next = from;
     for (const center of centers.slice(from, from + SITES_PER_PASS)) {
         const reach = plan.radiusOf(wanted) + 1;
         const area = {
@@ -192,12 +231,27 @@ async function findSite(server: ServerContainer, wanted: PolarisBuild): Promise<
             y2: 0,
             z2: center.z + reach
         };
-        const origin = await loaded(server, area, () => surveySite(server, wanted, center));
-        if (origin) {
-            nextSite.delete(key);
-            return origin;
+        const answer = await loaded(server, area, () => surveySite(server, wanted, center));
+        const where = `${server.installedAppId}: ${wanted.id} site ${next + 1}/${centers.length} at ${center.x},${center.z}`;
+        // The server would not say which chunks were held: this site again next pass.
+        if (!answer) {
+            console.info(`${LOG} ${where}: chunks unreadable`);
+            break;
         }
+        next += 1;
+        if ("origin" in answer) {
+            const { x, y, z } = answer.origin;
+            console.info(`${LOG} ${where}: site, origin ${x} ${y} ${z}`);
+            if (stored) await writeSearch(server.installedAppId, wanted.id, null, season);
+            return answer.origin;
+        }
+        console.info(`${LOG} ${where}: ${answer.why}`);
     }
+    // Nothing surveyed - the server would not say - is nothing to write down.
+    if (next === from) return null;
+    const last = centers[next - 1]!;
+    const search = { list, next: next >= centers.length ? 0 : next, last };
+    await writeSearch(server.installedAppId, wanted.id, search, season);
     return null;
 }
 
@@ -260,15 +314,22 @@ export async function reconcileWorldBuilds(
         const placed = plan.readPlaced(config);
         for (const one of placed.filter((p) => p.season !== decoration))
             await takeDown(server, one, catalog);
+        const season = decoration ? catalog.filter((one) => one.season === decoration) : [];
+        // Searches for builds of a season that is over: nothing goes on from them.
+        const searches = Object.keys(plan.readSiteSearches(config));
+        if (searches.some((id) => !season.some((one) => one.id === id)))
+            await host.appsInstallConfig.patchInstallConfig(server.installedAppId, (current) => ({
+                [plan.SITE_SEARCH_KEY]: searchesOf(current, season)
+            }));
         if (!decoration) return;
-        for (const wanted of catalog.filter((one) => one.season === decoration)) {
+        for (const wanted of season) {
             const existing = placed.find(
                 (one) => one.id === wanted.id && one.season === decoration
             );
             if (existing?.up) continue;
             let target = existing;
             if (!target) {
-                const origin = await findSite(server, wanted);
+                const origin = await findSite(server, wanted, config, season);
                 if (!origin) continue;
                 const fresh = plan.placedFor(
                     wanted,
@@ -280,6 +341,9 @@ export async function reconcileWorldBuilds(
                     fresh
                 ]);
                 target = fresh;
+                console.info(
+                    `${LOG} ${server.installedAppId}: placing ${wanted.id} at ${origin.x} ${origin.y} ${origin.z}`
+                );
             }
             await paste(server, wanted, target);
             return;
