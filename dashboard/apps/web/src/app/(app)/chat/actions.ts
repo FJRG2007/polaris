@@ -52,7 +52,7 @@ import {
     type ScheduledMessageView
 } from "@/lib/chat/scheduled";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
-import { callConversationMembers, voicePresence, type VoicePresence } from "@/lib/chat/meetings";
+import { callConversationMembers } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import type {
@@ -68,7 +68,7 @@ import type {
     ChatMemberView,
     ChatSpaceView
 } from "@/lib/chat/chat-service";
-import { reachableChannelIds, requirePostable, searchForConversation } from "@/lib/chat/access";
+import { requirePostable, searchForConversation } from "@/lib/chat/access";
 
 const CHAT_PATH = "/chat";
 
@@ -134,23 +134,6 @@ export async function chatListsAction(): Promise<{
         part(friendIds(me.id).then((ids) => [...ids]))
     ]);
     return { channels, spaces, categories, blocked, friends };
-}
-
-/**
- * Who is in each voice room, for the rail.
- *
- * Asked for the channels the rail is already showing, and answered only for the
- * ones this reader can reach - the ids arrive from a browser, so they are
- * intersected with what the reader can see rather than trusted.
- */
-export async function voicePresenceAction(
-    channelIds: string[]
-): Promise<{ inRoom: Record<string, VoicePresence[]> }> {
-    const me = await actor();
-    const reachable = await reachableChannelIds(me);
-    const asked = (Array.isArray(channelIds) ? channelIds : []).filter((id) => reachable.has(id));
-    const found = await voicePresence(asked);
-    return { inRoom: Object.fromEntries(found) };
 }
 
 /**

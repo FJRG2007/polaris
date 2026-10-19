@@ -95,6 +95,7 @@ import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
 import { placed } from "./ring-back";
+import { fetchLiveCall } from "./chat-polls";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -510,10 +511,11 @@ export function ChannelView({
     // something happens in the channel - starting one posts nothing, so the
     // question has to be asked rather than inferred from the messages.
     const checkCall = useCallback(() => {
-        void calls
-            .liveCallAction(channelId)
-            .then(setLive)
-            .catch(() => setLive(null));
+        // A failed ask leaves the call drawn as it was: reading it as "no call"
+        // took the Join button away from everybody outside it after an update.
+        void fetchLiveCall(channelId).then((found) => {
+            if (found !== undefined) setLive(found);
+        });
     }, [channelId]);
 
     // A moderator acts on a call from outside it as from inside: right-click a

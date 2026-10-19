@@ -94,6 +94,12 @@ env:
   # download buys nothing and is skipped. The images were never affected - their
   # `npm ci` already runs with --ignore-scripts.
   ONNXRUNTIME_NODE_INSTALL: "skip"
+  # npm runs install scripts in parallel. esbuild's links its native binary into
+  # place and runs it at once, and a child process another script forked in that
+  # moment can still hold the file open - Linux then refuses to run it
+  # (`spawnSync .../esbuild ETXTBSY`) and `npm ci` fails on a commit that
+  # touched nothing near it. One script at a time leaves no such moment.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
 
 jobs:
   checks:

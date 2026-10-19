@@ -30,7 +30,6 @@ import { getUserLocale } from "@/lib/i18n/locale-service";
 import * as moderation from "@/lib/chat/call-moderation";
 import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
-import { requireChannel } from "@/lib/chat/access";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
@@ -343,24 +342,6 @@ export async function setGuestLinkAction(
         meetings.setGuestLink({ id: user.id }, meetingId, open, approveGuests)
     );
     return result.error ? { error: result.error } : { token: result.value ?? null };
-}
-
-/**
- * Whether a conversation has a call running in it, for the header.
- *
- * The conversation is proved, not just the permission: "is anybody on a call in
- * this channel, and how many" is something about a room, and answering it for a
- * channel id somebody guessed would be a way to read a private conversation one
- * bit at a time.
- */
-export async function liveCallAction(channelId: string): Promise<LiveCall | null> {
-    const user = await requirePermission("chat.use");
-    const result = await guard(async () => {
-        await requireChannel({ id: user.id }, channelId);
-        return meetings.liveIn(channelId);
-    });
-    const live = result.value;
-    return live ? { meetingId: live.id, count: live.count, people: live.people } : null;
 }
 
 /** A call running in a conversation, and who is sitting in it - with their
