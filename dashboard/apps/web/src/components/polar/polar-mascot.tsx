@@ -1,11 +1,16 @@
 /**
- * Polar, the assistant's mascot: a polar bear's face with a star on its brow.
+ * Polar, the assistant's mascot: a polar bear's face, with the North Star
+ * hanging in the sky just above its right ear.
  *
  * Ported from the approved design with every animation it has - breathing,
  * blinking, the ears, the star's twinkle and its spin while thinking, the eyes
  * looking around, the mouth talking, the hop when something is done and the
  * shake on trouble. `prefers-reduced-motion` stops all of it. The colours are
  * Polar's own identity and stay fixed in both themes.
+ *
+ * The star sits outside the body group, so the hop and the shake move the bear
+ * and leave the sky where it is, and it is drawn with room to spare inside the
+ * 64-unit box at its twinkle's largest - nothing of it is ever cut off.
  */
 
 export const POLAR_MOODS = [
@@ -30,7 +35,7 @@ const STYLE = `
 @keyframes polar-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-1.6px)}40%{transform:translateX(1.6px)}60%{transform:translateX(-1px)}80%{transform:translateX(1px)}}
 @keyframes polar-talk{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
 @keyframes polar-look{0%,100%{transform:translate(0,0)}25%{transform:translate(1.2px,-0.4px)}60%{transform:translate(-1.2px,-0.4px)}}
-.polar-star-spin{transform-box:view-box;transform-origin:32px 24.5px;animation:polar-spin 1.4s cubic-bezier(.6,0,.4,1) infinite}
+.polar-star-spin{transform-box:view-box;transform-origin:56px 8px;animation:polar-spin 1.4s cubic-bezier(.6,0,.4,1) infinite}
 .polar-wave-a{animation:polar-wave 1.2s ease-in-out infinite}
 .polar-wave-b{animation:polar-wave 1.2s ease-in-out .3s infinite}
 .polar-body{transform-box:view-box;transform-origin:32px 56px}
@@ -42,7 +47,7 @@ const STYLE = `
 .polar-ear-l{transform-box:view-box;transform-origin:19px 24px;animation:polar-ear-l 7s ease-in-out infinite}
 .polar-ear-r{transform-box:view-box;transform-origin:45px 24px;animation:polar-ear-r 9s ease-in-out infinite}
 .m-listening .polar-ear-l,.m-listening .polar-ear-r{animation-duration:2.2s}
-.polar-twinkle{transform-box:view-box;transform-origin:32px 24.5px;animation:polar-twinkle 2.8s ease-in-out infinite}
+.polar-twinkle{transform-box:view-box;transform-origin:56px 8px;animation:polar-twinkle 2.8s ease-in-out infinite}
 .polar-talk{transform-box:view-box;transform-origin:32px 46.4px;animation:polar-talk .32s ease-in-out infinite}
 @media (prefers-reduced-motion: reduce){.polar-star-spin,.polar-wave-a,.polar-wave-b,.polar-body,.polar-eyes,.polar-look,.polar-ear-l,.polar-ear-r,.polar-twinkle,.polar-talk{animation:none!important}}
 `;
@@ -54,6 +59,10 @@ const INK = "#161A24";
 const EAR = "#C9B8FA";
 const MUZZLE = "#E3E7F1";
 const WAVE = "#9B78F5";
+
+/** The North Star: four points around (56, 8), 5 units out - 5.9 at the
+ *  twinkle's 1.18, so its widest reach is x 50.1 to 61.9 and y 2.1 to 13.9. */
+export const STAR = "M56 3 Q56 8 61 8 Q56 8 56 13 Q56 8 51 8 Q56 8 56 3 Z";
 
 export function PolarMascot({
     mood = "idle",
@@ -81,6 +90,19 @@ export function PolarMascot({
             <style>{STYLE}</style>
             {plate ? <rect x="0" y="0" width="64" height="64" rx="15" fill={VIOLET} /> : null}
             <g transform={plate ? "translate(6.4 7) scale(0.8)" : undefined}>
+                <g opacity={mood === "trouble" ? 0.4 : 1}>
+                    <g
+                        className={
+                            mood === "idle" || mood === "done" ? "polar-twinkle" : undefined
+                        }
+                    >
+                        <path
+                            className={mood === "thinking" ? "polar-star-spin" : undefined}
+                            d={STAR}
+                            fill={VIOLET}
+                        />
+                    </g>
+                </g>
                 <g className="polar-body">
                     <g className="polar-ear-l">
                         <circle
@@ -113,19 +135,6 @@ export function PolarMascot({
                         stroke={INK}
                         strokeOpacity="0.14"
                     />
-                    <g opacity={mood === "trouble" ? 0.4 : 1}>
-                        <g
-                            className={
-                                mood === "idle" || mood === "done" ? "polar-twinkle" : undefined
-                            }
-                        >
-                            <path
-                                className={mood === "thinking" ? "polar-star-spin" : undefined}
-                                d="M32 19 Q32 24.5 37.5 24.5 Q32 24.5 32 30 Q32 24.5 26.5 24.5 Q32 24.5 32 19 Z"
-                                fill={VIOLET}
-                            />
-                        </g>
-                    </g>
                     <ellipse cx="32" cy="44.5" rx="9.5" ry="7" fill={MUZZLE} />
                     <ellipse cx="32" cy="40.8" rx="3.4" ry="2.4" fill={INK} />
                     <g className="polar-look">
