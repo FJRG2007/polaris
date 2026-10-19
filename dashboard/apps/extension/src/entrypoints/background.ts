@@ -1597,7 +1597,7 @@ function summarize(login: Login, vaults: ReadonlyMap<string, string>): messages.
     return {
         id: login.id,
         name: login.name,
-        username: login.username ?? login.email,
+        username: login.username || login.email || null,
         host: displayHost(login.uris),
         totp: login.totp !== null,
         // Null for this account's own vault, and null too for a shared one whose
@@ -3616,7 +3616,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 // somebody might then paste somewhere it does not belong.
                 const value =
                     request.field === "username"
-                        ? login.username
+                        ? login.username || login.email
                         : request.field === "password"
                           ? login.password
                           : login.totp

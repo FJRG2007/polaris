@@ -282,6 +282,7 @@
         "expiryPlaceholder": "MM/YY",
         "email": "Email",
         "emailPlaceholder": "name@example.com",
+        "emailInvalid": "Enter an email address, like name@example.com.",
         "apiKey": "API key",
         "apiSecret": "Secret",
         "endpoint": "Base URL"

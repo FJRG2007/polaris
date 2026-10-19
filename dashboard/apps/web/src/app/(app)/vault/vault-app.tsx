@@ -673,23 +673,32 @@ export function VaultApp() {
                                                     {item.type === core.CIPHER_LOGIN ? (
                                                         <>
                                                             <ContextMenuItem
-                                                                disabled={!item.login.username}
+                                                                disabled={
+                                                                    !item.login.username &&
+                                                                    !loginEmail(item)
+                                                                }
                                                                 onSelect={() =>
                                                                     void copy(
                                                                         "username",
-                                                                        item.login.username
+                                                                        item.login.username ||
+                                                                            loginEmail(item)
                                                                     )
                                                                 }
                                                             >
                                                                 <Copy className="size-4" />
-                                                                {core.looksLikeEmail(
-                                                                    item.login.username
+                                                                {(
+                                                                    loginEmail(item)
+                                                                        ? !item.login.username
+                                                                        : core.looksLikeEmail(
+                                                                              item.login.username
+                                                                          )
                                                                 )
                                                                     ? t("app.menu.copyEmail")
                                                                     : t("app.menu.copyUsername")}
                                                                 <ShortcutHint id="vault.copyUsername" />
                                                             </ContextMenuItem>
-                                                            {loginEmail(item) ? (
+                                                            {item.login.username &&
+                                                            loginEmail(item) ? (
                                                                 <ContextMenuItem
                                                                     onSelect={() =>
                                                                         void copy(

@@ -295,7 +295,19 @@ export function ItemDialog({
         });
     }
 
+    /** The email as it is stored: trimmed and lowercased. One that was only
+     *  opened keeps the spelling it was saved with. */
+    const storedEmail = core.fieldValue(draft.fields, core.EMAIL_FIELD);
+    const typedEmail = email.trim().toLowerCase();
+    const emailEdited = typedEmail !== storedEmail.trim().toLowerCase();
+    const emailInvalid =
+        draft.type === core.CIPHER_LOGIN &&
+        emailEdited &&
+        typedEmail !== "" &&
+        !core.looksLikeEmail(typedEmail);
+
     async function onSubmit(): Promise<void> {
+        if (emailInvalid) return;
         const intoVault = !draft.id && draft.organizationId !== null;
         if (intoVault && !collectionId) {
             setError(t("item.pickCollection"));
@@ -339,7 +351,12 @@ export function ItemDialog({
             codes,
             core.FIELD_HIDDEN
         );
-        return core.withChangedField(withCodes, core.EMAIL_FIELD, email.trim(), core.FIELD_TEXT);
+        return core.withChangedField(
+            withCodes,
+            core.EMAIL_FIELD,
+            emailEdited ? typedEmail : storedEmail,
+            core.FIELD_TEXT
+        );
     }
 
     /** The custom fields drawn as name and value: everything this form has no
@@ -516,7 +533,19 @@ export function ItemDialog({
                                     placeholder={t("item.emailPlaceholder")}
                                     autoComplete="off"
                                     spellCheck={false}
+                                    aria-invalid={emailInvalid || undefined}
+                                    aria-describedby={
+                                        emailInvalid ? "vault-item-email-hint" : undefined
+                                    }
                                 />
+                                {emailInvalid ? (
+                                    <span
+                                        id="vault-item-email-hint"
+                                        className="text-xs text-danger"
+                                    >
+                                        {t("item.emailInvalid")}
+                                    </span>
+                                ) : null}
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 {t("item.password")}
@@ -1237,7 +1266,7 @@ export function ItemDialog({
                     <Button type="button" variant="secondary" onClick={onClose}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button type="button" onClick={onSubmit} disabled={pending}>
+                    <Button type="button" onClick={onSubmit} disabled={pending || emailInvalid}>
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         {tc("actions.save")}
                     </Button>
