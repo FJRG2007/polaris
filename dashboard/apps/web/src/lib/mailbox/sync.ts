@@ -860,6 +860,7 @@ async function storeMessages(
                 // put an accent, and a resync is the one moment the good line
                 // can replace it for good.
                 snippet,
+                reaction: message.structure.reaction ? core.mailReactionFrom(snippet) : "",
                 category,
                 categoryVersion: core.MAIL_CATEGORY_VERSION
             },
@@ -878,6 +879,7 @@ async function storeMessages(
                 ccJson: asJson(cc),
                 replyToJson: asJson(addresses(envelope?.replyTo)),
                 snippet,
+                reaction: message.structure.reaction ? core.mailReactionFrom(snippet) : "",
                 category,
                 categoryVersion: core.MAIL_CATEGORY_VERSION,
                 sentAt,
@@ -892,7 +894,7 @@ async function storeMessages(
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
-                    message.headers["return-receipt-to"]
+                        message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {

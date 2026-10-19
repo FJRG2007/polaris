@@ -694,7 +694,21 @@
         "thisSender": "este remitente",
         "saveZip": "Guardar todo en .zip",
         "saveMessage": "Guardar este mensaje",
-        "filterLike": "Filtrar mensajes como este"
+        "filterLike": "Filtrar mensajes como este",
+        "starMessage": "Destacar este mensaje",
+        "unstarMessage": "Quitar destacado",
+        "react": "Reaccionar con un emoji",
+        "messageMore": "Más de este mensaje",
+        "markMessageUnread": "Marcar este como no leído",
+        "trashMessage": "Eliminar este mensaje",
+        "blockMessageSender": "Bloquear a {sender}",
+        "reactions": "Reacciones",
+        "reacted": "Reacción {emoji} enviada",
+        "undoReaction": "Deshacer",
+        "reactionGone": "Esa reacción ya se ha enviado.",
+        "reactedBy": "{emoji} de {names}",
+        "you": "Tú",
+        "messageActFailed": "No se pudo cambiar el mensaje. Reinténtalo."
     },
     "spam": {
         "spf": "La dirección de la que dice venir no permite que este servidor envíe en su nombre",

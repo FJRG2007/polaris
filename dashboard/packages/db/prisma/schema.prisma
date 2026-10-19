@@ -12301,6 +12301,10 @@ model MailMessage {
     important Boolean @default(false)
 
     hasAttachments Boolean @default(false)
+    // The emoji, when this message is a reaction to the one it answers - it
+    // carries Gmail's reaction part - so a conversation draws it under that
+    // message instead of as a reply of its own. "" for everything else.
+    reaction       String  @default("")
     // Whether this message asked to be told when it was read. Recorded so the
     // reader can be shown that it did, which is the only thing Polaris does
     // about it.
@@ -12463,6 +12467,9 @@ model MailDraft {
     references      Json    @default("[]")
     forward         Boolean @default(false)
     requestReceipt  Boolean @default(false)
+    // One emoji when this is a reaction to the message it answers rather than a
+    // reply, "" otherwise - see `mail-reaction` in core.
+    reaction        String  @default("")
 
     // When to send it. Null is "not yet said", and also what a message the
     // outgoing server refused for good is left at: nothing is due, so no sweep

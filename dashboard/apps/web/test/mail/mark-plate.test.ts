@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { markColor, plateFor } from "@/lib/mailbox/mark-plate";
+import { coversWhole, markColor, plateFor } from "@/lib/mailbox/mark-plate";
 import { INK_DARK, INK_LIGHT, contrastRatio } from "@polaris/core";
 
 /** An image of one colour at one opacity, as the browser hands the pixels over. */
@@ -92,5 +92,26 @@ describe("deciding what goes behind it", () => {
             if (!plate) continue;
             expect(contrastRatio(mark, plate)).toBeGreaterThanOrEqual(3);
         }
+    });
+});
+
+describe("a picture that fills its square", () => {
+    it("is a photograph, whose own background is all that is ever seen", () => {
+        // A dark portrait: measured as a mark it would get a white plate, which
+        // drew as a white ring round somebody's own face.
+        expect(coversWhole(image([40, 32, 30]))).toBe(true);
+    });
+
+    it("is not a logo with empty corners", () => {
+        // A round mark in its square leaves about a fifth of it transparent.
+        expect(coversWhole(markOnNothing([20, 20, 20], 200))).toBe(false);
+    });
+
+    it("is not a picture drawn half see-through", () => {
+        expect(coversWhole(image([20, 20, 20], 60))).toBe(false);
+    });
+
+    it("is not an empty image", () => {
+        expect(coversWhole(new Uint8ClampedArray(0))).toBe(false);
     });
 });

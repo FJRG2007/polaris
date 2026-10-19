@@ -35,15 +35,24 @@
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
-import { markColor, plateFor } from "@/lib/mailbox/mark-plate";
+import { coversWhole, markColor, plateFor } from "@/lib/mailbox/mark-plate";
 
 /** How big the mark is sampled at. A logo's colour does not need more, and this
  *  is a canvas per sender rather than per message. */
 const SAMPLE = 16;
 
-/** What each mark turned out to need, by the address it came from. Held for the
+/** What a picture turned out to be, by the address it came from. Held for the
  *  session: the answer cannot change while the picture behind it does not. */
-const plates = new Map<string, string | null>();
+interface Measured {
+    /** The plate behind a mark that needs one, else null. */
+    readonly plate: string | null;
+    /** Whether it fills its square - a photograph rather than a logo. */
+    readonly whole: boolean;
+}
+
+const NOTHING_MEASURED: Measured = { plate: null, whole: false };
+
+const measured = new Map<string, Measured>();
 
 /**
  * What is behind a mark, measured from the pixels the browser has already
@@ -52,18 +61,23 @@ const plates = new Map<string, string | null>();
  * Same-origin, because Polaris served it - so the canvas is readable rather than
  * tainted, and this is a measurement rather than a request. Anything that goes
  * wrong answers "no plate", which is what the column looked like before.
+ *
+ * A picture that fills its square is never plated: it has its own background,
+ * and a plate behind it only shows as a ring round its edge.
  */
-function measure(image: HTMLImageElement): string | null {
+function measure(image: HTMLImageElement): Measured {
     try {
         const canvas = document.createElement("canvas");
         canvas.width = SAMPLE;
         canvas.height = SAMPLE;
         const context = canvas.getContext("2d", { willReadFrequently: true });
-        if (!context) return null;
+        if (!context) return NOTHING_MEASURED;
         context.drawImage(image, 0, 0, SAMPLE, SAMPLE);
-        return plateFor(markColor(context.getImageData(0, 0, SAMPLE, SAMPLE).data));
+        const pixels = context.getImageData(0, 0, SAMPLE, SAMPLE).data;
+        if (coversWhole(pixels)) return { plate: null, whole: true };
+        return { plate: plateFor(markColor(pixels)), whole: false };
     } catch {
-        return null;
+        return NOTHING_MEASURED;
     }
 }
 
@@ -85,21 +99,22 @@ export function SenderFace({
     size?: number;
     className?: string;
 }) {
-    const [plate, setPlate] = useState<string | null>(() => plates.get(address) ?? null);
+    const [seen, setSeen] = useState<Measured>(() => measured.get(address) ?? NOTHING_MEASURED);
     const label = senderLabel(name, address);
 
     useEffect(() => {
-        setPlate(plates.get(address) ?? null);
+        setSeen(measured.get(address) ?? NOTHING_MEASURED);
     }, [address]);
 
     const settle = (image: HTMLImageElement): void => {
-        if (plates.has(address)) {
-            setPlate(plates.get(address) ?? null);
+        const known = measured.get(address);
+        if (known) {
+            setSeen(known);
             return;
         }
         const found = measure(image);
-        plates.set(address, found);
-        setPlate(found);
+        measured.set(address, found);
+        setSeen(found);
     };
 
     return (
@@ -118,10 +133,12 @@ export function SenderFace({
                 size={size}
                 status={false}
                 tint={address || label}
-                fit="contain"
+                // A logo is drawn whole; a photograph fills the circle, the way
+                // every other face in Polaris does.
+                fit={seen.whole ? "cover" : "contain"}
                 // A plate only under a mark that needs one, so a mark that reads
                 // on both themes keeps the column as plain as it was.
-                backdrop={plate}
+                backdrop={seen.plate}
                 onPicture={settle}
                 // A mailbox is a long list; the rows below the fold are asked
                 // for as they come near, with their letters showing until then.

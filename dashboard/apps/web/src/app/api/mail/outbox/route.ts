@@ -25,7 +25,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return answer(
-            { error: issue?.message ?? (await readerWords("api"))("errors.checkMessage"), field: String(issue?.path[0] ?? "") },
+            {
+                error: issue?.message ?? (await readerWords("api"))("errors.checkMessage"),
+                field: String(issue?.path[0] ?? "")
+            },
             400
         );
     }
@@ -44,7 +47,8 @@ export async function POST(request: Request): Promise<Response> {
             forward: parsed.data.forward,
             sendAt: parsed.data.sendAt,
             requestReceipt: parsed.data.requestReceipt,
-            draftId: parsed.data.draftId
+            draftId: parsed.data.draftId,
+            reaction: parsed.data.reaction
         });
         return answer({ draftId: queued.draftId, sendAt: queued.sendAt.toISOString() });
     } catch (caught) {

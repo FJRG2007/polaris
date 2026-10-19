@@ -58,6 +58,7 @@ export * from "./environment-promotion.js";
 export * from "./php-serialize.js";
 export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
+export * from "./mail-reaction.js";
 export * from "./mail-prefs.js";
 export * from "./mail-keys.js";
 export * from "./shortcuts.js";

@@ -694,7 +694,21 @@
         "thisSender": "this sender",
         "saveZip": "Save all as a .zip",
         "saveMessage": "Save this message",
-        "filterLike": "Filter messages like this"
+        "filterLike": "Filter messages like this",
+        "starMessage": "Star this message",
+        "unstarMessage": "Unstar this message",
+        "react": "React with an emoji",
+        "messageMore": "More for this message",
+        "markMessageUnread": "Mark this message unread",
+        "trashMessage": "Delete this message",
+        "blockMessageSender": "Block {sender}",
+        "reactions": "Reactions",
+        "reacted": "Reacted with {emoji}",
+        "undoReaction": "Take it back",
+        "reactionGone": "That reaction has already been sent.",
+        "reactedBy": "{emoji} from {names}",
+        "you": "You",
+        "messageActFailed": "That message could not be changed. Try again."
     },
     "spam": {
         "spf": "The address it claims to be from does not allow this server to send for it",

@@ -61,7 +61,10 @@ const IMPLICIT_TLS_PORT = 465;
 const CONNECT_TIMEOUT_MS = 20_000;
 const SOCKET_TIMEOUT_MS = 60_000;
 
-function transportFor(account: MailSendSource, credential: Awaited<ReturnType<typeof mailCredential>>) {
+function transportFor(
+    account: MailSendSource,
+    credential: Awaited<ReturnType<typeof mailCredential>>
+) {
     return createTransport({
         host: account.smtpHost,
         port: account.smtpPort,
@@ -69,7 +72,11 @@ function transportFor(account: MailSendSource, credential: Awaited<ReturnType<ty
         auth:
             credential.kind === "password"
                 ? { user: credential.user, pass: credential.pass }
-                : { type: "OAuth2" as const, user: credential.user, accessToken: credential.accessToken },
+                : {
+                      type: "OAuth2" as const,
+                      user: credential.user,
+                      accessToken: credential.accessToken
+                  },
         // A server that offers STARTTLS is taken up on it: without this a
         // downgrade would put the credential on a plain socket.
         requireTLS: account.smtpSecurity !== "tls" && account.smtpPort !== IMPLICIT_TLS_PORT,
@@ -118,6 +125,27 @@ export interface OutgoingMessage {
     /** The conversation so far, oldest first, with angle brackets. */
     readonly references: readonly string[];
     readonly requestReceipt: boolean;
+    /** One emoji when this is a reaction to `inReplyTo` - see `mail-reaction`
+     *  in core. Absent or "" for an ordinary message. */
+    readonly reaction?: string;
+}
+
+/**
+ * The parts of a reaction, in the order Google asks for: the reaction between
+ * the plain text and the HTML, because some clients show the first part of an
+ * alternative and some the last, and either should land on the emoji itself.
+ * Passed as alternatives rather than as `text` and `html`, which nodemailer
+ * would put ahead of anything else.
+ */
+function reactionParts(emoji: string): Mail.Options["alternatives"] {
+    return [
+        { contentType: "text/plain; charset=utf-8", content: emoji },
+        {
+            contentType: `${core.MAIL_REACTION_TYPE}; charset=utf-8`,
+            content: core.mailReactionJson(emoji)
+        },
+        { contentType: "text/html; charset=utf-8", content: htmlFrom(emoji) }
+    ];
 }
 
 /**
@@ -177,8 +205,9 @@ export async function composeMime(
         ...(message.bcc.length > 0 ? { bcc: message.bcc.map(core.formatAddress) } : {}),
         ...(message.replyTo ? { replyTo: message.replyTo } : {}),
         subject: message.subject,
-        text: textFrom(message.body),
-        html: htmlFrom(message.body),
+        ...(message.reaction
+            ? { alternatives: reactionParts(message.reaction) }
+            : { text: textFrom(message.body), html: htmlFrom(message.body) }),
         ...(message.inReplyTo ? { inReplyTo: message.inReplyTo } : {}),
         ...(message.references.length > 0 ? { references: [...message.references] } : {}),
         attachments: message.attachments.map((file) => ({
@@ -243,7 +272,11 @@ export async function sendMime(
                 })
             );
         }
-        return { accepted, refused, response: typeof info.response === "string" ? info.response : "" };
+        return {
+            accepted,
+            refused,
+            response: typeof info.response === "string" ? info.response : ""
+        };
     } catch (caught) {
         if (caught instanceof MailRejectedError) throw caught;
         const failure = asMailFailure(caught);
