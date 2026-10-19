@@ -3,15 +3,20 @@
 
 import { scenePath } from "../route";
 
+/** One router for the page, as Next's own is: a screen that lists the router
+ *  among an effect's dependencies would otherwise run that effect on every
+ *  render, and one that sets state there never stops. */
+const router = {
+    push: (href: string) => scenePath.navigate(href),
+    replace: (href: string) => scenePath.navigate(href),
+    refresh: () => undefined,
+    back: () => undefined,
+    forward: () => undefined,
+    prefetch: () => undefined
+};
+
 export function useRouter() {
-    return {
-        push: (href: string) => scenePath.navigate(href),
-        replace: (href: string) => scenePath.navigate(href),
-        refresh: () => undefined,
-        back: () => undefined,
-        forward: () => undefined,
-        prefetch: () => undefined
-    };
+    return router;
 }
 
 export function usePathname(): string {

@@ -13,12 +13,13 @@ import {
 import { drive, driveLinks } from "./drive";
 import { games } from "./games";
 import { gameConsole, gameEvents, gameInventory, gamePlayers } from "./game-server";
-import { callGroup, callMeeting, inCall } from "./in-call";
+import { callDirect, callGroup, callMeeting, inCall } from "./in-call";
 import { launcher } from "./launcher";
 import { mail, mailThread } from "./mail";
 import { marketplace, marketplaceInstall } from "./marketplace";
 import { office, officeDoc } from "./office";
-import { accountSecurity, settings, settingsRoles } from "./settings";
+import { placesOverview } from "./places";
+import { accountSecurity, settings, settingsRoles, settingsUsers } from "./settings";
 import { soundboard } from "./soundboard";
 import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
@@ -55,15 +56,18 @@ export const SCENES: readonly SceneDefinition[] = [
     officeDoc,
     vault,
     vaultSends,
+    placesOverview,
     marketplace,
     marketplaceInstall,
     launcher,
     settings,
     settingsRoles,
+    settingsUsers,
     accountSecurity,
     call,
     inCall,
     callMeeting,
     callGroup,
+    callDirect,
     soundboard
 ];

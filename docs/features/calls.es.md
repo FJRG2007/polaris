@@ -51,6 +51,11 @@ la llamada, y la reunión tiene su propio chat.
 ## Llamadas en mensajes directos y grupos
 
 <picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-direct-light-es-desktop.webp">
+  <img src="../assets/media/call-direct-dark-es-desktop.webp" alt="Una videollamada en un mensaje directo, con las dos cámaras">
+</picture>
+
+<picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-group-light-es-desktop.webp">
   <img src="../assets/media/call-group-dark-es-desktop.webp" alt="Una llamada de grupo con una pantalla compartida vista entre las personas, grabándose">
 </picture>

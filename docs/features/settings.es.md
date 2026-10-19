@@ -22,6 +22,18 @@ este host. La página muestra dónde se llega a Polaris, sus páginas públicas
 para proveedores OAuth, los temas de temporada y una forma de llevarlo todo a
 otra máquina en un archivo sellado con frase de paso.
 
+## Personas y acceso
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/settings-users-light-es-desktop.webp">
+  <img src="../assets/media/settings-users-dark-es-desktop.webp" alt="Cada cuenta con sus roles, límites y verificación en dos pasos, y las invitaciones pendientes">
+</picture>
+
+Todas las cuentas en una lista: sus roles, si es administradora, si está
+limitada a algunos países o redes, suspendida o con verificación en dos pasos,
+y cuándo y desde dónde se vio por última vez. Encima, las invitaciones que
+siguen pendientes, y cada fila abre la ficha de la cuenta.
+
 ## Roles y permisos
 
 <picture>

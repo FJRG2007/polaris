@@ -49,6 +49,11 @@ chat of its own.
 ## Calls in direct messages and groups
 
 <picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-direct-light-en-desktop.webp">
+  <img src="../assets/media/call-direct-dark-en-desktop.webp" alt="A video call in a direct message, both cameras on">
+</picture>
+
+<picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-group-light-en-desktop.webp">
   <img src="../assets/media/call-group-dark-en-desktop.webp" alt="A group call with a shared screen watched among the people, being recorded">
 </picture>

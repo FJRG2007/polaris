@@ -22,6 +22,18 @@ shows where Polaris is reachable, its public pages for OAuth providers, the
 seasonal themes, and a way to move everything to another machine in one
 passphrase-sealed file.
 
+## People and access
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/settings-users-light-en-desktop.webp">
+  <img src="../assets/media/settings-users-dark-en-desktop.webp" alt="Every account with its roles, limits and two-step sign-in, and the invitations waiting">
+</picture>
+
+Every account in one list: its roles, whether it is an administrator, limited to
+some countries or networks, suspended, or signed in with a second step, and when
+and from where it was last seen. Invitations still waiting sit above it, and
+each row opens the account's own record.
+
 ## Roles and permissions
 
 <picture>
