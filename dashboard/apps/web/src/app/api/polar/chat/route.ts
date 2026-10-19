@@ -25,6 +25,7 @@ import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
+import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -150,6 +151,9 @@ export async function POST(request: Request): Promise<Response> {
             } catch (error) {
                 console.error("polar: could not save the turn", error);
             }
+            // A new thread is named by its model once the first answer is in,
+            // behind the reply; the screen asks for the title when it is ready.
+            startPolarTitle(user.id, body.data.threadId, resolved.model, finished);
         },
         onError: () => "polar_failed"
     });

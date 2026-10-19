@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { MockLanguageModelV4 } from "ai/test";
-import { tool, type LanguageModelV4StreamPart } from "ai";
+import { tool, type LanguageModelV4StreamPart, type UIMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const USER = {
@@ -29,6 +29,7 @@ const state = {
     parts: [] as LanguageModelV4StreamPart[],
     executed: [] as string[],
     saved: [] as unknown[],
+    titled: [] as unknown[][],
     resolveCalls: 0
 };
 
@@ -45,6 +46,9 @@ vi.mock("@/lib/polar/attachments", () => ({
 vi.mock("@/lib/polar/threads", () => ({
     ensurePolarThread: async () => state.owned,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
+}));
+vi.mock("@/lib/polar/titles", () => ({
+    startPolarTitle: (...args: unknown[]) => void state.titled.push(args)
 }));
 
 /** The first step streams `state.parts`; any step after a tool ran just answers. */
@@ -170,6 +174,7 @@ beforeEach(() => {
     state.parts = says("Done.");
     state.executed = [];
     state.saved = [];
+    state.titled = [];
     state.resolveCalls = 0;
 });
 
@@ -243,6 +248,21 @@ describe("what a request has to look like", () => {
         expect(answer.status).toBe(200);
         expect(await answer.text()).toContain("Done.");
         expect(state.saved).toHaveLength(1);
+    });
+
+    it("asks for the thread's title once the reply has finished, not before", async () => {
+        const answer = await post(body());
+        expect(state.titled).toHaveLength(0);
+        expect(await answer.text()).toContain("Done.");
+        expect(state.titled).toHaveLength(1);
+        const [userId, threadId, , finished] = state.titled[0] as [
+            string,
+            string,
+            unknown,
+            UIMessage[]
+        ];
+        expect([userId, threadId]).toEqual([USER.id, THREAD]);
+        expect(finished.map((message) => message.role)).toEqual(["user", "assistant"]);
     });
 });
 

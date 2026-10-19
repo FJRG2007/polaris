@@ -600,6 +600,29 @@ export function PolarChat({
         wasBusy.current = busy;
         if (ended && showHistory) loadThreads(true);
     }, [busy, showHistory, loadThreads]);
+    const settled = !busy && chat.messages.length > 0;
+    // A new thread is named by its model after the first answer; its title is
+    // asked for once, and the placeholder in the list is swapped for it.
+    const titled = useRef(new Set<string>());
+    useEffect(() => {
+        if (!settled || titled.current.has(threadId)) return;
+        titled.current.add(threadId);
+        if (!chat.messages.some((message) => message.role === "assistant")) return;
+        const id = threadId;
+        fetch(`/api/polar/threads/${id}/title`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { title?: unknown } | null) => {
+                const title = typeof data?.title === "string" ? data.title : null;
+                if (!title) return;
+                setThreads(
+                    (current) =>
+                        current?.map((row) =>
+                            row.id === id && row.title !== title ? { ...row, title } : row
+                        ) ?? null
+                );
+            })
+            .catch(() => undefined);
+    }, [settled, threadId]);
     // Whether the page's sidebar was put away, remembered per browser.
     useEffect(() => setCollapsed(readStored(SIDEBAR_KEY) === "hidden"), []);
     const setSidebarHidden = (hidden: boolean) => {
@@ -672,6 +695,8 @@ export function PolarChat({
             new Map(thread.messages.map((message) => [message.id, message.parentId]))
         );
         tree.current = next;
+        // A stored thread already has the title it will keep.
+        titled.current.add(thread.id);
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
         setThreadId(thread.id);
