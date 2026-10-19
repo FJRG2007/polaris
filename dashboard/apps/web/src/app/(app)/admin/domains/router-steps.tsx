@@ -28,9 +28,9 @@ import {
     fitRuleNames,
     likelyGateway,
     mergeProtocolRules,
+    routerBrandsFor,
     routerGuide,
     FORWARD_RULES,
-    ROUTER_BRANDS,
     type RouterBrand,
     type RouterForwardRule,
     type RouterFormField
@@ -68,7 +68,15 @@ function bold(chunks: ReactNode[]) {
 }
 
 /** One cell of the forwarding table: what to put in this field for this rule. */
-function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: RouterForwardRule; lanIp: string | null }) {
+function ForwardValue({
+    field,
+    rule,
+    lanIp
+}: {
+    field: RouterFormField;
+    rule: RouterForwardRule;
+    lanIp: string | null;
+}) {
     const t = useTranslations("admin");
     switch (field.value) {
         case "name":
@@ -80,11 +88,15 @@ function ForwardValue({ field, rule, lanIp }: { field: RouterFormField; rule: Ro
             // brand's form accepts - it is how a router is asked for a run of ports.
             return (
                 <code className="text-foreground">
-                    {rule.endPort && rule.endPort !== rule.port ? `${rule.port}-${rule.endPort}` : rule.port}
+                    {rule.endPort && rule.endPort !== rule.port
+                        ? `${rule.port}-${rule.endPort}`
+                        : rule.port}
                 </code>
             );
         case "portRange":
-            return <code className="text-foreground">{`${rule.port} ~ ${rule.endPort ?? rule.port}`}</code>;
+            return (
+                <code className="text-foreground">{`${rule.port} ~ ${rule.endPort ?? rule.port}`}</code>
+            );
         case "anySource":
             // Left at zeroes on purpose: the field limits which WAN addresses may use
             // the rule, and Polaris has to answer the whole internet.
@@ -143,7 +155,10 @@ export function RouterSteps({
                             picked.current = true;
                             setBrand(value as RouterBrand);
                         }}
-                        options={ROUTER_BRANDS.map((entry) => ({ value: entry.id, label: routerGuideIn(t, entry).label }))}
+                        options={routerBrandsFor("forward").map((entry) => ({
+                            value: entry.id,
+                            label: routerGuideIn(t, entry).label
+                        }))}
                     />
                 </label>
                 {adminUrl && (
@@ -159,7 +174,9 @@ export function RouterSteps({
                 className="flex w-fit items-center gap-1 font-medium text-foreground hover:underline"
                 onClick={() => setOpen((value) => !value)}
             >
-                <ChevronDown className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
+                <ChevronDown
+                    className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`}
+                />
                 {open ? t("domainsRouter.hideSteps") : t("domainsRouter.showSteps")}
             </button>
             {!open ? null : (
@@ -195,10 +212,19 @@ export function RouterSteps({
                         </li>
                         <li>
                             {t.rich("domainsRouter.steps.reserve", {
-                                address: lanIp ? <Value key="ip" text={lanIp} /> : t("domainsRouter.itsAddress")
+                                address: lanIp ? (
+                                    <Value key="ip" text={lanIp} />
+                                ) : (
+                                    t("domainsRouter.itsAddress")
+                                )
                             })}
                             <ol className="ml-4 mt-1 flex list-decimal flex-col gap-1">
-                                <li>{t.rich("domainsRouter.steps.goTo", { path: guide.reserve.path, b: bold })}</li>
+                                <li>
+                                    {t.rich("domainsRouter.steps.goTo", {
+                                        path: guide.reserve.path,
+                                        b: bold
+                                    })}
+                                </li>
                                 {guide.reserve.kind === "device" ? (
                                     <li>
                                         {t.rich("domainsRouter.steps.findDevice", {
@@ -213,16 +239,24 @@ export function RouterSteps({
                                 ) : (
                                     <>
                                         <li>
-                                            {t.rich("domainsRouter.steps.press", { button: guide.reserve.add, b: bold })}
+                                            {t.rich("domainsRouter.steps.press", {
+                                                button: guide.reserve.add,
+                                                b: bold
+                                            })}
                                         </li>
                                         <li>
-                                            {t.rich("domainsRouter.steps.fillIn", { button: guide.reserve.save, b: bold })}
+                                            {t.rich("domainsRouter.steps.fillIn", {
+                                                button: guide.reserve.save,
+                                                b: bold
+                                            })}
                                             <div className="mt-1 overflow-x-auto">
                                                 <table className="w-full min-w-72 border-separate border-spacing-x-3 text-left">
                                                     <tbody className="align-top">
                                                         {guide.reserve.fields.map((field) => (
                                                             <tr key={field.label}>
-                                                                <td className="text-muted-foreground">{field.label}</td>
+                                                                <td className="text-muted-foreground">
+                                                                    {field.label}
+                                                                </td>
                                                                 <td>
                                                                     {field.value === "name" ? (
                                                                         <Value text="polaris" />
@@ -230,18 +264,28 @@ export function RouterSteps({
                                                                         lanIp ? (
                                                                             <Value text={lanIp} />
                                                                         ) : (
-                                                                            t("domainsRouter.thisServerAddress")
+                                                                            t(
+                                                                                "domainsRouter.thisServerAddress"
+                                                                            )
                                                                         )
                                                                     ) : (
-                                                                        t.rich("domainsRouter.steps.mac", {
-                                                                            server: lanIp ? (
-                                                                                <code key="ip" className="text-foreground">
-                                                                                    {lanIp}
-                                                                                </code>
-                                                                            ) : (
-                                                                                t("domainsRouter.thisServer")
-                                                                            )
-                                                                        })
+                                                                        t.rich(
+                                                                            "domainsRouter.steps.mac",
+                                                                            {
+                                                                                server: lanIp ? (
+                                                                                    <code
+                                                                                        key="ip"
+                                                                                        className="text-foreground"
+                                                                                    >
+                                                                                        {lanIp}
+                                                                                    </code>
+                                                                                ) : (
+                                                                                    t(
+                                                                                        "domainsRouter.thisServer"
+                                                                                    )
+                                                                                )
+                                                                            }
+                                                                        )
                                                                     )}
                                                                 </td>
                                                             </tr>
@@ -276,43 +320,55 @@ export function RouterSteps({
                                 <table className="w-full min-w-80 border-separate border-spacing-x-3 text-left">
                                     <thead>
                                         <tr className="text-muted-foreground">
-                                            <th className="font-normal">{t("domainsRouter.steps.field")}</th>
+                                            <th className="font-normal">
+                                                {t("domainsRouter.steps.field")}
+                                            </th>
                                             {named.map((rule, index) => (
                                                 <th key={rule.name} className="font-normal">
-                                                    {t("domainsRouter.steps.rule", { number: index + 1 })}
+                                                    {t("domainsRouter.steps.rule", {
+                                                        number: index + 1
+                                                    })}
                                                 </th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="align-top">
-                                        {(guide.forwardFields ?? genericForwardFields(t)).map((field, index) => (
-                                            <tr key={`${field.label}-${index}`}>
-                                                <td>{field.label}</td>
-                                                {named.map((rule) => (
-                                                    <td key={rule.name}>
-                                                        <ForwardValue field={field} rule={rule} lanIp={lanIp} />
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
+                                        {(guide.forwardFields ?? genericForwardFields(t)).map(
+                                            (field, index) => (
+                                                <tr key={`${field.label}-${index}`}>
+                                                    <td>{field.label}</td>
+                                                    {named.map((rule) => (
+                                                        <td key={rule.name}>
+                                                            <ForwardValue
+                                                                field={field}
+                                                                rule={rule}
+                                                                lanIp={lanIp}
+                                                            />
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            )
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
-                            {!lanIp && (
-                                <p className="mt-1">{t("domainsRouter.steps.noLanIp")}</p>
-                            )}
+                            {!lanIp && <p className="mt-1">{t("domainsRouter.steps.noLanIp")}</p>}
                         </li>
                         {/* A rule saved but left off is the failure with nothing to see:
                             it is listed, its values are right, and no packet moves. */}
                         {guide.forwardEnable && (
                             <li>
-                                {t("domainsRouter.steps.switchOn", { count: named.length })} {guide.forwardEnable}
+                                {t("domainsRouter.steps.switchOn", { count: named.length })}{" "}
+                                {guide.forwardEnable}
                             </li>
                         )}
                         <li>{t("domainsRouter.steps.checkAgain")}</li>
                         <li>
                             {guide.remotePath
-                                ? t.rich("domainsRouter.steps.remote", { path: guide.remotePath, b: bold })
+                                ? t.rich("domainsRouter.steps.remote", {
+                                      path: guide.remotePath,
+                                      b: bold
+                                  })
                                 : t("domainsRouter.steps.remoteGeneric")}
                         </li>
                     </ol>

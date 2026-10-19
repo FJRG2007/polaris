@@ -15,6 +15,7 @@ import {
     gameForwardRules,
     likelyGateway,
     mergeProtocolRules,
+    routerBrandsFor,
     routerGuide,
     ROUTER_BRANDS
 } from "../../src/lib/router-guide";
@@ -303,5 +304,59 @@ describe("one rule where the router's form can hold two", () => {
         expect(ROUTER_BRANDS.find((brand) => brand.id === "zte")?.combinedProtocol).toBe(
             "TCP And UDP"
         );
+    });
+});
+
+describe("one catalogue for every router topic", () => {
+    it("backs every topic a guide claims with steps and the document they came from", () => {
+        for (const brand of ROUTER_BRANDS) {
+            if (brand.id === "other") continue;
+            if (brand.topics.includes("dns")) {
+                const dns = brand.dns;
+                expect(dns, brand.id).not.toBeNull();
+                if (!dns) continue;
+                for (const setting of [dns.lan, dns.ipv6, dns.conflict]) {
+                    if (!setting) continue;
+                    expect(setting.path.length, brand.id).toBeGreaterThan(0);
+                    expect(setting.field.length, brand.id).toBeGreaterThan(0);
+                    expect(setting.source, brand.id).toMatch(/^https:\/\//);
+                }
+            } else {
+                expect(brand.dns, brand.id).toBeNull();
+            }
+            if (brand.topics.includes("forward")) {
+                expect(brand.forwardPath.length, brand.id).toBeGreaterThan(0);
+                // Written from the devices own pages before sources were recorded.
+                if (!["zte", "huawei", "fritzbox"].includes(brand.id)) {
+                    expect(brand.forwardSource, brand.id).toMatch(/^https:\/\//);
+                }
+            } else {
+                expect(brand.forwardSource, brand.id).toBeNull();
+            }
+        }
+    });
+
+    it("lists a brand in a topic's picker only when it has that topic, the generic entry last", () => {
+        for (const topic of ["forward", "dns"] as const) {
+            const offered = routerBrandsFor(topic);
+            expect(offered.at(-1)?.id).toBe("other");
+            for (const brand of offered) expect(brand.topics).toContain(topic);
+        }
+        // UniFi and OpenWrt forwarding was not checked against their docs.
+        expect(routerBrandsFor("forward").map((brand) => brand.id)).not.toContain("unifi");
+        expect(routerBrandsFor("dns").map((brand) => brand.id)).toContain("unifi");
+    });
+
+    it("keeps the brands the domains page already offered", () => {
+        expect(routerBrandsFor("forward").map((brand) => brand.id)).toEqual([
+            "zte",
+            "huawei",
+            "tplink",
+            "asus",
+            "fritzbox",
+            "netgear",
+            "mikrotik",
+            "other"
+        ]);
     });
 });

@@ -14,7 +14,12 @@
  * ISP set, which is why the label on the router is always the first answer.
  */
 
-import { inBlock, DEFAULT_PORT_BLOCKS, type PortBlocks, type PortPolicy } from "@/lib/apps/port-block";
+import {
+    inBlock,
+    DEFAULT_PORT_BLOCKS,
+    type PortBlocks,
+    type PortPolicy
+} from "@/lib/apps/port-block";
 
 export type RouterBrand =
     | "zte"
@@ -24,7 +29,49 @@ export type RouterBrand =
     | "fritzbox"
     | "netgear"
     | "mikrotik"
+    | "unifi"
+    | "openwrt"
     | "other";
+
+/**
+ * What a guide can walk somebody through. A brand claims a topic only when its
+ * steps were read off the vendor's own documentation (the URL sits next to them),
+ * so a picker for one topic lists only the brands that have it - plus the generic
+ * entry, which describes where to look rather than naming a menu.
+ */
+export type RouterTopic = "forward" | "dns";
+
+/** One setting on the router's own pages, quoted as they show it. */
+export interface RouterDnsSetting {
+    /** Menu path to the page that holds it. */
+    readonly path: string;
+    /** The field or switch, as the page labels it. */
+    readonly field: string;
+    /** What goes in it: this server's LAN address, a DHCP option carrying that
+     *  address, this server's IPv6 address, or the switch turned off. */
+    readonly value: "address" | "dhcpOption6" | "addressV6" | "off";
+    /** The control that commits it, when the vendor's docs name one. */
+    readonly save: string | null;
+    /** The vendor document the path and labels were read from. */
+    readonly source: string;
+}
+
+/**
+ * How devices on this network end up asking the ad blocker.
+ *
+ * `direct` routers hand this server's address to devices with their lease, so the
+ * blocker sees each device. `relay` routers only let the router's own upstream be
+ * changed: devices keep asking the router, which asks Polaris for them - blocking
+ * still works, but every lookup is logged as coming from the router.
+ */
+export interface RouterDnsGuide {
+    readonly mode: "direct" | "relay";
+    readonly lan: RouterDnsSetting;
+    /** Where the IPv6 DNS server announced to devices is set, when documented. */
+    readonly ipv6: RouterDnsSetting | null;
+    /** A feature of the router's own that sends devices somewhere else, to turn off. */
+    readonly conflict: RouterDnsSetting | null;
+}
 
 /** A value the fixed-address form asks for, and where that value comes from. */
 export interface RouterReserveField {
@@ -60,6 +107,13 @@ export type RouterReservation =
 export interface RouterBrandGuide {
     readonly id: RouterBrand;
     readonly label: string;
+    /** What this guide covers; see `RouterTopic`. */
+    readonly topics: readonly RouterTopic[];
+    /** The vendor document the forwarding steps were checked against. Null for the
+     *  guides written from the device's own pages before sources were recorded. */
+    readonly forwardSource: string | null;
+    /** Pointing devices at the ad blocker, when this brand's docs say how. */
+    readonly dns: RouterDnsGuide | null;
     /** The name its admin page answers on, when it has one besides the gateway IP. */
     readonly admin: string | null;
     /** The factory sign-in, as far as one brand-wide answer exists. */
@@ -124,11 +178,50 @@ export interface RouterFormField {
     readonly value: RouterForwardValue;
 }
 
+/**
+ * The generic forwarding advice: where to look, not a menu to open. The "other"
+ * entry is made of it, and so are the brands whose forwarding pages were not
+ * checked against a document - they do not claim the topic, so no forwarding
+ * picker lists them, but a guide is a whole guide whatever it is looked up for.
+ */
+const LOOK_FOR_IT: Omit<RouterBrandGuide, "id" | "label" | "topics" | "forwardSource" | "dns"> = {
+    admin: null,
+    signIn: "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+    reserve: {
+        kind: "form",
+        path: "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+        add: "the button that adds an entry",
+        fields: [
+            // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+            { label: "MAC address", value: "mac" },
+            // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+            { label: "IP address", value: "ip" }
+        ],
+        save: "Save"
+    },
+    forwardPath:
+        "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
+    forwardFields: null,
+    forwardSave: null,
+    combinedProtocol: null,
+    nameLimit: null,
+    // Said for every unknown brand because it is the failure with nothing to
+    // see: the rule is listed, its values are right, and it does nothing.
+    forwardEnable:
+        "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
+    remotePath: "Look for Remote management, Web access from WAN or Remote administration.",
+    caution: null
+};
+
 export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
     {
         id: "zte",
         // i18n-ignore a brand's name
         label: "ZTE",
+        // Written from the H3640's own pages; ZTE publishes no manual for ISP firmware.
+        topics: ["forward"],
+        forwardSource: null,
+        dns: null,
         admin: null,
         signIn: "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
         reserve: {
@@ -175,7 +268,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         nameLimit: 16,
         forwardEnable:
             "The rule is created switched off. Set it to on in the list of rules once it is saved, or the ports stay closed behind a rule that looks right.",
-        remotePath: "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
+        remotePath:
+            "Management & Diagnosis > Remote management (some builds keep it under Internet > Security > Access control)",
         caution:
             "ZTE firmware supplied by an ISP reserves 80, 443, 21 and 7547 for its own management and refuses to forward them. If the form rejects the rule, the ports cannot be opened on this router - publish Polaris through a tunnel instead, under Advanced below."
     },
@@ -183,6 +277,10 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         id: "huawei",
         // i18n-ignore a brand's name
         label: "Huawei",
+        // Written from the device's own pages; ISP firmware has no public manual.
+        topics: ["forward"],
+        forwardSource: null,
+        dns: null,
         admin: "http://192.168.100.1",
         signIn: "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
         reserve: {
@@ -203,13 +301,30 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         combinedProtocol: null,
         nameLimit: null,
         forwardEnable: null,
-        remotePath: "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
+        remotePath:
+            "Security > ACL Rules, which is what usually publishes the admin page on the WAN side",
         caution: null
     },
     {
         id: "tplink",
         // i18n-ignore a brand's name
         label: "TP-Link",
+        // DNS: https://www.tp-link.com/support/faq/3230/ (Archer web interface).
+        topics: ["forward", "dns"],
+        forwardSource: "https://www.tp-link.com/us/support/faq/1379/",
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "Advanced > Network > DHCP Server",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Primary DNS",
+                value: "address",
+                save: "Save",
+                source: "https://www.tp-link.com/support/faq/3230/"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: "http://tplinkwifi.net",
         signIn: "The account you created on first setup. A router never set up asks for `admin` / `admin`.",
         reserve: {
@@ -239,6 +354,22 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         id: "asus",
         // i18n-ignore a brand's name
         label: "ASUS",
+        // DNS: https://www.asus.com/support/faq/1011703/ - left blank, the router answers itself.
+        topics: ["forward", "dns"],
+        forwardSource: "https://www.asus.com/support/faq/1037906/",
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "LAN > DHCP Server",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "DNS Server",
+                value: "address",
+                save: "Apply",
+                source: "https://www.asus.com/support/faq/1011703/"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: "http://router.asus.com",
         signIn: "The account you created on first setup, or `admin` / `admin` on one never set up.",
         reserve: {
@@ -255,7 +386,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             ],
             save: "Apply"
         },
-        forwardPath: "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
+        forwardPath:
+            "WAN > Virtual Server / Port Forwarding, with Enable Port Forwarding set to Yes",
         forwardFields: null,
         forwardSave: null,
         combinedProtocol: null,
@@ -268,6 +400,29 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         id: "fritzbox",
         // i18n-ignore a brand's name
         label: "FRITZ!Box",
+        // DNS: https://uk.fritz.com/service/knowledge-base/dok/FRITZ-Box-7490/165_Configuring-different-DNS-servers-in-the-FRITZ-Box/
+        topics: ["forward", "dns"],
+        forwardSource: null,
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "Home Network > Network > Network Settings > Additional Settings > IPv4 Settings",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Local DNS server",
+                value: "address",
+                save: "Apply",
+                source: "https://uk.fritz.com/service/knowledge-base/dok/FRITZ-Box-7490/165_Configuring-different-DNS-servers-in-the-FRITZ-Box/"
+            },
+            ipv6: {
+                path: "Home Network > Network > Network Settings > Additional Settings > IPv6 Settings",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Local DNSv6 server",
+                value: "addressV6",
+                save: "Apply",
+                source: "https://uk.fritz.com/service/knowledge-base/dok/FRITZ-Box-7490/165_Configuring-different-DNS-servers-in-the-FRITZ-Box/"
+            },
+            conflict: null
+        },
         admin: "http://fritz.box",
         signIn: "The FRITZ!Box password on the label or on the card that came with it. There is no user name.",
         reserve: {
@@ -289,6 +444,26 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         id: "netgear",
         // i18n-ignore a brand's name
         label: "NETGEAR",
+        // DNS: https://kb.netgear.com/30510/How-do-I-set-static-DNS-servers-on-my-NETGEAR-router
+        // Relay, because consumer NETGEAR firmware hands its own LAN address to devices
+        // whatever is set here (NETGEAR community moderator, community.netgear.com
+        // /discussions/home-wifi-routers-nighthawk/changing-dns-in-router-settings/1543576).
+        topics: ["forward", "dns"],
+        forwardSource:
+            "https://kb.netgear.com/24290/How-do-I-add-a-custom-port-forwarding-service-on-my-NETGEAR-router",
+        dns: {
+            mode: "relay",
+            lan: {
+                path: "Internet > Domain Name Server (DNS) Address",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Use these DNS Servers",
+                value: "address",
+                save: "Apply",
+                source: "https://kb.netgear.com/30510/How-do-I-set-static-DNS-servers-on-my-NETGEAR-router"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: "http://routerlogin.net",
         signIn: "`admin` with the password you set. A router never set up uses `admin` / `password`.",
         reserve: {
@@ -305,7 +480,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             ],
             save: "Add"
         },
-        forwardPath: "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
+        forwardPath:
+            "ADVANCED > Advanced Setup > Port Forwarding / Port Triggering > Add Custom Service",
         forwardFields: null,
         forwardSave: null,
         combinedProtocol: null,
@@ -318,6 +494,22 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         id: "mikrotik",
         // i18n-ignore a brand's name
         label: "MikroTik",
+        // DNS: https://help.mikrotik.com/docs/spaces/ROS/pages/24805500/DHCP (network dns-server).
+        topics: ["forward", "dns"],
+        forwardSource: "https://help.mikrotik.com/docs/spaces/ROS/pages/3211299/NAT",
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "IP > DHCP Server > Networks",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "DNS Servers",
+                value: "address",
+                save: null,
+                source: "https://help.mikrotik.com/docs/spaces/ROS/pages/24805500/DHCP"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: "http://192.168.88.1",
         signIn: "`admin`, with no password on a router still at defaults.",
         reserve: {
@@ -336,40 +528,84 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             "The form is not a port-forward form: set chain=dstnat, protocol=tcp, dst-port=80,443, in-interface to the WAN interface, then action=dst-nat with to-addresses set to this server."
     },
     {
+        id: "unifi",
+        // i18n-ignore a brand's name
+        label: "UniFi",
+        // DNS: https://help.ui.com/hc/en-us/articles/17484948645015 (DNS Troubleshooting Guide).
+        // Ad Blocking: https://help.ui.com/hc/en-us/articles/9794438523799 - with it on,
+        // clients set to another DNS server are redirected to the gateway's own. Its
+        // switch lives in Content Filter: https://help.ui.com/hc/en-us/articles/12568927589143.
+        topics: ["dns"],
+        forwardSource: null,
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "UniFi Network > Settings > Networks > [your network] > DHCP Service Management",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "DNS Server",
+                value: "address",
+                save: null,
+                source: "https://help.ui.com/hc/en-us/articles/17484948645015"
+            },
+            ipv6: null,
+            conflict: {
+                path: "Settings > CyberSecure > Content Filter",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Ad Blocking",
+                value: "off",
+                save: null,
+                source: "https://help.ui.com/hc/en-us/articles/12568927589143"
+            }
+        },
+        ...LOOK_FOR_IT
+    },
+    {
+        id: "openwrt",
+        // i18n-ignore a brand's name
+        label: "OpenWrt",
+        // DNS: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration ("Providing custom DNS with DHCP").
+        topics: ["dns"],
+        forwardSource: null,
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "Network > Interfaces > LAN > Edit > DHCP Server > General Setup",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "DHCP-Options",
+                value: "dhcpOption6",
+                save: null,
+                source: "https://openwrt.org/docs/guide-user/base-system/dhcp_configuration"
+            },
+            ipv6: {
+                path: "Network > Interfaces > LAN > Edit > DHCP Server > IPv6 Settings",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Announce IPv4/6 DNS servers",
+                value: "addressV6",
+                save: null,
+                source: "https://openwrt.org/docs/guide-user/base-system/dhcp_configuration"
+            },
+            conflict: null
+        },
+        ...LOOK_FOR_IT
+    },
+    {
         id: "other",
         // i18n-ignore said in the reader's words by admin/domains/router-words.ts
         label: "Another brand",
-        admin: null,
-        signIn: "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
-        reserve: {
-            kind: "form",
-            path: "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
-            add: "the button that adds an entry",
-            fields: [
-                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
-                { label: "MAC address", value: "mac" },
-                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
-                { label: "IP address", value: "ip" }
-            ],
-            save: "Save"
-        },
-        forwardPath:
-            "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
-        forwardFields: null,
-        forwardSave: null,
-        combinedProtocol: null,
-        nameLimit: null,
-        // Said for every unknown brand because it is the failure with nothing to
-        // see: the rule is listed, its values are right, and it does nothing.
-        forwardEnable:
-            "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
-        remotePath: "Look for Remote management, Web access from WAN or Remote administration.",
-        caution: null
+        topics: ["forward", "dns"],
+        forwardSource: null,
+        dns: null,
+        ...LOOK_FOR_IT
     }
 ];
 
 /** Fallback for anything not in the list, so a lookup always returns a guide. */
 const GENERIC = ROUTER_BRANDS[ROUTER_BRANDS.length - 1]!;
+
+/** The brands a picker for this topic offers, the generic entry last. */
+export function routerBrandsFor(topic: RouterTopic): readonly RouterBrandGuide[] {
+    return ROUTER_BRANDS.filter((entry) => entry.topics.includes(topic));
+}
 
 export function routerGuide(brand: RouterBrand): RouterBrandGuide {
     return ROUTER_BRANDS.find((entry) => entry.id === brand) ?? GENERIC;
@@ -425,12 +661,19 @@ export const FORWARD_RULES: readonly RouterForwardRule[] = [
  * range that does not contain it opens nothing for it.
  */
 export function gameForwardRules(
-    servers: readonly { name: string; ports: readonly { port: number; protocol: "tcp" | "udp" }[] }[],
+    servers: readonly {
+        name: string;
+        ports: readonly { port: number; protocol: "tcp" | "udp" }[];
+    }[],
     policy: PortPolicy = "per-port",
     blocks: PortBlocks = DEFAULT_PORT_BLOCKS
 ): RouterForwardRule[] {
     const named = (server: { name: string }, port: number, protocol: string): RouterForwardRule => {
-        const slug = server.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "server";
+        const slug =
+            server.name
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "") || "server";
         return { name: `game-${slug}-${port}`, protocol, port };
     };
     if (policy === "per-port") {
@@ -445,7 +688,8 @@ export function gameForwardRules(
     // opening nothing is behind.
     for (const protocol of ["tcp", "udp"] as const) {
         const block = blocks[protocol];
-        if (!servers.some((server) => server.ports.some((port) => port.protocol === protocol))) continue;
+        if (!servers.some((server) => server.ports.some((port) => port.protocol === protocol)))
+            continue;
         rules.push({
             name: `polaris-games-${protocol}`,
             protocol: protocol.toUpperCase(),
@@ -488,7 +732,8 @@ export function mergeProtocolRules(
     const last = Math.max(...rules.map((rule) => rule.endPort ?? rule.port));
     const covered = new Set<number>();
     for (const rule of rules) {
-        for (let port = rule.port; port <= (rule.endPort ?? rule.port); port += 1) covered.add(port);
+        for (let port = rule.port; port <= (rule.endPort ?? rule.port); port += 1)
+            covered.add(port);
     }
     if (covered.size !== last - first + 1) return rules;
     return [
@@ -510,7 +755,8 @@ function sharedName(rules: readonly RouterForwardRule[]): string {
     let shared = first ?? "";
     for (const name of rest) {
         let index = 0;
-        while (index < shared.length && index < name.length && shared[index] === name[index]) index += 1;
+        while (index < shared.length && index < name.length && shared[index] === name[index])
+            index += 1;
         shared = shared.slice(0, index);
     }
     const trimmed = shared.replace(/[-_]+$/, "");
@@ -549,7 +795,10 @@ function shortenName(name: string, limit: number): string {
     const cut = short.lastIndexOf("-");
     const tail = cut > 0 ? short.slice(cut) : "";
     if (tail.length >= limit) return short.slice(0, limit);
-    return `${short.slice(0, cut).slice(0, limit - tail.length).replace(/-+$/, "")}${tail}`;
+    return `${short
+        .slice(0, cut)
+        .slice(0, limit - tail.length)
+        .replace(/-+$/, "")}${tail}`;
 }
 
 /** A name no other rule in the set has taken, numbered when trimming collided. */

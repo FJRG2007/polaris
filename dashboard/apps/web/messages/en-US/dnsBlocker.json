@@ -257,5 +257,35 @@
         "days": "Days of lookups to keep",
         "namesFrom": "Router that knows device names",
         "namesFromHint": "Its address. Devices then show by name instead of address. Leave empty to show addresses."
+    },
+    "routerGuide": {
+        "brand": "Your router",
+        "open": "Open the router",
+        "thisServer": "this server's address",
+        "ipv6Address": "this server's IPv6 address",
+        "signIn": "Open the router's settings page and sign in.",
+        "lan": "Go to <b>{path}</b> and set <b>{field}</b> to",
+        "relay": "Go to <b>{path}</b>, choose <b>{field}</b> and enter as the primary server",
+        "save": "Then press <b>{button}</b>.",
+        "ipv6": "If your network uses IPv6, go to <b>{path}</b> and put in <b>{field}</b>",
+        "conflict": "Go to <b>{path}</b> and turn off <b>{field}</b>. While it is on, the router sends devices to its own DNS and skips this one.",
+        "relayNote": "This router keeps handing out its own address and asks the blocker on behalf of every device. Ads are still blocked, but every lookup shows up as coming from the router.",
+        "source": "Steps from the {brand} documentation",
+        "notes": {
+            "fritzbox": "For IPv6, also tick \"Also announce DNSv6 server via router advertisement (RFC 5006)\". Afterwards fritz.box may stop opening on your devices; use 192.168.178.1 instead.",
+            "tplink": "On a Deco, the same field is in the app under More > Advanced > DHCP Server. Restart the main Deco after saving.",
+            "unifi": "Devices pick it up when their lease renews, usually within a day. Turning a device off and on again is quicker.",
+            "netgear": "Devices keep the router as their DNS server, so nothing changes on them and no reconnect is needed."
+        },
+        "check": {
+            "title": "Are devices using it?",
+            "failed": "Polaris could not read the log just now. Check again in a moment.",
+            "again": "Check again",
+            "none": "No device has asked the blocker anything in the last 24 hours. The router is still handing out another DNS server, or devices have not renewed their address yet.",
+            "routerOnly": "Only the router ({router}) is asking the blocker. Devices go through the router, so they are covered, but the blocker cannot tell them apart. Set the DHCP DNS server above to see each device.",
+            "relayed": "The router ({router}) is asking the blocker for your devices, as expected for this router. Ads are being blocked.",
+            "devices": "{count, plural, one {One device has} other {# devices have}} used the blocker in the last 24 hours:",
+            "logOff": "The blocker is not keeping a log yet, so Polaris cannot see which devices use it. Apply the settings below once and check again."
+        }
     }
 }

@@ -37,6 +37,7 @@ import {
     turnOnDnsBlockerAction
 } from "./actions";
 import { DnsInsightsCard } from "./dns-insights";
+import { RouterDnsGuide, type RouterBrandOption } from "./router-dns-guide";
 
 /** One rule or resolver per line, blank lines ignored. */
 function lines(text: string): string[] {
@@ -70,7 +71,13 @@ const ENGINE_STATES: readonly DnsBlockerState[] = ["blocking", "starting", "port
 /** Addresses, a range and a name pattern, as typed into a group. */
 const GROUP_CLIENTS_EXAMPLE = "192.168.1.20\n192.168.1.64/26\nkids-*"; // i18n-ignore example values
 
-export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
+export function DnsBlockerView({
+    initial,
+    brands
+}: {
+    initial: dns.DnsSettings;
+    brands: RouterBrandOption[];
+}) {
     const t = useTranslations("dnsBlocker");
     const [status, setStatus] = useState<DnsBlockerStatus | null>(null);
     const [statusError, setStatusError] = useState<string | null>(null);
@@ -391,12 +398,11 @@ export function DnsBlockerView({ initial }: { initial: dns.DnsSettings }) {
                             <Skeleton className="h-5 w-28" />
                         )}
                     </div>
-                    <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm">
-                        <li>{t("router.step1")}</li>
-                        <li>{t("router.step2", { address: status?.address ?? "-" })}</li>
-                        <li>{t("router.step3")}</li>
-                        <li>{t("router.step4")}</li>
-                    </ol>
+                    <RouterDnsGuide
+                        address={status?.address ?? null}
+                        blocking={state === "blocking"}
+                        brands={brands}
+                    />
                 </CardBody>
             </Card>
 
