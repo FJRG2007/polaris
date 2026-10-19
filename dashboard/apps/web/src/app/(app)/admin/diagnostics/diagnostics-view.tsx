@@ -265,6 +265,7 @@ function SpeedCard({ initial }: { initial: SpeedResult | null }) {
                     {result ? (
                         <>
                             {t("speed.lastRun")} <RelativeTime iso={result.at} />
+                            {result.server ? ` - ${t("speed.via", { code: result.server })}` : null}
                         </>
                     ) : (
                         t("speed.never")

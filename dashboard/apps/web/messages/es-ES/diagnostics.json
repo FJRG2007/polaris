@@ -86,7 +86,7 @@
     },
     "speed": {
         "heading": "Velocidad",
-        "description": "Medida desde este servidor a un servicio público (Cloudflare), no desde tu navegador. Usa unos 12 MB.",
+        "description": "Medida desde este servidor a un servicio público (Cloudflare), no desde tu navegador. Usa hasta 300 MB.",
         "run": "Medir velocidad",
         "running": "Midiendo...",
         "download": "Bajada",
@@ -96,6 +96,7 @@
         "ms": "{value} ms",
         "none": "Sin medir",
         "never": "Aún no se ha medido.",
+        "via": "a través de Cloudflare {code}",
         "lastRun": "Última",
         "busy": "Ya hay una medición.",
         "limited": "Límite alcanzado. Prueba en {minutes, plural, one {# minuto} other {# minutos}}.",
