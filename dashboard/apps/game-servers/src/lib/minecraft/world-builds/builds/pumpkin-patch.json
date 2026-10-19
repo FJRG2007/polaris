@@ -1,0 +1,18 @@
+{
+    "format": "polaris-build",
+    "version": 1,
+    "id": "pumpkin-patch",
+    "season": "halloween",
+    "size": { "x": 5, "y": 2, "z": 5 },
+    "palette": [
+        "minecraft:air",
+        "minecraft:pumpkin",
+        "minecraft:carved_pumpkin[facing=south]",
+        "minecraft:hay_block[axis=y]",
+        "minecraft:jack_o_lantern[facing=south]"
+    ],
+    "blocks": [
+        1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 5, 1, 1, 0, 1, 3, 1, 0, 1, 1, 1, 0, 5, 1, 1, 0, 1, 1, 1, 0,
+        1, 2, 1, 0, 12, 4, 1, 0, 12
+    ]
+}

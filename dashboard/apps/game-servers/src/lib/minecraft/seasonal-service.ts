@@ -22,6 +22,8 @@ import { capsReading, forgetCapabilities } from "./events/in-server";
 import { chosenLanguage, readEventsConfig } from "./events/catalog";
 import * as halloween from "./seasonal-halloween";
 import { homeLanguage } from "./speech-service";
+import { readPlaced } from "./world-builds/plan";
+import { reconcileWorldBuilds } from "./world-builds/service";
 
 const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
 /** The deployment's switch, read from the host when asked rather than as this
@@ -185,6 +187,7 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         "line" in last &&
         last.line === clearLine &&
         (!switchedOff || last.offTold === true) &&
+        readPlaced(config).length === 0 &&
         (last.stoppedAt === undefined || now.getTime() < last.stoppedAt + STOPPED_RETRY_MS)
     )
         return false;
@@ -206,6 +209,10 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             forgetCapabilities(row.id);
             return false;
         }
+        // Builds in the world are plain commands: up or down whatever the jar.
+        await reconcileWorldBuilds(server, config, decoration).catch((caught: unknown) =>
+            console.error(`[minecraft-seasonal] world builds on ${row.id}:`, caught)
+        );
         if (!reading.caps.has("season")) {
             told.set(
                 row.id,

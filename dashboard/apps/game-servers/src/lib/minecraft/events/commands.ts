@@ -1005,8 +1005,9 @@ export function summonOnGround(x: number, z: number, tag: string | null = null):
  * the sea - by the heightmap that counts all of them (`motion_blocking`), for
  * what is built in the air over it.
  */
-export function summonOnTop(x: number, z: number, tag: string): string {
-    return `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking run summon minecraft:armor_stand ~ ~ ~ {Tags:["${MARK_TAG}","${tag}"],${MARKER_DATA}}`;
+export function summonOnTop(x: number, z: number, tag: string, marked = true): string {
+    const tags = [...(marked ? [MARK_TAG] : []), tag].map((one) => `"${one}"`).join(",");
+    return `execute in minecraft:overworld positioned ${x + 0.5} 0 ${z + 0.5} positioned over motion_blocking run summon minecraft:armor_stand ~ ~ ~ {Tags:[${tags}],${MARKER_DATA}}`;
 }
 
 /** How far apart the columns of a footprint are read for its top. */
@@ -1023,12 +1024,17 @@ export function footprintColumns(
     return offsets.flatMap((dx) => offsets.map((dz) => ({ x: center.x + dx, z: center.z + dz })));
 }
 
-/** A marker on top of every column of a footprint, the old ones taken away first. */
-export function topLines(columns: readonly { x: number; z: number }[]): string[] {
-    return [
-        `kill @e[tag=${SAMPLE_TAG}]`,
-        ...columns.map((one) => summonOnTop(one.x, one.z, SAMPLE_TAG))
-    ];
+/**
+ * A marker on top of every column of a footprint, the old ones taken away first.
+ * A survey that runs beside the events' own gives its markers a tag of its own,
+ * unmarked, so neither reads nor clears the other's.
+ */
+export function topLines(
+    columns: readonly { x: number; z: number }[],
+    tag = SAMPLE_TAG,
+    marked = true
+): string[] {
+    return [clearSamples(tag), ...columns.map((one) => summonOnTop(one.x, one.z, tag, marked))];
 }
 
 /** The highest of the tops read, or null when none was. */
@@ -1045,9 +1051,15 @@ export function sampleLines(samples: readonly { x: number; z: number }[]): strin
 }
 
 /** Where every one of them came down: `Armor Stand has the following entity data: [..]`. */
-export const READ_SAMPLES = `execute as @e[tag=${SAMPLE_TAG}] run data get entity @s Pos`;
+export function readSamples(tag = SAMPLE_TAG): string {
+    return `execute as @e[tag=${tag}] run data get entity @s Pos`;
+}
+export const READ_SAMPLES = readSamples();
 
-export const CLEAR_SAMPLES = `kill @e[tag=${SAMPLE_TAG}]`;
+export function clearSamples(tag = SAMPLE_TAG): string {
+    return `kill @e[tag=${tag}]`;
+}
+export const CLEAR_SAMPLES = clearSamples();
 
 /**
  * The markers standing on something somebody built, as `builtUnder` asks of one
@@ -1055,8 +1067,8 @@ export const CLEAR_SAMPLES = `kill @e[tag=${SAMPLE_TAG}]`;
  * markers none of its names matched, and a marker on a build is in every
  * line's answer.
  */
-export function builtUnderSamples(names: GroundNames): string[] {
-    const prefix = `execute as @e[tag=${SAMPLE_TAG}] at @s`;
+export function builtUnderSamples(names: GroundNames, tag = SAMPLE_TAG): string[] {
+    const prefix = `execute as @e[tag=${tag}] at @s`;
     const suffix = " run data get entity @s Pos";
     const lines: string[] = [];
     let line = prefix;
@@ -1075,14 +1087,17 @@ export function builtUnderSamples(names: GroundNames): string[] {
     return lines;
 }
 
+/** The markers standing on `block`, by where each is. */
+export function samplesOn(block: string, tag = SAMPLE_TAG): string {
+    return `execute as @e[tag=${tag}] at @s if block ~ ~-1 ~ ${block} run data get entity @s Pos`;
+}
+
 /** The markers standing on a tree, and the ones on open water. */
-export const SAMPLES_ON_TREES = ["#minecraft:leaves", "#minecraft:logs"].map(
-    (tag) =>
-        `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ ${tag} run data get entity @s Pos`
-);
-export const SAMPLES_ON_WATER = `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ minecraft:water run data get entity @s Pos`;
+export const TREE_BLOCKS = ["#minecraft:leaves", "#minecraft:logs"] as const;
+export const SAMPLES_ON_TREES = TREE_BLOCKS.map((block) => samplesOn(block));
+export const SAMPLES_ON_WATER = samplesOn("minecraft:water");
 /** The markers standing on lava, which the heightmap counts as ground too. */
-export const SAMPLES_ON_LAVA = `execute as @e[tag=${SAMPLE_TAG}] at @s if block ~ ~-1 ~ minecraft:lava run data get entity @s Pos`;
+export const SAMPLES_ON_LAVA = samplesOn("minecraft:lava");
 
 /** The columns out of a read of the markers, by where each was summoned. */
 export function samplesIn(output: string): { x: number; y: number; z: number }[] {
