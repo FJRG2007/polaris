@@ -545,11 +545,19 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64, world
     /** The markers a selector's volume takes in, all of them without one. */
     const selected = (command: string) => {
         const volume =
-            /@e\[tag=[^,\]]+,x=(-?\d+),y=-?\d+,z=(-?\d+),dx=(\d+),dy=\d+,dz=(\d+)\]/.exec(command);
+            /@e\[tag=[^,\]]+,x=(-?\d+),y=(-?\d+),z=(-?\d+),dx=(\d+),dy=([\d.]+),dz=(\d+)\]/.exec(
+                command
+            );
         if (!volume) return columns;
-        const [x, z, dx, dz] = volume.slice(1).map(Number) as [number, number, number, number];
+        const [x, y, z, dx, dy, dz] = volume.slice(1).map(Number) as number[];
+        // A marker has no height: one exactly at the volume's top is outside it.
         return columns.filter(
-            (one) => one.x >= x && one.x <= x + dx && one.z >= z && one.z <= z + dz
+            (one) =>
+                one.x >= x! &&
+                one.x <= x! + dx! &&
+                one.z >= z! &&
+                one.z <= z! + dz! &&
+                heightAt(one.x, one.z) < y! + dy! + 1
         );
     };
     const answer = (found: readonly { x: number; z: number }[]) =>
@@ -898,6 +906,63 @@ describe("a site as players leave the world", () => {
             expect(verdicts.every((line) => line.endsWith(`: ${world.why}`))).toBe(true);
         }
     });
+
+    it("reads every cell the foundation may fill, however far over the ground it is", async () => {
+        // Steps three high: the foundation in a low column reaches three cells up.
+        const steps = (x: number) => 64 + 3 * (((x % 2) + 2) % 2);
+        for (const world of [
+            // A torch on the step's face, two over the low ground: turned down.
+            { stray: (x: number, z: number, dy: number) => dy === 2 && steps(x) === 64, up: false },
+            // The same two over the high ground, clear of any foundation: built on.
+            { stray: (x: number, z: number, dy: number) => dy === 2 && steps(x) === 67, up: true }
+        ]) {
+            config = {};
+            logged = [];
+            const { server, sent } = fakeServer(steps, world);
+            await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+            expect(plan.readPlaced(config).length).toBe(world.up ? 1 : 0);
+            expect(sent.some((line) => line.endsWith(" keep"))).toBe(world.up);
+            if (!world.up)
+                expect(
+                    logged
+                        .filter((line) => line.includes(" site "))
+                        .every((line) => line.endsWith(": occupied"))
+                ).toBe(true);
+        }
+    });
+
+    /** A 64 x 64 slab of stone, the largest a build may be. */
+    const slab = format.polarisBuildSchema.parse({
+        format: "polaris-build",
+        version: 1,
+        id: "slab",
+        season: "winter",
+        size: { x: format.SIDE_MAX, y: 1, z: format.SIDE_MAX },
+        palette: [format.AIR, "minecraft:stone"],
+        blocks: format.encodeCells(Array.from({ length: format.SIDE_MAX ** 2 }, () => 1))
+    });
+    const summoned = (sent: readonly string[]) =>
+        sent.filter((line) => line.includes(" summon minecraft:armor_stand ")).length;
+
+    it("turns uneven ground down from a sample, without a marker on every column", async () => {
+        const { server, sent } = fakeServer(cliffs);
+        await reconcileWorldBuilds(server, config, "winter", [slab]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        const verdicts = logged.filter((line) => line.includes(" site "));
+        expect(verdicts).toHaveLength(6);
+        expect(verdicts.every((line) => line.endsWith(": uneven"))).toBe(true);
+        expect(summoned(sent)).toBeLessThanOrEqual(6 * 17 * 17);
+    });
+
+    it("reads every column of no more sites a pass than one of the largest build", async () => {
+        const { server, sent } = fakeServer(() => 64, { stray: (x, z, dy) => dy === 0 });
+        await reconcileWorldBuilds(server, config, "winter", [slab]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        const verdicts = logged.filter((line) => line.includes(" site "));
+        expect(verdicts).toEqual([expect.stringMatching(/: occupied$/)]);
+        expect(summoned(sent)).toBeLessThanOrEqual(17 * 17 + format.SIDE_MAX ** 2);
+        expect(plan.readSiteSearches(config)["slab"]).toMatchObject({ next: 1 });
+    }, 30_000);
 
     it("reaches the far rings when nothing nearer will do", async () => {
         const rugged = (x: number, z: number) => (Math.hypot(x, z) < 150 ? cliffs(x) : 64);

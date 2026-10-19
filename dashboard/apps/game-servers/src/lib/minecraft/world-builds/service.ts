@@ -15,7 +15,7 @@ import { createHash } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { WORLD_BUILDS } from "./catalog";
 import type { Box } from "../events/state";
-import type { PolarisBuild } from "./format";
+import { SIDE_MAX, type PolarisBuild } from "./format";
 import type { Decoration } from "../seasonal";
 import * as commands from "../events/commands";
 import * as arena from "../events/kinds/arena";
@@ -25,6 +25,9 @@ import { build, cancelBatch, capabilities } from "../events/in-server";
 
 /** Sites surveyed for one build in one pass: each costs a handful of trips. */
 const SITES_PER_PASS = 6;
+/** Columns read one by one in one pass - a site of the largest build - past
+ *  which the rest of the pass's sites wait for the next. */
+const COLUMNS_PER_PASS = SIDE_MAX * SIDE_MAX;
 /** Paste chunks run for one build in one pass; the rest go in on the next. */
 const CHUNKS_PER_PASS = 8;
 /** On a server without the Polaris jar every command is its own: one chunk a
@@ -187,47 +190,85 @@ async function allAir(server: ServerContainer, box: Box): Promise<boolean> {
     return true;
 }
 
+/** The tops of `columns`, a marker summoned on each and read a strip at a
+ *  time, so no answer is longer than RCON hands back. */
+async function readTops(
+    server: ServerContainer,
+    columns: readonly { x: number; z: number }[]
+): Promise<{ tops: plan.Point[]; strips: Box[] }> {
+    await server.sayAll(commands.topLines(columns, SAMPLE_TAG, false));
+    const strips = plan.stripsOf(columns);
+    const inside = new Set(columns.map((one) => `${one.x},${one.z}`));
+    const read = new Map<string, plan.Point>();
+    for (const strip of strips) {
+        const line = commands.readSamples(plan.stripTag(SAMPLE_TAG, strip));
+        for (const one of commands.samplesIn(await server.say([line]))) {
+            const key = `${one.x},${one.z}`;
+            if (inside.has(key)) read.set(key, one);
+        }
+    }
+    return { tops: [...read.values()], strips };
+}
+
+/** Whether a marker of any strip stands on a build, a tree, water or lava. */
+async function anyCovered(server: ServerContainer, strips: readonly Box[]): Promise<boolean> {
+    for (const strip of strips) {
+        const tag = plan.stripTag(SAMPLE_TAG, strip);
+        let covered = await unnatural(server, (names) => commands.builtUnderSamples(names, tag));
+        for (const block of [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"])
+            covered += commands.samplesIn(
+                await server.say([commands.samplesOn(block, tag)])
+            ).length;
+        if (covered > 0) return true;
+    }
+    return false;
+}
+
 /**
  * Whether the build fits at `center`: the origin it would take and the
- * foundation under it, or why not. Every column of the footprint is read, a
- * strip at a time, so no answer is longer than RCON hands back; the cheapest
- * reasons are asked first, and the rest only of a site still in the running.
+ * foundation under it, or why not. A sample of its columns is read first,
+ * which turns most sites down for a few trips; only a site still in the
+ * running has every column read - counted in `spent` - and the cheapest
+ * reasons are asked of it first.
  */
 async function surveySite(
     server: ServerContainer,
     wanted: PolarisBuild,
-    center: { x: number; z: number }
+    center: { x: number; z: number },
+    spent: { columns: number }
 ): Promise<SiteAnswer> {
     const columns = plan.footprintOf(wanted, center);
-    const strips = plan.stripsOf(wanted, center).map((strip) => plan.stripTag(SAMPLE_TAG, strip));
+    const sample = plan.footprintOf(wanted, center, commands.TOP_STEP);
     try {
-        await server.sayAll(commands.topLines(columns, SAMPLE_TAG, false));
-        const inside = new Set(columns.map((one) => `${one.x},${one.z}`));
-        const read = new Map<string, plan.Point>();
-        for (const tag of strips) {
-            for (const one of commands.samplesIn(await server.say([commands.readSamples(tag)]))) {
-                const key = `${one.x},${one.z}`;
-                if (inside.has(key)) read.set(key, one);
-            }
+        if (sample.length < columns.length) {
+            const rough = await readTops(server, sample);
+            const verdict = plan.judgeSite(sample.length, rough.tops, 0, wanted);
+            if (!("y" in verdict)) return verdict;
+            if (await anyCovered(server, rough.strips)) return { why: "covered" };
         }
-        const tops = [...read.values()];
+        spent.columns += columns.length;
+        const { tops, strips } = await readTops(server, columns);
         const verdict = plan.judgeSite(columns.length, tops, 0, wanted);
         if (!("y" in verdict)) return verdict;
         // Off any build, tree, water or lava, in every column.
-        for (const tag of strips) {
-            let covered = await unnatural(server, (names) =>
-                commands.builtUnderSamples(names, tag)
+        if (await anyCovered(server, strips)) return { why: "covered" };
+        // Over the ground, only air or what grows there, in every cell the
+        // foundation may fill: nobody's rail or torch goes under it.
+        const highest = verdict.y + plan.LIFT_MAX - 1;
+        for (const strip of strips) {
+            const low = Math.min(
+                ...tops
+                    .filter(
+                        (one) =>
+                            one.x >= strip.x1 &&
+                            one.x <= strip.x2 &&
+                            one.z >= strip.z1 &&
+                            one.z <= strip.z2
+                    )
+                    .map((one) => one.y)
             );
-            for (const block of [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"])
-                covered += commands.samplesIn(
-                    await server.say([commands.samplesOn(block, tag)])
-                ).length;
-            if (covered > 0) return { why: "covered" };
-        }
-        // Over the ground, only air or what grows there: nobody's rail or torch
-        // goes under the foundation.
-        for (const tag of strips) {
-            for (let dy = 0; dy < plan.LIFT_MAX; dy += 1) {
+            for (let dy = 0; low + dy <= highest; dy += 1) {
+                const tag = plan.stripTag(SAMPLE_TAG, strip, highest - dy);
                 const stray = await unnatural(server, (names) =>
                     commands.strayAtSamples(names, dy, tag)
                 );
@@ -267,6 +308,7 @@ async function findSite(
     const stored = plan.readSiteSearches(config)[wanted.id];
     const from = plan.searchStart(stored, centers);
     let next = from;
+    const spent = { columns: 0 };
     for (const center of centers.slice(from, from + SITES_PER_PASS)) {
         const reach = plan.radiusOf(wanted) + 1;
         const area = {
@@ -277,7 +319,7 @@ async function findSite(
             y2: 0,
             z2: center.z + reach
         };
-        const answer = await loaded(server, area, () => surveySite(server, wanted, center));
+        const answer = await loaded(server, area, () => surveySite(server, wanted, center, spent));
         const where = `${server.installedAppId}: ${wanted.id} site ${next + 1}/${centers.length} at ${center.x},${center.z}`;
         // The server would not say which chunks were held: this site again next pass.
         if (!answer) {
@@ -296,6 +338,7 @@ async function findSite(
             return answer;
         }
         console.info(`${LOG} ${where}: ${answer.why}`);
+        if (spent.columns >= COLUMNS_PER_PASS) break;
     }
     // Nothing surveyed - the server would not say - is nothing to write down.
     if (next === from) return null;

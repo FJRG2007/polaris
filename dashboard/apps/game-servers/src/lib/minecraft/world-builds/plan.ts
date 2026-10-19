@@ -231,39 +231,46 @@ export function radiusOf(build: PolarisBuild): number {
     return Math.ceil(Math.max(build.size.x, build.size.z) / 2);
 }
 
-/** Every column the build covers for a site centered on `center`: each is read. */
+/** Every `step`th column the build covers for a site centered on `center`, its
+ *  last row and column included: every column of it at a step of one. */
 export function footprintOf(
     build: PolarisBuild,
-    center: { x: number; z: number }
+    center: { x: number; z: number },
+    step = 1
 ): { x: number; z: number }[] {
     const origin = originFor(build, center, 0);
-    const columns: { x: number; z: number }[] = [];
-    for (let dz = 0; dz < build.size.z; dz += 1)
-        for (let dx = 0; dx < build.size.x; dx += 1)
-            columns.push({ x: origin.x + dx, z: origin.z + dz });
-    return columns;
+    const along = (side: number) => {
+        const at: number[] = [];
+        for (let one = 0; one < side - 1; one += step) at.push(one);
+        return [...at, side - 1];
+    };
+    return along(build.size.z).flatMap((dz) =>
+        along(build.size.x).map((dx) => ({ x: origin.x + dx, z: origin.z + dz }))
+    );
 }
 
 /** Columns read about in one answer: a marker's line is about seventy bytes,
  *  and RCON hands back 4096 of an answer at most. */
 export const STRIP_COLUMNS = 48;
 
-/** A footprint cut into strips of whole rows (or of a row, when one is wider
- *  than a strip) of at most `STRIP_COLUMNS` columns, each read on its own. */
-export function stripsOf(build: PolarisBuild, center: { x: number; z: number }): Box[] {
-    const origin = originFor(build, center, 0);
-    const width = Math.min(build.size.x, STRIP_COLUMNS);
+/** A grid of columns cut into strips of whole rows (or of a row, when one is
+ *  wider than a strip) of at most `STRIP_COLUMNS` columns, each read on its own. */
+export function stripsOf(columns: readonly { x: number; z: number }[]): Box[] {
+    const sorted = (values: number[]) => [...new Set(values)].sort((one, other) => one - other);
+    const xs = sorted(columns.map((one) => one.x));
+    const zs = sorted(columns.map((one) => one.z));
+    const width = Math.min(xs.length, STRIP_COLUMNS);
     const rows = Math.max(1, Math.floor(STRIP_COLUMNS / width));
     const strips: Box[] = [];
-    for (let dz = 0; dz < build.size.z; dz += rows) {
-        for (let dx = 0; dx < build.size.x; dx += width) {
+    for (let row = 0; row < zs.length; row += rows) {
+        for (let column = 0; column < xs.length; column += width) {
             strips.push({
-                x1: origin.x + dx,
+                x1: xs[column]!,
                 y1: 0,
-                z1: origin.z + dz,
-                x2: origin.x + Math.min(build.size.x, dx + width) - 1,
+                z1: zs[row]!,
+                x2: xs[Math.min(xs.length, column + width) - 1]!,
                 y2: 0,
-                z2: origin.z + Math.min(build.size.z, dz + rows) - 1
+                z2: zs[Math.min(zs.length, row + rows) - 1]!
             });
         }
     }
@@ -271,9 +278,13 @@ export function stripsOf(build: PolarisBuild, center: { x: number; z: number }):
 }
 
 /** A marker tag narrowed to one strip's columns, from the bottom of the world
- *  to the top, for any selector that takes a tag (`@e[tag=...]`). */
-export function stripTag(tag: string, strip: Box): string {
-    const volume = `dx=${strip.x2 - strip.x1},dy=384,dz=${strip.z2 - strip.z1}`;
+ *  to the top - or to the markers standing no higher than `top` - for any
+ *  selector that takes a tag (`@e[tag=...]`). */
+export function stripTag(tag: string, strip: Box, top?: number): string {
+    // A marker has no height: a volume ending half a block over `top` takes in
+    // the ones at `top` and none a block higher.
+    const height = top === undefined ? 384 : top + 63.5;
+    const volume = `dx=${strip.x2 - strip.x1},dy=${height},dz=${strip.z2 - strip.z1}`;
     return `${tag},x=${strip.x1},y=-64,z=${strip.z1},${volume}`;
 }
 
