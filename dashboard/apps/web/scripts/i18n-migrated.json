@@ -2059,6 +2059,14 @@
         "web/src/app/(app)/automations/runs/[runId]/page.tsx",
         "web/src/app/(app)/automations/runs/[runId]/run-detail.tsx",
         "web/src/components/message-toasts.tsx",
-        "web/src/components/listen-along-button.tsx"
+        "web/src/components/listen-along-button.tsx",
+        "web/src/app/(app)/apps/deploy/deploy-hooks-card.tsx",
+        "web/src/app/(app)/apps/deploy/deploy-hook-actions.ts",
+        "web/src/app/(app)/automations/webhooks/request-dialog.tsx",
+        "web/src/app/(app)/automations/webhooks/webhooks-view.tsx",
+        "web/src/app/(app)/automations/webhooks/page.tsx",
+        "web/src/app/(app)/automations/webhooks/actions.ts",
+        "web/src/app/(app)/automations/webhooks/delivery-log-dialog.tsx",
+        "web/src/components/icon-action.tsx"
     ]
 }

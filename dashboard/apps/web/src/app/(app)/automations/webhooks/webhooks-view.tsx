@@ -8,6 +8,7 @@
 import * as actions from "./actions";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { IconAction } from "@/components/icon-action";
 import { RelativeTime } from "@/components/relative-time";
 import { DeliveryLogDialog } from "./delivery-log-dialog";
 import { RequestDialog } from "./request-dialog";
@@ -347,33 +348,6 @@ function authLabel(
     if (type === "bearer") return t("webhooks.request.authBearer");
     if (type === "basic") return t("webhooks.request.authBasic");
     return t("webhooks.request.authHeader");
-}
-
-function IconAction({
-    label,
-    onClick,
-    disabled,
-    danger,
-    children
-}: {
-    label: string;
-    onClick: () => void;
-    disabled?: boolean;
-    danger?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-            className={`rounded p-1 text-muted-foreground transition-colors disabled:opacity-50 ${danger ? "hover:text-danger" : "hover:text-foreground"}`}
-        >
-            {children}
-        </button>
-    );
 }
 
 /** Adding an endpoint, or - given `hook` - changing which events it is sent. */

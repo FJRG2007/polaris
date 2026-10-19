@@ -84,8 +84,12 @@ function apply<T extends Record<string, unknown>>(row: T, data: Record<string, u
 
 const pick = <T extends Record<string, unknown>>(row: T) => ({ ...row });
 
+let mayUse = true;
+vi.mock("@polaris/auth", () => ({ userHasPermission: async () => mayUse }));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
+        user: { findUnique: async () => ({ isAdmin: false }) },
         outboundWebhook: {
             count: async ({ where }: { where: Record<string, unknown> }) =>
                 hooks.filter((h) => matches(h, where)).length,
@@ -296,6 +300,7 @@ beforeEach(() => {
     deliveries = [];
     requests.length = 0;
     allowRate = true;
+    mayUse = true;
     respond = async () => ({ status: 200 });
     notified.mockClear();
 });
@@ -332,6 +337,14 @@ describe("routing", () => {
         await queueOutboundHooks("u1", PAYLOAD);
         await queueOutboundHooks("u2", PAYLOAD);
         expect(requests).toHaveLength(0);
+    });
+
+    it("posts nothing for an account that no longer holds automations.use", async () => {
+        await addHook();
+        mayUse = false;
+        await queueOutboundHooks("u1", PAYLOAD);
+        expect(requests).toHaveLength(0);
+        expect(deliveries).toHaveLength(0);
     });
 });
 

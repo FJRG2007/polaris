@@ -9,6 +9,7 @@
 import * as actions from "./actions";
 import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
+import { IconAction } from "@/components/icon-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OutboundHookView } from "@/lib/notifications/outbound-hooks";
 import {
@@ -214,7 +215,7 @@ export function RequestDialog({
                                     value={authName}
                                     maxLength={100}
                                     autoComplete="off"
-                                    placeholder="X-Api-Key"
+                                    placeholder="X-Api-Key" // i18n-ignore a header name
                                     onChange={(event) => setAuthName(event.target.value)}
                                 />
                             </Field>
@@ -328,10 +329,10 @@ export function RequestDialog({
                                                     />
                                                     {t("webhooks.request.secret")}
                                                 </label>
-                                                <button
-                                                    type="button"
-                                                    aria-label={t("webhooks.request.removeHeader")}
-                                                    title={t("webhooks.request.removeHeader")}
+                                                <IconAction
+                                                    label={t("webhooks.request.removeHeader")}
+                                                    danger
+                                                    className="shrink-0"
                                                     onClick={() =>
                                                         setRows((current) =>
                                                             current.filter(
@@ -339,10 +340,9 @@ export function RequestDialog({
                                                             )
                                                         )
                                                     }
-                                                    className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:text-danger"
                                                 >
                                                     <Trash2 className="size-4" />
-                                                </button>
+                                                </IconAction>
                                             </div>
                                             {nameError || valueError ? (
                                                 <span className="text-xs text-danger">

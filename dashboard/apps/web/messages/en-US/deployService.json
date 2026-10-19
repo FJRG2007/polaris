@@ -769,6 +769,8 @@
         "secretDescription": "Copy it now. It is shown only this once; if you lose it, make a new one.",
         "secretVerify": "Sign each POST the same way: X-Polaris-Timestamp (unix seconds, within 5 minutes), a unique X-Polaris-Delivery id, and X-Polaris-Signature: sha256= followed by the hex HMAC-SHA256 of the timestamp, a dot and the raw body.",
         "done": "I have copied it",
+        "others": "Your hooks on other services",
+        "othersHint": "They count toward your maximum of {max}.",
         "errors": {
             "invalid": "Give the hook a name.",
             "rateLimited": "Too many tries. Wait a few minutes and try again.",

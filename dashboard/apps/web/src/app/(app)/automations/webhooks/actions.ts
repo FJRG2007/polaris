@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import {
     MAX_OUTBOUND_WEBHOOKS,
@@ -29,7 +29,7 @@ async function refusal(code: hooks.HookRefusal | "invalid" | "notSaved"): Promis
 export async function createOutboundHookAction(
     input: unknown
 ): Promise<{ hook?: hooks.OutboundHookView; secret?: string; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsed = outboundWebhookInputSchema.safeParse(input);
     if (!parsed.success) return { error: await refusal("invalid") };
     const result = await hooks.createOutboundHook(user.id, parsed.data);
@@ -42,7 +42,7 @@ export async function setOutboundHookEventsAction(
     id: unknown,
     events: unknown
 ): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsedId = idSchema.safeParse(id);
     const parsedEvents = eventsSchema.safeParse(events);
     if (!parsedId.success || !parsedEvents.success) return { error: await refusal("invalid") };
@@ -57,7 +57,7 @@ export async function setOutboundHookEnabledAction(
     id: unknown,
     enabled: unknown
 ): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsedId = idSchema.safeParse(id);
     const parsedEnabled = z.boolean().safeParse(enabled);
     if (!parsedId.success || !parsedEnabled.success) return { error: await refusal("notSaved") };
@@ -71,7 +71,7 @@ export async function setOutboundHookEnabledAction(
 export async function rotateOutboundHookSecretAction(
     id: unknown
 ): Promise<{ secret?: string; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: await refusal("notFound") };
     const secret = await hooks.rotateOutboundHookSecret(user.id, parsed.data);
@@ -79,7 +79,7 @@ export async function rotateOutboundHookSecretAction(
 }
 
 export async function deleteOutboundHookAction(id: unknown): Promise<{ error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsed = idSchema.safeParse(id);
     if (!parsed.success || !(await hooks.deleteOutboundHook(user.id, parsed.data))) {
         return { error: await refusal("notFound") };
@@ -91,7 +91,7 @@ export async function deleteOutboundHookAction(id: unknown): Promise<{ error?: s
 export async function testOutboundHookAction(
     id: unknown
 ): Promise<{ status?: "sent" | "failed"; delivery?: hooks.OutboundDeliveryView; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: await refusal("notFound") };
     const t = await getTranslations("accountNotifications");
@@ -108,7 +108,7 @@ export async function testOutboundHookAction(
 export async function redeliverOutboundAction(
     deliveryId: unknown
 ): Promise<{ status?: "sent" | "failed"; delivery?: hooks.OutboundDeliveryView; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsed = idSchema.safeParse(deliveryId);
     if (!parsed.success) return { error: await refusal("notFound") };
     const result = await hooks.redeliverOutbound(user.id, parsed.data);
@@ -120,7 +120,7 @@ export async function listOutboundDeliveriesAction(
     webhookId: unknown,
     cursor: unknown
 ): Promise<{ page?: hooks.DeliveryPage; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsedId = idSchema.safeParse(webhookId);
     const parsedCursor = idSchema.nullable().safeParse(cursor ?? null);
     if (!parsedId.success || !parsedCursor.success) return { error: await refusal("notFound") };
@@ -133,7 +133,7 @@ export async function setOutboundHookRequestAction(
     id: unknown,
     input: unknown
 ): Promise<{ hook?: hooks.OutboundHookView; error?: string }> {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const parsedId = idSchema.safeParse(id);
     const parsed = webhookRequestInputSchema.safeParse(input);
     if (!parsedId.success || !parsed.success) return { error: await refusal("invalid") };

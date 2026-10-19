@@ -10,6 +10,7 @@
 import { SettingsCard } from "./settings-kit";
 import * as actions from "./deploy-hook-actions";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
+import { IconAction } from "@/components/icon-action";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { InboundHookView } from "@/lib/deploy/inbound-hooks";
@@ -38,6 +39,9 @@ type Open =
 export function DeployHooksCard({ applicationId }: { applicationId: string }) {
     const t = useTranslations("deployService");
     const [hooks, setHooks] = useState<InboundHookView[] | null>(null);
+    const [others, setOthers] = useState<InboundHookView[]>([]);
+    const [mayCreate, setMayCreate] = useState(false);
+    const [max, setMax] = useState(0);
     const [baseUrl, setBaseUrl] = useState("");
     const [loadError, setLoadError] = useState<string | null>(null);
     const [open, setOpen] = useState<Open>(null);
@@ -51,6 +55,9 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
         const result = await actions.listDeployHooksAction(applicationId).catch(() => null);
         if (!result?.hooks) return setLoadError(result?.error ?? t("deployHooks.loadFailed"));
         setHooks(result.hooks);
+        setOthers(result.others ?? []);
+        setMayCreate(result.mayCreate === true);
+        setMax(result.max ?? 0);
         setBaseUrl(result.baseUrl ?? "");
     }, [applicationId, t]);
 
@@ -77,6 +84,13 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
         });
     }
 
+    const atLimit = hooks !== null && max > 0 && hooks.length + others.length >= max;
+    const addRefusal = !mayCreate
+        ? t("deployHooks.errors.forbidden")
+        : atLimit
+          ? t("deployHooks.errors.limit", { max })
+          : undefined;
+
     function close() {
         setOpen(null);
         setError(null);
@@ -90,7 +104,8 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
                 <Button
                     size="sm"
                     variant="secondary"
-                    disabled={hooks === null}
+                    disabled={hooks === null || addRefusal !== undefined}
+                    title={hooks === null ? undefined : addRefusal}
                     onClick={() => setOpen({ kind: "add" })}
                 >
                     <Plus className="size-4" />
@@ -99,6 +114,9 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
             }
         >
             <p className="text-xs text-muted-foreground">{t("deployHooks.guard")}</p>
+            {hooks !== null && addRefusal ? (
+                <p className="text-xs text-muted-foreground">{addRefusal}</p>
+            ) : null}
             {loadError ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm text-danger">
                     <span>{loadError}</span>
@@ -164,6 +182,42 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
                     ))}
                 </ul>
             )}
+            {others.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                    <p className="text-xs font-medium">{t("deployHooks.others")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("deployHooks.othersHint", { max })}
+                    </p>
+                    <ul className="divide-y divide-border rounded-md border border-border">
+                        {others.map((hook) => (
+                            <li
+                                key={hook.id}
+                                className="flex items-center justify-between gap-2 px-3 py-2"
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm" title={hook.name}>
+                                        {hook.name}
+                                    </p>
+                                    <p
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={hook.serviceName}
+                                    >
+                                        {hook.serviceName}
+                                    </p>
+                                </div>
+                                <IconAction
+                                    label={t("deployHooks.remove")}
+                                    danger
+                                    className="shrink-0"
+                                    onClick={() => setOpen({ kind: "remove", hook })}
+                                >
+                                    <Trash2 className="size-4" />
+                                </IconAction>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
             {error && open === null ? <p className="text-xs text-danger">{error}</p> : null}
 
             {open?.kind === "add" ? (
@@ -220,36 +274,15 @@ export function DeployHooksCard({ applicationId }: { applicationId: string }) {
                                 (current) =>
                                     current?.filter((entry) => entry.id !== open.hook.id) ?? null
                             );
+                            setOthers((current) =>
+                                current.filter((entry) => entry.id !== open.hook.id)
+                            );
                             close();
                         })
                     }
                 />
             ) : null}
         </SettingsCard>
-    );
-}
-
-function IconAction({
-    label,
-    onClick,
-    danger,
-    children
-}: {
-    label: string;
-    onClick: () => void;
-    danger?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            onClick={onClick}
-            className={`rounded p-1 text-muted-foreground transition-colors ${danger ? "hover:text-danger" : "hover:text-foreground"}`}
-        >
-            {children}
-        </button>
     );
 }
 

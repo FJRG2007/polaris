@@ -101,11 +101,7 @@ vi.mock("@/lib/deploy-project-access", () => ({
     requireApplicationAccess: async () => {
         if (!projectAccessOk) throw new Error("Service not found");
         return { ownerId: "owner-1", projectId: "p", environmentId: "e" };
-    },
-    visibleProjectIds: async () => [],
-    projectAccess: async () => null,
-    accessCan: () => true,
-    accessInEnvironment: () => true
+    }
 }));
 vi.mock("@/lib/deploy-service", () => ({
     deployApplication: (...args: unknown[]) => deploy(...args)
@@ -116,7 +112,7 @@ vi.mock("@/lib/notifications/outbound-hooks", () => ({
         `sha256=${createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex")}`
 }));
 
-const { receiveInbound, pruneInboundReceipts, rotateInboundHookSecret } = await import(
+const { mayRedeploy, receiveInbound, pruneInboundReceipts, rotateInboundHookSecret } = await import(
     "../../src/lib/deploy/inbound-hooks"
 );
 
@@ -257,5 +253,16 @@ describe("replacing a deploy hook's secret", () => {
         expect(await rotateInboundHookSecret("creator-1", HOOK_ID)).toEqual({
             error: "rateLimited"
         });
+    });
+});
+
+describe("whether a deploy hook may be added", () => {
+    it("asks the same permission and project access the gateway does", async () => {
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(true);
+        hasPermission = false;
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(false);
+        hasPermission = true;
+        projectAccessOk = false;
+        expect(await mayRedeploy("creator-1", APP_ID)).toBe(false);
     });
 });

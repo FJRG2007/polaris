@@ -75,17 +75,28 @@ const DEPLOY_HOOK = {
     lastUsedAt: null,
     createdAt: "2026-10-01T00:00:00.000Z"
 };
+const OTHER_DEPLOY_HOOK = {
+    ...DEPLOY_HOOK,
+    id: "00000000-0000-7000-8000-0000000000cc",
+    name: "Registry push",
+    applicationId: "00000000-0000-7000-8000-0000000000dd",
+    serviceName: "worker"
+};
 const listDeployHooks = vi.fn(async (_id: unknown) => ({
     hooks: [DEPLOY_HOOK],
+    others: [] as (typeof DEPLOY_HOOK)[],
+    mayCreate: true,
+    max: 20,
     baseUrl: "https://polaris.example.test"
 }));
 const rotateDeployHook = vi.fn(async (_id: unknown) => ({ secret: "whsec_rotated" }));
+const deleteDeployHook = vi.fn(async (_id: unknown) => ({}));
 vi.mock("@/app/(app)/apps/deploy/deploy-hook-actions", () => ({
     listDeployHooksAction: (id: unknown) => listDeployHooks(id),
     rotateDeployHookSecretAction: (id: unknown) => rotateDeployHook(id),
     createDeployHookAction: async () => ({}),
     setDeployHookEnabledAction: async () => ({}),
-    deleteDeployHookAction: async () => ({})
+    deleteDeployHookAction: (id: unknown) => deleteDeployHook(id)
 }));
 
 const { WebhooksView } = await import("@/app/(app)/automations/webhooks/webhooks-view");
@@ -237,5 +248,44 @@ describe("deploy hooks in a service's settings", () => {
         fireEvent.click(screen.getByRole("button", { name: "Make new secret" }));
         expect(await screen.findByText("whsec_rotated")).toBeTruthy();
         expect(rotateDeployHook).toHaveBeenCalledWith(DEPLOY_HOOK.id);
+    });
+
+    it("holds Add, with the reason, for someone the server would refuse", async () => {
+        listDeployHooks.mockResolvedValueOnce({
+            hooks: [DEPLOY_HOOK],
+            others: [],
+            mayCreate: false,
+            max: 20,
+            baseUrl: "https://polaris.example.test"
+        });
+        render(<DeployHooksCard applicationId={DEPLOY_HOOK.applicationId} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(await screen.findByText("You cannot redeploy this service.")).toBeTruthy();
+        const add = screen.getByRole("button", { name: "Add deploy hook" }) as HTMLButtonElement;
+        expect(add.disabled).toBe(true);
+    });
+
+    it("lists the account's hooks on other services, and removes one from here", async () => {
+        listDeployHooks.mockResolvedValueOnce({
+            hooks: [],
+            others: [OTHER_DEPLOY_HOOK],
+            mayCreate: true,
+            max: 1,
+            baseUrl: "https://polaris.example.test"
+        });
+        render(<DeployHooksCard applicationId={DEPLOY_HOOK.applicationId} />, {
+            wrapper: MessagesWrapper
+        });
+        expect(await screen.findByText("Registry push")).toBeTruthy();
+        expect(screen.getByText("worker")).toBeTruthy();
+        expect(screen.getByText("You have the maximum of 1 deploy hooks.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Remove deploy hook" }));
+        expect(deleteDeployHook).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "Remove hook" }));
+        await waitFor(() => expect(screen.queryByText("Registry push")).toBeNull());
+        expect(deleteDeployHook).toHaveBeenCalledWith(OTHER_DEPLOY_HOOK.id);
+        const add = screen.getByRole("button", { name: "Add deploy hook" }) as HTMLButtonElement;
+        expect(add.disabled).toBe(false);
     });
 });

@@ -5,7 +5,7 @@
  * redeploy, in Deploy.
  */
 
-import { requireUser } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { NOTIFICATION_EVENTS } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
@@ -16,7 +16,7 @@ import { eventLabel, groupLabel } from "@/app/(app)/account/notifications/event-
 export const dynamic = "force-dynamic";
 
 export default async function WebhooksPage() {
-    const user = await requireUser();
+    const user = await requirePermission("automations.use");
     const t = await getTranslations("accountNotifications");
     const hooks = await listOutboundHooks(user.id);
     const events: EventOption[] = NOTIFICATION_EVENTS.map((event) => ({

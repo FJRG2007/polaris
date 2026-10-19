@@ -24,6 +24,7 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
+import { userHasPermission } from "@polaris/auth";
 import { createHmac, randomBytes } from "node:crypto";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
@@ -405,6 +406,14 @@ export async function listOutboundDeliveries(
     return { items, nextCursor: more ? (items[items.length - 1]?.id ?? null) : null };
 }
 
+/** Whether the account may still have its endpoints posted to: the permission
+ *  the Webhooks screen asks for, or an administrator. */
+async function ownerMayUse(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (!user) return false;
+    return user.isAdmin || (await userHasPermission(userId, "automations.use"));
+}
+
 /**
  * Queue an alert for every endpoint of the account that asked for its event,
  * then try each one straight away. Never throws at the caller.
@@ -415,7 +424,7 @@ export async function queueOutboundHooks(userId: string, payload: OutboundPayloa
         take: MAX_OUTBOUND_WEBHOOKS,
         select: { id: true }
     });
-    if (hooks.length === 0) return;
+    if (hooks.length === 0 || !(await ownerMayUse(userId))) return;
     const body = JSON.stringify(payload);
     const now = new Date();
     const rows = await Promise.all(

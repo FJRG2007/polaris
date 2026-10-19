@@ -53,12 +53,6 @@ export interface InboundHookView {
     createdAt: string;
 }
 
-export interface RedeployableService {
-    id: string;
-    name: string;
-    project: string;
-}
-
 export const inboundHookInputSchema = z.object({
     name: z.string().trim().min(1).max(60),
     applicationId: z.string().uuid()
@@ -110,37 +104,9 @@ async function redeployAccess(
     }
 }
 
-/** The services this account may redeploy, which are the only ones offered. */
-export async function redeployableServices(userId: string): Promise<RedeployableService[]> {
-    if (!(await mayDeploy(userId))) return [];
-    const projectIds = await access.visibleProjectIds(userId);
-    const reachable = (
-        await Promise.all(
-            projectIds.map((id) => access.projectAccess(id, userId).catch(() => null))
-        )
-    ).filter(
-        (entry): entry is access.ProjectAccess =>
-            entry !== null && access.accessCan(entry, "deploy.run")
-    );
-    if (reachable.length === 0) return [];
-    const apps = await prisma.application.findMany({
-        where: { environment: { projectId: { in: reachable.map((entry) => entry.projectId) } } },
-        orderBy: { name: "asc" },
-        take: 500,
-        select: {
-            id: true,
-            name: true,
-            environmentId: true,
-            environment: { select: { projectId: true, project: { select: { name: true } } } }
-        }
-    });
-    const byProject = new Map(reachable.map((entry) => [entry.projectId, entry]));
-    return apps
-        .filter((app) => {
-            const granted = byProject.get(app.environment.projectId);
-            return granted !== undefined && access.accessInEnvironment(granted, app.environmentId);
-        })
-        .map((app) => ({ id: app.id, name: app.name, project: app.environment.project.name }));
+/** Whether the account may make a hook for this service right now. */
+export async function mayRedeploy(userId: string, applicationId: string): Promise<boolean> {
+    return (await redeployAccess(applicationId, userId)) !== null;
 }
 
 /** The account's hooks, or - given a service - only the ones that redeploy it. */
