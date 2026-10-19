@@ -145,20 +145,22 @@ export function SendsView() {
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sends.title")}</h1>
-                <p className="text-sm text-muted-foreground">
-                    {t("sends.intro")}
-                </p>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("sends.title")}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t("sends.intro")}</p>
             </div>
 
             {link ? (
                 <Card>
                     <CardBody className="flex flex-col gap-2">
-                        <p className="text-sm">
-                            {t("sends.copyNow")}
-                        </p>
+                        <p className="text-sm">{t("sends.copyNow")}</p>
                         <div className="flex items-center gap-2">
-                            <Input readOnly value={link} className="min-w-0 flex-1 font-mono text-xs" />
+                            <Input
+                                readOnly
+                                value={link}
+                                className="min-w-0 flex-1 font-mono text-xs"
+                            />
                             <Button
                                 type="button"
                                 size="icon"
@@ -200,7 +202,10 @@ export function SendsView() {
                                     name="days"
                                     value={days}
                                     onValueChange={setDays}
-                                    options={EXPIRY_OPTIONS.map((option) => ({ value: option.value, label: t(option.key) }))}
+                                    options={EXPIRY_OPTIONS.map((option) => ({
+                                        value: option.value,
+                                        label: t(option.key)
+                                    }))}
                                     aria-label={t("sends.lastsLabel")}
                                 />
                             </label>
@@ -274,7 +279,9 @@ export function SendsView() {
                                     {row.hasPassword ? (
                                         <Badge variant="neutral">{t("app.fields.password")}</Badge>
                                     ) : null}
-                                    {row.disabled ? <Badge variant="warning">{t("sends.off")}</Badge> : null}
+                                    {row.disabled ? (
+                                        <Badge variant="warning">{t("sends.off")}</Badge>
+                                    ) : null}
                                     <Button
                                         size="sm"
                                         variant="ghost"

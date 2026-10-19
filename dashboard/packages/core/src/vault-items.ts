@@ -153,7 +153,9 @@ export function masterPasswordProblem(password: string): string | null {
     if (password.length < MASTER_PASSWORD_MIN) {
         return `Use at least ${MASTER_PASSWORD_MIN} characters.`;
     }
-    const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((shape) => shape.test(password)).length;
+    const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter((shape) =>
+        shape.test(password)
+    ).length;
     if (classes < 2) {
         return "Mix at least two kinds of character - letters and numbers, or letters and punctuation.";
     }
@@ -259,16 +261,20 @@ export function withField<T extends { name: string; value: string; type: number 
  * to hold in your head.
  */
 export function readRecoveryCodes(value: string): string[] {
-    return value
-        .split(/\s+/)
-        .map((token) => token.trim())
-        // A leading "3." or "3)" is the list's numbering rather than part of the
-        // code - but only when what is left still looks like one.
-        .map((token) => {
-            const numbered = /^\d{1,2}[.)]$/.test(token) ? "" : token.replace(/^\d{1,2}[.)]/, "");
-            return numbered;
-        })
-        .filter((token) => token.length > 0);
+    return (
+        value
+            .split(/\s+/)
+            .map((token) => token.trim())
+            // A leading "3." or "3)" is the list's numbering rather than part of the
+            // code - but only when what is left still looks like one.
+            .map((token) => {
+                const numbered = /^\d{1,2}[.)]$/.test(token)
+                    ? ""
+                    : token.replace(/^\d{1,2}[.)]/, "");
+                return numbered;
+            })
+            .filter((token) => token.length > 0)
+    );
 }
 
 /** How the codes are written back: one per line, which is how every site that
@@ -303,7 +309,11 @@ export function looksLikeEmail(value: string): boolean {
  */
 export function itemInitials(name: string, host: string | null): string {
     const source = host ? host.replace(/^www\./, "") : name;
-    const word = source.trim().split(/[\s.\-_]+/).filter(Boolean)[0] ?? "";
+    const word =
+        source
+            .trim()
+            .split(/[\s.\-_]+/)
+            .filter(Boolean)[0] ?? "";
     if (!word) return "?";
     return word.slice(0, 2).toUpperCase();
 }

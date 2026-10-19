@@ -99,12 +99,17 @@ const SCHEMA_KEYS: Readonly<Record<string, NamespaceKey<"vault">>> = {
     "Unknown item type": "errors.schema.itemType",
     "Unknown send type": "errors.schema.sendType",
     "Give it a name": "errors.schema.name",
-    "Mix at least two kinds of character - letters and numbers, or letters and punctuation.": "errors.schema.mix"
+    "Mix at least two kinds of character - letters and numbers, or letters and punctuation.":
+        "errors.schema.mix"
 };
 
 /** A vault schema's complaint in the reader's words: the vault's own, then the
  *  shared ones (a length), then as it came. */
-export function vaultSchemaText(t: VaultT, validation: NamespaceTranslator<"validation">, message: string): string {
+export function vaultSchemaText(
+    t: VaultT,
+    validation: NamespaceTranslator<"validation">,
+    message: string
+): string {
     const key = SCHEMA_KEYS[message];
     if (key) return t(key);
     // core's master password rule says its length with a full stop.
