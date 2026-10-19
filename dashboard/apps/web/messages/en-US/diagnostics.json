@@ -86,7 +86,7 @@
     },
     "speed": {
         "heading": "Speed test",
-        "description": "Measured from this server to a public test service (Cloudflare), not from your browser. Uses about 12 MB.",
+        "description": "Measured from this server to a public test service (Cloudflare), not from your browser. Uses up to 300 MB.",
         "run": "Run speed test",
         "running": "Testing...",
         "download": "Download",
@@ -96,6 +96,7 @@
         "ms": "{value} ms",
         "none": "Not measured",
         "never": "No test has run yet.",
+        "via": "through Cloudflare {code}",
         "lastRun": "Last run",
         "busy": "A test is already running.",
         "limited": "Limit reached. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
