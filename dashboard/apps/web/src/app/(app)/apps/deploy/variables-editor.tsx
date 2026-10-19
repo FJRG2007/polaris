@@ -40,6 +40,7 @@ import {
     DropdownMenuTrigger,
     Input,
     Switch,
+    ShortcutHint,
     shortcutPressed
 } from "@polaris/ui";
 import {
@@ -798,6 +799,7 @@ export function VariablesEditor({
                                                     onSelect={() => void startEditing(row)}
                                                 >
                                                     <Pencil /> {t("variables.edit")}
+                                                    <ShortcutHint id="general.rename" />
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onSelect={() =>

@@ -59,8 +59,10 @@ import {
     Input,
     MenuShortcut,
     Select,
+    ShortcutHint,
     Switch,
     Textarea,
+    shortcutPressed,
     useToast
 } from "@polaris/ui";
 
@@ -267,7 +269,7 @@ export function CanvasEditor({
                             <Pencil aria-hidden="true" />
                             {t("canvas.menu.rename")}
                             {/* i18n-ignore: a key on the keyboard */}
-                            <MenuShortcut>F2</MenuShortcut>
+                            <ShortcutHint id="general.rename" />
                         </ContextMenuItem>
                     ) : null}
                 </ContextMenuGroup>
@@ -354,7 +356,7 @@ export function CanvasEditor({
                         : count > 1
                           ? t("canvas.menu.deleteMany", { count })
                           : t("canvas.menu.delete")}
-                    <MenuShortcut keys="Delete" />
+                    <ShortcutHint id="general.delete" />
                 </ContextMenuItem>
             </>
         );
@@ -398,7 +400,7 @@ export function CanvasEditor({
                     <ContextMenuItem variant="danger" onSelect={remove}>
                         <Trash2 aria-hidden="true" />
                         {t("canvas.menu.deleteEdge")}
-                        <MenuShortcut keys="Delete" />
+                        <ShortcutHint id="general.delete" />
                     </ContextMenuItem>
                 </>
             );
@@ -549,8 +551,9 @@ export function CanvasEditor({
             toggleEnabled(selection.nodes);
         else if (key === "p" && !mod && !event.shiftKey && !readOnly && single())
             togglePin(single()!);
-        else if (key === "f2" && !readOnly && single()) setRenaming(single()!.id);
-        else if ((key === "delete" || key === "backspace") && !readOnly) remove();
+        else if (shortcutPressed(event, "general.rename") && !readOnly && single())
+            setRenaming(single()!.id);
+        else if (shortcutPressed(event, "general.delete") && !readOnly) remove();
         else if (key === "n" && !mod && !readOnly && !event.shiftKey) {
             placeAt.current = center();
             setInsertOn(null);
