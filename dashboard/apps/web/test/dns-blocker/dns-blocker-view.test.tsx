@@ -64,7 +64,7 @@ function standing(state: DnsBlockerState): void {
 async function shown(): Promise<string[]> {
     render(
         <MessagesWrapper>
-            <DnsBlockerView initial={dns.DEFAULT_DNS_SETTINGS} />
+            <DnsBlockerView initial={dns.DEFAULT_DNS_SETTINGS} brands={[]} />
         </MessagesWrapper>
     );
     await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());

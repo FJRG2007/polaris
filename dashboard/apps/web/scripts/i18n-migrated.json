@@ -306,6 +306,7 @@
         "web/src/app/(app)/apps/dns-blocker/install-state.tsx",
         "web/src/app/(app)/apps/dns-blocker/layout.tsx",
         "web/src/app/(app)/apps/dns-blocker/page.tsx",
+        "web/src/app/(app)/apps/dns-blocker/router-dns-guide.tsx",
         "web/src/app/(app)/apps/servers/rollouts/page.tsx",
         "web/src/app/(app)/apps/servers/server-gpu.tsx",
         "web/src/app/(app)/home/page.tsx",

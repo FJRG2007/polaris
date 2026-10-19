@@ -7,7 +7,7 @@
  * The steps come from the same catalogue as the port-forwarding guide on the
  * Domains page (`lib/router-guide`), so a brand is described once. The check
  * underneath reads the engine's own query log: a device that asked the blocker
- * today is a device that is using it, which is the only proof that the router
+ * in the last 24 hours is a device that is using it, which is the only proof that the router
  * setting took - a saved setting looks the same whether devices picked it up or not.
  */
 
@@ -28,14 +28,20 @@ import { dnsClientsAction } from "./actions";
 const BRAND_KEY = "polaris.dnsBlocker.routerBrand";
 const LOOPBACK = new Set(["127.0.0.1", "::1", "localhost"]);
 
-/** What today's log says about who is using the blocker. */
+/** A brand in the picker, named in the reader's words by the page. */
+export interface RouterBrandOption {
+    readonly value: RouterBrand;
+    readonly label: string;
+}
+
+/** What the last 24 hours of log say about who is using the blocker. */
 export type DnsUse =
     | { readonly kind: "none" }
     | { readonly kind: "routerOnly"; readonly router: string }
     | { readonly kind: "devices"; readonly devices: readonly string[] };
 
 /**
- * Reads the distinct clients of today's log. The blocker's own machine is left
+ * Reads the distinct clients of the last 24 hours of log. The blocker's own machine is left
  * out (its health checks are not a device), and a log where the only asker is the
  * router means devices reach the blocker through it - covered, but not told apart.
  */
@@ -84,7 +90,15 @@ function saveBrand(brand: RouterBrand): void {
     }
 }
 
-export function RouterDnsGuide({ address, blocking }: { address: string | null; blocking: boolean }) {
+export function RouterDnsGuide({
+    address,
+    blocking,
+    brands
+}: {
+    address: string | null;
+    blocking: boolean;
+    brands: RouterBrandOption[];
+}) {
     const t = useTranslations("dnsBlocker");
     const [brand, setBrand] = useState<RouterBrand>("other");
     useEffect(() => {
@@ -107,10 +121,7 @@ export function RouterDnsGuide({ address, blocking }: { address: string | null; 
                             setBrand(value as RouterBrand);
                             saveBrand(value as RouterBrand);
                         }}
-                        options={routerBrandsFor("dns").map((entry) => ({
-                            value: entry.id,
-                            label: entry.id === "other" ? t("routerGuide.otherBrand") : entry.label
-                        }))}
+                        options={brands}
                     />
                 </label>
                 {adminUrl ? (
@@ -203,7 +214,7 @@ export function RouterDnsSteps({ brand, address }: { brand: RouterBrand; address
             );
 }
 
-/** Whether devices are actually asking the blocker, from today's query log. */
+/** Whether devices are actually asking the blocker, from the last 24 hours of query log. */
 function DnsUseCheck({ address, relay }: { address: string | null; relay: boolean }) {
     const t = useTranslations("dnsBlocker");
     const [use, setUse] = useState<DnsUse | null>(null);
@@ -214,8 +225,15 @@ function DnsUseCheck({ address, relay }: { address: string | null; relay: boolea
     const check = useCallback(
         async (fresh: boolean) => {
             setChecking(true);
-            const result = await dnsClientsAction(fresh);
-            setChecking(false);
+            let result: Awaited<ReturnType<typeof dnsClientsAction>>;
+            try {
+                result = await dnsClientsAction(fresh);
+            } catch {
+                setError(t("routerGuide.check.failed"));
+                return;
+            } finally {
+                setChecking(false);
+            }
             if (result.error !== undefined) {
                 setError(result.error);
                 return;
@@ -224,7 +242,7 @@ function DnsUseCheck({ address, relay }: { address: string | null; relay: boolea
             setLogOff(result.logOff);
             setUse(dnsUse(result.clients, address));
         },
-        [address]
+        [address, t]
     );
 
     useEffect(() => {

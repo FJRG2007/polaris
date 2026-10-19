@@ -2,7 +2,7 @@
 /**
  * One router catalogue, three screens: the Domains forward, the game-port forward
  * and the ad blocker's "point your network at it". Each renders from the same
- * guide, and the ad blocker's check reads who actually asked it today.
+ * guide, and the ad blocker's check reads who actually asked it in the last 24 hours.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +11,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MessagesWrapper, withMessages } from "../setup/i18n";
 import { gameForwardRules, routerBrandsFor } from "@/lib/router-guide";
 
-const dnsClientsAction = vi.fn(async () => ({
+const dnsClientsAction = vi.fn(async (): Promise<{ clients: string[]; logOff: boolean }> => ({
     clients: ["10.0.0.2", "10.0.0.7", "127.0.0.1"],
     logOff: false
 }));
@@ -24,6 +24,8 @@ const { RouterDnsGuide, RouterDnsSteps, dnsUse } = await import(
 const { RouterSteps } = await import("../../src/app/(app)/admin/domains/router-steps");
 
 afterEach(cleanup);
+
+const brands = routerBrandsFor("dns").map((entry) => ({ value: entry.id, label: entry.label }));
 
 describe("who is using the blocker", () => {
     it("leaves out the blocker's own machine", () => {
@@ -63,11 +65,19 @@ describe("the ad blocker's router steps", () => {
         expect(html).toContain("Ad Blocking");
     });
 
-    it("shows the devices seen today once blocking is on", async () => {
-        render(<RouterDnsGuide address="10.0.0.5" blocking />, { wrapper: MessagesWrapper });
+    it("shows the devices seen in the last 24 hours once blocking is on", async () => {
+        render(<RouterDnsGuide address="10.0.0.5" blocking brands={brands} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("10.0.0.7")).toBeTruthy();
         expect(screen.getByText("10.0.0.2")).toBeTruthy();
         expect(screen.queryByText("127.0.0.1")).toBeNull();
+    });
+
+    it("says the check failed and lets it run again when the action cannot be reached", async () => {
+        dnsClientsAction.mockRejectedValueOnce(new Error("network"));
+        render(<RouterDnsGuide address="10.0.0.5" blocking brands={brands} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        const again = screen.getByRole("button", { name: "Check again" }) as HTMLButtonElement;
+        expect(again.disabled).toBe(false);
     });
 });
 

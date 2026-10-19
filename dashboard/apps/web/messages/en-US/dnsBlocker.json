@@ -260,7 +260,6 @@
     },
     "routerGuide": {
         "brand": "Your router",
-        "otherBrand": "Another brand",
         "open": "Open the router",
         "thisServer": "this server's address",
         "ipv6Address": "this server's IPv6 address",
@@ -280,11 +279,12 @@
         },
         "check": {
             "title": "Are devices using it?",
+            "failed": "Polaris could not read the log just now. Check again in a moment.",
             "again": "Check again",
-            "none": "No device has asked the blocker anything today. The router is still handing out another DNS server, or devices have not renewed their address yet.",
+            "none": "No device has asked the blocker anything in the last 24 hours. The router is still handing out another DNS server, or devices have not renewed their address yet.",
             "routerOnly": "Only the router ({router}) is asking the blocker. Devices go through the router, so they are covered, but the blocker cannot tell them apart. Set the DHCP DNS server above to see each device.",
             "relayed": "The router ({router}) is asking the blocker for your devices, as expected for this router. Ads are being blocked.",
-            "devices": "{count, plural, one {One device has} other {# devices have}} used the blocker today:",
+            "devices": "{count, plural, one {One device has} other {# devices have}} used the blocker in the last 24 hours:",
             "logOff": "The blocker is not keeping a log yet, so Polaris cannot see which devices use it. Apply the settings below once and check again."
         }
     }

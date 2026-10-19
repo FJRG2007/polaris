@@ -523,7 +523,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         label: "UniFi",
         // DNS: https://help.ui.com/hc/en-us/articles/17484948645015 (DNS Troubleshooting Guide).
         // Ad Blocking: https://help.ui.com/hc/en-us/articles/9794438523799 - with it on,
-        // clients set to another DNS server are redirected to the gateway's own.
+        // clients set to another DNS server are redirected to the gateway's own. Its
+        // switch lives in Content Filter: https://help.ui.com/hc/en-us/articles/12568927589143.
         topics: ["dns"],
         forwardSource: null,
         dns: {

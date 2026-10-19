@@ -260,7 +260,6 @@
     },
     "routerGuide": {
         "brand": "Tu router",
-        "otherBrand": "Otra marca",
         "open": "Abrir el router",
         "thisServer": "la dirección del servidor",
         "ipv6Address": "la IPv6 de este servidor",
@@ -280,11 +279,12 @@
         },
         "check": {
             "title": "¿Lo usan los dispositivos?",
+            "failed": "Polaris no ha podido leer el registro ahora. Vuelve a comprobarlo en un momento.",
             "again": "Comprobar",
-            "none": "Ningún dispositivo ha preguntado nada al bloqueador hoy. El router aún reparte otro servidor DNS, o los dispositivos no han renovado su dirección.",
+            "none": "Ningún dispositivo ha preguntado nada al bloqueador en las últimas 24 horas. El router aún reparte otro servidor DNS, o los dispositivos no han renovado su dirección.",
             "routerOnly": "Solo el router ({router}) pregunta al bloqueador. Los dispositivos pasan por el router, así que están cubiertos, pero el bloqueador no los distingue. Cambia arriba el DNS del DHCP para ver cada uno.",
             "relayed": "El router ({router}) pregunta al bloqueador por tus dispositivos, como se espera en este router. Los anuncios se están bloqueando.",
-            "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador hoy:",
+            "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador en las últimas 24 horas:",
             "logOff": "El bloqueador aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
         }
     }

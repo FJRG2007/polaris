@@ -231,7 +231,7 @@ export async function ruleFromLogAction(
     }
 }
 
-/** Which addresses asked the blocker today, for the check under the router
+/** Which addresses asked the blocker in the last 24 hours, for the check under the router
  *  steps. The same read of the log as the insights card's unfiltered view. */
 export async function dnsClientsAction(
     fresh?: unknown
