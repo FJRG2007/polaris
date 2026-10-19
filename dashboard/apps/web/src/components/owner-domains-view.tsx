@@ -16,6 +16,7 @@
 
 import { runAction } from "@/lib/run-action";
 import { useEffect, useRef, useState } from "react";
+import * as polls from "@/app/(app)/account/domains/domains-polls";
 import { PageSection } from "@/components/page-section";
 import type { OwnerDomainView } from "@/lib/owner-domains";
 import { useDisplayFormat } from "@/components/display-format";
@@ -41,7 +42,6 @@ import {
 import {
     addOwnerDomainAction,
     checkOwnerDomainAction,
-    readOwnerDomainAction,
     removeOwnerDomainAction,
     retryOwnerDomainCertificateAction,
     setOwnerDomainDnsTokenAction,
@@ -459,11 +459,17 @@ function CertificatePanel({
     const waiting = ordering || certificate === null;
     useEffect(() => {
         if (!waiting) return;
+        const controller = new AbortController();
         const timer = window.setInterval(async () => {
-            const result = await readOwnerDomainAction(owner, domain.id).catch(() => null);
+            const result = await polls
+                .ownerDomain(owner, domain.id, controller.signal)
+                .catch(() => null);
             if (result?.domain) changedRef.current(result.domain);
         }, ORDER_POLL_MS);
-        return () => window.clearInterval(timer);
+        return () => {
+            controller.abort();
+            window.clearInterval(timer);
+        };
     }, [waiting, owner, domain.id]);
 
     async function saveToken(value: string) {

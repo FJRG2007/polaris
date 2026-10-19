@@ -51,7 +51,12 @@ vi.mock("@/app/(app)/apps/deploy/deploy-polls", () => {
 });
 
 vi.mock("@/app/(app)/apps/servers/servers-polls", () => ({
-    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1)
+    serverEdge: forward(() => import("@/app/(app)/apps/servers/actions"), "serverEdgeAction", 1),
+    enrollmentStatus: forward(
+        () => import("@/app/(app)/apps/servers/actions"),
+        "enrollmentStatusAction",
+        1
+    )
 }));
 
 vi.mock("@/app/(app)/apps/agents/sessions/sessions-polls", () => ({
@@ -95,3 +100,44 @@ vi.mock("@/app/(app)/admin/inbox/inbox-polls", () => {
         channelState: forward(actions, "channelStateAction", 1)
     };
 });
+
+vi.mock("@/app/(app)/apps/mail-server/mail-server-polls", () => ({
+    serverDetail: forward(
+        () => import("@/app/(app)/apps/mail-server/actions"),
+        "serverDetailAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/automations/automations-polls", () => ({
+    run: forward(() => import("@/app/(app)/automations/actions"), "getRunAction", 1)
+}));
+
+vi.mock("@/app/(app)/admin/settings/settings-polls", () => ({
+    updateStatus: forward(
+        () => import("@/app/(app)/admin/settings/actions"),
+        "checkUpdatesAction",
+        1
+    )
+}));
+
+vi.mock("@/app/(app)/account/domains/domains-polls", () => ({
+    ownerDomain: forward(
+        () => import("@/app/(app)/account/domains/actions"),
+        "readOwnerDomainAction",
+        2
+    ),
+    dnsPropagation: forward(
+        () => import("@/app/(app)/account/domains/dns-actions"),
+        "dnsPropagationAction",
+        2
+    )
+}));
+
+vi.mock("@/app/m/[token]/guest-polls", () => ({
+    guestCall: forward(() => import("@/app/(app)/chat/meeting-actions"), "readCallAction", 1)
+}));
+
+vi.mock("@/app/oauth/recover/recover-polls", () => ({
+    recoveryStatus: forward(() => import("@/app/oauth/recover/actions"), "recoveryStatusAction", 1)
+}));

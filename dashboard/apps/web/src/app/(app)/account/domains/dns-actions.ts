@@ -18,7 +18,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
-import { domainCallerFor } from "@/lib/owner-domain-caller";
+import { dnsScopeSchema as scopeSchema, domainCallerFor } from "@/lib/owner-domain-caller";
 import { dnsRecordDraftSchema } from "@/lib/dns/record-schema";
 import type { PropagationReport } from "@/lib/dns/propagation";
 import { CloudflareApiError } from "@/lib/integrations/cloudflare-api";
@@ -34,17 +34,6 @@ import {
     type ZoneRecords
 } from "@/lib/dns/zone-records";
 
-const scopeSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("instance"), zoneId: z.string().max(64) }),
-    z.object({
-        kind: z.literal("owner"),
-        ref: z.discriminatedUnion("kind", [
-            z.object({ kind: z.literal("user") }),
-            z.object({ kind: z.literal("org"), orgId: z.string().uuid() })
-        ]),
-        domainId: z.string().uuid()
-    })
-]);
 
 /** What the editor sends to say which zone it is looking at. */
 export type DnsScopeRef = z.infer<typeof scopeSchema>;

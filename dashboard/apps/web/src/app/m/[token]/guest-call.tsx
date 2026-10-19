@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import * as polls from "./guest-polls";
 import { Loader2, Video } from "lucide-react";
 import { useCall } from "@/app/(app)/chat/use-call";
 import { CallRoom } from "@/app/(app)/chat/call-room";
@@ -23,11 +24,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input } from "@polaris/ui";
-import {
-    joinAsGuestAction,
-    joinOnLinkAction,
-    readCallAction
-} from "@/app/(app)/chat/meeting-actions";
+import { joinAsGuestAction, joinOnLinkAction } from "@/app/(app)/chat/meeting-actions";
 
 /** How often the lobby asks whether it has been let in. Often enough not to feel
  *  stuck, rarely enough that a forgotten tab is not a load. */
@@ -80,8 +77,12 @@ export function GuestCall({
     // Waiting at the door, asked for as well as listened for.
     useEffect(() => {
         if (!seat || seat.admission !== "waiting") return;
+        const controller = new AbortController();
         const timer = setInterval(async () => {
-            const result = await readCallAction(seat.meetingId);
+            const result = await polls
+                .guestCall(seat.meetingId, controller.signal)
+                .catch(() => null);
+            if (!result) return;
             const me = result.meeting?.participants.find(
                 (person) => person.id === result.participantId
             );
@@ -92,7 +93,10 @@ export function GuestCall({
                 setError(t("guestCall.denied"));
             }
         }, LOBBY_POLL_MS);
-        return () => clearInterval(timer);
+        return () => {
+            controller.abort();
+            clearInterval(timer);
+        };
     }, [seat, t]);
 
     if (seat?.admission === "admitted") {

@@ -32,6 +32,7 @@ import type { CheckedAddress } from "@/lib/address-health";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, useTransition } from "react";
+import * as polls from "./settings-polls";
 import {
     isRecentRun,
     isUpdateInFlight,
@@ -60,7 +61,6 @@ import {
     TriangleAlert
 } from "lucide-react";
 import {
-    checkUpdatesAction,
     saveAutoUpdateAction,
     saveLegalContactAction,
     saveUpdateSourceAction,
@@ -316,7 +316,7 @@ export function SettingsView({
             // whether Polaris was updated under this tab so the update notice
             // and its reload can take over.
             setCheckFailed(false);
-            const answer = await checkUpdatesAction(force).catch(async () => {
+            const answer = await polls.updateStatus(force).catch(async () => {
                 if (!(await checkForNewBuild()) && force) setCheckFailed(true);
                 return null;
             });

@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import * as polls from "../automations-polls";
 import {
     ArrowDown,
     ArrowLeft,
@@ -52,7 +53,6 @@ import {
     deleteAutomationAction,
     getAutomationAction,
     compareVersionsAction,
-    getRunAction,
     renameVersionAction,
     listVersionsAction,
     publishAction,
@@ -163,8 +163,9 @@ function useTestRun(runId: string | null): RunDetail | null {
         if (!runId) return setRun(null);
         let stopped = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
+        const controller = new AbortController();
         const load = async () => {
-            const answer = await getRunAction(runId).catch(() => null);
+            const answer = await polls.run(runId, controller.signal).catch(() => null);
             if (stopped) return;
             if (answer?.ok) setRun(answer.run);
             if (!answer?.ok || !core.runFinished(answer.run.status)) timer = setTimeout(load, 1500);
@@ -172,6 +173,7 @@ function useTestRun(runId: string | null): RunDetail | null {
         void load();
         return () => {
             stopped = true;
+            controller.abort();
             clearTimeout(timer);
         };
     }, [runId]);

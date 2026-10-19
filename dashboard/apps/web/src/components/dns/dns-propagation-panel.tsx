@@ -10,7 +10,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { PropagationReport } from "@/lib/dns/propagation";
-import { dnsPropagationAction, type DnsScopeRef } from "@/app/(app)/account/domains/dns-actions";
+import type { DnsScopeRef } from "@/app/(app)/account/domains/dns-actions";
+import * as polls from "@/app/(app)/account/domains/domains-polls";
 import { AlertTriangle, CheckCircle2, CircleSlash, Loader2, RefreshCw, XCircle } from "lucide-react";
 
 /** How long a record that has not settled waits between checks, and how many
@@ -36,7 +37,7 @@ export function PropagationPanel({ scope, recordId }: { scope: DnsScopeRef; reco
 
     const check = useCallback(async () => {
         setBusy(true);
-        const result = await dnsPropagationAction(scopeRef.current, recordId).catch(() => ({
+        const result = await polls.dnsPropagation(scopeRef.current, recordId).catch(() => ({
             error: t("propagation.askFailed"),
             report: undefined
         }));

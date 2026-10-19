@@ -12,3 +12,10 @@ type Answer<F extends (...args: never[]) => Promise<unknown>> = Awaited<ReturnTy
 
 export const serverEdge = (hostId: string, signal?: AbortSignal) =>
     readPoll<Answer<typeof actions.serverEdgeAction>>("/api/servers/edge", { hostId }, signal);
+
+export const enrollmentStatus = (id: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.enrollmentStatusAction>>(
+        "/api/servers/enrollment-status",
+        { id },
+        signal
+    );

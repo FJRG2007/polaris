@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import * as polls from "../mail-server-polls";
 import { useDisplayFormat } from "@/components/display-format";
 import { Button, ConfirmDeleteDialog, Select, Skeleton } from "@polaris/ui";
 import { Check, Circle, ExternalLink, Loader2, RefreshCw } from "lucide-react";
@@ -28,7 +29,6 @@ import {
     healthAction,
     removeServerAction,
     resumeSetupAction,
-    serverDetailAction,
     storedHealthAction,
     type MailServerDetail
 } from "../actions";
@@ -59,8 +59,9 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
     useEffect(() => {
         let stopped = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
+        const controller = new AbortController();
         const tick = async () => {
-            const answer = await serverDetailAction(serverId).catch(() => ({
+            const answer = await polls.serverDetail(serverId, controller.signal).catch(() => ({
                 error: t("common.unreachable")
             }));
             if (stopped) return;
@@ -76,6 +77,7 @@ export function OverviewTab({ serverId, seed }: { serverId: string; seed: Overvi
         void tick();
         return () => {
             stopped = true;
+            controller.abort();
             if (timer) clearTimeout(timer);
         };
     }, [serverId, busy, t]);

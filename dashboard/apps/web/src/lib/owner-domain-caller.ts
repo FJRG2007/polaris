@@ -10,12 +10,26 @@
  * make it callable from the browser.
  */
 
+import { z } from "zod";
 import { requireUser } from "@/lib/session";
 import type { DomainOwner } from "@/lib/owner-domains";
 import { requireOrgPermission } from "@/lib/orgs/org-service";
 
 /** Which shelf the caller says the domain is on. */
 export type DomainOwnerRef = { kind: "user" } | { kind: "org"; orgId: string };
+
+/** A `DomainOwnerRef` as the browser sends it. */
+export const domainOwnerRefSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("user") }),
+    z.object({ kind: z.literal("org"), orgId: z.string().uuid() })
+]);
+
+/** Which DNS zone the record editor is looking at: this Polaris's own, or a
+ *  domain of one's own. */
+export const dnsScopeSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("instance"), zoneId: z.string().max(64) }),
+    z.object({ kind: z.literal("owner"), ref: domainOwnerRefSchema, domainId: z.string().uuid() })
+]);
 
 export interface DomainCaller {
     readonly owner: DomainOwner;
