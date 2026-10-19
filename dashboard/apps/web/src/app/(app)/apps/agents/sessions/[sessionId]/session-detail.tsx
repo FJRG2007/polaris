@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useEffect, useRef, useState, useTransition } from "react";
+import * as polls from "../sessions-polls";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
 import { Check, CircleDot, Loader2, Send, Square, TriangleAlert } from "lucide-react";
@@ -119,8 +120,10 @@ export function SessionDetail({ session, events, messages }: Props) {
             return;
         }
         let stopped = false;
+        const controller = new AbortController();
         const read = () => {
-            void sessionScreenAction(session.id)
+            void polls
+                .sessionScreen(session.id, controller.signal)
                 .then((result) => {
                     if (stopped) return;
                     setBoot(bootProgress(result?.screen ?? ""));
@@ -134,6 +137,7 @@ export function SessionDetail({ session, events, messages }: Props) {
         const timer = setInterval(read, REFRESH_MS);
         return () => {
             stopped = true;
+            controller.abort();
             clearInterval(timer);
         };
     }, [session.id, session.state]);
