@@ -7,6 +7,7 @@ import type { UpdateNotice } from "@/lib/update";
 import { looksLikeAddress, readOrigin } from "@/lib/address";
 import { accountHost, describeAccount } from "@/lib/accounts";
 import { GeneratorPanel } from "./generator";
+import { Picker } from "./picker";
 import { CheckMark, CopyMark } from "./marks";
 import { ServersFold, ServersPanel } from "./servers";
 import {
@@ -1483,26 +1484,22 @@ function Timeout({
     const t = useWords();
     return (
         <div className="row">
-            <label className="muted small" htmlFor="vault-timeout">
+            <label className="muted small" id="vault-timeout-label" htmlFor="vault-timeout">
                 {t("popup.lockAfter")}
             </label>
             <div className="acts">
-                <select
+                <Picker
                     id="vault-timeout"
+                    aria-labelledby="vault-timeout-label"
                     value={status.timeoutMs}
-                    onChange={(event) => {
-                        void askBackground({
-                            kind: "setTimeout",
-                            timeoutMs: Number(event.target.value)
-                        }).then(onChange);
+                    options={timeoutChoices(t).map((choice) => ({
+                        value: choice.ms,
+                        label: choice.label
+                    }))}
+                    onChange={(timeoutMs) => {
+                        void askBackground({ kind: "setTimeout", timeoutMs }).then(onChange);
                     }}
-                >
-                    {timeoutChoices(t).map((choice) => (
-                        <option key={choice.ms} value={choice.ms}>
-                            {choice.label}
-                        </option>
-                    ))}
-                </select>
+                />
             </div>
         </div>
     );

@@ -226,18 +226,8 @@ input {
     font: inherit;
 }
 
-select {
-    padding: 4px 6px;
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    background: hsl(var(--field));
-    color: inherit;
-    font: inherit;
-    font-size: 12px;
-}
-
 input:focus-visible,
-select:focus-visible,
+.picker-list:focus-visible,
 button:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 1px;
@@ -1277,4 +1267,74 @@ button.danger {
 
 .install-line button.icon {
     flex: none;
+}
+
+/* The popup's own dropdown (picker.tsx), styled as the field it replaced. */
+.picker {
+    position: relative;
+    min-width: 0;
+}
+
+button.picker-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 4px 6px;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--field));
+    color: inherit;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.picker-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.picker-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 20;
+    min-width: 100%;
+    max-height: 200px;
+    margin: 0;
+    padding: 4px;
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: var(--radius);
+    background: hsl(var(--elevated));
+    box-shadow: 0 8px 24px hsl(0 0% 0% / 0.35);
+}
+
+.picker-list.up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.picker-list [role="option"] {
+    padding: 5px 8px;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.picker-list [role="option"].active {
+    background: hsl(var(--border));
+}
+
+.picker-list [role="option"][aria-selected="true"] {
+    box-shadow: inset 2px 0 0 hsl(var(--primary));
+    font-weight: 600;
+}
+
+.picker-list [role="option"][aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: default;
 }

@@ -19,6 +19,7 @@ import {
     CardBody,
     ConfirmDeleteDialog,
     EmptyState,
+    Select,
     Skeleton,
     Switch
 } from "@polaris/ui";
@@ -151,20 +152,19 @@ export function SecurityView() {
                     <p className="text-sm text-muted-foreground">{t("intro")}</p>
                 </div>
                 {servers && servers.length > 0 ? (
-                    <label className="flex min-w-0 items-center gap-2 text-sm">
+                    <div className="flex min-w-0 items-center gap-2 text-sm">
                         <span className="shrink-0">{t("server")}</span>
-                        <select
-                            className="h-8 min-w-0 max-w-[16rem] truncate rounded-md border border-border bg-background px-2"
+                        <Select
+                            className="h-8 min-w-0 max-w-[16rem]"
                             value={current ?? ""}
-                            onChange={(event) => setServerId(event.target.value)}
-                        >
-                            {servers.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.local ? `${s.name} (${t("thisServer")})` : s.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
+                            onValueChange={setServerId}
+                            aria-label={t("server")}
+                            options={servers.map((s) => ({
+                                value: s.id,
+                                label: s.local ? `${s.name} (${t("thisServer")})` : s.name
+                            }))}
+                        />
+                    </div>
                 ) : null}
             </header>
 
@@ -381,17 +381,16 @@ function FilesPanel({
             <CardBody className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">{t("files.hint")}</p>
                 <div className="flex flex-wrap items-end gap-2">
-                    <select
-                        className="h-8 min-w-0 max-w-full rounded-md border border-border bg-background px-2 text-sm"
+                    <Select
+                        className="h-8 w-auto min-w-0 max-w-full"
                         value={volumeId}
-                        onChange={(event) => setVolumeId(event.target.value)}
-                    >
-                        {overview.volumes.map((volume) => (
-                            <option key={volume.id} value={volume.id}>
-                                {volume.label}
-                            </option>
-                        ))}
-                    </select>
+                        onValueChange={setVolumeId}
+                        aria-label={t("files.volume")}
+                        options={overview.volumes.map((volume) => ({
+                            value: volume.id,
+                            label: volume.label
+                        }))}
+                    />
                     <input
                         className="h-8 min-w-0 rounded-md border border-border bg-background px-2 text-sm"
                         placeholder={t("malware.folder")}
@@ -515,16 +514,21 @@ function HostPanel({
                         />
                     </div>
                 </div>
-                <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span className="min-w-0">
                         <span className="block font-medium">{t("host.schedule")}</span>
                         <span className="text-muted-foreground">{t("host.scheduleHint")}</span>
                     </span>
-                    <select
-                        className="h-8 rounded-md border border-border bg-background px-2"
-                        value={every}
-                        onChange={(event) => {
-                            const next = Number(event.target.value);
+                    <Select
+                        className="h-8 w-auto"
+                        value={String(every)}
+                        aria-label={t("host.schedule")}
+                        options={SCHEDULES.map((hours) => ({
+                            value: String(hours),
+                            label: t(`host.every.${hours}` as never)
+                        }))}
+                        onValueChange={(value) => {
+                            const next = Number(value);
                             if (next === every) return;
                             const previous = every;
                             setEvery(next);
@@ -537,14 +541,8 @@ function HostPanel({
                                 return result;
                             });
                         }}
-                    >
-                        {SCHEDULES.map((hours) => (
-                            <option key={hours} value={hours}>
-                                {t(`host.every.${hours}` as never)}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                    />
+                </div>
             </CardBody>
         </Card>
     );

@@ -68,6 +68,15 @@ export function FoldMark(): React.JSX.Element {
     );
 }
 
+/** Open a dropdown: the chevron pointing down. */
+export function OpenMark(): React.JSX.Element {
+    return (
+        <svg className="mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+        </svg>
+    );
+}
+
 /** Give it another name: a pencil. */
 export function PencilMark(): React.JSX.Element {
     return (

@@ -42,7 +42,8 @@
         "changes": "{added} añadidos, {removed} eliminados, {changed} cambiados",
         "added": "Añadido",
         "removed": "Eliminado",
-        "changed": "Cambiado"
+        "changed": "Cambiado",
+        "volume": "Volumen"
     },
     "host": {
         "hint": "Audita los ajustes del propio servidor con comprobaciones de endurecimiento. El sistema solo se lee.",
