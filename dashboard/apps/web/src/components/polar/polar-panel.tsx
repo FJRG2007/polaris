@@ -69,6 +69,7 @@ import {
     type SuggestionListItem
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -1373,11 +1374,53 @@ function MessageView({
     const t = useTranslations("polar");
     const mine = message.role === "user";
     const from = mine ? "user" : "assistant";
-    const meta = (message.metadata ?? {}) as { fellBackFrom?: string | null };
+    const meta = (message.metadata ?? {}) as {
+        fellBackFrom?: string | null;
+        workedMs?: number;
+    };
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) => tools[name]?.title ?? name;
     const { copied, copy } = useCopied();
+    const toolOf = (part: UIMessage["parts"][number]) => {
+        if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
+        const tool = part as unknown as ToolPart;
+        const name = part.type === "dynamic-tool" ? (tool.toolName ?? "tool") : part.type.slice(5);
+        return { tool, name };
+    };
+    // Thinking and tool calls fold into one line above the answer. A call
+    // waiting for (or given) an approval and a call that failed stay in view.
+    const folded = (part: UIMessage["parts"][number]) => {
+        if (part.type === "reasoning") return true;
+        const found = toolOf(part);
+        return !!found && !found.tool.approval && found.tool.state !== "output-error";
+    };
+    const work = message.parts.filter(folded);
+    const toolParts = message.parts.flatMap((part) => {
+        const found = toolOf(part);
+        return found ? [found] : [];
+    });
+    const failed = toolParts.filter(({ tool }) => tool.state === "output-error").length;
+    const lastWork = message.parts
+        .filter((part) => folded(part) || toolOf(part)?.tool.state === "output-error")
+        .at(-1);
+    const lastTool = lastWork ? toolOf(lastWork) : null;
+    const current =
+        lastTool && (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
+            ? toolName(lastTool.name)
+            : null;
+    const workIndex = message.parts.findIndex(folded);
+    const renderTool = (part: UIMessage["parts"][number], index: number, opened = false) => {
+        const found = toolOf(part);
+        if (!found) return null;
+        const { tool, name } = found;
+        return (
+            <Tool key={index} title={toolName(name)} state={tool.state} defaultOpen={opened}>
+                <ToolInput input={tool.input} />
+                <ToolOutput output={tool.output} errorText={tool.errorText} />
+            </Tool>
+        );
+    };
     return (
         <Message from={from}>
             {meta.fellBackFrom ? (
@@ -1399,6 +1442,34 @@ function MessageView({
                 </Attachments>
             ) : null}
             {message.parts.map((part, index) => {
+                if (index === workIndex) {
+                    return (
+                        <Work
+                            key={`work-${index}`}
+                            messageId={message.id}
+                            streaming={streaming}
+                            current={current}
+                            tools={toolParts.length}
+                            failed={failed}
+                            seconds={
+                                typeof meta.workedMs === "number"
+                                    ? Math.max(1, Math.round(meta.workedMs / 1000))
+                                    : null
+                            }
+                        >
+                            {work.map((entry) =>
+                                entry.type === "reasoning" ? (
+                                    <Reasoning key={message.parts.indexOf(entry)} isStreaming={false}>
+                                        {entry.text}
+                                    </Reasoning>
+                                ) : (
+                                    renderTool(entry, message.parts.indexOf(entry))
+                                )
+                            )}
+                        </Work>
+                    );
+                }
+                if (folded(part)) return null;
                 if (part.type === "text") {
                     if (!part.text.trim()) return null;
                     return (
@@ -1411,22 +1482,9 @@ function MessageView({
                         </MessageContent>
                     );
                 }
-                if (part.type === "reasoning") {
-                    return (
-                        <Reasoning
-                            key={index}
-                            isStreaming={streaming && index === message.parts.length - 1}
-                        >
-                            {part.text}
-                        </Reasoning>
-                    );
-                }
-                if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
-                    const tool = part as unknown as ToolPart;
-                    const name =
-                        part.type === "dynamic-tool"
-                            ? (tool.toolName ?? "tool")
-                            : part.type.slice(5);
+                const found = toolOf(part);
+                if (found) {
+                    const { tool, name } = found;
                     const described = tools[name];
                     if (tool.approval) {
                         return (
@@ -1443,12 +1501,9 @@ function MessageView({
                             />
                         );
                     }
-                    return (
-                        <Tool key={index} title={toolName(name)} state={tool.state}>
-                            <ToolInput input={tool.input} />
-                            <ToolOutput output={tool.output} errorText={tool.errorText} />
-                        </Tool>
-                    );
+                    // A failed call stays in view, opened: it may be why the
+                    // answer reads the way it does.
+                    return renderTool(part, index, true);
                 }
                 return null;
             })}

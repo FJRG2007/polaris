@@ -246,7 +246,10 @@ describe("what a request has to look like", () => {
     it("streams an answer and saves the turn", async () => {
         const answer = await post(body());
         expect(answer.status).toBe(200);
-        expect(await answer.text()).toContain("Done.");
+        const text = await answer.text();
+        expect(text).toContain("Done.");
+        // How long the turn worked, for the line its steps fold into.
+        expect(text).toMatch(/"workedMs":\d+/);
         expect(state.saved).toHaveLength(1);
     });
 

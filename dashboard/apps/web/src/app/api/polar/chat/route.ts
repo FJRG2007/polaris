@@ -120,6 +120,7 @@ export async function POST(request: Request): Promise<Response> {
             ? body.data.parentId
             : (list[index - 1]?.id ?? null);
 
+    const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
         system: polarSystemPrompt(user.name, fencePageContext(body.data.context)),
@@ -142,7 +143,10 @@ export async function POST(request: Request): Promise<Response> {
                       payer: resolved.credential.source,
                       fellBackFrom
                   }
-                : undefined,
+                : part.type === "finish"
+                  ? // How long the turn worked, for the line its steps fold into.
+                    { workedMs: Date.now() - startedAt }
+                  : undefined,
         onFinish: async ({ messages: finished }) => {
             try {
                 await savePolarMessages(user.id, body.data.threadId, finished, (index) =>

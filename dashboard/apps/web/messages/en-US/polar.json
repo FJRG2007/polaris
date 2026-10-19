@@ -152,6 +152,12 @@
             "output-denied": "Not run"
         }
     },
+    "work": {
+        "done": "Worked for {seconds} s - {tools, plural, one {# tool} other {# tools}}",
+        "used": "{tools, plural, one {Used # tool} other {Used # tools}}",
+        "running": "{step}...",
+        "failed": "{count, plural, one {# step failed} other {# steps failed}}"
+    },
     "files": {
         "add": "Attach files",
         "remove": "Remove {name}",
