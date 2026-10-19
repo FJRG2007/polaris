@@ -26,7 +26,5 @@ CREATE INDEX IF NOT EXISTS "VaultPasskey_userId_idx" ON "VaultPasskey"("userId")
 CREATE UNIQUE INDEX IF NOT EXISTS "VaultPasskey_userId_credentialId_key" ON "VaultPasskey"("userId", "credentialId");
 
 -- AddForeignKey
-DO $$ BEGIN
-    ALTER TABLE "VaultPasskey" ADD CONSTRAINT "VaultPasskey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "VaultAccount"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "VaultPasskey" DROP CONSTRAINT IF EXISTS "VaultPasskey_userId_fkey";
+ALTER TABLE "VaultPasskey" ADD CONSTRAINT "VaultPasskey_userId_fkey" FOREIGN KEY ("userId") REFERENCES "VaultAccount"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
