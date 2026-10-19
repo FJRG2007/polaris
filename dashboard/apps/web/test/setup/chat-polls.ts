@@ -3,7 +3,7 @@
 // the reads used to call. Forward to whatever a test file mocked there, so each
 // file keeps saying what the server answers in one place. A file that mocks
 // neither gets empty answers, never a network call. The routes themselves are
-// tested on their own, with the real module (`vi.importActual`).
+// tested on their own, in `test/chat/chat-poll-routes.test.ts`.
 import { vi } from "vitest";
 
 vi.mock("@/app/(app)/chat/chat-polls", () => ({

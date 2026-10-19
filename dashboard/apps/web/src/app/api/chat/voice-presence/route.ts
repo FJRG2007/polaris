@@ -17,11 +17,11 @@ import { voicePresence } from "@/lib/chat/meetings";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** More rooms than any rail lists, so a crafted request cannot ask for the
- *  whole table at once. */
+/** How many rooms one request is answered for, so a crafted request cannot ask
+ *  for the whole table at once; ids past it are dropped rather than refused. */
 const MAX_ROOMS = 200;
 
-const idsSchema = z.array(z.string().uuid()).max(MAX_ROOMS);
+const idsSchema = z.array(z.string().uuid());
 
 export async function GET(request: Request): Promise<Response> {
     const user = await backgroundUser();
@@ -29,7 +29,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     if (!(await sessionCan(user, "chat.use"))) return NextResponse.json({ inRoom: {} });
     const raw = new URL(request.url).searchParams.get("ids") ?? "";
-    const parsed = idsSchema.safeParse(raw ? raw.split(",") : []);
+    const parsed = idsSchema.safeParse(raw ? raw.split(",").slice(0, MAX_ROOMS) : []);
     // i18n-ignore: a status body the voice rail never shows
     if (!parsed.success) return NextResponse.json({ error: "Bad ids" }, { status: 400 });
     const reachable = await reachableChannelIds({ id: user.id });
