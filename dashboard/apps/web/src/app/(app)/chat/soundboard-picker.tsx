@@ -97,9 +97,22 @@ const boards = new Map<string, CallSoundboard>();
  *  two calls. Replaced the moment this call's own answer arrives. */
 let lastBoard: CallSoundboard | null = null;
 
+/** What a call this tab has not asked about yet opens on: another call's sounds,
+ *  but none of what that call's space decided - its refusal, its own section,
+ *  its manage link - since this call may be in a different space. */
+function borrowedBoard(): CallSoundboard | null {
+    if (!lastBoard) return null;
+    return {
+        ...lastBoard,
+        refusal: null,
+        manageSpaceId: null,
+        groups: lastBoard.groups.map((group) => ({ ...group, here: false }))
+    };
+}
+
 /** Ask what this call's picker offers. A route, not an action - see
  *  `api/chat/meetings/[meetingId]/soundboard`. Nothing at all on a failure:
- *  the picker keeps whatever it last showed. */
+ *  the picker keeps this call's last answer, never one borrowed from another. */
 async function fetchBoard(meetingId: string): Promise<CallSoundboard | null> {
     try {
         const response = await fetch(
@@ -167,7 +180,7 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
     const t = useTranslations("chat");
     const [open, setOpen] = useState(false);
     const [board, setBoard] = useState<CallSoundboard | null>(
-        () => boards.get(meetingId) ?? lastBoard
+        () => boards.get(meetingId) ?? borrowedBoard()
     );
     const trigger = useRef<HTMLButtonElement>(null);
     const panel = useRef<HTMLDivElement>(null);
@@ -177,7 +190,10 @@ export function SoundboardButton({ meetingId, call }: { meetingId: string; call:
     // allowed before anybody presses it, and again each time the picker opens.
     const load = useCallback(() => {
         void fetchBoard(meetingId).then((answer) => {
-            if (!answer) return;
+            if (!answer) {
+                if (!boards.has(meetingId)) setBoard(null);
+                return;
+            }
             boards.set(meetingId, answer);
             lastBoard = answer;
             setBoard(answer);

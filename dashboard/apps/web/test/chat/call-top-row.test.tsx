@@ -14,13 +14,12 @@
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CallState } from "@/app/(app)/chat/use-call";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const recording = { supported: true, seconds: 0, start: () => undefined, stop: () => undefined };
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => ({ recording }) }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
 vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
-    callSoundboardAction: async () => ({}),
     favoriteSoundAction: async () => ({}),
     playSoundAction: async () => ({})
 }));
@@ -78,6 +77,13 @@ function callWith(screens: ReadonlyMap<string, MediaStream> = new Map()): CallSt
         }
     }) as unknown as CallState;
 }
+
+beforeEach(() => {
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({ error: "Not in this call." }, { status: 410 }))
+    );
+});
 
 afterEach(cleanup);
 

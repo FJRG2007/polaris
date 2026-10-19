@@ -568,24 +568,6 @@ dialog.pdfSlick-dialog .dialogButton {
 }
 
 /*
- * A hand going up in a call.
- *
- * The one animation here that is not decoration. A raised hand is somebody
- * asking to speak, and it appears on a screen whose whole job is faces moving -
- * a badge that simply materialised among them is a badge the eye never catches.
- * The movement is what makes it a gesture rather than another status light.
- *
- * One pass and done, unlike the ornaments above: it plays when the badge mounts,
- * which is the moment the hand went up, and a hand that kept waving for the four
- * minutes it stays up would be unreadable next to the person's face. Rises,
- * overshoots once, waves twice and settles level - so the frame it stops on is
- * the frame it holds for the rest of the call.
- *
- * Every keyframe writes the same three functions in the same order. A transform
- * list that changes shape between frames is interpolated as a whole rather than
- * per function, which is a visible jump in the middle of a 700ms animation.
- */
-/*
  * A call control under the pointer: its icon gives a small turn and settles,
  * the way a voice client answers a hover - instead of the button changing
  * colour, which on a tinted control (a muted microphone, a camera that is on)
@@ -619,6 +601,24 @@ dialog.pdfSlick-dialog .dialogButton {
     }
 }
 
+/*
+ * A hand going up in a call.
+ *
+ * The one animation here that is not decoration. A raised hand is somebody
+ * asking to speak, and it appears on a screen whose whole job is faces moving -
+ * a badge that simply materialised among them is a badge the eye never catches.
+ * The movement is what makes it a gesture rather than another status light.
+ *
+ * One pass and done, unlike the ornaments above: it plays when the badge mounts,
+ * which is the moment the hand went up, and a hand that kept waving for the four
+ * minutes it stays up would be unreadable next to the person's face. Rises,
+ * overshoots once, waves twice and settles level - so the frame it stops on is
+ * the frame it holds for the rest of the call.
+ *
+ * Every keyframe writes the same three functions in the same order. A transform
+ * list that changes shape between frames is interpolated as a whole rather than
+ * per function, which is a visible jump in the middle of a 700ms animation.
+ */
 @keyframes polaris-hand-up {
     0% {
         transform: translateY(0.4rem) scale(0.8) rotate(0deg);

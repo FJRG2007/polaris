@@ -38,6 +38,11 @@ import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
  */
 const ASKED = "polaris.call.elsewhere.dismissed";
 
+/** How long a call this browser just hung up is not offered back to it: long
+ *  enough for the leave to land on the server, short enough that rejoining it
+ *  from another device a moment later is still noticed here. */
+const LEAVE_WINDOW_MS = 10_000;
+
 /** The call dismissed in this browser, or null. Storage can be refused (a
  *  private window, blocked site data), and then nothing was dismissed. */
 function readDismissed(): string | null {
@@ -68,8 +73,13 @@ export function CallElsewhere() {
             held.current = session.meetingId;
             left.current = null;
         } else if (held.current) {
-            left.current = held.current;
+            const meetingId = held.current;
+            left.current = meetingId;
             held.current = null;
+            const timer = window.setTimeout(() => {
+                if (left.current === meetingId) left.current = null;
+            }, LEAVE_WINDOW_MS);
+            return () => window.clearTimeout(timer);
         }
     }, [session]);
 
@@ -80,9 +90,10 @@ export function CallElsewhere() {
             setFound(null);
             return;
         }
-        void askCallElsewhere().then((call) =>
-            setFound(call && call.meetingId === left.current ? null : call)
-        );
+        void askCallElsewhere().then((call) => {
+            if (call?.meetingId !== left.current) left.current = null;
+            setFound(call && call.meetingId === left.current ? null : call);
+        });
     }, [session]);
 
     useEffect(() => {

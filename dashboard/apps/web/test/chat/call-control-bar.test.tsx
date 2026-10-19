@@ -12,14 +12,13 @@
 import { CallRoom } from "@/app/(app)/chat/call-room";
 import type { CallState } from "@/app/(app)/chat/use-call";
 import { NOISE_LEVELS } from "@/app/(app)/chat/mic-cleanup";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 
 const recording = { supported: true, seconds: 0, start: () => undefined, stop: () => undefined };
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => ({ recording }) }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
 vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
-    callSoundboardAction: async () => ({}),
     favoriteSoundAction: async () => ({}),
     playSoundAction: async () => ({})
 }));
@@ -110,6 +109,13 @@ function barWidth(width: number): void {
         }
     );
 }
+
+beforeEach(() => {
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({ error: "Not in this call." }, { status: 410 }))
+    );
+});
 
 afterEach(() => {
     cleanup();
