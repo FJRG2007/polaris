@@ -25,7 +25,10 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
         return answer(
-            { error: issue?.message ?? (await readerWords("api"))("errors.checkMessage"), field: String(issue?.path[0] ?? "") },
+            {
+                error: issue?.message ?? (await readerWords("api"))("errors.checkMessage"),
+                field: String(issue?.path[0] ?? "")
+            },
             400
         );
     }

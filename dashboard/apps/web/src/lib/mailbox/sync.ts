@@ -894,7 +894,7 @@ async function storeMessages(
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
-                    message.headers["return-receipt-to"]
+                        message.headers["return-receipt-to"]
                 ),
                 headers: message.headers,
                 attachments: {

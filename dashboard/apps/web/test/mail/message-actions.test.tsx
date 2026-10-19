@@ -69,7 +69,10 @@ const queued: Record<string, unknown>[] = [];
 vi.mock("@/app/(app)/mail/outbox", () => ({
     queueMessage: async (message: Record<string, unknown>) => {
         queued.push(message);
-        return { draftId: "0190c1d2-0000-7000-8000-0000000000aa", sendAt: new Date().toISOString() };
+        return {
+            draftId: "0190c1d2-0000-7000-8000-0000000000aa",
+            sendAt: new Date().toISOString()
+        };
     },
     undoSend: async () => ({ undone: true }),
     isRefused: (outcome: object) => "error" in outcome
@@ -227,7 +230,10 @@ describe("the open message's own buttons", () => {
         expect(sent.body).toBe("🎉");
         expect(sent.inReplyToId).toBe(ORIGINAL.id);
         // Reply to all, without the reader's own address.
-        const people = [...(sent.to as { address: string }[]), ...(sent.cc as { address: string }[])];
+        const people = [
+            ...(sent.to as { address: string }[]),
+            ...(sent.cc as { address: string }[])
+        ];
         expect(people.map((person) => person.address).sort()).toEqual([
             "ana@example.test",
             "ben@example.test"

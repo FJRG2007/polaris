@@ -30,7 +30,13 @@ import { addressesFrom, asJson, stringsFrom } from "./json";
 import { withImap, type MailConnectionSource } from "./imap";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount } from "./access";
 import { composeMime, sendMime, MailRejectedError, type OutgoingMessage } from "./send";
-import { announcePartial, announceUnsent, recordSend, recordSentCopy, type MailSentCopy } from "./delivery";
+import {
+    announcePartial,
+    announceUnsent,
+    recordSend,
+    recordSentCopy,
+    type MailSentCopy
+} from "./delivery";
 
 /** What the composer sends up. */
 export interface ComposeInput {
@@ -456,13 +462,14 @@ export async function outgoingFromDraft(
         subject: draft.subject,
         // A reaction is one emoji and nothing else: a signature under it would
         // be the whole of what a client that cannot draw reactions shows.
-        body: how.signature && !draft.reaction
-            ? withSignature(draft.body, signature, {
-                  above: account.signatureAboveQuote,
-                  auto: account.signatureAuto,
-                  answering: Boolean(draft.inReplyToHeader)
-              })
-            : draft.body,
+        body:
+            how.signature && !draft.reaction
+                ? withSignature(draft.body, signature, {
+                      above: account.signatureAboveQuote,
+                      auto: account.signatureAuto,
+                      answering: Boolean(draft.inReplyToHeader)
+                  })
+                : draft.body,
         attachments,
         inReplyTo: draft.inReplyToHeader,
         references: stringsFrom(draft.references),

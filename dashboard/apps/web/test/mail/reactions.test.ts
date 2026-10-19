@@ -127,11 +127,15 @@ describe("the queue refusing what is not a reaction", () => {
     it("refuses words, a reaction to nothing, and a crowd past Gmail's limit", () => {
         expect(core.mailComposeSchema.safeParse({ ...valid, reaction: "yes" }).success).toBe(false);
         expect(
-            core.mailComposeSchema.safeParse({ ...valid, inReplyToId: null, reaction: "👍" }).success
+            core.mailComposeSchema.safeParse({ ...valid, inReplyToId: null, reaction: "👍" })
+                .success
         ).toBe(false);
-        const crowd = Array.from({ length: core.MAIL_REACTION_MOST_RECIPIENTS + 1 }, (_, index) => ({
-            address: `person${index}@example.test`
-        }));
+        const crowd = Array.from(
+            { length: core.MAIL_REACTION_MOST_RECIPIENTS + 1 },
+            (_, index) => ({
+                address: `person${index}@example.test`
+            })
+        );
         expect(
             core.mailComposeSchema.safeParse({ ...valid, to: crowd, reaction: "👍" }).success
         ).toBe(false);

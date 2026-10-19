@@ -368,7 +368,8 @@ export function ThreadView({
                             label: t("view.undoReaction"),
                             run: async () => {
                                 const undone = await outbox.undoSend(outcome.draftId);
-                                if (outbox.isRefused(undone)) return mailRefusalText(t, undone.error);
+                                if (outbox.isRefused(undone))
+                                    return mailRefusalText(t, undone.error);
                                 if (!undone.undone) return t("view.reactionGone");
                                 await discardDraftAction(outcome.draftId);
                                 drop();
@@ -1184,219 +1185,231 @@ function MessageCard({
                 than the actions inside the header: it is a button that folds
                 the message, and a button inside a button is not one. */}
             <div className="flex w-full items-start">
-            <button
-                type="button"
-                className={cn(
-                    "flex min-w-0 flex-1 items-baseline gap-2 px-3 text-left",
-                    open ? "items-start py-2" : "py-1.5"
-                )}
-                aria-expanded={open}
-                onClick={onToggle}
-            >
-                {/* Who wrote it, before the name is read - the same face the
+                <button
+                    type="button"
+                    className={cn(
+                        "flex min-w-0 flex-1 items-baseline gap-2 px-3 text-left",
+                        open ? "items-start py-2" : "py-1.5"
+                    )}
+                    aria-expanded={open}
+                    onClick={onToggle}
+                >
+                    {/* Who wrote it, before the name is read - the same face the
                     row in the list has, initials and all when there is no
                     picture to be had. */}
-                {sender ? (
-                    <SenderFace
-                        name={sender.name}
-                        address={sender.address}
-                        size={open ? 32 : 20}
-                        className={open ? undefined : "self-center"}
-                    />
-                ) : null}
-                {open ? (
-                    // Each person is a chip rather than text: copy under the
-                    // pointer, and the rest on the right-click. See
-                    // `address-chip`. The div is not a button - it sits inside
-                    // one - so the chips stop the click that would collapse the
-                    // message when somebody is acting on an address in it.
-                    <div
-                        className="min-w-0 flex-1"
-                        onClick={(event) => event.stopPropagation()}
-                        onContextMenu={(event) => event.stopPropagation()}
-                        role="presentation"
-                    >
-                        <div className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-foreground">
-                            {sender ? (
-                                <AddressChip
-                                    entry={sender}
-                                    accountId={accountId}
-                                    onBlock={onBlock}
-                                />
-                            ) : (
-                                <span className="truncate">{t("view.nobody")}</span>
-                            )}
-                        </div>
-                        {/* A message delivered with nobody in its To line is a
+                    {sender ? (
+                        <SenderFace
+                            name={sender.name}
+                            address={sender.address}
+                            size={open ? 32 : 20}
+                            className={open ? undefined : "self-center"}
+                        />
+                    ) : null}
+                    {open ? (
+                        // Each person is a chip rather than text: copy under the
+                        // pointer, and the rest on the right-click. See
+                        // `address-chip`. The div is not a button - it sits inside
+                        // one - so the chips stop the click that would collapse the
+                        // message when somebody is acting on an address in it.
+                        <div
+                            className="min-w-0 flex-1"
+                            onClick={(event) => event.stopPropagation()}
+                            onContextMenu={(event) => event.stopPropagation()}
+                            role="presentation"
+                        >
+                            <div className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-foreground">
+                                {sender ? (
+                                    <AddressChip
+                                        entry={sender}
+                                        accountId={accountId}
+                                        onBlock={onBlock}
+                                    />
+                                ) : (
+                                    <span className="truncate">{t("view.nobody")}</span>
+                                )}
+                            </div>
+                            {/* A message delivered with nobody in its To line is a
                             blind copy, which is a fact about it rather than a
                             gap - "to nobody" read as a bug. The comma between two
                             addresses goes to the chip, which is what knows where
                             it actually ends; see `after` in `address-chip`. */}
-                        <div className="mt-0.5 flex flex-col gap-0.5 text-[12px] text-foreground-subtle">
-                            <RecipientRow
-                                label={t("view.to")}
-                                people={message.to}
-                                empty={t("view.undisclosed")}
-                            />
-                            {message.cc.length > 0 ? (
-                                <RecipientRow label={t("view.copyTo")} people={message.cc} />
-                            ) : null}
+                            <div className="mt-0.5 flex flex-col gap-0.5 text-[12px] text-foreground-subtle">
+                                <RecipientRow
+                                    label={t("view.to")}
+                                    people={message.to}
+                                    empty={t("view.undisclosed")}
+                                />
+                                {message.cc.length > 0 ? (
+                                    <RecipientRow label={t("view.copyTo")} people={message.cc} />
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ) : (
-                    <>
-                        <span
-                            className={cn(
-                                "w-40 shrink-0 truncate text-[13px]",
-                                message.seen
-                                    ? "text-muted-foreground"
-                                    : "font-semibold text-foreground"
-                            )}
-                        >
-                            {sender ? core.addressName(sender) : t("view.nobody")}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
-                            {message.snippet}
-                        </span>
-                        {/* The files are inside the message, which is folded
+                    ) : (
+                        <>
+                            <span
+                                className={cn(
+                                    "w-40 shrink-0 truncate text-[13px]",
+                                    message.seen
+                                        ? "text-muted-foreground"
+                                        : "font-semibold text-foreground"
+                                )}
+                            >
+                                {sender ? core.addressName(sender) : t("view.nobody")}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-[12px] text-foreground-subtle">
+                                {message.snippet}
+                            </span>
+                            {/* The files are inside the message, which is folded
                             here - and a thread whose list row has a paperclip
                             and whose messages show none reads as the files
                             having gone missing. */}
-                        {files.length > 0 ? (
-                            <span
-                                className="flex shrink-0 items-center gap-0.5 pl-2 text-[11px] text-foreground-subtle"
-                                title={files.map((file) => file.name).join(", ")}
-                                aria-label={
-                                    files.length === 1
-                                        ? t("view.oneAttachment", { name: files[0]!.name })
-                                        : t("view.attachments", { count: files.length })
-                                }
-                            >
-                                <Paperclip className="size-3.5 shrink-0" aria-hidden />
-                                {files.length > 1 ? files.length : null}
-                            </span>
-                        ) : null}
-                    </>
-                )}
-                <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
-                    {open
-                        ? format.dateTime(new Date(message.sentAt))
-                        : shortWhen(message.sentAt, format)}
-                </span>
-                <ChevronDown
-                    className={cn("size-4 shrink-0 text-foreground-subtle", open && "rotate-180")}
-                    aria-hidden
-                />
-            </button>
-            {/* What Gmail puts on every open message: its star, a reaction,
+                            {files.length > 0 ? (
+                                <span
+                                    className="flex shrink-0 items-center gap-0.5 pl-2 text-[11px] text-foreground-subtle"
+                                    title={files.map((file) => file.name).join(", ")}
+                                    aria-label={
+                                        files.length === 1
+                                            ? t("view.oneAttachment", { name: files[0]!.name })
+                                            : t("view.attachments", { count: files.length })
+                                    }
+                                >
+                                    <Paperclip className="size-3.5 shrink-0" aria-hidden />
+                                    {files.length > 1 ? files.length : null}
+                                </span>
+                            ) : null}
+                        </>
+                    )}
+                    <span className="ml-auto shrink-0 pl-2 text-[11px] text-foreground-subtle">
+                        {open
+                            ? format.dateTime(new Date(message.sentAt))
+                            : shortWhen(message.sentAt, format)}
+                    </span>
+                    <ChevronDown
+                        className={cn(
+                            "size-4 shrink-0 text-foreground-subtle",
+                            open && "rotate-180"
+                        )}
+                        aria-hidden
+                    />
+                </button>
+                {/* What Gmail puts on every open message: its star, a reaction,
                 Reply, and the rest behind a menu - aimed at this message, not
                 at the newest one, which is what the conversation's own
                 buttons answer. */}
-            {open ? (
-                <div className="flex shrink-0 items-center gap-0.5 py-1.5 pr-2">
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={starred ? t("view.unstarMessage") : t("view.starMessage")}
-                        title={starred ? t("view.unstarMessage") : t("view.starMessage")}
-                        aria-pressed={starred}
-                        onClick={star}
-                    >
-                        <Star
-                            className={cn("size-4 shrink-0", starred && "fill-current text-warning")}
-                            aria-hidden
-                        />
-                    </Button>
-                    {reactable ? (
-                        <EmojiPicker
-                            disabled={false}
-                            media={false}
-                            label={t("view.react")}
-                            triggerClassName="inline-flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            onEmoji={(emoji) => {
-                                // A space's own emoji is a token no other mail
-                                // client could draw, so only a real one is sent.
-                                if (core.isMailReaction(emoji)) onReact(emoji);
-                            }}
-                        />
-                    ) : null}
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={t("thread.reply")}
-                        title={t("thread.reply")}
-                        disabled={answering}
-                        onClick={() => onAnswer("reply")}
-                    >
-                        <Reply className="size-4 shrink-0" aria-hidden />
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={t("view.messageMore")}
-                                title={t("view.messageMore")}
-                            >
-                                <MoreVertical className="size-4 shrink-0" aria-hidden />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled={answering} onSelect={() => onAnswer("reply")}>
-                                <Reply className="size-3.5 shrink-0" aria-hidden />
-                                {t("thread.reply")}
-                            </DropdownMenuItem>
-                            {several ? (
+                {open ? (
+                    <div className="flex shrink-0 items-center gap-0.5 py-1.5 pr-2">
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={starred ? t("view.unstarMessage") : t("view.starMessage")}
+                            title={starred ? t("view.unstarMessage") : t("view.starMessage")}
+                            aria-pressed={starred}
+                            onClick={star}
+                        >
+                            <Star
+                                className={cn(
+                                    "size-4 shrink-0",
+                                    starred && "fill-current text-warning"
+                                )}
+                                aria-hidden
+                            />
+                        </Button>
+                        {reactable ? (
+                            <EmojiPicker
+                                disabled={false}
+                                media={false}
+                                label={t("view.react")}
+                                triggerClassName="inline-flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                onEmoji={(emoji) => {
+                                    // A space's own emoji is a token no other mail
+                                    // client could draw, so only a real one is sent.
+                                    if (core.isMailReaction(emoji)) onReact(emoji);
+                                }}
+                            />
+                        ) : null}
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("thread.reply")}
+                            title={t("thread.reply")}
+                            disabled={answering}
+                            onClick={() => onAnswer("reply")}
+                        >
+                            <Reply className="size-4 shrink-0" aria-hidden />
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("view.messageMore")}
+                                    title={t("view.messageMore")}
+                                >
+                                    <MoreVertical className="size-4 shrink-0" aria-hidden />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                     disabled={answering}
-                                    onSelect={() => onAnswer("reply-all")}
+                                    onSelect={() => onAnswer("reply")}
                                 >
-                                    <ReplyAll className="size-3.5 shrink-0" aria-hidden />
-                                    {t("thread.replyAll")}
+                                    <Reply className="size-3.5 shrink-0" aria-hidden />
+                                    {t("thread.reply")}
                                 </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuItem disabled={answering} onSelect={() => onAnswer("forward")}>
-                                <Forward className="size-3.5 shrink-0" aria-hidden />
-                                {t("thread.forward")}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => void onAct("unread")}>
-                                <Mail className="size-3.5 shrink-0" aria-hidden />
-                                {t("view.markMessageUnread")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={() =>
-                                    saveFile(
-                                        `/api/mail/export?messageId=${encodeURIComponent(message.id)}`,
-                                        "message.eml"
-                                    )
-                                }
-                            >
-                                <Download className="size-3.5 shrink-0" aria-hidden />
-                                {t("view.saveMessage")}
-                            </DropdownMenuItem>
-                            {sender && onBlock ? (
+                                {several ? (
+                                    <DropdownMenuItem
+                                        disabled={answering}
+                                        onSelect={() => onAnswer("reply-all")}
+                                    >
+                                        <ReplyAll className="size-3.5 shrink-0" aria-hidden />
+                                        {t("thread.replyAll")}
+                                    </DropdownMenuItem>
+                                ) : null}
                                 <DropdownMenuItem
-                                    onSelect={() => onBlock(accountId, sender.address)}
+                                    disabled={answering}
+                                    onSelect={() => onAnswer("forward")}
                                 >
-                                    <UserRoundX className="size-3.5 shrink-0" aria-hidden />
-                                    {t("view.blockMessageSender", {
-                                        sender: core.addressName(sender)
-                                    })}
+                                    <Forward className="size-3.5 shrink-0" aria-hidden />
+                                    {t("thread.forward")}
                                 </DropdownMenuItem>
-                            ) : null}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                className="text-danger"
-                                onSelect={() => void onAct("trash")}
-                            >
-                                <Trash2 className="size-3.5 shrink-0" aria-hidden />
-                                {t("view.trashMessage")}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            ) : null}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => void onAct("unread")}>
+                                    <Mail className="size-3.5 shrink-0" aria-hidden />
+                                    {t("view.markMessageUnread")}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() =>
+                                        saveFile(
+                                            `/api/mail/export?messageId=${encodeURIComponent(message.id)}`,
+                                            "message.eml"
+                                        )
+                                    }
+                                >
+                                    <Download className="size-3.5 shrink-0" aria-hidden />
+                                    {t("view.saveMessage")}
+                                </DropdownMenuItem>
+                                {sender && onBlock ? (
+                                    <DropdownMenuItem
+                                        onSelect={() => onBlock(accountId, sender.address)}
+                                    >
+                                        <UserRoundX className="size-3.5 shrink-0" aria-hidden />
+                                        {t("view.blockMessageSender", {
+                                            sender: core.addressName(sender)
+                                        })}
+                                    </DropdownMenuItem>
+                                ) : null}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                    className="text-danger"
+                                    onSelect={() => void onAct("trash")}
+                                >
+                                    <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                                    {t("view.trashMessage")}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                ) : null}
             </div>
 
             {open ? (
@@ -1710,10 +1723,7 @@ function MessageCard({
 
 /** Who reacted with one emoji, in words: the names when there are any, "You"
  *  for the reader's own reaction still on its way. */
-function reactionWho(
-    t: ReturnType<typeof useTranslations>,
-    chip: ReactionChip
-): string {
+function reactionWho(t: ReturnType<typeof useTranslations>, chip: ReactionChip): string {
     const names = chip.names.length > 0 ? chip.names.join(", ") : t("view.you");
     return t("view.reactedBy", { emoji: chip.emoji, names });
 }
