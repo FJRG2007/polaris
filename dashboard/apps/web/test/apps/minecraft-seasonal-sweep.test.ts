@@ -97,7 +97,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/speech-service", () => ({
     homeLanguage: async () => "en"
 }));
 
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/state", () => ({
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/state", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
     readEventState: () => ({ run: eventRunning ? { id: "run" } : null })
 }));
 
