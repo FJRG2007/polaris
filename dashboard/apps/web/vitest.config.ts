@@ -32,7 +32,8 @@ export default defineConfig({
         setupFiles: [
             "./test/setup/app-host.ts",
             "./test/setup/chat-polls.ts",
-            "./test/setup/app-polls.ts"
+            "./test/setup/app-polls.ts",
+            "./test/setup/layout-box.ts"
         ],
         testTimeout: 30_000,
         hookTimeout: 30_000
