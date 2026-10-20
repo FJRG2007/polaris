@@ -273,6 +273,7 @@ export function PolarToggle() {
 
 /** The side panel, rendered by the shell beside the content. */
 export function PolarAside() {
+    const t = useTranslations("polar");
     const { open, setOpen } = usePolar();
     const pathname = usePathname();
     const [width, setWidth] = useState(400);
@@ -302,7 +303,7 @@ export function PolarAside() {
     if (!presence.mounted) return null;
     return (
         <aside
-            aria-label="Polar"
+            aria-label={t("page.title")}
             data-state={presence.state}
             onAnimationEnd={presence.onAnimationEnd}
             style={{ ["--polar-width" as string]: `${width}px` }}
@@ -1183,7 +1184,7 @@ export function PolarChat({
                         </MessageAction>
                     ) : null}
                     <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
-                    <span className="text-sm font-semibold text-foreground">Polar</span>
+                    <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
                     <span className="flex-1" />
                     {fullPage ? (
                         !wide || collapsed ? (

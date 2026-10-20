@@ -38,7 +38,7 @@ export function SharedChat({ thread, signedIn }: { thread: SharedPolarThread; si
                             )}
                         >
                             <span className="sr-only">
-                                {message.role === "user" ? t("polarShare.you") : "Polar"}
+                                {t(message.role === "user" ? "polarShare.you" : "polarShare.assistant")}
                             </span>
                             {message.role === "user" ? (
                                 message.text

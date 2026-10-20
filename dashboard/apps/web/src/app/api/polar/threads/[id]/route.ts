@@ -54,8 +54,10 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
     const body = patchSchema.safeParse(await request.json().catch(() => null));
     if (!body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     const { title, queue, pinned, archived, projectId } = body.data;
+    const changing = pinned !== undefined || archived !== undefined || projectId !== undefined;
+    if (changing && user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     let found = true;
-    if (pinned !== undefined || archived !== undefined || projectId !== undefined)
+    if (changing)
         found = await changePolarThread(user.id, id.data, { pinned, archived, projectId });
     if (found && title !== undefined) found = await renamePolarThread(user.id, id.data, title);
     if (found && queue !== undefined) found = await setPolarQueue(user.id, id.data, queue);

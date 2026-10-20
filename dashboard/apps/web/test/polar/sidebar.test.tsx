@@ -9,7 +9,16 @@ import type { ReactNode } from "react";
 import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    renderHook,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 
 vi.mock("@ai-sdk/react", () => ({
     useChat: () => ({
@@ -45,14 +54,20 @@ const FILED = row("00000000-0000-4000-8000-000000000003", "Filed chat", {
     projectId: PROJECT.id
 });
 
+const OLD = row("00000000-0000-4000-8000-000000000004", "Old chat", {
+    updatedAt: "2024-01-01T00:00:00.000Z"
+});
+
 const calls: Array<{ url: string; method: string; body?: unknown }> = [];
 let refuse = false;
 let pinned = [PINNED];
+let more = false;
 
 beforeEach(() => {
     calls.length = 0;
     refuse = false;
     pinned = [PINNED];
+    more = false;
     const stored = new Map<string, string>();
     vi.stubGlobal("localStorage", {
         getItem: (key: string) => stored.get(key) ?? null,
@@ -68,9 +83,15 @@ beforeEach(() => {
             if (url === "/api/polar/models")
                 return Response.json({ providers: [], tools: {}, isAdmin: false });
             if (url === "/api/polar/threads")
-                return Response.json({ threads: [RECENT], pinned, projects: [PROJECT] });
+                return Response.json({ threads: [RECENT], more, pinned, projects: [PROJECT] });
             if (url.startsWith("/api/polar/threads?view=project"))
-                return Response.json({ threads: [FILED] });
+                return Response.json({ threads: [FILED], more });
+            if (url.startsWith("/api/polar/search")) return Response.json({ results: [OLD], more: false });
+            if (url.includes("cursor=")) return Response.json({ threads: [], more: false });
+            if (url === `/api/polar/threads/${OLD.id}` && method === "GET")
+                return Response.json({
+                    thread: { ...OLD, choice: null, queue: [], messages: [] }
+                });
             if (url.endsWith("/share") && method === "GET") return Response.json({ link: null });
             if (url.endsWith("/share") && method === "POST")
                 return Response.json({
@@ -88,6 +109,7 @@ afterEach(() => {
 });
 
 const { PolarChat } = await import("@/components/polar/polar-panel");
+const { usePolarSidebar } = await import("@/components/polar/use-polar-sidebar");
 
 function Wrapper({ children }: { children: ReactNode }) {
     return (
@@ -230,5 +252,64 @@ describe("the row menu", () => {
         const field = (await screen.findByLabelText("Public link")) as HTMLInputElement;
         expect(field.value).toBe("https://polaris.example/c/token");
         expect(screen.getByRole("button", { name: "Delete link" })).toBeTruthy();
+    });
+});
+
+describe("Show more", () => {
+    it("reads the next recents after the last one the server sent, not a chat found by search", async () => {
+        more = true;
+        await mountPage();
+        fireEvent.click(screen.getByRole("button", { name: "Search chats" }));
+        fireEvent.change(await screen.findByLabelText("Search titles and messages"), {
+            target: { value: "old" }
+        });
+        fireEvent.click(await screen.findByTitle("Old chat"));
+        await screen.findByText("Old chat");
+        const recents = screen.getByRole("button", { name: "Recents" }).parentElement as HTMLElement;
+        fireEvent.click(within(recents).getByRole("button", { name: "Show more" }));
+        await waitFor(() =>
+            expect(calls.some((call) => call.url.includes("cursor="))).toBe(true)
+        );
+        expect(calls.find((call) => call.url.includes("cursor="))?.url).toBe(
+            `/api/polar/threads?view=recent&cursor=${RECENT.id}`
+        );
+    });
+
+    it("pages a project's own chats", async () => {
+        more = true;
+        await mountPage();
+        fireEvent.click(screen.getByRole("button", { name: "Homelab" }));
+        await screen.findByText("Filed chat");
+        const project = screen.getByRole("button", { name: "Homelab" }).closest("div")
+            ?.parentElement as HTMLElement;
+        fireEvent.click(within(project).getByRole("button", { name: "Show more" }));
+        await waitFor(() =>
+            expect(calls.map((call) => call.url)).toContain(
+                `/api/polar/threads?view=project&project=${PROJECT.id}&cursor=${FILED.id}`
+            )
+        );
+    });
+});
+
+describe("the sidebar's state", () => {
+    it("reads an open project again when the list is shown again", async () => {
+        const { result, rerender } = renderHook(
+            ({ enabled }) => usePolarSidebar({ enabled, onRemoved: () => undefined }),
+            { wrapper: Wrapper, initialProps: { enabled: true } }
+        );
+        await waitFor(() => expect(result.current.rows).not.toBeNull());
+        act(() => result.current.openProject(PROJECT.id));
+        await waitFor(() =>
+            expect(result.current.rows?.some((entry) => entry.id === FILED.id)).toBe(true)
+        );
+        rerender({ enabled: false });
+        rerender({ enabled: true });
+        await waitFor(() =>
+            expect(calls.filter((call) => call.url.includes("view=project")).length).toBe(2)
+        );
+        await waitFor(() =>
+            expect(result.current.rows?.some((entry) => entry.id === FILED.id)).toBe(true)
+        );
+        expect(result.current.openProjects.has(PROJECT.id)).toBe(true);
     });
 });

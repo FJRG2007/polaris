@@ -42,6 +42,7 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
     const user = await apiUser();
     if (user instanceof NextResponse) return user;
+    if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
     return (await revokePolarShare(user.id, id.data))

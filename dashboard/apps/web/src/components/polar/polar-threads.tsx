@@ -61,7 +61,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PolarSidebar } from "@/components/polar/use-polar-sidebar";
+import { projectList, type PolarSidebar } from "@/components/polar/use-polar-sidebar";
 import * as polarShared from "@/lib/polar/shared";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 
@@ -148,7 +148,7 @@ export function PolarThreads({
         <nav aria-label={t("history.title")} className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex h-11 shrink-0 items-center gap-1 pl-4 pr-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-                    Polar
+                    {t("page.title")}
                 </span>
                 <IconButton label={t("history.search")} onClick={() => setSearching(true)}>
                     <Search className="size-4" />
@@ -175,6 +175,7 @@ export function PolarThreads({
                         {sections.pinned.length > 0 ? (
                             <Section id="polar-pinned" label={t("history.pinned")}>
                                 {sections.pinned.map(item)}
+                                <MoreButton sidebar={sidebar} list="pinned" />
                             </Section>
                         ) : null}
                         <Section id="polar-projects" label={t("history.projects")}>
@@ -195,7 +196,13 @@ export function PolarThreads({
                                     onDelete={() => setDeletingProject(project)}
                                 >
                                     {(sections.projects.get(project.id) ?? []).length > 0 ? (
-                                        (sections.projects.get(project.id) ?? []).map(item)
+                                        <>
+                                            {(sections.projects.get(project.id) ?? []).map(item)}
+                                            <MoreButton
+                                                sidebar={sidebar}
+                                                list={projectList(project.id)}
+                                            />
+                                        </>
                                     ) : (
                                         <p className="py-1.5 pl-9 pr-2 text-xs text-muted-foreground">
                                             {t("history.projectEmpty")}
@@ -245,16 +252,7 @@ export function PolarThreads({
                                             </div>
                                         ))
                                     )}
-                                    {sidebar.moreRecents ? (
-                                        <button
-                                            type="button"
-                                            onClick={sidebar.loadMore}
-                                            disabled={sidebar.loadingMore}
-                                            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
-                                        >
-                                            {t("history.more")}
-                                        </button>
-                                    ) : null}
+                                    <MoreButton sidebar={sidebar} list="recent" />
                                 </div>
                             )}
                         </div>
@@ -378,10 +376,26 @@ function Section({ id, label, children }: { id: string; label: string; children:
     );
 }
 
+/** "Show more" under a list the server has another page of. */
+function MoreButton({ sidebar, list }: { sidebar: PolarSidebar; list: string }) {
+    const t = useTranslations("polar");
+    if (!sidebar.hasMore(list)) return null;
+    return (
+        <button
+            type="button"
+            onClick={() => sidebar.loadMore(list)}
+            disabled={sidebar.isLoading(list)}
+            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+        >
+            {t("history.more")}
+        </button>
+    );
+}
+
 /** The classes of the "..." and pin buttons: hidden until the row is hovered,
  *  focused or open, always there on a touch screen. */
 const ROW_ACTION =
-    "inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity duration-fast hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100";
+    "inline-flex size-6 shrink-0 [@media(pointer:coarse)]:size-11 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity duration-fast hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100 group-focus-within/row:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100";
 
 function ProjectItem({
     project,
@@ -661,6 +675,8 @@ function SearchDialog({
     const [more, setMore] = useState(false);
     const [page, setPage] = useState(0);
     const [failed, setFailed] = useState(false);
+    /** The last archived chat the server sent: the next page starts after it. */
+    const archivedCursor = useRef<string | null>(null);
     const query = polarShared.searchTextSchema.safeParse(text);
     const words = query.success ? query.data : "";
 
@@ -672,14 +688,16 @@ function SearchDialog({
         const controller = new AbortController();
         const timer = window.setTimeout(
             () => {
+                const after = page > 0 ? archivedCursor.current : null;
                 const url = archived
-                    ? "/api/polar/threads?view=archived"
+                    ? `/api/polar/threads?view=archived${after ? `&cursor=${encodeURIComponent(after)}` : ""}`
                     : `/api/polar/search?q=${encodeURIComponent(words)}&page=${page}`;
                 setFailed(false);
                 fetch(url, { signal: controller.signal })
                     .then((response) => (response.ok ? response.json() : Promise.reject()))
                     .then((data: { threads?: PolarThreadRow[]; results?: PolarThreadRow[]; more?: boolean }) => {
                         const found = data.results ?? data.threads ?? [];
+                        if (archived) archivedCursor.current = found.at(-1)?.id ?? archivedCursor.current;
                         setResults((current) => (page > 0 ? [...(current ?? []), ...found] : found));
                         setMore(Boolean(data.more));
                     })
@@ -762,7 +780,7 @@ function SearchDialog({
                             ))}
                         </ul>
                     )}
-                    {more && !archived ? (
+                    {more ? (
                         <button
                             type="button"
                             onClick={() => setPage(page + 1)}

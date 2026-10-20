@@ -12,6 +12,7 @@ const PROJECT = "33333333-3333-4333-8333-333333333333";
 
 const state = {
     anonymous: false,
+    viewingAs: null as null | string,
     found: true,
     changes: [] as unknown[],
     share: null as null | { sharedAt: Date; threadId: string; thread: { title: string } },
@@ -22,7 +23,7 @@ vi.mock("@/lib/api-session", () => ({
     apiUser: async () =>
         state.anonymous
             ? NextResponse.json({ error: "unauthorized" }, { status: 401 })
-            : { id: "u1", name: "Ana", viewingAs: null }
+            : { id: "u1", name: "Ana", viewingAs: state.viewingAs }
 }));
 vi.mock("@/lib/polar/threads", () => ({
     changePolarThread: async (...args: unknown[]) => {
@@ -40,11 +41,18 @@ vi.mock("@polaris/db", () => ({
         polarMessage: { findMany: async () => state.messages }
     }
 }));
+vi.mock("@/lib/polar/projects", () => ({
+    updatePolarProject: async () => state.found,
+    deletePolarProject: async () => state.found
+}));
+vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://polaris.example" }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({ encryptSecret: vi.fn(), decryptSecret: vi.fn() }));
 
 const route = await import("@/app/api/polar/threads/[id]/route");
+const projectRoute = await import("@/app/api/polar/projects/[id]/route");
+const shareRoute = await import("@/app/api/polar/threads/[id]/share/route");
 const { readSharedPolarThread } = await import("@/lib/polar/share");
 
 const params = { params: Promise.resolve({ id: ID }) };
@@ -59,6 +67,7 @@ const patch = (body: unknown) =>
 
 beforeEach(() => {
     state.anonymous = false;
+    state.viewingAs = null;
     state.found = true;
     state.changes = [];
     state.share = null;
@@ -92,6 +101,29 @@ describe("PATCH /api/polar/threads/:id", () => {
     it("needs a session", async () => {
         state.anonymous = true;
         expect((await patch({ pinned: true })).status).toBe(401);
+    });
+});
+
+describe("while viewing as somebody else", () => {
+    it("changes none of their chats, projects or links", async () => {
+        state.viewingAs = "u2";
+        expect((await patch({ pinned: true })).status).toBe(403);
+        expect((await patch({ archived: true })).status).toBe(403);
+        expect((await patch({ projectId: null })).status).toBe(403);
+        expect(state.changes).toEqual([]);
+        const request = (method: string, body?: unknown) =>
+            new Request(`http://x/api/polar/projects/${ID}`, {
+                method,
+                ...(body ? { body: JSON.stringify(body) } : {})
+            });
+        expect((await projectRoute.PATCH(request("PATCH", { name: "X" }), params)).status).toBe(403);
+        expect((await projectRoute.DELETE(request("DELETE"), params)).status).toBe(403);
+        expect((await shareRoute.DELETE(request("DELETE"), params)).status).toBe(403);
+    });
+
+    it("still saves the queue and the title as before", async () => {
+        state.viewingAs = "u2";
+        expect((await patch({ title: "Renamed" })).status).toBe(200);
     });
 });
 

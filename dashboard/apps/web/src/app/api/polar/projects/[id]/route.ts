@@ -29,6 +29,7 @@ const NOT_FOUND = () => NextResponse.json({ error: "not_found" }, { status: 404 
 export async function PATCH(request: Request, { params }: Params): Promise<Response> {
     const user = await apiUser();
     if (user instanceof NextResponse) return user;
+    if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
     const body = patchSchema.safeParse(await request.json().catch(() => null));
@@ -41,6 +42,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
     const user = await apiUser();
     if (user instanceof NextResponse) return user;
+    if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
     return (await deletePolarProject(user.id, id.data))

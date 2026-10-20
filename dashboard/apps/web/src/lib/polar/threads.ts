@@ -98,24 +98,30 @@ export async function listPolarThreads(
     cursor?: string,
     view: ThreadView = "recent",
     projectId?: string
-): Promise<PolarThreadRow[]> {
+): Promise<{ threads: PolarThreadRow[]; more: boolean }> {
     const rows = await prisma.polarThread.findMany({
         ...viewQuery(userId, view, projectId),
         select: ROW_SELECT,
-        take: POLAR_THREAD_PAGE,
+        take: POLAR_THREAD_PAGE + 1,
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
     });
-    return rows.map(toRow);
+    return {
+        threads: rows.slice(0, POLAR_THREAD_PAGE).map(toRow),
+        more: rows.length > POLAR_THREAD_PAGE
+    };
 }
 
 /** Everything the sidebar opens on, in one round trip: the first page of
- *  recents, the pinned chats and the projects. */
+ *  recents and of the pinned chats, whether each has another, and the
+ *  projects. */
 export async function polarSidebar(userId: string): Promise<{
     threads: PolarThreadRow[];
+    more: boolean;
     pinned: PolarThreadRow[];
+    morePinned: boolean;
     projects: PolarProjectRow[];
 }> {
-    const [threads, pinned, projects] = await Promise.all([
+    const [recent, pinned, projects] = await Promise.all([
         listPolarThreads(userId),
         listPolarThreads(userId, undefined, "pinned"),
         prisma.polarProject.findMany({
@@ -124,8 +130,18 @@ export async function polarSidebar(userId: string): Promise<{
             orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
         })
     ]);
-    return { threads, pinned, projects };
+    return {
+        threads: recent.threads,
+        more: recent.more,
+        pinned: pinned.threads,
+        morePinned: pinned.more,
+        projects
+    };
 }
+
+/** Longest a search may read for, so a person with a long history waits a
+ *  bounded time and the database is not held by one keystroke. */
+const SEARCH_TIMEOUT_MS = 5000;
 
 /** Escapes what ILIKE reads as a wildcard, so a search is for the text typed. */
 export function likePattern(text: string): string {
@@ -143,27 +159,32 @@ export async function searchPolarThreads(
     page = 0
 ): Promise<{ results: PolarThreadRow[]; more: boolean }> {
     const pattern = likePattern(text);
-    const rows = await prisma.$queryRaw<StoredRow[]>(Prisma.sql`
-        SELECT t."id", t."title", t."updatedAt", t."pinnedAt", t."archivedAt", t."projectId"
-        FROM "PolarThread" AS t
-        WHERE t."userId" = ${userId}::uuid
-          AND (
-            t."title" ILIKE ${pattern}
-            OR EXISTS (
-              SELECT 1
-              FROM "PolarMessage" AS m,
-                   jsonb_array_elements(
-                     CASE WHEN jsonb_typeof(m."parts") = 'array' THEN m."parts" ELSE '[]'::jsonb END
-                   ) AS part
-              WHERE m."threadId" = t."id"
-                AND part->>'type' = 'text'
-                AND part->>'text' ILIKE ${pattern}
-            )
-          )
-        ORDER BY t."updatedAt" DESC, t."id" DESC
-        LIMIT ${POLAR_SEARCH_PAGE + 1}
-        OFFSET ${page * POLAR_SEARCH_PAGE}
-    `);
+    const [, rows] = await prisma.$transaction([
+        prisma.$queryRaw(
+            Prisma.sql`SELECT set_config('statement_timeout', ${String(SEARCH_TIMEOUT_MS)}, true)`
+        ),
+        prisma.$queryRaw<StoredRow[]>(Prisma.sql`
+            SELECT t."id", t."title", t."updatedAt", t."pinnedAt", t."archivedAt", t."projectId"
+            FROM "PolarThread" AS t
+            WHERE t."userId" = ${userId}::uuid
+              AND (
+                t."title" ILIKE ${pattern}
+                OR EXISTS (
+                  SELECT 1
+                  FROM "PolarMessage" AS m,
+                       jsonb_array_elements(
+                         CASE WHEN jsonb_typeof(m."parts") = 'array' THEN m."parts" ELSE '[]'::jsonb END
+                       ) AS part
+                  WHERE m."threadId" = t."id"
+                    AND part->>'type' = 'text'
+                    AND part->>'text' ILIKE ${pattern}
+                )
+              )
+            ORDER BY t."updatedAt" DESC, t."id" DESC
+            LIMIT ${POLAR_SEARCH_PAGE + 1}
+            OFFSET ${page * POLAR_SEARCH_PAGE}
+        `)
+    ]);
     return {
         results: rows.slice(0, POLAR_SEARCH_PAGE).map(toRow),
         more: rows.length > POLAR_SEARCH_PAGE

@@ -16,11 +16,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     POLAR_THREAD_PAGE,
+    threadPlace,
     type PolarProjectRow,
     type PolarThreadRow
 } from "@/lib/polar/shared";
 
 const CACHE_KEY = "polar.sidebar.v2";
+const PROJECT_LIST = "project:";
+
+/** The key of a project's list for `loadMore` and `hasMore`. */
+export function projectList(id: string): string {
+    return `${PROJECT_LIST}${id}`;
+}
 
 type SidebarCache = { rows: PolarThreadRow[]; projects: PolarProjectRow[] };
 
@@ -31,6 +38,21 @@ export function mergeRows(
 ): PolarThreadRow[] {
     const ids = new Set(fresh.map((row) => row.id));
     return [...fresh, ...(current ?? []).filter((row) => !ids.has(row.id))];
+}
+
+/** Puts a key in a set held in state, or takes it out. */
+function setFlag(
+    set: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void,
+    key: string,
+    on: boolean
+): void {
+    set((current) => {
+        if (current.has(key) === on) return current;
+        const next = new Set(current);
+        if (on) next.add(key);
+        else next.delete(key);
+        return next;
+    });
 }
 
 async function send(url: string, method: string, body?: unknown): Promise<Response | null> {
@@ -57,23 +79,46 @@ export function usePolarSidebar({
     const toast = useToast();
     const [rows, setRows] = useState<PolarThreadRow[] | null>(null);
     const [projects, setProjects] = useState<PolarProjectRow[] | null>(null);
-    const [moreRecents, setMoreRecents] = useState(false);
-    const [loadingMore, setLoadingMore] = useState(false);
+    /** Lists with another page on the server, and the ones being read. */
+    const [more, setMore] = useState<ReadonlySet<string>>(new Set());
+    const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
     /** Projects whose chats are shown, and whether each has been read. */
     const [openProjects, setOpenProjects] = useState<ReadonlySet<string>>(new Set());
+    const openProjectsRef = useRef(openProjects);
+    openProjectsRef.current = openProjects;
     const loadedProjects = useRef(new Set<string>());
+    /** The ids each list's pages brought, in the server's order: the next
+     *  page starts after the last of them still in that list. */
+    const received = useRef(new Map<string, string[]>());
     const rowsRef = useRef(rows);
     rowsRef.current = rows;
 
-    const loadProject = useCallback((id: string) => {
-        loadedProjects.current.add(id);
-        void fetch(`/api/polar/threads?view=project&project=${encodeURIComponent(id)}`)
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { threads: PolarThreadRow[] } | null) => {
-                if (data) setRows((current) => mergeRows(current, data.threads));
-            })
-            .catch(() => undefined);
-    }, []);
+    /** Records a page a list read: the first page starts the list over. */
+    const tookPage = useCallback(
+        (key: string, page: PolarThreadRow[], hasMore: boolean, first: boolean) => {
+            const ids = page.map((row) => row.id);
+            received.current.set(key, first ? ids : [...(received.current.get(key) ?? []), ...ids]);
+            setFlag(setMore, key, hasMore);
+        },
+        []
+    );
+
+    /** Reads a project's first page; `track` false only merges its rows, for a
+     *  refresh that keeps the pages already read. */
+    const loadProject = useCallback(
+        (id: string, track = true) => {
+            loadedProjects.current.add(id);
+            void fetch(`/api/polar/threads?view=project&project=${encodeURIComponent(id)}`)
+                .then((response) => (response.ok ? response.json() : null))
+                .then((data: { threads: PolarThreadRow[]; more?: boolean } | null) => {
+                    if (!data) return;
+                    setRows((current) => mergeRows(current, data.threads));
+                    if (track) tookPage(projectList(id), data.threads, Boolean(data.more), true);
+                })
+                .catch(() => undefined);
+        },
+        [tookPage]
+    );
 
     // Last known sidebar instantly, refreshed behind it. `keep` leaves the rows
     // already loaded (pages read with "Show more", opened projects) in place.
@@ -97,22 +142,29 @@ export function usePolarSidebar({
                     (
                         data: {
                             threads: PolarThreadRow[];
+                            more?: boolean;
                             pinned?: PolarThreadRow[];
+                            morePinned?: boolean;
                             projects?: PolarProjectRow[];
                         } | null
                     ) => {
                         if (!data) return;
-                        const fresh = [...(data.pinned ?? []), ...data.threads];
+                        const pinned = data.pinned ?? [];
+                        const fresh = [...pinned, ...data.threads];
                         setRows((current) => (keep ? mergeRows(current, fresh) : fresh));
                         setProjects(data.projects ?? []);
-                        if (!keep) setMoreRecents(data.threads.length >= POLAR_THREAD_PAGE);
+                        if (keep) return;
+                        tookPage("recent", data.threads, Boolean(data.more), true);
+                        tookPage("pinned", pinned, Boolean(data.morePinned), true);
+                        // The rows were replaced: the open projects are read again.
+                        loadedProjects.current.clear();
+                        for (const id of openProjectsRef.current) loadProject(id);
                     }
                 )
                 .catch(() => undefined);
-            if (keep) for (const id of loadedProjects.current) loadProject(id);
-            else loadedProjects.current.clear();
+            if (keep) for (const id of loadedProjects.current) loadProject(id, false);
         },
-        [loadProject]
+        [loadProject, tookPage]
     );
 
     useEffect(() => {
@@ -130,25 +182,38 @@ export function usePolarSidebar({
         }
     }, [rows, projects]);
 
-    const loadMore = () => {
-        const recents = (rowsRef.current ?? []).filter(
-            (row) => !row.pinnedAt && !row.archivedAt && !row.projectId
-        );
-        const cursor = recents
-            .slice()
-            .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
-            .at(-1)?.id;
-        if (!cursor || loadingMore) return;
-        setLoadingMore(true);
-        fetch(`/api/polar/threads?cursor=${encodeURIComponent(cursor)}`)
+    /** The next page of one list: "recent", "pinned" or a project's. */
+    const loadMore = (key: string) => {
+        if (loading.has(key)) return;
+        const known = new Map((rowsRef.current ?? []).map((row) => [row.id, row]));
+        const ids = [...(received.current.get(key) ?? [])].reverse();
+        const inList = (row: PolarThreadRow) =>
+            !row.archivedAt &&
+            (key === "recent"
+                ? threadPlace(row) === "recent"
+                : key === "pinned"
+                  ? Boolean(row.pinnedAt)
+                  : projectList(row.projectId ?? "") === key);
+        const cursor =
+            ids.find((id) => {
+                const row = known.get(id);
+                return row !== undefined && inList(row);
+            }) ?? ids.find((id) => known.has(id));
+        if (!cursor) return;
+        const project = key.startsWith(PROJECT_LIST) ? key.slice(PROJECT_LIST.length) : null;
+        const view = project
+            ? `view=project&project=${encodeURIComponent(project)}`
+            : `view=${key}`;
+        setFlag(setLoading, key, true);
+        fetch(`/api/polar/threads?${view}&cursor=${encodeURIComponent(cursor)}`)
             .then((response) => (response.ok ? response.json() : null))
-            .then((data: { threads: PolarThreadRow[] } | null) => {
+            .then((data: { threads: PolarThreadRow[]; more?: boolean } | null) => {
                 if (!data) return;
                 setRows((current) => mergeRows(current, data.threads));
-                setMoreRecents(data.threads.length >= POLAR_THREAD_PAGE);
+                tookPage(key, data.threads, Boolean(data.more), false);
             })
             .catch(() => undefined)
-            .finally(() => setLoadingMore(false));
+            .finally(() => setFlag(setLoading, key, false));
     };
 
     /** A row's fields set at once, and only those fields put back on failure. */
@@ -283,8 +348,8 @@ export function usePolarSidebar({
     return {
         rows,
         projects,
-        moreRecents,
-        loadingMore,
+        hasMore: (key: string) => more.has(key),
+        isLoading: (key: string) => loading.has(key),
         openProjects,
         refresh,
         loadMore,
