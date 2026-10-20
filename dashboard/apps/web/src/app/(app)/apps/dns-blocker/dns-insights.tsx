@@ -787,13 +787,13 @@ function ShareList({
                                         <button
                                             type="button"
                                             title={hint}
-                                            className="min-w-0 flex-1 truncate text-left hover:underline"
+                                            className="min-w-0 flex-1 break-all text-left hover:underline"
                                             onClick={() => onPick(item.name)}
                                         >
                                             {name}
                                         </button>
                                     ) : (
-                                        <span className="min-w-0 flex-1 truncate" title={name}>
+                                        <span className="min-w-0 flex-1 break-all" title={name}>
                                             {name}
                                         </span>
                                     )}
@@ -850,7 +850,7 @@ function TopList({
                                 <button
                                     type="button"
                                     title={`${shown} - ${hint}`}
-                                    className="min-w-0 flex-1 truncate text-left hover:underline"
+                                    className="min-w-0 flex-1 break-all text-left hover:underline"
                                     onClick={() => onPick(item.name)}
                                 >
                                     {shown}
@@ -865,6 +865,20 @@ function TopList({
             )}
         </div>
     );
+}
+
+/** A row's time: the clock alone for today's rows, with the date otherwise. */
+export function rowTime(at: number, now: Date = new Date()): string {
+    const when = new Date(at);
+    return when.toDateString() === now.toDateString()
+        ? when.toLocaleTimeString()
+        : when.toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit"
+          });
 }
 
 function QueryRows({
@@ -890,18 +904,19 @@ function QueryRows({
             <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                     <tr>
-                        <th className="w-36 p-2 font-medium">{t("insights.time")}</th>
+                        <th className="w-20 p-2 pl-3 font-medium sm:w-32">
+                            {t("insights.time")}
+                        </th>
                         <th className="p-2 font-medium">{t("insights.domain")}</th>
-                        <th className="hidden w-16 p-2 font-medium sm:table-cell">
+                        <th className="hidden w-14 p-2 font-medium sm:table-cell">
                             {t("insights.type")}
                         </th>
-                        <th className="hidden w-40 p-2 font-medium md:table-cell">
+                        <th className="hidden w-32 p-2 font-medium md:table-cell xl:w-40">
                             {t("insights.client")}
                         </th>
-                        <th className="hidden w-44 p-2 font-medium lg:table-cell">
+                        <th className="hidden w-32 p-2 font-medium lg:table-cell xl:w-40">
                             {t("insights.answeredBy")}
                         </th>
-                        <th className="w-24 p-2 font-medium">{t("insights.outcome")}</th>
                         <th className="w-12 p-2">
                             <span className="sr-only">{t("insights.actions")}</span>
                         </th>
@@ -909,10 +924,14 @@ function QueryRows({
                 </thead>
                 <tbody>
                     {rows.map((row, index) => {
-                        const at = Number.isNaN(row.at)
+                        const at = Number.isNaN(row.at) ? row.time : rowTime(row.at);
+                        const full = Number.isNaN(row.at)
                             ? row.time
                             : new Date(row.at).toLocaleString();
                         const blocked = row.outcome === "blocked";
+                        const outcome = blocked
+                            ? t("insights.blockedOnly")
+                            : t("insights.allowedOnly");
                         const action = blocked ? t("insights.allowName") : t("insights.blockName");
                         return (
                             <tr
@@ -920,25 +939,34 @@ function QueryRows({
                                 className="border-t border-border"
                             >
                                 <td
-                                    className="truncate p-2 tabular-nums text-muted-foreground"
-                                    title={at}
+                                    className="relative truncate p-2 pl-3 align-top tabular-nums text-muted-foreground"
+                                    title={`${full} - ${outcome}`}
                                 >
+                                    <span
+                                        aria-hidden
+                                        data-outcome={row.outcome}
+                                        className={`absolute inset-y-0 left-0 w-1 ${blocked ? "bg-danger" : "bg-success"}`}
+                                    />
                                     {at}
                                 </td>
-                                <td className="p-2">
+                                <td className="p-2 align-top">
                                     <button
                                         type="button"
-                                        title={row.domain}
-                                        className="block w-full truncate text-left hover:underline"
+                                        title={`${row.domain} - ${outcome}`}
+                                        className={`block w-full break-all text-left hover:underline ${blocked ? "text-danger-ink" : ""}`}
                                         onClick={() => onDomain(row.domain)}
                                     >
+                                        <span className="sr-only">{outcome}: </span>
                                         {row.domain}
                                     </button>
                                 </td>
-                                <td className="hidden truncate p-2 sm:table-cell" title={row.type}>
+                                <td
+                                    className="hidden truncate p-2 align-top text-muted-foreground sm:table-cell"
+                                    title={row.type}
+                                >
                                     {row.type}
                                 </td>
-                                <td className="hidden p-2 md:table-cell">
+                                <td className="hidden p-2 align-top md:table-cell">
                                     <button
                                         type="button"
                                         title={`${row.clientName ? `${row.clientName} (${row.client})` : row.client} - ${t("insights.filterClient")}`}
@@ -949,7 +977,7 @@ function QueryRows({
                                     </button>
                                 </td>
                                 <td
-                                    className="hidden truncate p-2 text-muted-foreground lg:table-cell"
+                                    className="hidden truncate p-2 align-top text-muted-foreground lg:table-cell"
                                     title={row.reason}
                                 >
                                     {blocked && row.list
@@ -966,14 +994,7 @@ function QueryRows({
                                               )
                                             : row.via}
                                 </td>
-                                <td className="p-2">
-                                    <Badge variant={blocked ? "danger" : "neutral"}>
-                                        {blocked
-                                            ? t("insights.blockedOnly")
-                                            : t("insights.allowedOnly")}
-                                    </Badge>
-                                </td>
-                                <td className="p-1 text-right">
+                                <td className="p-1 text-right align-top">
                                     <Button
                                         variant="ghost"
                                         size="icon"

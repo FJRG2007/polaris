@@ -34,7 +34,7 @@ export default async function DnsBlockerPage() {
         label: routerGuideIn(tAdmin, entry).label
     }));
     return (
-        <div className="mx-auto flex w-full max-w-4xl flex-col">
+        <div className="mx-auto flex w-full max-w-6xl flex-col">
             <PageHeader title={t("page.title")} description={t("page.description")} />
             {settings ? (
                 <DnsBlockerView initial={settings} brands={brands} />

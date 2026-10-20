@@ -158,3 +158,71 @@ describe("DnsBlockerView today", () => {
         expect(screen.queryByText("stale.example")).toBeNull();
     });
 });
+
+describe("DnsBlockerView query log", () => {
+    function row(domain: string, outcome: "blocked" | "allowed", at: number) {
+        return {
+            time: new Date(at).toISOString(),
+            at,
+            client: "10.0.0.2",
+            clientName: "",
+            domain,
+            type: "A",
+            outcome,
+            reason: outcome === "blocked" ? "BLOCKED (ads)" : "RESOLVED",
+            durationMs: 1,
+            via: outcome === "blocked" ? "blocked" : "cache",
+            list: outcome === "blocked" ? "ads" : ""
+        };
+    }
+
+    it("shows the outcome on the row instead of a column of its own", async () => {
+        standing("blocking");
+        const now = Date.now();
+        dnsInsightsAction.mockImplementation(async () => {
+            const base = insights();
+            return {
+                insights: {
+                    ...base.insights,
+                    log: {
+                        rows: [
+                            row("tracker.blocked.example", "blocked", now),
+                            row("fine.allowed.example", "allowed", now)
+                        ],
+                        page: 0,
+                        hasMore: false
+                    }
+                }
+            };
+        });
+        await shown();
+        const button = (text: string) =>
+            [...document.querySelectorAll("button")].find(
+                (item) => item.textContent === text
+            ) as HTMLButtonElement;
+        await waitFor(() => expect(button("Blocked: tracker.blocked.example")).toBeTruthy());
+        const blocked = button("Blocked: tracker.blocked.example");
+        expect(blocked.className).toContain("text-danger-ink");
+        const allowed = button("Allowed: fine.allowed.example");
+        expect(allowed.className).not.toContain("text-danger-ink");
+        expect(blocked.className).not.toContain("truncate");
+        const headers = [...document.querySelectorAll("th")].map((cell) => cell.textContent);
+        expect(headers).not.toContain("Result");
+        const bars = [...document.querySelectorAll("[data-outcome]")].map(
+            (bar) => bar.getAttribute("data-outcome")
+        );
+        expect(bars).toEqual(["blocked", "allowed"]);
+    });
+});
+
+describe("rowTime", () => {
+    it("drops the date for today's rows and keeps it otherwise", async () => {
+        const { rowTime } = await import("../../src/app/(app)/apps/dns-blocker/dns-insights");
+        const now = new Date(2026, 9, 20, 15, 0, 0);
+        const today = new Date(2026, 9, 20, 9, 5, 7).getTime();
+        const yesterday = new Date(2026, 9, 19, 9, 5, 7).getTime();
+        expect(rowTime(today, now)).toBe(new Date(today).toLocaleTimeString());
+        expect(rowTime(yesterday, now)).not.toBe(new Date(yesterday).toLocaleTimeString());
+        expect(rowTime(yesterday, now)).toContain("19");
+    });
+});
