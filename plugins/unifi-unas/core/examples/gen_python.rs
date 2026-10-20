@@ -8,7 +8,8 @@
 //! CI regenerates this and fails if the committed file differs.
 
 use polaris_unas_core::bays::DeviceModel;
-use polaris_unas_core::mqtt::seg;
+use polaris_unas_core::mqtt::{control, seg};
+use polaris_unas_core::storage::FanProfile;
 
 fn main() {
     let mut out = String::new();
@@ -42,12 +43,30 @@ fn main() {
         seg::SMB,
         seg::NFS,
         seg::SHARE,
+        seg::NETWORK,
+        seg::SCRUB,
     ] {
         out.push_str(&format!(
             "        \"{segment}\": f\"{{root}}/{segment}\",\n"
         ));
     }
-    out.push_str("    }\n");
+    out.push_str("    }\n\n");
+
+    out.push_str("CONTROL_TOPICS = {\n");
+    for (name, leaf) in [
+        ("fan_profile", control::FAN_PROFILE),
+        ("scrub_run", control::SCRUB_RUN),
+    ] {
+        out.push_str(&format!("    {name:?}: {leaf:?},\n"));
+    }
+    out.push_str("}\n\n");
+
+    out.push_str("# Native console fan profiles: option -> value the Drive API takes.\n");
+    out.push_str("FAN_PROFILES = {\n");
+    for p in FanProfile::ALL {
+        out.push_str(&format!("    {:?}: {:?},\n", p.key(), p.api_value()));
+    }
+    out.push_str("}\n");
 
     print!("{out}");
 }

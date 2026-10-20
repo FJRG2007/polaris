@@ -19,6 +19,17 @@ pub mod seg {
     pub const SMB: &str = "smb";
     pub const NFS: &str = "nfs";
     pub const SHARE: &str = "share";
+    pub const NETWORK: &str = "network";
+    pub const SCRUB: &str = "scrub";
+}
+
+/// Control leaves under `<root>/control/`, written by Home Assistant (or
+/// Polaris) and acted on by the agent. Generated into Python with the rest.
+pub mod control {
+    /// Native console fan profile: `quiet`, `balanced` or `cooling`.
+    pub const FAN_PROFILE: &str = "fan/profile";
+    /// Start a consistency check on every md array. Never sent retained.
+    pub const SCRUB_RUN: &str = "scrub/run";
 }
 
 /// Root prefix for every topic belonging to one integration entry.
@@ -81,6 +92,24 @@ impl Topics {
         format!("{}/{}/{leaf}", self.root, seg::NFS)
     }
 
+    pub fn network(&self, leaf: &str) -> String {
+        format!("{}/{}/{leaf}", self.root, seg::NETWORK)
+    }
+
+    pub fn scrub(&self, array: &str, metric: &str) -> String {
+        format!("{}/{}/{array}/{metric}", self.root, seg::SCRUB)
+    }
+
+    /// Native fan profile control topic (see [`control::FAN_PROFILE`]).
+    pub fn fan_profile(&self) -> String {
+        format!("{}/{}/{}", self.root, seg::CONTROL, control::FAN_PROFILE)
+    }
+
+    /// Scrub trigger topic (see [`control::SCRUB_RUN`]).
+    pub fn scrub_run(&self) -> String {
+        format!("{}/{}/{}", self.root, seg::CONTROL, control::SCRUB_RUN)
+    }
+
     /// Interval control topic the agent subscribes to for live re-tuning.
     pub fn monitor_interval(&self) -> String {
         format!("{}/{}/monitor_interval", self.root, seg::CONTROL)
@@ -123,5 +152,9 @@ mod tests {
             "unas/abcdef01/control/fan/curve/min_temp"
         );
         assert_eq!(t.availability(), "unas/abcdef01/availability");
+        assert_eq!(t.fan_profile(), "unas/abcdef01/control/fan/profile");
+        assert_eq!(t.scrub_run(), "unas/abcdef01/control/scrub/run");
+        assert_eq!(t.scrub("md3", "action"), "unas/abcdef01/scrub/md3/action");
+        assert_eq!(t.network("ip"), "unas/abcdef01/network/ip");
     }
 }

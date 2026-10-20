@@ -11,6 +11,7 @@ mod broker;
 mod collect;
 mod config;
 mod fanctl;
+mod services;
 mod util;
 
 use std::sync::{Arc, Mutex};
@@ -21,6 +22,10 @@ use rumqttc::{Client, Event, Packet, QoS};
 
 use polaris_unas_core::model::ToMqttFields;
 use polaris_unas_core::mqtt::Topics;
+use polaris_unas_core::storage::DiskSummary;
+
+use crate::api::ApiClient;
+use crate::services::NetSampler;
 
 use crate::collect::Monitor;
 use crate::config::Config;
@@ -56,6 +61,7 @@ fn main() {
         let topics = topics.clone();
         let control = control.clone();
         thread::spawn(move || {
+            let mut writer = ApiClient::new();
             for event in connection.iter() {
                 match event {
                     Ok(Event::Incoming(Packet::ConnAck(_))) => {
@@ -64,9 +70,25 @@ fn main() {
                         let _ = client.subscribe(topics.monitor_interval(), QoS::AtLeastOnce);
                         let _ = client.subscribe(topics.fan_mode(), QoS::AtLeastOnce);
                         let _ = client.subscribe(topics.fan_curve_wildcard(), QoS::AtLeastOnce);
+                        let _ = client.subscribe(topics.fan_profile(), QoS::AtLeastOnce);
+                        let _ = client.subscribe(topics.scrub_run(), QoS::AtLeastOnce);
                     }
                     Ok(Event::Incoming(Packet::Publish(p))) => {
                         if let Ok(payload) = std::str::from_utf8(&p.payload) {
+                            if p.topic == topics.fan_profile() {
+                                if !payload.is_empty() {
+                                    services::set_fan_profile(&mut writer, payload);
+                                }
+                                continue;
+                            }
+                            if p.topic == topics.scrub_run() {
+                                // A retained trigger would re-run the scrub on
+                                // every reconnect; only a live press counts.
+                                if !p.retain && !payload.is_empty() {
+                                    services::run_scrub();
+                                }
+                                continue;
+                            }
                             let mut state = control.lock().unwrap();
                             apply_control(&mut state, &topics, &p.topic, payload);
                         }
@@ -90,9 +112,12 @@ fn main() {
         let model = cfg.model;
         thread::spawn(move || {
             let mut monitor = Monitor::new(model);
+            let mut net = NetSampler::default();
+            let mut api = ApiClient::new();
             let mut generation = 0u64;
             loop {
-                let drive_temps = collect_and_publish(&client, &topics, &mut monitor);
+                let drive_temps =
+                    collect_and_publish(&client, &topics, &mut monitor, &mut net, &mut api);
                 generation += 1;
                 {
                     let mut snap = temps.lock().unwrap();
@@ -119,7 +144,13 @@ fn main() {
 
 /// Collect everything once, publish it retained, and return the drive
 /// temperatures (hottest first) for the fan loop.
-fn collect_and_publish(client: &Client, topics: &Topics, monitor: &mut Monitor) -> Vec<i64> {
+fn collect_and_publish(
+    client: &Client,
+    topics: &Topics,
+    monitor: &mut Monitor,
+    net: &mut NetSampler,
+    api: &mut ApiClient,
+) -> Vec<i64> {
     let system = monitor.system_metrics();
     for (metric, value) in system.to_mqtt_fields() {
         broker::publish(client, topics.system(metric), value);
@@ -130,6 +161,42 @@ fn collect_and_publish(client: &Client, topics: &Topics, monitor: &mut Monitor) 
         for (metric, value) in d.to_mqtt_fields() {
             broker::publish(client, topics.hdd(&d.bay, metric), value);
         }
+    }
+
+    // Every physical bay reports whether it holds a drive, so an empty bay
+    // reads "No Drive Detected" instead of vanishing.
+    let bays = monitor.model().bays();
+    for bay in &bays {
+        let present = drives.iter().any(|d| d.bay == *bay);
+        broker::publish(
+            client,
+            topics.hdd(bay, "present"),
+            if present { "ON" } else { "OFF" }.to_string(),
+        );
+    }
+    let summary = DiskSummary::from_drives(&drives, bays.len());
+    for (metric, value) in summary.to_mqtt_fields() {
+        broker::publish(client, topics.system(metric), value);
+    }
+
+    if let Some(link) = net.sample() {
+        for (metric, value) in link.to_mqtt_fields() {
+            broker::publish(client, topics.network(metric), value);
+        }
+    }
+
+    for scrub in services::scrubs() {
+        for (metric, value) in scrub.to_mqtt_fields() {
+            broker::publish(client, topics.scrub(&scrub.array, metric), value);
+        }
+    }
+
+    if let Some(profile) = services::fan_profile(api) {
+        broker::publish(
+            client,
+            topics.system("fan_profile"),
+            profile.key().to_string(),
+        );
     }
 
     let nvmes = monitor.nvme_drives();
@@ -155,6 +222,16 @@ fn collect_and_publish(client: &Client, topics: &Topics, monitor: &mut Monitor) 
             topics.smb("clients"),
             serde_json::to_string(&smb_clients).unwrap_or_else(|_| "[]".into()),
         );
+
+        if let Some(shares) = services::time_machine() {
+            let on = if shares.is_empty() { "OFF" } else { "ON" };
+            broker::publish(client, topics.smb("time_machine"), on.to_string());
+            broker::publish(
+                client,
+                topics.smb("time_machine_shares"),
+                serde_json::to_string(&shares).unwrap_or_else(|_| "[]".into()),
+            );
+        }
 
         let (nfs_count, nfs_clients) = monitor.nfs();
         broker::publish(client, topics.nfs("mounts"), nfs_count.to_string());

@@ -49,6 +49,10 @@ impl Monitor {
         }
     }
 
+    pub fn model(&self) -> DeviceModel {
+        self.model
+    }
+
     pub fn is_unvr(&self) -> bool {
         self.model.is_unvr()
     }

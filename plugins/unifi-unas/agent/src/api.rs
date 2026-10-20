@@ -1,8 +1,10 @@
 //! Minimal client for the on-box UniFi Drive API (`127.0.0.1:16080`).
 //!
 //! A hand-rolled HTTP/1.1 client over `TcpStream` avoids pulling a full HTTP
-//! stack into the static binary. Only localhost GETs are needed; the Home
-//! Assistant side owns the write/backup endpoints over SSH.
+//! stack into the static binary. Reads are GETs; the one write the agent
+//! makes itself is the native fan profile (`PUT /api/v2/systems/fan-control`),
+//! because it arrives over MQTT. The Home Assistant side still owns the
+//! backup endpoints over SSH.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -44,6 +46,22 @@ impl ApiClient {
     /// Drive API requires for user/share endpoints. Returns `None` on any
     /// failure, warning at most once to avoid log spam.
     pub fn get(&mut self, path: &str, need_auth: bool) -> Option<Value> {
+        self.request("GET", path, None, need_auth)
+    }
+
+    /// Send a JSON body with `method` (e.g. `PUT`). Same failure contract as
+    /// [`ApiClient::get`]: `None` on any failure.
+    pub fn send(&mut self, method: &str, path: &str, body: &Value) -> Option<Value> {
+        self.request(method, path, Some(body), true)
+    }
+
+    fn request(
+        &mut self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        need_auth: bool,
+    ) -> Option<Value> {
         let mut headers: Vec<(String, String)> = Vec::new();
         if need_auth {
             match self.admin_uid() {
@@ -57,7 +75,7 @@ impl ApiClient {
                 }
             }
         }
-        match http_get(path, &headers) {
+        match http_request(method, path, &headers, body) {
             Ok(Some(v)) => Some(v),
             Ok(None) => None,
             Err(e) => {
@@ -77,16 +95,27 @@ impl ApiClient {
 
 /// Perform the GET and parse the body as JSON. `Ok(None)` means a non-200
 /// status or an empty/unparseable body; `Err` means a transport failure.
-fn http_get(path: &str, headers: &[(String, String)]) -> Result<Option<Value>, String> {
+fn http_request(
+    method: &str,
+    path: &str,
+    headers: &[(String, String)],
+    body: Option<&Value>,
+) -> Result<Option<Value>, String> {
     let mut stream = TcpStream::connect((API_HOST, API_PORT)).map_err(|e| e.to_string())?;
     stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
     stream.set_write_timeout(Some(Duration::from_secs(5))).ok();
 
-    let mut req = format!("GET {path} HTTP/1.1\r\nHost: {API_HOST}\r\nConnection: close\r\n");
+    let payload = body.map(Value::to_string).unwrap_or_default();
+    let mut req = format!("{method} {path} HTTP/1.1\r\nHost: {API_HOST}\r\nConnection: close\r\n");
     for (k, v) in headers {
         req.push_str(&format!("{k}: {v}\r\n"));
     }
+    if body.is_some() {
+        req.push_str("Content-Type: application/json\r\n");
+        req.push_str(&format!("Content-Length: {}\r\n", payload.len()));
+    }
     req.push_str("\r\n");
+    req.push_str(&payload);
     stream
         .write_all(req.as_bytes())
         .map_err(|e| e.to_string())?;
@@ -117,7 +146,7 @@ fn http_get(path: &str, headers: &[(String, String)]) -> Result<Option<Value>, S
         .split(|&b| b == b'\n')
         .next()
         .and_then(|line| std::str::from_utf8(line).ok())
-        .map(|line| line.contains(" 200"))
+        .map(|line| line.contains(" 200") || line.contains(" 204"))
         .unwrap_or(false);
     if !status_ok {
         return Ok(None);

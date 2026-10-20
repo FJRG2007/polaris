@@ -77,6 +77,15 @@ impl DeviceModel {
         matches!(self, Self::Unvr | Self::UnvrPro)
     }
 
+    /// Every physical bay label this model has, in bay order.
+    pub fn bays(self) -> Vec<&'static str> {
+        let mut bays: Vec<&'static str> = (1..=8)
+            .filter_map(|ata| self.ata_to_bay(&ata.to_string()))
+            .collect();
+        bays.sort_by_key(|b| b.parse::<u32>().unwrap_or(u32::MAX));
+        bays
+    }
+
     /// Map an ATA link number to the physical bay label, if this model knows it.
     ///
     /// `(ata, bay)` pairs; both are the numeric strings used upstream so the
@@ -119,6 +128,16 @@ mod tests {
         assert_eq!(DeviceModel::UnasPro.ata_to_bay("1"), Some("6"));
         assert_eq!(DeviceModel::UnasPro.ata_to_bay("8"), Some("1"));
         assert_eq!(DeviceModel::UnasPro.ata_to_bay("2"), None);
+    }
+
+    #[test]
+    fn bays_lists_every_physical_bay() {
+        assert_eq!(
+            DeviceModel::UnasPro.bays(),
+            vec!["1", "2", "3", "4", "5", "6", "7"]
+        );
+        assert_eq!(DeviceModel::Unas2.bays(), vec!["1", "2"]);
+        assert_eq!(DeviceModel::Unvr.bays(), vec!["1", "2", "3", "4"]);
     }
 
     #[test]

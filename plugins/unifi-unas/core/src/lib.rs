@@ -11,6 +11,7 @@ pub mod fan;
 pub mod model;
 pub mod mqtt;
 pub mod smart;
+pub mod storage;
 
 pub use model::{HddDrive, NvmeDrive, Pool, Share, SystemMetrics};
 
