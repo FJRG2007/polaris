@@ -393,6 +393,7 @@
         "blockReply": "Un nombre bloqueado responde",
         "zeroIp": "0.0.0.0 (rápido)",
         "nxDomain": "No existe",
-        "fqdnOnly": "No enviar fuera nombres sin un punto"
+        "fqdnOnly": "Dar por inexistentes los nombres sin punto",
+        "dnssec": "Comprobar la firma DNSSEC de cada respuesta"
     }
 }

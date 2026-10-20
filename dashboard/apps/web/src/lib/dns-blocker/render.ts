@@ -195,6 +195,7 @@ export function blockyConfig(
             ? { filtering: { queryTypes: [...settings.engine.dropTypes] } }
             : {}),
         ...(settings.engine.fqdnOnly ? { fqdnOnly: { enable: true } } : {}),
+        ...(settings.engine.dnssec ? { dnssec: { validate: true } } : {}),
         ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
         // One file a day on the engine's own volume, read back by the screen;
         // a day more than asked, so the oldest day is still whole.

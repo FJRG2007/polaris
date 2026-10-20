@@ -393,6 +393,7 @@
         "blockReply": "A blocked name answers",
         "zeroIp": "0.0.0.0 (fastest)",
         "nxDomain": "No such name",
-        "fqdnOnly": "Never send names without a dot upstream"
+        "fqdnOnly": "Answer names without a dot as not found",
+        "dnssec": "Check the DNSSEC signature of each answer"
     }
 }

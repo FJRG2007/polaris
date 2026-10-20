@@ -303,6 +303,7 @@ describe("engine settings", () => {
         expect(config.caching).toEqual({ prefetching: true });
         expect(config).not.toHaveProperty("filtering");
         expect(config).not.toHaveProperty("fqdnOnly");
+        expect(config).not.toHaveProperty("dnssec");
         expect((config.blocking as { blockType: string }).blockType).toBe("zeroIp");
     });
 
@@ -315,19 +316,26 @@ describe("engine settings", () => {
                     prefetch: false,
                     dropTypes: ["AAAA"],
                     blockReply: "nxDomain",
-                    fqdnOnly: true
+                    fqdnOnly: true,
+                    dnssec: true
                 }
             })
         );
         expect(config.caching).toEqual({ prefetching: false, minTime: "5m", maxTime: "60m" });
         expect(config.filtering).toEqual({ queryTypes: ["AAAA"] });
         expect(config.fqdnOnly).toEqual({ enable: true });
+        expect(config.dnssec).toEqual({ validate: true });
         expect((config.blocking as { blockType: string }).blockType).toBe("nxDomain");
     });
 
     it("keeps the defaults for a row stored before, and refuses a min above the max", async () => {
         const dns = await import("@/lib/dns-blocker/settings");
         expect(dns.readDnsSettings({}).engine).toEqual(dns.DEFAULT_DNS_ENGINE);
+        const { dnssec: _unset, ...beforeDnssec } = { ...dns.DEFAULT_DNS_ENGINE, prefetch: false };
+        expect(dns.readDnsSettings({ engine: beforeDnssec }).engine).toEqual({
+            ...dns.DEFAULT_DNS_ENGINE,
+            prefetch: false
+        });
         expect(
             dns.dnsEngineSchema.safeParse({
                 ...dns.DEFAULT_DNS_ENGINE,

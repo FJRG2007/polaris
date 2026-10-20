@@ -254,6 +254,15 @@ export function DnsSettingsSection() {
                         />
                         <span>{t("engine.fqdnOnly")}</span>
                     </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                            checked={engine.dnssec}
+                            onChange={(dnssec: boolean) =>
+                                setEngine((current) => ({ ...current, dnssec }))
+                            }
+                        />
+                        <span>{t("engine.dnssec")}</span>
+                    </label>
                 </CardBody>
             </Card>
             <DnsSaveBar />

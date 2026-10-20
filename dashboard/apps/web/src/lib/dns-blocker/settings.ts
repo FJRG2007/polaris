@@ -513,7 +513,9 @@ export const dnsEngineSchema = z
         /** A blocked name answers 0.0.0.0 (zeroIp) or "no such name" (nxDomain). */
         blockReply: z.enum(["zeroIp", "nxDomain"]),
         /** Answer a bare name (no dot) here and never send it upstream. */
-        fqdnOnly: z.boolean()
+        fqdnOnly: z.boolean(),
+        /** Check DNSSEC signatures; a forged or broken answer fails instead of resolving. */
+        dnssec: z.boolean().default(false)
     })
     .refine(
         (engine) =>
@@ -529,7 +531,8 @@ export const DEFAULT_DNS_ENGINE: DnsEngine = {
     prefetch: true,
     dropTypes: [],
     blockReply: "zeroIp",
-    fqdnOnly: false
+    fqdnOnly: false,
+    dnssec: false
 };
 
 export const dnsSettingsSchema = z.object({
