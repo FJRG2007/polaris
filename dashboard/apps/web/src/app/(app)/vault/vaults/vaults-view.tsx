@@ -69,6 +69,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select
 } from "@polaris/ui";
 
@@ -838,7 +839,15 @@ function VaultPanel({
                                     maxLength={core.VAULT_NAME_MAX}
                                     autoFocus
                                 />
-                                <Button type="submit" size="sm" disabled={pending}>
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={
+                                        pending ||
+                                        !renaming.trim() ||
+                                        !isDirty(vault.name, renaming)
+                                    }
+                                >
                                     {tc("actions.save")}
                                 </Button>
                                 <Button
@@ -966,6 +975,19 @@ function AccessDialog({
     }
 
     const firstTime = member !== null && member.status !== core.ORG_USER_CONFIRMED;
+    // The access this member already has: nothing to save. Letting someone in
+    // for the first time always is.
+    const unchanged =
+        member !== null &&
+        !firstTime &&
+        !isDirty(
+            {
+                whole: member.accessAll,
+                picked: member.collections.map((entry) => [entry.id, entry.readOnly])
+            },
+            { whole, picked: [...picked.entries()].map(([id, options]) => [id, options.readOnly]) },
+            (value) => ({ whole: value.whole, picked: value.whole ? [] : [...value.picked].sort() })
+        );
     return (
         <Dialog open={member !== null} onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
@@ -1039,7 +1061,7 @@ function AccessDialog({
                     <Button
                         type="button"
                         onClick={onConfirm}
-                        disabled={pending || (!whole && picked.size === 0)}
+                        disabled={pending || (!whole && picked.size === 0) || unchanged}
                     >
                         {pending ? (
                             <Loader2 className="size-4 animate-spin" />

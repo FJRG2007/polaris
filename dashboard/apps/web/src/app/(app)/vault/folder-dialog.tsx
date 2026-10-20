@@ -27,7 +27,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 export function FolderDialog({
@@ -56,6 +57,9 @@ export function FolderDialog({
     async function save(folderId: string | null, name: string): Promise<void> {
         const trimmed = name.trim();
         if (!trimmed) return;
+        // Renamed to the name it already has: nothing to write.
+        const named = folders.find((folder) => folder.id === folderId);
+        if (named && !isDirty(named.name, trimmed)) return setEditingId(null);
         setPending(true);
         setError(null);
         // Encrypted here, like every other name in a vault - the server stores a
@@ -159,7 +163,10 @@ export function FolderDialog({
                                                     variant="ghost"
                                                     title={tc("actions.save")}
                                                     aria-label={t("folders.saveName")}
-                                                    disabled={pending}
+                                                    disabled={
+                                                        pending ||
+                                                        !isDirty(folder.name, editingName)
+                                                    }
                                                     onClick={() =>
                                                         void save(folder.id, editingName)
                                                     }
