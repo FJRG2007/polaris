@@ -161,7 +161,13 @@ vi.mock("@/lib/polar/tools", () => ({
             })
         },
         approval: { delete_task: "user-approval" },
-        described: {}
+        described: {},
+        // Core tools, so every turn sends them whatever the screen.
+        catalog: [
+            { name: "read_tasks", description: "Lists tasks", category: "polaris" },
+            { name: "delete_task", description: "Deletes a task", category: "polaris" }
+        ],
+        call: async () => null
     })
 }));
 

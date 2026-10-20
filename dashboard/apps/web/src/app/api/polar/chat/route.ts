@@ -7,7 +7,11 @@
  * Session-authenticated, body validated before anything is believed. The model
  * is one the person can spend a key on; the tools are Polaris's own MCP tools
  * run as the person, and any that can change something waits for an approval
- * in the chat (`toolApproval`). The page context arrives fenced as data.
+ * in the chat (`toolApproval`). The page context arrives fenced as data, on
+ * the question it was asked with (`withScreenNotes`), never in the system
+ * prompt: the prompt and the tools stay byte-identical across screens, so the
+ * provider's prompt cache keeps hitting. The model is sent the core tools and
+ * the current app's (`tool-relevance.ts`); `find_tools` brings in the rest.
  */
 
 import { z } from "zod";
@@ -25,6 +29,15 @@ import {
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
+import {
+    FIND_TOOLS,
+    READ_CURRENT_VIEW,
+    activeToolNames,
+    currentViewTool,
+    findToolsTool,
+    foundInSteps,
+    usedInMessages
+} from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import {
     NATIVE_SEARCH_STAND_INS,
@@ -57,9 +70,9 @@ import {
     type StoredFailure
 } from "@/lib/polar/provider-failure";
 import {
-    fencePageContext,
     modelChoiceSchema,
     pageContextSchema,
+    withScreenNotes,
     type ModelChoice
 } from "@/lib/polar/shared";
 
@@ -165,20 +178,41 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const toolset = await polarTools(user);
+    // Tools the person switched off in Polar's settings: never offered, and
+    // never turned up by find_tools either.
+    const off = new Set(body.data.off);
+    const catalog = toolset.catalog.filter((entry) => !off.has(entry.name));
     // Known to the check even while memory is off, so an older turn that used
     // them still reads as valid.
     const memoryTools = polarMemoryTools(user.id, body.data.threadId);
+    const screenTools = {
+        ...currentViewTool(body.data.context, toolset.call),
+        ...findToolsTool(catalog)
+    };
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
             ...toolset.tools,
+            ...screenTools,
             ...memoryTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", "")
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
-    const messages = checked.data as UIMessage[];
+    const messages = (checked.data as UIMessage[]).map((message, index, list) =>
+        // The newest question carries the screen it was asked on, stored with
+        // it; older ones keep what they were saved with.
+        index === list.length - 1 && message.role === "user"
+            ? {
+                  ...message,
+                  metadata: {
+                      ...((message.metadata as object | undefined) ?? {}),
+                      screen: body.data.context ?? undefined
+                  }
+              }
+            : message
+    );
 
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
@@ -217,12 +251,29 @@ export async function POST(request: Request): Promise<Response> {
     // for a turn; either one off and the tools are simply not offered.
     const web = access.web && body.data.web;
     const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
-    const off = new Set(body.data.off);
     const tools = {
+        ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
         ...webTools
     };
+    // What the model is sent: the core and the current app's tools, and any
+    // this conversation already reached for. Every one stays registered, so an
+    // approval or an older turn naming one still resolves.
+    const always = [
+        READ_CURRENT_VIEW,
+        FIND_TOOLS,
+        ...Object.keys(remembers ? memoryTools : {}),
+        ...Object.keys(webTools)
+    ];
+    const used = usedInMessages(messages as never);
+    const activeFor = (found: ReadonlySet<string>) =>
+        activeToolNames(
+            catalog,
+            body.data.context?.app,
+            always,
+            new Set([...used, ...found])
+        ) as (keyof typeof tools & string)[];
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -268,21 +319,30 @@ export async function POST(request: Request): Promise<Response> {
     let lastStep: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined;
     const result = streamText({
         model: resolved.model,
-        system: [
-            polarSystemPrompt(
-                user.name,
-                fencePageContext(body.data.context),
-                instructions,
-                memories,
-                web
-            ),
-            fenceSummary(compacted.summary),
-            refineLine(body.data.refine)
-        ]
-            .filter(Boolean)
-            .join("\n\n"),
-        messages: await convertToModelMessages(withoutFailures(sendable)),
+        // One breakpoint after the tools and the system prompt: Anthropic caches
+        // that prefix (docs.anthropic.com prompt caching); OpenAI and Gemini
+        // cache a byte-identical prefix on their own.
+        system: {
+            role: "system",
+            content: [
+                polarSystemPrompt(user.name, instructions, memories, web),
+                fenceSummary(compacted.summary),
+                // Only on a turn asked again from an answer's row: that turn's
+                // prefix is not cached, every other one is.
+                refineLine(body.data.refine)
+            ]
+                .filter(Boolean)
+                .join("\n\n"),
+            providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } }
+        },
+        messages: await convertToModelMessages(withScreenNotes(withoutFailures(sendable))),
         tools,
+        activeTools: activeFor(new Set()),
+        // A tool find_tools turned up is sent from the next step on.
+        prepareStep: ({ steps }) => {
+            const found = foundInSteps(steps as never);
+            return found.size > 0 ? { activeTools: activeFor(found) } : undefined;
+        },
         toolApproval: {
             ...toolset.approval,
             ...(remembers ? MEMORY_APPROVAL : {}),
@@ -351,6 +411,10 @@ export async function POST(request: Request): Promise<Response> {
         onFinish: async ({ messages: finished, responseMessage }) => {
             await save(finished);
             if (spent) {
+                // Whether the stable prefix is being served from the cache.
+                console.info(
+                    `polar: turn input ${spent.inputTokens} tokens, ${spent.cachedTokens ?? "unreported"} cached (${resolved.option.provider})`
+                );
                 try {
                     await recordPolarUsage({
                         userId: user.id,
