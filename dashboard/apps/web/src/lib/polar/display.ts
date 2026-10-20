@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { PAYERS } from "@/lib/polar/shared";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
 
 export const POLAR_DISPLAY_KEYS = [
@@ -38,11 +39,33 @@ export function displayOf(value: unknown): PolarDisplay {
     return display;
 }
 
+/**
+ * The model Polar's small jobs - thread titles and the suggested next message
+ * - are written with. Null is Automatic: the fastest model the person can use.
+ */
+export const polarHelperModelSchema = z
+    .object({
+        provider: z.string().trim().min(1).max(64),
+        model: z.string().trim().min(1).max(200),
+        payer: z.enum(PAYERS).nullable().default(null)
+    })
+    .strict();
+
+export type PolarHelperModel = z.infer<typeof polarHelperModelSchema>;
+
+/** A stored helper model read whole: anything unreadable is Automatic. */
+export function helperModelOf(value: unknown): PolarHelperModel | null {
+    const parsed = polarHelperModelSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
 /** A change to Polar's settings: any of the display switches, memory, the
- *  dictation model, or several. */
+ *  dictation model, the suggested next message, and the helper model. */
 export const polarPreferencesPatchSchema = z
     .object({
         memory: z.boolean().optional(),
+        suggestions: z.boolean().optional(),
+        helperModel: polarHelperModelSchema.nullable().optional(),
         showTokens: z.boolean().optional(),
         showCost: z.boolean().optional(),
         showContextBar: z.boolean().optional(),

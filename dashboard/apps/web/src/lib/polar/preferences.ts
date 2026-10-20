@@ -1,21 +1,34 @@
 /**
- * Polar's per-person settings as one row: memory on or off, what a chat
- * shows (`display.ts`), and the model dictation hears with. No row means
- * every default. Server-only.
+ * Polar's per-person settings as one row: memory on or off, what a chat shows
+ * (`display.ts`), the model dictation hears with, whether a suggested next
+ * message follows each answer, and the model titles and suggestions are
+ * written with. No row means every default, and a stored helper model that no
+ * longer reads is Automatic. Server-only.
  */
 
-import { prisma } from "@polaris/db";
+import { Prisma, prisma } from "@polaris/db";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
-import { displayOf, type PolarDisplay, type PolarPreferencesPatch } from "@/lib/polar/display";
+import {
+    displayOf,
+    helperModelOf,
+    type PolarDisplay,
+    type PolarHelperModel,
+    type PolarPreferencesPatch
+} from "@/lib/polar/display";
 
 export interface PolarPreferences extends PolarDisplay {
     memory: boolean;
+    suggestions: boolean;
     /** `provider/model`, or null for the fastest model a key is held for. */
     transcriptionModel: string | null;
+    /** Null is Automatic. */
+    helperModel: PolarHelperModel | null;
 }
 
 const SELECTED = {
     memory: true,
+    suggestions: true,
+    helperModel: true,
     showTokens: true,
     showCost: true,
     showContextBar: true,
@@ -24,16 +37,30 @@ const SELECTED = {
 } as const;
 
 /** A stored pick that still reads as one, or null. */
-function transcriptionOf(row: { transcriptionModel?: string | null } | null): string | null {
+function transcriptionOf(row: { transcriptionModel?: unknown } | null): string | null {
     const parsed = transcriptionChoiceSchema.safeParse(row?.transcriptionModel);
     return parsed.success ? parsed.data : null;
 }
 
 export async function polarPreferences(userId: string): Promise<PolarPreferences> {
     const row = await prisma.polarPreference.findUnique({ where: { userId }, select: SELECTED });
+    return preferencesOf(row);
+}
+
+/** A row read whole: anything missing or unreadable is its default. */
+function preferencesOf(
+    row: {
+        memory?: unknown;
+        suggestions?: unknown;
+        transcriptionModel?: unknown;
+        helperModel?: unknown;
+    } | null
+): PolarPreferences {
     return {
-        memory: row?.memory ?? true,
+        memory: typeof row?.memory === "boolean" ? row.memory : true,
+        suggestions: typeof row?.suggestions === "boolean" ? row.suggestions : true,
         transcriptionModel: transcriptionOf(row),
+        helperModel: helperModelOf(row?.helperModel),
         ...displayOf(row)
     };
 }
@@ -43,18 +70,23 @@ export async function setPolarPreferences(
     userId: string,
     patch: PolarPreferencesPatch
 ): Promise<PolarPreferences> {
-    const data = Object.fromEntries(
-        Object.entries(patch).filter(
-            ([key, value]) =>
-                typeof value === "boolean" ||
-                (key === "transcriptionModel" && (value === null || typeof value === "string"))
-        )
-    ) as PolarPreferencesPatch;
+    const switches = Object.fromEntries(
+        Object.entries(patch).filter(([, value]) => typeof value === "boolean")
+    );
+    const data = {
+        ...switches,
+        ...(patch.transcriptionModel !== undefined
+            ? { transcriptionModel: patch.transcriptionModel }
+            : {}),
+        ...(patch.helperModel !== undefined
+            ? { helperModel: patch.helperModel ?? Prisma.DbNull }
+            : {})
+    };
     const row = await prisma.polarPreference.upsert({
         where: { userId },
         create: { userId, ...data },
         update: data,
         select: SELECTED
     });
-    return { memory: row.memory, transcriptionModel: transcriptionOf(row), ...displayOf(row) };
+    return preferencesOf(row);
 }
