@@ -69,6 +69,7 @@ import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping
 import { sweepReleaseImages } from "@/lib/deploy/release-retention";
 import { watchDisks } from "@/lib/deploy/disk-watch";
 import { runCutoverPass } from "@/lib/deploy/dns-cutover-service";
+import { reapplyAfterClockChange } from "@/lib/dns-blocker/service";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
 const MINUTE = 60 * 1000;
@@ -181,6 +182,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once count every outage exactly once.
         leaseMs: null,
         run: compactOutages
+    },
+    {
+        key: "dns-blocker-clock",
+        // Every fifteen minutes, so a daylight-saving change has moved the ad
+        // blocker's schedules within minutes of the clock moving. A pass that
+        // finds the configuration current reads two rows and renders it once.
+        everyMs: 15 * MINUTE,
+        // Leased: two runners would each redeploy the DNS server, and the
+        // second restart would drop the answers the first had just resumed.
+        leaseMs: 10 * MINUTE,
+        run: () => reapplyAfterClockChange()
     },
     {
         key: "dns-cutovers",

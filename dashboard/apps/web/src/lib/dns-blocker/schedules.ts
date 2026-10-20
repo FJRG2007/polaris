@@ -6,7 +6,8 @@
  * UTC day. So the hours typed on the screen, in the operator's zone, are moved to
  * UTC here, with the zone's offset at `now`. A daylight-saving change moves that
  * offset; the configuration rendered after it no longer matches the one the
- * engine runs, which is what the screen reads to offer applying it again.
+ * engine runs, and the `dns-blocker-clock` job applies it again on its own
+ * (`clock-change.ts`).
  *
  * Pure, so every shift across midnight and across the week is asserted in a test.
  */

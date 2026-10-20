@@ -29,6 +29,7 @@ import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
 import { encodeBlockyConfig } from "./render";
 import { DNS_CHECK_NAME } from "./settings";
+import { clockChangeDecision } from "./clock-change";
 import { resolveServiceNames } from "./services-registry";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
@@ -375,4 +376,47 @@ export async function turnOff(): Promise<void> {
     const engine = await engineRow();
     if (!engine) return;
     await uninstallApp(engine.ownerId, engine.id, { deleteData: true });
+}
+
+/**
+ * Give the DNS server its configuration again when the only thing that moved is
+ * the clock: a daylight-saving change shifts every schedule's UTC hours, and the
+ * engine would run an hour off until somebody pressed Apply now. Run on a
+ * schedule (`dns-blocker-clock`); nothing at all when the blocker is not
+ * installed, is off, is not up, or already runs what the settings render to.
+ * Whether to is `clockChangeDecision`'s; every other cause of a stale
+ * configuration is left to the screen.
+ */
+export async function reapplyAfterClockChange(
+    now: Date = new Date()
+): Promise<{ applied: boolean }> {
+    const row = await appRow();
+    if (!row) return { applied: false };
+    const engine = await engineRow();
+    const applicationId = engine?.applicationId;
+    if (!engine || !applicationId) return { applied: false };
+    const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);
+    const storedValue = () =>
+        prisma.envVar.findFirst({
+            where: { scopeType: "application", scopeId: applicationId, key: DNS_CONFIG_ENV },
+            select: { value: true }
+        });
+    const [stored, deployFailed] = await Promise.all([storedValue(), lastDeployFailed(engine)]);
+    const decision = clockChangeDecision({
+        engine: { running: engine.status === "running" && !deployFailed },
+        stored: stored?.value ?? null,
+        settings,
+        now
+    });
+    if (!decision.apply || decision.encoded.length > ENV_VALUE_MAX) return { applied: false };
+    // A save that landed while this was deciding applies itself; this one must
+    // not then write the settings it read over the operator's.
+    const [again, storedAgain] = await Promise.all([appRow(), storedValue()]);
+    if (again?.config !== row.config || storedAgain?.value !== stored?.value)
+        return { applied: false };
+    console.info(
+        `polaris: the ad blocker's schedules moved with the clock in ${settings.timeZone}; applying them again`
+    );
+    await apply(engine, decision.encoded, engine.ownerId, await getHostLanIp().catch(() => null));
+    return { applied: true };
 }
