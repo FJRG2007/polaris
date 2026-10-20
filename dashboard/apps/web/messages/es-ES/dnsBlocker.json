@@ -136,7 +136,9 @@
         "invalidClient": "No es una dirección, un rango ni un nombre de dispositivo:",
         "logDays": "Entre 1 y {max} días.",
         "invalidAddress": "No es una dirección IPv4.",
-        "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios."
+        "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios.",
+        "invalidDomain": "No es un dominio.",
+        "invalidForwardServer": "No es un servidor, como 192.168.1.1."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -301,5 +303,14 @@
         "address": "Dirección",
         "add": "Nombrar",
         "remove": "Quitar nombre"
+    },
+    "forwards": {
+        "title": "Dominios locales",
+        "intro": "Envía un dominio a otro servidor, como el router para home.lan o una zona inversa.",
+        "empty": "Ninguno. Todo va a los resolvedores de arriba.",
+        "domain": "Dominio",
+        "server": "Servidor",
+        "add": "Reenviar",
+        "remove": "Dejar de reenviar"
     }
 }

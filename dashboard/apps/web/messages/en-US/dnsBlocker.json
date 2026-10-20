@@ -136,7 +136,9 @@
         "invalidClient": "Not an address, a range or a device name:",
         "logDays": "Between 1 and {max} days.",
         "invalidAddress": "Not an IPv4 address.",
-        "invalidDeviceName": "Letters, digits, dots and dashes; no spaces."
+        "invalidDeviceName": "Letters, digits, dots and dashes; no spaces.",
+        "invalidDomain": "Not a domain name.",
+        "invalidForwardServer": "Not a server address, like 192.168.1.1."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -301,5 +303,14 @@
         "address": "Device address",
         "add": "Name it",
         "remove": "Remove name"
+    },
+    "forwards": {
+        "title": "Local domains",
+        "intro": "Send a domain to another server, like your router for home.lan or a reverse zone.",
+        "empty": "None. Every name goes to the resolvers above.",
+        "domain": "Domain",
+        "server": "Its server",
+        "add": "Forward",
+        "remove": "Stop forwarding"
     }
 }

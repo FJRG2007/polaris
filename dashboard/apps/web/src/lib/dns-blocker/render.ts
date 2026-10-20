@@ -144,6 +144,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                   }
               }
             : {}),
+        ...(settings.forwards.length > 0 ? { conditional: { mapping: forwardsOf(settings) } } : {}),
         ...(settings.namesFrom || settings.devices.length > 0
             ? { clientLookup: clientLookupOf(settings) }
             : {}),
@@ -158,6 +159,17 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
         queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: settings.logDays + 1 },
         log: { level: "info", format: "text", timestamp: true, privacy: false }
     };
+}
+
+/** Each forwarded domain and the servers it goes to, in the order typed. */
+function forwardsOf(settings: DnsSettings): Record<string, string> {
+    const mapping = new Map<string, string[]>();
+    for (const forward of settings.forwards) {
+        const servers = mapping.get(forward.domain) ?? [];
+        if (!servers.includes(forward.server)) servers.push(forward.server);
+        mapping.set(forward.domain, servers);
+    }
+    return Object.fromEntries([...mapping].map(([domain, servers]) => [domain, servers.join(",")]));
 }
 
 /** Where device names come from: the ones typed here, then the router. */

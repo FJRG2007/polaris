@@ -110,6 +110,9 @@ export function DnsBlockerView({
     const [logDays, setLogDays] = useState(String(initial.logDays));
     const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
     const [devices, setDevices] = useState(initial.devices);
+    const [forwards, setForwards] = useState(initial.forwards);
+    const [forwardDomain, setForwardDomain] = useState("");
+    const [forwardServer, setForwardServer] = useState("");
     const [deviceName, setDeviceName] = useState("");
     const [deviceAddress, setDeviceAddress] = useState("");
 
@@ -190,6 +193,7 @@ export function DnsBlockerView({
             clientGroups,
             logDays: days,
             devices,
+            forwards,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -205,6 +209,7 @@ export function DnsBlockerView({
             clientGroups,
             days,
             devices,
+            forwards,
             namesFrom
         ]
     );
@@ -230,6 +235,15 @@ export function DnsBlockerView({
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const newRecord = dns.dnsRecordSchema.safeParse({ name: recordName, address: recordAddress });
     const newAlias = dns.dnsAliasSchema.safeParse({ name: aliasName, target: aliasTarget });
+    const newForward = dns.dnsForwardSchema.safeParse({
+        domain: forwardDomain,
+        server: forwardServer
+    });
+    const forwardIssue = newForward.success
+        ? null
+        : (newForward.error.issues.find((issue) =>
+              issue.path[0] === "domain" ? forwardDomain.trim() !== "" : forwardServer.trim() !== ""
+          )?.message ?? null);
     const newDevice = dns.dnsDeviceSchema.safeParse({ name: deviceName, address: deviceAddress });
     const deviceIssue = newDevice.success
         ? null
@@ -751,6 +765,88 @@ export function DnsBlockerView({
                             {t("aliases.add")}
                         </Button>
                     </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("forwards.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("forwards.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {forwards.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("forwards.empty")}</p>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {forwards.map((forward, index) => (
+                                <li
+                                    key={`${forward.domain}-${forward.server}-${index}`}
+                                    className="flex min-w-0 items-center gap-2 rounded-md bg-muted p-2 text-sm"
+                                >
+                                    <span className="min-w-0 flex-1 break-all font-mono text-xs">
+                                        {forward.domain}
+                                    </span>
+                                    <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">
+                                        {forward.server}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`${t("forwards.remove")}: ${forward.domain}`}
+                                        title={t("forwards.remove")}
+                                        onClick={() =>
+                                            setForwards((current) =>
+                                                current.filter((_, at) => at !== index)
+                                            )
+                                        }
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                        <Input
+                            className="sm:w-56"
+                            value={forwardDomain}
+                            placeholder="home.lan"
+                            aria-label={t("forwards.domain")}
+                            aria-invalid={forwardIssue === "invalidName"}
+                            onChange={(event) => setForwardDomain(event.target.value)}
+                        />
+                        <Input
+                            className="sm:w-56"
+                            value={forwardServer}
+                            placeholder="192.168.1.1"
+                            aria-label={t("forwards.server")}
+                            aria-invalid={forwardIssue === "invalidUpstream"}
+                            onChange={(event) => setForwardServer(event.target.value)}
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                                !newForward.success || forwards.length >= dns.DNS_LIMITS.forwards
+                            }
+                            onClick={() => {
+                                if (!newForward.success) return;
+                                setForwards((current) => [...current, newForward.data]);
+                                setForwardDomain("");
+                                setForwardServer("");
+                            }}
+                        >
+                            <Plus />
+                            {t("forwards.add")}
+                        </Button>
+                    </div>
+                    {forwardIssue ? (
+                        <span className="text-xs text-danger-ink">
+                            {forwardIssue === "invalidName"
+                                ? t("validation.invalidDomain")
+                                : t("validation.invalidForwardServer")}
+                        </span>
+                    ) : null}
                 </CardBody>
             </Card>
 

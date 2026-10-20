@@ -214,3 +214,32 @@ describe("device names", () => {
         expect(dns.readDnsSettings({}).devices).toEqual([]);
     });
 });
+
+describe("local domains", () => {
+    it("sends each domain to its servers, merged by domain", () => {
+        const forwards = [
+            { domain: "home.lan", server: "192.168.1.1" },
+            { domain: "home.lan", server: "192.168.1.2:5353" },
+            { domain: "168.192.in-addr.arpa", server: "192.168.1.1" }
+        ];
+        expect(render.blockyConfig(settings({ forwards })).conditional).toEqual({
+            mapping: {
+                "home.lan": "192.168.1.1,192.168.1.2:5353",
+                "168.192.in-addr.arpa": "192.168.1.1"
+            }
+        });
+        expect(render.blockyConfig(settings()).conditional).toBeUndefined();
+    });
+
+    it("normalizes the domain and refuses a server that is not one", () => {
+        expect(dns.dnsForwardSchema.parse({ domain: "Home.LAN.", server: " 192.168.1.1 " })).toEqual(
+            { domain: "home.lan", server: "192.168.1.1" }
+        );
+        expect(dns.dnsForwardSchema.safeParse({ domain: "home.lan", server: "router" }).success).toBe(
+            false
+        );
+        expect(dns.readDnsSettings({ forwards: [{ domain: "x y", server: "1.1.1.1" }] }).forwards).toEqual(
+            []
+        );
+    });
+});
