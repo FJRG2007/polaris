@@ -229,7 +229,7 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
         }),
         loadGraph(run.versionId)
     ]);
-    const episode = await getEpisode(run.automationId, episodeIdOf(run.cause));
+    const episode = canEdit ? await getEpisode(run.automationId, episodeIdOf(run.cause)) : null;
     return {
         id: run.id,
         automationId: run.automationId,

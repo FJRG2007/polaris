@@ -13,6 +13,7 @@ import { loadEnv } from "@polaris/config";
 import { createHash, createHmac } from "node:crypto";
 import type { StartedRun } from "./engine";
 import { fireTrigger } from "./combine";
+import { closeStrandedEpisodes } from "./alarm-episodes";
 
 /** The secret part of a webhook trigger's address. Derived, never stored; only its hash is. */
 export function hookToken(automationId: string, nodeId: string, rotation: number): string {
@@ -171,10 +172,24 @@ export async function armVersion(
             update: data
         });
     }
+    await closeStrandedEpisodes(automationId, openEpisodes(armed));
+}
+
+/** The alarm episodes armed threshold triggers still hold open in their memory. */
+function openEpisodes(
+    armed: readonly { nodeId: string; eventType: string; state: Record<string, unknown> }[]
+): { nodeId: string; startedAt: string }[] {
+    return armed.flatMap((row) => {
+        const episode = row.state.episode as { startedAt?: unknown } | null | undefined;
+        return row.eventType === "core.threshold" && typeof episode?.startedAt === "string"
+            ? [{ nodeId: row.nodeId, startedAt: episode.startedAt }]
+            : [];
+    });
 }
 
 export async function disarm(automationId: string): Promise<void> {
     await prisma.automationTrigger.deleteMany({ where: { automationId } });
+    await closeStrandedEpisodes(automationId, []);
 }
 
 /**

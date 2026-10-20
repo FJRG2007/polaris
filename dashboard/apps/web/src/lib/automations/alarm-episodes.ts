@@ -16,7 +16,11 @@ export const EPISODE_KEEP_DAYS = 90;
 /** At most this many per automation, newest kept. */
 export const EPISODE_KEEP_PER_AUTOMATION = 500;
 
-/** Open an episode on the way into alarm, close it on the way back. */
+/**
+ * Open an episode on the way into alarm, keep its worst value while it lasts,
+ * close it on the way back. Opening one closes any other the same trigger left
+ * open: only the trigger's current memory is still in alarm.
+ */
 export const recordEpisode: EpisodeRecorder = async (
     trigger: { automationId: string; nodeId: string },
     config: core.ThresholdConfig,
@@ -30,6 +34,16 @@ export const recordEpisode: EpisodeRecorder = async (
             startedAt
         }
     };
+    if (crossing.state === "alarm")
+        await prisma.automationAlarmEpisode.updateMany({
+            where: {
+                automationId: trigger.automationId,
+                nodeId: trigger.nodeId,
+                resolvedAt: null,
+                startedAt: { not: startedAt }
+            },
+            data: { resolvedAt: startedAt }
+        });
     const row = await prisma.automationAlarmEpisode.upsert({
         where: key,
         create: {
@@ -48,11 +62,42 @@ export const recordEpisode: EpisodeRecorder = async (
         update:
             crossing.state === "ok"
                 ? { resolvedAt: crossing.at, endValue: crossing.value, peakValue: crossing.peak }
-                : {},
+                : { resolvedAt: null, endValue: null, peakValue: crossing.peak },
         select: { id: true }
     });
     return row.id;
 };
+
+/**
+ * Close the open episodes of an automation that no armed trigger is still in:
+ * a trigger removed or re-configured on publish, or the automation switched
+ * off. `keep` names the ones the armed triggers' memory still holds open.
+ */
+export async function closeStrandedEpisodes(
+    automationId: string,
+    keep: readonly { nodeId: string; startedAt: string }[],
+    at = new Date()
+): Promise<number> {
+    const open = await prisma.automationAlarmEpisode.findMany({
+        where: { automationId, resolvedAt: null },
+        select: { id: true, nodeId: true, startedAt: true },
+        take: 1000
+    });
+    const stranded = open.filter(
+        (row) =>
+            !keep.some(
+                (held) =>
+                    held.nodeId === row.nodeId &&
+                    Date.parse(held.startedAt) === row.startedAt.getTime()
+            )
+    );
+    if (stranded.length === 0) return 0;
+    const closed = await prisma.automationAlarmEpisode.updateMany({
+        where: { id: { in: stranded.map((row) => row.id) }, resolvedAt: null },
+        data: { resolvedAt: at }
+    });
+    return closed.count;
+}
 
 export interface EpisodeView {
     readonly id: string;

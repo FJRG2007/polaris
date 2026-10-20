@@ -135,6 +135,53 @@ describe("alarm episodes", () => {
         expect(episode).toMatchObject({ resolvedAt: null, durationSeconds: null });
     });
 
+    it("keeps the worst value of an alarm still going on", async () => {
+        const automationId = await seed();
+        for (const [minute, value] of [95, 96, 99, 97].entries()) await check(value, minute);
+        const [episode] = await episodes.listEpisodes(automationId);
+        expect(episode).toMatchObject({ startValue: 96, peakValue: 99, resolvedAt: null });
+    });
+
+    it("closes an open alarm when the trigger is re-configured or switched off, not when republished as is", async () => {
+        const automationId = await seed();
+        await check(95, 0);
+        await check(96, 1);
+        const automation = fake().tables.automation!.find((row) => row.id === automationId)!;
+        const version = fake().tables.automationVersion!.find(
+            (row) => row.id === automation.publishedVersionId
+        )!;
+        const graph = version.graph as core.AutomationGraph;
+        await triggers.armVersion(automationId, version.id as string, graph);
+        expect((await episodes.listEpisodes(automationId))[0]!.resolvedAt).toBeNull();
+        const changed = {
+            ...graph,
+            nodes: graph.nodes.map((node) =>
+                node.id === "t1" ? { ...node, config: { ...node.config, value: 80 } } : node
+            )
+        };
+        await triggers.armVersion(automationId, version.id as string, changed);
+        expect((await episodes.listEpisodes(automationId))[0]!.resolvedAt).not.toBeNull();
+
+        fake().tables.automationAlarmEpisode = [];
+        await triggers.armVersion(automationId, version.id as string, graph);
+        await check(95, 2);
+        await check(96, 3);
+        await triggers.disarm(automationId);
+        expect((await episodes.listEpisodes(automationId))[0]!.resolvedAt).not.toBeNull();
+    });
+
+    it("closes an episode the trigger left open when a new one opens", async () => {
+        const automationId = await seed();
+        await check(95, 0);
+        await check(96, 1);
+        const trigger = fake().tables.automationTrigger!.find((row) => row.nodeId === "t1")!;
+        trigger.state = { ...(trigger.state as object), state: "ok", streak: 1, episode: null };
+        await check(97, 2);
+        const [newer, older] = await episodes.listEpisodes(automationId);
+        expect(newer).toMatchObject({ startValue: 97, resolvedAt: null });
+        expect(older!.resolvedAt).toBe(newer!.startedAt);
+    });
+
     it("finds the same row when a crossing is recorded twice", async () => {
         const automationId = await seed();
         const config = core.thresholdConfigSchema.parse({
@@ -173,7 +220,13 @@ describe("alarm episodes", () => {
         };
         const table: Record<string, unknown>[] = [];
         fake().tables.automationAlarmEpisode = table;
-        table.push({ ...base, id: "old-resolved", automationId: "a1", startedAt: old, resolvedAt: old });
+        table.push({
+            ...base,
+            id: "old-resolved",
+            automationId: "a1",
+            startedAt: old,
+            resolvedAt: old
+        });
         table.push({
             ...base,
             id: "old-open",

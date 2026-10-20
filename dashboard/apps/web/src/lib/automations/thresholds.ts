@@ -136,11 +136,21 @@ export function judge(
         const episode = { startedAt: at, startValue: reading.value, peak: reading.value };
         return {
             memory: { ...base, episode },
-            crossing: { state: "alarm", at: reading.at, value: reading.value, ...episode, durationSeconds: null }
+            crossing: {
+                state: "alarm",
+                at: reading.at,
+                value: reading.value,
+                ...episode,
+                durationSeconds: null
+            }
         };
     }
     if (step.transition === "resolved") {
-        const episode = memory.episode ?? { startedAt: at, startValue: reading.value, peak: reading.value };
+        const episode = memory.episode ?? {
+            startedAt: at,
+            startValue: reading.value,
+            peak: reading.value
+        };
         return {
             memory: { ...base, episode: null },
             crossing: {
@@ -157,7 +167,10 @@ export function judge(
     }
     const episode =
         base.state === "alarm" && memory.episode
-            ? { ...memory.episode, peak: worse(config.comparator, memory.episode.peak, reading.value) }
+            ? {
+                  ...memory.episode,
+                  peak: worse(config.comparator, memory.episode.peak, reading.value)
+              }
             : memory.episode;
     return { memory: { ...base, episode }, crossing: null };
 }
@@ -278,6 +291,17 @@ async function checkOne(
                 cause: crossingCause(row.nodeId, config, crossing, episodeId),
                 depth: 0
             });
+    } else if (next.episode && memory.episode && next.episode.peak !== memory.episode.peak) {
+        const worsened: Crossing = {
+            state: "alarm",
+            at: next.sampledAt ? new Date(next.sampledAt) : now,
+            value: next.value ?? next.episode.peak,
+            ...next.episode,
+            durationSeconds: null
+        };
+        await record(row, config, worsened).catch((caught) =>
+            console.error("polaris: an alarm episode's worst value failed to save:", caught)
+        );
     }
     await prisma.automationTrigger.updateMany({
         where: { id: row.id },

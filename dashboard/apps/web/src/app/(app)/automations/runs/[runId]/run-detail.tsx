@@ -215,7 +215,7 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                 }
             />
             {run.error ? <p className="text-sm text-danger">{words(run.error)}</p> : null}
-            {run.episode ? <AlarmEpisodeCard episode={run.episode} /> : null}
+            {run.canSeeData && run.episode ? <AlarmEpisodeCard episode={run.episode} /> : null}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
                 <div className="h-[60vh] min-h-[22rem] min-w-0">
                     {graph ? (

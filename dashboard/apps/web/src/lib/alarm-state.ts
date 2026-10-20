@@ -11,8 +11,10 @@
  * Pure, so the rule is asserted in one place and both callers keep it.
  */
 
-export const COMPARATORS = ["gt", "gte", "lt", "lte"] as const;
-export type Comparator = (typeof COMPARATORS)[number];
+import * as core from "@polaris/core";
+
+export const COMPARATORS = core.THRESHOLD_COMPARATORS;
+export type Comparator = core.ThresholdComparator;
 
 /** Whether `value` breaches `threshold`. Anything unknown reads as "above". */
 export function compare(value: number, comparator: string, threshold: number): boolean {
@@ -45,7 +47,8 @@ export function stepAlarm(
     sample: { readonly breach: boolean; readonly insufficient: boolean },
     forPeriods: number
 ): AlarmStep {
-    if (sample.insufficient) return { state: "insufficient", streak: prior.streak, transition: null };
+    if (sample.insufficient)
+        return { state: "insufficient", streak: prior.streak, transition: null };
     if (sample.breach) {
         const streak = prior.streak + 1;
         if (streak >= forPeriods)
