@@ -567,7 +567,9 @@
             "close": "Cerrar",
             "operate": "Accionar",
             "watch": "Ver",
-            "control": "Controlar"
+            "control": "Controlar",
+            "fan": "Ventilador",
+            "backup": "Lanzar copia"
         },
         "capabilities": {
             "guest": {
