@@ -226,3 +226,28 @@ describe("rowTime", () => {
         expect(rowTime(yesterday, now)).toContain("19");
     });
 });
+
+describe("DnsBlockerView device names", () => {
+    it("adds a name only when both fields are valid, and says which one is not", async () => {
+        standing("off");
+        await shown();
+        const add = screen.getByRole("button", { name: "Name it" });
+        fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
+            target: { value: "ana laptop" }
+        });
+        fireEvent.change(screen.getByRole("textbox", { name: "Device address" }), {
+            target: { value: "192.168.1.20" }
+        });
+        expect(add).toHaveProperty("disabled", true);
+        expect(screen.getByText("Letters, digits, dots and dashes; no spaces.")).toBeTruthy();
+        fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
+            target: { value: "Ana-Laptop" }
+        });
+        expect(add).toHaveProperty("disabled", false);
+        fireEvent.click(add);
+        expect(screen.getByText("ana-laptop")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(
+            false
+        );
+    });
+});

@@ -109,6 +109,9 @@ export function DnsBlockerView({
     const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
     const [logDays, setLogDays] = useState(String(initial.logDays));
     const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
+    const [devices, setDevices] = useState(initial.devices);
+    const [deviceName, setDeviceName] = useState("");
+    const [deviceAddress, setDeviceAddress] = useState("");
 
     /** A rule set from the query log: the lists as saved, without touching
      *  a list somebody is editing here. */
@@ -186,6 +189,7 @@ export function DnsBlockerView({
             aliases,
             clientGroups,
             logDays: days,
+            devices,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -200,6 +204,7 @@ export function DnsBlockerView({
             aliases,
             clientGroups,
             days,
+            devices,
             namesFrom
         ]
     );
@@ -225,6 +230,12 @@ export function DnsBlockerView({
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const newRecord = dns.dnsRecordSchema.safeParse({ name: recordName, address: recordAddress });
     const newAlias = dns.dnsAliasSchema.safeParse({ name: aliasName, target: aliasTarget });
+    const newDevice = dns.dnsDeviceSchema.safeParse({ name: deviceName, address: deviceAddress });
+    const deviceIssue = newDevice.success
+        ? null
+        : (newDevice.error.issues.find((issue) =>
+              issue.path[0] === "name" ? deviceName.trim() !== "" : deviceAddress.trim() !== ""
+          )?.message ?? null);
     const badGroupClients = rejected(groupClients, dns.normalizeDnsClient);
     const newGroup = dns.dnsClientGroupSchema.safeParse({
         name: groupName,
@@ -740,6 +751,86 @@ export function DnsBlockerView({
                             {t("aliases.add")}
                         </Button>
                     </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("devices.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("devices.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {devices.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("devices.empty")}</p>
+                    ) : (
+                        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {devices.map((device, index) => (
+                                <li
+                                    key={`${device.name}-${device.address}-${index}`}
+                                    className="flex min-w-0 items-center gap-2 rounded-md bg-muted p-2 text-sm"
+                                >
+                                    <span className="min-w-0 flex-1 break-all font-medium">
+                                        {device.name}
+                                    </span>
+                                    <span className="min-w-0 break-all text-xs text-muted-foreground">
+                                        {device.address}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`${t("devices.remove")}: ${device.name}`}
+                                        title={t("devices.remove")}
+                                        onClick={() =>
+                                            setDevices((current) =>
+                                                current.filter((_, at) => at !== index)
+                                            )
+                                        }
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                        <Input
+                            className="sm:w-56"
+                            value={deviceName}
+                            placeholder={t("devices.namePlaceholder")}
+                            aria-label={t("devices.name")}
+                            aria-invalid={deviceIssue === "invalidDeviceName"}
+                            onChange={(event) => setDeviceName(event.target.value)}
+                        />
+                        <Input
+                            className="sm:w-56"
+                            value={deviceAddress}
+                            placeholder="192.168.1.20"
+                            aria-label={t("devices.address")}
+                            aria-invalid={deviceIssue === "invalidAddress"}
+                            onChange={(event) => setDeviceAddress(event.target.value)}
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!newDevice.success || devices.length >= dns.DNS_LIMITS.devices}
+                            onClick={() => {
+                                if (!newDevice.success) return;
+                                setDevices((current) => [...current, newDevice.data]);
+                                setDeviceName("");
+                                setDeviceAddress("");
+                            }}
+                        >
+                            <Plus />
+                            {t("devices.add")}
+                        </Button>
+                    </div>
+                    {deviceIssue ? (
+                        <span className="text-xs text-danger-ink">
+                            {deviceIssue === "invalidDeviceName"
+                                ? t("validation.invalidDeviceName")
+                                : t("validation.invalidAddress")}
+                        </span>
+                    ) : null}
                 </CardBody>
             </Card>
 

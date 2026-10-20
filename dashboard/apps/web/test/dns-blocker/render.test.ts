@@ -186,3 +186,31 @@ describe("Pi-hole parity settings", () => {
         expect(dns.normalizeDnsClient("a b")).toBeNull();
     });
 });
+
+describe("device names", () => {
+    it("names devices by hand, merged by name, beside the router's names", () => {
+        const devices = [
+            { name: "ana-laptop", address: "192.168.1.20" },
+            { name: "ana-laptop", address: "fd00::20" },
+            { name: "tv", address: "192.168.1.30" }
+        ];
+        expect(render.blockyConfig(settings({ devices })).clientLookup).toEqual({
+            clients: { "ana-laptop": ["192.168.1.20", "fd00::20"], tv: ["192.168.1.30"] }
+        });
+        expect(
+            render.blockyConfig(settings({ devices, namesFrom: "192.168.1.1" })).clientLookup
+        ).toMatchObject({ upstream: "192.168.1.1", singleNameOrder: [1] });
+    });
+
+    it("normalizes a typed name and refuses one with spaces", () => {
+        expect(
+            dns.dnsDeviceSchema.parse({ name: " Ana-Laptop ", address: " 192.168.1.20 " })
+        ).toEqual({ name: "ana-laptop", address: "192.168.1.20" });
+        expect(dns.dnsDeviceSchema.safeParse({ name: "ana laptop", address: "192.168.1.20" })
+            .success).toBe(false);
+        expect(dns.dnsDeviceSchema.safeParse({ name: "tv", address: "not-an-ip" }).success).toBe(
+            false
+        );
+        expect(dns.readDnsSettings({}).devices).toEqual([]);
+    });
+});

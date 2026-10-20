@@ -144,8 +144,8 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                   }
               }
             : {}),
-        ...(settings.namesFrom
-            ? { clientLookup: { upstream: settings.namesFrom, singleNameOrder: [1] } }
+        ...(settings.namesFrom || settings.devices.length > 0
+            ? { clientLookup: clientLookupOf(settings) }
             : {}),
         // Read on the container's loopback only (the HTTP port is never
         // published): how many names each category's lists hold, and when they
@@ -157,6 +157,20 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
         // a day more than asked, so the oldest day is still whole.
         queryLog: { type: "csv", target: QUERY_LOG_DIR, logRetentionDays: settings.logDays + 1 },
         log: { level: "info", format: "text", timestamp: true, privacy: false }
+    };
+}
+
+/** Where device names come from: the ones typed here, then the router. */
+function clientLookupOf(settings: DnsSettings): Record<string, unknown> {
+    const clients = new Map<string, string[]>();
+    for (const device of settings.devices) {
+        const addresses = clients.get(device.name) ?? [];
+        if (!addresses.includes(device.address)) addresses.push(device.address);
+        clients.set(device.name, addresses);
+    }
+    return {
+        ...(settings.namesFrom ? { upstream: settings.namesFrom, singleNameOrder: [1] } : {}),
+        ...(clients.size > 0 ? { clients: Object.fromEntries(clients) } : {})
     };
 }
 

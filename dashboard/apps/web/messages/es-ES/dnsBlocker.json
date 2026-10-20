@@ -135,7 +135,8 @@
         "aliasClash": "Estos nombres son a la vez alias y nombre local: {names}. Deja solo uno.",
         "invalidClient": "No es una dirección, un rango ni un nombre de dispositivo:",
         "logDays": "Entre 1 y {max} días.",
-        "invalidAddress": "No es una dirección IPv4."
+        "invalidAddress": "No es una dirección IPv4.",
+        "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -290,5 +291,15 @@
             "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador en las últimas 24 horas:",
             "logOff": "El bloqueador aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
         }
+    },
+    "devices": {
+        "title": "Dispositivos",
+        "intro": "Pon nombre a un dispositivo por su dirección. El registro lo muestra y un grupo lo usa.",
+        "empty": "Sin nombres. Se ven por dirección o por el nombre que les da el router.",
+        "name": "Nombre",
+        "namePlaceholder": "portatil-ana",
+        "address": "Dirección",
+        "add": "Nombrar",
+        "remove": "Quitar nombre"
     }
 }

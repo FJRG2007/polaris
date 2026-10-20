@@ -159,6 +159,7 @@ export const DNS_LIMITS = {
     records: 200,
     upstreams: 8,
     clientGroups: 20,
+    devices: 200,
     groupClients: 50,
     /** Days of lookups the engine keeps, which is as far back as the screen reads. */
     logDays: 30
@@ -298,6 +299,23 @@ export function normalizeDnsClient(text: string): string | null {
     return /^[a-z0-9*](?:[a-z0-9*._-]{0,62})$/.test(value) ? value : null;
 }
 
+/** A device named by hand: the name the log shows and a group can hold. */
+export const dnsDeviceSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine((value) => /^[a-z0-9](?:[a-z0-9._-]{0,62})$/.test(value), "invalidDeviceName"),
+    address: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine(
+            (value) => IPV4.test(value) || (value.includes(":") && IPV6.test(value)),
+            "invalidAddress"
+        )
+});
+
 const clientSchema = z.string().transform((value, ctx) => {
     const client = normalizeDnsClient(value);
     if (!client) {
@@ -349,6 +367,8 @@ export const dnsSettingsSchema = z.object({
     clientGroups: z.array(dnsClientGroupSchema).max(DNS_LIMITS.clientGroups),
     /** How many days of lookups are kept. */
     logDays: z.number().int().min(1).max(DNS_LIMITS.logDays),
+    /** Devices named by hand, which win over a name the router reports. */
+    devices: z.array(dnsDeviceSchema).max(DNS_LIMITS.devices),
     /** The router asked for device names (reverse lookups), or "" for none. */
     namesFrom: z
         .string()
@@ -361,6 +381,7 @@ export type DnsRecord = z.infer<typeof dnsRecordSchema>;
 export type DnsCustomList = z.infer<typeof dnsCustomListSchema>;
 export type DnsAlias = z.infer<typeof dnsAliasSchema>;
 export type DnsClientGroup = z.infer<typeof dnsClientGroupSchema>;
+export type DnsDevice = z.infer<typeof dnsDeviceSchema>;
 
 export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     sources: DNS_LIST_SOURCES.filter((source) => source.recommended).map((source) => source.id),
@@ -374,6 +395,7 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     aliases: [],
     clientGroups: [],
     logDays: 7,
+    devices: [],
     namesFrom: ""
 };
 
@@ -409,6 +431,7 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         aliases: field("aliases"),
         clientGroups: field("clientGroups"),
         logDays: field("logDays"),
+        devices: field("devices"),
         namesFrom: field("namesFrom")
     };
 }

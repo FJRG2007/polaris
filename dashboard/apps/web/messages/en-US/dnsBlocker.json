@@ -135,7 +135,8 @@
         "aliasClash": "These names are both an alias and a local name: {names}. Keep one.",
         "invalidClient": "Not an address, a range or a device name:",
         "logDays": "Between 1 and {max} days.",
-        "invalidAddress": "Not an IPv4 address."
+        "invalidAddress": "Not an IPv4 address.",
+        "invalidDeviceName": "Letters, digits, dots and dashes; no spaces."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -290,5 +291,15 @@
             "devices": "{count, plural, one {One device has} other {# devices have}} used the blocker in the last 24 hours:",
             "logOff": "The blocker is not keeping a log yet, so Polaris cannot see which devices use it. Apply the settings below once and check again."
         }
+    },
+    "devices": {
+        "title": "Device names",
+        "intro": "Name a device by its address. The log shows the name, and a group can hold it.",
+        "empty": "No names yet. Devices show by address, or by the name your router gives them.",
+        "name": "Device name",
+        "namePlaceholder": "ana-laptop",
+        "address": "Device address",
+        "add": "Name it",
+        "remove": "Remove name"
     }
 }
