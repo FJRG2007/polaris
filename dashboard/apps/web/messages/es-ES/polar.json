@@ -270,7 +270,8 @@
             "too_large": "{name} pesa más de 10 MB.",
             "rate_limited": "Demasiadas subidas. Espera un minuto.",
             "storage_failed": "{name} no se pudo guardar. Reinténtalo.",
-            "upload_failed": "{name} no se subió. Reinténtalo."
+            "upload_failed": "{name} no se subió. Reinténtalo.",
+            "not_found": "No se pudo adjuntar {name}. Ya no existe o no es tuyo."
         },
         "open": "Abrir {name}",
         "retry": "Reintentar {name}",

@@ -66,6 +66,7 @@ import {
     type MailListAnswer
 } from "./use-mail-list";
 import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
+import * as droppedItems from "@/lib/polar/dropped-items";
 import {
     useCallback,
     useEffect,
@@ -2496,6 +2497,18 @@ function ThreadRow({
                 event.dataTransfer.setData(MAIL_DRAG_TYPE, carried.join(","));
                 // Firefox refuses a drag with no plain payload at all.
                 event.dataTransfer.setData("text/plain", "");
+                // And onto Polar, to ask about them.
+                droppedItems.writeDraggedItems(
+                    event.dataTransfer,
+                    carried.map((id) => ({
+                        kind: "mail-message" as const,
+                        id,
+                        title:
+                            carried.length === 1 && thread.subject
+                                ? thread.subject.slice(0, 255)
+                                : undefined
+                    }))
+                );
             }}
             className={cn(
                 // Rows scrolled out of view are not laid out or painted. A list

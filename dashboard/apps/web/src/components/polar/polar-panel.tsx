@@ -80,6 +80,7 @@ import {
 import { PolarThreads } from "@/components/polar/polar-threads";
 import { PolarSettings, ToolSettings } from "@/components/polar/polar-settings";
 import * as polarShared from "@/lib/polar/shared";
+import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
 import {
@@ -600,7 +601,8 @@ const UPLOAD_ERRORS = [
     "too_large",
     "rate_limited",
     "storage_failed",
-    "upload_failed"
+    "upload_failed",
+    "not_found"
 ] as const;
 type UploadError = (typeof UPLOAD_ERRORS)[number];
 
@@ -620,6 +622,23 @@ export function pastedFiles(data: DataTransfer): File[] {
         const file = item.kind === "file" ? item.getAsFile() : null;
         return file ? [file] : [];
     });
+}
+
+/** An item dragged in from another app, stored by the server as the caller. */
+async function attachItem(item: droppedItems.DroppedItem): Promise<AttachmentData | string> {
+    const response = await fetch("/api/polar/attachments/item", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ item })
+    }).catch(() => null);
+    const body = response
+        ? ((await response.json().catch(() => null)) as {
+              error?: string;
+              file?: { id: string; url: string; filename: string; mediaType: string; size: number };
+          } | null)
+        : null;
+    if (!response?.ok || !body?.file) return body?.error ?? "upload_failed";
+    return { ...body.file };
 }
 
 async function uploadFile(
@@ -710,6 +729,8 @@ export function PolarChat({
     const [dragging, setDragging] = useState(false);
     /** The original of each staged file not yet stored, for a retry. */
     const picked = useRef(new Map<string, File>());
+    /** Likewise for items dragged in from another app. */
+    const dropped = useRef(new Map<string, droppedItems.DroppedItem>());
     const filesNow = useRef(files);
     filesNow.current = files;
     // The project a new chat is filed under when its first message is sent.
@@ -1191,17 +1212,31 @@ export function PolarChat({
     };
 
     /** Uploads one staged file, drawing its progress, and leaves it ready or failed. */
-    const upload = async (key: string, file: File) => {
-        const stored = await uploadFile(file, (share) =>
-            setFiles((current) =>
-                current.map((entry) => (entry.id === key ? { ...entry, progress: share } : entry))
+    const upload = (key: string, file: File) =>
+        settle(
+            key,
+            file.name,
+            uploadFile(file, (share) =>
+                setFiles((current) =>
+                    current.map((entry) =>
+                        entry.id === key ? { ...entry, progress: share } : entry
+                    )
+                )
             )
         );
+
+    /** One staged attachment, ready or failed once its store answers. */
+    const settle = async (
+        key: string,
+        name: string,
+        storing: Promise<AttachmentData | string>
+    ) => {
+        const stored = await storing;
         if (typeof stored === "string") {
             const code: UploadError = (UPLOAD_ERRORS as readonly string[]).includes(stored)
                 ? (stored as UploadError)
                 : "upload_failed";
-            const sentence = t(`files.errors.${code}`, { name: file.name });
+            const sentence = t(`files.errors.${code}`, { name });
             setFiles((current) =>
                 current.map((entry) =>
                     entry.id === key ? { ...entry, pending: false, failed: sentence } : entry
@@ -1211,6 +1246,7 @@ export function PolarChat({
             return;
         }
         picked.current.delete(key);
+        dropped.current.delete(key);
         // The local preview stays on the thumbnail until the file leaves the
         // composer, so the picture does not blink while the stored one loads.
         setFiles((current) =>
@@ -1252,7 +1288,71 @@ export function PolarChat({
         }
     };
 
+    /** Things dragged in from Mail, Drive or Chat, each stored by the server. */
+    const addItems = (items: droppedItems.DroppedItem[]) => {
+        const room = Math.max(0, POLAR_ATTACHMENT_MOST - filesNow.current.length);
+        setFileError(
+            items.length > room ? t("files.tooMany", { most: POLAR_ATTACHMENT_MOST }) : null
+        );
+        for (const item of items.slice(0, room)) {
+            const key = newId();
+            const name = droppedItems.itemLabel(item);
+            dropped.current.set(key, item);
+            setFiles((current) => [
+                ...current,
+                {
+                    id: key,
+                    url: "",
+                    filename: name,
+                    mediaType: "",
+                    size: 0,
+                    pending: true,
+                    progress: 0
+                }
+            ]);
+            void settle(key, name, attachItem(item));
+        }
+    };
+
+    /** A drop of files from the computer or of items from an app, anywhere on the chat. */
+    const droppable = (types: readonly string[]) =>
+        !noKeys && (types.includes("Files") || droppedItems.carriesItems(types));
+    const dropHandlers = {
+        onDragOver: (event: React.DragEvent) => {
+            if (!droppable(Array.from(event.dataTransfer.types))) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setDragging(true);
+        },
+        onDragLeave: (event: React.DragEvent) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                setDragging(false);
+        },
+        onDrop: (event: React.DragEvent) => {
+            const types = Array.from(event.dataTransfer.types);
+            if (!droppable(types)) return;
+            event.preventDefault();
+            setDragging(false);
+            const items = droppedItems.carriesItems(types)
+                ? droppedItems.readDraggedItems(event.dataTransfer)
+                : null;
+            if (items) addItems(items);
+            else if (types.includes("Files")) addFiles(Array.from(event.dataTransfer.files));
+        }
+    };
+
     const retryFile = (file: AttachmentData) => {
+        const item = dropped.current.get(file.id);
+        if (item) {
+            setFileError(null);
+            setFiles((current) =>
+                current.map((entry) =>
+                    entry.id === file.id ? { ...entry, pending: true, failed: undefined } : entry
+                )
+            );
+            void settle(file.id, droppedItems.itemLabel(item), attachItem(item));
+            return;
+        }
         const original = picked.current.get(file.id);
         if (!original) return;
         setFileError(null);
@@ -1270,6 +1370,7 @@ export function PolarChat({
         setFiles((current) => current.filter((entry) => entry.id !== file.id));
         if (file.preview) URL.revokeObjectURL(file.preview);
         picked.current.delete(file.id);
+        dropped.current.delete(file.id);
         const stored = file.pending ? null : polarAttachmentId(file.url);
         if (stored) {
             void fetch(`/api/polar/attachments/${encodeURIComponent(stored)}`, {
@@ -1686,23 +1787,6 @@ export function PolarChat({
                 <PromptInput
                     onSubmit={submit}
                     className={cn(dragging && "border-primary bg-primary/10")}
-                    onDragOver={(event) => {
-                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files"))
-                            return;
-                        event.preventDefault();
-                        setDragging(true);
-                    }}
-                    onDragLeave={(event) => {
-                        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-                            setDragging(false);
-                    }}
-                    onDrop={(event) => {
-                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files"))
-                            return;
-                        event.preventDefault();
-                        setDragging(false);
-                        addFiles(Array.from(event.dataTransfer.files));
-                    }}
                 >
                     <PromptInputHeader>
                         {context ? (
@@ -1899,7 +1983,15 @@ export function PolarChat({
     );
 
     return (
-        <div className="relative flex h-full min-h-0 min-w-0 flex-1">
+        <div className="relative flex h-full min-h-0 min-w-0 flex-1" {...dropHandlers}>
+            {dragging ? (
+                // The whole chat takes the drop, so it is the whole chat that says so.
+                <div
+                    aria-hidden
+                    data-polar-drop-target
+                    className="pointer-events-none absolute inset-1 z-30 rounded-lg border-2 border-dashed border-primary bg-primary/5"
+                />
+            ) : null}
             {sidebarShown ? (
                 // The app rail's own width and surface: on this page it is the
                 // only sidebar, so it reads as the one every other app has.

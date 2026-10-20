@@ -54,6 +54,7 @@ import { EmojiPicker } from "./emoji-picker";
 import type { SpaceEmojiScope } from "./space-emoji";
 import { EmojiFace } from "@/components/rich-text/custom-emoji";
 import { embedFor } from "@/lib/chat/embeds";
+import * as droppedItems from "@/lib/polar/dropped-items";
 import { LinkCard } from "./link-card";
 import { EditHistoryDialog } from "./edit-history-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -1474,6 +1475,18 @@ function KeepableImage({
                 <img
                     src={href}
                     alt={alt}
+                    // Dragged onto Polar, it is attached there - read again on
+                    // the server through this conversation's own access.
+                    onDragStart={(event) => {
+                        const id = source.startsWith("attachment:")
+                            ? source.slice("attachment:".length)
+                            : null;
+                        if (!id) return;
+                        event.dataTransfer.effectAllowed = "copyLink";
+                        droppedItems.writeDraggedItems(event.dataTransfer, [
+                            { kind: "chat-attachment", id, title: name.slice(0, 255) || undefined }
+                        ]);
+                    }}
                     className="max-h-72 max-w-full rounded-md border border-border object-contain"
                 />
             </button>
