@@ -1,0 +1,136 @@
+"use server";
+
+/**
+ * Polar's Code side: the person's agent sessions, read for the sidebar.
+ *
+ * Code work in Polar is an Agents session - the harness, the repository, the
+ * branch - and never an answer from the chat model. So everything here is the
+ * Agents app's own actions, asked only once this account is known to hold the
+ * permission: those actions send somebody without it to another page, which a
+ * panel open beside some other screen must never do.
+ *
+ * The labels are translated here rather than in the browser so the panel does
+ * not have to carry the whole Agents catalog onto every page.
+ */
+
+import * as core from "@polaris/core";
+import { getTranslations } from "@/lib/i18n/request";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { requireUser, userHasManage } from "@/lib/session";
+import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
+import { listSessionsAction, sessionDetailAction } from "@/app/(app)/apps/agents/sessions/actions";
+
+/** What this account may do on the Code side: nothing, read sessions, or start them. */
+export type PolarCodeAccess = "none" | "read" | "manage";
+
+export interface PolarCodeRow {
+    readonly id: string;
+    readonly title: string;
+    /** `owner/name`, or empty for a workspace with nothing checked out. */
+    readonly repo: string;
+    readonly branch: string;
+    readonly state: core.AgentSessionState;
+    readonly stateLabel: string;
+    /** Whether it can still be told something. */
+    readonly live: boolean;
+    readonly createdAt: string;
+}
+
+export interface PolarCodeOverview {
+    readonly access: PolarCodeAccess;
+    readonly sessions: readonly PolarCodeRow[];
+}
+
+export interface PolarCodeEntry {
+    readonly at: string;
+    /** A message somebody said, or a line of what the agent did. */
+    readonly type: "message" | "event";
+    readonly role: string;
+    readonly text: string;
+    readonly detail: string;
+}
+
+export interface PolarCodeThread {
+    readonly session: PolarCodeRow;
+    readonly entries: readonly PolarCodeEntry[];
+    readonly error: string | null;
+}
+
+/** As many sessions as a sidebar has room to be useful with; the full list is
+ *  one click away on the Agents page. */
+const LISTED = 50;
+
+/** As many lines of activity as the thread shows; the session's own page keeps
+ *  the rest. */
+const EVENTS_SHOWN = 80;
+
+async function accessOf(): Promise<PolarCodeAccess> {
+    const user = await requireUser();
+    if (await userHasManage(user, "agents.manage")) return "manage";
+    if (await userHasManage(user, "agents.read")) return "read";
+    return "none";
+}
+
+function rowOf(
+    t: NamespaceTranslator<"agents">,
+    session: {
+        id: string;
+        title: string;
+        repoFullName: string;
+        branch: string;
+        state: core.AgentSessionState;
+        lastEventAt: string | null;
+        createdAt: string;
+    }
+): PolarCodeRow {
+    return {
+        id: session.id,
+        title: session.title,
+        repo: session.repoFullName,
+        branch: session.branch,
+        state: session.state,
+        stateLabel: sessionStateWord(t, session.state, session.lastEventAt !== null),
+        live: !core.isSessionOver(session.state),
+        createdAt: session.createdAt
+    };
+}
+
+/** Whether Code is open to this account, and its sessions when it is. */
+export async function polarCodeAction(): Promise<PolarCodeOverview> {
+    const access = await accessOf();
+    if (access === "none") return { access, sessions: [] };
+    const [list, t] = await Promise.all([listSessionsAction(), getTranslations("agents")]);
+    return { access, sessions: list.slice(0, LISTED).map((session) => rowOf(t, session)) };
+}
+
+/** One session as the thread shows it, or null when it is not this account's. */
+export async function polarCodeThreadAction(sessionId: string): Promise<PolarCodeThread | null> {
+    if ((await accessOf()) === "none") return null;
+    const [detail, t] = await Promise.all([sessionDetailAction(sessionId), getTranslations("agents")]);
+    if (!detail) return null;
+    const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
+        at: message.at,
+        type: "message",
+        role: message.role,
+        text: message.body,
+        detail: ""
+    }));
+    const events: PolarCodeEntry[] = detail.events.slice(-EVENTS_SHOWN).map((event) => {
+        const key = SESSION_EVENT_KEYS[event.kind];
+        return {
+            at: event.at,
+            type: "event",
+            role: event.kind,
+            text: key ? t(key) : event.kind,
+            detail: event.detail ? agentText(t, event.detail) : event.subject
+        };
+    });
+    // Stable on equal times, so a prompt and the event it caused keep the order
+    // they were written in.
+    const entries = [...messages, ...events].sort((a, b) => a.at.localeCompare(b.at));
+    return {
+        session: rowOf(t, detail.session),
+        entries,
+        error: detail.session.error ? agentText(t, detail.session.error) : null
+    };
+}

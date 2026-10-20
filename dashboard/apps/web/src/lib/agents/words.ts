@@ -205,3 +205,23 @@ export function sessionStateWord(
 ): string {
     return agentWord(t, "sessionState", state === "idle" && !hasReported ? "starting" : state);
 }
+
+/** How each event reads on a session's activity strip - its own page and Polar's
+ *  Code view. Written as what happened rather than as the event's own name,
+ *  because nobody outside this codebase knows what `tool.start` is and everybody
+ *  knows what "ran" means. */
+export const SESSION_EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "session.start": "session.events.sessionStart",
+    prompt: "session.events.prompt",
+    "tool.start": "session.events.toolStart",
+    "tool.end": "session.events.toolEnd",
+    "tool.failed": "session.events.toolFailed",
+    permission: "session.events.permission",
+    question: "session.events.question",
+    "subagent.start": "session.events.subagentStart",
+    "subagent.end": "session.events.subagentEnd",
+    compact: "session.events.compact",
+    "turn.end": "session.events.turnEnd",
+    "session.end": "session.events.sessionEnd",
+    error: "session.events.error"
+};

@@ -80,6 +80,7 @@ import {
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
+import { PolarCode, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
 import * as polarShared from "@/lib/polar/shared";
 import * as settingsPath from "@/lib/polar/settings-path";
 import * as droppedItems from "@/lib/polar/dropped-items";
@@ -799,6 +800,8 @@ export function PolarChat({
     /** The answer a share is being made from. */
     const [sharingFrom, setSharingFrom] = useState<string | null>(null);
     const wide = useWide();
+    // Chat or Code: Code is Agents sessions, drawn over the chat (which keeps its draft).
+    const code = usePolarCode();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
     // Text asked about from a right-click menu: quoted here, once.
@@ -1854,7 +1857,7 @@ export function PolarChat({
             hide={hide}
         />
     );
-    const sidebarShown = fullPage && wide && !collapsed;
+    const sidebarShown = fullPage && wide && !collapsed && code.mode === "chat";
 
     const queueView =
         queue.length > 0 ? (
@@ -2187,13 +2190,23 @@ export function PolarChat({
                 </div>
             ) : null}
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+                {code.mode === "code" ? (
+                    <div
+                        className={cn(
+                            "absolute inset-x-0 bottom-0 top-11 z-20 flex flex-col",
+                            fullPage ? "bg-background" : "bg-card"
+                        )}
+                    >
+                        <PolarCode code={code} split={fullPage && wide} />
+                    </div>
+                ) : null}
                 <div
                     className={cn(
                         "flex h-11 shrink-0 items-center gap-2 px-3",
                         !fullPage && "border-b border-border"
                     )}
                 >
-                    {fullPage && (!wide || collapsed) ? (
+                    {fullPage && (!wide || collapsed) && code.mode === "chat" ? (
                         <MessageAction
                             ref={drawerButton}
                             label={t("history.show")}
@@ -2204,6 +2217,7 @@ export function PolarChat({
                     ) : null}
                     <PolarAvatar state={avatarState} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
+                    <PolarModeSwitch code={code} />
                     <span className="flex-1" />
                     <MessageAction
                         label={temporary ? t("temporary.off") : t("temporary.on")}
