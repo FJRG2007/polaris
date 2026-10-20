@@ -55,10 +55,44 @@ const stored = () => ({
     updatedAt: at(5),
     // Newest first, as the query orders them.
     messages: [
-        { id: "a2", parentId: "u2", role: "assistant", parts: [{ type: "text", text: "Second answer" }], metadata: null, createdAt: at(4) },
-        { id: "u2", parentId: null, role: "user", parts: [{ type: "text", text: "Edited question" }], metadata: null, createdAt: at(3) },
-        { id: "a1", parentId: "u1", role: "assistant", parts: [{ type: "text", text: "First answer" }, { type: "tool-search", input: { q: "x" } }], metadata: null, createdAt: at(2) },
-        { id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Question" }, { type: "file", filename: "plan.pdf", url: "/x" }], metadata: null, createdAt: at(1) }
+        {
+            id: "a2",
+            parentId: "u2",
+            role: "assistant",
+            parts: [{ type: "text", text: "Second answer" }],
+            metadata: null,
+            createdAt: at(4)
+        },
+        {
+            id: "u2",
+            parentId: null,
+            role: "user",
+            parts: [{ type: "text", text: "Edited question" }],
+            metadata: null,
+            createdAt: at(3)
+        },
+        {
+            id: "a1",
+            parentId: "u1",
+            role: "assistant",
+            parts: [
+                { type: "text", text: "First answer" },
+                { type: "tool-search", input: { q: "x" } }
+            ],
+            metadata: null,
+            createdAt: at(2)
+        },
+        {
+            id: "u1",
+            parentId: null,
+            role: "user",
+            parts: [
+                { type: "text", text: "Question" },
+                { type: "file", filename: "plan.pdf", url: "/x" }
+            ],
+            metadata: null,
+            createdAt: at(1)
+        }
     ]
 });
 
@@ -94,7 +128,14 @@ describe("formats", () => {
                 ...thread,
                 title: " ",
                 messages: [
-                    { id: "x", parentId: null, role: "user", parts: [{ type: "file" }, { type: "tool-search" }], metadata: null, createdAt: "" }
+                    {
+                        id: "x",
+                        parentId: null,
+                        role: "user",
+                        parts: [{ type: "file" }, { type: "tool-search" }],
+                        metadata: null,
+                        createdAt: ""
+                    }
                 ]
             },
             NAMES
@@ -127,7 +168,12 @@ describe("formats", () => {
     it("keeps every version in JSON", async () => {
         const thread = (await exporter.readExportThread("u1", ID))!;
         const parsed = JSON.parse(exporter.threadJson(thread));
-        expect(parsed.messages.map((message: { id: string }) => message.id)).toEqual(["u1", "a1", "u2", "a2"]);
+        expect(parsed.messages.map((message: { id: string }) => message.id)).toEqual([
+            "u1",
+            "a1",
+            "u2",
+            "a2"
+        ]);
         expect(parsed.version).toBe(1);
     });
 
@@ -137,7 +183,9 @@ describe("formats", () => {
             { id: "2", parentId: "1", role: "assistant", parts: [], metadata: null, createdAt: "" }
         ]);
         expect(path.map((message) => message.id)).toEqual(["1", "2"]);
-        expect(exporter.exportFileName('Ünïcode "quotes"/../x', ID, "md")).toBe("unicode-quotes-x-11111111.md");
+        expect(exporter.exportFileName('Ünïcode "quotes"/../x', ID, "md")).toBe(
+            "unicode-quotes-x-11111111.md"
+        );
         expect(exporter.exportFileName("日本", ID, "json")).toBe("chat-11111111.json");
     });
 });
@@ -147,7 +195,9 @@ describe("routes", () => {
 
     it("downloads one chat as Markdown or JSON", async () => {
         const markdown = await single.GET(new Request("http://x?format=markdown"), params);
-        expect(markdown.headers.get("content-disposition")).toBe('attachment; filename="trip-to-lisbon-11111111.md"');
+        expect(markdown.headers.get("content-disposition")).toBe(
+            'attachment; filename="trip-to-lisbon-11111111.md"'
+        );
         expect(await markdown.text()).toContain("## export.you");
         const json = await single.GET(new Request("http://x?format=json"), params);
         expect(json.headers.get("content-type")).toContain("application/json");
@@ -175,7 +225,9 @@ describe("routes", () => {
     it("pages through every saved chat instead of stopping at a limit", async () => {
         const row = (n: number) => ({ id: `t${n}`, title: `Chat ${n}`, updatedAt: at(5) });
         state.pages = [Array.from({ length: 200 }, (_, n) => row(n)), [row(200)]];
-        const text = new TextDecoder().decode(new Uint8Array(await (await all.GET()).arrayBuffer()));
+        const text = new TextDecoder().decode(
+            new Uint8Array(await (await all.GET()).arrayBuffer())
+        );
         expect(text).toContain("markdown/chat-200-t200.md");
         expect(state.listCalls).toHaveLength(2);
         expect(state.listCalls[1]).toMatchObject({ cursor: { id: "t199" }, skip: 1 });

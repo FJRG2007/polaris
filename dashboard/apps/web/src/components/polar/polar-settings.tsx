@@ -24,11 +24,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    looksSecret,
-    normalizeMemoryText,
-    POLAR_MEMORY_MAX_CHARS
-} from "@/lib/polar/shared";
+import { looksSecret, normalizeMemoryText, POLAR_MEMORY_MAX_CHARS } from "@/lib/polar/shared";
 
 export interface MemoryRow {
     id: string;
@@ -218,7 +214,9 @@ export function MemorySettings() {
         if (before) commit(before);
         const error = ((await response?.json().catch(() => null)) as { error?: unknown } | null)
             ?.error;
-        toast.show({ title: t(`settings.memory.errors.${refusalOf(error)}`, { most: POLAR_MEMORY_MAX_CHARS }) });
+        toast.show({
+            title: t(`settings.memory.errors.${refusalOf(error)}`, { most: POLAR_MEMORY_MAX_CHARS })
+        });
     };
 
     const replaceRow = (temp: string) => (data: unknown) => {
@@ -298,7 +296,9 @@ export function MemorySettings() {
                                                 {
                                                     ...state,
                                                     memories: state.memories.map((entry) =>
-                                                        entry.id === row.id ? { ...entry, text } : entry
+                                                        entry.id === row.id
+                                                            ? { ...entry, text }
+                                                            : entry
                                                     )
                                                 },
                                                 () =>
@@ -338,7 +338,8 @@ export function MemorySettings() {
                                                         (entry) => entry.id !== row.id
                                                     )
                                                 },
-                                                () => send(`/api/polar/memories/${row.id}`, "DELETE")
+                                                () =>
+                                                    send(`/api/polar/memories/${row.id}`, "DELETE")
                                             )
                                         }
                                     >
@@ -351,7 +352,12 @@ export function MemorySettings() {
                 </ul>
             )}
             <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={adding}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAdding(true)}
+                    disabled={adding}
+                >
                     <Plus />
                     {t("settings.memory.add")}
                 </Button>

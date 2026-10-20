@@ -87,7 +87,13 @@ export function viewQuery(
             };
         default:
             return {
-                where: { userId, temporary: false, archivedAt: null, pinnedAt: null, projectId: null },
+                where: {
+                    userId,
+                    temporary: false,
+                    archivedAt: null,
+                    pinnedAt: null,
+                    projectId: null
+                },
                 orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
             };
     }
@@ -292,7 +298,9 @@ export async function ensurePolarThread(
             title: titleFrom(firstText),
             titleSource: "placeholder",
             projectId:
-                !temporary && projectId && (await ownsProject(userId, projectId)) ? projectId : null,
+                !temporary && projectId && (await ownsProject(userId, projectId))
+                    ? projectId
+                    : null,
             choice: choice as unknown as Prisma.InputJsonValue,
             temporary
         }

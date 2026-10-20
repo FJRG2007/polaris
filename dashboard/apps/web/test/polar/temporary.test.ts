@@ -41,7 +41,13 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const threads = await import("@/lib/polar/threads");
-const choice = { kind: "language", provider: "openai", model: "m", intelligence: "fast", payer: null } as never;
+const choice = {
+    kind: "language",
+    provider: "openai",
+    model: "m",
+    intelligence: "fast",
+    payer: null
+} as never;
 
 beforeEach(() => {
     state.existing = null;
@@ -64,7 +70,9 @@ describe("ensurePolarThread", () => {
             temporary: false
         });
         state.existing = { userId: "u1", temporary: true };
-        expect(await threads.ensurePolarThread("u1", ID, "hi", choice)).toEqual({ temporary: true });
+        expect(await threads.ensurePolarThread("u1", ID, "hi", choice)).toEqual({
+            temporary: true
+        });
     });
 
     it("answers null for somebody else's id", async () => {

@@ -607,13 +607,19 @@ function ThreadItem({
                                 {t("history.share")}
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <a href={`/api/polar/threads/${row.id}/export?format=markdown`} download>
+                                <a
+                                    href={`/api/polar/threads/${row.id}/export?format=markdown`}
+                                    download
+                                >
                                     <FileDown />
                                     {t("export.markdown")}
                                 </a>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <a href={`/api/polar/threads/${row.id}/export?format=json`} download>
+                                <a
+                                    href={`/api/polar/threads/${row.id}/export?format=json`}
+                                    download
+                                >
                                     <FileJson />
                                     {t("export.json")}
                                 </a>

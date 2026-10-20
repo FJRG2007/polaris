@@ -27,7 +27,9 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const user = await apiUser();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
-    const format = formatSchema.safeParse(new URL(request.url).searchParams.get("format") ?? undefined);
+    const format = formatSchema.safeParse(
+        new URL(request.url).searchParams.get("format") ?? undefined
+    );
     if (!format.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     if (!id.success) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const thread = await readExportThread(user.id, id.data);
@@ -37,7 +39,9 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const name = exportFileName(thread.title, thread.id, markdown ? "md" : "json");
     return new Response(body, {
         headers: {
-            "Content-Type": markdown ? "text/markdown; charset=utf-8" : "application/json; charset=utf-8",
+            "Content-Type": markdown
+                ? "text/markdown; charset=utf-8"
+                : "application/json; charset=utf-8",
             "Content-Disposition": `attachment; filename="${name}"`,
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff"

@@ -1694,7 +1694,10 @@ function MessageView({
                                 action={toolName(name)}
                                 affects={
                                     name === "polar_remember"
-                                        ? affectedBy({ name: (tool.input as { text?: unknown } | undefined)?.text })
+                                        ? affectedBy({
+                                              name: (tool.input as { text?: unknown } | undefined)
+                                                  ?.text
+                                          })
                                         : affectedBy(tool.input)
                                 }
                                 destructive={described?.destructive ?? name !== "polar_remember"}

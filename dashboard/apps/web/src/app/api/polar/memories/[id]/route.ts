@@ -41,5 +41,7 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Res
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
-    return (await deletePolarMemory(user.id, id.data)) ? NextResponse.json({ ok: true }) : NOT_FOUND();
+    return (await deletePolarMemory(user.id, id.data))
+        ? NextResponse.json({ ok: true })
+        : NOT_FOUND();
 }

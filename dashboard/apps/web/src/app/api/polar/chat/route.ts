@@ -136,9 +136,7 @@ export async function POST(request: Request): Promise<Response> {
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
     ]);
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
-    const tools = remembers
-        ? { ...toolset.tools, ...memoryTools }
-        : toolset.tools;
+    const tools = remembers ? { ...toolset.tools, ...memoryTools } : toolset.tools;
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"

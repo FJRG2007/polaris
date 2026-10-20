@@ -99,7 +99,9 @@ function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
         if (type === "text" && typeof part.text === "string" && part.text.trim()) {
             lines.push(part.text.trim());
         } else if (type === "file") {
-            lines.push(`> ${names.file(typeof part.filename === "string" ? part.filename : names.attachment)}`);
+            lines.push(
+                `> ${names.file(typeof part.filename === "string" ? part.filename : names.attachment)}`
+            );
         } else if (type.startsWith("tool-") || type === "dynamic-tool") {
             const name = type === "dynamic-tool" ? String(part.toolName ?? "tool") : type.slice(5);
             lines.push(`> ${names.used(name)}`);
@@ -109,7 +111,10 @@ function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
 }
 
 export function threadMarkdown(thread: ExportThread, names: ExportNames): string {
-    const blocks = [`# ${thread.title.replace(/\s+/g, " ").trim() || names.untitled}`, `_${thread.createdAt}_`];
+    const blocks = [
+        `# ${thread.title.replace(/\s+/g, " ").trim() || names.untitled}`,
+        `_${thread.createdAt}_`
+    ];
     if (thread.truncated) blocks.push(`> ${names.truncated}`);
     for (const message of newestPath(thread.messages)) {
         const body = partsMarkdown(message.parts, names);
@@ -191,16 +196,19 @@ function textStream(text: string): ReadableStream<Uint8Array> {
 /** Every saved chat of the person, a page at a time, newest first. Ordered by
  *  creation so a chat touched while the zip is written is neither skipped nor
  *  repeated. */
-async function* savedThreads(userId: string): AsyncGenerator<{ id: string; title: string; updatedAt: Date }> {
+async function* savedThreads(
+    userId: string
+): AsyncGenerator<{ id: string; title: string; updatedAt: Date }> {
     let cursor: string | null = null;
     for (;;) {
-        const page: { id: string; title: string; updatedAt: Date }[] = await prisma.polarThread.findMany({
-            where: { userId, temporary: false },
-            select: { id: true, title: true, updatedAt: true },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            take: EXPORT_THREADS_PAGE,
-            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
-        });
+        const page: { id: string; title: string; updatedAt: Date }[] =
+            await prisma.polarThread.findMany({
+                where: { userId, temporary: false },
+                select: { id: true, title: true, updatedAt: true },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                take: EXPORT_THREADS_PAGE,
+                ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+            });
         yield* page;
         if (page.length < EXPORT_THREADS_PAGE) return;
         cursor = page[page.length - 1]!.id;
@@ -209,7 +217,10 @@ async function* savedThreads(userId: string): AsyncGenerator<{ id: string; title
 
 /** Every saved chat of the person as a zip: a Markdown and a JSON file each.
  *  Each chat is read only when the archive reaches it. */
-export async function exportAllThreads(userId: string, names: ExportNames): Promise<ReadableStream<Uint8Array>> {
+export async function exportAllThreads(
+    userId: string,
+    names: ExportNames
+): Promise<ReadableStream<Uint8Array>> {
     async function* sources(): AsyncGenerator<ZipSource> {
         yield { name: "markdown/", kind: "dir", size: 0n };
         yield { name: "json/", kind: "dir", size: 0n };

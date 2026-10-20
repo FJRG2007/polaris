@@ -45,7 +45,12 @@ vi.mock("@polaris/db", () => {
                 count: async () => 0,
                 create: async (args: { data: { text: string } }) => {
                     state.calls.push({ op: "create", args });
-                    return { id: ID, text: args.data.text, createdAt: new Date(0), updatedAt: new Date(0) };
+                    return {
+                        id: ID,
+                        text: args.data.text,
+                        createdAt: new Date(0),
+                        updatedAt: new Date(0)
+                    };
                 },
                 updateMany: async (args: unknown) => {
                     state.calls.push({ op: "updateMany", args });
@@ -128,20 +133,26 @@ describe("owner scope", () => {
 
     it("the remember tool refuses a secret without writing", async () => {
         const tools = memory.polarMemoryTools("u1", ID);
-        const result = await tools.polar_remember!.execute!({ text: "password: abc" } as never, {
-            toolCallId: "t",
-            messages: []
-        } as never);
+        const result = await tools.polar_remember!.execute!(
+            { text: "password: abc" } as never,
+            {
+                toolCallId: "t",
+                messages: []
+            } as never
+        );
         expect(result).toMatchObject({ ok: false });
         expect(state.calls.some((call) => call.op === "create")).toBe(false);
     });
 
     it("the remember tool refuses while memory is off and saves while on", async () => {
         const run = (text: string) =>
-            memory.polarMemoryTools("u1", ID).polar_remember!.execute!({ text } as never, {
-                toolCallId: "t",
-                messages: []
-            } as never);
+            memory.polarMemoryTools("u1", ID).polar_remember!.execute!(
+                { text } as never,
+                {
+                    toolCallId: "t",
+                    messages: []
+                } as never
+            );
         state.preference = { memory: false };
         expect(await run("likes tea")).toEqual({ ok: false, text: "Memory is off." });
         expect(state.calls.some((call) => call.op === "create")).toBe(false);
@@ -179,7 +190,10 @@ describe("routes", () => {
 
     it("answers 404 for a memory that is not the caller's", async () => {
         const params = { params: Promise.resolve({ id: ID }) };
-        const response = await single.PATCH(json("http://x", "PATCH", { text: "likes tea" }), params);
+        const response = await single.PATCH(
+            json("http://x", "PATCH", { text: "likes tea" }),
+            params
+        );
         expect(response.status).toBe(404);
         const invalid = await single.DELETE(new Request("http://x"), {
             params: Promise.resolve({ id: "nope" })
@@ -193,6 +207,8 @@ describe("routes", () => {
         expect(state.calls.find((call) => call.op === "upsert")?.args).toMatchObject({
             where: { userId: "u1" }
         });
-        expect((await preferences.PATCH(json("http://x", "PATCH", { memory: "no" }))).status).toBe(400);
+        expect((await preferences.PATCH(json("http://x", "PATCH", { memory: "no" }))).status).toBe(
+            400
+        );
     });
 });
