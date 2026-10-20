@@ -915,8 +915,8 @@ export function PolarChat({
         // A remembered chat that was deleted, or belongs to another account.
         if (response?.status === 404 && readStored(THREAD_KEY) === id) writeStored(THREAD_KEY, "");
         if (!response?.ok) return;
-        const { thread } = (await response.json()) as {
-            thread: {
+        const { thread } = (await response.json().catch(() => ({}))) as {
+            thread?: {
                 id: string;
                 projectId: string | null;
                 messages: StoredMessage[];
@@ -924,6 +924,8 @@ export function PolarChat({
                 choice: ModelChoice | null;
             };
         };
+        // An answer that is not a chat (a proxy page, an older server) opens nothing.
+        if (!Array.isArray(thread?.messages)) return;
         // Every stored version goes into the tree; the newest path is shown.
         const next: VersionTree = new Map();
         learnPath(
