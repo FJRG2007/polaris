@@ -77,7 +77,7 @@ describe("the configure dialogs", () => {
     });
 });
 
-describe("the AI providers screen", () => {
+describe("the AI provider keys screen", () => {
     it("offers a key for every model provider in the catalog", () => {
         // Both screens that add a key read this one list, so a provider missing
         // here is a provider nobody can bring a key for.

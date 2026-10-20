@@ -1352,7 +1352,7 @@
     "integrations": {
         "page": {
             "title": "Integraciones",
-            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Proveedores de IA</link>."
+            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Claves de IA</link>."
         },
         "grid": {
             "search": "Buscar integraciones",
@@ -1945,7 +1945,7 @@
         }
     },
     "integrationsModels": {
-        "title": "Modelos de IA",
+        "title": "Claves de IA",
         "intro": "Las cuentas propias de este despliegue con los proveedores de modelos. Una clave se entrega a una ejecución mediante una llamada autenticada y nunca se escribe en un repositorio, así que al sustituirla aquí el cambio se aplica en todas partes a la vez. Cada proveedor te factura directamente: Polaris no añade nada.",
         "keys": {
             "title": "Las claves de proveedor del despliegue",
@@ -2120,7 +2120,7 @@
                 "description": "Servicios de terceros (impresión de etiquetas, análisis de archivos)."
             },
             "integrationsModels": {
-                "title": "Modelos de IA",
+                "title": "Claves de IA",
                 "description": "Los proveedores de modelos que usan los agentes y las claves que guarda este despliegue."
             },
             "settings": {

@@ -2175,12 +2175,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
-            label: "AI providers", // i18n-ignore
+            label: "AI provider keys", // i18n-ignore
             href: "/admin/integrations/models",
             adminOnly: true,
             icon: Sparkles,
             keywords: [
                 "models",
+                "providers",
                 "anthropic",
                 "claude",
                 "openai",

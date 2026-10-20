@@ -1352,7 +1352,7 @@
     "integrations": {
         "page": {
             "title": "Integrations",
-            "intro": "The outside services Polaris can use, grouped by the job connecting one does. Whatever is set up here works everywhere at once - there is nothing to switch on per screen. The model providers agents run on have their own list under <link>AI providers</link>."
+            "intro": "The outside services Polaris can use, grouped by the job connecting one does. Whatever is set up here works everywhere at once - there is nothing to switch on per screen. The model providers agents run on have their own list under <link>AI provider keys</link>."
         },
         "grid": {
             "search": "Search integrations",
@@ -1945,7 +1945,7 @@
         }
     },
     "integrationsModels": {
-        "title": "AI providers",
+        "title": "AI provider keys",
         "intro": "This deployment's own accounts with the model providers. A key is handed to a run over an authenticated call and never written into a repository, so replacing it here takes effect everywhere at once. Every provider bills you directly - Polaris adds nothing.",
         "keys": {
             "title": "The deployment's provider keys",
@@ -2120,7 +2120,7 @@
                 "description": "Third-party services (label printing, file scanning)."
             },
             "integrationsModels": {
-                "title": "AI providers",
+                "title": "AI provider keys",
                 "description": "The model providers agents run on, and the keys this deployment holds."
             },
             "settings": {
