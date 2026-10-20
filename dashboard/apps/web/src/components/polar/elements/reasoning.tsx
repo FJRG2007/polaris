@@ -13,6 +13,7 @@
 import { cn } from "@polaris/ui";
 import { Brain, ChevronDown } from "lucide-react";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
@@ -55,7 +56,9 @@ export function Reasoning({
             >
                 <Brain className="h-3.5 w-3.5 shrink-0" />
                 {isStreaming ? (
-                    <Shimmer>{t("elements.thinking")}</Shimmer>
+                    <Shimmer>
+                        <BusyVerb />
+                    </Shimmer>
                 ) : seconds !== null ? (
                     <span>{t("elements.thoughtFor", { seconds })}</span>
                 ) : (

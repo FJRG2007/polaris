@@ -81,6 +81,7 @@ import {
     type SuggestionListItem
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
@@ -1702,7 +1703,9 @@ export function PolarChat({
                                 {chat.status === "submitted" ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ThinkingOrb state="breathing" size={20} decorative />
-                                        <Shimmer>{t("status.thinking")}</Shimmer>
+                                        <Shimmer>
+                                            <BusyVerb />
+                                        </Shimmer>
                                     </div>
                                 ) : null}
                                 {chat.error ? (

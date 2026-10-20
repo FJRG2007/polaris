@@ -14,6 +14,7 @@ import { cn } from "@polaris/ui";
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown, Layers, XCircle } from "lucide-react";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import type { OrbState } from "@/components/polar/motion/orb-engine/presets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -93,7 +94,7 @@ export function Work({
                 )}
                 {streaming ? (
                     <Shimmer className="min-w-0 truncate">
-                        {current ? t("work.running", { step: current }) : t("elements.thinking")}
+                        {current ? t("work.running", { step: current }) : <BusyVerb />}
                     </Shimmer>
                 ) : (
                     <span className="min-w-0 truncate" title={summary}>
