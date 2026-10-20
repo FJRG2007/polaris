@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { queueSchema, threadTitleSchema } from "@/lib/polar/shared";
 import {
     changePolarThread,
@@ -38,7 +38,7 @@ type Params = { params: Promise<{ id: string }> };
 const NOT_FOUND = () => NextResponse.json({ error: "not_found" }, { status: 404 });
 
 export async function GET(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
@@ -47,7 +47,7 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
 }
 
 export async function PATCH(request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
@@ -65,7 +65,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
 }
 
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();

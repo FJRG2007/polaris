@@ -110,6 +110,25 @@
             "checkSettings": "Check the settings",
             "providerNotConnected": "Connect {provider} under Integrations before defaulting to this model.",
             "poolGone": "That runner pool no longer exists."
+        },
+        "polarAccess": {
+            "use": {
+                "label": "Who may use Polar",
+                "hint": "Everybody else does not see Polar at all. Administrators always can."
+            },
+            "spend": {
+                "label": "Who may spend this deployment's keys",
+                "hint": "Everybody else uses Polar only with keys they add under Account > AI provider keys."
+            },
+            "who": {
+                "admins": "Administrators",
+                "chosen": "Chosen people",
+                "everyone": "Everyone signed in"
+            },
+            "people": "People",
+            "groups": "Groups",
+            "noGroups": "No groups yet. Create them under Groups to pick one here.",
+            "guests": "Include guest accounts"
         }
     },
     "billing": {

@@ -19,7 +19,7 @@ import {
     streamText,
     type UIMessage
 } from "ai";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
@@ -74,7 +74,7 @@ function firstText(message: UIMessage | undefined): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     // An administrator looking through somebody else's eyes is not that person,
     // and Polar does things in its user's name.

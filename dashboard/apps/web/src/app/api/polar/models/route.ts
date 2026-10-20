@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarModelOptions } from "@/lib/polar/models";
 import { polarVoiceAvailability } from "@/lib/polar/voice";
@@ -14,7 +14,7 @@ import { polarVoiceAvailability } from "@/lib/polar/voice";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const [providers, toolset, voice] = await Promise.all([
         polarModelOptions(user.id),

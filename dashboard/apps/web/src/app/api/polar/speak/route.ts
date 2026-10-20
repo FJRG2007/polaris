@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { experimental_generateSpeech as generateSpeech } from "ai";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { polarSpeaker } from "@/lib/polar/voice";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
@@ -24,7 +24,7 @@ function refuse(code: string, status: number): NextResponse {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return refuse("view_as", 403);
     // A sentence a request: a long answer is a few dozen of them.

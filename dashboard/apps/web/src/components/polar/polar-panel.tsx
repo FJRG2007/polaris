@@ -141,6 +141,9 @@ import {
 type ExtraContext = Pick<PageContext, "record" | "selection">;
 
 interface PolarState {
+    /** Whether this account may use Polar at all: the same answer every Polar
+     *  route gives, read once by the shell. Nothing of Polar is drawn without it. */
+    allowed: boolean;
     open: boolean;
     setOpen: (open: boolean) => void;
     extra: ExtraContext | null;
@@ -229,8 +232,15 @@ function writeStored(key: string, value: string): void {
     }
 }
 
-export function PolarProvider({ children }: { children: ReactNode }) {
-    const [open, setOpenState] = useState(false);
+export function PolarProvider({
+    allowed = true,
+    children
+}: {
+    allowed?: boolean;
+    children: ReactNode;
+}) {
+    const [stored, setOpenState] = useState(false);
+    const open = allowed && stored;
     const [extra, setExtra] = useState<ExtraContext | null>(null);
     useEffect(() => setOpenState(readStored(OPEN_KEY) === "1"), []);
     const setOpen = useCallback((next: boolean) => {
@@ -238,6 +248,7 @@ export function PolarProvider({ children }: { children: ReactNode }) {
         writeStored(OPEN_KEY, next ? "1" : "0");
     }, []);
     useEffect(() => {
+        if (!allowed) return;
         function onKey(event: KeyboardEvent) {
             if (
                 (event.ctrlKey || event.metaKey) &&
@@ -254,16 +265,22 @@ export function PolarProvider({ children }: { children: ReactNode }) {
         }
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, []);
-    const value = useMemo(() => ({ open, setOpen, extra, setExtra }), [open, setOpen, extra]);
+    }, [allowed]);
+    const value = useMemo(
+        () => ({ allowed, open, setOpen, extra, setExtra }),
+        [allowed, open, setOpen, extra]
+    );
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
 
 /** The header button. */
 export function PolarToggle() {
     const t = useTranslations("polar");
-    const { open, setOpen } = usePolar();
+    const { allowed, open, setOpen } = usePolar();
     const shortcut = useShortcutText();
+    // Hidden rather than offered: the administrator keeps Polar to some people,
+    // and a button that only ever answers "not for you" is noise in the header.
+    if (!allowed) return null;
     return (
         <button
             type="button"
@@ -283,6 +300,11 @@ export function PolarToggle() {
 
 /** The side panel, rendered by the shell beside the content. */
 export function PolarAside() {
+    const { allowed } = usePolar();
+    return allowed ? <PolarAsideOpen /> : null;
+}
+
+function PolarAsideOpen() {
     const t = useTranslations("polar");
     const { open, setOpen } = usePolar();
     const pathname = usePathname();

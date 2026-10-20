@@ -110,6 +110,25 @@
             "checkSettings": "Revisa los ajustes",
             "providerNotConnected": "Conecta {provider} en Integraciones antes de usar este modelo por defecto.",
             "poolGone": "Ese grupo de runners ya no existe."
+        },
+        "polarAccess": {
+            "use": {
+                "label": "Quién puede usar Polar",
+                "hint": "El resto no ve Polar en absoluto. Los administradores siempre pueden."
+            },
+            "spend": {
+                "label": "Quién gasta las claves del despliegue",
+                "hint": "El resto usa Polar solo con las claves que añade en Cuenta > Claves de proveedores de IA."
+            },
+            "who": {
+                "admins": "Administradores",
+                "chosen": "Personas elegidas",
+                "everyone": "Todos con sesión"
+            },
+            "people": "Personas",
+            "groups": "Grupos",
+            "noGroups": "Aún no hay grupos. Créalos en Grupos para elegir uno aquí.",
+            "guests": "Incluir cuentas de invitado"
         }
     },
     "billing": {

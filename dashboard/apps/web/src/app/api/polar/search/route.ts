@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { searchPolarThreads } from "@/lib/polar/threads";
 import { POLAR_SEARCH_PAGES, searchTextSchema } from "@/lib/polar/shared";
@@ -24,7 +24,7 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const query = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) return NextResponse.json({ error: "invalid" }, { status: 400 });

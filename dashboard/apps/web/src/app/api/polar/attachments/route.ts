@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import {
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 const querySchema = z.object({ name: z.string().trim().min(1).max(255) });
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const limited = await rateLimit(`polar-upload:${user.id}`, 30, 60_000);

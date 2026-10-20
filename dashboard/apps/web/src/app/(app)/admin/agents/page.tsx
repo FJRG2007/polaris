@@ -9,6 +9,8 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { UsageLimitsCard } from "./usage-limits-card";
 import { CatalogCard, KeySharingCard, SharedWorkspaceCard } from "./catalog-card";
+import { PolarAccessCard } from "./polar-access-card";
+import { readPolarPolicy } from "@/lib/polar/access";
 import { PlatformDefaultsView } from "./platform-defaults-view";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
 import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
@@ -29,6 +31,8 @@ export default async function AgentDefaultsAdminPage() {
         keysShared,
         limits,
         sharedMachine,
+        polarPolicy,
+        groups,
         t
     ] = await Promise.all([
         getPlatformAgentDefaults(),
@@ -45,6 +49,8 @@ export default async function AgentDefaultsAdminPage() {
         instanceKeysAreShared(),
         listUsageLimits(),
         sharedWorkspaceAllowed(),
+        readPolarPolicy(),
+        prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" }, take: 200 }),
         getTranslations("admin")
     ]);
 
@@ -58,6 +64,14 @@ export default async function AgentDefaultsAdminPage() {
             />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />
+                <PolarAccessCard
+                    policy={polarPolicy}
+                    groups={groups}
+                    people={await prisma.user.findMany({
+                        where: { id: { in: [...polarPolicy.use.userIds, ...polarPolicy.spend.userIds] } },
+                        select: { id: true, name: true }
+                    })}
+                />
                 <SharedWorkspaceCard allowed={sharedMachine} />
                 <UsageLimitsCard limits={limits} />
                 <CatalogCard
