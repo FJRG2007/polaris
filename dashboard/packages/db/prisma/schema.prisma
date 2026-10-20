@@ -36,6 +36,7 @@ model User {
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
+    polarToolGrants   PolarToolGrant[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -15033,6 +15034,25 @@ model PolarThread {
 
 // A folder of Polar chats. Its instructions are added to the system context of
 // every chat filed under it. One person's: only its owner sees it.
+// A Polar tool this person said to stop asking about ("Always allow"). The
+// chat's server loop reads these and skips the approval card for a matching
+// call; the tool still runs only if the person holds its permission at that
+// moment. `target` is empty for the whole tool, or the one thing it acts on
+// (a device's id) for a tool that can destroy - so allowing one door to open
+// never allows every door. `targetName` is the name it had when allowed, for
+// the settings list. Revoking deletes the row.
+model PolarToolGrant {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    ownerId    String   @db.Uuid
+    owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    tool       String
+    target     String   @default("")
+    targetName String   @default("")
+    createdAt  DateTime @default(now())
+
+    @@unique([ownerId, tool, target])
+}
+
 model PolarProject {
     id           String        @id @default(uuid(7)) @db.Uuid
     ownerId      String        @db.Uuid

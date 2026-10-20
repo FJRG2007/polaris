@@ -7,7 +7,9 @@
  * right now, and never an administrator's view-as. No token is minted.
  *
  * A tool that can change anything (`readOnly: false`) is marked for approval,
- * so the chat shows a card and nothing runs until the person says yes. A tool's
+ * so the chat shows a card and nothing runs until the person says yes - unless
+ * they told Polar to stop asking about it (`tool-grants.ts`), which this loop
+ * reads from the database, never from the browser. A tool's
  * answer is data the model reads; the system prompt says so.
  *
  * Server-only.
@@ -18,6 +20,7 @@ import { mcpTools } from "@/lib/mcp/catalog";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { MCP_SCOPES, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
 import { McpRefusal, callerMayUse, type McpCaller, type McpTool } from "@/lib/mcp/protocol";
+import { callTarget, grantCovers, grantKeys } from "@/lib/polar/tool-grants";
 
 /** The scopes this person holds, worked out once per request. */
 export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
@@ -31,6 +34,15 @@ export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
     return scopes;
 }
 
+/** The person as an MCP caller: their own scopes, never a view-as. */
+export async function polarCaller(user: SessionUser): Promise<McpCaller> {
+    return {
+        userId: user.id,
+        isAdmin: user.isAdmin && !user.viewingAs,
+        scopes: await sessionScopes(user)
+    };
+}
+
 /** Whether a tool must be approved in the chat before it runs. */
 export function needsApproval(entry: Pick<McpTool<never>, "readOnly">): boolean {
     return !entry.readOnly;
@@ -38,8 +50,9 @@ export function needsApproval(entry: Pick<McpTool<never>, "readOnly">): boolean 
 
 export interface PolarToolSet {
     tools: ToolSet;
-    /** Tool name to `user-approval`, for streamText's `toolApproval`. */
-    approval: Record<string, "user-approval">;
+    /** Tool name to whether a call waits for the person, for streamText's
+     *  `toolApproval`: approved when a stored grant covers it, else asked. */
+    approval: Record<string, (input: unknown) => Promise<"approved" | "user-approval">>;
     /** Name to the title and whether it writes, for the cards. */
     described: Record<string, { title: string; writes: boolean; destructive: boolean }>;
 }
@@ -56,12 +69,9 @@ function failure(entry: McpTool<never>, error: unknown): string {
  * not offered at all, the way `tools/list` leaves it out for a key.
  */
 export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
-    const caller: McpCaller = {
-        userId: user.id,
-        isAdmin: user.isAdmin && !user.viewingAs,
-        scopes: await sessionScopes(user)
-    };
+    const caller = await polarCaller(user);
     const result: PolarToolSet = { tools: {}, approval: {}, described: {} };
+    const grants = await grantKeys(user.id);
     for (const entry of await mcpTools()) {
         if (!callerMayUse(entry, caller)) continue;
         const writes = needsApproval(entry);
@@ -83,7 +93,13 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
                 }
             }
         });
-        if (writes) result.approval[entry.name] = "user-approval";
+        if (writes) {
+            result.approval[entry.name] = async (input) => {
+                if (grants.size === 0) return "user-approval";
+                const target = await callTarget(entry, input, caller);
+                return grantCovers(grants, entry, target) ? "approved" : "user-approval";
+            };
+        }
         result.described[entry.name] = {
             title: entry.title ?? entry.name,
             writes,

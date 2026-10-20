@@ -9,6 +9,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const held = new Set<string>();
 const ran: string[] = [];
+/** The person's stored "Always allow" rows, as the database holds them. */
+const grants: { tool: string; target: string }[] = [];
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        polarToolGrant: {
+            findMany: async ({ where }: { where: { ownerId: string } }) =>
+                where.ownerId === "u1" ? grants : []
+        }
+    }
+}));
 
 vi.mock("@/lib/session", () => ({
     sessionCan: async (_user: unknown, permission: string) => held.has(permission)
@@ -35,6 +46,7 @@ vi.mock("@/lib/mcp/catalog", () => ({
             input: z.object({ id: z.string() }),
             scope: "tasks.manage",
             readOnly: false,
+            target: async (input: { id: string }) => ({ id: input.id, name: `Task ${input.id}` }),
             run: async () => {
                 ran.push("tasks_delete");
                 return { text: "deleted" };
@@ -68,7 +80,10 @@ const USER = { id: "u1", isAdmin: false, viewingAs: null } as never;
 beforeEach(() => {
     held.clear();
     ran.length = 0;
+    grants.length = 0;
 });
+
+type Approve = (input: unknown) => Promise<string>;
 
 async function run(name: string, toolset: Awaited<ReturnType<typeof polarTools>>, input: object) {
     const entry = toolset.tools[name] as {
@@ -87,10 +102,13 @@ describe("polarTools", () => {
     it("holds every tool that changes something for approval, and none that only reads", async () => {
         held.add("tasks.read").add("tasks.manage");
         const toolset = await polarTools(USER);
-        expect(toolset.approval).toEqual({
-            tasks_delete: "user-approval",
-            tasks_rename: "user-approval"
-        });
+        expect(Object.keys(toolset.approval).sort()).toEqual(["tasks_delete", "tasks_rename"]);
+        expect(await (toolset.approval.tasks_delete as Approve)({ id: "ENG-1" })).toBe(
+            "user-approval"
+        );
+        expect(await (toolset.approval.tasks_rename as Approve)({ id: "ENG-1" })).toBe(
+            "user-approval"
+        );
         expect(toolset.described.tasks_list).toEqual({
             title: "List tasks",
             writes: false,
@@ -118,5 +136,33 @@ describe("polarTools", () => {
         const answer = await run("tasks_delete", toolset, { id: "ENG-1" });
         expect(answer).toMatchObject({ ok: false });
         expect(ran).toEqual([]);
+    });
+
+    it("skips the card for a tool the person always allows, from the stored grant", async () => {
+        held.add("tasks.manage");
+        grants.push({ tool: "tasks_rename", target: "" });
+        const toolset = await polarTools(USER);
+        expect(await (toolset.approval.tasks_rename as Approve)({ id: "ENG-1" })).toBe("approved");
+        expect(await (toolset.approval.tasks_delete as Approve)({ id: "ENG-1" })).toBe(
+            "user-approval"
+        );
+    });
+
+    it("scopes a destructive tool's grant to the one target it was given for", async () => {
+        held.add("tasks.manage");
+        grants.push({ tool: "tasks_delete", target: "ENG-1" });
+        const toolset = await polarTools(USER);
+        expect(await (toolset.approval.tasks_delete as Approve)({ id: "ENG-1" })).toBe("approved");
+        expect(await (toolset.approval.tasks_delete as Approve)({ id: "ENG-2" })).toBe(
+            "user-approval"
+        );
+    });
+
+    it("still refuses at run time an always-allowed tool whose permission is gone", async () => {
+        held.add("tasks.manage");
+        grants.push({ tool: "tasks_rename", target: "" });
+        const toolset = await polarTools(USER);
+        held.delete("tasks.manage");
+        expect(await run("tasks_rename", toolset, { id: "ENG-1" })).toMatchObject({ ok: false });
     });
 });
