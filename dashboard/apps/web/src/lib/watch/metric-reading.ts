@@ -70,7 +70,10 @@ export async function latestMetricValue(
 }
 
 /** What a service's volumes hold, from each one's latest measurement. */
-export async function serviceDiskGb(applicationId: string, now = Date.now()): Promise<MetricReading> {
+export async function serviceDiskGb(
+    applicationId: string,
+    now = Date.now()
+): Promise<MetricReading> {
     const volumes = await prisma.volume.findMany({
         where: { applicationId },
         select: { id: true }

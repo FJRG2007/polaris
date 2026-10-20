@@ -28,7 +28,12 @@ vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k".re
 vi.mock("undici", () => ({ Agent: class {}, fetch: async () => new Response("{}") }));
 vi.mock("@/lib/automations/threshold-sources", () => {
     const source = { id: "host.cpu", unit: "%", read: async () => ({ ...reading }) };
-    const kind = { kind: "host", subjects: async () => [], mayRead: async () => true, sources: [source] };
+    const kind = {
+        kind: "host",
+        subjects: async () => [],
+        mayRead: async () => true,
+        sources: [source]
+    };
     return { thresholdSource: (id: string) => (id === "host.cpu" ? { kind, source } : null) };
 });
 
@@ -46,14 +51,32 @@ async function seed() {
                 id: "t1",
                 type: "core.threshold",
                 position: { x: 0, y: 0 },
-                config: { source: "host.cpu", subjectId: SUBJECT, value: 90, streak: 2, recovery: true }
+                config: {
+                    source: "host.cpu",
+                    subjectId: SUBJECT,
+                    value: 90,
+                    streak: 2,
+                    recovery: true
+                }
             },
-            { id: "a", type: "core.notify", position: { x: 0, y: 0 }, config: { title: "hot", body: "" } }
+            {
+                id: "a",
+                type: "core.notify",
+                position: { x: 0, y: 0 },
+                config: { title: "hot", body: "" }
+            }
         ],
         edges: [{ from: { node: "t1", port: "next" }, to: { node: "a" } }]
     });
     const row = await fake().prisma.automation.create({
-        data: { name: "Hot", draft: graph, enabled: true, runAsId: "u1", userId: "u1", mode: "parallel" }
+        data: {
+            name: "Hot",
+            draft: graph,
+            enabled: true,
+            runAsId: "u1",
+            userId: "u1",
+            mode: "parallel"
+        }
     });
     const version = await fake().prisma.automationVersion.create({
         data: { automationId: row.id, number: 1, graph }
@@ -114,13 +137,21 @@ describe("the threshold pass", () => {
         const held = new Promise<void>((resolve) => (release = resolve));
         const first = withLease(thresholds.THRESHOLD_LEASE, 60_000, () => held.then(() => "first"));
         await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "second")).toBeNull();
+        expect(
+            await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "second")
+        ).toBeNull();
         release();
         expect(await first).toBe("first");
-        expect(await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "third")).toBe("third");
+        expect(await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "third")).toBe(
+            "third"
+        );
         // A holder that died: its expiry passes and the next process takes over.
-        const lease = fake().tables.setting!.find((row) => String(row.key).endsWith(thresholds.THRESHOLD_LEASE))!;
+        const lease = fake().tables.setting!.find((row) =>
+            String(row.key).endsWith(thresholds.THRESHOLD_LEASE)
+        )!;
         lease.value = `${new Date(Date.now() - 1000).toISOString()} dead`;
-        expect(await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "after")).toBe("after");
+        expect(await withLease(thresholds.THRESHOLD_LEASE, 60_000, async () => "after")).toBe(
+            "after"
+        );
     });
 });

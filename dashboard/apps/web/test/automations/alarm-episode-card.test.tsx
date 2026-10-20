@@ -9,7 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { EpisodeView } from "@/lib/automations/alarm-episodes";
 
-vi.mock("@/app/(app)/automations/actions", () => ({ thresholdChoicesAction: async () => ({ ok: true, kinds: [] }) }));
+vi.mock("@/app/(app)/automations/actions", () => ({
+    thresholdChoicesAction: async () => ({ ok: true, kinds: [] })
+}));
 
 const { AlarmEpisodeCard } = await import("@/app/(app)/automations/runs/[runId]/alarm-episode");
 
@@ -43,7 +45,12 @@ describe("the alarm episode card", () => {
     });
 
     it("says an alarm still going on has not come back yet", () => {
-        const markup = render({ ...resolved, resolvedAt: null, endValue: null, durationSeconds: null });
+        const markup = render({
+            ...resolved,
+            resolvedAt: null,
+            endValue: null,
+            durationSeconds: null
+        });
         expect(markup).toContain("Still in alarm");
         expect(markup).toContain("Not yet");
         expect(markup).toContain("so far");

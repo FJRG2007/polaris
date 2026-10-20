@@ -45,7 +45,9 @@ function Labeled({
         <label className="block min-w-0 space-y-1 text-sm">
             <span>{state === "ok" ? label : `${label} *`}</span>
             {children}
-            {state === "invalid" ? <span className="block text-xs text-danger-ink">{invalid}</span> : null}
+            {state === "invalid" ? (
+                <span className="block text-xs text-danger-ink">{invalid}</span>
+            ) : null}
         </label>
     );
 }
@@ -123,7 +125,11 @@ export function ThresholdFields({
                         onValueChange={(next) => {
                             const chosen = kinds?.find((entry) => entry.kind === next);
                             if (!chosen || next === kindId) return;
-                            setConfig({ ...config, source: chosen.sources[0]?.id ?? "", subjectId: "" });
+                            setConfig({
+                                ...config,
+                                source: chosen.sources[0]?.id ?? "",
+                                subjectId: ""
+                            });
                         }}
                         aria-label={t("threshold.watch")}
                     />
@@ -146,7 +152,9 @@ export function ThresholdFields({
             {kind && kind.subjects.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("threshold.subjectNone")}</p>
             ) : null}
-            {subjectGone ? <p className="text-xs text-danger-ink">{t("threshold.subjectGone")}</p> : null}
+            {subjectGone ? (
+                <p className="text-xs text-danger-ink">{t("threshold.subjectGone")}</p>
+            ) : null}
             <Labeled
                 label={t("threshold.reading")}
                 state={kind ? states.source : "ok"}

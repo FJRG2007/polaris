@@ -24,8 +24,7 @@ import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
 type Result<T = object> =
-    | ({ ok: true } & T)
-    | { ok: false; error: string; problems?: core.GraphProblem[] };
+    ({ ok: true } & T) | { ok: false; error: string; problems?: core.GraphProblem[] };
 
 async function actor(): Promise<RunActor> {
     const user = await requirePermission("automations.use");

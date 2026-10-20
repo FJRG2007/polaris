@@ -11,7 +11,10 @@ import { compare, stepAlarm, worse } from "@/lib/alarm-state";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k".repeat(64) }) }));
-vi.mock("@/lib/automations/engine", () => ({ loadGraph: async () => null, startRun: async () => null }));
+vi.mock("@/lib/automations/engine", () => ({
+    loadGraph: async () => null,
+    startRun: async () => null
+}));
 vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => null }));
 vi.mock("@/lib/automations/threshold-sources", () => ({ thresholdSource: () => null }));
 
@@ -32,7 +35,8 @@ const at = (minute: number) => new Date(t0 + minute * 60_000);
 /** Feed one value per minute and say which minutes crossed, and how. */
 function feed(values: (number | string)[], sameSampleTwice = false) {
     let memory = thresholds.readMemory(null, "c");
-    const crossings: { minute: number; state: string; peak: number; duration: number | null }[] = [];
+    const crossings: { minute: number; state: string; peak: number; duration: number | null }[] =
+        [];
     values.forEach((value, minute) => {
         const reading = typeof value === "string" ? value : { value, at: at(minute) };
         const passes = sameSampleTwice ? 2 : 1;
@@ -79,7 +83,11 @@ describe("the shared alarm state machine", () => {
     });
 
     it("keeps the streak through a sample with no data, as Watch always did", () => {
-        const step = stepAlarm({ state: "ok", streak: 2 }, { breach: false, insufficient: true }, 3);
+        const step = stepAlarm(
+            { state: "ok", streak: 2 },
+            { breach: false, insufficient: true },
+            3
+        );
         expect(step).toEqual({ state: "insufficient", streak: 2, transition: null });
     });
 });
@@ -143,8 +151,12 @@ describe("a threshold trigger", () => {
     });
 
     it("rejects a config without a subject or with a malformed source", () => {
-        expect(core.thresholdConfigSchema.safeParse({ ...config, subjectId: "" }).success).toBe(false);
-        expect(core.thresholdConfigSchema.safeParse({ ...config, source: "CPU" }).success).toBe(false);
+        expect(core.thresholdConfigSchema.safeParse({ ...config, subjectId: "" }).success).toBe(
+            false
+        );
+        expect(core.thresholdConfigSchema.safeParse({ ...config, source: "CPU" }).success).toBe(
+            false
+        );
     });
 
     it("is armed due now, and keeps its memory through a publish that left it alone", () => {

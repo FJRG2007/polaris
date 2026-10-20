@@ -13,7 +13,9 @@ export type FieldState = "ok" | "required" | "invalid";
 
 /** Nothing filled in. A number box with letters in it holds NaN: filled in, wrongly. */
 function empty(value: unknown): boolean {
-    return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
+    return (
+        value === undefined || value === null || (typeof value === "string" && value.trim() === "")
+    );
 }
 
 /** Each field's state for a config as the form holds it. */
@@ -43,7 +45,13 @@ export function numberFromInput(text: string): number | undefined {
 
 /** "> 90", ">= 90", "< 20", "<= 20": how a comparator reads on a node and in the history. */
 export function comparatorSymbol(comparator: string): string {
-    return comparator === "gte" ? ">=" : comparator === "lt" ? "<" : comparator === "lte" ? "<=" : ">";
+    return comparator === "gte"
+        ? ">="
+        : comparator === "lt"
+          ? "<"
+          : comparator === "lte"
+            ? "<="
+            : ">";
 }
 
 /** A source id's catalog key under `automations.threshold.sources`. */

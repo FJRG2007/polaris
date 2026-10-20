@@ -133,7 +133,9 @@ async function upsReading(
     });
     if (!sample || now - sample.ts.getTime() >= RECENT_SAMPLE_MS) return "no recent metrics";
     const value = sample[column];
-    return typeof value === "number" ? { value: value / scale, at: sample.ts } : "metric unavailable";
+    return typeof value === "number"
+        ? { value: value / scale, at: sample.ts }
+        : "metric unavailable";
 }
 
 const UPS_READINGS: readonly { id: string; column: UpsColumn; unit: string; scale: number }[] = [

@@ -37,7 +37,6 @@ import {
     type MetricSubject
 } from "./metric-reading";
 
-
 interface AlarmRow {
     id: string;
     ownerId: string;
@@ -221,7 +220,9 @@ async function notifyTransition(
     await notify({
         userId: alarm.ownerId,
         event: triggered ? "watch.alarm" : "watch.ok",
-        title: triggered ? t("notices.alarm", { name: alarm.name }) : t("notices.recovered", { name: alarm.name }),
+        title: triggered
+            ? t("notices.alarm", { name: alarm.name })
+            : t("notices.recovered", { name: alarm.name }),
         body: said,
         actionRequired: triggered,
         href: "/watch",

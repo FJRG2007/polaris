@@ -62,7 +62,12 @@ describe("the threshold form", () => {
     });
 
     it("reads each comparator as a symbol and names each source by a catalog key", () => {
-        expect(core.THRESHOLD_COMPARATORS.map(form.comparatorSymbol)).toEqual([">", ">=", "<", "<="]);
+        expect(core.THRESHOLD_COMPARATORS.map(form.comparatorSymbol)).toEqual([
+            ">",
+            ">=",
+            "<",
+            "<="
+        ]);
         expect(form.sourceKey("ups.input_voltage")).toBe("threshold.sources.ups_input_voltage");
     });
 });
