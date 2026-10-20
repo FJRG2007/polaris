@@ -76,6 +76,8 @@ export interface PolarModelOption {
     costInput: number | null;
     /** Price per million output tokens, when the catalogue knows it. */
     costOutput: number | null;
+    /** What it reads, from the catalogue ("image", "pdf", ...); empty when unknown. */
+    inputs: string[];
     releaseDate: string | null;
 }
 
@@ -140,6 +142,7 @@ function catalogueOption(
         contextTokens: model.contextTokens,
         costInput: model.costInput,
         costOutput: model.costOutput,
+        inputs: model.inputModalities ?? [],
         releaseDate: model.releaseDate
     };
 }
@@ -155,6 +158,7 @@ function gatewayOption(slug: string, providerName: string, model: string): Polar
         contextTokens: 0,
         costInput: null,
         costOutput: null,
+        inputs: [],
         releaseDate: null
     };
 }

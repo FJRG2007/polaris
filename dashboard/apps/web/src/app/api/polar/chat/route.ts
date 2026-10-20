@@ -161,6 +161,14 @@ export async function POST(request: Request): Promise<Response> {
             ? body.data.parentId
             : (list[index - 1]?.id ?? null);
 
+    // A file the model cannot read is sent as its text; one with no text to
+    // take out stops the turn with its name instead of being dropped unseen.
+    const unreadable: string[] = [];
+    const sendable = await inlinePolarFiles(user.id, messages, resolved.option, unreadable);
+    if (unreadable.length > 0) {
+        return NextResponse.json({ error: "file_unreadable", name: unreadable[0] }, { status: 422 });
+    }
+
     const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
@@ -170,7 +178,7 @@ export async function POST(request: Request): Promise<Response> {
             instructions,
             memories
         ),
-        messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
+        messages: await convertToModelMessages(sendable),
         tools,
         toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
         stopWhen: isStepCount(STEP_MAX),

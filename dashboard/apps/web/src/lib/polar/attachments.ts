@@ -164,9 +164,74 @@ function attachmentIds(message: UIMessage): string[] {
  * always goes, and an older file that no longer fits is left out without being
  * read from storage at all.
  */
+/** Most characters of one document's text a turn carries. */
+const TEXT_MAX_CHARS = 100_000;
+
+const DOCUMENT_TYPES = new Set([
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+]);
+
+/** What the chosen model reads, from the catalogue. `inputs` empty is unknown:
+ *  then only the older `attachment` flag says it takes pictures. */
+export interface ModelReads {
+    inputs: readonly string[];
+    attachment: boolean;
+}
+
+/**
+ * How a file reaches the model: as the file itself when the model reads that
+ * kind (a picture to a model that sees, a PDF to one whose catalogue entry lists
+ * "pdf"), otherwise as the text taken out of it. Plain text always goes as text:
+ * every model reads that, and not every provider takes a text file part.
+ */
+export function fileRoute(mediaType: string, reads: ModelReads): "file" | "text" {
+    if (mediaType.startsWith("image/")) {
+        return reads.inputs.includes("image") || (reads.inputs.length === 0 && reads.attachment)
+            ? "file"
+            : "text";
+    }
+    if (mediaType === "application/pdf" && reads.inputs.includes("pdf")) return "file";
+    return "text";
+}
+
+/** The text of a document, bounded, or null when none can be taken out. */
+async function documentText(mediaType: string, bytes: Uint8Array): Promise<string | null> {
+    let text: string;
+    if (mediaType.startsWith("text/") || mediaType === "application/json") {
+        text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    } else if (DOCUMENT_TYPES.has(mediaType)) {
+        const parse = await import("@polaris/file-parse");
+        const read =
+            mediaType === "application/pdf"
+                ? parse.pdfToText
+                : mediaType.includes("wordprocessingml")
+                  ? parse.docxToText
+                  : mediaType.includes("spreadsheetml")
+                    ? parse.xlsxToText
+                    : parse.pptxToText;
+        text = await read(bytes).catch(() => "");
+    } else {
+        return null;
+    }
+    text = text.trim();
+    if (!text) return null;
+    return text.length > TEXT_MAX_CHARS ? `${text.slice(0, TEXT_MAX_CHARS)}
+[...]` : text;
+}
+
+/** Everything the model may read: pictures only, as before this was known. */
+const READS_PICTURES: ModelReads = { inputs: [], attachment: true };
+
 export async function inlinePolarFiles(
     userId: string,
-    messages: readonly UIMessage[]
+    messages: readonly UIMessage[],
+    reads: ModelReads = READS_PICTURES,
+    /** Filled with the names of the newest message's files the model can
+     *  neither read as files nor be given the text of. */
+    unreadable: string[] = []
 ): Promise<UIMessage[]> {
     const ids = [...new Set(messages.flatMap(attachmentIds))];
     const rows = ids.length
@@ -178,6 +243,7 @@ export async function inlinePolarFiles(
     const stored = new Map(rows.map((row) => [row.id, row]));
     let budget = TURN_MAX_BYTES;
     const result: UIMessage[] = [];
+    const newest = messages.at(-1);
     for (const message of [...messages].reverse()) {
         const parts: UIMessage["parts"] = [];
         for (const part of message.parts) {
@@ -193,10 +259,26 @@ export async function inlinePolarFiles(
             const bytes = new Uint8Array(await new Response(file.body).arrayBuffer());
             if (bytes.byteLength > budget) continue;
             budget -= bytes.byteLength;
+            if (fileRoute(file.mediaType, reads) === "file") {
+                parts.push({
+                    ...part,
+                    mediaType: file.mediaType,
+                    url: `data:${file.mediaType};base64,${Buffer.from(bytes).toString("base64")}`
+                });
+                continue;
+            }
+            const name = part.filename ?? "file";
+            const text = await documentText(file.mediaType, bytes).catch(() => null);
+            if (text === null) {
+                if (message === newest) unreadable.push(name);
+                continue;
+            }
+            // Fenced as the file's contents: data to read, not instructions.
             parts.push({
-                ...part,
-                mediaType: file.mediaType,
-                url: `data:${file.mediaType};base64,${Buffer.from(bytes).toString("base64")}`
+                type: "text",
+                text: `<file name=${JSON.stringify(name)} type=${JSON.stringify(file.mediaType)}>
+${text}
+</file>`
             });
         }
         result.push({ ...message, parts });

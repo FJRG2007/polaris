@@ -63,6 +63,7 @@ const rawModelSchema = z.object({
     release_date: z.string().optional(),
     limit: z.object({ context: z.number().optional(), output: z.number().optional() }).optional(),
     cost: z.object({ input: z.number().optional(), output: z.number().optional() }).optional(),
+    modalities: z.object({ input: z.array(z.string()).optional() }).partial().optional(),
     reasoning_options: z
         .array(z.object({ type: z.string(), values: z.array(z.string()) }))
         .optional()
@@ -95,6 +96,8 @@ export interface CatalogModel {
     attachment: boolean;
     costInput: number | null;
     costOutput: number | null;
+    /** What it reads ("text", "image", "pdf", ...); empty when unknown. */
+    inputModalities: string[];
     releaseDate: string | null;
 }
 
@@ -110,8 +113,19 @@ type ModelRow = {
     attachment: boolean;
     costInput: number | null;
     costOutput: number | null;
+    inputModalities: string;
     releaseDate: string | null;
 };
+
+/** A stored JSON string array, or empty for anything else. */
+function stringList(value: string | undefined): string[] {
+    try {
+        const parsed: unknown = JSON.parse(value ?? "[]");
+        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+    } catch {
+        return [];
+    }
+}
 
 function toModel(row: ModelRow): CatalogModel {
     let rungs: string[] = [];
@@ -123,7 +137,7 @@ function toModel(row: ModelRow): CatalogModel {
         // reading: the setting becomes a documented no-op rather than sending
         // the provider a level it never published.
     }
-    return { ...row, effortRungs: rungs };
+    return { ...row, effortRungs: rungs, inputModalities: stringList(row.inputModalities) };
 }
 
 const SELECT = {
@@ -138,6 +152,7 @@ const SELECT = {
     attachment: true,
     costInput: true,
     costOutput: true,
+    inputModalities: true,
     releaseDate: true
 } as const;
 
@@ -206,6 +221,7 @@ export function parseCatalogPayload(payload: unknown): ModelRow[] {
                 attachment: data.attachment === true,
                 costInput: data.cost?.input ?? null,
                 costOutput: data.cost?.output ?? null,
+                inputModalities: JSON.stringify(data.modalities?.input ?? []),
                 releaseDate: data.release_date ?? null
             });
         }

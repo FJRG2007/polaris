@@ -136,7 +136,7 @@ vi.mock("@polaris/db", () => ({
 
 const upload = await import("../../src/app/api/polar/attachments/route");
 const read = await import("../../src/app/api/polar/attachments/[id]/route");
-const { inlinePolarFiles, linkPolarAttachments, sweepUnsentPolarAttachments } = await import(
+const { fileRoute, inlinePolarFiles, linkPolarAttachments, sweepUnsentPolarAttachments } = await import(
     "@/lib/polar/attachments"
 );
 
@@ -268,6 +268,48 @@ describe("inlinePolarFiles", () => {
         expect(turn[0]?.parts).toEqual([]);
         expect(turn[2]?.parts.map((part) => part.type)).toEqual(["text", "file"]);
         expect(state.reads).toEqual([`p/${NEW}`]);
+    });
+});
+
+describe("fileRoute", () => {
+    it("sends a file only to a model whose catalogue entry reads that kind", () => {
+        const pdfReader = { inputs: ["text", "image", "pdf"], attachment: true };
+        const textOnly = { inputs: ["text"], attachment: false };
+        expect(fileRoute("application/pdf", pdfReader)).toBe("file");
+        expect(fileRoute("application/pdf", textOnly)).toBe("text");
+        expect(fileRoute("image/png", pdfReader)).toBe("file");
+        expect(fileRoute("image/png", textOnly)).toBe("text");
+        // Nothing known about what it reads: the older flag still says pictures.
+        expect(fileRoute("image/png", { inputs: [], attachment: true })).toBe("file");
+        expect(fileRoute("application/pdf", { inputs: [], attachment: true })).toBe("text");
+        expect(
+            fileRoute("application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfReader)
+        ).toBe("text");
+    });
+
+    it("gives a model that cannot see a picture nothing, and names the file", async () => {
+        const unreadable: string[] = [];
+        const [turn] = await inlinePolarFiles(
+            OWNER,
+            [
+                {
+                    id: "u1",
+                    role: "user",
+                    parts: [
+                        {
+                            type: "file",
+                            mediaType: "image/png",
+                            filename: "chart.png",
+                            url: `/api/polar/attachments/${MINE}`
+                        }
+                    ]
+                }
+            ],
+            { inputs: ["text"], attachment: false },
+            unreadable
+        );
+        expect(turn?.parts).toEqual([]);
+        expect(unreadable).toEqual(["chart.png"]);
     });
 });
 

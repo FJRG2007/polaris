@@ -8224,11 +8224,15 @@ model AgentModel {
     effortRungs   String   @default("[]")
     reasoning     Boolean  @default(false)
     attachment    Boolean  @default(false)
-    // USD per million tokens as published. Display only - what an operator is
-    // actually billed is settled by the provider, so this is never summed into
-    // anything Polaris presents as a charge.
+    // USD per million tokens as published. What an operator is actually billed
+    // is settled by the provider, so it is never presented as a charge - Polar
+    // shows what an answer spent as an estimate worked out from it, labelled so.
     costInput     Float?
     costOutput    Float?
+    // What the model reads, as a JSON string array from the index ("text",
+    // "image", "pdf", "audio", "video"). Empty when the index did not say -
+    // which is unknown, not text-only.
+    inputModalities String @default("[]")
     releaseDate   String?
     refreshedAt   DateTime @updatedAt
 

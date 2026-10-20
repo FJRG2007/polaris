@@ -1683,16 +1683,22 @@ export function PolarChat({
                                     </div>
                                 ) : null}
                                 {chat.error ? (
-                                    limit ? (
+                                    unreadableOf(chat.error) || limit ? (
                                         <p
                                             role="alert"
                                             className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
                                         >
-                                            {t("errors.usageLimit", {
-                                                used: limit.used,
-                                                amount: limit.amount,
-                                                period: t(`usage.periods.${limit.period}`)
-                                            })}
+                                            {unreadableOf(chat.error)
+                                                ? t("errors.fileUnreadable", {
+                                                      name: unreadableOf(chat.error)!
+                                                  })
+                                                : limit
+                                                ? t("errors.usageLimit", {
+                                                      used: limit.used,
+                                                      amount: limit.amount,
+                                                      period: t(`usage.periods.${limit.period}`)
+                                                  })
+                                                : null}
                                         </p>
                                     ) : (
                                         <PolarFailureNotice
@@ -1772,6 +1778,17 @@ export function limitOf(
             (period === "day" || period === "week" || period === "month")
             ? { used: body.used, amount: body.amount, period }
             : null;
+    } catch {
+        return null;
+    }
+}
+
+/** The file a refused turn could not hand the model, when that was why. */
+export function unreadableOf(error: Error | undefined): string | null {
+    if (!error) return null;
+    try {
+        const body = JSON.parse(error.message) as Record<string, unknown>;
+        return body.error === "file_unreadable" && typeof body.name === "string" ? body.name : null;
     } catch {
         return null;
     }
