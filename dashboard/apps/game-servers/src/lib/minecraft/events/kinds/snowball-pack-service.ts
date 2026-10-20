@@ -32,12 +32,20 @@ export async function ensurePack(server: ServerContainer): Promise<boolean> {
     if (!level) return false;
     const root = `${DATA_DIR}/${level}/datapacks/${pack.PACK_DIR}`;
     const files = pack.packFiles();
+    const retired = pack.RETIRED_FILES.map((path) => `${root}/${path}`);
     const paths = [...files.keys()].map((path) => `${root}/${path}`);
-    const there = await readContainerFiles(server, paths);
+    const there = await readContainerFiles(server, [...paths, ...retired]);
     let changed = false;
     for (const [path, content] of files) {
         if (there.get(`${root}/${path}`) === content) continue;
         await writeContainerFile(server, `${root}/${path}`, content);
+        changed = true;
+    }
+    // What an older Polaris wrote and this one does not: the game would go on
+    // loading it, and logging it as broken at every start.
+    const stale = retired.filter((path) => there.has(path));
+    if (stale.length > 0) {
+        await server.run(["rm", "-f", "--", ...stale]);
         changed = true;
     }
     const enabled = async () => pack.packEnabled(await server.say(["datapack list enabled"]));

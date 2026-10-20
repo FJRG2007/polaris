@@ -13514,11 +13514,10 @@ describe("Pillars", () => {
         // written, its drops armed for this server's item data, nothing given
         // over the console.
         expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
-        expect(
-            JSON.parse(packed("data/polaris/loot_table/pillars/balanced_components.json")!)
-        ).toEqual(pi.lootTable("balanced", "components"));
-        for (const line of pi.armLines(4, "balanced", "components"))
-            expect(world.sent).toContain(line);
+        expect(JSON.parse(packed("data/polaris/loot_table/pillars/balanced.json")!)).toEqual(
+            pi.lootTable("balanced", "components")
+        );
+        for (const line of pi.armLines(4, "balanced")) expect(world.sent).toContain(line);
         expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
         await play(2_100);
 

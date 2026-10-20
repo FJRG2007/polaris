@@ -213,31 +213,40 @@ describe("the pillars' items", () => {
 });
 
 describe("the pillars' drops", () => {
-    it("are in the events pack: each era's tables where its releases read them, and a bounded drop", () => {
+    it("are in the events pack: each era's tables only where its releases read them, and a bounded drop", () => {
         const files = pack.packFiles();
         const tables = (folder: string) =>
             [...files.keys()]
-                .filter((path) => path.startsWith(`data/polaris/${folder}/pillars/`))
-                .map((path) => path.slice(`data/polaris/${folder}/pillars/`.length))
+                .filter((path) => path.startsWith(`${folder}/pillars/`))
+                .map((path) => path.slice(`${folder}/pillars/`.length))
                 .sort();
-        // Up to 1.20.6 the plural folder, read by both eras; from 1.21 the
-        // singular one, read only by releases that write components.
-        expect(tables("loot_tables")).toEqual(
-            Object.keys(pi.LOOT_TABLES)
-                .map((name) => `${name}.json`)
-                .sort()
-        );
-        expect(tables("loot_table")).toEqual(
-            pi.POOLS.map((pool) => `${pool}_components.json`).sort()
-        );
-        for (const [path, content] of files) {
-            if (!/\/loot_tables?\/pillars\//.test(path)) continue;
-            const name = path
-                .split("/")
-                .at(-1)!
-                .replace(/\.json$/, "");
-            expect(JSON.parse(content)).toEqual(pi.LOOT_TABLES[name]);
+        const named = pi.POOLS.map((pool) => `${pool}.json`).sort();
+        // Up to 1.20.4 the plural folder in NBT; 1.20.5 and 1.20.6 read the
+        // same folder with the overlay's tables over it; from 1.21 the
+        // singular one, read only by releases that write components. One name
+        // per pool in every era, so no release ever meets the other era's.
+        expect(tables("data/polaris/loot_tables")).toEqual(named);
+        expect(tables(`${pack.COMPONENTS_OVERLAY}/data/polaris/loot_tables`)).toEqual(named);
+        expect(tables("data/polaris/loot_table")).toEqual(named);
+        for (const pool of pi.POOLS) {
+            const table = (path: string) => JSON.parse(files.get(`${path}/pillars/${pool}.json`)!);
+            expect(table("data/polaris/loot_tables")).toEqual(pi.lootTable(pool, "tag"));
+            expect(table(`${pack.COMPONENTS_OVERLAY}/data/polaris/loot_tables`)).toEqual(
+                pi.lootTable(pool, "components")
+            );
+            expect(table("data/polaris/loot_table")).toEqual(pi.lootTable(pool, "components"));
         }
+        // The overlay applies to 1.20.5 (41) up to the rename (45), in both
+        // spellings of a range: `formats` before 1.21.9, min and max from it.
+        const meta = JSON.parse(files.get("pack.mcmeta")!);
+        expect(meta.overlays.entries).toEqual([
+            {
+                formats: [41, 44],
+                min_format: 41,
+                max_format: 44,
+                directory: pack.COMPONENTS_OVERLAY
+            }
+        ]);
         for (const folder of ["functions", "function"]) {
             const read = (name: string) =>
                 files
@@ -247,25 +256,19 @@ describe("the pillars' drops", () => {
             expect(files.get(`data/minecraft/tags/${folder}/tick.json`)).toContain(
                 "polaris:pillars/tick"
             );
-            // Each era's rolls in a function of its own: from 1.20.5 a function
-            // naming a table that did not load is refused whole, so the era a
-            // release cannot load never takes the drop down with it.
-            expect(read("drop")).toContain(
-                `execute if score #era ${pi.OBJECTIVE} matches 1 run function polaris:pillars/drop_components`
-            );
-            expect(read("drop")).toContain(
-                `execute if score #era ${pi.OBJECTIVE} matches 0 run function polaris:pillars/drop_tag`
-            );
-            expect(read("drop").some((line) => line.includes("loot give"))).toBe(false);
-            // Each player still in rolls their own: one command for all of them.
-            for (const era of ["components", "tag"] as const)
-                expect(read(`drop_${era}`)).toEqual(
+            // Each player still in rolls their own: one command for all of them,
+            // naming the table the server's own era loaded.
+            expect(read("drop")).toEqual(
+                expect.arrayContaining(
                     pi.POOLS.map(
                         (pool, index) =>
-                            `execute if score #pool ${pi.OBJECTIVE} matches ${index} as @a[tag=${pi.IN_TAG},tag=!${pi.OUT_TAG}] run loot give @s loot polaris:pillars/${pool}_${era}`
+                            `execute if score #pool ${pi.OBJECTIVE} matches ${index} as @a[tag=${pi.IN_TAG},tag=!${pi.OUT_TAG}] run loot give @s loot polaris:pillars/${pool}`
                     )
-                );
+                )
+            );
         }
+        // No path the pack ships is one it takes away.
+        for (const path of pack.RETIRED_FILES) expect(files.has(path)).toBe(false);
         // Every function one of them names is in the pack, and no line starts
         // with a slash, which a function refuses.
         for (const lines of Object.values(pi.FUNCTIONS))
@@ -369,11 +372,10 @@ describe("the pillars' drops", () => {
         );
         expect(pi.itemOf(pi.DROPS[0]!, "tag")).toBe("minecraft:oak_planks{polaris_event:1b}");
     });
-    it("is switched on with its interval, pool and era, the first drop at once, and off safely", () => {
-        const on = pi.armLines(7, "chaos", "tag");
+    it("is switched on with its interval and pool, the first drop at once, and off safely", () => {
+        const on = pi.armLines(7, "chaos");
         expect(on).toContain(`scoreboard players set #every ${pi.OBJECTIVE} 140`);
         expect(on).toContain(`scoreboard players set #pool ${pi.OBJECTIVE} 2`);
-        expect(on).toContain(`scoreboard players set #era ${pi.OBJECTIVE} 0`);
         expect(on).toContain(`scoreboard players set #left ${pi.OBJECTIVE} 1`);
         expect(on.at(-1)).toBe(`scoreboard players set #on ${pi.OBJECTIVE} 1`);
         expect(pi.STOP_LINES[0]).toBe(`scoreboard players set #on ${pi.OBJECTIVE} 0`);
@@ -595,7 +597,7 @@ describe("a pillars game played", () => {
         });
         expect(on).toContain("gamemode survival Ana");
         expect(on).toContain(`tag Ana add ${pi.IN_TAG}`);
-        expect(on).toEqual(expect.arrayContaining(pi.armLines(5, "blocks", "components")));
+        expect(on).toEqual(expect.arrayContaining(pi.armLines(5, "blocks")));
         packOn = false;
         const off = await game.goLines(contextFor(run).ctx, {
             marker: "components",
