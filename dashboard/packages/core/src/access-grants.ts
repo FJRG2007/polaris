@@ -71,7 +71,8 @@ export const GRANT_SUBJECTS = [
     "note.space",
     "office.document",
     "place.device",
-    "place.camera"
+    "place.camera",
+    "place.ups"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -119,10 +120,79 @@ export const GRANT_CAPABILITIES = {
     "place.device": ["view", "control"],
     // Watching is all there is to give: nothing here points a camera or wipes
     // its footage on somebody else's behalf.
-    "place.camera": ["view"]
+    "place.camera": ["view"],
+    // A UPS: reading its status and history, or also sending it commands,
+    // writing its variables and running its self-test. The same split NUT
+    // itself draws - Home Assistant's NUT integration reads with no login and
+    // offers commands only to a NUT user with instant-command rights
+    // (https://www.home-assistant.io/integrations/nut).
+    "place.ups": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
+
+/**
+ * What a grant may be used FOR, per subject - the cut inside a capability.
+ *
+ * `control` over a door says the visitor may operate it; this says which way.
+ * Lock brands sell exactly this (a key that only opens, a code that only
+ * works some hours), and Home Assistant has no per-entity sharing at all - its
+ * users are administrators or not, and a hidden card is not a refused call
+ * (https://github.com/orgs/home-assistant/discussions/1171,
+ * https://developers.home-assistant.io/docs/auth_permissions) - so the
+ * vocabulary is ours:
+ *
+ * - a device: `open` (unlock, unlatch), `close` (lock) and `operate`
+ *   (everything a switch, a light or an air conditioner does);
+ * - a camera: `watch`;
+ * - a UPS: `watch` (status, history) and `control` (commands, variables, test).
+ *
+ * `watch` is what `view` reaches; every other action needs `control`.
+ */
+export const GRANT_ACTIONS = {
+    "chat.space": [],
+    "chat.channel": [],
+    "task.space": [],
+    "task.folder": [],
+    "note.space": [],
+    "office.document": [],
+    "place.device": ["open", "close", "operate"],
+    "place.camera": ["watch"],
+    "place.ups": ["watch", "control"]
+} as const satisfies Record<GrantSubject, readonly string[]>;
+
+/**
+ * The actions one grant really allows.
+ *
+ * An empty list is a row written before grants named their actions (or by a
+ * dashboard that had not been updated yet) and means everything the capability
+ * reaches - which is what it allowed when it was written. A listed action the
+ * capability does not reach is dropped rather than honoured: a `view` grant
+ * that somehow says `open` still opens nothing.
+ */
+export function grantActions(
+    subject: GrantSubject,
+    capability: string,
+    actions: readonly string[]
+): string[] {
+    const all = GRANT_ACTIONS[subject] as readonly string[];
+    const ladder = GRANT_CAPABILITIES[subject] as readonly string[];
+    const controls = ladder.includes("control") && atLeast(subject, capability, "control");
+    const reachable = all.filter((action) => action === "watch" || controls);
+    return actions.length === 0
+        ? reachable
+        : reachable.filter((action) => actions.includes(action));
+}
+
+/** Whether one grant allows one action. */
+export function allowsAction(
+    subject: GrantSubject,
+    capability: string,
+    actions: readonly string[],
+    wanted: string
+): boolean {
+    return grantActions(subject, capability, actions).includes(wanted);
+}
 
 /** Whether `held` is `wanted` or stronger, in that subject's own ladder. An
  *  unknown word is weaker than everything, which is the safe way to be wrong. */
@@ -356,55 +426,205 @@ function grantMoment(message: string) {
         .refine((value) => !Number.isNaN(Date.parse(value)), { message });
 }
 
+/** The narrowest and widest "only near the place" fence a grant may draw. A
+ *  browser's fix is rarely better than tens of metres, and past a few
+ *  kilometres it is not "near" any more. */
+export const NEARBY_MIN_M = 25;
+export const NEARBY_MAX_M = 5000;
+
 /**
  * What a screen sends to make or replace one.
  *
  * The subject is never in here: it comes from the route being called, so a
  * request cannot name a thing the caller was not already resolved against.
  */
-export const accessGrantSchema = z
-    .object({
-        principalType: z.enum(GRANT_PRINCIPALS),
-        principalId: z.string().trim().min(1).max(64),
-        capability: z.string().trim().min(1).max(32),
-        startsAt: grantMoment("Give the first day as a date").optional(),
-        endsAt: grantMoment("Give the last day as a date").optional(),
-        days: z.number().int().min(1).max(EVERY_DAY).default(EVERY_DAY),
-        startMinute: z
-            .number()
-            .int()
-            .min(0)
-            .max(MINUTES_IN_DAY - 1)
-            .nullable()
-            .default(null),
-        endMinute: z
-            .number()
-            .int()
-            .min(0)
-            .max(MINUTES_IN_DAY - 1)
-            .nullable()
-            .default(null),
-        timeZone: z.string().trim().max(64).default(""),
-        // Zero would be a grant that is spent before it is written, which is a
-        // way of saying "no" that looks like a way of saying "yes".
-        maxUses: z.number().int().min(1).max(100_000).nullable().default(null),
-        note: z.string().trim().max(200).default("")
-    })
-    // On the object because they are facts about the pair. Half an hour window
-    // is not a window, and equal ends cannot be read - it is both no time at all
-    // and the whole day, and there is nothing to pick between them.
-    .refine((grant) => (grant.startMinute === null) === (grant.endMinute === null), {
-        message: "Give the hours a start and an end, or neither",
-        path: ["endMinute"]
-    })
-    .refine((grant) => grant.startMinute === null || grant.startMinute !== grant.endMinute, {
-        message: "Give it a start and an end that differ",
-        path: ["endMinute"]
-    })
-    .refine(
-        (grant) =>
-            !grant.startsAt || !grant.endsAt || new Date(grant.startsAt) < new Date(grant.endsAt),
-        { message: "The last day is before the first", path: ["endsAt"] }
+const grantBounds = z.object({
+    capability: z.string().trim().min(1).max(32),
+    startsAt: grantMoment("Give the first day as a date").optional(),
+    endsAt: grantMoment("Give the last day as a date").optional(),
+    days: z.number().int().min(1).max(EVERY_DAY).default(EVERY_DAY),
+    startMinute: z
+        .number()
+        .int()
+        .min(0)
+        .max(MINUTES_IN_DAY - 1)
+        .nullable()
+        .default(null),
+    endMinute: z
+        .number()
+        .int()
+        .min(0)
+        .max(MINUTES_IN_DAY - 1)
+        .nullable()
+        .default(null),
+    timeZone: z.string().trim().max(64).default(""),
+    // Zero would be a grant that is spent before it is written, which is a
+    // way of saying "no" that looks like a way of saying "yes".
+    maxUses: z.number().int().min(1).max(100_000).nullable().default(null),
+    // Which of the subject's actions it allows (GRANT_ACTIONS); empty is all
+    // of them. Checked against the subject where the subject is known.
+    actions: z.array(z.string().trim().min(1).max(32)).max(8).default([]),
+    // Only near the place: the act is allowed when the browser says it is
+    // within this many metres of where the subject stands. A convenience
+    // fence, not a lock - a browser's location can be made up.
+    nearbyMeters: z.number().int().min(NEARBY_MIN_M).max(NEARBY_MAX_M).nullable().default(null),
+    note: z.string().trim().max(200).default("")
+});
+
+/** The facts about how a grant's bounds go together, for either kind of grant. */
+function withGrantRules<T extends typeof grantBounds>(
+    schema: T
+): z.ZodEffects<z.ZodEffects<z.ZodEffects<T>>> {
+    // Typed from T because `refine` reads its output from the constraint, which
+    // would drop whatever the caller extended the bounds with.
+    return (
+        schema
+            // On the object because they are facts about the pair. Half an hour window
+            // is not a window, and equal ends cannot be read - it is both no time at all
+            // and the whole day, and there is nothing to pick between them.
+            .refine((grant) => (grant.startMinute === null) === (grant.endMinute === null), {
+                message: "Give the hours a start and an end, or neither",
+                path: ["endMinute"]
+            })
+            .refine(
+                (grant) => grant.startMinute === null || grant.startMinute !== grant.endMinute,
+                {
+                    message: "Give it a start and an end that differ",
+                    path: ["endMinute"]
+                }
+            )
+            .refine(
+                (grant) =>
+                    !grant.startsAt ||
+                    !grant.endsAt ||
+                    new Date(grant.startsAt) < new Date(grant.endsAt),
+                { message: "The last day is before the first", path: ["endsAt"] }
+            ) as z.ZodEffects<z.ZodEffects<z.ZodEffects<T>>>
     );
+}
+
+export const accessGrantSchema = withGrantRules(
+    grantBounds.extend({
+        principalType: z.enum(GRANT_PRINCIPALS),
+        principalId: z.string().trim().min(1).max(64)
+    })
+);
 
 export type AccessGrantInput = z.infer<typeof accessGrantSchema>;
+
+/**
+ * A grant handed out as a link, for somebody with no Polaris account: the same
+ * bounds, nobody named. Whoever holds the link holds the grant, so it is only
+ * offered for what one press does - a door, a UPS - and never for a camera,
+ * whose pictures are not a thing to send to an address nobody signed in to.
+ */
+export const grantLinkSchema = withGrantRules(grantBounds);
+
+export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
+
+/** What may be handed out as a link. */
+export const GRANT_LINK_SUBJECTS = [
+    "place.device",
+    "place.ups"
+] as const satisfies readonly GrantSubject[];
+
+/** The principal a link grant is written under; its id is the link's hash. */
+export const LINK_PRINCIPAL = "link";
+
+/** Where the browser says it is, at the moment of an act. */
+export interface ReportedLocation {
+    readonly latitude: number;
+    readonly longitude: number;
+    /** The browser's own radius of uncertainty, in metres. */
+    readonly accuracy: number;
+}
+
+/**
+ * Where this browser says it is, asked once for an act fenced to its place.
+ *
+ * Only ever asked when a press needs it - the server answers "near the place
+ * only" first - so nobody is asked for their location to look at a door. Null
+ * when there is no browser location, the person said no, or it took too long:
+ * the server's refusal then stands, in its own words. Safe to import on a
+ * server; it answers null there.
+ */
+export function whereNow(timeoutMs = 10_000): Promise<ReportedLocation | null> {
+    // Typed here rather than from the DOM library, which this package does not
+    // compile against: the one call it makes.
+    const geolocation = (
+        globalThis as {
+            navigator?: {
+                geolocation?: {
+                    getCurrentPosition(
+                        found: (position: { coords: ReportedLocation }) => void,
+                        failed: () => void,
+                        options: {
+                            enableHighAccuracy: boolean;
+                            timeout: number;
+                            maximumAge: number;
+                        }
+                    ): void;
+                };
+            };
+        }
+    ).navigator?.geolocation;
+    if (!geolocation) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        geolocation.getCurrentPosition(
+            (position) =>
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                }),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30_000 }
+        );
+    });
+}
+
+export const reportedLocationSchema = z.object({
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    accuracy: z.number().min(0).max(100_000)
+});
+
+/** Metres between two points on the Earth (haversine, mean radius). */
+export function metresBetween(
+    a: { latitude: number; longitude: number },
+    b: { latitude: number; longitude: number }
+): number {
+    const R = 6_371_008.8;
+    const rad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = rad(b.latitude - a.latitude);
+    const dLon = rad(b.longitude - a.longitude);
+    const h =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Whether an act is near enough, for a grant fenced to `meters` around a place.
+ *
+ * - `near`: the browser's point is inside the fence;
+ * - `far`: it is outside;
+ * - `vague`: the browser's own uncertainty is wider than the fence, so it says
+ *   nothing either way - refused rather than given the benefit of the doubt;
+ * - `unasked`: no location came with the act (the screen asks and tries again);
+ * - `unplaced`: the place has no coordinates to measure from - refused, since
+ *   a fence nobody can check is not one.
+ */
+export type NearbyVerdict = "near" | "far" | "vague" | "unasked" | "unplaced";
+
+export function nearbyVerdict(
+    place: { latitude: number | null; longitude: number | null } | null,
+    where: ReportedLocation | null,
+    meters: number
+): NearbyVerdict {
+    if (!place || place.latitude === null || place.longitude === null) return "unplaced";
+    if (!where) return "unasked";
+    if (where.accuracy > meters) return "vague";
+    const distance = metresBetween({ latitude: place.latitude, longitude: place.longitude }, where);
+    return distance <= meters ? "near" : "far";
+}

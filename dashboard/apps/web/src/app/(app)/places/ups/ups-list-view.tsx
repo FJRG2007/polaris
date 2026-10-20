@@ -56,7 +56,7 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
             setOfferError(result.error);
             return;
         }
-        router.push(`/apps/servers/ups/${result.value}`);
+        router.push(`/places/ups/${result.value}`);
     }
 
     return (
@@ -169,7 +169,7 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                                           <tr key={ups.id} className="border-t border-border">
                                               <td className="max-w-[16rem] py-2.5 pr-3">
                                                   <Link
-                                                      href={`/apps/servers/ups/${ups.id}`}
+                                                      href={`/places/ups/${ups.id}`}
                                                       className="block truncate font-medium hover:underline"
                                                       title={ups.name}
                                                   >
@@ -224,7 +224,7 @@ export function UpsListView({ machines }: { machines: UpsMachine[] }) {
                     editing={null}
                     machines={machines}
                     offers={offers}
-                    onSaved={(id) => router.push(`/apps/servers/ups/${id}`)}
+                    onSaved={(id) => router.push(`/places/ups/${id}`)}
                 />
             ) : null}
         </>

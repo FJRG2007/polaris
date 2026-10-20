@@ -396,7 +396,7 @@ const controlTool = () =>
         // not named to them.
         async target(input, caller) {
             const { user, install } = await contextFor(caller);
-            await requireDeviceControl(user, input.deviceId);
+            await requireDeviceControl(user, input.deviceId, input.action);
             const device = await devices.getDevice(install.id, input.deviceId);
             return { id: device.id, name: device.name, action: spokenAction(input.action) };
         },

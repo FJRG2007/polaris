@@ -99,7 +99,7 @@ export function UpsAnalytics() {
                                 <tr key={row.upsId} className="border-t">
                                     <td className="max-w-48 truncate px-3 py-2">
                                         <Link
-                                            href={`/apps/servers/ups/${row.upsId}`}
+                                            href={`/places/ups/${row.upsId}`}
                                             className="hover:underline"
                                             title={row.name}
                                         >
@@ -120,7 +120,7 @@ export function UpsAnalytics() {
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         <Link
-                                            href={`/apps/servers/ups/${row.upsId}?tab=events`}
+                                            href={`/places/ups/${row.upsId}?tab=events`}
                                             className="hover:underline"
                                         >
                                             {row.events}

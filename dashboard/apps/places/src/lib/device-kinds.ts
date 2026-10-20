@@ -288,6 +288,18 @@ export const DEVICE_ACTIONS = [
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
 
+/**
+ * Which of a lending grant's actions one device action is: `open` for unlocking
+ * or unlatching a door, `close` for locking it, `operate` for everything a
+ * switch, a light or an air conditioner does. `stop` halts a door or a cover,
+ * so it goes with operating rather than with either direction.
+ */
+export function grantActionFor(action: DeviceAction): "open" | "close" | "operate" {
+    if (action === "unlock" || action === "unlatch") return "open";
+    if (action === "lock") return "close";
+    return "operate";
+}
+
 /** The actions a light takes from its sliders rather than from a button. */
 export const LIGHT_ACTIONS: readonly DeviceAction[] = [
     "set-brightness",

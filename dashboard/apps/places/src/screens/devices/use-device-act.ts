@@ -18,6 +18,7 @@ import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
 import { hostUi } from "@polaris/app-host/client";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
+import { whereNow, type ReportedLocation } from "@polaris/core";
 
 const { runAction } = hostUi.runAction;
 
@@ -65,10 +66,18 @@ export function useDeviceAct({
         else if (air) settle({ ...device, air });
         else if (light) settle({ ...device, light });
         else if (settled) settle({ ...device, state: settled });
-        const result = await runAction(
-            () => actions.operateDeviceAction(device.id, action, command),
-            setError
-        );
+        const send = (where?: ReportedLocation) =>
+            runAction(
+                () => actions.operateDeviceAction(device.id, action, command, where),
+                setError
+            );
+        let result = await send();
+        // A grant fenced to the place answers first that it needs to know where
+        // the browser is; asked then, and only then, and tried once more.
+        if (result?.nearby === "unasked") {
+            const where = await whereNow();
+            if (where) result = await send(where);
+        }
         setBusy(null);
         if (!result || result.error) {
             // Only what this press changed is put back, and only while it is

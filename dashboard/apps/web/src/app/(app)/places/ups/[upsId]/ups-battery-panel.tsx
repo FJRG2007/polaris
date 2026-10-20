@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import * as upsReading from "@/lib/ups/ups-reading";
 import { useUpsCommand } from "./ups-commands-panel";
+import { useUpsStanding } from "./ups-standing";
 import * as upsSettings from "@/lib/ups/ups-settings";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -38,6 +39,7 @@ export function UpsBatteryPanel({
     hours: number;
 }) {
     const t = useTranslations("servers");
+    const standing = useUpsStanding();
     const tests = useLiveResource<UpsEventsAnswer>({
         url: `/api/servers/ups/${upsId}/events?kinds=TEST&days=365`,
         cacheKey: `ups:${upsId}:tests`,
@@ -171,7 +173,7 @@ export function UpsBatteryPanel({
                 </h3>
                 {answer === null ? (
                     <Skeleton className="h-8 w-64" />
-                ) : TESTS.some((one) => available.has(one)) ? (
+                ) : standing.control && TESTS.some((one) => available.has(one)) ? (
                     <div className="flex flex-wrap gap-2">
                         {TESTS.filter((one) => available.has(one)).map((one) => (
                             <Button

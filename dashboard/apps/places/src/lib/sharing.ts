@@ -31,9 +31,11 @@ import * as core from "@polaris/core";
 import { HomeError } from "./home-error";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import { grantActionFor, type DeviceAction } from "./device-kinds";
 
 const { sessionCan } = host.session;
-const { grantedSubjects, liveGrants, reachesAnySubject, spendGrant } = host.accessGrants;
+const { grantedActions, grantedSubjects, liveGrants, reachesAnySubject, spendGrant } =
+    host.accessGrants;
 type SessionUser = AppHostTypes["SessionUser"];
 type LiveGrant = AppHostTypes["LiveGrant"];
 
@@ -49,6 +51,12 @@ export interface PlacesReach {
     readonly cameras: ReadonlyMap<string, string>;
     /** The same for doors, openers, switches and sensors. */
     readonly devices: ReadonlyMap<string, string>;
+    /** What a visitor may do with each device they were lent: open, close,
+     *  operate (`core.GRANT_ACTIONS`). Empty for a resident. */
+    readonly deviceActions: ReadonlyMap<string, readonly string[]>;
+    /** The UPSes they were lent. Their screens are core's; Places lists them on
+     *  the place they stand in, so somebody lent only a UPS has a way to it. */
+    readonly upses: ReadonlyMap<string, string>;
 }
 
 /**
@@ -59,13 +67,31 @@ export interface PlacesReach {
  */
 export async function placesReach(user: SessionUser): Promise<PlacesReach> {
     if (await sessionCan(user, "home.read")) {
-        return { everything: true, cameras: new Map(), devices: new Map() };
+        return {
+            everything: true,
+            cameras: new Map(),
+            devices: new Map(),
+            deviceActions: new Map(),
+            upses: new Map()
+        };
     }
-    const [cameras, devices] = await Promise.all([
+    const [cameras, devices, deviceActions, upses] = await Promise.all([
         grantedSubjects(user.id, "place.camera"),
-        grantedSubjects(user.id, "place.device")
+        grantedSubjects(user.id, "place.device"),
+        grantedActions(user.id, "place.device"),
+        grantedSubjects(user.id, "place.ups")
     ]);
-    return { everything: false, cameras, devices };
+    return { everything: false, cameras, devices, deviceActions, upses };
+}
+
+/** Whether a visitor's reach holds nothing at all, which is a refusal. */
+export function reachesNothing(reach: PlacesReach): boolean {
+    return (
+        !reach.everything &&
+        reach.cameras.size === 0 &&
+        reach.devices.size === 0 &&
+        reach.upses.size === 0
+    );
 }
 
 /**
@@ -78,9 +104,8 @@ export async function placesReach(user: SessionUser): Promise<PlacesReach> {
  * of a request: a page that resolves its navigation, its landing path and a
  * refusal's destination asks this three times and pays for it once.
  */
-export const reachesPlaces = cache(
-    async (userId: string): Promise<boolean> =>
-        reachesAnySubject(userId, ["place.camera", "place.device"])
+export const reachesPlaces = cache(async (userId: string): Promise<boolean> =>
+    reachesAnySubject(userId, ["place.camera", "place.device", "place.ups"])
 );
 
 /** Whether a reach covers one camera. */
@@ -142,11 +167,19 @@ export async function requireCameraView(user: SessionUser, cameraId: string): Pr
  */
 export async function requireDeviceControl(
     user: SessionUser,
-    deviceId: string
+    deviceId: string,
+    action: DeviceAction
 ): Promise<LiveGrant | null> {
     if (await sessionCan(user, "home.control")) return null;
     const held = await liveGrants(user.id, "place.device", deviceId);
-    const usable = held.find((grant) => core.atLeast("place.device", grant.capability, "control"));
+    // The grant has to allow this direction: a key lent to open the door does
+    // not lock it, and one lent to lock it at night does not open it.
+    const wanted = grantActionFor(action);
+    const usable = held.find(
+        (grant) =>
+            core.atLeast("place.device", grant.capability, "control") &&
+            grant.actions.includes(wanted)
+    );
     if (!usable) {
         // Deliberately one sentence for three cases - never lent, lent but out
         // of hours, lent but used up - because the screen says which: it has the

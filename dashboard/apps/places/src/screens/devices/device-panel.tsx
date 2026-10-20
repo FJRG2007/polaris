@@ -21,6 +21,7 @@
 import { ruleToneClass } from "@polaris/ui/automation-rules";
 import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
+import { useLentActions } from "./lent-actions";
 import { usePlacesT } from "../use-places-t";
 import { placesRefusalText } from "../../lib/refusal-text";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -151,7 +152,7 @@ function StatePill({ device }: { device: DeviceView }) {
 /** The controls, which are the reason most people open this. */
 export function DeviceControls({
     device,
-    canControl,
+    canControl: resident,
     busy,
     onAct,
     detailed = false,
@@ -166,6 +167,12 @@ export function DeviceControls({
     className?: string;
 }) {
     const t = usePlacesT();
+    // A visitor's grant decides button by button: a key lent to open the door
+    // draws Open and not Lock. Everything a switch or a light does is `operate`.
+    const lent = useLentActions(device.id);
+    const allowed = (action: DeviceAction): boolean =>
+        resident || lent.includes(kinds.grantActionFor(action));
+    const canControl = resident || lent.includes("operate");
     if (kinds.deviceKind(device.kind) === "light" && device.light) {
         // The switch as any light has it, with what this one also dims, warms
         // and colours beneath it.
@@ -231,7 +238,8 @@ export function DeviceControls({
             />
         );
     }
-    if (!canControl) return null;
+    const actions = kinds.actionsFor(device.kind).filter(allowed);
+    if (actions.length === 0 && !resident) return null;
     // Nothing to press on something that only measures. Left silent rather than
     // explained: a row of buttons that is not there needs no note, and a sentence
     // under every sensor in a house would be thirty sentences.
@@ -247,7 +255,7 @@ export function DeviceControls({
     }
     return (
         <div className={cn("flex flex-wrap gap-2", className)}>
-            {kinds.actionsFor(device.kind).map((action) => {
+            {actions.map((action) => {
                 const Icon = ACTION_ICONS[action];
                 // A socket that is already on has nothing to be told. The button
                 // stays where it is, so the pair does not jump about as it is

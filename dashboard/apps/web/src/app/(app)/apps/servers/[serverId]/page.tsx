@@ -5,7 +5,8 @@ import { requirePermission } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { LOCAL_SERVER_ID, serverIdSchema } from "@polaris/core";
 import { peekServerMetrics } from "@/lib/server-metrics-service";
-import { hostRouteId, LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
+import { upsProtecting } from "@/lib/ups/ups-service";
+import { hostRouteId, hostSubject, LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import { HOST_DOCKER_PREFIX, LOCAL_DOCKER_CONNECTION_ID } from "@/lib/docker-service";
 
 export const dynamic = "force-dynamic";
@@ -51,14 +52,20 @@ export default async function ServerPage({ params }: { params: Promise<{ serverI
     // may be off. Null when nothing has read this server recently, and then the
     // view fills the panel in as its own request lands.
     const cached = server.hostId ? peekServerMetrics(server.hostId) : null;
+    // One indexed-array read; the UPS screens are in Places now, so this is the
+    // link back from the machine to whatever keeps it powered.
+    const protectedBy = await upsProtecting(hostSubject(server.id));
 
     return (
         <ServerDetail
             machineName={localMachineNameNow()}
             server={server}
             initialUsage={cached ? { at: cached.at, value: cached.metrics } : undefined}
+            protectedBy={protectedBy}
             connectionId={
-                server.kind === "local" ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${server.id}`
+                server.kind === "local"
+                    ? LOCAL_DOCKER_CONNECTION_ID
+                    : `${HOST_DOCKER_PREFIX}${server.id}`
             }
             // A registered server that turned out to be this machine is folded into
             // the local row upstream, so a host row here is always a remote one and

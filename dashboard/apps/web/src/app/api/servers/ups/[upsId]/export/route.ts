@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 import * as upsData from "@/lib/ups/ups-data";
 import * as upsSettings from "@/lib/ups/ups-settings";
-import { badRequest, upsAdmin, upsFromPath } from "../../guard";
+import { badRequest, upsReached } from "../../guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,10 +16,9 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ upsId: string }> }
 ): Promise<Response> {
-    const user = await upsAdmin();
-    if (user instanceof Response) return user;
-    const row = await upsFromPath(params);
-    if (row instanceof Response) return row;
+    const reached = await upsReached(params, "watch");
+    if (reached instanceof Response) return reached;
+    const { row } = reached;
     // The download ticket rides on the same query; the schema only reads the export's own.
     const { dl: _ticket, ...fields } = Object.fromEntries(new URL(request.url).searchParams);
     const query = upsSettings.exportQuerySchema.safeParse(fields);

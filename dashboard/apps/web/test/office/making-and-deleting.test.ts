@@ -162,7 +162,7 @@ describe("taking somebody's access back", () => {
 
     it("asks before the person loses it, and says who", async () => {
         const source = await dialog;
-        expect(source).toContain('title: t("share.stopTitle", { name: grant.principalName })');
+        expect(source).toContain('title: t("share.stopTitle", { name: who(grant) })');
         expect(source).toContain('confirmLabel: t("share.stop")');
         expect(components.share.stopTitle).toBe("Stop sharing with {name}?");
         expect(components.share.stop).toBe("Stop sharing");

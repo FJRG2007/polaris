@@ -30,6 +30,22 @@ import {
 const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["Home is not set up yet", "refusals.notSetUp"],
     ["You do not have access to that", "refusals.noAccess"],
+    [
+        "This can only be used near the place. Allow your location to go on",
+        "refusals.nearbyUnasked"
+    ],
+    ["This can only be used near the place, and you are not there", "refusals.nearbyFar"],
+    ["This link does not open anything right now", "refusals.linkClosed"],
+    ["Too many presses. Wait a minute and try again", "refusals.linkTooMany"],
+    ["This link does not allow that", "refusals.linkNotThat"],
+    [
+        "Your location is not precise enough to tell whether you are near the place",
+        "refusals.nearbyVague"
+    ],
+    [
+        "The place has no location yet, so this cannot check you are near it",
+        "refusals.nearbyUnplaced"
+    ],
     ["Give it a name", "refusals.giveName"],
     ["Choose what it should tell you about", "refusals.chooseKinds"],
     ["Choose who to tell", "refusals.chooseWho"],

@@ -42,12 +42,7 @@ export interface UpsMachine {
 }
 
 export type UpsStatusKey =
-    | "online"
-    | "onBattery"
-    | "lowBattery"
-    | "replaceBattery"
-    | "overloaded"
-    | "unknown";
+    "online" | "onBattery" | "lowBattery" | "replaceBattery" | "overloaded" | "unknown";
 
 export type UpsTone = "success" | "warning" | "danger" | "neutral";
 

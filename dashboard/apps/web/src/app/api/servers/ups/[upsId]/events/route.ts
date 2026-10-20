@@ -6,7 +6,7 @@
 
 import * as upsData from "@/lib/ups/ups-data";
 import * as upsEvents from "@/lib/ups/ups-events";
-import { badRequest, upsAdmin, upsFromPath } from "../../guard";
+import { badRequest, upsReached } from "../../guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +15,9 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ upsId: string }> }
 ): Promise<Response> {
-    const user = await upsAdmin();
-    if (user instanceof Response) return user;
-    const row = await upsFromPath(params);
-    if (row instanceof Response) return row;
+    const reached = await upsReached(params, "watch");
+    if (reached instanceof Response) return reached;
+    const { row } = reached;
     const query = upsEvents.upsEventQuerySchema.safeParse(
         Object.fromEntries(new URL(request.url).searchParams)
     );

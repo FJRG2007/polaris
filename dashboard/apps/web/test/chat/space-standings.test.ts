@@ -40,6 +40,7 @@ function handedTo(principalType: string, principalId: string, capability: string
         principalType,
         principalId,
         capability,
+        actions: [],
         startsAt: null,
         endsAt: null,
         days: core.EVERY_DAY,
@@ -47,7 +48,8 @@ function handedTo(principalType: string, principalId: string, capability: string
         endMinute: null,
         timeZone: "UTC",
         maxUses: null,
-        uses: 0
+        uses: 0,
+        nearbyMeters: null
     };
 }
 

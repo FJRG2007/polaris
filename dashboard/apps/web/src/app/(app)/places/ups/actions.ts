@@ -1,16 +1,20 @@
 "use server";
 
 /**
- * Adding, changing and driving a UPS. Platform admins only, the same gate as
- * the Servers app: every action asks for system.manage before it reads
- * anything. Reading a UPS is not here - a tab that keeps polling one does it
+ * Adding, changing and driving a UPS. Platform admins, the same gate as the
+ * Servers app: every action asks for system.manage before it reads anything -
+ * except driving one (a command, a variable, a self-test), which somebody it
+ * was lent to control may do too, spending one of their uses each time. Reading a UPS is not here - a tab that keeps polling one does it
  * through `/api/servers/ups`, which a deploy cannot leave pointing at an action
  * id that no longer exists.
  */
 
 import { z } from "zod";
-import { listServerRows } from "../server-rows";
-import { requirePermission } from "@/lib/session";
+import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
+import { requirePermission, requireUser, type SessionUser } from "@/lib/session";
+import { spendGrant, type LiveGrant } from "@/lib/access/grants";
+import * as core from "@polaris/core";
+import { upsNearby, upsStanding } from "@/lib/ups/ups-access";
 import { recordAudit } from "@/lib/audit-service";
 import { hostSubject } from "@/lib/metrics-shared";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -36,6 +40,39 @@ function refused(error: unknown): { ok: false; error: string } {
 /** The machines this admin can name, as the metric subjects the UPS rows keep. */
 async function knownMachines(userId: string): Promise<Set<string>> {
     return new Set((await listServerRows(userId)).map((row) => hostSubject(row.id)));
+}
+
+/** Whoever may drive this UPS - its administrators, or a visitor lent control
+ *  of it - with the grant a visitor spends. Null for anybody else. */
+async function controlling(
+    id: string
+): Promise<{ user: SessionUser; upsId: string; grant: LiveGrant | null } | null> {
+    const user = await requireUser();
+    const upsId = idSchema.parse(id);
+    const standing = await upsStanding(user, upsId);
+    return standing?.control ? { user, upsId, grant: standing.grant } : null;
+}
+
+/** The error a fenced grant is refused with when the act is not near, or null
+ *  to go ahead. The location is compared here and goes no further. */
+async function fenced(
+    grant: LiveGrant | null,
+    placeId: string | null,
+    where: unknown
+): Promise<{ ok: false; error: string } | null> {
+    const parsed = core.reportedLocationSchema.safeParse(where);
+    const verdict = await upsNearby(grant, placeId, parsed.success ? parsed.data : null);
+    if (!verdict) return null;
+    return { ok: false, error: `nearby${verdict[0]!.toUpperCase()}${verdict.slice(1)}` };
+}
+
+/** A visitor's use, counted once the UPS did what was asked. Bookkeeping about
+ *  an act that already happened, so a failure is logged rather than raised. */
+async function countUse(grant: LiveGrant | null, outcome: upsService.UpsSetResult): Promise<void> {
+    if (!grant || outcome !== "ok") return;
+    await spendGrant(grant).catch((caught: unknown) =>
+        console.error("polaris: a UPS use could not be counted:", caught)
+    );
 }
 
 async function parseConnection(
@@ -138,15 +175,20 @@ export async function removeUpsAction(id: string): Promise<UpsActionResult> {
 
 export async function runUpsCommandAction(
     id: string,
-    command: string
+    command: string,
+    where?: unknown
 ): Promise<UpsActionResult<upsService.UpsCommandResult>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId, grant } = reached;
         const parsed = commandSchema.parse(command);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
+        const refusedNear = await fenced(grant, row.placeId, where);
+        if (refusedNear) return refusedNear;
         const outcome = await upsService.runUpsCommand(row, parsed);
+        await countUse(grant, outcome);
         await upsData.logAction({
             upsId,
             actorId: user.id,
@@ -159,7 +201,7 @@ export async function runUpsCommandAction(
             action: "ups.command",
             targetType: "ups",
             targetId: upsId,
-            metadata: { command: parsed, outcome }
+            metadata: { command: parsed, outcome, lent: Boolean(grant) }
         });
         return { ok: true, value: outcome };
     } catch (error) {
@@ -224,9 +266,10 @@ export async function acknowledgeUpsEventsAction(
     id: string,
     ids: unknown
 ): Promise<UpsActionResult<number>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId } = reached;
         const which = acknowledgeSchema.parse(ids);
         return { ok: true, value: await upsData.acknowledgeEvents(upsId, which, user.id) };
     } catch (error) {
@@ -236,15 +279,20 @@ export async function acknowledgeUpsEventsAction(
 
 export async function setUpsVarAction(
     id: string,
-    raw: unknown
+    raw: unknown,
+    where?: unknown
 ): Promise<UpsActionResult<{ outcome: upsService.UpsSetResult; error?: string }>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId, grant } = reached;
         const input = upsSettings.setVarSchema.parse(raw);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
+        const refusedNear = await fenced(grant, row.placeId, where);
+        if (refusedNear) return refusedNear;
         const result = await upsService.setUpsVar(row, input.name, input.value);
+        await countUse(grant, result.outcome);
         await upsData.logAction({
             upsId,
             actorId: user.id,
@@ -258,7 +306,7 @@ export async function setUpsVarAction(
             action: "ups.variable",
             targetType: "ups",
             targetId: upsId,
-            metadata: { name: input.name, outcome: result.outcome }
+            metadata: { name: input.name, outcome: result.outcome, lent: Boolean(grant) }
         });
         return { ok: true, value: result };
     } catch (error) {
@@ -333,6 +381,27 @@ export async function makeUpsReportAction(id: string): Promise<UpsActionResult<s
         );
         const name = `${upsData.fileStem(row.name)}-${schedule}-${period.from.toISOString().slice(0, 10)}.md`;
         return { ok: true, value: await upsData.saveToDrive(user.id, name, content) };
+    } catch (error) {
+        return refused(error);
+    }
+}
+
+/** Put a UPS in one of the places, or in none. */
+export async function setUpsPlaceAction(id: string, placeId: unknown): Promise<UpsActionResult> {
+    const user = await requirePermission("system.manage");
+    try {
+        const upsId = idSchema.parse(id);
+        const place = idSchema.nullable().parse(placeId ?? null);
+        if (!(await upsService.updateUpsPlace(upsId, place)))
+            return { ok: false, error: "notFound" };
+        await recordAudit({
+            actorId: user.id,
+            action: "ups.place",
+            targetType: "ups",
+            targetId: upsId,
+            metadata: { placeId: place }
+        });
+        return { ok: true, value: undefined };
     } catch (error) {
         return refused(error);
     }

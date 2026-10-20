@@ -65,9 +65,8 @@ vi.mock("@polaris/db", () => ({
 
 vi.mock("@/lib/orgs/org-service", () => ({ teamIdsFor: async () => teams }));
 
-const { grantedCapability, grantedSubjects, liveGrants, spendGrant, writeGrant } = await import(
-    "@/lib/access/grants"
-);
+const { grantedCapability, grantedSubjects, liveGrants, spendGrant, writeGrant } =
+    await import("@/lib/access/grants");
 
 /** One row, with the shape the reader selects and no bounds unless a case adds
  *  them. */
@@ -79,6 +78,7 @@ function grant(over: Record<string, unknown> = {}) {
         principalType: "user",
         principalId: "u1",
         capability: "control",
+        actions: [],
         startsAt: null,
         endsAt: null,
         days: EVERY_DAY,

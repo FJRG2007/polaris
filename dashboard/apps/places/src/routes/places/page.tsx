@@ -8,20 +8,39 @@
  * has been asked anything.
  */
 
+import Link from "next/link";
 import { placesT } from "../../lib/i18n";
+import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { PageHeader } from "@polaris/ui";
 import { requireHomeReach } from "../../lib/access";
 import { currentPlace } from "../../lib/current-place";
 import { PlaceSwitcher } from "../../screens/place-switcher";
 import { OverviewView } from "../../screens/overview/overview-view";
+import { LentActionsProvider } from "../../screens/devices/lent-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlacePage() {
     const t = await placesT();
     // A visitor lent one door or one camera lands here too, and is shown that.
-    const { install, reach, canManage, canControl } = await requireHomeReach();
+    const { install, user, reach, canManage, canControl, lent } = await requireHomeReach();
     const place = await currentPlace(install.id);
+    // The UPSes standing in this place. Their screens are core's (a UPS keeps
+    // shutting machines down with Places uninstalled), so they are only listed
+    // to whoever may open them - all of them for an administrator, the ones lent
+    // for a visitor - and read straight off the table.
+    const manages = await host.session.sessionCan(user, "system.manage");
+    const lentUps = [...reach.upses.keys()];
+    const upses =
+        manages || lentUps.length > 0
+            ? await prisma.ups.findMany({
+                  where: { placeId: place.current.id, ...(manages ? {} : { id: { in: lentUps } }) },
+                  select: { id: true, name: true },
+                  orderBy: { name: "asc" },
+                  take: 50
+              })
+            : [];
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -36,13 +55,34 @@ export default async function PlacePage() {
                     canManage={canManage}
                 />
             </div>
-            <OverviewView
-                placeId={place.current.id}
-                places={place.places}
-                resident={reach.everything}
-                canControl={canControl}
-                canManage={canManage}
-            />
+            <LentActionsProvider lent={lent}>
+                <OverviewView
+                    placeId={place.current.id}
+                    places={place.places}
+                    resident={reach.everything}
+                    canControl={canControl}
+                    canManage={canManage}
+                />
+            </LentActionsProvider>
+            {upses.length > 0 ? (
+                <section aria-labelledby="place-ups" className="flex flex-col gap-2">
+                    <h2 id="place-ups" className="text-sm font-medium">
+                        {t("overview.upsTitle")}
+                    </h2>
+                    <ul className="flex flex-wrap gap-2">
+                        {upses.map((ups) => (
+                            <li key={ups.id} className="min-w-0">
+                                <Link
+                                    href={`/places/ups/${ups.id}`}
+                                    className="block truncate rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
+                                >
+                                    {ups.name}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
         </div>
     );
 }

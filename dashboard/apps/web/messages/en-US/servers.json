@@ -762,6 +762,12 @@
         "description": "Battery backups, their charge and the machines they protect",
         "add": "Add a UPS",
         "back": "All UPSes",
+        "place": {
+            "label": "Place",
+            "none": "No place",
+            "failed": "The UPS could not be moved"
+        },
+        "protectedBy": "Protected by",
         "empty": {
             "title": "No UPS yet",
             "body": "One plugged in by USB shows up here by itself. Add one on a NUT server or read over SNMP."
@@ -926,6 +932,7 @@
             "cancel": "Cancel"
         },
         "edit": "Edit connection",
+        "share": "Share",
         "remove": "Remove",
         "removeKind": "UPS",
         "removeBody": "Its history and protected machines are forgotten. The UPS itself is not touched.",
@@ -940,6 +947,10 @@
             "unknownMachine": "That machine is not one of yours.",
             "shutdownIncomplete": "Pick at least one machine and one threshold.",
             "notFound": "This UPS was removed.",
+            "nearbyUnasked": "Allow your location: this only works near the UPS.",
+            "nearbyFar": "Only near the UPS, and you are not there.",
+            "nearbyVague": "Your location is not precise enough to tell.",
+            "nearbyUnplaced": "The UPS's place has no location, so this cannot check.",
             "failed": "That did not work. Try again.",
             "invalid": "Check the highlighted fields."
         },

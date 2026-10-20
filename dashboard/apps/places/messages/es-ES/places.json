@@ -459,6 +459,13 @@
         "justNow": "ahora mismo"
     },
     "refusals": {
+        "linkClosed": "Este enlace no abre nada ahora mismo",
+        "linkTooMany": "Demasiadas pulsaciones. Espera un minuto y vuelve a probar",
+        "linkNotThat": "Este enlace no permite eso",
+        "nearbyUnasked": "Solo se puede usar cerca del lugar. Permite tu ubicación para seguir",
+        "nearbyFar": "Solo se puede usar cerca del lugar, y no estás allí",
+        "nearbyVague": "Tu ubicación no es lo bastante precisa para saber si estás cerca del lugar",
+        "nearbyUnplaced": "El lugar aún no tiene ubicación, así que no se puede comprobar que estás cerca",
         "notSetUp": "Places aún no está listo",
         "noAccess": "No tienes acceso a eso",
         "giveName": "Ponle un nombre",
@@ -2498,6 +2505,7 @@
         }
     },
     "overview": {
+        "upsTitle": "Equipos SAI",
         "statusLabel": "Estado de dispositivos",
         "statusHint": "Cómo están los dispositivos que elijas: temperaturas, calidad del aire, lecturas y baterías.",
         "controlsLabel": "Controles rápidos",
@@ -2560,5 +2568,9 @@
         "denied": "Se denegó la ubicación. Permítela o escríbela.",
         "failed": "No se pudo obtener la ubicación. Reinténtalo.",
         "unsupported": "Este navegador no puede dar su ubicación."
+    },
+    "guest": {
+        "until": "Funciona hasta el {when}.",
+        "nearby": "Solo funciona a menos de {meters} m del lugar. El navegador te pedirá la ubicación al pulsar."
     }
 }

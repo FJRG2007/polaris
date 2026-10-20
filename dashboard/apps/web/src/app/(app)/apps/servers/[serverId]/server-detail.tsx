@@ -84,7 +84,8 @@ export function ServerDetail({
     connectionId,
     metricsId,
     machineName,
-    initialUsage
+    initialUsage,
+    protectedBy = []
 }: {
     server: ServerRow;
     /** What the box calls itself, resolved on the server so the line under the
@@ -100,6 +101,8 @@ export function ServerDetail({
     metricsId: string;
     /** The reading the server already had of this machine, for the first paint. */
     initialUsage?: { at: number; value: ServerMetrics };
+    /** The UPSes that shut this machine down on a power cut; they live in Places. */
+    protectedBy?: { id: string; name: string }[];
 }) {
     const t = useTranslations("servers");
     const tc = useTranslations("components");
@@ -229,6 +232,21 @@ export function ServerDetail({
             ) : tab === "overview" ? (
                 <div className="flex flex-col gap-5">
                     <Reachability server={server} status={status} />
+
+                    {protectedBy.length > 0 ? (
+                        <p className="flex flex-wrap gap-x-2 text-sm text-muted-foreground">
+                            {t("ups.protectedBy")}
+                            {protectedBy.map((ups) => (
+                                <Link
+                                    key={ups.id}
+                                    href={`/places/ups/${ups.id}`}
+                                    className="min-w-0 truncate text-foreground hover:underline"
+                                >
+                                    {ups.name}
+                                </Link>
+                            ))}
+                        </p>
+                    ) : null}
 
                     {/* Only where there is a machine to ask. The box Polaris runs
                         on is already as near as anything gets. */}

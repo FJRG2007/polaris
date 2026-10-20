@@ -762,6 +762,12 @@
         "description": "Sistemas de alimentación, su carga y las máquinas que protegen",
         "add": "Añadir SAI",
         "back": "Los SAI",
+        "place": {
+            "label": "Lugar",
+            "none": "Sin lugar",
+            "failed": "No se pudo mover el SAI"
+        },
+        "protectedBy": "Lo protege",
         "empty": {
             "title": "Sin SAI aún",
             "body": "Uno conectado por USB sale aquí solo. Añade uno de un servidor NUT o leído por SNMP."
@@ -926,6 +932,7 @@
             "cancel": "Cancelar"
         },
         "edit": "Editar conexión",
+        "share": "Prestar",
         "remove": "Quitar",
         "removeKind": "SAI",
         "removeBody": "Se olvidan su historial y sus máquinas protegidas. El SAI en sí no se toca.",
@@ -940,6 +947,10 @@
             "unknownMachine": "Esa máquina no es tuya.",
             "shutdownIncomplete": "Elige al menos una máquina y un umbral.",
             "notFound": "Este SAI se quitó.",
+            "nearbyUnasked": "Permite tu ubicación: solo funciona cerca del SAI.",
+            "nearbyFar": "Solo cerca del SAI, y no estás allí.",
+            "nearbyVague": "Tu ubicación no es lo bastante precisa.",
+            "nearbyUnplaced": "El lugar del SAI no tiene ubicación, no se puede comprobar.",
             "failed": "No funcionó. Inténtalo de nuevo.",
             "invalid": "Revisa los campos marcados."
         },

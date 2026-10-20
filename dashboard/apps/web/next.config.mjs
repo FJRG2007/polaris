@@ -42,7 +42,7 @@ const PLAYER_ORIGINS = [
 
 /**
  * The top-level paths whose address is itself the credential: a shared chat,
- * a Drive link, a drop point, a form, a published note, a vote... Their pages
+ * a Drive link, a drop point, a form, a published note, a vote, a lent door or UPS... Their pages
  * send no Referer at all, so following a link out of one never hands the token
  * to the site at the other end. `test/seo/never-indexed.test.ts` holds every
  * public route folder to this list.
@@ -51,6 +51,7 @@ export const TOKEN_PATH_PREFIXES = [
     "c",
     "cal",
     "forms",
+    "k",
     "m",
     "n",
     "od",
@@ -136,6 +137,11 @@ const nextConfig = {
         // that ever followed it, and this project has already lost one path that
         // way.
         { source: "/house", destination: "/places", permanent: false },
+        // The UPS screens moved from Servers into Places, where the other
+        // physical things are. Kept for good, and temporary for the reason
+        // above: a cached 308 cannot be taken back if the address moves again.
+        { source: "/apps/servers/ups", destination: "/places/ups", permanent: false },
+        { source: "/apps/servers/ups/:path*", destination: "/places/ups/:path*", permanent: false },
         { source: "/house/:path*", destination: "/places/:path*", permanent: false },
         // Management's screens were spread between /admin and the top level, so
         // the URL said nothing about which part of Polaris you were in. They are

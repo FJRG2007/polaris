@@ -459,6 +459,13 @@
         "justNow": "just now"
     },
     "refusals": {
+        "linkClosed": "This link does not open anything right now",
+        "linkTooMany": "Too many presses. Wait a minute and try again",
+        "linkNotThat": "This link does not allow that",
+        "nearbyUnasked": "This can only be used near the place. Allow your location to go on",
+        "nearbyFar": "This can only be used near the place, and you are not there",
+        "nearbyVague": "Your location is not precise enough to tell whether you are near the place",
+        "nearbyUnplaced": "The place has no location yet, so this cannot check you are near it",
         "notSetUp": "Home is not set up yet",
         "noAccess": "You do not have access to that",
         "giveName": "Give it a name",
@@ -2498,6 +2505,7 @@
         }
     },
     "overview": {
+        "upsTitle": "UPS units",
         "statusLabel": "Devices at a glance",
         "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
         "controlsLabel": "Quick controls",
@@ -2560,5 +2568,9 @@
         "denied": "Location was refused. Allow it, or type it in.",
         "failed": "Could not get the location. Try again.",
         "unsupported": "This browser cannot share a location."
+    },
+    "guest": {
+        "until": "Works until {when}.",
+        "nearby": "Only works within {meters} m of the place. Your browser will ask for your location when you press."
     }
 }

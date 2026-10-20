@@ -30,6 +30,7 @@ import { UpsActionHistory } from "./ups-commands-panel";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setUpsVarAction, updateUpsVariableMapAction } from "../actions";
+import { fencedCall, upsErrorKey, useUpsStanding } from "./ups-standing";
 
 export function UpsVariablesPanel({
     ups,
@@ -50,6 +51,9 @@ export function UpsVariablesPanel({
         select: (body) => body as UpsActionsAnswer
     });
     const [editing, setEditing] = useState<upsSettings.UpsRwVar | null>(null);
+    // Which names mean what is the UPS's set-up, not driving it: a visitor lent
+    // control writes variables and leaves the mappings alone.
+    const { manage } = useUpsStanding();
 
     return (
         <div className="flex flex-col gap-6">
@@ -97,7 +101,7 @@ export function UpsVariablesPanel({
             </section>
 
             <UpsRawVariables vars={vars} />
-            <UpsMappings ups={ups} vars={vars} onSaved={onChanged} />
+            {manage ? <UpsMappings ups={ups} vars={vars} onSaved={onChanged} /> : null}
 
             {editing ? (
                 <EditVariableDialog
@@ -144,10 +148,12 @@ function EditVariableDialog({
     async function save() {
         setPending(true);
         setServerError(null);
-        const outcome = await setUpsVarAction(upsId, { name: rw.name, value });
+        const outcome = await fencedCall((where) =>
+            setUpsVarAction(upsId, { name: rw.name, value }, where)
+        );
         setPending(false);
         if (!outcome.ok) {
-            setServerError(t("ups.errors.failed"));
+            setServerError(t(`ups.errors.${upsErrorKey(outcome.error)}`));
             return;
         }
         if (outcome.value.outcome === "invalid") {

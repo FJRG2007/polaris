@@ -12,7 +12,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Share2, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -28,6 +28,7 @@ import {
     MultiSeriesChart,
     PageHeader,
     SegmentedControl,
+    Select,
     Skeleton,
     Switch,
     useToast
@@ -41,10 +42,22 @@ import { UpsBatteryPanel } from "./ups-battery-panel";
 import { UpsCommandsPanel } from "./ups-commands-panel";
 import { UpsSettingsPanel } from "./ups-settings-panel";
 import { UpsVariablesPanel } from "./ups-variables-panel";
+import { ShareDialog } from "@/components/access/share-dialog";
+import {
+    fencedCall,
+    upsErrorKey,
+    UpsStandingContext,
+    type UpsReaderStanding
+} from "./ups-standing";
 import * as upsSettings from "@/lib/ups/ups-settings";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { removeUpsAction, runUpsCommandAction, updateUpsShutdownAction } from "../actions";
+import {
+    removeUpsAction,
+    runUpsCommandAction,
+    setUpsPlaceAction,
+    updateUpsShutdownAction
+} from "../actions";
 import {
     minutesLeft,
     rounded,
@@ -71,20 +84,34 @@ type Tab = (typeof TABS)[number];
 export function UpsDetailView({
     initial,
     machines,
-    canOfferNetwork
+    canOfferNetwork,
+    places,
+    standing = { manage: true, control: true }
 }: {
     initial: UpsView;
     machines: UpsMachine[];
     canOfferNetwork: boolean;
+    places: { id: string; name: string }[];
+    /** What the reader may do: an administrator runs it, a visitor was lent it
+     *  to watch or to control. Everything else is not drawn for them. */
+    standing?: UpsReaderStanding;
 }) {
     const t = useTranslations("servers");
     const router = useRouter();
     const pathname = usePathname();
     const search = useSearchParams();
     const asked = search.get("tab");
-    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "")
+    // A visitor sees the tabs they were lent: no settings unless they run it,
+    // no commands or variables unless they may drive it.
+    const tabs = TABS.filter(
+        (key) =>
+            (key !== "settings" || standing.manage) &&
+            ((key !== "commands" && key !== "variables") || standing.control)
+    );
+    const tab: Tab = (tabs as readonly string[]).includes(asked ?? "")
         ? (asked as Tab)
         : "overview";
+    const [sharing, setSharing] = useState(false);
     const [range, setRange] = useState<RangeKey>("h24");
     const [editing, setEditing] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -96,6 +123,20 @@ export function UpsDetailView({
         select: (body) => body as UpsDetailAnswer
     });
     const ups = live.data?.ups ?? initial;
+    const toast = useToast();
+    // Optimistic: the picker shows the new place at once and goes back to the
+    // old one if the server refuses it.
+    const [placeId, setPlaceId] = useState<string | null>(initial.placeId);
+    async function movePlace(next: string | null) {
+        const before = placeId;
+        if (next === before) return;
+        setPlaceId(next);
+        const outcome = await setUpsPlaceAction(ups.id, next);
+        if (!outcome.ok) {
+            setPlaceId(before);
+            toast.show({ key: `ups:${ups.id}:place`, title: t("ups.place.failed") });
+        }
+    }
     const result = live.data?.result ?? null;
     const reading = result?.ok ? result.reading : null;
 
@@ -105,7 +146,7 @@ export function UpsDetailView({
             setRemoveError(t(`ups.errors.${outcome.error === "notFound" ? "notFound" : "failed"}`));
             return;
         }
-        router.push("/apps/servers/ups");
+        router.push("/places/ups");
     }
 
     function openTab(next: Tab) {
@@ -130,9 +171,9 @@ export function UpsDetailView({
     );
 
     return (
-        <>
+        <UpsStandingContext.Provider value={standing}>
             <Link
-                href="/apps/servers/ups"
+                href="/places/ups"
                 className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden />
@@ -142,16 +183,37 @@ export function UpsDetailView({
                 title={ups.name}
                 description={t(`ups.connection.${ups.connection}`)}
                 actions={
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setEditing(true)}>
-                            <Pencil className="size-4 shrink-0" aria-hidden />
-                            {t("ups.edit")}
-                        </Button>
-                        <Button variant="outline" onClick={() => setRemoving(true)}>
-                            <Trash2 className="size-4 shrink-0" aria-hidden />
-                            {t("ups.remove")}
-                        </Button>
-                    </div>
+                    standing.manage ? (
+                        <div className="flex flex-wrap gap-2">
+                            {places.length > 0 ? (
+                                <Select
+                                    aria-label={t("ups.place.label")}
+                                    className="w-48"
+                                    value={placeId ?? ""}
+                                    onValueChange={(value) => void movePlace(value || null)}
+                                    options={[
+                                        { value: "", label: t("ups.place.none") },
+                                        ...places.map((place) => ({
+                                            value: place.id,
+                                            label: place.name
+                                        }))
+                                    ]}
+                                />
+                            ) : null}
+                            <Button variant="outline" onClick={() => setEditing(true)}>
+                                <Pencil className="size-4 shrink-0" aria-hidden />
+                                {t("ups.edit")}
+                            </Button>
+                            <Button variant="outline" onClick={() => setSharing(true)}>
+                                <Share2 className="size-4 shrink-0" aria-hidden />
+                                {t("ups.share")}
+                            </Button>
+                            <Button variant="outline" onClick={() => setRemoving(true)}>
+                                <Trash2 className="size-4 shrink-0" aria-hidden />
+                                {t("ups.remove")}
+                            </Button>
+                        </div>
+                    ) : null
                 }
             />
 
@@ -161,7 +223,7 @@ export function UpsDetailView({
                     aria-label={t("ups.tabs.label")}
                     value={tab}
                     onValueChange={openTab}
-                    options={TABS.map((key) => ({ value: key, label: t(`ups.tabs.${key}`) }))}
+                    options={tabs.map((key) => ({ value: key, label: t(`ups.tabs.${key}`) }))}
                 />
             </div>
 
@@ -189,27 +251,31 @@ export function UpsDetailView({
                         )}
                     </section>
 
-                    <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
-                        <h2 id="ups-controls" className="text-sm font-medium">
-                            {t("ups.regions.controls")}
-                        </h2>
-                        {result === null ? (
-                            <Skeleton className="h-16 w-full" />
-                        ) : (
-                            <UpsControls id={ups.id} reading={reading} />
-                        )}
-                    </section>
+                    {standing.control ? (
+                        <section aria-labelledby="ups-controls" className="flex flex-col gap-3">
+                            <h2 id="ups-controls" className="text-sm font-medium">
+                                {t("ups.regions.controls")}
+                            </h2>
+                            {result === null ? (
+                                <Skeleton className="h-16 w-full" />
+                            ) : (
+                                <UpsControls id={ups.id} reading={reading} />
+                            )}
+                        </section>
+                    ) : null}
 
-                    <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
-                        <h2 id="ups-shutdown" className="text-sm font-medium">
-                            {t("ups.regions.shutdown")}
-                        </h2>
-                        <UpsShutdown
-                            ups={initial}
-                            machines={machines}
-                            sentAt={ups.shutdownSentAt}
-                        />
-                    </section>
+                    {standing.manage ? (
+                        <section aria-labelledby="ups-shutdown" className="flex flex-col gap-3">
+                            <h2 id="ups-shutdown" className="text-sm font-medium">
+                                {t("ups.regions.shutdown")}
+                            </h2>
+                            <UpsShutdown
+                                ups={initial}
+                                machines={machines}
+                                sentAt={ups.shutdownSentAt}
+                            />
+                        </section>
+                    ) : null}
                 </div>
             ) : null}
 
@@ -279,7 +345,19 @@ export function UpsDetailView({
                 error={removeError}
                 onConfirm={() => void remove()}
             />
-        </>
+            {standing.manage ? (
+                <ShareDialog
+                    open={sharing}
+                    onOpenChange={setSharing}
+                    subject="place.ups"
+                    subjectId={ups.id}
+                    name={ups.name}
+                    // Watching a UPS through an outage, or running its test,
+                    // is as much a thing for an afternoon as a door is.
+                    bounded
+                />
+            ) : null}
+        </UpsStandingContext.Provider>
     );
 }
 
@@ -494,13 +572,13 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
 
     async function run(command: upsReading.UpsCommand) {
         setBusy(command);
-        const outcome = await runUpsCommandAction(id, command);
+        const outcome = await fencedCall((where) => runUpsCommandAction(id, command, where));
         setBusy(null);
         toast.show({
             key: `ups:${id}:command`,
             title: outcome.ok
                 ? t(`ups.commandResult.${outcome.value}`)
-                : t(`ups.errors.${outcome.error === "notFound" ? "notFound" : "failed"}`)
+                : t(`ups.errors.${upsErrorKey(outcome.error)}`)
         });
     }
 

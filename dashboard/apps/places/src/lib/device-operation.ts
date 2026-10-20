@@ -12,6 +12,8 @@
 import * as devices from "./devices";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import type * as core from "@polaris/core";
+import { requireNearby } from "./nearby";
 import { countDeviceUse, requireDeviceControl } from "./sharing";
 import type { DeviceAction, DeviceCommand, DeviceView } from "./device-kinds";
 
@@ -28,9 +30,19 @@ export async function operateDevice(
     installedAppId: string,
     deviceId: string,
     action: DeviceAction,
-    setting: DeviceCommand | undefined
+    setting: DeviceCommand | undefined,
+    /** Where the browser says it is, for a grant fenced to the place. The
+     *  assistant has none, so a fenced grant is refused there. */
+    where: core.ReportedLocation | null = null
 ): Promise<DeviceView> {
-    const lent = await requireDeviceControl(user, deviceId);
+    const lent = await requireDeviceControl(user, deviceId, action);
+    const near = lent?.nearbyMeters
+        ? await requireNearby(
+              lent.nearbyMeters,
+              (await devices.getDevice(installedAppId, deviceId)).placeId,
+              where
+          )
+        : false;
     let device: DeviceView;
     try {
         device = await devices.actOnDevice(installedAppId, deviceId, action, user.name, setting);
@@ -56,6 +68,8 @@ export async function operateDevice(
         metadata: {
             name: device.name,
             lent: Boolean(lent),
+            // Whether a fenced grant was checked and found near - never where.
+            ...(near ? { nearby: true } : {}),
             ...(setting ? { setting } : {})
         }
     });

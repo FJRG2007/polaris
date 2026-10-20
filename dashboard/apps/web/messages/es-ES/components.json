@@ -561,6 +561,14 @@
         "switchAccounts": "Cambiar de cuenta"
     },
     "share": {
+        "actionsLabel": "Permite",
+        "actions": {
+            "open": "Abrir",
+            "close": "Cerrar",
+            "operate": "Accionar",
+            "watch": "Ver",
+            "control": "Controlar"
+        },
         "capabilities": {
             "guest": {
                 "label": "Invitado",
@@ -634,7 +642,19 @@
         "usesHint": "Solo cuenta manejarlo de verdad. Mirarlo no.",
         "note": "Para qué es",
         "notePlaceholder": "Limpieza, los martes",
-        "share": "Compartir"
+        "share": "Compartir",
+        "nearbyLabel": "Solo cerca del lugar",
+        "nearbyMeters": "A menos de (m)",
+        "nearbyHint": "Cada pulsación pide al navegador dónde está. Esa ubicación se puede falsear: es una comodidad, no un cerrojo.",
+        "nearbyNoPlace": "El lugar aún no tiene ubicación. Ponla primero en el lugar o se rechazará cada pulsación.",
+        "linkTitle": "O un enlace, sin cuenta",
+        "linkHint": "Cualquiera con el enlace puede usarlo, dentro de los límites de arriba. Se muestra una vez.",
+        "makeLink": "Crear enlace",
+        "linkMade": "Copia este enlace ahora. No se volverá a mostrar.",
+        "copyLink": "Copiar",
+        "copied": "Enlace copiado",
+        "linkName": "Enlace",
+        "needAction": "Permite al menos una cosa."
     },
     "environments": {
         "homeNat": {

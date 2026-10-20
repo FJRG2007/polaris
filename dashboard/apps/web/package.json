@@ -26,7 +26,7 @@
         "@enigmax/primitives": "0.28.0",
         "@giphy/js-fetch-api": "5.8.0",
         "@github/relative-time-element": "4.4.4",
-        "@modelcontextprotocol/sdk": "1.31.0",
+        "@modelcontextprotocol/sdk": "1.32.1",
         "@napi-rs/canvas": "1.0.11",
         "@pdfslick/react": "4.0.3",
         "@polaris-app/security-scans": "0.1.0",

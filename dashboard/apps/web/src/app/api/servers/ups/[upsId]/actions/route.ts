@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import * as upsData from "@/lib/ups/ups-data";
-import { upsAdmin, upsFromPath } from "../../guard";
+import { upsReached } from "../../guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,10 +13,9 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ upsId: string }> }
 ): Promise<Response> {
-    const user = await upsAdmin();
-    if (user instanceof Response) return user;
-    const row = await upsFromPath(params);
-    if (row instanceof Response) return row;
+    const reached = await upsReached(params, "control");
+    if (reached instanceof Response) return reached;
+    const { row } = reached;
     const kind = kindSchema.parse(new URL(request.url).searchParams.get("kind") ?? undefined);
     return Response.json({ actions: await upsData.listActions(row.id, kind) });
 }
