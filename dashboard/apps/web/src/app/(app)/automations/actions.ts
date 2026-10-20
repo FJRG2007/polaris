@@ -676,6 +676,36 @@ export async function chatWebhooksAction(): Promise<
     }
 }
 
+/** What a threshold trigger can watch, for its picker: each kind's subjects and readings. */
+export interface ThresholdKindChoice {
+    readonly kind: string;
+    readonly subjects: readonly { readonly id: string; readonly name: string }[];
+    readonly sources: readonly { readonly id: string; readonly unit: string }[];
+}
+
+/**
+ * The servers, services and UPS this account may watch. The same check runs
+ * again on every evaluation against whoever the automation runs as.
+ */
+export async function thresholdChoicesAction(): Promise<
+    Result<{ kinds: readonly ThresholdKindChoice[] }>
+> {
+    try {
+        const who = await actor();
+        const { thresholdKinds } = await import("@/lib/automations/threshold-sources");
+        const kinds = await Promise.all(
+            thresholdKinds().map(async (kind) => ({
+                kind: kind.kind,
+                subjects: await kind.subjects(who).catch(() => []),
+                sources: kind.sources.map(({ id, unit }) => ({ id, unit }))
+            }))
+        );
+        return { ok: true, kinds };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 /** One of the account's own notification destinations, as a notice step lists it. */
 export interface NoticeDestinationChoice {
     readonly id: string;

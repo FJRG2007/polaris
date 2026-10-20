@@ -69,33 +69,63 @@ export interface EpisodeView {
     readonly durationSeconds: number | null;
 }
 
-/** An automation's newest episodes. The caller has already checked it may read the automation. */
-export async function listEpisodes(automationId: string, take = 50): Promise<EpisodeView[]> {
-    const rows = await prisma.automationAlarmEpisode.findMany({
-        where: { automationId },
-        orderBy: { startedAt: "desc" },
-        take: Math.min(Math.max(take, 1), 200),
-        select: {
-            id: true,
-            nodeId: true,
-            source: true,
-            comparator: true,
-            threshold: true,
-            startedAt: true,
-            startValue: true,
-            peakValue: true,
-            resolvedAt: true,
-            endValue: true
-        }
-    });
-    return rows.map((row) => ({
+const EPISODE_SELECT = {
+    id: true,
+    nodeId: true,
+    source: true,
+    comparator: true,
+    threshold: true,
+    startedAt: true,
+    startValue: true,
+    peakValue: true,
+    resolvedAt: true,
+    endValue: true
+} as const;
+
+function toView(row: {
+    id: string;
+    nodeId: string;
+    source: string;
+    comparator: string;
+    threshold: number;
+    startedAt: Date;
+    startValue: number;
+    peakValue: number;
+    resolvedAt: Date | null;
+    endValue: number | null;
+}): EpisodeView {
+    return {
         ...row,
         startedAt: row.startedAt.toISOString(),
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
         durationSeconds: row.resolvedAt
             ? Math.round((row.resolvedAt.getTime() - row.startedAt.getTime()) / 1000)
             : null
-    }));
+    };
+}
+
+/** An automation's newest episodes. The caller has already checked it may read the automation. */
+export async function listEpisodes(automationId: string, take = 50): Promise<EpisodeView[]> {
+    const rows = await prisma.automationAlarmEpisode.findMany({
+        where: { automationId },
+        orderBy: { startedAt: "desc" },
+        take: Math.min(Math.max(take, 1), 200),
+        select: EPISODE_SELECT
+    });
+    return rows.map(toView);
+}
+
+/** One episode of this automation, or null - never another automation's, whatever id a run names. */
+export async function getEpisode(
+    automationId: string,
+    episodeId: string | null
+): Promise<EpisodeView | null> {
+    if (!episodeId) return null;
+    const row = await prisma.automationAlarmEpisode.findFirst({
+        where: { id: episodeId, automationId },
+        select: EPISODE_SELECT
+    });
+    return row ? toView(row) : null;
 }
 
 /**

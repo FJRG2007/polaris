@@ -132,7 +132,8 @@
         "try": "Intentar",
         "waitCondition": "Esperar una condición",
         "set": "Fijar valores",
-        "message": "Publicar en un canal"
+        "message": "Publicar en un canal",
+        "threshold": "Una lectura cruza un umbral"
     },
     "fields": {
         "scheduleKind": "Repetir",
@@ -622,7 +623,8 @@
         "try": "Ejecuta los pasos de dentro y elige qué sigue a un fallo.",
         "waitCondition": "Pausa hasta que se cumpla una condición o se acabe el tiempo.",
         "set": "Calcula valores una vez. Los pasos siguientes los leen de este paso.",
-        "message": "Publica en un canal mediante su webhook, como bot."
+        "message": "Publica en un canal mediante su webhook, como bot.",
+        "threshold": "Empieza cuando una lectura de un servidor, servicio o SAI se pasa de un valor."
     },
     "flow": {
         "conditionGroup": "Condiciones",
@@ -777,5 +779,66 @@
     "filter": {
         "label": "Filtros",
         "remove": "Quitar filtro {name}"
+    },
+    "threshold": {
+        "watch": "Vigilar",
+        "kinds": {
+            "host": "Servidor",
+            "app": "Servicio",
+            "ups": "SAI"
+        },
+        "subject": "Cuál",
+        "reading": "Lectura",
+        "loading": "Cargando",
+        "pick": "Elige uno",
+        "subjectPick": "Elige qué vigilar.",
+        "subjectNone": "Aún no hay nada de este tipo que puedas vigilar.",
+        "subjectGone": "El elegido ya no existe o ya no es tuyo. Elige otro.",
+        "invalidSource": "Elige una lectura de este tipo.",
+        "comparison": "Salta cuando está",
+        "comparators": {
+            "gt": "Mayor que",
+            "gte": "Al menos",
+            "lt": "Menor que",
+            "lte": "A lo sumo"
+        },
+        "value": "Valor",
+        "valueIn": "Valor ({unit})",
+        "invalidValue": "Escribe un número.",
+        "streak": "Muestras seguidas",
+        "invalidStreak": "Un número entero del 1 al 60.",
+        "streakHint": "Una muestra por minuto: salta tras {minutes} min pasada la línea.",
+        "recovery": "También al recuperarse",
+        "readsHint": "La ejecución lee el valor como {value}, y alarma u ok como {state}.",
+        "sources": {
+            "host_cpu": "CPU",
+            "host_memory": "Memoria",
+            "host_disk": "Disco",
+            "host_network_in": "Red entrante",
+            "host_network_out": "Red saliente",
+            "app_cpu": "CPU",
+            "app_memory": "Memoria",
+            "app_disk": "Disco",
+            "app_network_in": "Red entrante",
+            "app_network_out": "Red saliente",
+            "ups_charge": "Carga de batería",
+            "ups_runtime": "Autonomía",
+            "ups_load": "Carga",
+            "ups_input_voltage": "Tensión de red",
+            "ups_output_voltage": "Tensión de salida",
+            "ups_battery_voltage": "Tensión de batería",
+            "ups_power": "Consumo"
+        }
+    },
+    "episode": {
+        "title": "Alarma",
+        "ongoing": "Sigue en alarma",
+        "resolved": "Recuperada",
+        "started": "Cruzó",
+        "worst": "Peor",
+        "ended": "Vuelta",
+        "duration": "Duró",
+        "notYet": "Aún no",
+        "sinceStart": "{time} por ahora"
     }
 }

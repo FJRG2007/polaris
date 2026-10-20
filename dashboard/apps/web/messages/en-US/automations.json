@@ -132,7 +132,8 @@
         "try": "Try block",
         "waitCondition": "Wait for a condition",
         "set": "Set values",
-        "message": "Post to a chat channel"
+        "message": "Post to a chat channel",
+        "threshold": "A reading crosses a threshold"
     },
     "fields": {
         "scheduleKind": "Repeat",
@@ -622,7 +623,8 @@
         "try": "Run the steps inside, and choose what follows a failure.",
         "waitCondition": "Pause until a condition is true, or time runs out.",
         "set": "Work values out once. Later steps pick them from this step's values.",
-        "message": "Post in a space channel through its webhook, as a bot."
+        "message": "Post in a space channel through its webhook, as a bot.",
+        "threshold": "Starts when a server, service or UPS reading stays past a value."
     },
     "flow": {
         "conditionGroup": "Conditions",
@@ -777,5 +779,66 @@
     "filter": {
         "label": "Filters",
         "remove": "Remove filter {name}"
+    },
+    "threshold": {
+        "watch": "Watch",
+        "kinds": {
+            "host": "Server",
+            "app": "Service",
+            "ups": "UPS"
+        },
+        "subject": "Which one",
+        "reading": "Reading",
+        "loading": "Loading",
+        "pick": "Choose one",
+        "subjectPick": "Choose what to watch.",
+        "subjectNone": "There is nothing of this kind you can watch yet.",
+        "subjectGone": "The one chosen is gone or no longer yours. Choose another.",
+        "invalidSource": "Choose a reading of this kind.",
+        "comparison": "Fires when it is",
+        "comparators": {
+            "gt": "Higher than",
+            "gte": "At least",
+            "lt": "Lower than",
+            "lte": "At most"
+        },
+        "value": "Value",
+        "valueIn": "Value ({unit})",
+        "invalidValue": "Type a number.",
+        "streak": "Samples in a row",
+        "invalidStreak": "A whole number from 1 to 60.",
+        "streakHint": "One sample a minute: it fires after {minutes} min past the line.",
+        "recovery": "Also when it recovers",
+        "readsHint": "The run reads the value as {value}, and alarm or ok as {state}.",
+        "sources": {
+            "host_cpu": "CPU",
+            "host_memory": "Memory",
+            "host_disk": "Disk",
+            "host_network_in": "Network in",
+            "host_network_out": "Network out",
+            "app_cpu": "CPU",
+            "app_memory": "Memory",
+            "app_disk": "Disk",
+            "app_network_in": "Network in",
+            "app_network_out": "Network out",
+            "ups_charge": "Battery charge",
+            "ups_runtime": "Runtime left",
+            "ups_load": "Load",
+            "ups_input_voltage": "Mains voltage",
+            "ups_output_voltage": "Output voltage",
+            "ups_battery_voltage": "Battery voltage",
+            "ups_power": "Power draw"
+        }
+    },
+    "episode": {
+        "title": "Alarm",
+        "ongoing": "Still in alarm",
+        "resolved": "Recovered",
+        "started": "Crossed",
+        "worst": "Worst",
+        "ended": "Back",
+        "duration": "Lasted",
+        "notYet": "Not yet",
+        "sinceStart": "{time} so far"
     }
 }
