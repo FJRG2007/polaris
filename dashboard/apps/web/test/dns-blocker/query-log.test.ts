@@ -266,3 +266,31 @@ describe("name lookup", () => {
         expect(parseLookup("example.com", "{\"reason\":1}")).toBeNull();
     });
 });
+
+describe("devices seen", () => {
+    it("counts each device with its first and last lookup, busiest first", () => {
+        const read = reader({ outcome: "blocked" });
+        read.add(line("192.168.1.20", "a.com", "RESOLVED", { time: "2026-10-18 09:00:00" }));
+        read.add(line("192.168.1.20", "ads.com", "BLOCKED", { time: "2026-10-18 11:00:00" }));
+        read.add(line("192.168.1.20", "b.com", "CACHED", { time: "2026-10-18 10:00:00" }));
+        read.add(line("192.168.1.30", "c.com", "RESOLVED", { name: "tv.lan" }));
+        expect(read.devices()).toEqual([
+            {
+                address: "192.168.1.20",
+                name: "",
+                queries: 3,
+                blocked: 1,
+                first: Date.parse("2026-10-18T09:00:00Z"),
+                last: Date.parse("2026-10-18T11:00:00Z")
+            },
+            {
+                address: "192.168.1.30",
+                name: "tv.lan",
+                queries: 1,
+                blocked: 0,
+                first: Date.parse("2026-10-18T10:00:00Z"),
+                last: Date.parse("2026-10-18T10:00:00Z")
+            }
+        ]);
+    });
+});

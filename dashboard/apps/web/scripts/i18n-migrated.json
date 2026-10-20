@@ -312,6 +312,7 @@
         "web/src/app/(app)/apps/dns-blocker/local-dns/page.tsx",
         "web/src/app/(app)/apps/dns-blocker/log-section.tsx",
         "web/src/app/(app)/apps/dns-blocker/lookup-card.tsx",
+        "web/src/app/(app)/apps/dns-blocker/network-card.tsx",
         "web/src/app/(app)/apps/dns-blocker/log/page.tsx",
         "web/src/app/(app)/apps/dns-blocker/overview-section.tsx",
         "web/src/app/(app)/apps/dns-blocker/save-bar.tsx",

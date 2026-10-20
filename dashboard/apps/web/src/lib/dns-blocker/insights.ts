@@ -25,11 +25,13 @@ import {
     queryLogPath,
     rangeWindow,
     type DnsLookup,
+    type DnsRange,
     type EngineMetrics,
     type QueryFilter,
     type QueryPage,
     type QueryRow,
-    type QueryStats
+    type QueryStats,
+    type SeenDevice
 } from "./query-log";
 import { DNS_ENGINE_HTTP_PORT } from "./render";
 
@@ -166,6 +168,19 @@ export async function dnsInsights(filter: QueryFilter, fresh = false): Promise<D
         pause: parseBlockingStatus(status),
         logOff
     };
+}
+
+/** Every device the log saw over a range, through the same unfiltered read as
+ *  the Overview, and whether the log is off. */
+export async function seenDevices(
+    range: DnsRange,
+    fresh = false
+): Promise<{ devices: SeenDevice[]; logOff: boolean }> {
+    const target = await engine();
+    const { page: _page, ...rows } = queryFilterSchema.parse({ range });
+    const log = await cachedLog(target, rows, fresh);
+    const logOff = !log.found && !(await engineConfigCurrent(target.row));
+    return { devices: log.reader.devices(), logOff };
 }
 
 /** The newest lookups that match, for the live view: the end of today's file

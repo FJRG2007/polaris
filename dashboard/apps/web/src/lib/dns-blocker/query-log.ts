@@ -110,6 +110,21 @@ export interface QueryClient {
     readonly name: string;
 }
 
+/** A device as the log has seen it over a range. */
+export interface SeenDevice {
+    readonly address: string;
+    /** The name the router reported for it, or "". */
+    readonly name: string;
+    readonly queries: number;
+    readonly blocked: number;
+    /** First and last lookup in the range, epoch ms. */
+    readonly first: number;
+    readonly last: number;
+}
+
+/** How many devices the network view lists, busiest first. */
+export const SEEN_DEVICES_MAX = 500;
+
 export interface QueryTimeline {
     readonly from: number;
     readonly bucketMs: number;
@@ -252,6 +267,7 @@ export class QueryLogReader {
     private readonly clients = new Map<string, number>();
     private readonly blockedClients = new Map<string, number>();
     private readonly names = new Map<string, string>();
+    private readonly seen = new Map<string, { first: number; last: number }>();
     private readonly rows: QueryRow[] = [];
     // One row past the last page says whether there is an older one.
     private readonly keep = QUERY_LOG_PAGES * QUERY_LOG_ROWS + 1;
@@ -273,6 +289,12 @@ export class QueryLogReader {
         bump(this.types, row.type || "?");
         bump(this.destinations, row.via);
         bump(this.clients, row.client);
+        const seen = this.seen.get(row.client);
+        if (seen) {
+            seen.first = Math.min(seen.first, row.at);
+            seen.last = Math.max(seen.last, row.at);
+        } else if (this.seen.size < DISTINCT_MAX)
+            this.seen.set(row.client, { first: row.at, last: row.at });
         if (row.clientName && this.names.size < DISTINCT_MAX)
             this.names.set(row.client, row.clientName);
         let series = this.perClient.get(row.client);
@@ -329,6 +351,22 @@ export class QueryLogReader {
                 .slice(0, 500)
                 .map((address) => ({ address, name: label(address) }))
         };
+    }
+
+    /** Every device in the range, busiest first, bounded. Not part of `stats`,
+     *  which every refresh of the screen carries. */
+    public devices(limit = SEEN_DEVICES_MAX): SeenDevice[] {
+        return ranked(this.clients, limit).map(({ name: address, count }) => {
+            const seen = this.seen.get(address);
+            return {
+                address,
+                name: this.names.get(address) ?? "",
+                queries: count,
+                blocked: this.blockedClients.get(address) ?? 0,
+                first: seen?.first ?? 0,
+                last: seen?.last ?? 0
+            };
+        });
     }
 
     /** One page of matching rows, newest first. */

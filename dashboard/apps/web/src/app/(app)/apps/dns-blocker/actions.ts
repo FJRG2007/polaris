@@ -20,6 +20,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { installApp } from "@/lib/apps/install-service";
 import { DNS_BLOCKER_APP, type DnsSettings } from "@/lib/dns-blocker/settings";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
+import { networkDevices, type NetworkDevice } from "@/lib/dns-blocker/devices";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -239,6 +240,28 @@ export async function dnsLookupAction(
     try {
         const { domain } = queryLog.lookupSchema.parse(input);
         return { lookup: await insights.lookupName(domain) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Every device the log saw over a range, with its name and groups as saved. */
+export async function dnsDevicesAction(
+    input: unknown
+): Promise<Result<{ devices: NetworkDevice[]; logOff: boolean }>> {
+    await requireAdmin();
+    try {
+        const { range, fresh } = z
+            .object({
+                range: queryLog.queryFilterSchema.shape.range,
+                fresh: z.boolean().default(false)
+            })
+            .parse(input);
+        const [seen, settings] = await Promise.all([
+            insights.seenDevices(range, fresh),
+            blocker.readSettings()
+        ]);
+        return { devices: networkDevices(seen.devices, settings), logOff: seen.logOff };
     } catch (error) {
         return failed(error);
     }

@@ -20,8 +20,12 @@ import {
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RuleField, serviceName, lines, rejected } from "./fields";
-import { useField } from "./dns-blocker-context";
+import { useDnsBlocker, useField } from "./dns-blocker-context";
+import { DnsNetworkCard } from "./network-card";
 import { DnsSaveBar } from "./save-bar";
+
+/** The field a device seen on the network is named in. */
+const DEVICE_NAME_FIELD = "dns-device-name";
 
 /** Addresses, a range and a name pattern, as typed into a group. */
 const GROUP_CLIENTS_EXAMPLE = "192.168.1.20\n192.168.1.64/26\nkids-*"; // i18n-ignore example values
@@ -32,6 +36,13 @@ export function DnsDevicesSection() {
     const [clientGroups, setClientGroups] = useField("clientGroups");
     const [deviceName, setDeviceName] = useState("");
     const [deviceAddress, setDeviceAddress] = useState("");
+    const { status } = useDnsBlocker();
+    const nameDevice = (address: string) => {
+        setDeviceAddress(address);
+        const field = document.getElementById(DEVICE_NAME_FIELD);
+        field?.scrollIntoView({ block: "center", behavior: "smooth" });
+        field?.focus({ preventScroll: true });
+    };
     const [groupName, setGroupName] = useState("");
     const [groupClients, setGroupClients] = useState("");
     const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
@@ -52,6 +63,7 @@ export function DnsDevicesSection() {
 
     return (
         <div className="flex flex-col gap-4">
+            {status?.state === "blocking" ? <DnsNetworkCard onName={nameDevice} /> : null}
             <Card>
                 <CardHeader>
                     <CardTitle>{t("devices.title")}</CardTitle>
@@ -92,6 +104,7 @@ export function DnsDevicesSection() {
                     )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                         <Input
+                            id={DEVICE_NAME_FIELD}
                             className="sm:w-56"
                             value={deviceName}
                             placeholder={t("devices.namePlaceholder")}

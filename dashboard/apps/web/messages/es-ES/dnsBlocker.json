@@ -410,5 +410,20 @@
         "allow": "Permitir",
         "block": "Bloquear",
         "inLog": "Ver registro"
+    },
+    "network": {
+        "title": "Vistos en la red",
+        "intro": "Cada equipo que ha preguntado. Abre uno para ver sus consultas.",
+        "refresh": "Refrescar",
+        "empty": "Ningún equipo preguntó en este rango.",
+        "device": "Equipo",
+        "firstSeen": "Primera vez",
+        "lastSeen": "Última vez",
+        "queries": "Consultas",
+        "blocked": "Bloqueadas",
+        "groups": "Grupo",
+        "everyone": "Todos",
+        "openLog": "Ver sus consultas",
+        "name": "Nombrar"
     }
 }

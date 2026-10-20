@@ -410,5 +410,20 @@
         "allow": "Allow it",
         "block": "Block it",
         "inLog": "See the log"
+    },
+    "network": {
+        "title": "Seen on the network",
+        "intro": "Every device that asked the blocker. Open one to see its lookups.",
+        "refresh": "Refresh",
+        "empty": "No device has asked in this range.",
+        "device": "Device",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "queries": "Lookups",
+        "blocked": "Blocked",
+        "groups": "Group",
+        "everyone": "Everyone",
+        "openLog": "Open its lookups",
+        "name": "Name it"
     }
 }
