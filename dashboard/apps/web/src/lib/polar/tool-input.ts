@@ -18,7 +18,7 @@ import type { McpTool } from "@/lib/mcp/protocol";
 import { jsonSchema, zodSchema, type Schema } from "ai";
 
 export function polarInputSchema(input: McpTool<never>["input"] | z.ZodType): Schema<unknown> {
-    const described = zodSchema(input as z.ZodType);
+    const described = zodSchema(input as any);
     return jsonSchema(() => described.jsonSchema, {
         validate: async (value) => {
             const checked = await input.safeParseAsync(value);
