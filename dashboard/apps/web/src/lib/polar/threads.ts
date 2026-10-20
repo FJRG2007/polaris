@@ -12,6 +12,7 @@
 import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
 import { prisma, Prisma } from "@polaris/db";
+import { FAILURE_PART, keepStoredFailures } from "@/lib/polar/provider-failure";
 import {
     keepSharedAttachments,
     discardPolarAttachments,
@@ -328,6 +329,21 @@ export async function savePolarMessages(
 ): Promise<void> {
     const owned = await prisma.polarThread.count({ where: { id: threadId, userId } });
     if (!owned) return;
+    // Only the rows that hold a failure are read back, to keep it.
+    const failed = await prisma.polarMessage.findMany({
+        where: {
+            threadId,
+            id: { in: messages.map((message) => message.id) },
+            parts: { array_contains: [{ type: FAILURE_PART }] }
+        },
+        select: { id: true, parts: true }
+    });
+    const storedParts = new Map(failed.map((row) => [row.id, row.parts]));
+    const partsOf = (message: UIMessage) =>
+        keepStoredFailures(
+            message.parts,
+            storedParts.get(message.id)
+        ) as unknown as Prisma.InputJsonValue;
     await prisma.$transaction([
         prisma.polarMessage.createMany({
             data: messages.map((message, index) => ({
@@ -335,7 +351,7 @@ export async function savePolarMessages(
                 threadId,
                 parentId: parentOf(index),
                 role: message.role,
-                parts: message.parts as unknown as Prisma.InputJsonValue,
+                parts: partsOf(message),
                 metadata: (message.metadata ?? undefined) as Prisma.InputJsonValue | undefined
             })),
             skipDuplicates: true
@@ -344,7 +360,7 @@ export async function savePolarMessages(
             prisma.polarMessage.updateMany({
                 where: { id: message.id, threadId },
                 data: {
-                    parts: message.parts as unknown as Prisma.InputJsonValue,
+                    parts: partsOf(message),
                     metadata: (message.metadata ?? undefined) as Prisma.InputJsonValue | undefined
                 }
             })

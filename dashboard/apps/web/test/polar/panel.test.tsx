@@ -401,6 +401,49 @@ describe("the conversation list after a turn", () => {
     });
 });
 
+describe("a failure kept in the conversation", () => {
+    const credit = {
+        type: "data-polar-failure",
+        data: { code: "provider", kind: "credit", provider: "Acme", slug: "acme", payer: "own" }
+    };
+    const said = /Acme says the account behind this key is out of credit/;
+
+    it("is shown where it happened, and only the newest offers to try again", async () => {
+        chat.messages = [
+            { id: "u1", role: "user", parts: [{ type: "text", text: "First" }] },
+            { id: "a1", role: "assistant", parts: [credit as never] },
+            { id: "u2", role: "user", parts: [{ type: "text", text: "Second" }] },
+            { id: "a2", role: "assistant", parts: [credit as never] }
+        ];
+        mount();
+        expect(await screen.findAllByText(said)).toHaveLength(2);
+        expect(screen.getAllByRole("button", { name: "Try again" })).toHaveLength(1);
+        // Another provider's model is offered on the newest one too, once the list is in.
+        expect(await screen.findAllByRole("button", { name: /^Try with / })).toHaveLength(1);
+    });
+
+    it("says why a turn went unanswered after a reload, without an error", async () => {
+        chat.messages = [
+            { id: "u1", role: "user", parts: [{ type: "text", text: "Read this" }] },
+            {
+                id: "a1",
+                role: "assistant",
+                parts: [
+                    {
+                        type: "data-polar-failure",
+                        data: { code: "file_unreadable", name: "scan.tiff" }
+                    } as never
+                ]
+            }
+        ];
+        mount();
+        await ready();
+        expect(screen.getByText(/scan\.tiff cannot be read by this model/)).toBeTruthy();
+        // A file is not fixed by asking again.
+        expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+});
+
 describe("a message's copy button", () => {
     it("turns into a check once the text is in the clipboard", async () => {
         const writeText = vi.fn(async () => undefined);

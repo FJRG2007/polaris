@@ -5,13 +5,15 @@
  *
  * The provider is named and the cause is put in plain words; the person who can
  * fix it gets a link to the key, and everybody else is told who to ask. When
- * another model can serve, one click retries the turn on it.
+ * another model can serve, one click retries the turn on it. A failure kept in
+ * the conversation's history shows the same sentence; only the newest one
+ * offers to try again.
  */
 
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ModelSelectorProvider } from "./elements/model-selector";
-import { decodePolarFailure, type PolarFailure } from "@/lib/polar/provider-failure";
+import type { PolarFailure, StoredFailure } from "@/lib/polar/provider-failure";
 
 type ModelEntry = ModelSelectorProvider["models"][number];
 
@@ -36,37 +38,49 @@ export function standIn(
 }
 
 export function PolarFailureNotice({
-    error,
+    failure: stored,
     isAdmin,
     providers,
     failedModel,
     onRetry,
     onTryWith
 }: {
-    /** The text the stream's error carried. */
-    error: string | undefined;
+    /** Why the turn has no answer; null when nothing says why. */
+    failure: StoredFailure | null;
     isAdmin: boolean;
     providers: readonly ModelSelectorProvider[];
     failedModel: string | null;
-    onRetry: () => void;
-    onTryWith: (model: ModelEntry) => void;
+    /** Absent on an older failure in the history: it only says what happened. */
+    onRetry?: () => void;
+    onTryWith?: (model: ModelEntry) => void;
 }) {
     const t = useTranslations("polar");
-    const failure = decodePolarFailure(error);
-    const alternative = failure ? standIn(failure, failedModel, providers) : null;
+    const failure: PolarFailure | null = stored?.code === "provider" ? stored : null;
+    const alternative = failure && onTryWith ? standIn(failure, failedModel, providers) : null;
     // Only a key problem is somebody's to fix: a limit or an outage passes.
     const keyProblem = failure?.kind === "key" || failure?.kind === "credit";
+    const sentence =
+        stored?.code === "usage_limit"
+            ? t("errors.usageLimit", {
+                  used: stored.used,
+                  amount: stored.amount,
+                  period: t(`usage.periods.${stored.period}`)
+              })
+            : stored?.code === "file_unreadable"
+              ? t("errors.fileUnreadable", { name: stored.name })
+              : failure
+                ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
+                : t("errors.failed");
+    // A limit or a file is not fixed by asking again.
+    const retry =
+        stored?.code === "usage_limit" || stored?.code === "file_unreadable" ? undefined : onRetry;
 
     return (
         <div
             role="alert"
             className="flex flex-col gap-2 rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
         >
-            <p>
-                {failure
-                    ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
-                    : t("errors.failed")}
-            </p>
+            <p>{sentence}</p>
             {failure && keyProblem && failure.payer === "instance" && !isAdmin ? (
                 <p>{t("errors.provider.askAdmin", { provider: failure.provider })}</p>
             ) : null}
@@ -85,7 +99,7 @@ export function PolarFailureNotice({
                             : t("errors.provider.openKey")}
                     </Link>
                 ) : null}
-                {alternative ? (
+                {alternative && onTryWith ? (
                     <button
                         type="button"
                         className="font-medium underline"
@@ -94,9 +108,11 @@ export function PolarFailureNotice({
                         {t("errors.provider.tryWith", { model: alternative.name })}
                     </button>
                 ) : null}
-                <button type="button" className="font-medium underline" onClick={onRetry}>
-                    {t("errors.provider.retry")}
-                </button>
+                {retry ? (
+                    <button type="button" className="font-medium underline" onClick={retry}>
+                        {t("errors.provider.retry")}
+                    </button>
+                ) : null}
             </div>
         </div>
     );

@@ -60,6 +60,13 @@ vi.mock("@polaris/db", () => ({
             }
         },
         polarMessage: {
+            findMany: async ({ where }: { where: { threadId: string; id: { in: string[] } } }) =>
+                state.messages.filter(
+                    (message) =>
+                        message.threadId === where.threadId &&
+                        where.id.in.includes(message.id) &&
+                        JSON.stringify(message.parts).includes('"data-polar-failure"')
+                ),
             createMany: async ({ data }: { data: Omit<Message, "createdAt">[] }) => {
                 let count = 0;
                 for (const entry of data) {
@@ -135,6 +142,26 @@ describe("savePolarMessages", () => {
         ]);
         expect(state.messages[0]?.parts).toEqual([{ type: "text", text: "hi again" }]);
         expect(state.linked).toHaveLength(2);
+    });
+
+    it("keeps a stored failure when the answer is re-sent without it", async () => {
+        const failure = {
+            type: "data-polar-failure",
+            data: { code: "file_unreadable", name: "scan.tiff" }
+        };
+        await savePolarMessages(
+            OWNER,
+            MINE,
+            [{ id: "a1", role: "assistant", parts: [failure as never] }],
+            () => null
+        );
+        await savePolarMessages(
+            OWNER,
+            MINE,
+            [{ id: "a1", role: "assistant", parts: [] }, text("u2", "user", "again")],
+            (index) => (index === 1 ? "a1" : null)
+        );
+        expect(state.messages[0]?.parts).toEqual([failure]);
     });
 
     it("writes nothing into a thread the caller does not own", async () => {

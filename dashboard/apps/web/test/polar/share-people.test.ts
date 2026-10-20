@@ -238,6 +238,28 @@ describe("reading what was sent", () => {
         expect(state.fileReads).toEqual([FILE, FILE, FILE]);
     });
 
+    it("leaves the sender's failures out of what the reader sees and continues", async () => {
+        state.recipient = { userId: FRIEND };
+        const failure = {
+            type: "data-polar-failure",
+            data: { code: "usage_limit", used: 5, amount: 4, period: "day" }
+        };
+        const added = [
+            { id: "q2", parentId: "a", role: "user", parts: [{ type: "text", text: "More?" }] },
+            { id: "a2", parentId: "q2", role: "assistant", parts: [failure] }
+        ];
+        MESSAGES.push(...(added as never[]));
+        try {
+            const thread = await share.readReceivedPolarThread(FRIEND, ROW);
+            expect(thread?.messages.map((message) => message.id)).toEqual(["q", "a", "q2"]);
+            expect(JSON.stringify(thread)).not.toContain("usage_limit");
+            await share.continueReceivedPolarThread(FRIEND, ROW);
+            expect(JSON.stringify(state.messagesMade)).not.toContain("data-polar-failure");
+        } finally {
+            MESSAGES.splice(MESSAGES.length - added.length, added.length);
+        }
+    });
+
     it("leaves a missing name to the reader's language", async () => {
         state.recipient = { userId: FRIEND };
         const owner = SHARE.thread.user;

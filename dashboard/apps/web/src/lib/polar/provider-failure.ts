@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import type { UIMessage } from "ai";
 
 export const FAILURE_KINDS = ["key", "credit", "rate", "down", "model", "other"] as const;
 export type FailureKind = (typeof FAILURE_KINDS)[number];
@@ -86,6 +87,77 @@ export function decodePolarFailure(text: string | undefined): PolarFailure | nul
     } catch {
         return null;
     }
+}
+
+/**
+ * Why a turn has no answer, kept in the conversation as a part of the answer it
+ * replaced, so a reload, another device and the chat's history all show it.
+ * A provider's refusal, the shared key's ceiling, or a file the model could not
+ * be handed.
+ */
+export const storedFailureSchema = z.discriminatedUnion("code", [
+    polarFailureSchema,
+    z.object({
+        code: z.literal("usage_limit"),
+        used: z.number().nonnegative(),
+        amount: z.number().nonnegative(),
+        period: z.enum(["day", "week", "month"])
+    }),
+    z.object({ code: z.literal("file_unreadable"), name: z.string().max(255) })
+]);
+export type StoredFailure = z.infer<typeof storedFailureSchema>;
+
+/** The message part a failure is stored as. */
+export const FAILURE_PART = "data-polar-failure";
+
+type Part = UIMessage["parts"][number];
+
+function isFailurePart(part: Part): boolean {
+    return part.type === FAILURE_PART;
+}
+
+/** The failure a message part carries, or null for any other part or a stored
+ *  one that no longer reads. */
+export function failureOf(part: Part): StoredFailure | null {
+    if (!isFailurePart(part)) return null;
+    const parsed = storedFailureSchema.safeParse((part as { data?: unknown }).data);
+    return parsed.success ? parsed.data : null;
+}
+
+/** The failure a message ends with, if any. */
+export function messageFailure(message: UIMessage | undefined): StoredFailure | null {
+    for (const part of [...(message?.parts ?? [])].reverse()) {
+        const failure = failureOf(part);
+        if (failure) return failure;
+    }
+    return null;
+}
+
+/**
+ * The conversation as a model may read it: failures are for the person, not the
+ * model, and an answer that held nothing but one is left out entirely - a
+ * provider refuses an empty assistant message.
+ */
+export function withoutFailures<T extends UIMessage>(messages: readonly T[]): T[] {
+    return messages.flatMap((message) => {
+        if (!message.parts.some(isFailurePart)) return [message];
+        const parts = message.parts.filter((part) => !isFailurePart(part));
+        const empty = parts.every((part) => part.type === "step-start");
+        return message.role === "assistant" && empty ? [] : [{ ...message, parts }];
+    });
+}
+
+/**
+ * The parts to store for a message whose row already holds `stored`: a failure
+ * the row keeps survives a later turn re-sending the message without it, from a
+ * screen that never received it.
+ */
+export function keepStoredFailures(incoming: readonly Part[], stored: unknown): Part[] {
+    if (incoming.some(isFailurePart) || !Array.isArray(stored)) return [...incoming];
+    const kept = (stored as Part[]).filter(
+        (part) => !!part && typeof part === "object" && failureOf(part) !== null
+    );
+    return [...incoming, ...kept];
 }
 
 /** One log line for a failed call: provider, status and kind, never the body
