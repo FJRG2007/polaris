@@ -144,7 +144,24 @@
         "tools": "Ver qué puede hacer Polar aqui",
         "call": "Hablar con Polar en voz alta",
         "later": "Llega en una versión posterior",
-        "toolsPrompt": "¿Qué puedes hacer por mí en esta página? Enumera tus herramientas, en breve."
+        "toolsPrompt": "¿Qué puedes hacer por mí en esta página? Enumera tus herramientas, en breve.",
+        "groups": {
+            "polar": "Polar",
+            "control": "Este chat",
+            "own": "Tuyos"
+        },
+        "control": {
+            "clear": "Empezar de cero; el chat sigue en tu historial",
+            "compact": "Resumir el chat hasta aquí para liberar sitio",
+            "context": "Ver cuánto ocupa el contexto de este chat",
+            "usage": "Tokens y coste de este chat",
+            "rename": "Renombrar este chat",
+            "export": "Descargar este chat en Markdown",
+            "branch": "Seguir desde aquí en un chat nuevo",
+            "temp": "Abrir un chat temporal, o salir de él",
+            "memory": "Abrir lo que Polar recuerda",
+            "help": "Ver todos los comandos"
+        }
     },
     "context": {
         "title": "Polar ve esta página",
@@ -502,5 +519,32 @@
         "reading": "Leyendo {site}",
         "sources": "Fuentes",
         "calls": "{searches, plural, one {# búsqueda} other {# búsquedas}} - {pages, plural, one {# página leída} other {# páginas leídas}}"
+    },
+    "control": {
+        "busy": "Espera a que termine la respuesta.",
+        "empty": "Envía un mensaje primero.",
+        "temporary": "Los chats temporales no pueden.",
+        "renameHow": "Escribe el nombre tras /rename.",
+        "renamed": "Chat renombrado.",
+        "renameFailed": "No se pudo renombrar. Reinténtalo."
+    },
+    "compact": {
+        "divider": "Conversación compactada",
+        "dividerAuto": "Compactada automáticamente",
+        "working": "Compactando la conversación...",
+        "failed": "No se pudo compactar. Reinténtalo.",
+        "nothing": "Aún no hay nada que compactar.",
+        "now": "Compactar ya"
+    },
+    "contextUsage": {
+        "title": "Contexto",
+        "used": "{used} de {window} tokens ({share}%)",
+        "unknown": "Unos {used} tokens. No se sabe el límite.",
+        "month": "Uso de este mes",
+        "levels": {
+            "ok": "Queda espacio de sobra.",
+            "warn": "Se está llenando. Compacta pronto.",
+            "over": "No cabe en este modelo. Compacta o elige otro."
+        }
     }
 }

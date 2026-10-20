@@ -180,16 +180,17 @@ describe("the / commands", () => {
         mount();
         await ready();
         slash("/");
-        // Polar's six, then the entry that writes a new one.
-        expect(options()).toHaveLength(7);
-        expect(options()[6]).toMatch(/^New command/);
+        // Polar's six, the ten that act on the chat, then the entry that
+        // writes a new one.
+        expect(options()).toHaveLength(17);
+        expect(options()[16]).toMatch(/^New command/);
         expect(highlighted()).toMatch(/^\/new/);
         const box = screen.getByLabelText("Message Polar");
         expect(box.getAttribute("aria-activedescendant")).toBe(
             screen.getAllByRole("option")[0]!.id
         );
         slash("/mo");
-        expect(options()).toHaveLength(2);
+        expect(options()).toHaveLength(3);
         expect(options()[0]).toMatch(/^\/model/);
         slash("/model now");
         expect(screen.queryByRole("listbox")).toBeNull();
@@ -205,14 +206,15 @@ describe("the / commands", () => {
         fireEvent.keyDown(box, { key: "ArrowUp" });
         // Up from the first wraps to the last row, the new command entry.
         expect(highlighted()).toMatch(/^New command/);
-        // "/call" is not ready yet, so up from there skips it.
-        fireEvent.keyDown(box, { key: "ArrowUp" });
-        expect(highlighted()).toMatch(/^\/tools/);
-        fireEvent.keyDown(box, { key: "ArrowDown" });
         fireEvent.keyDown(box, { key: "ArrowDown" });
         expect(highlighted()).toMatch(/^\/new/);
+        for (let step = 0; step < 4; step++) fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(highlighted()).toMatch(/^\/tools/);
+        // "/call" is not ready yet, so down from "/tools" skips it.
+        fireEvent.keyDown(box, { key: "ArrowDown" });
+        expect(highlighted()).toMatch(/^\/clear/);
         fireEvent.keyDown(box, { key: "ArrowUp" });
-        fireEvent.keyDown(box, { key: "ArrowUp" });
+        expect(highlighted()).toMatch(/^\/tools/);
         fireEvent.keyDown(box, { key: "Enter" });
         expect(chat.sent.map((message) => message.text)).toEqual([
             "What can you do for me on this page? List the tools you have, briefly."
@@ -526,11 +528,20 @@ describe("matching the / list", () => {
     });
     const labels = (input: string, own = [row("tldr"), row("translate"), row("fix-tests")]) =>
         slashMatches(input, own).map((match) =>
-            match.kind === "builtin" ? match.command : match.row.shortcut
+            match.kind === "own" ? match.row.shortcut : match.command
         );
 
     it("ranks a prefix over a contained run over letters in order, Polar's first", () => {
-        expect(labels("/t")).toEqual(["tools", "tldr", "translate", "fix-tests"]);
+        expect(labels("/t")).toEqual([
+            "tools",
+            "temp",
+            "compact",
+            "context",
+            "export",
+            "tldr",
+            "translate",
+            "fix-tests"
+        ]);
         expect(labels("/ft")).toEqual(["fix-tests"]);
         expect(labels("/zz")).toEqual([]);
         expect(labels("/tldr now")).toEqual([]);

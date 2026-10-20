@@ -340,6 +340,43 @@ export const memoryTextSchema = z
 export const POLAR_BUILTIN_COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
 export type BuiltinCommand = (typeof POLAR_BUILTIN_COMMANDS)[number];
 
+/**
+ * The commands that act on the conversation itself, as Claude Code's /clear
+ * and /compact do (https://code.claude.com/docs/en/commands): they run here,
+ * never reach the model as text, and no command of a person's can take their
+ * name. Left out of Claude Code's list: /init, /rewind and /resume (a chat has
+ * no project files to set up or restore; the history list already reopens
+ * any chat), and /cost, which is /usage there too.
+ */
+export const POLAR_CONTROL_COMMANDS = [
+    "clear",
+    "compact",
+    "context",
+    "usage",
+    "rename",
+    "export",
+    "branch",
+    "temp",
+    "memory",
+    "help"
+] as const;
+export type ControlCommand = (typeof POLAR_CONTROL_COMMANDS)[number];
+
+/** Every name a person's own command cannot use. */
+export const POLAR_RESERVED_SHORTCUTS: readonly string[] = [
+    ...POLAR_BUILTIN_COMMANDS,
+    ...POLAR_CONTROL_COMMANDS
+];
+
+/** A control command typed whole, with what follows its name; null for any
+ *  other text. Only at the start of the message, as Claude Code reads them. */
+export function controlCommandIn(raw: string): { command: ControlCommand; rest: string } | null {
+    const found = /^\/([a-z]+)(?:\s+([\s\S]*))?$/i.exec(raw.trim());
+    const name = found?.[1]?.toLowerCase();
+    if (!name || !(POLAR_CONTROL_COMMANDS as readonly string[]).includes(name)) return null;
+    return { command: name as ControlCommand, rest: (found?.[2] ?? "").trim() };
+}
+
 export const POLAR_COMMAND_SHORTCUT_MAX = 32;
 export const POLAR_COMMAND_PROMPT_MAX = 4000;
 /** Most commands one person keeps. */
@@ -366,10 +403,7 @@ export const commandShortcutSchema = z
             .min(1)
             .max(POLAR_COMMAND_SHORTCUT_MAX, "long")
             .regex(SHORTCUT_FORMAT, "format")
-            .refine(
-                (value) => !(POLAR_BUILTIN_COMMANDS as readonly string[]).includes(value),
-                "builtin"
-            )
+            .refine((value) => !POLAR_RESERVED_SHORTCUTS.includes(value), "builtin")
     );
 
 export const commandPromptSchema = z.string().trim().min(1).max(POLAR_COMMAND_PROMPT_MAX);

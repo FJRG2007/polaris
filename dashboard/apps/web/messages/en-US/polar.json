@@ -144,7 +144,24 @@
         "tools": "See what Polar can do here",
         "call": "Talk to Polar out loud",
         "later": "Coming in a later update",
-        "toolsPrompt": "What can you do for me on this page? List the tools you have, briefly."
+        "toolsPrompt": "What can you do for me on this page? List the tools you have, briefly.",
+        "groups": {
+            "polar": "Polar",
+            "control": "This chat",
+            "own": "Yours"
+        },
+        "control": {
+            "clear": "Start over; this chat stays in your history",
+            "compact": "Summarize the chat so far to free up room",
+            "context": "See how full this chat's context is",
+            "usage": "Tokens and cost of this chat",
+            "rename": "Rename this chat",
+            "export": "Download this chat as Markdown",
+            "branch": "Continue from here in a new chat",
+            "temp": "Start a temporary chat, or leave one",
+            "memory": "Open what Polar remembers",
+            "help": "Show every command"
+        }
     },
     "context": {
         "title": "Polar sees this page",
@@ -502,5 +519,32 @@
         "reading": "Reading {site}",
         "sources": "Sources",
         "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
+    },
+    "control": {
+        "busy": "Wait for the answer to finish first.",
+        "empty": "Send a message first.",
+        "temporary": "Temporary chats can't do that.",
+        "renameHow": "Type the new name after /rename.",
+        "renamed": "Chat renamed.",
+        "renameFailed": "Couldn't rename the chat. Try again."
+    },
+    "compact": {
+        "divider": "Conversation compacted",
+        "dividerAuto": "Compacted automatically",
+        "working": "Compacting the conversation...",
+        "failed": "Couldn't compact the chat. Try again.",
+        "nothing": "Nothing new to compact yet.",
+        "now": "Compact now"
+    },
+    "contextUsage": {
+        "title": "Context",
+        "used": "{used} of {window} tokens ({share}%)",
+        "unknown": "About {used} tokens. This model's limit isn't known.",
+        "month": "Usage this month",
+        "levels": {
+            "ok": "Plenty of room left.",
+            "warn": "Getting full. Compact soon to keep going.",
+            "over": "Doesn't fit this model. Compact or pick a bigger one."
+        }
     }
 }

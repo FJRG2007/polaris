@@ -38,6 +38,7 @@ import {
     polarMemoryTools
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
+import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
 import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
 import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
@@ -185,9 +186,12 @@ export async function POST(request: Request): Promise<Response> {
     // A file the model cannot read is sent as its text; one with no text to
     // take out stops the turn with its name instead of being dropped unseen.
     const unreadable: string[] = [];
+    // After a compaction marker the model reads its summary and what follows
+    // it, never the history it replaced (`compaction.ts`).
+    const compacted = splitAtCompaction(messages);
     const sendable = await inlinePolarFiles(
         user.id,
-        withoutPastProviderSearches(messages),
+        withoutPastProviderSearches(compacted.messages),
         resolved.option,
         unreadable
     );
@@ -202,13 +206,18 @@ export async function POST(request: Request): Promise<Response> {
     let spent: ReturnType<typeof answerUsage> | undefined;
     const result = streamText({
         model: resolved.model,
-        system: polarSystemPrompt(
-            user.name,
-            fencePageContext(body.data.context),
-            instructions,
-            memories,
-            web
-        ),
+        system: [
+            polarSystemPrompt(
+                user.name,
+                fencePageContext(body.data.context),
+                instructions,
+                memories,
+                web
+            ),
+            fenceSummary(compacted.summary)
+        ]
+            .filter(Boolean)
+            .join("\n\n"),
         messages: await convertToModelMessages(sendable),
         tools,
         toolApproval: {

@@ -65,6 +65,12 @@ import {
     SquarePen,
     Wrench,
     BookmarkPlus,
+    Brain,
+    ChartPie,
+    CircleHelp,
+    Download,
+    Eraser,
+    Minimize2,
     SquareSlash,
     Zap,
     X
@@ -88,6 +94,14 @@ import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
+import { CompactionDivider, ContextDialog } from "@/components/polar/polar-context";
+import {
+    compactionOf,
+    contextUsed,
+    contextWindowOf,
+    sendableMessages,
+    summaryOf
+} from "@/lib/polar/compaction";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
@@ -142,7 +156,6 @@ import {
     POLAR_ATTACHMENT_MAX_BYTES,
     POLAR_ATTACHMENT_MOST,
     POLAR_ATTACHMENT_TYPES,
-    sendableTail,
     type ModelChoice,
     type PageContext,
     type QueuedMessage
@@ -425,9 +438,30 @@ const COMMAND_ICONS: Record<Command, SuggestionListItem["icon"]> = {
     call: Phone
 };
 
-/** One row of the "/" list: a command of Polar's, or one of the person's own. */
+type Control = polarShared.ControlCommand;
+const CONTROLS = polarShared.POLAR_CONTROL_COMMANDS;
+const CONTROL_ICONS: Record<Control, SuggestionListItem["icon"]> = {
+    clear: Eraser,
+    compact: Minimize2,
+    context: ChartPie,
+    usage: Gauge,
+    rename: Pencil,
+    export: Download,
+    branch: GitBranchPlus,
+    temp: Ghost,
+    memory: Brain,
+    help: CircleHelp
+};
+/** Control commands that take words after them, so picking one from the list
+ *  puts it in the box instead of running it. */
+const TAKES_TEXT = new Set<Control>(["rename"]);
+
+/** One row of the "/" list: a command of Polar's, one that acts on the chat
+ *  itself, or one of the person's own. */
 export type SlashMatch =
-    { kind: "builtin"; command: Command } | { kind: "own"; row: polarShared.PolarCommandRow };
+    | { kind: "builtin"; command: Command }
+    | { kind: "control"; command: Control }
+    | { kind: "own"; row: polarShared.PolarCommandRow };
 
 /** How well a shortcut answers what was typed after the "/": 0 when it starts
  *  with it, 1 when it holds it, 2 when it holds its letters in order; null when
@@ -460,6 +494,10 @@ export function slashMatches(
     return [
         ...ranked(COMMANDS, (command) => command, query).map((command): SlashMatch => ({
             kind: "builtin",
+            command
+        })),
+        ...ranked(CONTROLS, (command) => command, query).map((command): SlashMatch => ({
+            kind: "control",
             command
         })),
         ...ranked(own, (row) => row.shortcut, query).map((row): SlashMatch => ({
@@ -637,6 +675,8 @@ export function PolarChat({
     const [commandDraft, setCommandDraft] = useState<polarCommands.CommandDraft | null>(null);
     const [managing, setManaging] = useState(false);
     const [showUsage, setShowUsage] = useState(false);
+    const [showContext, setShowContext] = useState(false);
+    const [compacting, setCompacting] = useState(false);
     /** The model one turn is sent on instead of the chosen one: a command's. */
     const turnChoice = useRef<ModelChoice | null>(null);
     const wide = useWide();
@@ -669,7 +709,7 @@ export function PolarChat({
                 prepareSendMessagesRequest: ({ messages }) => ({
                     body: {
                         threadId: live.current.threadId,
-                        messages: sendableTail(messages),
+                        messages: sendableMessages(messages),
                         // A command's model answers its own turn only; the
                         // thread stays on the chosen one.
                         choice: live.current.turnChoice.current ?? live.current.choice,
@@ -1059,8 +1099,96 @@ export function PolarChat({
         }
     };
 
+    /** Summarises the conversation so far into a marker the next turns send
+     *  instead of the history. True once the marker is in. */
+    const compact = async (instructions: string | null, auto: boolean): Promise<boolean> => {
+        const leaf = chat.messages.at(-1);
+        const current = live.current.choice;
+        if (!leaf || !current || compactionOf(leaf)) {
+            if (!auto) toast.show({ title: t("compact.nothing") });
+            return false;
+        }
+        setCompacting(true);
+        const response = await fetch(`/api/polar/threads/${live.current.threadId}/compact`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messageId: leaf.id, choice: current, instructions, auto })
+        }).catch(() => null);
+        const data = (await response?.json().catch(() => null)) as {
+            message?: UIMessage;
+            error?: string;
+        } | null;
+        setCompacting(false);
+        if (!response?.ok || !data?.message) {
+            toast.show({
+                title: t(data?.error === "nothing" ? "compact.nothing" : "compact.failed")
+            });
+            return false;
+        }
+        chat.setMessages([...chat.messages, data.message]);
+        return true;
+    };
+
+    /** Renames the open chat, shown in the list at once and put back if refused. */
+    const renameChat = async (typed: string) => {
+        const title = polarShared.threadTitleSchema.safeParse(typed);
+        if (!title.success) {
+            toast.show({ title: t("control.renameHow") });
+            return;
+        }
+        const id = live.current.threadId;
+        sidebar.retitle(id, title.data);
+        const response = await fetch(`/api/polar/threads/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ title: title.data })
+        }).catch(() => null);
+        if (response?.ok) return void toast.show({ title: t("control.renamed") });
+        sidebar.refresh(true);
+        toast.show({ title: t("control.renameFailed") });
+    };
+
+    /** What a command that acts on the chat itself does. Never sent as text. */
+    const runControl = (command: Control, rest: string) => {
+        setInput("");
+        if (command === "clear") return startNew();
+        if (command === "temp") {
+            startNew();
+            return setTemporary(!temporary);
+        }
+        if (command === "memory") return setSettingsOpen(true);
+        if (command === "context") return setShowContext(true);
+        if (command === "usage") {
+            return chat.messages.length === 0 ? setShowUsage(true) : setShowContext(true);
+        }
+        if (command === "help") {
+            setInput("/");
+            return textarea.current?.focus();
+        }
+        if (busy || compacting) return void toast.show({ title: t("control.busy") });
+        if (chat.messages.length === 0) return void toast.show({ title: t("control.empty") });
+        if (command === "compact") return void compact(rest || null, false);
+        if (temporary) return void toast.show({ title: t("control.temporary") });
+        if (command === "rename") return void renameChat(rest);
+        if (command === "branch") {
+            const last = chat.messages.at(-1);
+            return last ? void branchFrom(last.id) : undefined;
+        }
+        if (command === "export") {
+            const link = document.createElement("a");
+            link.href = `/api/polar/threads/${live.current.threadId}/export?format=markdown`;
+            link.download = "";
+            link.click();
+        }
+    };
+
     const submit = () => {
         const raw = input.trim();
+        // A command that acts on the chat runs here, before a person's own
+        // command of the same name could: it never reaches the model.
+        const control = polarShared.controlCommandIn(raw);
+        if (control) return runControl(control.command, control.rest);
+        if (compacting) return;
         const ready = files.filter((file) => !file.pending && !file.failed);
         if ((!raw && ready.length === 0) || !choice || files.some(stillStaging)) return;
         const typed = COMMANDS.find((command) => raw === `/${command}`);
@@ -1133,11 +1261,21 @@ export function PolarChat({
                     ? "done"
                     : "idle";
     const noKeys = providers !== null && providers.length === 0;
+    const lastMessage = chat.messages.at(-1);
+    const canCompact = !busy && !compacting && !!lastMessage && !compactionOf(lastMessage);
     const commandsFull = commands.commands.length >= polarShared.POLAR_COMMAND_MOST;
     const slashFound = slashMatches(input, commands.commands);
     const slashItems: SuggestionListItem[] = [
         ...slashFound.map((match): SuggestionListItem =>
-            match.kind === "builtin"
+            match.kind === "control"
+                ? {
+                      key: `control:${match.command}`,
+                      label: `/${match.command}`,
+                      detail: t(`slash.control.${match.command}`),
+                      icon: CONTROL_ICONS[match.command],
+                      group: t("slash.groups.control")
+                  }
+                : match.kind === "builtin"
                 ? {
                       key: match.command,
                       label: `/${match.command}`,
@@ -1145,13 +1283,15 @@ export function PolarChat({
                           ? t("slash.later")
                           : t(`slash.${match.command}`),
                       icon: COMMAND_ICONS[match.command],
-                      disabled: LATER.has(match.command)
+                      disabled: LATER.has(match.command),
+                      group: t("slash.groups.polar")
                   }
                 : {
                       key: `own:${match.row.id}`,
                       label: `/${match.row.shortcut}`,
                       detail: polarShared.firstLine(match.row.prompt),
-                      icon: Zap
+                      icon: Zap,
+                      group: t("slash.groups.own")
                   }
         ),
         ...(input.startsWith("/") && !/\s/.test(input)
@@ -1172,7 +1312,9 @@ export function PolarChat({
     ];
     const slashOpen = !slashDismissed && slashItems.length > 0;
     const slashHighlight =
-        slashItems[slashActive]?.disabled === false ? slashActive : firstPickable(slashItems);
+        slashItems[slashActive] && !slashItems[slashActive].disabled
+            ? slashActive
+            : firstPickable(slashItems);
     const ids = fullPage
         ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
         : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
@@ -1192,6 +1334,14 @@ export function PolarChat({
             setInput(`/${match.row.shortcut} `);
             textarea.current?.focus();
             return;
+        }
+        if (match?.kind === "control") {
+            if (TAKES_TEXT.has(match.command)) {
+                setInput(`/${match.command} `);
+                textarea.current?.focus();
+                return;
+            }
+            return runControl(match.command, "");
         }
         if (match?.kind === "builtin") runCommand(match.command);
     };
@@ -1687,6 +1837,16 @@ export function PolarChat({
                                     </ConversationEmptyState>
                                 ) : null}
                                 {chat.messages.map((message, index) => {
+                                    const marker = compactionOf(message);
+                                    if (marker) {
+                                        return (
+                                            <CompactionDivider
+                                                key={message.id}
+                                                summary={summaryOf(message)}
+                                                auto={marker.auto}
+                                            />
+                                        );
+                                    }
                                     const versions = versionsOf(tree.current, message.id);
                                     const at = versions.indexOf(message.id);
                                     return (
@@ -1728,6 +1888,12 @@ export function PolarChat({
                                         />
                                     );
                                 })}
+                                {compacting ? (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <ThinkingOrb state="breathing" size={20} decorative />
+                                        <Shimmer>{t("compact.working")}</Shimmer>
+                                    </div>
+                                ) : null}
                                 {chat.status === "submitted" ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ThinkingOrb state="breathing" size={20} decorative />
@@ -1793,6 +1959,22 @@ export function PolarChat({
                 )}
             </div>
             {showUsage ? <UsageDialog onClose={() => setShowUsage(false)} /> : null}
+            {showContext ? (
+                <ContextDialog
+                    used={contextUsed(chat.messages)}
+                    window={windowOf(providers, choice)}
+                    canCompact={canCompact}
+                    onCompact={() => {
+                        setShowContext(false);
+                        void compact(null, false);
+                    }}
+                    onMonth={() => {
+                        setShowContext(false);
+                        setShowUsage(true);
+                    }}
+                    onClose={() => setShowContext(false)}
+                />
+            ) : null}
             {managing ? (
                 <polarCommands.CommandsDialog
                     store={commands}
@@ -1846,6 +2028,23 @@ export function unreadableOf(error: Error | undefined): string | null {
 }
 
 /** Whether the picker offers this model to the person now. */
+/** The window of the chosen model, from the catalogue; null for Automatic
+ *  (the model is picked per turn) or a model with no known window. */
+export function windowOf(
+    providers: ModelSelectorProvider[] | null,
+    choice: ModelChoice | null
+): number | null {
+    if (!choice || isAutomatic(choice)) return null;
+    const model = providers
+        ?.find((entry) => entry.provider === choice.provider)
+        ?.models.find((entry) => entry.model === choice.model) as
+        | { contextTokens?: unknown }
+        | undefined;
+    return contextWindowOf({
+        catalogue: typeof model?.contextTokens === "number" ? model.contextTokens : null
+    });
+}
+
 function offered(providers: ModelSelectorProvider[] | null, choice: ModelChoice): boolean {
     return (providers ?? []).some((entry) =>
         entry.models.some(
