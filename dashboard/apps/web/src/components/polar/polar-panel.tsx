@@ -256,6 +256,7 @@ const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
 /** Whether this viewer left web search on in the composer. */
 const WEB_KEY = "polar.web";
+const THREAD_KEY = "polar.thread";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 
@@ -891,6 +892,8 @@ export function PolarChat({
 
     const openThread = async (id: string) => {
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
+        // A remembered chat that was deleted, or belongs to another account.
+        if (response?.status === 404 && readStored(THREAD_KEY) === id) writeStored(THREAD_KEY, "");
         if (!response?.ok) return;
         const { thread } = (await response.json()) as {
             thread: {
@@ -927,14 +930,20 @@ export function PolarChat({
         setDrawer(false);
     };
     // A chat named in the page's address (a shared chat just continued) opens
-    // once, and the address goes back to plain /polar.
+    // once, and the address goes back to plain /polar. Otherwise the chat that
+    // was open before a reload opens again.
     useEffect(() => {
-        if (!fullPage) return;
-        const named = new URLSearchParams(window.location.search).get("thread");
-        if (!named) return;
-        window.history.replaceState(null, "", window.location.pathname);
-        void openThread(named);
+        const named = fullPage ? new URLSearchParams(window.location.search).get("thread") : null;
+        if (named) window.history.replaceState(null, "", window.location.pathname);
+        const reopen = named ?? readStored(THREAD_KEY);
+        if (reopen) void openThread(reopen);
     }, []);
+    // Remembered once it has something in it; a temporary chat is deleted when
+    // the page goes, so there is nothing to come back to.
+    useEffect(() => {
+        if (temporary || chat.messages.length === 0) return;
+        writeStored(THREAD_KEY, threadId);
+    }, [threadId, temporary, chat.messages.length]);
 
     /** Empties the composer's files, letting go of their local previews. */
     const clearFiles = () => {
@@ -964,6 +973,7 @@ export function PolarChat({
         tree.current = new Map();
         setOpening([]);
         setThreadId(newId());
+        writeStored(THREAD_KEY, "");
         setQueue([]);
         setInput("");
         setQuote(null);
