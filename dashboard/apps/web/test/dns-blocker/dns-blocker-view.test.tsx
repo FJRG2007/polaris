@@ -48,14 +48,65 @@ function insights(logOff = false, domain = "example.com") {
                 topBlockedClients: [],
                 clients: [{ address: "10.0.0.2", name: "" }]
             },
-            log: { rows: [], page: 0, hasMore: false },
+            log: {
+                rows: [
+                    {
+                        time: new Date(0).toISOString(),
+                        at: 0,
+                        client: "10.0.0.2",
+                        clientName: "",
+                        domain,
+                        type: "A",
+                        outcome: "allowed",
+                        reason: "RESOLVED",
+                        durationMs: 1,
+                        via: "cache",
+                        list: ""
+                    }
+                ],
+                page: 0,
+                hasMore: false
+            },
             pause: { enabled: true, secondsLeft: null },
             logOff
         }
     };
 }
 
-const { DnsBlockerView } = await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-view");
+const replace = vi.fn();
+const push = vi.fn();
+let search = "";
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ replace, push }),
+    usePathname: () => "/apps/dns-blocker/log",
+    useSearchParams: () => new URLSearchParams(search)
+}));
+
+const { DnsBlockerProvider } = await import(
+    "../../src/app/(app)/apps/dns-blocker/dns-blocker-context"
+);
+const { DnsOverviewSection } = await import(
+    "../../src/app/(app)/apps/dns-blocker/overview-section"
+);
+const { DnsLogSection } = await import("../../src/app/(app)/apps/dns-blocker/log-section");
+const { DnsListsSection } = await import("../../src/app/(app)/apps/dns-blocker/lists-section");
+const { DnsDevicesSection } = await import("../../src/app/(app)/apps/dns-blocker/devices-section");
+
+/** One section of the screen, inside the provider its layout gives it. */
+function mount(
+    Section: () => React.ReactElement,
+    initial: dns.DnsSettings = dns.DEFAULT_DNS_SETTINGS
+) {
+    return render(
+        <MessagesWrapper>
+            <DnsBlockerProvider initial={initial}>
+                <Section />
+            </DnsBlockerProvider>
+        </MessagesWrapper>
+    );
+}
+
+const Overview = () => <DnsOverviewSection brands={[]} />;
 
 function standing(state: DnsBlockerState): void {
     answer = {
@@ -63,12 +114,8 @@ function standing(state: DnsBlockerState): void {
     };
 }
 
-async function shown(): Promise<string[]> {
-    render(
-        <MessagesWrapper>
-            <DnsBlockerView initial={dns.DEFAULT_DNS_SETTINGS} brands={[]} />
-        </MessagesWrapper>
-    );
+async function shown(Section: () => React.ReactElement = Overview): Promise<string[]> {
+    mount(Section);
     await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
     return ["Turn on", "Turn off", "Try again"].filter((label) =>
         screen.queryByRole("button", { name: label })
@@ -77,6 +124,9 @@ async function shown(): Promise<string[]> {
 
 afterEach(() => {
     cleanup();
+    search = "";
+    replace.mockClear();
+    push.mockClear();
     turnOnDnsBlockerAction.mockClear();
     dnsInsightsAction.mockReset();
     dnsInsightsAction.mockImplementation(async () => insights());
@@ -147,7 +197,7 @@ describe("DnsBlockerView today", () => {
         dnsInsightsAction
             .mockImplementationOnce(() => new Promise((resolve) => (releaseFirst = resolve)))
             .mockImplementation(async () => insights(false, "newest.example"));
-        await shown();
+        await shown(DnsLogSection);
         await waitFor(() => expect(dnsInsightsAction).toHaveBeenCalledTimes(1));
         fireEvent.change(screen.getByRole("textbox", { name: "Search a domain" }), {
             target: { value: "newest" }
@@ -197,7 +247,7 @@ describe("DnsBlockerView query log", () => {
                 }
             };
         });
-        await shown();
+        await shown(DnsLogSection);
         const button = (text: string) =>
             [...document.querySelectorAll("button")].find(
                 (item) => item.textContent === text
@@ -236,7 +286,7 @@ describe("rowTime", () => {
 describe("DnsBlockerView device names", () => {
     it("adds a name only when both fields are valid, and says which one is not", async () => {
         standing("off");
-        await shown();
+        await shown(DnsDevicesSection);
         const add = screen.getByRole("button", { name: "Name it" });
         fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
             target: { value: "ana laptop" }
@@ -268,14 +318,10 @@ describe("DnsBlockerView device names", () => {
 describe("DnsBlockerView schedules", () => {
     it("offers only the categories that have a list on, and adds a valid schedule", async () => {
         standing("off");
-        render(
-            <MessagesWrapper>
-                <DnsBlockerView
-                    initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: ["hagezi-pro", "hagezi-social"] }}
-                    brands={[]}
-                />
-            </MessagesWrapper>
-        );
+        mount(DnsListsSection, {
+            ...dns.DEFAULT_DNS_SETTINGS,
+            sources: ["hagezi-pro", "hagezi-social"]
+        });
         await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
         const section = within(screen.getByText("Schedules").closest("div")!.parentElement!);
         expect(section.queryByRole("switch", { name: "Adult" })).toBeNull();
@@ -295,11 +341,7 @@ describe("DnsBlockerView schedules", () => {
 
     it("says to turn a list on when none is", async () => {
         standing("off");
-        render(
-            <MessagesWrapper>
-                <DnsBlockerView initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: [] }} brands={[]} />
-            </MessagesWrapper>
-        );
+        mount(DnsListsSection, { ...dns.DEFAULT_DNS_SETTINGS, sources: [] });
         expect(screen.getByText("Turn on a list above to schedule it.")).toBeTruthy();
     });
 
@@ -313,11 +355,7 @@ describe("DnsBlockerView schedules", () => {
             }
         };
         dnsInsightsAction.mockImplementation(async () => insights());
-        render(
-            <MessagesWrapper>
-                <DnsBlockerView initial={dns.DEFAULT_DNS_SETTINGS} brands={[]} />
-            </MessagesWrapper>
-        );
+        mount(DnsListsSection, dns.DEFAULT_DNS_SETTINGS);
         fireEvent.click(await screen.findByRole("button", { name: "Apply now" }));
         await waitFor(() => expect(turnOnDnsBlockerAction).toHaveBeenCalled());
     });
@@ -326,11 +364,7 @@ describe("DnsBlockerView schedules", () => {
 describe("DnsBlockerView blocked services", () => {
     it("turns a service on, and offers it to schedules once it is on", async () => {
         standing("off");
-        render(
-            <MessagesWrapper>
-                <DnsBlockerView initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: [] }} brands={[]} />
-            </MessagesWrapper>
-        );
+        mount(DnsListsSection, { ...dns.DEFAULT_DNS_SETTINGS, sources: [] });
         await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
         expect(screen.getByText("Turn on a list above to schedule it.")).toBeTruthy();
         fireEvent.click(screen.getByRole("switch", { name: "YouTube" }));
@@ -351,13 +385,72 @@ describe("DnsBlockerView unchanged settings", () => {
             timeZone: "Europe/Madrid",
             clientGroups: [{ name: "Kids", clients: ["10.0.0.9"], categories: [] }]
         });
-        render(
-            <MessagesWrapper>
-                <DnsBlockerView initial={initial} brands={[]} />
-            </MessagesWrapper>
-        );
+        mount(DnsListsSection, initial);
         await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
         expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
         expect(screen.getByText("Mon, 21:00 - 07:00")).toBeTruthy();
+    });
+});
+
+describe("Ad blocker sections", () => {
+    it("opens the log on a device picked on the Overview", async () => {
+        standing("blocking");
+        await shown();
+        const device = await screen.findAllByRole("button", { name: /10\.0\.0\.2/ });
+        fireEvent.click(device[0]!);
+        expect(push).toHaveBeenCalledWith("/apps/dns-blocker/log?client=10.0.0.2");
+    });
+
+    it("reads the log's filter from a link and keeps it in the address", async () => {
+        standing("blocking");
+        search = "client=10.0.0.2&domain=Example.COM&outcome=blocked&range=nonsense";
+        await shown(DnsLogSection);
+        await waitFor(() => expect(dnsInsightsAction).toHaveBeenCalled());
+        expect(dnsInsightsAction.mock.calls[0]![0]).toMatchObject({
+            client: "10.0.0.2",
+            search: "example.com",
+            outcome: "blocked",
+            range: "24h"
+        });
+        await waitFor(() =>
+            expect(replace).toHaveBeenCalledWith(
+                "/apps/dns-blocker/log?client=10.0.0.2&domain=example.com&outcome=blocked",
+                { scroll: false }
+            )
+        );
+    });
+
+    it("keeps an edit made in one section while another is open", async () => {
+        standing("off");
+        mount(() => (
+            <>
+                <DnsListsSection />
+                <DnsDevicesSection />
+            </>
+        ));
+        await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
+        fireEvent.click(screen.getByRole("switch", { name: "YouTube" }));
+        const saves = screen.getAllByRole("button", { name: "Save" });
+        expect(saves).toHaveLength(2);
+        for (const save of saves) expect(save.hasAttribute("disabled")).toBe(false);
+    });
+});
+
+describe("Ad blocker rail", () => {
+    it("gives every section its own screen in the rail", async () => {
+        const nav = await import("@/lib/apps");
+        const subapp = nav.resolveSubapp("/apps/dns-blocker/lists");
+        expect(subapp?.id).toBe("dns-blocker");
+        expect(subapp?.sections.map((section) => section.href)).toEqual([
+            "/apps/dns-blocker",
+            "/apps/dns-blocker/log",
+            "/apps/dns-blocker/lists",
+            "/apps/dns-blocker/devices",
+            "/apps/dns-blocker/local-dns",
+            "/apps/dns-blocker/settings"
+        ]);
+        expect(subapp?.sections.every((section) => section.requiresApp === "dns-blocker")).toBe(
+            true
+        );
     });
 });

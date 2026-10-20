@@ -125,7 +125,8 @@
         "refresh": "Refresh lists every (hours)",
         "save": "Save",
         "saveApply": "Save and apply",
-        "saved": "Saved."
+        "saved": "Saved.",
+        "unsaved": "Changes not saved yet."
     },
     "validation": {
         "invalidUrl": "Enter an http or https address.",
@@ -373,5 +374,9 @@
             "games": "Games",
             "other": "Other"
         }
+    },
+    "log": {
+        "off": "Lookups show up here once blocking is on.",
+        "overview": "Go to Overview"
     }
 }

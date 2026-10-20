@@ -349,7 +349,10 @@
         "Rollouts": "Rollouts",
         "Activity sharing": "Activity sharing",
         "UPS": "UPS",
-        "Polar": "Polar"
+        "Polar": "Polar",
+        "Query log": "Query log",
+        "Lists": "Lists",
+        "Local DNS": "Local DNS"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

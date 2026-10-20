@@ -125,7 +125,8 @@
         "refresh": "Actualizar listas cada (horas)",
         "save": "Guardar",
         "saveApply": "Guardar y aplicar",
-        "saved": "Guardado."
+        "saved": "Guardado.",
+        "unsaved": "Cambios sin guardar."
     },
     "validation": {
         "invalidUrl": "Escribe una dirección http o https.",
@@ -373,5 +374,9 @@
             "games": "Juegos",
             "other": "Otros"
         }
+    },
+    "log": {
+        "off": "Las consultas salen aquí con el bloqueo.",
+        "overview": "Ir al resumen"
     }
 }

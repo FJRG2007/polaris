@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as polls from "./dns-blocker-polls";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import {
@@ -53,7 +54,8 @@ import {
     type NameCount,
     type QueryFilter,
     type QueryRow,
-    type QueryTimeline
+    type QueryTimeline,
+    queryFilterSchema
 } from "@/lib/dns-blocker/query-log";
 import {
     dnsListsAction,
@@ -80,6 +82,39 @@ const EMPTY_FILTER: QueryFilter = {
     range: "24h",
     page: 0
 };
+
+/** Where the query log is, and what a link into it carries. */
+export const DNS_LOG_HREF = "/apps/dns-blocker/log";
+
+/** The log's filter as a link: `?client=`, `?domain=`, `?outcome=`, `?type=`, `?range=`. */
+export function logHref(patch: Partial<QueryFilter>): string {
+    const query = new URLSearchParams();
+    if (patch.client) query.set("client", patch.client);
+    if (patch.search) query.set("domain", patch.search);
+    if (patch.outcome && patch.outcome !== "all") query.set("outcome", patch.outcome);
+    if (patch.type) query.set("type", patch.type);
+    if (patch.range && patch.range !== "24h") query.set("range", patch.range);
+    const text = query.toString();
+    return text ? `${DNS_LOG_HREF}?${text}` : DNS_LOG_HREF;
+}
+
+/** The filter a link into the log asked for. Anything malformed in it is left at
+ *  its default rather than refusing the page. */
+export function filterFromQuery(query: URLSearchParams): QueryFilter {
+    const field = <K extends keyof QueryFilter>(key: K, value: string | null): QueryFilter[K] => {
+        if (value === null) return EMPTY_FILTER[key];
+        const parsed = queryFilterSchema.shape[key].safeParse(value);
+        return parsed.success ? (parsed.data as QueryFilter[K]) : EMPTY_FILTER[key];
+    };
+    return {
+        search: field("search", query.get("domain")),
+        outcome: field("outcome", query.get("outcome")),
+        client: field("client", query.get("client")),
+        type: field("type", query.get("type")),
+        range: field("range", query.get("range")),
+        page: 0
+    };
+}
 
 function pauseLabel(t: Translate, seconds: number): string {
     if (seconds === 0) return t("insights.untilResumed");
@@ -108,19 +143,29 @@ function points(counts: readonly number[], timeline: QueryTimeline) {
 }
 
 export function DnsInsightsCard({
+    mode,
     onApplied,
     onRules,
     logDays,
     refreshHours
 }: {
+    /** The Overview draws the numbers and sends a pick to the log; the log
+     *  section draws the log and keeps its filter in the address. */
+    mode: "overview" | "log";
     onApplied: () => void;
     onRules: (settings: DnsSettings) => void;
     logDays: number;
     refreshHours: number;
 }) {
     const t = useTranslations("dnsBlocker");
-    const [filter, setFilter] = useState<QueryFilter>(EMPTY_FILTER);
-    const [typed, setTyped] = useState("");
+    const router = useRouter();
+    const pathname = usePathname();
+    const query = useSearchParams();
+    const onLog = mode === "log";
+    const [filter, setFilter] = useState<QueryFilter>(() =>
+        onLog && query ? filterFromQuery(new URLSearchParams(query.toString())) : EMPTY_FILTER
+    );
+    const [typed, setTyped] = useState(filter.search);
     const [data, setData] = useState<DnsInsights | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -142,8 +187,8 @@ export function DnsInsightsCard({
     }, []);
 
     useEffect(() => {
-        void loadMetrics();
-    }, [loadMetrics]);
+        if (!onLog) void loadMetrics();
+    }, [onLog, loadMetrics]);
 
     const refreshLists = () =>
         startRefreshingLists(async () => {
@@ -210,6 +255,28 @@ export function DnsInsightsCard({
     const refine = (patch: Partial<QueryFilter>) =>
         setFilter((current) => ({ ...current, page: 0, ...patch }));
 
+    // The log keeps its filter in the address, so a reload or a shared link
+    // opens the same view; replaced, not pushed, so Back leaves the log.
+    useEffect(() => {
+        if (!onLog) return;
+        const target = logHref(filter);
+        const asked = query?.toString() ?? "";
+        if (target !== (asked ? `${pathname}?${asked}` : pathname))
+            router.replace(target, { scroll: false });
+    }, [onLog, filter, pathname, query, router]);
+
+    /** A picked domain, device or type: the log narrows to it, and from the
+     *  Overview the log opens on it. */
+    const pick = (patch: Partial<QueryFilter>) => {
+        if (!onLog) {
+            router.push(logHref({ range: filter.range, ...patch }));
+            return;
+        }
+        const { search, ...rest } = patch;
+        if (search !== undefined) setTyped(search);
+        if (Object.keys(rest).length > 0) refine(rest);
+    };
+
     const togglePause = () =>
         startTransition(async () => {
             const result =
@@ -263,7 +330,9 @@ export function DnsInsightsCard({
         <Card>
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
-                    <CardTitle className="truncate">{t("insights.title")}</CardTitle>
+                    <CardTitle className="truncate">
+                        {onLog ? t("insights.log") : t("insights.title")}
+                    </CardTitle>
                     {pauseState ? (
                         <Badge variant={pause?.enabled ? "success" : "warning"}>{pauseState}</Badge>
                     ) : null}
@@ -342,7 +411,7 @@ export function DnsInsightsCard({
                         </Button>
                     </div>
                 ) : null}
-                {!ready ? null : (
+                {!ready || onLog ? null : (
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Figure
                             label={t("insights.queries")}
@@ -369,10 +438,10 @@ export function DnsInsightsCard({
                         />
                     </div>
                 )}
-                {stats && stats.queries === 0 && !data?.logOff ? (
+                {stats && stats.queries === 0 && !data?.logOff && !onLog ? (
                     <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>
                 ) : null}
-                {!ready ? null : (
+                {!ready || onLog ? null : (
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                         <ChartBlock
                             title={t("insights.overTime")}
@@ -412,7 +481,7 @@ export function DnsInsightsCard({
                         />
                     </div>
                 )}
-                {!ready ? null : (
+                {!ready || onLog ? null : (
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                         <ShareList
                             title={t("insights.queryTypes")}
@@ -421,7 +490,7 @@ export function DnsInsightsCard({
                             empty={t("insights.none")}
                             label={(name) => name}
                             hint={t("insights.filterType")}
-                            onPick={(type) => refine({ type: type === "?" ? "" : type })}
+                            onPick={(type) => pick({ type: type === "?" ? "" : type })}
                         />
                         <ShareList
                             title={t("insights.upstreams")}
@@ -440,21 +509,21 @@ export function DnsInsightsCard({
                         />
                     </div>
                 )}
-                {!ready ? null : (
+                {!ready || onLog ? null : (
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                         <TopList
                             title={t("insights.topPermitted")}
                             items={stats?.topPermitted}
                             empty={t("insights.none")}
                             hint={t("insights.filterDomain")}
-                            onPick={setTyped}
+                            onPick={(search) => pick({ search })}
                         />
                         <TopList
                             title={t("insights.topBlocked")}
                             items={stats?.topBlocked}
                             empty={t("insights.none")}
                             hint={t("insights.filterDomain")}
-                            onPick={setTyped}
+                            onPick={(search) => pick({ search, outcome: "blocked" })}
                         />
                         <TopList
                             title={t("insights.topClients")}
@@ -462,7 +531,7 @@ export function DnsInsightsCard({
                             names={stats?.clients}
                             empty={t("insights.none")}
                             hint={t("insights.filterClient")}
-                            onPick={(client) => refine({ client })}
+                            onPick={(client) => pick({ client })}
                         />
                         <TopList
                             title={t("insights.topBlockedClients")}
@@ -470,11 +539,11 @@ export function DnsInsightsCard({
                             names={stats?.clients}
                             empty={t("insights.none")}
                             hint={t("insights.filterClient")}
-                            onPick={(client) => refine({ client, outcome: "blocked" })}
+                            onPick={(client) => pick({ client, outcome: "blocked" })}
                         />
                     </div>
                 )}
-                {!ready ? null : (
+                {!ready || !onLog ? null : (
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <h3 className="text-sm font-medium">{t("insights.log")}</h3>
@@ -593,13 +662,15 @@ export function DnsInsightsCard({
                         ) : null}
                     </div>
                 )}
-                <ListsSection
-                    t={t}
-                    metrics={metrics}
-                    refreshHours={refreshHours}
-                    refreshing={refreshingLists}
-                    onRefresh={refreshLists}
-                />
+                {onLog ? null : (
+                    <ListsSection
+                        t={t}
+                        metrics={metrics}
+                        refreshHours={refreshHours}
+                        refreshing={refreshingLists}
+                        onRefresh={refreshLists}
+                    />
+                )}
             </CardBody>
         </Card>
     );
