@@ -45,6 +45,7 @@ import {
 } from "@polaris/ui";
 import {
     Cpu,
+    Gauge,
     FileText,
     GitBranchPlus,
     History,
@@ -83,7 +84,9 @@ import { Shimmer } from "@/components/polar/elements/shimmer";
 import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { UsageDialog } from "@/components/polar/polar-usage";
+import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
 import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-avatar";
@@ -612,6 +615,7 @@ export function PolarChat({
     const commands = polarCommands.usePolarCommands();
     const [commandDraft, setCommandDraft] = useState<polarCommands.CommandDraft | null>(null);
     const [managing, setManaging] = useState(false);
+    const [showUsage, setShowUsage] = useState(false);
     /** The model one turn is sent on instead of the chosen one: a command's. */
     const turnChoice = useRef<ModelChoice | null>(null);
     const wide = useWide();
@@ -667,6 +671,7 @@ export function PolarChat({
     const busy = chat.status === "submitted" || chat.status === "streaming";
     const online = usePolarOnline();
     const avatarState = avatarStateFor({ open: true, online, busy });
+    const limit = limitOf(chat.error);
     const waitingApproval = chat.messages
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
@@ -1530,6 +1535,9 @@ export function PolarChat({
                     <MessageAction label={t("commands.manage")} onClick={() => setManaging(true)}>
                         <SquareSlash />
                     </MessageAction>
+                    <MessageAction label={t("usage.title")} onClick={() => setShowUsage(true)}>
+                        <Gauge />
+                    </MessageAction>
                     <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
                         <Settings2 />
                     </MessageAction>
@@ -1675,27 +1683,40 @@ export function PolarChat({
                                     </div>
                                 ) : null}
                                 {chat.error ? (
-                                    <PolarFailureNotice
-                                        error={chat.error.message}
-                                        isAdmin={isAdmin}
-                                        providers={providers ?? []}
-                                        failedModel={choice?.model ?? null}
-                                        onRetry={() => void chat.regenerate()}
-                                        onTryWith={(model) => {
-                                            if (!choice) return;
-                                            const next: ModelChoice = {
-                                                ...choice,
-                                                provider: model.provider,
-                                                model: model.model,
-                                                payer: null
-                                            };
-                                            // Read by the transport on this very send,
-                                            // before the state below has rendered.
-                                            live.current = { ...live.current, choice: next };
-                                            setChoice(next);
-                                            void chat.regenerate();
-                                        }}
-                                    />
+                                    limit ? (
+                                        <p
+                                            role="alert"
+                                            className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
+                                        >
+                                            {t("errors.usageLimit", {
+                                                used: limit.used,
+                                                amount: limit.amount,
+                                                period: t(`usage.periods.${limit.period}`)
+                                            })}
+                                        </p>
+                                    ) : (
+                                        <PolarFailureNotice
+                                            error={chat.error.message}
+                                            isAdmin={isAdmin}
+                                            providers={providers ?? []}
+                                            failedModel={choice?.model ?? null}
+                                            onRetry={() => void chat.regenerate()}
+                                            onTryWith={(model) => {
+                                                if (!choice) return;
+                                                const next: ModelChoice = {
+                                                    ...choice,
+                                                    provider: model.provider,
+                                                    model: model.model,
+                                                    payer: null
+                                                };
+                                                // Read by the transport on this very send,
+                                                // before the state below has rendered.
+                                                live.current = { ...live.current, choice: next };
+                                                setChoice(next);
+                                                void chat.regenerate();
+                                            }}
+                                        />
+                                    )
                                 ) : null}
                             </ConversationContent>
                         </Conversation>
@@ -1713,6 +1734,7 @@ export function PolarChat({
                     </>
                 )}
             </div>
+            {showUsage ? <UsageDialog onClose={() => setShowUsage(false)} /> : null}
             {managing ? (
                 <polarCommands.CommandsDialog
                     store={commands}
@@ -1735,6 +1757,26 @@ export function PolarChat({
 }
 
 /** Whether the picker offers this model to the person now. */
+/** The ceiling a refused turn ran into, when that was why: the transport hands
+ *  the route's answer over as the error's message. */
+export function limitOf(
+    error: Error | undefined
+): { used: number; amount: number; period: "day" | "week" | "month" } | null {
+    if (!error) return null;
+    try {
+        const body = JSON.parse(error.message) as Record<string, unknown>;
+        const period = body.period;
+        return body.error === "usage_limit" &&
+            typeof body.used === "number" &&
+            typeof body.amount === "number" &&
+            (period === "day" || period === "week" || period === "month")
+            ? { used: body.used, amount: body.amount, period }
+            : null;
+    } catch {
+        return null;
+    }
+}
+
 function offered(providers: ModelSelectorProvider[] | null, choice: ModelChoice): boolean {
     return (providers ?? []).some((entry) =>
         entry.models.some(
@@ -1826,7 +1868,17 @@ function MessageView({
         workedMs?: number;
         model?: string;
         automatic?: boolean;
+        usage?: { inputTokens?: unknown; outputTokens?: unknown; costUsd?: unknown };
     };
+    const locale = useLocale();
+    const spent =
+        typeof meta.usage?.inputTokens === "number" && typeof meta.usage.outputTokens === "number"
+            ? {
+                  input: meta.usage.inputTokens,
+                  output: meta.usage.outputTokens,
+                  cost: typeof meta.usage.costUsd === "number" ? meta.usage.costUsd : null
+              }
+            : null;
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) =>
@@ -1990,6 +2042,20 @@ function MessageView({
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {
                         model: meta.model
                     })}
+                    {spent ? (
+                        <span
+                            className="tabular-nums"
+                            title={t("usage.breakdown", {
+                                input: formatTokens(spent.input, locale),
+                                output: formatTokens(spent.output, locale)
+                            })}
+                        >
+                            {` - ${t("usage.answer", { tokens: formatTokens(spent.input + spent.output, locale) })}`}
+                            {spent.cost !== null
+                                ? ` - ${t("usage.cost", { cost: formatUsd(spent.cost, locale) })}`
+                                : null}
+                        </span>
+                    ) : null}
                 </p>
             ) : null}
             {!streaming ? (

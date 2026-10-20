@@ -32,12 +32,25 @@ const state = {
     titled: [] as unknown[][],
     resolveCalls: 0,
     ensured: [] as unknown[][],
-    signals: [] as unknown[]
+    signals: [] as unknown[],
+    source: "own" as "own" | "instance",
+    hit: null as null | { used: number; amount: number; period: string },
+    recorded: [] as unknown[]
 };
 
 vi.mock("@/lib/polar/access", async () =>
     (await import("./fixtures/open-polar-access")).openPolarAccess()
 );
+vi.mock("@/lib/polar/usage", () => ({
+    answerUsage: (usage?: { inputTokens?: number; outputTokens?: number }) => ({
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        costUsd: null
+    }),
+    polarLimitReached: async () => state.hit,
+    recordPolarUsage: async (entry: unknown) => void state.recorded.push(entry)
+}));
+
 vi.mock("@/lib/api-session", () => ({
     apiUser: async () =>
         state.user === "anonymous"
@@ -102,7 +115,7 @@ vi.mock("@/lib/polar/models", () => ({
         if (state.resolved === "unknown_model") return "unknown_model";
         if (state.resolved === "retired-then-ok" && choice.model === "retired")
             return "unknown_model";
-        return { model: model(), option: OPTION, credential: { source: "own" } };
+        return { model: model(), option: OPTION, credential: { source: state.source } };
     }
 }));
 
@@ -186,6 +199,9 @@ beforeEach(() => {
     state.user = USER;
     state.limited = false;
     state.resolved = "ok";
+    state.source = "own";
+    state.hit = null;
+    state.recorded = [];
     state.owned = true;
     state.parts = says("Done.");
     state.executed = [];
@@ -276,6 +292,28 @@ describe("what a request has to look like", () => {
             contextChars: "Tidy my tasks".length,
             lastChars: "Tidy my tasks".length
         });
+    });
+
+    it("refuses a turn on the shared key past an administrator's ceiling", async () => {
+        state.source = "instance";
+        state.hit = { used: 120, amount: 100, period: "day" };
+        const answer = await post(body());
+        expect(answer.status).toBe(429);
+        expect(await answer.json()).toEqual({ error: "usage_limit", used: 120, amount: 100, period: "day" });
+    });
+
+    it("never caps a person's own key", async () => {
+        state.hit = { used: 120, amount: 100, period: "day" };
+        const answer = await post(body());
+        expect(answer.status).toBe(200);
+    });
+
+    it("puts what the answer spent on it and in the ledger", async () => {
+        const answer = await post(body());
+        const text = await answer.text();
+        expect(text).toMatch(/"usage":\{"inputTokens":\d+,"outputTokens":\d+/);
+        await vi.waitFor(() => expect(state.recorded).toHaveLength(1));
+        expect(state.recorded[0]).toMatchObject({ payer: "own", threadId: THREAD });
     });
 
     it("streams an answer and saves the turn", async () => {

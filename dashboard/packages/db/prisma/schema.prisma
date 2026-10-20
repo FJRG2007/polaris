@@ -35,6 +35,7 @@ model User {
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
+    polarUsage        PolarUsage[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -15113,6 +15114,32 @@ model PolarMessage {
     createdAt DateTime    @default(now())
 
     @@index([threadId, createdAt])
+}
+
+// What one Polar answer spent: the provider's own token counts and, when the
+// model catalogue carries a price for the model, the cost worked out from it.
+// A ledger of its own rather than a read of message metadata, so the monthly
+// view and the spending ceilings are one indexed sum, and deleting a chat does
+// not undo what it cost. `threadId` and `messageId` are not keys: the row
+// outlives both.
+model PolarUsage {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    threadId     String?  @db.Uuid
+    messageId    String?
+    provider     String
+    model        String
+    // "own" (the person's key) or "instance" (the key this Polaris shares).
+    payer        String
+    inputTokens  Int      @default(0)
+    outputTokens Int      @default(0)
+    // Null when the catalogue has no price for the model: tokens only.
+    costUsd      Float?
+    createdAt    DateTime @default(now())
+
+    @@index([userId, createdAt])
+    @@index([payer, createdAt])
 }
 
 // A picture or file somebody gave Polar. The bytes live on the storage chat

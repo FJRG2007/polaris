@@ -33,6 +33,7 @@ import {
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
 import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
+import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -130,6 +131,12 @@ export async function POST(request: Request): Promise<Response> {
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
+    // The administrator's token ceilings bound the key this Polaris shares; a
+    // person's own key is theirs to spend.
+    if (resolved.credential.source === "instance") {
+        const hit = await polarLimitReached(user.id);
+        if (hit) return NextResponse.json({ error: "usage_limit", ...hit }, { status: 429 });
+    }
 
     const owned = await ensurePolarThread(
         user.id,
@@ -188,10 +195,30 @@ export async function POST(request: Request): Promise<Response> {
                       fellBackFrom
                   }
                 : part.type === "finish"
-                  ? // How long the turn worked, for the line its steps fold into.
-                    { workedMs: Date.now() - startedAt }
+                  ? // How long the turn worked, for the line its steps fold
+                    // into, and what it spent, for the line under the answer.
+                    {
+                        workedMs: Date.now() - startedAt,
+                        usage: answerUsage(part.totalUsage, resolved.option)
+                    }
                   : undefined,
-        onFinish: async ({ messages: finished }) => {
+        onFinish: async ({ messages: finished, responseMessage }) => {
+            try {
+                const total = await Promise.resolve(result.totalUsage).catch(() => undefined);
+                if (total) {
+                    await recordPolarUsage({
+                        userId: user.id,
+                        threadId: body.data.threadId,
+                        messageId: responseMessage?.id ?? null,
+                        provider: resolved.option.provider,
+                        model: resolved.option.model,
+                        payer: resolved.credential.source === "instance" ? "instance" : "own",
+                        usage: answerUsage(total, resolved.option)
+                    });
+                }
+            } catch (error) {
+                console.error("polar: could not record the turn's usage", error);
+            }
             try {
                 await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
                     parentFor(index, finished)

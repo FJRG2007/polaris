@@ -127,7 +127,8 @@
             "tryWith": "Probar con {model}",
             "retry": "Reintentar"
         },
-        "branchFailed": "No se pudo ramificar el chat. Vuelve a intentarlo."
+        "branchFailed": "No se pudo ramificar el chat. Vuelve a intentarlo.",
+        "usageLimit": "Has usado {used} de los {amount} tokens por {period} que este Polaris te deja en su clave compartida. Añade tu clave o pide más a un admin."
     },
     "queue": {
         "title": "Van después",
@@ -387,6 +388,26 @@
             "too_many": "Puedes guardar hasta {most} comandos. Elimina uno para añadir otro.",
             "unknown_model": "Ese modelo ya no está disponible para ti. Elige otro o Automático.",
             "failed": "No se pudo guardar el comando. Inténtalo de nuevo."
+        }
+    },
+    "usage": {
+        "title": "Uso de este mes",
+        "intro": "Lo que han usado tus chats con Polar desde inicio de mes.",
+        "summary": "{tokens} tokens desde inicio de mes, unos {cost} donde hay precio.",
+        "failed": "No se pudo cargar tu uso. Cierra esto y vuelve a probar.",
+        "empty": "Aún no has usado nada este mes.",
+        "shared": "{answers} respuestas - clave compartida",
+        "own": "{answers} respuestas - tu clave",
+        "tokens": "{input} entrada - {output} salida",
+        "noPrice": "Sin precio",
+        "estimate": "Costes estimados con precios publicados. Sin precio publicado se cuentan solo los tokens.",
+        "answer": "{tokens} tokens",
+        "cost": "unos {cost}",
+        "breakdown": "{input} tokens de entrada, {output} de salida",
+        "periods": {
+            "day": "día",
+            "week": "semana",
+            "month": "30 días"
         }
     }
 }

@@ -127,7 +127,8 @@
             "tryWith": "Try with {model}",
             "retry": "Try again"
         },
-        "branchFailed": "Could not branch this chat. Try again in a moment."
+        "branchFailed": "Could not branch this chat. Try again in a moment.",
+        "usageLimit": "You have used {used} of the {amount} tokens this Polaris allows you on its shared key per {period}. Add your own key, or ask an administrator to raise the limit."
     },
     "queue": {
         "title": "Sends next",
@@ -387,6 +388,26 @@
             "too_many": "You can keep up to {most} commands. Delete one to add another.",
             "unknown_model": "That model is no longer available to you. Pick another one or Automatic.",
             "failed": "The command could not be saved. Try again."
+        }
+    },
+    "usage": {
+        "title": "Usage this month",
+        "intro": "What your chats with Polar have used since the month began.",
+        "summary": "{tokens} tokens since the month began, about {cost} where a price is known.",
+        "failed": "Your usage could not be loaded. Close this and try again.",
+        "empty": "Nothing used yet this month.",
+        "shared": "{answers} answers - shared key",
+        "own": "{answers} answers - your key",
+        "tokens": "{input} in - {output} out",
+        "noPrice": "No price known",
+        "estimate": "Costs are estimates from published prices. Models with no published price count tokens only.",
+        "answer": "{tokens} tokens",
+        "cost": "about {cost}",
+        "breakdown": "{input} tokens in, {output} tokens out",
+        "periods": {
+            "day": "day",
+            "week": "week",
+            "month": "30 days"
         }
     }
 }
