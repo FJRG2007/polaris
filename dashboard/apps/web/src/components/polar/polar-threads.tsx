@@ -222,7 +222,7 @@ export function PolarThreads({
                             ))}
                         </Section>
                         <SharedWithYou rowClass={SHARED_ROW} />
-                        <div className="pt-3">
+                        <div className="pt-4">
                             <button
                                 type="button"
                                 aria-expanded={!folded}
@@ -231,7 +231,10 @@ export function PolarThreads({
                                     setFolded(!folded);
                                     writeFolded(!folded);
                                 }}
-                                className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-left text-xs font-medium text-foreground-subtle hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className={cn(
+                                    "flex w-full items-center gap-1 rounded-md px-2 pb-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                    HEADING
+                                )}
                             >
                                 <span className="truncate">{t("history.recents")}</span>
                                 {folded ? (
@@ -243,7 +246,7 @@ export function PolarThreads({
                             {folded ? null : (
                                 <div id="polar-recents">
                                     {sections.recents.length === 0 ? (
-                                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                                        <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
                                             {t("history.empty")}
                                         </p>
                                     ) : (
@@ -257,7 +260,7 @@ export function PolarThreads({
                                                 >
                                                     <p
                                                         id={`polar-group-${group}`}
-                                                        className="px-2 pb-1 pt-2 text-xs text-foreground-subtle"
+                                                        className="px-2 pb-1 pt-2 text-[0.6875rem] text-foreground-subtle"
                                                     >
                                                         {t(`history.groups.${group}`)}
                                                     </p>
@@ -384,9 +387,9 @@ function NavRow({
         <button
             type="button"
             onClick={onClick}
-            className="flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-            <Icon className="size-4 shrink-0" />
+            <Icon className="size-4 shrink-0 text-foreground-subtle" />
             <span className="min-w-0 truncate">{children}</span>
         </button>
     );
@@ -394,8 +397,8 @@ function NavRow({
 
 function Section({ id, label, children }: { id: string; label: string; children: ReactNode }) {
     return (
-        <div role="group" aria-labelledby={id} className="pt-3">
-            <p id={id} className="truncate px-2 pb-1 text-xs font-medium text-foreground-subtle">
+        <div role="group" aria-labelledby={id} className="pt-4">
+            <p id={id} className={cn("truncate px-2 pb-1", HEADING)}>
                 {label}
             </p>
             {children}
@@ -412,12 +415,15 @@ function MoreButton({ sidebar, list }: { sidebar: PolarSidebar; list: string }) 
             type="button"
             onClick={() => sidebar.loadMore(list)}
             disabled={sidebar.isLoading(list)}
-            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+            className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
         >
             {t("history.more")}
         </button>
     );
 }
+
+/** A section's heading, as the app rail draws one (`AppSidebar`). */
+const HEADING = "text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle";
 
 /** The classes of the "..." and pin buttons: hidden until the row is hovered,
  *  focused or open, always there on a touch screen. */
@@ -452,9 +458,9 @@ function ProjectItem({
                     aria-expanded={open}
                     onClick={onToggle}
                     title={project.name}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground focus-visible:outline-none"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
                 >
-                    <Icon className="size-4 shrink-0" />
+                    <Icon className="size-4 shrink-0 text-foreground-subtle" />
                     <span className="min-w-0 truncate">{project.name}</span>
                 </button>
                 <DropdownMenu>
@@ -542,7 +548,7 @@ function ThreadItem({
         <div
             className={cn(
                 "group/row flex min-w-0 items-center rounded-md",
-                active ? "bg-card-hover" : "hover:bg-card-hover focus-within:bg-card-hover"
+                active ? "bg-primary/15" : "hover:bg-card-hover focus-within:bg-card-hover"
             )}
         >
             {renaming ? (
@@ -572,8 +578,8 @@ function ThreadItem({
                     aria-current={active ? "page" : undefined}
                     title={row.title}
                     className={cn(
-                        "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-sm text-foreground focus-visible:outline-none",
-                        active && "font-medium"
+                        "min-w-0 flex-1 truncate px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none",
+                        active && "font-medium text-foreground"
                     )}
                 >
                     {row.title}

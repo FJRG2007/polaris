@@ -19,9 +19,7 @@ afterEach(() => {
     pathname = "/tasks";
 });
 
-const { PolarProvider, PolarToggle, onPolarPage } = await import(
-    "@/components/polar/polar-panel"
-);
+const { PolarProvider, PolarToggle, onPolarPage } = await import("@/components/polar/polar-panel");
 
 function header(allowed = true) {
     return render(
