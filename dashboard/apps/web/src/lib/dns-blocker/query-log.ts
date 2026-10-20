@@ -196,12 +196,17 @@ function timeOf(time: string): number {
     return Date.parse(`${time.trim().replace(" ", "T")}Z`);
 }
 
+const LOOPBACK = /^(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|::1)$/;
+
 /** One line of the log, or null for a line that is not one. */
 export function parseQueryLine(line: string): QueryRow | null {
     const cells = line.split("\t");
     if (cells.length < 10) return null;
     const [time, client, names, duration, reason, question, , , responseType, type] = cells;
     if (!time || !client || !question) return null;
+    // Asked from inside the engine's own container - Polaris checking a name
+    // for "Is this name blocked?" - never by a device on the network.
+    if (LOOPBACK.test(client)) return null;
     const domain = question.replace(/\.$/, "").toLowerCase();
     // Polaris asking whether blocking is on: not a lookup anybody made.
     if (domain === DNS_CHECK_NAME) return null;

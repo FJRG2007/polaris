@@ -49,6 +49,12 @@ describe("query log", () => {
         expect(queryLogPath(new Date("2026-10-18T23:59:00Z"))).toBe("/logs/2026-10-18_ALL.log");
     });
 
+    it("leaves out names Polaris looked up from inside the engine's container", () => {
+        expect(parseQueryLine(line("127.0.0.1", "example.com", "RESOLVED"))).toBeNull();
+        expect(parseQueryLine(line("::1", "example.com", "RESOLVED"))).toBeNull();
+        expect(parseQueryLine(line("10.0.0.127", "example.com", "RESOLVED"))).not.toBeNull();
+    });
+
     it("parses a row, who answered it and what blocked it, and refuses a short line", () => {
         expect(
             parseQueryLine(
