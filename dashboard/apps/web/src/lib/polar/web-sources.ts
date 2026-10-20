@@ -67,7 +67,9 @@ function pagesOf(name: string, output: unknown): { url: string; title?: string }
     if (Array.isArray(output)) {
         // A provider's search: a list of results, each with a url and a title.
         return output.flatMap((entry) =>
-            entry && typeof entry === "object" && typeof (entry as { url?: unknown }).url === "string"
+            entry &&
+            typeof entry === "object" &&
+            typeof (entry as { url?: unknown }).url === "string"
                 ? [{ url: (entry as { url: string }).url, title: titleOf(entry) }]
                 : []
         );
@@ -76,7 +78,9 @@ function pagesOf(name: string, output: unknown): { url: string; title?: string }
     if (record.ok === false) return [];
     if (name === SEARCH_TOOL && Array.isArray(record.results)) return pagesOf(name, record.results);
     if (name === READ_TOOL && typeof record.url === "string") {
-        return [{ url: record.url, title: typeof record.title === "string" ? record.title : undefined }];
+        return [
+            { url: record.url, title: typeof record.title === "string" ? record.title : undefined }
+        ];
     }
     return [];
 }
@@ -142,7 +146,10 @@ export function webCallsOf(parts: readonly SourcePart[]): { searches: number; pa
 }
 
 /** What a web step is doing, for its row: the query searched or the site read. */
-export function webStepOf(name: string, input: unknown): { kind: "search" | "read"; detail: string } | null {
+export function webStepOf(
+    name: string,
+    input: unknown
+): { kind: "search" | "read"; detail: string } | null {
     if (!isWebTool(name)) return null;
     const record = (input && typeof input === "object" ? input : {}) as {
         query?: unknown;

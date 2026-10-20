@@ -22,7 +22,12 @@ import {
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
-import { NATIVE_SEARCH_STAND_INS, WEB_APPROVAL, polarWebTools, withoutPastProviderSearches } from "@/lib/polar/web";
+import {
+    NATIVE_SEARCH_STAND_INS,
+    WEB_APPROVAL,
+    polarWebTools,
+    withoutPastProviderSearches
+} from "@/lib/polar/web";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";

@@ -39,10 +39,7 @@ import {
 
 /** Why a transcription did not come back, as a code the screen has words for. */
 export type TranscribeError =
-    | "transcribe_failed"
-    | "rate_limited"
-    | "too_large"
-    | "no_voice_provider";
+    "transcribe_failed" | "rate_limited" | "too_large" | "no_voice_provider";
 
 /** Send a recording to be read; the text, or why not. */
 export async function transcribeAudio(
@@ -80,10 +77,7 @@ export async function transcribeAudio(
 
 /** What a voice button says when it is pressed but cannot work. */
 export type VoiceNotice =
-    | "unavailable"
-    | "micDenied"
-    | "cannotRecord"
-    | Exclude<TranscribeError, "no_voice_provider">;
+    "unavailable" | "micDenied" | "cannotRecord" | Exclude<TranscribeError, "no_voice_provider">;
 
 /**
  * The microphone in the composer. Unavailable stays visible and focusable, and

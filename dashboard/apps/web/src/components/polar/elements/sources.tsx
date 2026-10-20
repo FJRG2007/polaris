@@ -39,7 +39,9 @@ export function WebSources({
                             <span className="shrink-0 font-medium tabular-nums text-foreground">
                                 {index + 1}
                             </span>
-                            <span className="min-w-0 truncate" title={source.title}>{source.title}</span>
+                            <span className="min-w-0 truncate" title={source.title}>
+                                {source.title}
+                            </span>
                             <span className="shrink-0 text-muted-foreground">{source.host}</span>
                         </a>
                     </li>

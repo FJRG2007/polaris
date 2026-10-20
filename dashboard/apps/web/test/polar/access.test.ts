@@ -50,7 +50,10 @@ describe("Polar access policy", () => {
             use: true,
             spend: false
         });
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toMatchObject({ use: true, spend: true });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toMatchObject({
+            use: true,
+            spend: true
+        });
     });
 
     it("carries the deployment's key sharing over to a policy that was never saved", () => {
@@ -103,7 +106,10 @@ describe("Polar access policy", () => {
     it("lets Polar on the web by default, and not once an administrator turns it off", () => {
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).web).toBe(true);
         // A policy saved before the setting existed reads as on.
-        const saved = polarPolicySchema.parse({ use: { who: "everyone" }, spend: { who: "admins" } });
+        const saved = polarPolicySchema.parse({
+            use: { who: "everyone" },
+            spend: { who: "admins" }
+        });
         expect(saved.web).toBe(true);
         expect(decidePolarAccess({ ...saved, web: false }, member).web).toBe(false);
         expect(decidePolarAccess({ ...saved, web: false }, admin).web).toBe(false);
