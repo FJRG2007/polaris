@@ -37,6 +37,7 @@ import {
     Select,
     Skeleton,
     Switch,
+    isDirty,
     useToast
 } from "@polaris/ui";
 import {
@@ -560,13 +561,10 @@ function WorkingHoursEditor({
         Object.entries(draft).filter(([, spans]) => (spans ?? []).length > 0)
     ) as WorkingHours;
     const check = preferencesPatchSchema.safeParse({ workingHours: cleaned });
-    const dirty =
-        JSON.stringify(cleaned) !==
-        JSON.stringify(
-            Object.fromEntries(
-                Object.entries(value).filter(([, spans]) => (spans ?? []).length > 0)
-            )
-        );
+    const dirty = isDirty(
+        Object.fromEntries(Object.entries(value).filter(([, spans]) => (spans ?? []).length > 0)),
+        cleaned as Record<string, unknown>
+    );
     const blocked = !dirty
         ? t("editor.noChanges")
         : !check.success

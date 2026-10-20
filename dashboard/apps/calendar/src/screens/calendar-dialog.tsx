@@ -31,6 +31,7 @@ import {
     Select,
     Switch,
     Textarea,
+    sameValue,
     useToast
 } from "@polaris/ui";
 
@@ -201,7 +202,7 @@ export function CalendarDialog({
                       "defaultAlarms"
                   ] as const
               )
-                  .filter((key) => JSON.stringify(form[key]) !== JSON.stringify(initial[key]))
+                  .filter((key) => !sameValue(form[key], initial[key]))
                   .map((key) => [key, form[key]])
           )
         : null;

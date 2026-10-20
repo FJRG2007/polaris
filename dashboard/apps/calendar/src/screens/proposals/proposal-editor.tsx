@@ -18,7 +18,7 @@ import { hostUi } from "@polaris/app-host/client";
 import { StatusNote, useIssueText } from "../public/kit";
 import * as proposalActions from "../../actions/proposals";
 import type { ProposalView } from "../../lib/scheduling-wire";
-import { Button, Input, Select, Switch, Textarea } from "@polaris/ui";
+import { Button, Input, Select, Switch, Textarea, isDirty } from "@polaris/ui";
 import { emailSchema, proposalInputSchema } from "../../lib/scheduling-schemas";
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
@@ -77,14 +77,14 @@ export function ProposalEditor({
     const [problem, setProblem] = useState<string | null>(null);
     const [addProblem, setAddProblem] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
-    const initial = useMemo(() => JSON.stringify(draftOf(proposal)), [proposal]);
+    const initial = useMemo(() => draftOf(proposal), [proposal]);
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
         setDraft((current) => ({ ...current, [key]: value }));
 
     const filledDates = draft.dates.filter((date) => date.trim() !== "");
     const input = { ...draft, dates: filledDates.map((date) => instantOf(date, draft.timezone)) };
     const parsed = proposalInputSchema.safeParse(input);
-    const dirty = JSON.stringify(draft) !== initial;
+    const dirty = isDirty(initial, draft);
     const issueFor = (field: string) => {
         if (parsed.success) return null;
         const issues = parsed.error.issues.filter((issue) => issue.path[0] === field);

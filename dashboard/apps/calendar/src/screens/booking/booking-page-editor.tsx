@@ -53,7 +53,8 @@ import {
     Skeleton,
     Switch,
     Textarea,
-    buttonVariants
+    buttonVariants,
+    isDirty
 } from "@polaris/ui";
 
 type Field = keyof BookingDraft;
@@ -162,8 +163,7 @@ export function BookingPageEditor({
         () => (draft ? problemsOf(draft) : new Map<string, { message: string }[]>()),
         [draft]
     );
-    const dirty =
-        draft !== null && baseline !== null && JSON.stringify(draft) !== JSON.stringify(baseline);
+    const dirty = draft !== null && baseline !== null && isDirty(baseline, draft);
     const valid = problems.size === 0;
 
     const set = <K extends Field>(field: K, value: BookingDraft[K]) => {
