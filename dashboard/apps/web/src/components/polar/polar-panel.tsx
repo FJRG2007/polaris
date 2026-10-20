@@ -49,7 +49,6 @@ import {
     Gauge,
     FileText,
     GitBranchPlus,
-    Globe,
     History,
     Ghost,
     Maximize2,
@@ -77,7 +76,7 @@ import {
     X
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
-import { PolarSettings } from "@/components/polar/polar-settings";
+import { PolarSettings, ToolSettings } from "@/components/polar/polar-settings";
 import * as polarShared from "@/lib/polar/shared";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
@@ -144,7 +143,6 @@ import {
 import {
     PromptInput,
     PromptInputAttach,
-    PromptInputButton,
     PromptInputFooter,
     PromptInputHeader,
     PromptInputSubmit,
@@ -256,6 +254,8 @@ const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
 /** Whether this viewer left web search on in the composer. */
 const WEB_KEY = "polar.web";
+/** The tools this viewer switched off in Polar's settings. */
+const TOOLS_OFF_KEY = "polar.toolsOff";
 const THREAD_KEY = "polar.thread";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
@@ -673,6 +673,16 @@ export function PolarChat({
     const [webAllowed, setWebAllowed] = useState(false);
     const [webOn, setWebOn] = useState(true);
     useEffect(() => setWebOn(readStored(WEB_KEY) !== "off"), []);
+    const [toolsOff, setToolsOff] = useState<string[]>([]);
+    useEffect(() => {
+        try {
+            const kept: unknown = JSON.parse(readStored(TOOLS_OFF_KEY) ?? "[]");
+            if (Array.isArray(kept))
+                setToolsOff(kept.filter((name): name is string => typeof name === "string"));
+        } catch {
+            // Unreadable: every tool on, as for somebody who never chose.
+        }
+    }, []);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const commands = polarCommands.usePolarCommands();
@@ -704,8 +714,17 @@ export function PolarChat({
         [withPage, pathname, state?.extra]
     );
     const web = webAllowed && webOn;
-    const live = useRef({ threadId, choice, context, newProject, temporary, turnChoice, web });
-    live.current = { threadId, choice, context, newProject, temporary, turnChoice, web };
+    const live = useRef({
+        threadId,
+        choice,
+        context,
+        newProject,
+        temporary,
+        turnChoice,
+        web,
+        toolsOff
+    });
+    live.current = { threadId, choice, context, newProject, temporary, turnChoice, web, toolsOff };
 
     const transport = useMemo(
         () =>
@@ -723,6 +742,7 @@ export function PolarChat({
                         projectId: live.current.newProject,
                         temporary: live.current.temporary,
                         web: live.current.web,
+                        off: live.current.toolsOff,
                         parentId:
                             messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
                     }
@@ -1644,19 +1664,6 @@ export function PolarChat({
                                 onNotice={setVoiceNotice}
                                 onOpen={() => setInCall(true)}
                             />
-                            {webAllowed ? (
-                                <PromptInputButton
-                                    label={t("web.toggle")}
-                                    aria-pressed={webOn}
-                                    className={cn(webOn && "bg-muted text-foreground")}
-                                    onClick={() => {
-                                        writeStored(WEB_KEY, webOn ? "off" : "on");
-                                        setWebOn(!webOn);
-                                    }}
-                                >
-                                    <Globe />
-                                </PromptInputButton>
-                            ) : null}
                             <ModelSelector
                                 providers={providers ?? []}
                                 choice={choice}
@@ -1784,7 +1791,25 @@ export function PolarChat({
                     <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
                         <Settings2 />
                     </MessageAction>
-                    <PolarSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
+                    <PolarSettings open={settingsOpen} onOpenChange={setSettingsOpen}>
+                        <ToolSettings
+                            webAllowed={webAllowed}
+                            webOn={webOn}
+                            onWeb={(on) => {
+                                writeStored(WEB_KEY, on ? "on" : "off");
+                                setWebOn(on);
+                            }}
+                            tools={tools}
+                            off={toolsOff}
+                            onTool={(name, on) => {
+                                const next = on
+                                    ? toolsOff.filter((one) => one !== name)
+                                    : [...toolsOff, name];
+                                writeStored(TOOLS_OFF_KEY, JSON.stringify(next));
+                                setToolsOff(next);
+                            }}
+                        />
+                    </PolarSettings>
                     {fullPage ? (
                         !wide || collapsed ? (
                             <MessageAction label={t("actions.new")} onClick={() => startNew()}>

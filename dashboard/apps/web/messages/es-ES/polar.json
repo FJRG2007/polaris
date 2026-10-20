@@ -319,7 +319,7 @@
     "settings": {
         "open": "Ajustes de Polar",
         "title": "Ajustes de Polar",
-        "intro": "Lo que Polar recuerda, lo que ves en tus chats y lo que guardas.",
+        "intro": "Lo que Polar recuerda, las herramientas que usa, lo que ves en tus chats y lo que guardas.",
         "memory": {
             "title": "Memoria",
             "intro": "Datos que Polar tiene presentes entre chats. Pídele recordar u olvidar algo, o edítalos aquí.",
@@ -343,6 +343,11 @@
                 "rate_limited": "Demasiados cambios. Espera un poco.",
                 "failed": "No se pudo guardar el cambio. Reinténtalo."
             }
+        },
+        "tools": {
+            "title": "Herramientas",
+            "intro": "Lo que Polar puede usar en un chat. Si apagas una, no se le ofrece.",
+            "webOff": "Tu administrador ha desactivado la búsqueda web."
         },
         "data": {
             "title": "Tus chats",

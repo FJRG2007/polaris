@@ -410,6 +410,77 @@ export function DataSettings() {
     );
 }
 
+/** One switch in the tools list: the name, and whether it is offered. */
+function ToolRow({
+    label,
+    checked,
+    disabled,
+    onChange
+}: {
+    label: string;
+    checked: boolean;
+    disabled?: boolean;
+    onChange: (on: boolean) => void;
+}) {
+    return (
+        <li className="flex min-w-0 items-center gap-3 py-1.5">
+            <span className="min-w-0 flex-1 truncate text-sm" title={label}>
+                {label}
+            </span>
+            <Switch checked={checked} disabled={disabled} aria-label={label} onChange={onChange} />
+        </li>
+    );
+}
+
+/**
+ * What Polar may use in a chat. A tool switched off here is not offered to the
+ * model at all, so it can neither use it nor ask to. Web search is the
+ * administrator's to allow before it is the reader's to use.
+ */
+export function ToolSettings({
+    webAllowed,
+    webOn,
+    onWeb,
+    tools,
+    off,
+    onTool
+}: {
+    webAllowed: boolean;
+    webOn: boolean;
+    onWeb: (on: boolean) => void;
+    tools: Record<string, { title: string }>;
+    off: readonly string[];
+    onTool: (name: string, on: boolean) => void;
+}) {
+    const t = useTranslations("polar");
+    const listed = Object.entries(tools).sort(([, a], [, b]) => a.title.localeCompare(b.title));
+    return (
+        <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
+            <ul className="flex flex-col divide-y divide-border">
+                <ToolRow
+                    label={t("web.toggle")}
+                    checked={webAllowed && webOn}
+                    disabled={!webAllowed}
+                    onChange={onWeb}
+                />
+                {!webAllowed ? (
+                    <li className="pb-1.5 text-xs text-muted-foreground">
+                        {t("settings.tools.webOff")}
+                    </li>
+                ) : null}
+                {listed.map(([name, tool]) => (
+                    <ToolRow
+                        key={name}
+                        label={tool.title}
+                        checked={!off.includes(name)}
+                        onChange={(on) => onTool(name, on)}
+                    />
+                ))}
+            </ul>
+        </Section>
+    );
+}
+
 /** The settings dialog. `sections` past memory are added by their features. */
 export function PolarSettings({
     open,
