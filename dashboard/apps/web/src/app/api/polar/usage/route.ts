@@ -4,13 +4,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { polarMonthUsage } from "@/lib/polar/usage";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     return NextResponse.json(await polarMonthUsage(user.id));
 }

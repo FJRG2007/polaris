@@ -31,6 +31,9 @@ const state = {
 vi.mock("@/lib/api-session", () => ({
     apiUser: async () => ({ id: "u1", name: "Ana", viewingAs: state.viewingAs })
 }));
+vi.mock("@/lib/polar/access", async () =>
+    (await import("./fixtures/open-polar-access")).openPolarAccess()
+);
 vi.mock("@/lib/polar/models", () => ({
     polarModelOptions: async () => [
         { provider: "openai", payers: ["own"], models: [{ provider: "openai", model: "mini" }] }

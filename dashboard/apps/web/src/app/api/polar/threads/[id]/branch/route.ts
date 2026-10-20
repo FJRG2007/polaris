@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { branchPolarThread } from "@/lib/polar/threads";
 
@@ -19,7 +19,7 @@ const bodySchema = z.object({ messageId: z.string().trim().min(1).max(64) }).str
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);

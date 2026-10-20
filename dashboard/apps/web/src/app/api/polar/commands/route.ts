@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { polarCommandInputSchema } from "@/lib/polar/shared";
 import { createPolarCommand, listPolarCommands } from "@/lib/polar/commands";
 
@@ -14,13 +14,13 @@ export const dynamic = "force-dynamic";
 const STATUS = { too_many: 409, taken: 409, unknown_model: 409, not_found: 404 } as const;
 
 export async function GET(): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     return NextResponse.json({ commands: await listPolarCommands(user.id) });
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const body = polarCommandInputSchema.safeParse(await request.json().catch(() => null));
