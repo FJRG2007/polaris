@@ -43,6 +43,7 @@ import {
     DialogHeader,
     DialogTitle,
     SegmentedControl,
+    isDirty,
     shortcutPressed
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
@@ -53,6 +54,12 @@ const GRAMMAR: Readonly<Record<RawFormat, string>> = { env: "ini", json: "json" 
 
 /** What a download is called: the file each format is. */
 const FILE_NAME: Readonly<Record<RawFormat, string>> = { env: ".env", json: "variables.json" };
+
+/** Entries as a set: order in the text means nothing, and a value is compared
+ *  exactly - a space at either end is part of a variable. */
+function rawSettled(entries: readonly RawEntry[]): string[] {
+    return entries.map((entry) => `${entry.key}=${JSON.stringify(entry.value)}`).sort();
+}
 
 export function VariablesRawDialog({
     scope,
@@ -92,6 +99,13 @@ export function VariablesRawDialog({
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const matches = useMemo(() => findMatches(text, query), [text, query]);
     const on = matches.length === 0 ? 0 : Math.min(at, matches.length - 1);
+    /** What the text held when it opened, so typing it back to that is nothing to update. */
+    const [opened, setOpened] = useState<RawEntry[] | null>(null);
+    const unchanged = useMemo(() => {
+        if (!opened) return false;
+        const read = parseRaw(text, format);
+        return read.ok && !isDirty(opened, read.entries, rawSettled);
+    }, [opened, text, format]);
 
     useEffect(() => {
         let live = true;
@@ -99,8 +113,10 @@ export function VariablesRawDialog({
             .then((result) => {
                 if (!live) return;
                 if (result.values) {
+                    const entries = draftEntries(rows, draft, result.values);
                     setValues(result.values);
-                    setText(renderRaw(draftEntries(rows, draft, result.values), "env"));
+                    setOpened(entries);
+                    setText(renderRaw(entries, "env"));
                 } else setError(result.error ?? t("variables.raw.loadFailed"));
             })
             .catch(() => live && setError(t("variables.raw.loadFailed")));
@@ -315,7 +331,7 @@ export function VariablesRawDialog({
                         {t("variables.raw.close")}
                     </Button>
                     {canWrite && (
-                        <Button disabled={values === null} onClick={update}>
+                        <Button disabled={values === null || unchanged} onClick={update}>
                             {t("variables.raw.update")}
                         </Button>
                     )}

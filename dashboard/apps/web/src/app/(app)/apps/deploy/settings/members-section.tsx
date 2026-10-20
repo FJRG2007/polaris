@@ -29,7 +29,8 @@ import {
     DialogContent,
     DialogTitle,
     Input,
-    Select
+    Select,
+    isDirty
 } from "@polaris/ui";
 import {
     listProjectMembersAction,
@@ -171,6 +172,15 @@ function draftFrom(entry: ProjectMemberView): Draft {
         // otherwise, so reopening one to change a capability does not silently
         // make it permanent.
         expiry: entry.expiresAt ? "keep" : "never"
+    };
+}
+
+/** A draft as it would be saved: which capabilities and environments, in no order. */
+function settledDraft(draft: Draft) {
+    return {
+        ...draft,
+        capabilities: new Set(draft.capabilities),
+        environmentIds: new Set(draft.environmentIds)
     };
 }
 
@@ -385,6 +395,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
 
             {draft && (
                 <AccessDialog
+                    key={draft.entryId ?? "new"}
                     draft={draft}
                     environments={environments.filter(
                         (environment) =>
@@ -488,6 +499,9 @@ function AccessDialog({
         Boolean(draft.principalId) ||
         (draft.principal === "user" && draft.identifier.trim().length > 0);
     const ready = named && (everyEnvironment || draft.environmentIds.length > 0);
+    // The entry as it was opened: a change put back gives nothing to save.
+    const [loaded] = useState(() => draft);
+    const unchanged = draft.entryId !== null && !isDirty(loaded, draft, settledDraft);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -686,7 +700,7 @@ function AccessDialog({
                         <Button variant="ghost" onClick={onClose}>
                             {t("members.cancel")}
                         </Button>
-                        <Button onClick={onSave} disabled={pending || !ready}>
+                        <Button onClick={onSave} disabled={pending || !ready || unchanged}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {draft.entryId ? t("members.save") : t("members.give")}
                         </Button>

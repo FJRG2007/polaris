@@ -17,7 +17,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ServiceCronRunView, ServiceCronView } from "@/lib/deploy/service-cron";
-import { Button, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, Input, Switch, cn, isDirty } from "@polaris/ui";
 import { CodeEditor } from "@/components/json-view";
 import { ChevronRight, Clock, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
@@ -202,6 +202,7 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
 
             {draft && (
                 <CronForm
+                    key={draft.id ?? "new"}
                     applicationId={applicationId}
                     draft={draft}
                     onChange={setDraft}
@@ -373,6 +374,9 @@ function CronForm({
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [pending, startTransition] = useTransition();
     const parsed = useMemo(() => core.serviceCronInputSchema.safeParse(inputOf(draft)), [draft]);
+    // The job as it was opened: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => draft);
+    const unchanged = draft.id !== undefined && !isDirty(loaded, draft);
     /** Each field's first complaint, shown once the field has been left - an
      *  empty field is unfinished, not wrong. */
     const issues = useMemo(() => {
@@ -539,7 +543,11 @@ function CronForm({
                 <Button variant="ghost" onClick={onCancel}>
                     {t("cron.cancel")}
                 </Button>
-                <Button onClick={save} disabled={pending} aria-disabled={!parsed.success}>
+                <Button
+                    onClick={save}
+                    disabled={pending || unchanged}
+                    aria-disabled={!parsed.success}
+                >
                     {pending ? (
                         <Loader2 className="size-4 animate-spin" />
                     ) : (
