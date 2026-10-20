@@ -616,5 +616,14 @@
         "skip": "Omitir",
         "thanks": "Gracias por contárnoslo.",
         "failed": "No se guardó tu valoración. Reinténtalo."
+    },
+    "embed": {
+        "signedOutTitle": "Entra para usar Polar aquí",
+        "signedOutBody": "Inicia sesión en Polaris en una pestaña y vuelve a este panel.",
+        "signIn": "Entrar en Polaris",
+        "retry": "Ya he entrado",
+        "noAccessTitle": "Polar no está activo en tu cuenta",
+        "noAccessBody": "Un administrador decide quién usa Polar en este Polaris.",
+        "openPolaris": "Abrir Polaris"
     }
 }

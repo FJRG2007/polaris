@@ -616,5 +616,14 @@
         "skip": "Skip",
         "thanks": "Thanks for telling us.",
         "failed": "Couldn't save your rating. Try again."
+    },
+    "embed": {
+        "signedOutTitle": "Sign in to use Polar here",
+        "signedOutBody": "Sign in to Polaris in a tab, then come back to this panel.",
+        "signIn": "Sign in to Polaris",
+        "retry": "I have signed in",
+        "noAccessTitle": "Polar is not on for your account",
+        "noAccessBody": "An administrator decides who can use Polar on this Polaris.",
+        "openPolaris": "Open Polaris"
     }
 }

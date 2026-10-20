@@ -162,6 +162,7 @@ import {
     POLAR_ATTACHMENT_TYPES,
     type ModelChoice,
     type PageContext,
+    type SiteContext,
     type QueuedMessage,
     screenOf
 } from "@/lib/polar/shared";
@@ -675,10 +676,17 @@ async function uploadFile(
 
 export function PolarChat({
     onClose,
-    fullPage = false
+    fullPage = false,
+    site
 }: {
     onClose?: () => void;
     fullPage?: boolean;
+    /**
+     * A page outside Polaris standing in for this one: the browser extension's
+     * side panel passes the tab somebody allowed (or null while none is), and
+     * the Polaris address the chat itself sits on is then nobody's business.
+     */
+    site?: SiteContext | null;
 }) {
     const t = useTranslations("polar");
     const pathname = usePathname();
@@ -806,15 +814,19 @@ export function PolarChat({
 
     const context = useMemo(
         () =>
-            withPage
-                ? pageContextFrom(
-                      pathname,
-                      typeof document === "undefined" ? "" : document.title,
-                      state?.extra ?? null
-                  )
-                : null,
-        [withPage, pathname, state?.extra]
+            !withPage
+                ? null
+                : site !== undefined
+                  ? site && { route: pathname, title: site.title, site }
+                  : pageContextFrom(
+                        pathname,
+                        typeof document === "undefined" ? "" : document.title,
+                        state?.extra ?? null
+                    ),
+        [withPage, pathname, state?.extra, site]
     );
+    // Another page in the browser is another thing to leave out or not.
+    useEffect(() => setWithPage(true), [site?.url]);
     const web = webAllowed && webOn;
     const live = useRef({
         threadId,
