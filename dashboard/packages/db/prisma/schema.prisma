@@ -33,6 +33,7 @@ datasource db {
 
 model User {
     polarThreads      PolarThread[]
+    polarProjects     PolarProject[]
     polarAttachments  PolarAttachment[]
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
@@ -14992,12 +14993,54 @@ model PolarThread {
     // Messages typed while a turn was still running, in the order they will be
     // sent. Kept on the thread so a reload does not lose them.
     queue       Json              @default("[]")
+    // Kept above the recency list while set; the order pinned chats are shown in.
+    pinnedAt    DateTime?
+    // Out of every list but the archived one while set; nothing is deleted.
+    archivedAt  DateTime?
+    // The project the chat is filed under. Its instructions reach the model.
+    projectId   String?           @db.Uuid
+    project     PolarProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]
     attachments PolarAttachment[]
+    share       PolarThreadShare?
 
     @@index([userId, updatedAt(sort: Desc)])
+    @@index([userId, archivedAt, pinnedAt])
+    @@index([projectId, updatedAt(sort: Desc)])
+}
+
+// A folder of Polar chats. Its instructions are added to the system context of
+// every chat filed under it. One person's: only its owner sees it.
+model PolarProject {
+    id           String        @id @default(uuid(7)) @db.Uuid
+    ownerId      String        @db.Uuid
+    owner        User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name         String
+    instructions String        @default("")
+    createdAt    DateTime      @default(now())
+    updatedAt    DateTime      @updatedAt
+    threads      PolarThread[]
+
+    @@index([ownerId, updatedAt(sort: Desc)])
+}
+
+// A read-only public link to a Polar chat. The raw token lives in the URL only;
+// the row keeps its hash for the lookup and an encrypted copy so the owner can be
+// shown the link again. Revoking deletes the row, so the link answers 404.
+// `sharedAt` is the snapshot: messages written after it are not shown until the
+// link is updated.
+model PolarThreadShare {
+    id             String      @id @default(uuid(7)) @db.Uuid
+    threadId       String      @unique @db.Uuid
+    thread         PolarThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+    tokenHash      String      @unique
+    encryptedToken Bytes
+    tokenNonce     Bytes
+    tokenKeyId     String
+    sharedAt       DateTime    @default(now())
+    createdAt      DateTime    @default(now())
 }
 
 // One message of a thread, in the AI SDK's UI message shape. `parentId` is the

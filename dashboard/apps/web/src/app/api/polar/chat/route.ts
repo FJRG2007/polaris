@@ -26,7 +26,7 @@ import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
 import { startPolarTitle } from "@/lib/polar/titles";
-import { ensurePolarThread, savePolarMessages } from "@/lib/polar/threads";
+import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
     fencePageContext,
@@ -50,7 +50,9 @@ const bodySchema = z.object({
     choice: modelChoiceSchema,
     context: pageContextSchema.nullable().default(null),
     /** The message the newest one follows: its parent, for edit versions. */
-    parentId: z.string().max(64).nullable().default(null)
+    parentId: z.string().max(64).nullable().default(null),
+    /** The project a new thread is filed under; ignored for an existing one. */
+    projectId: z.string().uuid().nullable().default(null)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -111,9 +113,11 @@ export async function POST(request: Request): Promise<Response> {
         user.id,
         body.data.threadId,
         firstText(messages[0]),
-        choice
+        choice,
+        body.data.projectId
     );
     if (!owned) return refuse("not_found", 404);
+    const instructions = await polarThreadInstructions(user.id, body.data.threadId);
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -123,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
     const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
-        system: polarSystemPrompt(user.name, fencePageContext(body.data.context)),
+        system: polarSystemPrompt(user.name, fencePageContext(body.data.context), instructions),
         messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
         tools: toolset.tools,
         toolApproval: toolset.approval,

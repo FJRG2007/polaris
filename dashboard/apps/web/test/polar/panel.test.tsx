@@ -259,9 +259,9 @@ describe("the conversation list after a turn", () => {
                 }
                 if (url === "/api/polar/threads") {
                     lists++;
-                    return Response.json({ threads: firstPage });
+                    return Response.json({ threads: firstPage, more: true });
                 }
-                if (url.startsWith("/api/polar/threads?cursor=")) {
+                if (url.startsWith("/api/polar/threads?view=recent&cursor=")) {
                     return Response.json({ threads: secondPage });
                 }
                 return Response.json({});

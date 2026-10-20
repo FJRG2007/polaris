@@ -276,5 +276,13 @@
         "opening": "Abriendo el documento",
         "canEdit": "Puedes editarlo",
         "canRead": "Puedes leerlo"
+    },
+    "polarShare": {
+        "sharedOn": "Compartido el {date}",
+        "empty": "Esta conversación no tiene mensajes que mostrar.",
+        "readOnly": "Una copia de solo lectura de una conversación con Polar.",
+        "you": "Tú",
+        "assistant": "Polar",
+        "busy": "Demasiadas peticiones. Espera un minuto y recarga la página."
     }
 }

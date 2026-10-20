@@ -195,3 +195,86 @@ export function groupThreads<T extends { updatedAt: string }>(
         rows: buckets.get(group) ?? []
     }));
 }
+
+/** A conversation as every list shows it. */
+export interface PolarThreadRow {
+    id: string;
+    title: string;
+    updatedAt: string;
+    /** Set while it is pinned; pinned chats are listed newest pin first. */
+    pinnedAt: string | null;
+    /** Set while it is archived: out of every list but the archived one. */
+    archivedAt: string | null;
+    /** The project it is filed under. */
+    projectId: string | null;
+}
+
+/** A folder of chats, as the sidebar lists it. */
+export interface PolarProjectRow {
+    id: string;
+    name: string;
+    instructions: string;
+}
+
+/** Where a conversation is listed in the sidebar. A pinned chat is listed under
+ *  Pinned even when it is filed in a project; an archived one is listed nowhere
+ *  but the archived list. Recents are what is left. */
+export type ThreadPlace = "archived" | "pinned" | "project" | "recent";
+
+export function threadPlace(
+    row: Pick<PolarThreadRow, "pinnedAt" | "archivedAt" | "projectId">
+): ThreadPlace {
+    if (row.archivedAt) return "archived";
+    if (row.pinnedAt) return "pinned";
+    if (row.projectId) return "project";
+    return "recent";
+}
+
+const newestFirst = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0);
+
+/**
+ * The sidebar's sections from every row the screen has loaded: pinned (newest
+ * pin first), recents (newest first, outside any project) and each project's
+ * own chats (newest first, pinned ones included). Archived rows are left out.
+ */
+export function threadSections(rows: readonly PolarThreadRow[]): {
+    pinned: PolarThreadRow[];
+    recents: PolarThreadRow[];
+    projects: Map<string, PolarThreadRow[]>;
+} {
+    const live = rows.filter((row) => !row.archivedAt);
+    const projects = new Map<string, PolarThreadRow[]>();
+    for (const row of live) {
+        if (!row.projectId) continue;
+        projects.set(row.projectId, [...(projects.get(row.projectId) ?? []), row]);
+    }
+    for (const list of projects.values()) {
+        list.sort((a, b) => newestFirst(a.updatedAt, b.updatedAt));
+    }
+    return {
+        pinned: live
+            .filter((row) => row.pinnedAt)
+            .sort((a, b) => newestFirst(a.pinnedAt ?? "", b.pinnedAt ?? "")),
+        recents: live
+            .filter((row) => threadPlace(row) === "recent")
+            .sort((a, b) => newestFirst(a.updatedAt, b.updatedAt)),
+        projects
+    };
+}
+
+/** Which list a request for conversations reads. */
+export const THREAD_VIEWS = ["recent", "pinned", "archived", "project"] as const;
+export type ThreadView = (typeof THREAD_VIEWS)[number];
+
+export const POLAR_PROJECT_NAME_MAX = 80;
+export const POLAR_PROJECT_INSTRUCTIONS_MAX = 8000;
+/** Most projects one person keeps. */
+export const POLAR_PROJECT_MOST = 200;
+export const projectNameSchema = z.string().trim().min(1).max(POLAR_PROJECT_NAME_MAX);
+export const projectInstructionsSchema = z.string().trim().max(POLAR_PROJECT_INSTRUCTIONS_MAX);
+
+/** Results one page of a search carries. */
+export const POLAR_SEARCH_PAGE = 20;
+/** Deepest page a search reads. */
+export const POLAR_SEARCH_PAGES = 25;
+export const searchTextSchema = z.string().trim().min(1).max(200);
