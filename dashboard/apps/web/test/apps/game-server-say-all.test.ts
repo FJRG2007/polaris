@@ -89,7 +89,7 @@ describe("sayAll", () => {
         await close();
         expect(fake.runs).toHaveLength(1);
         const script = fake.runs[0]![2] ?? "";
-        const encoded = /^printf %s (\S+) \| base64 -d \| rcon-cli$/.exec(script)?.[1] ?? "";
+        const encoded = /^printf %s (\S+) \| base64 -d \| rcon-cli 2>&1$/.exec(script)?.[1] ?? "";
         expect(Buffer.from(encoded, "base64").toString("utf8")).toBe(
             `${line('"a"')}\n${line('"b"')}\n`
         );
