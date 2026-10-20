@@ -293,15 +293,23 @@ export function PolarProvider({
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
 
+/** Whether this address is Polar's own page, where the side panel has no place:
+ *  the page is the same chat, full size. Exact, so `/polaris-...` is not it. */
+export function onPolarPage(pathname: string): boolean {
+    return pathname === "/polar" || pathname.startsWith("/polar/");
+}
+
 /** The header button. */
 export function PolarToggle() {
     const t = useTranslations("polar");
     const { allowed, open, setOpen } = usePolar();
     const online = usePolarOnline();
     const shortcut = useShortcutText();
+    const pathname = usePathname();
     // Hidden rather than offered: the administrator keeps Polar to some people,
     // and a button that only ever answers "not for you" is noise in the header.
-    if (!allowed) return null;
+    // On Polar's own page it would open a second copy of the chat on screen.
+    if (!allowed || onPolarPage(pathname)) return null;
     return (
         <button
             type="button"
@@ -352,7 +360,7 @@ function PolarAsideOpen() {
         window.addEventListener("pointerup", up);
     };
     // Kept on screen while it slides away; the page itself has no side panel.
-    const presence = useExitPresence(open && !pathname.startsWith("/polar"));
+    const presence = useExitPresence(open && !onPolarPage(pathname));
     if (!presence.mounted) return null;
     return (
         <aside
