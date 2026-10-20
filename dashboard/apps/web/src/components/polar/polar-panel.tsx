@@ -45,7 +45,9 @@ import {
     Cpu,
     FileText,
     History,
+    Ghost,
     Maximize2,
+    Settings2,
     Menu,
     PanelLeftClose,
     PanelLeftOpen,
@@ -60,6 +62,7 @@ import {
     X
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
+import { PolarSettings } from "@/components/polar/polar-settings";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
 import {
     firstPickable,
@@ -505,6 +508,10 @@ export function PolarChat({
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [modelOpen, setModelOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    // New chats are temporary while this is on: not listed, no memory, deleted
+    // when the chat is left. It stays on for the next new chat, as ChatGPT's does.
+    const [temporary, setTemporary] = useState(false);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const wide = useWide();
@@ -525,8 +532,8 @@ export function PolarChat({
                 : null,
         [withPage, pathname, state?.extra]
     );
-    const live = useRef({ threadId, choice, context, newProject });
-    live.current = { threadId, choice, context, newProject };
+    const live = useRef({ threadId, choice, context, newProject, temporary });
+    live.current = { threadId, choice, context, newProject, temporary };
 
     const transport = useMemo(
         () =>
@@ -539,6 +546,7 @@ export function PolarChat({
                         choice: live.current.choice,
                         context: live.current.context,
                         projectId: live.current.newProject,
+                        temporary: live.current.temporary,
                         parentId:
                             messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
                     }
@@ -671,6 +679,26 @@ export function PolarChat({
         if (next) void chat.sendMessage({ text: next.text });
     }, [busy, waitingApproval, queue.length, chat.status]);
 
+    /** A temporary chat that was written to is deleted as soon as it is left.
+     *  `keepalive` lets the request finish while the tab closes; the hourly
+     *  sweep removes one whose tab never got to say so. */
+    const shown = useRef(0);
+    shown.current = chat.messages.length;
+    const discardTemporary = useCallback(() => {
+        if (!live.current.temporary || shown.current === 0) return;
+        void fetch(`/api/polar/threads/${live.current.threadId}`, {
+            method: "DELETE",
+            keepalive: true
+        }).catch(() => undefined);
+    }, []);
+    useEffect(() => {
+        window.addEventListener("pagehide", discardTemporary);
+        return () => {
+            window.removeEventListener("pagehide", discardTemporary);
+            discardTemporary();
+        };
+    }, [discardTemporary]);
+
     const openThread = async (id: string) => {
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         if (!response?.ok) return;
@@ -693,6 +721,8 @@ export function PolarChat({
         tree.current = next;
         // A stored thread already has the title it will keep.
         titled.current.add(thread.id);
+        discardTemporary();
+        setTemporary(false);
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
         setThreadId(thread.id);
@@ -726,6 +756,7 @@ export function PolarChat({
 
     const startNew = (projectId: string | null = null) => {
         void chat.stop();
+        discardTemporary();
         setNewProject(projectId);
         if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
@@ -1289,6 +1320,21 @@ export function PolarChat({
                     <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
                     <span className="flex-1" />
+                    <MessageAction
+                        label={temporary ? t("temporary.off") : t("temporary.on")}
+                        aria-pressed={temporary}
+                        className={cn(temporary && "bg-muted text-foreground")}
+                        onClick={() => {
+                            startNew();
+                            setTemporary(!temporary);
+                        }}
+                    >
+                        <Ghost />
+                    </MessageAction>
+                    <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
+                        <Settings2 />
+                    </MessageAction>
+                    <PolarSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
                     {fullPage ? (
                         !wide || collapsed ? (
                             <MessageAction label={t("actions.new")} onClick={() => startNew()}>
@@ -1327,8 +1373,13 @@ export function PolarChat({
                             <div className="flex flex-col items-center gap-3 text-center">
                                 <PolarMascot mood={mood} size={64} />
                                 <h1 className="text-xl font-semibold text-foreground">
-                                    {t("welcome")}
+                                    {temporary ? t("temporary.title") : t("welcome")}
                                 </h1>
+                                {temporary ? (
+                                    <p className="max-w-md text-sm text-muted-foreground">
+                                        {t("temporary.body")}
+                                    </p>
+                                ) : null}
                             </div>
                             {queueView}
                             {composer}
@@ -1343,6 +1394,12 @@ export function PolarChat({
                                     fullPage ? "mx-auto w-full max-w-3xl px-4 py-6" : undefined
                                 }
                             >
+                                {temporary ? (
+                                    <p className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                                        <Ghost className="size-3.5 shrink-0" />
+                                        <span className="min-w-0">{t("temporary.banner")}</span>
+                                    </p>
+                                ) : null}
                                 {noKeys ? (
                                     <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
                                         <p className="text-foreground">{t("noKeys.title")}</p>
@@ -1514,7 +1571,13 @@ function MessageView({
     };
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
-    const toolName = (name: string) => tools[name]?.title ?? name;
+    const toolName = (name: string) =>
+        tools[name]?.title ??
+        (name === "polar_remember"
+            ? t("memory.remember")
+            : name === "polar_forget"
+              ? t("memory.forget")
+              : name);
     const { copied, copy } = useCopied();
     const toolOf = (part: UIMessage["parts"][number]) => {
         if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
@@ -1629,8 +1692,15 @@ function MessageView({
                                 state={tool.state}
                                 approval={tool.approval}
                                 action={toolName(name)}
-                                affects={affectedBy(tool.input)}
-                                destructive={described?.destructive ?? true}
+                                affects={
+                                    name === "polar_remember"
+                                        ? affectedBy({
+                                              name: (tool.input as { text?: unknown } | undefined)
+                                                  ?.text
+                                          })
+                                        : affectedBy(tool.input)
+                                }
+                                destructive={described?.destructive ?? name !== "polar_remember"}
                                 input={tool.input}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
                                 onReject={() => tool.approval && onApprove(tool.approval.id, false)}

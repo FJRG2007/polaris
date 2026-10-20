@@ -25,6 +25,12 @@ import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
+import {
+    MEMORY_APPROVAL,
+    polarMemoryEnabled,
+    polarMemoryPrompt,
+    polarMemoryTools
+} from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
@@ -52,7 +58,9 @@ const bodySchema = z.object({
     /** The message the newest one follows: its parent, for edit versions. */
     parentId: z.string().max(64).nullable().default(null),
     /** The project a new thread is filed under; ignored for an existing one. */
-    projectId: z.string().uuid().nullable().default(null)
+    projectId: z.string().uuid().nullable().default(null),
+    /** A new thread made temporary: not listed, no memory, deleted on leave. */
+    temporary: z.boolean().default(false)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -87,9 +95,12 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const toolset = await polarTools(user);
+    // Known to the check even while memory is off, so an older turn that used
+    // them still reads as valid.
+    const memoryTools = polarMemoryTools(user.id, body.data.threadId);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
-        tools: toolset.tools as never
+        tools: { ...toolset.tools, ...memoryTools } as never
     });
     if (!checked.success) return refuse("invalid", 400);
     const messages = checked.data as UIMessage[];
@@ -114,10 +125,18 @@ export async function POST(request: Request): Promise<Response> {
         body.data.threadId,
         firstText(messages[0]),
         choice,
-        body.data.projectId
+        body.data.projectId,
+        body.data.temporary
     );
     if (!owned) return refuse("not_found", 404);
-    const instructions = await polarThreadInstructions(user.id, body.data.threadId);
+    // The stored kind decides, whatever this request said.
+    const temporary = owned.temporary;
+    const [instructions, remembers] = await Promise.all([
+        polarThreadInstructions(user.id, body.data.threadId),
+        temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
+    ]);
+    const memories = remembers ? await polarMemoryPrompt(user.id) : "";
+    const tools = remembers ? { ...toolset.tools, ...memoryTools } : toolset.tools;
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -127,10 +146,15 @@ export async function POST(request: Request): Promise<Response> {
     const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
-        system: polarSystemPrompt(user.name, fencePageContext(body.data.context), instructions),
+        system: polarSystemPrompt(
+            user.name,
+            fencePageContext(body.data.context),
+            instructions,
+            memories
+        ),
         messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
-        tools: toolset.tools,
-        toolApproval: toolset.approval,
+        tools,
+        toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
         stopWhen: isStepCount(STEP_MAX),
         reasoning: reasoningFor(choice.intelligence, resolved.option),
         abortSignal: request.signal
@@ -161,6 +185,7 @@ export async function POST(request: Request): Promise<Response> {
             }
             // A new thread is named by its model once the first answer is in,
             // behind the reply; the screen asks for the title when it is ready.
+            if (temporary) return;
             startPolarTitle(
                 user.id,
                 body.data.threadId,

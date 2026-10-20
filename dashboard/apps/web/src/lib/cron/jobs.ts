@@ -34,6 +34,7 @@ import { runSleepPass } from "@/lib/deploy/sleep-service";
 import { sweepOrphanUploads } from "@/lib/mailbox/uploads";
 import { sweepUploads } from "@/lib/chat/uploads";
 import { sweepUnsentPolarAttachments } from "@/lib/polar/attachments";
+import { sweepTemporaryPolarThreads } from "@/lib/polar/threads";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
 import { probeAllDomains } from "@/lib/watch/health-probe";
@@ -410,6 +411,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         leaseMs: null,
         run: sweepUnsentPolarAttachments
+    },
+    {
+        key: "polar-temporary-chats",
+        // A temporary chat whose tab closed without saying so: gone a day after
+        // its last message. Hourly; nothing reads them in the meantime.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: async () => {
+            await sweepTemporaryPolarThreads();
+        }
     },
     {
         key: "chat-empty-groups",

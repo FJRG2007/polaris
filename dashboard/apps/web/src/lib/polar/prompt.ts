@@ -3,11 +3,13 @@
  */
 
 /** What the model is told before anything else. `instructions` are the ones
- *  the person wrote on the project the chat is filed under. */
+ *  the person wrote on the project the chat is filed under; `memories` is the
+ *  fenced block of saved memories (`memory.ts`), empty when there are none. */
 export function polarSystemPrompt(
     name: string,
     context: string,
-    instructions: string | null = null
+    instructions: string | null = null,
+    memories = ""
 ): string {
     return [
         "You are Polar, the assistant inside Polaris, a self-hosted dashboard.",
@@ -23,6 +25,7 @@ export function polarSystemPrompt(
                   "</project_instructions>"
               ].join("\n")
             : "",
+        memories,
         context
     ]
         .filter(Boolean)

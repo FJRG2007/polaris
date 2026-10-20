@@ -278,3 +278,44 @@ export const POLAR_SEARCH_PAGE = 20;
 /** Deepest page a search reads. */
 export const POLAR_SEARCH_PAGES = 25;
 export const searchTextSchema = z.string().trim().min(1).max(200);
+
+// ---------------------------------------------------------------------------
+// Memory
+// ---------------------------------------------------------------------------
+
+/** Longest memory, in characters: one sentence, not a document. */
+export const POLAR_MEMORY_MAX_CHARS = 300;
+/** Most memories one person keeps. */
+export const POLAR_MEMORY_MOST = 200;
+
+/** One memory as stored and compared: trimmed, whitespace collapsed. Shared by
+ *  the settings form and the server so both judge the same text. */
+export function normalizeMemoryText(text: string): string {
+    return text.replace(/\s+/g, " ").trim();
+}
+
+/** Shapes a password, key or token takes. Deliberately broad: a refused
+ *  sentence costs a retype, a stored secret is in every prompt from then on. */
+const SECRET_PATTERNS: readonly RegExp[] = [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+    /\b(?:sk|pk|rk)[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9_-]{16,}/,
+    /\bgh[pousr]_[A-Za-z0-9]{20,}/,
+    /\bgithub_pat_[A-Za-z0-9_]{20,}/,
+    /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+    /\bAKIA[0-9A-Z]{16}\b/,
+    /\bAIza[0-9A-Za-z_-]{30,}/,
+    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\./,
+    /\b(?:password|passwd|passcode|contrase(?:ñ|n)a|clave|pin|api[ _-]?key|secret|token|otp|2fa|cvv|iban)\b\s*(?:is|es|=|:)\s*\S+/i,
+    // A long unbroken run of letters and digits mixed together.
+    /(?=[A-Za-z0-9_\-+/=]*\d)(?=[A-Za-z0-9_\-+/=]*[A-Za-z])[A-Za-z0-9_\-+/=]{32,}/
+];
+
+/** Whether the text looks like it carries a credential. */
+export function looksSecret(text: string): boolean {
+    return SECRET_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+export const memoryTextSchema = z
+    .string()
+    .transform(normalizeMemoryText)
+    .pipe(z.string().min(1).max(POLAR_MEMORY_MAX_CHARS));

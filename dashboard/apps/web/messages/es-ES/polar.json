@@ -265,5 +265,60 @@
         "polar": "Polar",
         "captions": "Subtítulos",
         "dismiss": "Cerrar"
+    },
+    "memory": {
+        "remember": "Recordar",
+        "forget": "Olvidar"
+    },
+    "settings": {
+        "open": "Ajustes de Polar",
+        "title": "Ajustes de Polar",
+        "intro": "Lo que Polar recuerda y lo que guardas de tus chats.",
+        "memory": {
+            "title": "Memoria",
+            "intro": "Datos que Polar tiene presentes entre chats. Pídele recordar u olvidar algo, o edítalos aquí.",
+            "toggle": "Usar y guardar recuerdos",
+            "off": "Memoria apagada. Polar no lee ni guarda recuerdos; los guardados siguen aquí.",
+            "empty": "Nada guardado aún.",
+            "add": "Nueva memoria",
+            "edit": "Editar memoria",
+            "delete": "Borrar recuerdo",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "placeholder": "Algo que Polar debe saber",
+            "clear": "Borrar todo",
+            "kind": "recuerdos",
+            "clearTitle": "¿Borrar todos los recuerdos?",
+            "clearQuestion": "Polar olvidará todo lo guardado aquí. Tus chats se quedan.",
+            "errors": {
+                "too_long": "Menos de {most} caracteres.",
+                "secret": "Parece una contraseña o clave. Polar nunca las guarda.",
+                "full": "Memoria llena. Borra alguno antes.",
+                "rate_limited": "Demasiados cambios. Espera un poco.",
+                "failed": "No se pudo guardar el cambio. Reinténtalo."
+            }
+        },
+        "data": {
+            "title": "Tus chats",
+            "intro": "Descarga todos los chats guardados en Markdown y JSON en un zip.",
+            "exportAll": "Exportar todo"
+        }
+    },
+    "temporary": {
+        "on": "Chat temporal",
+        "off": "Salir del chat temporal",
+        "title": "Chat temporal",
+        "body": "No se guarda en tus chats ni se usa para la memoria. Se borra al salir.",
+        "banner": "Chat temporal: fuera del historial y la memoria, se borra al salir."
+    },
+    "export": {
+        "markdown": "Exportar en Markdown",
+        "json": "Exportar en JSON",
+        "you": "Tú",
+        "untitled": "Conversación",
+        "file": "Archivo: {name}",
+        "attachment": "adjunto",
+        "used": "Usó {name}",
+        "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat."
     }
 }

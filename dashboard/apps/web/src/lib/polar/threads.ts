@@ -72,22 +72,28 @@ export function viewQuery(
     switch (view) {
         case "pinned":
             return {
-                where: { userId, archivedAt: null, pinnedAt: { not: null } },
+                where: { userId, temporary: false, archivedAt: null, pinnedAt: { not: null } },
                 orderBy: [{ pinnedAt: "desc" }, { id: "desc" }]
             };
         case "archived":
             return {
-                where: { userId, archivedAt: { not: null } },
+                where: { userId, temporary: false, archivedAt: { not: null } },
                 orderBy: [{ archivedAt: "desc" }, { id: "desc" }]
             };
         case "project":
             return {
-                where: { userId, archivedAt: null, projectId: projectId ?? "" },
+                where: { userId, temporary: false, archivedAt: null, projectId: projectId ?? "" },
                 orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
             };
         default:
             return {
-                where: { userId, archivedAt: null, pinnedAt: null, projectId: null },
+                where: {
+                    userId,
+                    temporary: false,
+                    archivedAt: null,
+                    pinnedAt: null,
+                    projectId: null
+                },
                 orderBy: [{ updatedAt: "desc" }, { id: "desc" }]
             };
     }
@@ -167,6 +173,7 @@ export async function searchPolarThreads(
             SELECT t."id", t."title", t."updatedAt", t."pinnedAt", t."archivedAt", t."projectId"
             FROM "PolarThread" AS t
             WHERE t."userId" = ${userId}::uuid
+              AND t."temporary" = false
               AND (
                 t."title" ILIKE ${pattern}
                 OR EXISTS (
@@ -261,25 +268,28 @@ async function ownsProject(userId: string, projectId: string): Promise<boolean> 
 }
 
 /** The thread, made if it is new - filed under `projectId` when that project is
- *  the person's. False when the id belongs to somebody else. */
+ *  the person's, temporary when asked. Null when the id belongs to somebody
+ *  else. An existing thread keeps the kind it was made with: a request cannot
+ *  turn a saved chat temporary or the other way round. */
 export async function ensurePolarThread(
     userId: string,
     id: string,
     firstText: string,
     choice: ModelChoice,
-    projectId: string | null = null
-): Promise<boolean> {
+    projectId: string | null = null,
+    temporary = false
+): Promise<{ temporary: boolean } | null> {
     const existing = await prisma.polarThread.findUnique({
         where: { id },
-        select: { userId: true }
+        select: { userId: true, temporary: true }
     });
     if (existing) {
-        if (existing.userId !== userId) return false;
+        if (existing.userId !== userId) return null;
         await prisma.polarThread.update({
             where: { id },
             data: { choice: choice as unknown as Prisma.InputJsonValue }
         });
-        return true;
+        return { temporary: existing.temporary };
     }
     await prisma.polarThread.create({
         data: {
@@ -287,11 +297,15 @@ export async function ensurePolarThread(
             userId,
             title: titleFrom(firstText),
             titleSource: "placeholder",
-            projectId: projectId && (await ownsProject(userId, projectId)) ? projectId : null,
-            choice: choice as unknown as Prisma.InputJsonValue
+            projectId:
+                !temporary && projectId && (await ownsProject(userId, projectId))
+                    ? projectId
+                    : null,
+            choice: choice as unknown as Prisma.InputJsonValue,
+            temporary
         }
     });
-    return true;
+    return { temporary };
 }
 
 /**
@@ -416,4 +430,25 @@ export async function deletePolarThread(userId: string, id: string): Promise<boo
     const { count } = await prisma.polarThread.deleteMany({ where: { id, userId } });
     if (count > 0) await discardPolarAttachments(files);
     return count > 0;
+}
+
+/** How long a temporary chat outlives its last message when its tab never said
+ *  it was done with it. */
+export const TEMPORARY_TTL_MS = 24 * 60 * 60 * 1000;
+/** Most temporary chats one sweep removes; the next run takes the rest. */
+const SWEEP_BATCH = 200;
+
+/** Deletes temporary chats nobody has written to for a day, files and all. */
+export async function sweepTemporaryPolarThreads(now = new Date()): Promise<number> {
+    const stale = await prisma.polarThread.findMany({
+        where: { temporary: true, updatedAt: { lt: new Date(now.getTime() - TEMPORARY_TTL_MS) } },
+        select: { id: true, userId: true },
+        orderBy: { updatedAt: "asc" },
+        take: SWEEP_BATCH
+    });
+    let removed = 0;
+    for (const thread of stale) {
+        if (await deletePolarThread(thread.userId, thread.id)) removed += 1;
+    }
+    return removed;
 }

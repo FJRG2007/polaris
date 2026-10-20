@@ -43,8 +43,14 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !stat
 vi.mock("@/lib/polar/attachments", () => ({
     inlinePolarFiles: async (_user: string, messages: unknown) => messages
 }));
+vi.mock("@/lib/polar/memory", () => ({
+    MEMORY_APPROVAL: { polar_remember: "user-approval" },
+    polarMemoryEnabled: async () => true,
+    polarMemoryPrompt: async () => "",
+    polarMemoryTools: () => ({})
+}));
 vi.mock("@/lib/polar/threads", () => ({
-    ensurePolarThread: async () => state.owned,
+    ensurePolarThread: async () => (state.owned ? { temporary: false } : null),
     polarThreadInstructions: async () => null,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
 }));
