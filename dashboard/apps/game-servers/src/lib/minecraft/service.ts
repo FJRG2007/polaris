@@ -27,7 +27,7 @@ import type { AppHostTypes } from "@polaris/app-host";
 import { readContainerFile } from "../container-files";
 import { gameOfServer, withTimeout } from "@polaris/core";
 import { readsPlayerList, readsServer } from "./text-vars";
-import { sayEachReplies, sayEachScript } from "./say-each";
+import { sayEachInput, sayEachReplies } from "./say-each";
 import {
     hiddenFromPending,
     hiddenFromPendingArgv,
@@ -708,7 +708,7 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
 }
 
 /**
- * Several commands and their answers, one trip into the container per batch.
+ * Several commands and their answers, over one RCON connection per batch.
  *
  * Java only: Bedrock's console answers nowhere a command can read back, so it
  * takes them one at a time. In one RCON turn, so nothing else's answer lands in
@@ -723,24 +723,54 @@ async function sendGameCommands(
     const commands = given.map((argv) => forThePlayersIn(install, argv));
     for (const argv of commands) assertSafeCommand(argv);
     if (commands.length === 0) return [];
-    if (install.edition !== "java") {
+    if (install.edition !== "java" || sayEachInput(commands) === null) {
         const answers: (string | null)[] = [];
         for (const argv of commands)
             answers.push(await sendGameCommand(ports, install, argv).catch(() => null));
         return answers;
     }
-    const result = await inRconTurn(install.installedAppId, () =>
-        withTimeout(
-            ports.runIn(install.container, ["sh", "-c", sayEachScript(commands)]),
-            COMMAND_TIMEOUT_MS * 2,
-            gameMessage("games", "lib.noAnswerInTime")
-        )
-    );
-    return sayEachReplies(result.output, commands.length);
+    const answers: (string | null)[] = [];
+    for (const batch of batchesOf(commands, (argv) => argv.join(" "))) {
+        const result = await inRconTurn(install.installedAppId, () =>
+            withTimeout(
+                ports.runIn(install.container, ["sh", "-c", piped(sayEachInput(batch)!)]),
+                COMMAND_TIMEOUT_MS * 2,
+                gameMessage("games", "lib.noAnswerInTime")
+            )
+        );
+        answers.push(...sayEachReplies(result.output, batch.length));
+    }
+    return answers;
 }
 
 /** Room for one batch in a command's arguments, in base64 characters. */
 const BATCH_MAX = 12_000;
+
+/** `items` cut into batches whose lines fit in one command's arguments. */
+function batchesOf<T>(items: readonly T[], lineOf: (item: T) => string): T[][] {
+    const batches: T[][] = [];
+    let current: T[] = [];
+    let bytes = 0;
+    for (const item of items) {
+        const size = Buffer.byteLength(lineOf(item)) + 1;
+        if (current.length > 0 && (bytes + size) * 1.4 > BATCH_MAX) {
+            batches.push(current);
+            current = [];
+            bytes = 0;
+        }
+        current.push(item);
+        bytes += size;
+    }
+    if (current.length > 0) batches.push(current);
+    return batches;
+}
+
+/** The shell line that hands `input` to the console tool as one session, its
+ *  complaints along with its answers. */
+function piped(input: string): string {
+    const encoded = Buffer.from(input, "utf8").toString("base64");
+    return `printf %s ${encoded} | base64 -d | rcon-cli 2>&1`;
+}
 
 async function sendGameLines(
     ports: RuntimePorts,
@@ -755,26 +785,10 @@ async function sendGameLines(
         for (const line of lines) await sendOneCommand(ports, install, [line]);
         return;
     }
-    const batches: string[][] = [];
-    let current: string[] = [];
-    for (const line of lines) {
-        const size = Buffer.byteLength([...current, line].join("\n")) * 1.4;
-        if (current.length > 0 && size > BATCH_MAX) {
-            batches.push(current);
-            current = [];
-        }
-        current.push(line);
-    }
-    if (current.length > 0) batches.push(current);
-    for (const batch of batches) {
-        const encoded = Buffer.from(`${batch.join("\n")}\n`, "utf8").toString("base64");
+    for (const batch of batchesOf(lines, (line) => line)) {
         const result = await inRconTurn(install.installedAppId, () =>
             withTimeout(
-                ports.runIn(install.container, [
-                    "sh",
-                    "-c",
-                    `printf %s ${encoded} | base64 -d | rcon-cli`
-                ]),
+                ports.runIn(install.container, ["sh", "-c", piped(`${batch.join("\n")}\n`)]),
                 COMMAND_TIMEOUT_MS,
                 gameMessage("games", "lib.noAnswerInTime")
             )

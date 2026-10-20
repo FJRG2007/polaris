@@ -60,6 +60,9 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
             running: true,
             say: async (argv: string[]) => {
                 fake.said.push(argv[0] ?? "");
+            },
+            sayAll: async (lines: string[]) => {
+                fake.said.push(...lines);
             }
         })
 }));

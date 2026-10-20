@@ -10,10 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    sayEachReplies,
-    sayEachScript
-} from "@polaris-app/game-servers/src/lib/minecraft/say-each";
+import { sayEachInput, sayEachReplies } from "@polaris-app/game-servers/src/lib/minecraft/say-each";
 import {
     readLiveInventories,
     readLiveInventory
@@ -60,11 +57,9 @@ function server(bags: Record<string, string[]>) {
         commands: readonly (readonly string[])[]
     ): Promise<(string | null)[]> => {
         trips += 1;
-        // What the shell script prints, cut at what one trip hands back.
-        expect(sayEachScript(commands)).toContain("rcon-cli");
-        const printed = commands
-            .map((argv, index) => `${answer(argv)}\n@@polaris-end ${index} 0\n`)
-            .join("");
+        // What the console tool prints for its input, cut at what one trip hands back.
+        expect(sayEachInput(commands)?.split("\n")).toHaveLength(commands.length + 1);
+        const printed = `${commands.map((argv) => `> ${answer(argv)}\n`).join("")}> `;
         return sayEachReplies(printed.slice(0, TRIP_CAP), commands.length);
     };
     return { say, sayEach, trips: () => trips };
@@ -163,20 +158,46 @@ describe("reading bags", () => {
 });
 
 describe("sayEachReplies", () => {
-    it("hands back each answer, and nothing for one whose end did not arrive", () => {
-        const output =
-            "first answer\n@@polaris-end 0 0\nsecond\r\nspans lines\n@@polaris-end 1 0\nthird, cut off";
-        expect(sayEachReplies(output, 3)).toEqual(["first answer", "second\nspans lines", null]);
+    const reset = "\u001b[0m";
+
+    it("hands back each answer, lines and all, and nothing for one whose next prompt did not arrive", () => {
+        const output = `> first answer\n> second\n${reset}spans lines\n> third, cut off`;
+        expect(sayEachReplies(output, 3)).toEqual([
+            "first answer",
+            `second\n${reset}spans lines`,
+            null
+        ]);
     });
 
-    it("hands back nothing for a command the console tool failed on, so it is asked alone", () => {
-        const output = "Error: connection refused\n@@polaris-end 0 1\nfine\n@@polaris-end 1 0\n";
-        expect(sayEachReplies(output, 2)).toEqual([null, "fine"]);
+    it("hands back every answer of a session that ran to its end, an empty one too", () => {
+        expect(sayEachReplies("> one\n> \n> > quoted\n> ", 3)).toEqual(["one", "", "> quoted"]);
     });
 
-    it("quotes every argument, so a bracket or a quote reaches the game as typed", () => {
-        expect(sayEachScript([["data", "get", "entity", "O'Neil", "Inventory[3]"]])).toBe(
-            "rcon-cli 'data' 'get' 'entity' 'O'\\''Neil' 'Inventory[3]'; printf '\\n@@polaris-end %d %d\\n' 0 $?"
+    it("keeps what came before a line the trip cut part way through", () => {
+        const output = `> whole\n> long\n${reset}cut off in the mid`;
+        expect(sayEachReplies(output.slice(0, -3), 2)).toEqual(["whole", null]);
+        expect(sayEachReplies(`> whole\n> long\n\u001b[`, 2)).toEqual(["whole", null]);
+    });
+
+    it("trusts none of a session the tool complained in, or one it never opened", () => {
+        const complained = "> one\nFailed to read command: i/o timeout\n> > two\n> ";
+        expect(sayEachReplies(complained, 2)).toEqual([null, null]);
+        const weird = "> one\nWeird. This response is for another request.\n> two\n> ";
+        expect(sayEachReplies(weird, 2)).toEqual([null, null]);
+        expect(sayEachReplies("dial tcp [::1]:25575: connect: connection refused\n", 2)).toEqual([
+            null,
+            null
+        ]);
+        expect(sayEachReplies("> one\n> two\n> three\n> ", 2)).toEqual([null, null]);
+    });
+
+    it("writes one command a line, as the tool would join its arguments", () => {
+        expect(sayEachInput([["data", "get", "entity", "O'Neil", "Inventory[3]"], ["list"]])).toBe(
+            "data get entity O'Neil Inventory[3]\nlist\n"
         );
+    });
+
+    it("refuses the word that would end the session, so it is asked alone", () => {
+        expect(sayEachInput([["list"], ["exit"]])).toBeNull();
     });
 });
