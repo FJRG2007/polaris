@@ -123,6 +123,13 @@ import {
     type PageContext,
     type QueuedMessage
 } from "@/lib/polar/shared";
+import { NO_VOICE, type VoiceAvailability } from "@/lib/polar/voice-call";
+import {
+    DictationButton,
+    VoiceCall,
+    VoiceModeButton,
+    type VoiceNotice
+} from "@/components/polar/polar-voice";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -469,6 +476,9 @@ export function PolarChat({
     const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
     const [tools, setTools] = useState<Record<string, ToolDescription>>({});
     const [isAdmin, setIsAdmin] = useState(false);
+    const [voice, setVoice] = useState<VoiceAvailability>(NO_VOICE);
+    const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
+    const [inCall, setInCall] = useState(false);
     const [choice, setChoice] = useState<ModelChoice | null>(null);
     const [input, setInput] = useState("");
     const [quote, setQuote] = useState<string | null>(null);
@@ -567,12 +577,14 @@ export function PolarChat({
                         providers: ModelSelectorProvider[];
                         tools?: Record<string, ToolDescription>;
                         isAdmin: boolean;
+                        voice?: VoiceAvailability;
                     } | null
                 ) => {
                     if (!data) return setProviders([]);
                     setProviders(data.providers);
                     setTools(data.tools ?? {});
                     setIsAdmin(data.isAdmin);
+                    setVoice(data.voice ?? NO_VOICE);
                     setChoice((current) => {
                         const known = data.providers.some((entry) =>
                             entry.models.some(
@@ -881,6 +893,14 @@ export function PolarChat({
         void chat.sendMessage(message);
     };
 
+    /** What was said in voice mode, sent as the next message of this thread. */
+    const sendSpoken = async (text: string) => {
+        if (!live.current.choice) return;
+        if (chat.status === "submitted" || chat.status === "streaming") await chat.stop();
+        setLastApproved(false);
+        void chat.sendMessage({ text });
+    };
+
     const streamingText =
         chat.status === "streaming" && chat.messages.at(-1)?.parts.at(-1)?.type === "text";
     const mood: PolarMood =
@@ -1061,6 +1081,53 @@ export function PolarChat({
                         {fileError}
                     </p>
                 ) : null}
+                {voiceNotice ? (
+                    <div
+                        role="alert"
+                        className="mb-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+                    >
+                        <span
+                            className={
+                                voiceNotice === "unavailable"
+                                    ? "text-muted-foreground"
+                                    : "text-danger-ink"
+                            }
+                        >
+                            {voiceNotice === "unavailable"
+                                ? t("voice.unavailable")
+                                : voiceNotice === "micDenied" || voiceNotice === "cannotRecord"
+                                  ? t(`voice.${voiceNotice}`)
+                                  : t(`voice.errors.${voiceNotice}`)}
+                        </span>
+                        {voiceNotice === "unavailable" ? (
+                            <>
+                                <Link
+                                    href="/account/ai-keys"
+                                    className="text-primary hover:underline"
+                                >
+                                    {t("noKeys.own")}
+                                </Link>
+                                {isAdmin ? (
+                                    <Link
+                                        href="/admin/integrations/models"
+                                        className="text-primary hover:underline"
+                                    >
+                                        {t("noKeys.admin")}
+                                    </Link>
+                                ) : null}
+                            </>
+                        ) : null}
+                        <button
+                            type="button"
+                            className="ml-auto text-muted-foreground hover:text-foreground"
+                            aria-label={t("voice.dismiss")}
+                            title={t("voice.dismiss")}
+                            onClick={() => setVoiceNotice(null)}
+                        >
+                            <X className="size-3.5" />
+                        </button>
+                    </div>
+                ) : null}
                 <label htmlFor={ids.input} className="sr-only">
                     {t("composer.label")}
                 </label>
@@ -1099,6 +1166,24 @@ export function PolarChat({
                                 onFailed={setFileError}
                             />
                         </span>
+                        <DictationButton
+                            available={voice.dictation}
+                            disabled={noKeys}
+                            payer={choice?.payer}
+                            onNotice={setVoiceNotice}
+                            onText={(text) => {
+                                setInput((current) =>
+                                    current.trim() ? `${current.trimEnd()} ${text}` : text
+                                );
+                                textarea.current?.focus();
+                            }}
+                        />
+                        <VoiceModeButton
+                            available={voice.dictation}
+                            disabled={noKeys || !choice}
+                            onNotice={setVoiceNotice}
+                            onOpen={() => setInCall(true)}
+                        />
                         <ModelSelector
                             providers={providers ?? []}
                             choice={choice}
@@ -1121,6 +1206,25 @@ export function PolarChat({
                 </PromptInputFooter>
             </PromptInput>
             <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
+            {inCall ? (
+                <VoiceCall
+                    messages={chat.messages}
+                    status={chat.status}
+                    speech={voice.speech}
+                    payer={choice?.payer}
+                    tools={tools}
+                    onSend={(text) => void sendSpoken(text)}
+                    onStop={() => void chat.stop()}
+                    onApprove={(id, approved) => {
+                        setLastApproved(approved);
+                        void chat.addToolApprovalResponse({ id, approved });
+                    }}
+                    onEnd={() => {
+                        setInCall(false);
+                        textarea.current?.focus();
+                    }}
+                />
+            ) : null}
         </div>
     );
 

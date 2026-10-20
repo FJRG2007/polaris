@@ -2074,6 +2074,11 @@
         "web/src/components/polar/polar-threads.tsx",
         "web/src/components/polar/use-polar-sidebar.ts",
         "web/src/components/polar/polar-panel.tsx",
+        "web/src/components/polar/polar-voice.tsx",
+        "web/src/lib/polar/voice-call.ts",
+        "web/src/lib/polar/voice.ts",
+        "web/src/app/api/polar/speak/route.ts",
+        "web/src/app/api/polar/transcribe/route.ts",
         "web/src/app/c/[token]/page.tsx",
         "web/src/app/c/[token]/shared-chat.tsx"
     ]
