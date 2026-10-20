@@ -60,9 +60,12 @@ export function spreadAllowed(build: PolarisBuild): number {
 
 /** What a build clears out of its way rather than stand over: grass and ferns,
  *  which grow back on any grass block. Tall grass and large ferns are two
- *  blocks; clearing the lower half takes the upper with it. */
+ *  blocks; clearing the lower half takes the upper with it. Short grass was
+ *  `grass` before 1.20.3, and a server refuses only the line of the name it
+ *  does not know. */
 export const WEEDS = [
     "minecraft:short_grass",
+    "minecraft:grass",
     "minecraft:tall_grass",
     "minecraft:fern",
     "minecraft:large_fern"
@@ -81,7 +84,7 @@ export function clearWeeds(box: Box): string[] {
 }
 
 /** How far a build is lifted over flowers in its way, the tallest of
- *  which (a sunflower, tall grass) are two blocks. */
+ *  which (a sunflower, a rose bush) are two blocks. */
 export const LIFT_MAX = 2;
 
 /** What the foundation is made of: grass from the ground round it grows over

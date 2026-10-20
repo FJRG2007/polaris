@@ -526,8 +526,8 @@ describe("the catalog", () => {
 
 let ids = 0;
 
-/** What else a fake world holds: a block over the ground (`solid`), short
- *  grass a weed-clearing fill empties (`weeds`), a tree on a column, something
+/** What else a fake world holds: a block over the ground (`solid`), grass a
+ *  weed-clearing fill empties (`weeds`), a tree on a column, something
  *  somebody left `dy` over a column's ground. */
 interface FakeWorld {
     solid?: (x: number, y: number, z: number) => boolean;
@@ -616,7 +616,7 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64, world
                 if (top)
                     columns.push({ x: Math.floor(Number(top[1])), z: Math.floor(Number(top[2])) });
                 if (line.startsWith("kill @e[tag=")) columns.length = 0;
-                if (line.endsWith(" minecraft:air replace minecraft:short_grass"))
+                if (plan.WEEDS.some((weed) => line.endsWith(` minecraft:air replace ${weed}`)))
                     for (const cell of cellsOf(line).cells) cleared.add(cell);
             }
             sent.push(...lines);
@@ -889,6 +889,53 @@ describe("a site as players leave the world", () => {
                 expect(y >= box.y1 && y <= box.y2).toBe(true);
             }
         }
+    });
+
+    it("clears the grass out of the foundation's cells before the dirt goes in", async () => {
+        // Grass on the ground of every column the foundation fills.
+        const grass = (x: number, y: number, z: number) => y === slope(x, z);
+        const { server, sent } = fakeServer(slope, { weeds: grass });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        const { box } = placed!.arena;
+        const firstDirt = sent.findIndex((line) => line.includes(" minecraft:dirt keep"));
+        expect(firstDirt).toBeGreaterThan(-1);
+        const cleared = new Set(
+            sent
+                .slice(0, firstDirt)
+                .filter((line) => line.endsWith(" minecraft:air replace minecraft:short_grass"))
+                .flatMap((line) => cellsOf(line).cells)
+        );
+        let under = 0;
+        for (let x = box.x1; x <= box.x2; x++)
+            for (let z = box.z1; z <= box.z2; z++) {
+                const y = slope(x, z);
+                if (y >= box.y1) continue;
+                under += 1;
+                expect(cleared.has(`${x},${y},${z}`)).toBe(true);
+            }
+        expect(under).toBeGreaterThan(0);
+    });
+
+    it("clears every name the grass has had, the one before 1.20.3 too", () => {
+        const lines = plan.clearWeeds({ x1: 0, y1: 64, z1: 0, x2: 1, y2: 65, z2: 1 });
+        for (const weed of ["minecraft:short_grass", "minecraft:grass", "minecraft:tall_grass"])
+            expect(lines.some((line) => line.endsWith(` minecraft:air replace ${weed}`))).toBe(
+                true
+            );
+    });
+
+    it("leaves the grass of a site it turns down as it was", async () => {
+        // Grass under something no lift gets over: the site is never built on.
+        const grass = (x: number, y: number, z: number) => y === 64;
+        const tall = (x: number, y: number, z: number) => y >= 65 && y < 67;
+        const { server, sent } = fakeServer(() => 64, { weeds: grass, solid: tall });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(plan.readPlaced(config)).toEqual([]);
+        expect(sent.some((line) => line.includes(" minecraft:air replace "))).toBe(false);
+        const verdicts = logged.filter((line) => line.includes(" site "));
+        expect(verdicts.length).toBeGreaterThan(0);
+        expect(verdicts.every((line) => line.endsWith(": not-air"))).toBe(true);
     });
 
     it("lifts a build over the flowers in its way, which stay under the foundation", async () => {

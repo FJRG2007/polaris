@@ -277,15 +277,21 @@ async function surveySite(
         }
         // Its whole box nothing but air - on the ground once the grass in its
         // way is cleared, lifted over a flower - or it is not built on.
-        for (let lift = 0; lift <= plan.LIFT_MAX; lift += 1) {
+        const at = (lift: number) => {
             const origin = plan.originFor(wanted, center, verdict.y + lift);
-            const box = plan.boxFor(wanted, origin);
-            if (await allAir(server, box))
-                return { origin, foundation: plan.foundationRuns(tops, origin.y) };
-            if (lift > 0) continue;
-            await server.sayAll(plan.clearWeeds(box));
-            if (await allAir(server, box))
-                return { origin, foundation: plan.foundationRuns(tops, origin.y) };
+            return { origin, box: plan.boxFor(wanted, origin) };
+        };
+        const site = (origin: plan.Point): SiteAnswer => ({
+            origin,
+            foundation: plan.foundationRuns(tops, origin.y)
+        });
+        const ground = at(0);
+        if (await allAir(server, ground.box)) return site(ground.origin);
+        for (let lift = 1; lift <= plan.LIFT_MAX; lift += 1) {
+            const lifted = at(lift);
+            if (!(await allAir(server, lifted.box))) continue;
+            await server.sayAll(plan.clearWeeds(ground.box));
+            return site((await allAir(server, ground.box)) ? ground.origin : lifted.origin);
         }
         return { why: "not-air" };
     } finally {
