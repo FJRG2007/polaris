@@ -622,7 +622,7 @@ function ThreadItem({
                                     <FolderInput />
                                     {t("history.move")}
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                                <DropdownMenuSubContent className="max-h-80 overflow-y-auto overscroll-contain">
                                     {actions.projects.map((project) => (
                                         <DropdownMenuItem
                                             key={project.id}
@@ -758,7 +758,7 @@ function SearchDialog({
                         }}
                     />
                 )}
-                <div className="-mx-2 min-h-0 flex-1 overflow-y-auto">
+                <div className="-mx-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {failed ? (
                         <p className="px-2 py-1.5 text-sm text-danger">
                             {t("history.searchFailed")}
