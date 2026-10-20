@@ -13,6 +13,7 @@ import { loadEnv } from "@polaris/config";
 import { createHash, createHmac } from "node:crypto";
 import type { StartedRun } from "./engine";
 import { fireTrigger } from "./combine";
+import { closeStrandedEpisodes } from "./alarm-episodes";
 
 /** The secret part of a webhook trigger's address. Derived, never stored; only its hash is. */
 export function hookToken(automationId: string, nodeId: string, rotation: number): string {
@@ -39,7 +40,7 @@ interface Armed {
     subjectKey: string | null;
     hookHash: string | null;
     nextDueAt: Date | null;
-    state: { config: string };
+    state: { config: string } & Record<string, unknown>;
 }
 
 /** The rows a graph's triggers arm, given the ones already there. Pure apart from the clock. */
@@ -104,6 +105,22 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (node.type === "core.threshold") {
+            // Polled (thresholds.ts). Its memory - ok or alarm, the streak, the
+            // open episode - survives a publish that left its config alone.
+            const config = core.thresholdConfigSchema.safeParse(node.config);
+            if (!config.success) continue;
+            const before = existing.find((row) => row.nodeId === node.id);
+            const kept = before?.state as ({ config?: string } & Record<string, unknown>) | null;
+            const same = kept?.config === configKey;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.threshold",
+                subjectKey: `${config.data.source}:${config.data.subjectId}`,
+                hookHash: null,
+                nextDueAt: same && before?.nextDueAt ? before.nextDueAt : now,
+                state: same && kept ? { ...kept, config: configKey } : { config: configKey }
+            });
         } else if (node.type === "core.schedule") {
             const config = core.scheduleConfigSchema.parse(node.config);
             const before = existing.find((row) => row.nodeId === node.id);
@@ -147,7 +164,7 @@ export async function armVersion(
             subjectKey: row.subjectKey,
             hookHash: row.hookHash,
             nextDueAt: row.nextDueAt,
-            state: row.state
+            state: row.state as object
         };
         await prisma.automationTrigger.upsert({
             where: { automationId_nodeId: { automationId, nodeId: row.nodeId } },
@@ -155,10 +172,24 @@ export async function armVersion(
             update: data
         });
     }
+    await closeStrandedEpisodes(automationId, openEpisodes(armed));
+}
+
+/** The alarm episodes armed threshold triggers still hold open in their memory. */
+function openEpisodes(
+    armed: readonly { nodeId: string; eventType: string; state: Record<string, unknown> }[]
+): { nodeId: string; startedAt: string }[] {
+    return armed.flatMap((row) => {
+        const episode = row.state.episode as { startedAt?: unknown } | null | undefined;
+        return row.eventType === "core.threshold" && typeof episode?.startedAt === "string"
+            ? [{ nodeId: row.nodeId, startedAt: episode.startedAt }]
+            : [];
+    });
 }
 
 export async function disarm(automationId: string): Promise<void> {
     await prisma.automationTrigger.deleteMany({ where: { automationId } });
+    await closeStrandedEpisodes(automationId, []);
 }
 
 /**

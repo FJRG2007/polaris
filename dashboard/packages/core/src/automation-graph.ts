@@ -699,6 +699,29 @@ export const DEFAULT_NOTICE_DELIVERY: NoticeDelivery = {
     chat: null
 };
 
+/** How a threshold trigger compares a reading with its value. */
+export const THRESHOLD_COMPARATORS = ["gt", "gte", "lt", "lte"] as const;
+export type ThresholdComparator = (typeof THRESHOLD_COMPARATORS)[number];
+
+/**
+ * "When a reading crosses a threshold": a polled reading (`source`, such as
+ * `host.cpu` or `ups.charge`, of one `subjectId`) judged against `value`. It
+ * fires on the transition into alarm once `streak` samples in a row breach,
+ * and on the way back when `recovery` is on - never on every sample.
+ */
+export const thresholdConfigSchema = z.object({
+    source: z
+        .string()
+        .max(80)
+        .regex(/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/, "thresholdSource"),
+    subjectId: z.string().uuid("thresholdSubject"),
+    comparator: z.enum(THRESHOLD_COMPARATORS).default("gt"),
+    value: z.number().finite(),
+    streak: z.number().int().min(1).max(60).default(3),
+    recovery: z.boolean().default(false)
+});
+export type ThresholdConfig = z.infer<typeof thresholdConfigSchema>;
+
 /** Every node type core contributes, with the config each one takes. */
 export const CORE_NODE_CONFIGS = {
     "core.manual": z.object({}).strict(),
@@ -776,7 +799,8 @@ export const CORE_NODE_CONFIGS = {
         /** A run whose On error path completes does not end as failed. */
         recover: z.boolean().default(false)
     }),
-    "core.waitCondition": waitConditionConfigSchema
+    "core.waitCondition": waitConditionConfigSchema,
+    "core.threshold": thresholdConfigSchema
 } as const;
 export type CoreNodeType = keyof typeof CORE_NODE_CONFIGS;
 export const CORE_NODE_TYPES = Object.keys(CORE_NODE_CONFIGS) as CoreNodeType[];
@@ -827,7 +851,8 @@ export const CORE_NODE_META: Readonly<Record<CoreNodeType, CoreNodeMeta>> = {
         own: true,
         idempotent: true
     },
-    "core.waitCondition": { role: "action", ports: ["timeout"], idempotent: true }
+    "core.waitCondition": { role: "action", ports: ["timeout"], idempotent: true },
+    "core.threshold": { role: "trigger", ports: [], idempotent: true }
 };
 
 /** Loop nodes: their "each" port starts a body that runs once per item or pass. */

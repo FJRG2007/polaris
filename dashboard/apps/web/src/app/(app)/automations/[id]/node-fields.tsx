@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { chatWebhooksAction, hookAddressAction, rotateHookAction } from "../actions";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
 import { RefInput, RefTextarea } from "./references";
+import { ThresholdFields } from "./threshold-fields";
 import { NoticeDeliveryFields } from "@/components/automations/notice-delivery-fields";
 import { AppSlotView } from "@/components/app-extensions/installed-client";
 import {
@@ -50,6 +51,7 @@ export const TRIGGER_TYPES = [
     "core.webhook",
     "core.onEvent",
     "core.failed",
+    "core.threshold",
     "core.called"
 ] as const;
 export const STEP_TYPES = [
@@ -102,6 +104,13 @@ export const DEFAULT_CONFIG: Record<string, () => unknown> = {
     "core.called": () => ({ inputs: [] }),
     "core.onEvent": () => ({ name: "" }),
     "core.failed": () => ({ automations: [] }),
+    "core.threshold": () => ({
+        source: "",
+        subjectId: "",
+        comparator: "gt",
+        streak: 3,
+        recovery: false
+    }),
     "core.switch": () => ({
         kind: "rules",
         cases: [{ label: "", condition: emptyCondition() }],
@@ -473,6 +482,8 @@ export function NodeFields({
             );
         case "core.message":
             return <ChatMessageFields config={config} set={set} />;
+        case "core.threshold":
+            return <ThresholdFields config={config} set={set} setConfig={setConfig} />;
         case "core.chat":
             return (
                 <div className="space-y-3">

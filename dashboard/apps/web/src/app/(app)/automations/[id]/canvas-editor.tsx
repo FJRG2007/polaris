@@ -44,6 +44,7 @@ import {
     type CanvasSelection,
     type CanvasViewActions
 } from "./canvas-board";
+import { comparatorSymbol } from "@/lib/automations/threshold-form";
 import { NodeFields, STEP_TYPES, TRIGGER_TYPES, configValid, newNode, type T } from "./node-fields";
 import { FailureFields, WhenFields } from "./flow-fields";
 import { nodeTitle } from "../shared";
@@ -82,6 +83,8 @@ export function nodeSubtitle(t: T, node: core.GraphNode): string | null {
         return typeof config.title === "string" && config.title ? config.title : null;
     if (node.type === "core.message")
         return typeof config.body === "string" && config.body ? config.body : null;
+    if (node.type === "core.threshold" && typeof config.value === "number")
+        return `${comparatorSymbol(String(config.comparator ?? "gt"))} ${config.value}`;
     if (node.type === "core.schedule" && config.kind === "cron")
         return String(config.expression ?? "");
     return null;

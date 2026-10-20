@@ -24,8 +24,7 @@ import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
 type Result<T = object> =
-    | ({ ok: true } & T)
-    | { ok: false; error: string; problems?: core.GraphProblem[] };
+    ({ ok: true } & T) | { ok: false; error: string; problems?: core.GraphProblem[] };
 
 async function actor(): Promise<RunActor> {
     const user = await requirePermission("automations.use");
@@ -671,6 +670,36 @@ export async function chatWebhooksAction(): Promise<
         const who = await actor();
         const { webhooksToPostThrough } = await import("@/lib/chat/webhooks");
         return { ok: true, webhooks: await webhooksToPostThrough(who) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+/** What a threshold trigger can watch, for its picker: each kind's subjects and readings. */
+export interface ThresholdKindChoice {
+    readonly kind: string;
+    readonly subjects: readonly { readonly id: string; readonly name: string }[];
+    readonly sources: readonly { readonly id: string; readonly unit: string }[];
+}
+
+/**
+ * The servers, services and UPS this account may watch. The same check runs
+ * again on every evaluation against whoever the automation runs as.
+ */
+export async function thresholdChoicesAction(): Promise<
+    Result<{ kinds: readonly ThresholdKindChoice[] }>
+> {
+    try {
+        const who = await actor();
+        const { thresholdKinds } = await import("@/lib/automations/threshold-sources");
+        const kinds = await Promise.all(
+            thresholdKinds().map(async (kind) => ({
+                kind: kind.kind,
+                subjects: await kind.subjects(who).catch(() => []),
+                sources: kind.sources.map(({ id, unit }) => ({ id, unit }))
+            }))
+        );
+        return { ok: true, kinds };
     } catch (caught) {
         return failure(caught);
     }

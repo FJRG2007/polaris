@@ -680,7 +680,22 @@ export const CORE_NODE_OUTPUT_PATHS: Readonly<Record<graphs.CoreNodeType, readon
     "core.message": ["messageId", "channelId"],
     "core.announce": ["name", "eventId"],
     "core.try": ["failed", "error", "node", "recovered"],
-    "core.waitCondition": ["matched", "checks", "timedOut"]
+    "core.waitCondition": ["matched", "checks", "timedOut"],
+    "core.threshold": [
+        "id",
+        "at",
+        "kind",
+        "state",
+        "value",
+        "threshold",
+        "comparator",
+        "source",
+        "subjectId",
+        "episodeId",
+        "startedAt",
+        "durationSeconds",
+        "peak"
+    ]
 };
 
 export interface ReferenceOption {

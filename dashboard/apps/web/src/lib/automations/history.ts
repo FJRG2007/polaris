@@ -11,6 +11,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { RunActor } from "./types";
+import { getEpisode, type EpisodeView } from "./alarm-episodes";
 import { randomUUID } from "node:crypto";
 import { graphProblems } from "./node-registry";
 import { advanceRun, loadGraph, startRun } from "./engine";
@@ -154,6 +155,8 @@ export interface RunDetail {
     readonly canCancel: boolean;
     /** Whether "Run again" can start: an editor, a live run, an automation switched on. */
     readonly canRerun: boolean;
+    /** The alarm a threshold trigger's crossing started this run for, as it stands now. */
+    readonly episode: EpisodeView | null;
 }
 
 /**
@@ -192,7 +195,8 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
             triggerNodeId: true,
             queuedAt: true,
             startedAt: true,
-            finishedAt: true
+            finishedAt: true,
+            cause: true
         }
     });
     if (!run) throw new AutomationAccessError("notFound");
@@ -225,6 +229,7 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
         }),
         loadGraph(run.versionId)
     ]);
+    const episode = canEdit ? await getEpisode(run.automationId, episodeIdOf(run.cause)) : null;
     return {
         id: run.id,
         automationId: run.automationId,
@@ -242,6 +247,7 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
         canSeeData: canEdit,
         canCancel: canEdit && !core.runFinished(run.status),
         canRerun: canEdit && !run.test && row.enabled && row.publishedVersionId !== null,
+        episode,
         steps: steps.map((step) => {
             const data = step as { input?: unknown; output?: unknown };
             return {
@@ -259,6 +265,13 @@ export async function getRun(actor: RunActor, runId: string): Promise<RunDetail>
             };
         })
     };
+}
+
+/** The episode a threshold crossing named on the run, when it did. */
+export function episodeIdOf(cause: unknown): string | null {
+    const value = (cause as { kind?: unknown; episodeId?: unknown } | null) ?? null;
+    if (value?.kind !== "threshold" || typeof value.episodeId !== "string") return null;
+    return /^[0-9a-f-]{36}$/i.test(value.episodeId) ? value.episodeId : null;
 }
 
 function kick(runId: string): void {

@@ -18,26 +18,24 @@ import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { watchText } from "@/lib/watch/words";
 import { bridgeSend } from "@/lib/messaging/bridge-client";
-import { COLLECT_TICK_MS, LOCAL_HOST_SUBJECT, STORAGE_EVERY_TICKS } from "@/lib/metrics-shared";
-import {
-    isLocalMachine,
-    localMachineIdentity,
-    type LocalMachineIdentity
-} from "@/lib/local-machine";
+import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
+import { stepAlarm } from "@/lib/alarm-state";
+import { localMachineIdentity, type LocalMachineIdentity } from "@/lib/local-machine";
 import {
     alarmUnit,
     breaches,
     formatAlarmValue,
     formatThreshold,
-    METRIC_LABEL,
-    sampleValue,
-    volumeDiskGb
+    METRIC_LABEL
 } from "./alarm-metrics";
-
-const RECENT_SAMPLE_MS = 3 * 60_000;
-/** Volumes are measured on the slower storage cadence; three of those missed in a
- *  row is a volume nothing can read, rather than one between measurements. */
-const RECENT_VOLUME_MS = 3 * STORAGE_EVERY_TICKS * COLLECT_TICK_MS;
+import {
+    hostSubject,
+    latestMetricValue,
+    RECENT_SAMPLE_MS,
+    serviceDiskGb,
+    type MetricReading,
+    type MetricSubject
+} from "./metric-reading";
 
 interface AlarmRow {
     id: string;
@@ -124,7 +122,7 @@ async function evaluateCondition(alarm: AlarmRow, context: PassContext): Promise
     // A service's disk is what its volumes hold, measured as subjects of their own.
     const value =
         alarm.metric === "disk" && alarm.targetType === "application"
-            ? await serviceDiskGb(alarm.targetId)
+            ? valueOf(await serviceDiskGb(alarm.targetId))
             : await subjectValue(alarm, context);
     if (typeof value === "string")
         return { breach: false, value: null, detail: value, insufficient: true };
@@ -194,63 +192,20 @@ async function passContext(alarms: readonly AlarmRow[]): Promise<PassContext> {
  * the machine Polaris runs on is filed under its reserved subject whichever way
  * the alarm names it, since that is where its samples are.
  */
-async function subjectOf(
-    alarm: AlarmRow,
-    context: PassContext
-): Promise<{ type: "app" | "host"; id: string }> {
+async function subjectOf(alarm: AlarmRow, context: PassContext): Promise<MetricSubject> {
     if (alarm.targetType !== "host") return { type: "app", id: alarm.targetId };
     if (alarm.targetId === LOCAL_HOST_SUBJECT) return { type: "host", id: LOCAL_HOST_SUBJECT };
-    const host = context.hosts.get(alarm.targetId) ?? null;
     context.identity ??= await localMachineIdentity().catch(() => null);
-    const local = host && context.identity ? isLocalMachine(host, context.identity) : false;
-    return { type: "host", id: local ? LOCAL_HOST_SUBJECT : alarm.targetId };
+    return hostSubject(alarm.targetId, context.hosts.get(alarm.targetId) ?? null, context.identity);
 }
 
 /** The alarm's metric from its subject's latest sample, or why there is none. */
 async function subjectValue(alarm: AlarmRow, context: PassContext): Promise<number | string> {
-    const subject = await subjectOf(alarm, context);
-    // The newest two: a rate is worked out between them.
-    const [latest, previous] = await prisma.metricSample.findMany({
-        where: { subjectType: subject.type, subjectId: subject.id },
-        orderBy: { ts: "desc" },
-        take: 2,
-        select: {
-            ts: true,
-            cpuPercent: true,
-            memUsedBytes: true,
-            memTotalBytes: true,
-            diskUsedBytes: true,
-            diskTotalBytes: true,
-            netRxBytes: true,
-            netTxBytes: true
-        }
-    });
-    if (!latest || Date.now() - latest.ts.getTime() >= RECENT_SAMPLE_MS) return "no recent metrics";
-    const value = sampleValue(alarm.metric, latest, previous ?? null);
-    if (value !== null) return value;
-    if (alarm.metric === "disk") return "this server's disk is not measured";
-    return "metric unavailable";
+    return valueOf(await latestMetricValue(await subjectOf(alarm, context), alarm.metric));
 }
 
-/** What a service's volumes hold, from each one's latest measurement. */
-async function serviceDiskGb(applicationId: string): Promise<number | string> {
-    const volumes = await prisma.volume.findMany({
-        where: { applicationId },
-        select: { id: true }
-    });
-    if (volumes.length === 0) return "the service has no volumes";
-    const since = new Date(Date.now() - RECENT_VOLUME_MS);
-    const readings = await Promise.all(
-        volumes.map((volume) =>
-            prisma.metricSample.findFirst({
-                where: { subjectType: "volume", subjectId: volume.id, ts: { gte: since } },
-                orderBy: { ts: "desc" },
-                select: { diskUsedBytes: true }
-            })
-        )
-    );
-    const value = volumeDiskGb(readings.filter((reading) => reading !== null));
-    return value === null ? "no recent volume measurement" : value;
+function valueOf(reading: MetricReading): number | string {
+    return typeof reading === "string" ? reading : reading.value;
 }
 
 async function notifyTransition(
@@ -265,7 +220,9 @@ async function notifyTransition(
     await notify({
         userId: alarm.ownerId,
         event: triggered ? "watch.alarm" : "watch.ok",
-        title: triggered ? t("notices.alarm", { name: alarm.name }) : t("notices.recovered", { name: alarm.name }),
+        title: triggered
+            ? t("notices.alarm", { name: alarm.name })
+            : t("notices.recovered", { name: alarm.name }),
         body: said,
         actionRequired: triggered,
         href: "/watch",
@@ -292,25 +249,11 @@ async function evaluateOne(
     context: PassContext
 ): Promise<"unchanged" | "written"> {
     const result = await evaluateCondition(alarm, context);
-    let state = alarm.state;
-    let streak = alarm.breachStreak;
-    let transition: "triggered" | "resolved" | null = null;
-
-    if (result.insufficient) {
-        state = "insufficient";
-    } else if (result.breach) {
-        streak = alarm.breachStreak + 1;
-        if (streak >= alarm.forPeriods) {
-            if (alarm.state !== "alarm") transition = "triggered";
-            state = "alarm";
-        } else {
-            state = alarm.state === "alarm" ? "alarm" : "ok";
-        }
-    } else {
-        streak = 0;
-        if (alarm.state === "alarm") transition = "resolved";
-        state = "ok";
-    }
+    const { state, streak, transition } = stepAlarm(
+        { state: alarm.state, streak: alarm.breachStreak },
+        result,
+        alarm.forPeriods
+    );
 
     if (state === alarm.state && streak === alarm.breachStreak) return "unchanged";
 
