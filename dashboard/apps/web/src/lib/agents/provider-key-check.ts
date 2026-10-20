@@ -15,18 +15,45 @@
  * to the provider must not be a deployment where nobody can add a key.
  */
 
-import { GATEWAY_SLUG } from "@/lib/agents/agent-providers";
+import { readerWords } from "@/lib/i18n/reader-words";
+import {
+    GATEWAY_SLUG,
+    ANTHROPIC_WORKSPACE_HEADER,
+    anthropicWorkspaceHeaders
+} from "@/lib/agents/agent-providers";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 
-/** Why a key was not accepted, in the terms a caller can branch on. */
-export type KeyCheckCode = "invalid" | "forbidden" | "rate_limited" | "network" | "unknown" | "unsupported";
+/** Why a key was not accepted, in the terms a caller can branch on. `workspace`
+ *  is an Anthropic key that needs a workspace ID, or was given a wrong one. */
+export type KeyCheckCode =
+    | "invalid"
+    | "forbidden"
+    | "workspace"
+    | "rate_limited"
+    | "network"
+    | "unknown"
+    | "unsupported";
+
+/** The catalog sentence behind a reason, under `refusals.aiKeys.check` in the
+ *  api namespace, so the screen says it in the reader's language. */
+export interface KeyCheckWords {
+    key: string;
+    values?: Record<string, string | number>;
+}
 
 export type KeyCheck =
     | { state: "valid" }
     /** The provider refused the credential itself. */
-    | { state: "rejected"; code: "invalid" | "forbidden"; reason: string }
+    | {
+          state: "rejected";
+          code: "invalid" | "forbidden" | "workspace";
+          reason: string;
+          words?: KeyCheckWords;
+      }
     /** Nothing was learned. The key is stored, and a run is what proves it. */
-    | { state: "unverified"; code: KeyCheckCode; reason: string };
+    | { state: "unverified"; code: KeyCheckCode; reason: string; words?: KeyCheckWords };
+
+export { ANTHROPIC_WORKSPACE_HEADER, anthropicWorkspaceHeaders };
 
 /** One provider's read-only probe, in the vendor's own auth terms. */
 interface Probe {
@@ -139,13 +166,39 @@ const TIMEOUT_MS = 8000;
  * frequently one on their own network, and a server-side request to an address
  * somebody supplies is a probe of the network Polaris sits in. Its shape is
  * checked instead, and the first run is what proves it.
+ *
+ * `workspaceId` is sent to Anthropic only, as the header a key that is not tied
+ * to one workspace has to name its workspace in.
  */
-export async function checkProviderKey(provider: string, secret: string): Promise<KeyCheck> {
+export async function checkProviderKey(
+    provider: string,
+    secret: string,
+    options: { workspaceId?: string | null } = {}
+): Promise<KeyCheck> {
+    return inReadersWords(await probeKey(provider, secret, options));
+}
+
+/** The verdict with its reason in the language of whoever is reading it. */
+async function inReadersWords(check: KeyCheck): Promise<KeyCheck> {
+    if (check.state === "valid" || !check.words) return check;
+    const t = (await readerWords("api")) as unknown as (
+        key: string,
+        values?: Record<string, string | number>
+    ) => string;
+    return { ...check, reason: t(`refusals.aiKeys.check.${check.words.key}`, check.words.values) };
+}
+
+async function probeKey(
+    provider: string,
+    secret: string,
+    options: { workspaceId?: string | null }
+): Promise<KeyCheck> {
     if (provider === GATEWAY_SLUG) {
         return {
             state: "unverified",
             code: "unsupported",
-            reason: "An endpoint of your own is proven by the first run, not from here."
+            reason: "An endpoint of your own is proven by the first run, not from here.",
+            words: { key: "ownEndpoint" }
         };
     }
     const probe = PROBES[provider];
@@ -153,16 +206,21 @@ export async function checkProviderKey(provider: string, secret: string): Promis
         return {
             state: "unverified",
             code: "unsupported",
-            reason: "Polaris has no way to check this provider's keys."
+            reason: "Polaris has no way to check this provider's keys.",
+            words: { key: "noProbe" }
         };
     }
 
     const credential = probe.prefix ? `${probe.prefix}${secret.trim()}` : secret.trim();
+    // Only Anthropic knows what a workspace is; anywhere else the header would be
+    // a stray value sent to somebody who never asked for it.
+    const workspace =
+        provider === "anthropic" ? anthropicWorkspaceHeaders(options.workspaceId) : {};
     let response: Response;
     try {
         response = await fetch(probe.endpoint, {
             method: probe.method,
-            headers: { [probe.header]: credential, ...probe.extraHeaders },
+            headers: { [probe.header]: credential, ...probe.extraHeaders, ...workspace },
             signal: AbortSignal.timeout(TIMEOUT_MS),
             cache: "no-store"
         });
@@ -173,42 +231,150 @@ export async function checkProviderKey(provider: string, secret: string): Promis
             code: "network",
             reason: timedOut
                 ? "The provider did not answer in time, so the key could not be checked."
-                : "Could not reach the provider to check the key."
+                : "Could not reach the provider to check the key.",
+            words: { key: timedOut ? "timedOut" : "unreachable" }
         };
     }
 
-    return classify(response.status);
+    if (response.ok) return classify(response.status);
+    const body = await response.text().catch(() => "");
+    return classify(response.status, providerMessage(body, secret));
+}
+
+/** How much of a provider's own sentence is shown: enough for any error message
+ *  a provider writes, short enough that a page of HTML never is one. */
+const MESSAGE_LIMIT = 200;
+
+/**
+ * The provider's own explanation, from the error body it answered with.
+ *
+ * Read from the shapes providers use - `{ error: { message } }` (Anthropic,
+ * OpenAI and the compatible ones), `{ error: "..." }` and `{ message }` - and
+ * nothing else: a body that is not JSON is a proxy's page, not a sentence.
+ * Control characters are dropped, the key is cut out wherever the provider
+ * echoed it, and the length is capped, because this ends up on a screen.
+ */
+export function providerMessage(body: string, secret = ""): string | null {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(body);
+    } catch {
+        return null;
+    }
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const record = parsed as { error?: unknown; message?: unknown };
+    const nested =
+        typeof record.error === "object" && record.error !== null
+            ? (record.error as { message?: unknown }).message
+            : record.error;
+    const raw =
+        typeof nested === "string"
+            ? nested
+            : typeof record.message === "string"
+              ? record.message
+              : null;
+    if (!raw) return null;
+    let text = Array.from(raw, (char) =>
+        char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? " " : char
+    ).join("");
+    const key = secret.trim();
+    if (key.length >= 8) text = text.split(key).join("[key]");
+    text = text.split(" ").filter(Boolean).join(" ");
+    if (!text) return null;
+    return text.length > MESSAGE_LIMIT ? `${text.slice(0, MESSAGE_LIMIT - 3).trimEnd()}...` : text;
 }
 
 /**
- * What a status code means for a credential.
+ * What a status code means for a credential, given what the provider said.
  *
- * Only the two codes that mean "not you" refuse. A 429 is the account's rate
- * ceiling rather than a verdict on the key, a 404 means the endpoint moved, and
- * anything from 500 up is the provider's morning, not this key's problem.
+ * Only the two codes that mean "not you" refuse, plus Anthropic's answers about
+ * the workspace a key acts in. A 429 is the account's rate ceiling rather than a
+ * verdict on the key, a 404 means the endpoint moved, and anything from 500 up
+ * is the provider's morning, not this key's problem.
+ *
+ * The workspace sentences are the ones Anthropic documents, plus the wording a
+ * `sk-ant-usr-` key was answered with on 2026-10-20:
+ * https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
  */
-export function classify(status: number): KeyCheck {
+export function classify(status: number, message: string | null = null): KeyCheck {
     if (status >= 200 && status < 300) return { state: "valid" };
+    const workspace = workspaceVerdict(status, message);
+    if (workspace) return workspace;
     if (status === 401) {
-        return { state: "rejected", code: "invalid", reason: "The provider did not accept that key." };
+        return {
+            state: "rejected",
+            code: "invalid",
+            reason: "The provider did not accept that key.",
+            words: { key: "invalid" }
+        };
     }
     if (status === 403) {
         return {
             state: "rejected",
             code: "forbidden",
-            reason: "That key does not carry the access this provider needs."
+            reason: "That key does not carry the access this provider needs.",
+            words: { key: "forbidden" }
         };
     }
     if (status === 429) {
         return {
             state: "unverified",
             code: "rate_limited",
-            reason: "The provider is rate limiting this account, so the key could not be checked."
+            reason: "The provider is rate limiting this account, so the key could not be checked.",
+            words: { key: "rateLimited" }
+        };
+    }
+    if (message) {
+        return {
+            state: "unverified",
+            code: "unknown",
+            reason: `The provider answered ${status}: ${message}`,
+            words: { key: "providerSaid", values: { status, message } }
         };
     }
     return {
         state: "unverified",
         code: "unknown",
-        reason: `The provider answered ${status}, so the key could not be checked.`
+        reason: `The provider answered ${status}, so the key could not be checked.`,
+        words: { key: "status", values: { status } }
     };
+}
+
+/** Anthropic's three answers about a key's workspace, or null for anything else. */
+function workspaceVerdict(status: number, message: string | null): KeyCheck | null {
+    if (!message || !message.toLowerCase().includes("workspace")) return null;
+    const said = message.toLowerCase();
+    // "This API key is not scoped to a workspace, so this request must include the
+    // anthropic-workspace-id header ..." and the documented "anthropic-workspace-id
+    // is required when authenticating with an identity-linked API key ...".
+    if (
+        status === 400 &&
+        (said.includes("not scoped to a workspace") || said.includes("is required"))
+    ) {
+        return {
+            state: "rejected",
+            code: "workspace",
+            reason: "This key needs the ID of the Anthropic workspace to use. Add it under Workspace ID.",
+            words: { key: "workspaceMissing" }
+        };
+    }
+    // "anthropic-workspace-id header must be a valid workspace ID."
+    if (status === 400 && said.includes("valid workspace id")) {
+        return {
+            state: "rejected",
+            code: "workspace",
+            reason: "That is not a workspace ID. Copy it from the Workspaces page of the Claude Console.",
+            words: { key: "workspaceMalformed" }
+        };
+    }
+    // "Workspace `wrkspc_...` not found." - unknown, or not open to this key.
+    if (status === 404 && said.includes("not found")) {
+        return {
+            state: "rejected",
+            code: "workspace",
+            reason: "This key cannot use a workspace with that ID. Check the ID, or that the key has access to it.",
+            words: { key: "workspaceNotFound" }
+        };
+    }
+    return null;
 }

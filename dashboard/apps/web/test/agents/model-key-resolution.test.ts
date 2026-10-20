@@ -471,3 +471,35 @@ describe("chatCredentialFor", () => {
         expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
     });
 });
+
+describe("an Anthropic key that names its workspace", () => {
+    const WORKSPACE = "wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ";
+
+    it("hands a run the header Claude Code adds to every request", async () => {
+        ownHas("k1", "anthropic", "sk-ant-usr-mine", { workspaceId: WORKSPACE });
+        const secrets = await runSecretsFor("user-1");
+        expect(secrets?.ANTHROPIC_API_KEY).toBe("sk-ant-usr-mine");
+        expect(secrets?.ANTHROPIC_CUSTOM_HEADERS).toBe(`anthropic-workspace-id: ${WORKSPACE}`);
+    });
+
+    it("hands over no header for a key that names none", async () => {
+        ownHas("k1", "anthropic", "sk-ant-api-mine");
+        expect((await runSecretsFor("user-1"))?.ANTHROPIC_CUSTOM_HEADERS).toBeUndefined();
+    });
+
+    it("carries the workspace of the key that was picked, not of a later one", async () => {
+        ownHas("k1", "anthropic", null, { workspaceId: WORKSPACE });
+        ownHas("k2", "anthropic", "sk-ant-api-second");
+        const secrets = await runSecretsFor("user-1");
+        expect(secrets?.ANTHROPIC_API_KEY).toBe("sk-ant-api-second");
+        expect(secrets?.ANTHROPIC_CUSTOM_HEADERS).toBeUndefined();
+    });
+
+    it("gives a chat the workspace along with the key", async () => {
+        ownHas("k1", "anthropic", "sk-ant-usr-mine", { workspaceId: WORKSPACE });
+        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({
+            secret: "sk-ant-usr-mine",
+            workspaceId: WORKSPACE
+        });
+    });
+});

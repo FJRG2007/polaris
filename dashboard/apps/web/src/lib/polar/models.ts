@@ -29,7 +29,11 @@ import {
     type AutoRoute,
     type TurnSignals
 } from "@/lib/polar/automatic";
-import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import {
+    GATEWAY_SLUG,
+    MODEL_PROVIDERS,
+    anthropicWorkspaceHeaders
+} from "@/lib/agents/agent-providers";
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import {
@@ -222,7 +226,11 @@ export function languageModel(credential: ChatCredential, model: string): Langua
     const apiKey = credential.secret;
     switch (credential.provider) {
         case "anthropic":
-            return createAnthropic({ apiKey })(model);
+            // A key not tied to one workspace names its workspace on every call.
+            return createAnthropic({
+                apiKey,
+                headers: anthropicWorkspaceHeaders(credential.workspaceId)
+            })(model);
         case "openai":
             return createOpenAI({ apiKey })(model);
         case "google-ai":

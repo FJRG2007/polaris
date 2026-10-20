@@ -30,7 +30,7 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
 import type { KeyActionResult } from "@/lib/agents/model-key-actions";
-import { modelKeyNameSchema } from "@polaris/core";
+import { anthropicWorkspaceIdSchema, modelKeyNameSchema } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
@@ -605,6 +605,11 @@ function KeyDialog({
     const [touched, setTouched] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const storedWorkspace =
+        typeof existing?.config.workspaceId === "string" ? existing.config.workspaceId : "";
+    const [workspace, setWorkspace] = useState(storedWorkspace);
+    // Set once Anthropic answered that this key has to name a workspace.
+    const [askedForWorkspace, setAskedForWorkspace] = useState(false);
 
     const entry = providers.find((row) => row.slug === provider) ?? null;
     const nameCheck = modelKeyNameSchema.safeParse(name);
@@ -623,6 +628,22 @@ function KeyDialog({
         secret.trim().length >= 8 || (entry?.isGateway ?? false) || existing !== null;
     const gatewayReady =
         !entry?.isGateway || (gateway.baseUrl.trim().length > 0 && gateway.model.trim().length > 0);
+    // Asked for where it can matter: an Anthropic key whose prefix says it acts
+    // as a person (sk-ant-usr-), one already stored (its prefix is not readable
+    // back), or one Anthropic just refused for want of a workspace.
+    const showWorkspace =
+        provider === "anthropic" &&
+        (existing !== null ||
+            askedForWorkspace ||
+            secret.trim().startsWith("sk-ant-usr-") ||
+            workspace.trim().length > 0);
+    const typedWorkspace = workspace.trim();
+    const workspaceError =
+        showWorkspace &&
+        typedWorkspace.length > 0 &&
+        !anthropicWorkspaceIdSchema.safeParse(typedWorkspace).success
+            ? t("modelKeys.workspaceShape")
+            : null;
     const expiresAt = expiry ? endOfDay(expiry) : null;
     const expiryReady = expiry === "" || (expiresAt !== null && expiresAt.getTime() > Date.now());
     const ready =
@@ -631,6 +652,7 @@ function KeyDialog({
         !taken &&
         secretReady &&
         gatewayReady &&
+        workspaceError === null &&
         expiryReady;
 
     const submit = async () => {
@@ -646,6 +668,7 @@ function KeyDialog({
             : undefined;
         const typed = secret.trim();
         const ends = expiresAt?.toISOString() ?? null;
+        const named = showWorkspace && typedWorkspace.length > 0 ? typedWorkspace : undefined;
         const result = await runAction(
             () =>
                 existing
@@ -656,6 +679,11 @@ function KeyDialog({
                           // field is write-only, so blank cannot mean erase.
                           secret: typed.length > 0 ? typed : undefined,
                           config,
+                          // Blank on a key that named one stops naming it; blank
+                          // on one that never did says nothing.
+                          ...(provider === "anthropic"
+                              ? { workspaceId: named ?? (storedWorkspace ? null : undefined) }
+                              : {}),
                           expiresAt: ends
                       })
                     : actions.add({
@@ -669,6 +697,7 @@ function KeyDialog({
                           // thing that tells two subscriptions apart in a table
                           // where every other column is identical.
                           ...(Object.keys(identity).length > 0 ? { identity } : {}),
+                          ...(named ? { workspaceId: named } : {}),
                           expiresAt: ends
                       }),
             setError
@@ -677,6 +706,7 @@ function KeyDialog({
         if (!result) return;
         if (result.error) {
             setError(result.error);
+            if (result.needsWorkspace) setAskedForWorkspace(true);
             return;
         }
         onSaved(result.warning);
@@ -860,6 +890,25 @@ function KeyDialog({
                             </span>
                         ) : null}
                     </label>
+
+                    {showWorkspace ? (
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("modelKeys.workspaceId")}
+                            <Input
+                                value={workspace}
+                                placeholder="wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ" // i18n-ignore the documented example ID
+                                autoComplete="off"
+                                spellCheck={false}
+                                aria-invalid={workspaceError !== null}
+                                onChange={(event) => setWorkspace(event.target.value)}
+                            />
+                            <span
+                                className={`text-xs ${workspaceError ? "text-danger" : "text-muted-foreground"}`}
+                            >
+                                {workspaceError ?? t("modelKeys.workspaceHint")}
+                            </span>
+                        </label>
+                    ) : null}
 
                     <label className="flex flex-col gap-1 text-sm">
                         {t("modelKeys.expires")}

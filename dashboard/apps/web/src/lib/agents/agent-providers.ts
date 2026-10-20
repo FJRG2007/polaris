@@ -57,6 +57,24 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
  */
 export const GATEWAY_SLUG = "enigma";
 
+/**
+ * The header an Anthropic key that is not tied to one workspace names its
+ * workspace in. Without it such a key is answered 400 on every request.
+ * https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
+ */
+export const ANTHROPIC_WORKSPACE_HEADER = "anthropic-workspace-id";
+
+/** Where Claude Code reads extra request headers from, one `Name: Value` per
+ *  line. https://code.claude.com/docs/en/env-vars */
+export const ANTHROPIC_HEADERS_ENV = "ANTHROPIC_CUSTOM_HEADERS";
+
+/** The headers that carry a workspace, or none when there is no workspace. */
+export function anthropicWorkspaceHeaders(
+    workspaceId: string | null | undefined
+): Record<string, string> {
+    return workspaceId ? { [ANTHROPIC_WORKSPACE_HEADER]: workspaceId } : {};
+}
+
 /** Which provider a model slug needs a key for, or null when nothing here serves
  *  it (a raw specifier, or a provider Polaris does not carry a credential for). */
 export function providerForModel(model: string): ModelProvider | null {

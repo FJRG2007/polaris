@@ -89,4 +89,23 @@ describe("what a session's environment may carry", () => {
         expect(claude.credentials[0]?.env).toBe("CLAUDE_CODE_OAUTH_TOKEN");
         expect(claude.credentials[0]?.subscription).toBe(true);
     });
+
+    it("carries an Anthropic key's workspace with that key, and only with it", () => {
+        // A key not tied to one workspace is refused every request without the
+        // header; Claude Code reads extra headers from ANTHROPIC_CUSTOM_HEADERS.
+        const claude = core.agentCliById("claude")!;
+        const header = "anthropic-workspace-id: wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ";
+        expect(
+            credentialsForAgent(claude, {
+                ANTHROPIC_API_KEY: "sk-ant-usr",
+                ANTHROPIC_CUSTOM_HEADERS: header
+            }).ANTHROPIC_CUSTOM_HEADERS
+        ).toBe(header);
+        expect(
+            credentialsForAgent(claude, {
+                CLAUDE_CODE_OAUTH_TOKEN: "sub-token",
+                ANTHROPIC_CUSTOM_HEADERS: header
+            }).ANTHROPIC_CUSTOM_HEADERS
+        ).toBeUndefined();
+    });
 });
