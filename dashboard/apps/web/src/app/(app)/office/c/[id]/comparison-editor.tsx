@@ -40,6 +40,7 @@ import {
     Select,
     Textarea,
     cn,
+    isDirty,
     useToast
 } from "@polaris/ui";
 
@@ -452,7 +453,18 @@ function SubjectDialog({
                         <Button variant="secondary" onClick={onClose}>
                             {t("comparison.cancel")}
                         </Button>
-                        <Button onClick={save}>{t("comparison.save")}</Button>
+                        <Button
+                            // The competitor as it already reads: nothing to save.
+                            disabled={
+                                !isDirty(
+                                    { name: subject.name, url: subject.url, does: subject.does },
+                                    { name, url, does }
+                                )
+                            }
+                            onClick={save}
+                        >
+                            {t("comparison.save")}
+                        </Button>
                     </div>
                 </div>
             </DialogContent>
