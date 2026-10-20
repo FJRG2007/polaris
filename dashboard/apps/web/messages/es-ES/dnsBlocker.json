@@ -276,7 +276,9 @@
             "tplink": "En un Deco, el mismo campo está en la app en More > Advanced > DHCP Server. Reinicia el Deco principal tras guardar.",
             "unifi": "Los dispositivos lo toman al renovar su concesión, normalmente en un día. Apagar y encender el dispositivo es más rápido.",
             "netgear": "Los dispositivos siguen usando el router como DNS, así que en ellos no cambia nada ni hace falta reconectar.",
-            "zte": "Algunas versiones del operador bloquean esta página o deshacen el cambio sin avisar; si abajo no aparece ningún dispositivo, pide al operador que lo cambie. Si los móviles siguen con anuncios, reciben el DNS del operador por IPv6: pide que desactiven IPv6."
+            "zte": "Algunas versiones del operador bloquean esta página o deshacen el cambio sin avisar; si abajo no aparece ningún dispositivo, pide al operador que lo cambie. Si los móviles siguen con anuncios, reciben el DNS del operador por IPv6: pide que desactiven IPv6.",
+            "eero": "Custom DNS aparece en gris mientras haya algún filtro de eero Plus activo: desactívalos antes. Al guardar se reinicia la red.",
+            "googlewifi": "Si tras guardar la red deja de cargar páginas, un móvil con datos puede abrir la app y devolver el DNS."
         },
         "check": {
             "title": "¿Lo usan los dispositivos?",

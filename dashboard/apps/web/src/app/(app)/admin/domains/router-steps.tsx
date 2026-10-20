@@ -26,8 +26,8 @@ import { ChevronDown, ExternalLink } from "lucide-react";
 import {
     detectRouterBrand,
     fitRuleNames,
-    likelyGateway,
     mergeProtocolRules,
+    routerAdminUrl,
     routerBrandsFor,
     routerGuide,
     FORWARD_RULES,
@@ -67,6 +67,14 @@ function bold(chunks: ReactNode[]) {
     );
 }
 
+/** A range rule fills the same single field with `start-end`, which every brand's
+ *  form accepts - it is how a router is asked for a run of ports. */
+function portText(rule: RouterForwardRule): string {
+    return rule.endPort && rule.endPort !== rule.port
+        ? `${rule.port}-${rule.endPort}`
+        : `${rule.port}`;
+}
+
 /** One cell of the forwarding table: what to put in this field for this rule. */
 function ForwardValue({
     field,
@@ -84,15 +92,12 @@ function ForwardValue({
         case "protocol":
             return <code className="text-foreground">{rule.protocol}</code>;
         case "port":
-            // A range rule fills the same single field with `start-end`, which every
-            // brand's form accepts - it is how a router is asked for a run of ports.
-            return (
-                <code className="text-foreground">
-                    {rule.endPort && rule.endPort !== rule.port
-                        ? `${rule.port}-${rule.endPort}`
-                        : rule.port}
-                </code>
-            );
+            return <code className="text-foreground">{portText(rule)}</code>;
+        case "tcpPort":
+        case "udpPort":
+            return rule.protocol === (field.value === "tcpPort" ? "TCP" : "UDP") ? (
+                <code className="text-foreground">{portText(rule)}</code>
+            ) : null;
         case "portRange":
             return (
                 <code className="text-foreground">{`${rule.port} ~ ${rule.endPort ?? rule.port}`}</code>
@@ -132,8 +137,7 @@ export function RouterSteps({
     }, [detected]);
 
     const guide = routerGuideIn(t, routerGuide(brand));
-    const gateway = likelyGateway(lanIp);
-    const adminUrl = guide.admin ?? (gateway ? `http://${gateway}` : null);
+    const adminUrl = routerAdminUrl(guide, lanIp);
     // Named for the form in front of the operator rather than for Polaris: a brand
     // whose Name field is too short to hold `polaris-games-tcp` gets it shortened
     // here, so what the page shows is what the router will accept.
@@ -183,29 +187,34 @@ export function RouterSteps({
                 <div className="flex flex-col gap-3">
                     <ol className="ml-4 flex list-decimal flex-col gap-2">
                         <li>
-                            {t("domainsRouter.steps.openAdmin")}{" "}
-                            {adminUrl
-                                ? t.rich(
-                                      guide.admin === null
-                                          ? "domainsRouter.steps.adminGateway"
-                                          : "domainsRouter.steps.adminKnown",
-                                      {
-                                          brand: guide.label,
-                                          url: adminUrl,
-                                          link: (chunks) => (
-                                              <a
-                                                  key="link"
-                                                  href={adminUrl}
-                                                  target="_blank"
-                                                  rel="noreferrer noopener"
-                                                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                                              >
-                                                  {chunks} <ExternalLink className="size-3" />
-                                              </a>
-                                          )
-                                      }
-                                  )
-                                : t("domainsRouter.steps.adminUnknown")}
+                            {guide.app
+                                ? t("domainsRouter.steps.openApp", { app: guide.app })
+                                : null}
+                            {guide.app ? null : <>{t("domainsRouter.steps.openAdmin")} </>}
+                            {guide.app
+                                ? null
+                                : adminUrl
+                                  ? t.rich(
+                                        guide.admin === null
+                                            ? "domainsRouter.steps.adminGateway"
+                                            : "domainsRouter.steps.adminKnown",
+                                        {
+                                            brand: guide.label,
+                                            url: adminUrl,
+                                            link: (chunks) => (
+                                                <a
+                                                    key="link"
+                                                    href={adminUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                >
+                                                    {chunks} <ExternalLink className="size-3" />
+                                                </a>
+                                            )
+                                        }
+                                    )
+                                  : t("domainsRouter.steps.adminUnknown")}
                         </li>
                         <li>
                             {t("domainsRouter.steps.signIn")} {guide.signIn}
@@ -363,14 +372,16 @@ export function RouterSteps({
                             </li>
                         )}
                         <li>{t("domainsRouter.steps.checkAgain")}</li>
-                        <li>
-                            {guide.remotePath
-                                ? t.rich("domainsRouter.steps.remote", {
-                                      path: guide.remotePath,
-                                      b: bold
-                                  })
-                                : t("domainsRouter.steps.remoteGeneric")}
-                        </li>
+                        {guide.app ? null : (
+                            <li>
+                                {guide.remotePath
+                                    ? t.rich("domainsRouter.steps.remote", {
+                                          path: guide.remotePath,
+                                          b: bold
+                                      })
+                                    : t("domainsRouter.steps.remoteGeneric")}
+                            </li>
+                        )}
                     </ol>
 
                     {guide.caution && <p className="text-foreground">{guide.caution}</p>}

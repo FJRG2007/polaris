@@ -276,7 +276,9 @@
             "tplink": "On a Deco, the same field is in the app under More > Advanced > DHCP Server. Restart the main Deco after saving.",
             "unifi": "Devices pick it up when their lease renews, usually within a day. Turning a device off and on again is quicker.",
             "netgear": "Devices keep the router as their DNS server, so nothing changes on them and no reconnect is needed.",
-            "zte": "Some provider builds lock this page or quietly undo the change; if no device shows up below, ask your provider to set it. If phones still show ads, they get the provider's DNS over IPv6: ask your provider to turn IPv6 off."
+            "zte": "Some provider builds lock this page or quietly undo the change; if no device shows up below, ask your provider to set it. If phones still show ads, they get the provider's DNS over IPv6: ask your provider to turn IPv6 off.",
+            "eero": "Custom DNS is greyed out while any eero Plus filter is on: turn those off first. Saving restarts the network.",
+            "googlewifi": "If the network stops loading pages after saving, a phone on mobile data can still open the app and put the DNS back."
         },
         "check": {
             "title": "Are devices using it?",

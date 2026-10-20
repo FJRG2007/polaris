@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MessagesWrapper, withMessages } from "../setup/i18n";
 import { gameForwardRules, routerBrandsFor } from "@/lib/router-guide";
 
@@ -108,6 +108,51 @@ describe("the forward guides on the Domains page", () => {
             withMessages(<RouterSteps server="FRITZ!OS" lanIp="10.0.0.5" />)
         );
         expect(html).toContain("FRITZ!Box");
+    });
+
+    it("walks a provider box through its own Spanish menus once the steps are open", async () => {
+        render(<RouterSteps server="Livebox" lanIp="10.0.0.5" />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByRole("button", { name: /exactly what to do/i }));
+        expect(
+            await screen.findByText("Configuración avanzada > Configuración de red > NAT/PAT")
+        ).toBeTruthy();
+        expect(document.body.textContent).toContain("http://192.168.1.1");
+    });
+
+    it("sends an app-only mesh system to its app, with no admin page to open or turn off", async () => {
+        Element.prototype.scrollIntoView ??= vi.fn();
+        render(<RouterSteps server={null} lanIp="10.0.0.5" />, { wrapper: MessagesWrapper });
+        const picker = screen.getByRole("combobox");
+        fireEvent.click(picker);
+        fireEvent.click(await screen.findByRole("option", { name: "eero" }));
+        fireEvent.click(screen.getByRole("button", { name: /exactly what to do/i }));
+        expect(await screen.findByText(/Open the eero app/)).toBeTruthy();
+        expect(screen.queryByRole("link", { name: /Open the router/ })).toBeNull();
+        expect(document.body.textContent).not.toContain("http://10.0.0.1");
+        expect(document.body.textContent).not.toContain("remote-management");
+    });
+
+    it("puts D-Link's port in the box for the rule's transport and no Protocol row", async () => {
+        render(<RouterSteps server="D-Link" lanIp="10.0.0.5" />, { wrapper: MessagesWrapper });
+        fireEvent.click(screen.getByRole("button", { name: /exactly what to do/i }));
+        const tcp = (await screen.findByText("TCP Port")).closest("tr")!;
+        expect(tcp.textContent).toContain("80");
+        expect(tcp.textContent).toContain("443");
+        expect(screen.getByText("UDP Port").closest("tr")!.textContent).toBe("UDP Port");
+        expect(screen.queryByText("Protocol")).toBeNull();
+    });
+
+    it("offers the app-only mesh systems to the ad blocker with their app's path", () => {
+        expect(brands.map((brand) => brand.value)).toEqual(
+            expect.arrayContaining(["googlewifi", "eero"])
+        );
+        const html = renderToStaticMarkup(
+            withMessages(<RouterDnsSteps brand="eero" address="10.0.0.5" />)
+        );
+        expect(html).toContain("eero app &gt; Settings &gt; Advanced networking &gt; DNS");
+        expect(html).toContain("eero Plus");
     });
 
     it("renders the game-port rules from the same catalogue", () => {

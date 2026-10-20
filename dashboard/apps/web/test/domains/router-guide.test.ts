@@ -15,6 +15,7 @@ import {
     gameForwardRules,
     likelyGateway,
     mergeProtocolRules,
+    routerAdminUrl,
     routerBrandsFor,
     routerGuide,
     ROUTER_BRANDS
@@ -50,7 +51,11 @@ describe("the instructions themselves", () => {
     it("is written in English, whatever market the router ships in", () => {
         // The menus are read off the router's own page, which the operator can switch
         // to their language; a half-translated path matches neither.
+        // Except the provider boxes whose firmware has no English at all, where the
+        // Spanish label is the only one the page will ever show.
+        const spanishOnly = ["movistar", "livebox", "vodafone"];
         for (const brand of ROUTER_BRANDS) {
+            if (spanishOnly.includes(brand.id)) continue;
             expect(brand.forwardPath).not.toMatch(/Reenvio|Seguridad|puertos/i);
         }
     });
@@ -342,8 +347,6 @@ describe("one catalogue for every router topic", () => {
             expect(offered.at(-1)?.id).toBe("other");
             for (const brand of offered) expect(brand.topics).toContain(topic);
         }
-        // UniFi and OpenWrt forwarding was not checked against their docs.
-        expect(routerBrandsFor("forward").map((brand) => brand.id)).not.toContain("unifi");
         expect(routerBrandsFor("dns").map((brand) => brand.id)).toContain("unifi");
         // ISP routers hand out the DNS from their DHCP Server page like any other.
         expect(routerBrandsFor("dns").map((brand) => brand.id)).toEqual(
@@ -367,7 +370,136 @@ describe("one catalogue for every router topic", () => {
             "fritzbox",
             "netgear",
             "mikrotik",
+            "unifi",
+            "openwrt",
+            "movistar",
+            "livebox",
+            "vodafone",
+            "sagemcom",
+            "nokia",
+            "xiaomi",
+            "linksys",
+            "dlink",
+            "mercusys",
+            "tenda",
+            "googlewifi",
+            "eero",
             "other"
         ]);
+    });
+});
+
+describe("the routers people actually have", () => {
+    const forward = routerBrandsFor("forward").map((brand) => brand.id);
+    const dns = routerBrandsFor("dns").map((brand) => brand.id);
+
+    it("offers UniFi and OpenWrt for forwarding now that their docs were read", () => {
+        // They were only in the ad blocker's picker, so the Domains page had no
+        // entry for two of the most common self-hosted routers.
+        expect(forward).toEqual(expect.arrayContaining(["unifi", "openwrt"]));
+        expect(routerGuide("unifi").forwardPath).toContain("Policy Engine > Port Forwarding");
+        expect(routerGuide("unifi").reserve).toMatchObject({ kind: "device" });
+        expect(routerGuide("openwrt").forwardPath).toBe("Network > Firewall > Port Forwards > Add");
+        expect(routerGuide("openwrt").forwardSave).toBe("Save & Apply");
+        expect(routerGuide("openwrt").combinedProtocol).toBe("TCP+UDP");
+    });
+
+    it("names the provider boxes by the provider, since that is what is on the box", () => {
+        expect(routerGuide("movistar").label).toBe("Movistar / O2");
+        expect(routerGuide("livebox").label).toBe("Orange / Jazztel Livebox");
+        expect(routerGuide("vodafone").label).toBe("Vodafone (Sercomm)");
+        // Quoted as the Spanish-only firmware shows them.
+        expect(routerGuide("movistar").forwardPath).toBe("Puertos");
+        expect(routerGuide("livebox").forwardPath).toBe(
+            "Configuración avanzada > Configuración de red > NAT/PAT"
+        );
+        expect(routerGuide("vodafone").forwardPath).toContain("Modo Experto");
+    });
+
+    it("keeps a provider box out of the ad blocker's picker when its build locks the DNS", () => {
+        // A Livebox hands out itself and cannot be told otherwise; Movistar's portal
+        // has no DNS field and its advanced menu reverts. Listing them would send
+        // somebody to a field that is not there.
+        for (const id of ["movistar", "livebox", "vodafone"] as const) {
+            expect(forward, id).toContain(id);
+            expect(dns, id).not.toContain(id);
+        }
+        expect(routerGuide("livebox").caution).toMatch(/DNS server cannot be changed/);
+    });
+
+    it("walks the app-only mesh systems through their app, and says there is no admin page", () => {
+        for (const id of ["googlewifi", "eero"] as const) {
+            const guide = routerGuide(id);
+            expect(forward, id).toContain(id);
+            expect(dns, id).toContain(id);
+            expect(guide.app, id).not.toBeNull();
+            expect(guide.admin, id).toBeNull();
+            expect(guide.caution, id).toMatch(/no admin page/);
+            // Both answer devices themselves, so the blocker sees only the router.
+            expect(guide.dns?.mode, id).toBe("relay");
+        }
+        expect(routerGuide("googlewifi").forwardPath).toContain("Port management");
+        expect(routerGuide("eero").forwardPath).toContain("Reservations & port forwarding");
+    });
+
+    it("uses each vendor's own form labels where its docs name them", () => {
+        expect(routerGuide("linksys").forwardFields?.map((field) => field.label)).toEqual([
+            "Application name",
+            "External Port",
+            "Internal Port",
+            "Protocol",
+            "Device IP#"
+        ]);
+        expect(routerGuide("mercusys").forwardFields?.map((field) => field.label)).toEqual([
+            "Service Name",
+            "Device IP Address",
+            "External Port",
+            "Internal Port",
+            "Protocol"
+        ]);
+        expect(routerGuide("dlink").forwardPath).toBe("Features > Port Forwarding > Add Rule");
+        expect(routerGuide("tenda").forwardPath).toBe("Advanced Settings > Virtual Server");
+        expect(routerGuide("xiaomi").forwardPath).toBe("Advanced > Port forwarding > Add rule");
+        expect(routerGuide("nokia").forwardPath).toBe("Application > Port Forwarding");
+        expect(routerGuide("sagemcom").forwardPath).toContain("Access Control > Port Forwarding");
+    });
+
+    it("merges the two call rules on the brands whose Protocol field does both", () => {
+        const call = [
+            { name: "polaris-call-udp", protocol: "UDP", port: 7881 },
+            { name: "polaris-call-tcp", protocol: "TCP", port: 7882 }
+        ];
+        for (const id of ["openwrt", "linksys", "tenda", "googlewifi"] as const) {
+            expect(mergeProtocolRules(call, routerGuide(id).combinedProtocol), id).toHaveLength(1);
+        }
+    });
+
+    it("recognizes the new brands from the header their firmware sends", () => {
+        expect(detectRouterBrand("Livebox")).toBe("livebox");
+        expect(detectRouterBrand("Movistar Fibra")).toBe("movistar");
+        expect(detectRouterBrand("Vodafone Power Station")).toBe("vodafone");
+        expect(detectRouterBrand("D-Link")).toBe("dlink");
+        expect(detectRouterBrand("Linksys")).toBe("linksys");
+        expect(detectRouterBrand("Sagemcom")).toBe("sagemcom");
+        expect(detectRouterBrand("OpenWrt")).toBe("openwrt");
+    });
+
+    it("leaves a box that names only the maker that built it to the generic guide", () => {
+        for (const header of ["Arcadyan httpd 1.0", "Sercomm", "Askey", "Mitrastar"]) {
+            expect(detectRouterBrand(header), header).toBe("other");
+        }
+    });
+
+    it("splits D-Link's port between its TCP and UDP boxes instead of asking for a protocol", () => {
+        const values = routerGuide("dlink").forwardFields?.map((field) => field.value);
+        expect(values).toEqual(["name", "ip", "tcpPort", "udpPort"]);
+    });
+
+    it("offers no admin page to open on the app-only mesh systems", () => {
+        for (const id of ["googlewifi", "eero"] as const) {
+            expect(routerAdminUrl(routerGuide(id), "192.168.86.20"), id).toBeNull();
+        }
+        expect(routerAdminUrl(routerGuide("other"), "192.168.1.20")).toBe("http://192.168.1.1");
+        expect(routerAdminUrl(routerGuide("tplink"), null)).toBe("http://tplinkwifi.net");
     });
 });
