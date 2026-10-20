@@ -80,6 +80,11 @@ describe("pageContextFrom", () => {
         expect(pageContextSchema.safeParse(context).success).toBe(true);
     });
 
+    it("leaves out what the tab says is waiting", () => {
+        expect(pageContextFrom("/chat", "(1) Chat", null).title).toBe("Chat");
+        expect(pageContextFrom("/chat", "\u2022 Chat", null).title).toBe("Chat");
+    });
+
     it("survives an address that does not decode", () => {
         expect(() => pageContextFrom("/drive/%E0%A4%A", "Drive", null)).not.toThrow();
     });

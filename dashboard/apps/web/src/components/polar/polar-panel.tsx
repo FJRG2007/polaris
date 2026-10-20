@@ -126,6 +126,7 @@ import {
     type PageContext,
     type QueuedMessage
 } from "@/lib/polar/shared";
+import { titleWithBadge } from "@/lib/favicon-style";
 import { NO_VOICE, type VoiceAvailability } from "@/lib/polar/voice-call";
 import {
     DictationButton,
@@ -194,7 +195,9 @@ export function pageContextFrom(
     const selection = (extra?.selection ?? []).map(cleanContextText).filter(Boolean).slice(0, 20);
     return {
         route: pathname,
-        title: cleanContextText(title) || undefined,
+        // The tab's title carries what is waiting in front of it ("(1) Chat"),
+        // which is the tab's business and not the page's name.
+        title: cleanContextText(titleWithBadge(title, null)) || undefined,
         ids: Object.keys(ids).length ? ids : undefined,
         record:
             recordId && recordKind

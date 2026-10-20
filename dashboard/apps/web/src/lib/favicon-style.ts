@@ -97,7 +97,9 @@ export function onFaviconStyleChange(listener: () => void): () => void {
 
 /** A stored value that may have been written by another build, or by hand. */
 export function asFaviconStyle(value: string | null | undefined): FaviconStyle {
-    return FAVICON_STYLES.includes(value as FaviconStyle) ? (value as FaviconStyle) : DEFAULT_FAVICON_STYLE;
+    return FAVICON_STYLES.includes(value as FaviconStyle)
+        ? (value as FaviconStyle)
+        : DEFAULT_FAVICON_STYLE;
 }
 
 /**
@@ -117,7 +119,7 @@ export function faviconBadge(style: FaviconStyle, waiting: number): FaviconBadge
 }
 
 /** A prefix this module put on a title, and nothing a page named itself. */
-const TITLE_BADGE = /^(?:\(\d+\+?\) |\u2022 )/;
+const TITLE_BADGE = /^(?:\(\d+\+?\) |\u2022 )+/;
 
 /**
  * The tab's title with what is waiting in front of it - "(3) Chat", or a dot -

@@ -17,6 +17,7 @@ describe("titleWithBadge", () => {
     it("replaces its own prefix instead of stacking", () => {
         expect(titleWithBadge("(3) Chat", { kind: "count", label: "4" })).toBe("(4) Chat");
         expect(titleWithBadge("\u2022 Chat", { kind: "count", label: "1" })).toBe("(1) Chat");
+        expect(titleWithBadge("(1) (1) Chat", { kind: "count", label: "2" })).toBe("(2) Chat");
     });
 
     it("takes the prefix off when nothing is waiting", () => {
