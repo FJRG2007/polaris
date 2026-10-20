@@ -428,6 +428,14 @@
             "tokens": "Tokens",
             "cost": "Coste est.",
             "unpriced": "{count} respuestas usaron modelos sin precio publicado y solo cuentan tokens."
+        },
+        "polarFeedback": {
+            "title": "Cómo se valoraron las respuestas",
+            "description": "Valoraciones buenas y malas de los últimos 30 días, y las malas más recientes.",
+            "good": "Valorada buena",
+            "bad": "Valorada mala",
+            "failed": "No se pudieron cargar las valoraciones.",
+            "empty": "Aún no hay respuestas valoradas como malas."
         }
     },
     "display": {

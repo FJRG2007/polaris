@@ -576,5 +576,16 @@
         "detail": "{used} de {window} tokens ({share}%), {draft} de ellos en tu mensaje",
         "short": "{share}% del contexto",
         "over": "Este chat ya no cabe en este modelo. Compáctalo antes de enviar."
+    },
+    "feedback": {
+        "reasons": {
+            "incorrect": "No es correcta",
+            "instructions": "Ignoró lo que pedí",
+            "incomplete": "Incompleta",
+            "style": "Tono o estilo malos",
+            "slow": "Demasiado lenta",
+            "unsafe": "Dañina o peligrosa",
+            "other": "Otra cosa"
+        }
     }
 }

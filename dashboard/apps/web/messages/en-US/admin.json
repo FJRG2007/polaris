@@ -428,6 +428,14 @@
             "tokens": "Tokens",
             "cost": "Est. cost",
             "unpriced": "{count} answers were on models with no published price and count tokens only."
+        },
+        "polarFeedback": {
+            "title": "How Polar's answers were rated",
+            "description": "Good and bad marks people gave answers in the last 30 days, and the latest bad ones.",
+            "good": "Marked good",
+            "bad": "Marked bad",
+            "failed": "Answer ratings could not be loaded.",
+            "empty": "No answer has been marked bad yet."
         }
     },
     "display": {

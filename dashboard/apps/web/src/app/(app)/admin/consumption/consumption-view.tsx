@@ -26,6 +26,7 @@ import { useLiveResource } from "@/components/use-live-resource";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { PolarisFootprintCard } from "@/app/(app)/apps/containers/polaris-footprint";
 import { PolarSpendCard } from "@/app/(app)/admin/consumption/polar-spend-card";
+import { PolarFeedbackCard } from "@/app/(app)/admin/consumption/polar-feedback-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, cn, EmptyState, PageHeader, Skeleton } from "@polaris/ui";
@@ -129,6 +130,7 @@ export function ConsumptionView() {
                     <ConsumptionSplit consumption={data} />
                     <PolarisFootprintCard />
                     <PolarSpendCard />
+                    <PolarFeedbackCard />
                     {(data?.groups ?? []).map((group) =>
                         group.id === "polaris" ? null : (
                             <ConsumptionGroupTable key={group.id} group={group} />

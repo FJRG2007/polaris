@@ -576,5 +576,16 @@
         "detail": "{used} of {window} tokens ({share}%), {draft} of them in your message",
         "short": "{share}% of context",
         "over": "This chat no longer fits this model. Compact it before sending."
+    },
+    "feedback": {
+        "reasons": {
+            "incorrect": "Not correct",
+            "instructions": "Ignored what I asked",
+            "incomplete": "Incomplete",
+            "style": "Wrong tone or style",
+            "slow": "Too slow",
+            "unsafe": "Harmful or unsafe",
+            "other": "Something else"
+        }
     }
 }
