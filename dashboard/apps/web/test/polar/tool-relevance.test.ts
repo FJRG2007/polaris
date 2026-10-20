@@ -119,7 +119,7 @@ describe("read_current_view", () => {
 
     it("never reads a vault item and points elsewhere for unknown kinds", async () => {
         const call = vi.fn();
-        for (const kind of ["vault item", "server"]) {
+        for (const kind of ["vault item", "server", "installed app", "deploy project"]) {
             const set = relevance.currentViewTool(context({ kind, id: "1" }), call as never);
             const output = (await run(set, relevance.READ_CURRENT_VIEW, {})) as { text: string };
             expect(output.text).toContain("find_tools");

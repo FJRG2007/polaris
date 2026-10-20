@@ -9,9 +9,10 @@
  * run as the person, and any that can change something waits for an approval
  * in the chat (`toolApproval`). The page context arrives fenced as data, on
  * the question it was asked with (`withScreenNotes`), never in the system
- * prompt: the prompt and the tools stay byte-identical across screens, so the
- * provider's prompt cache keeps hitting. The model is sent the core tools and
- * the current app's (`tool-relevance.ts`); `find_tools` brings in the rest.
+ * prompt: the prompt stays byte-identical across screens and the tools across
+ * screens of one app, so the provider's prompt cache keeps hitting. The model
+ * is sent the core tools and the current app's (`tool-relevance.ts`);
+ * `find_tools` brings in the rest.
  */
 
 import { z } from "zod";
@@ -186,7 +187,9 @@ export async function POST(request: Request): Promise<Response> {
     // them still reads as valid.
     const memoryTools = polarMemoryTools(user.id, body.data.threadId);
     const screenTools = {
-        ...currentViewTool(body.data.context, toolset.call),
+        ...currentViewTool(body.data.context, async (name, input) =>
+            off.has(name) ? null : toolset.call(name, input)
+        ),
         ...findToolsTool(catalog)
     };
     const checked = await safeValidateUIMessages({

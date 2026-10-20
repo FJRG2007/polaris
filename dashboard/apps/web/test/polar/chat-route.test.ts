@@ -167,7 +167,10 @@ vi.mock("@/lib/polar/tools", () => ({
             { name: "read_tasks", description: "Lists tasks", category: "polaris" },
             { name: "delete_task", description: "Deletes a task", category: "polaris" }
         ],
-        call: async () => null
+        call: async (name: string) => {
+            state.executed.push(name);
+            return { ok: true, text: "Task T-1: write the report" };
+        }
     })
 }));
 
@@ -554,6 +557,31 @@ describe("Polar on the web", () => {
         const names = await offered(body({ off: ["read_tasks"] }));
         expect(names).not.toContain("read_tasks");
         expect(names).toContain("delete_task");
+    });
+
+    it("reads the record on screen through its reader", async () => {
+        state.parts = calls("read_current_view", {});
+        const text = await (
+            await post(
+                body({ context: { route: "/tasks/T-1", record: { kind: "task", id: "T-1" } } })
+            )
+        ).text();
+        expect(state.executed).toEqual(["tasks_get"]);
+        expect(text).toContain("write the report");
+    });
+
+    it("does not read the record on screen through a tool switched off", async () => {
+        state.parts = calls("read_current_view", {});
+        const text = await (
+            await post(
+                body({
+                    context: { route: "/tasks/T-1", record: { kind: "task", id: "T-1" } },
+                    off: ["tasks_get"]
+                })
+            )
+        ).text();
+        expect(state.executed).toEqual([]);
+        expect(text).not.toContain("write the report");
     });
 
     it("still reads an older turn that searched, whatever this turn may use", async () => {

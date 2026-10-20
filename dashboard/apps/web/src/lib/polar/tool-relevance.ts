@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { tool, type ToolSet } from "ai";
+import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import type { McpCategory } from "@/lib/mcp/scope-table";
 import { fenceScreen, type PageContext } from "@/lib/polar/shared";
 
@@ -142,13 +142,17 @@ export function usedInMessages(
     return used;
 }
 
+const findToolsInput = z.object({ query: z.string().min(1).max(200) });
+
 /** `find_tools`: searches every tool the person may use. Read-only. */
 export function findToolsTool(catalog: readonly CatalogEntry[]): ToolSet {
     return {
         [FIND_TOOLS]: tool({
             description:
                 "Find more Polaris tools by what you need to do (e.g. 'restart a deploy', 'minecraft players'). Returns names and one-line descriptions; the tools found can be called in the next step. Use it when no tool you have fits.",
-            inputSchema: z.object({ query: z.string().min(1).max(200) }),
+            inputSchema: findToolsInput as unknown as FlexibleSchema<
+                z.infer<typeof findToolsInput>
+            >,
             async execute({ query }) {
                 const found = rankTools(catalog, query);
                 return {
@@ -167,9 +171,7 @@ const READERS: Readonly<Record<string, { tool: string; input: (id: string) => un
     task: { tool: "tasks_get", input: (id) => ({ task: id }) },
     note: { tool: "notes_get", input: (id) => ({ noteId: id }) },
     "agent session": { tool: "agent_session_get", input: (id) => ({ sessionId: id }) },
-    "chat channel": { tool: "chat_messages", input: (id) => ({ conversationId: id }) },
-    "deploy project": { tool: "deploy_projects", input: () => ({}) },
-    "installed app": { tool: "games_servers", input: () => ({}) }
+    "chat channel": { tool: "chat_messages", input: (id) => ({ conversationId: id }) }
 };
 
 /** Kinds whose content is never read for the model, whatever tools exist. */
@@ -192,7 +194,7 @@ export function currentViewTool(context: PageContext | null, call: ToolCall): To
         [READ_CURRENT_VIEW]: tool({
             description:
                 "Read the record open on the person's current screen (the one in the newest <screen> note), with their access. Use it when they say 'this', 'here' or ask about what they are looking at.",
-            inputSchema: z.object({}),
+            inputSchema: z.object({}) as unknown as FlexibleSchema<Record<string, never>>,
             async execute() {
                 const screen = fenceScreen(context);
                 if (!context) return { text: "The person is not sharing their screen." };

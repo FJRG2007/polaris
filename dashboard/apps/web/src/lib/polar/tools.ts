@@ -70,6 +70,12 @@ export interface PolarToolSet {
     call: (name: string, input: unknown) => Promise<{ ok: boolean; text: string } | null>;
 }
 
+/** How one run as the person went, before it is worded for its caller. */
+type RunOutcome =
+    | { kind: "denied" }
+    | { kind: "invalid" }
+    | { kind: "ran"; ok: boolean; text: string; data: unknown };
+
 /** What a tool answers when it refused or failed, as the model reads it. */
 function failure(entry: McpTool<never>, error: unknown): string {
     if (error instanceof McpRefusal) return error.message;
@@ -84,6 +90,21 @@ function failure(entry: McpTool<never>, error: unknown): string {
 export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
     const caller = await polarCaller(user);
     const readers = new Map<string, McpTool<never>>();
+    const runAs = async (entry: McpTool<never>, input: unknown): Promise<RunOutcome> => {
+        // Checked again at the moment it runs: an approval can sit for a
+        // while, and a permission removed in between must hold.
+        const fresh = { ...caller, scopes: await sessionScopes(user) };
+        if (!callerMayUse(entry, fresh)) return { kind: "denied" };
+        // Checked as the model wrote it, parsed here: see `tool-input.ts`.
+        const parsed = entry.input.safeParse(input);
+        if (!parsed.success) return { kind: "invalid" };
+        try {
+            const answer = await entry.run(parsed.data as never, fresh);
+            return { kind: "ran", ok: true, text: answer.text, data: answer.structured ?? null };
+        } catch (error) {
+            return { kind: "ran", ok: false, text: failure(entry, error), data: null };
+        }
+    };
     const result: PolarToolSet = {
         tools: {},
         approval: {},
@@ -92,15 +113,11 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
         async call(name, input) {
             const entry = readers.get(name);
             if (!entry) return null;
-            const fresh = { ...caller, scopes: await sessionScopes(user) };
-            if (!callerMayUse(entry, fresh)) return null;
-            const parsed = entry.input.safeParse(input);
-            if (!parsed.success) return { ok: false, text: `${name} could not read that record.` };
-            try {
-                return { ok: true, text: (await entry.run(parsed.data as never, fresh)).text };
-            } catch (error) {
-                return { ok: false, text: failure(entry, error) };
-            }
+            const outcome = await runAs(entry, input);
+            if (outcome.kind === "denied") return null;
+            if (outcome.kind === "invalid")
+                return { ok: false, text: `${name} could not read that record.` };
+            return { ok: outcome.ok, text: outcome.text };
         }
     };
     const grants = await grantKeys(user.id);
@@ -117,26 +134,17 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
             description: entry.description,
             inputSchema: polarInputSchema(entry.input),
             async execute(written: unknown) {
-                // Checked again at the moment it runs: an approval can sit for a
-                // while, and a permission removed in between must hold.
-                const fresh = { ...caller, scopes: await sessionScopes(user) };
-                if (!callerMayUse(entry, fresh)) {
+                const outcome = await runAs(entry, written);
+                if (outcome.kind === "denied") {
                     return { ok: false, text: `You no longer have access to ${entry.name}.` };
                 }
-                // Checked as the model wrote it, parsed here: see `tool-input.ts`.
-                const parsed = entry.input.safeParse(written);
-                if (!parsed.success) {
+                if (outcome.kind === "invalid") {
                     return {
                         ok: false,
                         text: `${entry.name} was called with input it does not take.`
                     };
                 }
-                try {
-                    const answer = await entry.run(parsed.data as never, fresh);
-                    return { ok: true, text: answer.text, data: answer.structured ?? null };
-                } catch (error) {
-                    return { ok: false, text: failure(entry, error) };
-                }
+                return { ok: outcome.ok, text: outcome.text, data: outcome.data };
             }
         });
         if (writes) {
