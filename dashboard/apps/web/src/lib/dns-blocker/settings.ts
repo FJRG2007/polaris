@@ -123,6 +123,66 @@ export const DNS_LIST_SOURCES: readonly DnsListSource[] = [
     }
 ];
 
+/** How the blocked services are grouped on the screen. */
+export const DNS_SERVICE_GROUPS = ["social", "messaging", "video", "games", "other"] as const;
+export type DnsServiceGroup = (typeof DNS_SERVICE_GROUPS)[number];
+
+/** A service that can be blocked by name, each its own list in the engine. */
+export interface DnsService {
+    /** The service's id in the public registry its domains are read from. */
+    readonly id: string;
+    readonly name: string;
+    readonly group: DnsServiceGroup;
+}
+
+/**
+ * The services offered as switches. Only names and ids live here: the domains
+ * each one uses are downloaded from AdGuard's public services registry when the
+ * settings are saved (`services-registry.ts`), and stored with them. Every id
+ * was checked to be in that registry before it was written here.
+ */
+export const DNS_SERVICES: readonly DnsService[] = [
+    { id: "facebook", name: "Facebook", group: "social" },
+    { id: "instagram", name: "Instagram", group: "social" },
+    { id: "tiktok", name: "TikTok", group: "social" },
+    { id: "snapchat", name: "Snapchat", group: "social" },
+    { id: "twitter", name: "X (Twitter)", group: "social" },
+    { id: "reddit", name: "Reddit", group: "social" },
+    { id: "pinterest", name: "Pinterest", group: "social" },
+    { id: "linkedin", name: "LinkedIn", group: "social" },
+    { id: "tumblr", name: "Tumblr", group: "social" },
+    { id: "bluesky", name: "Bluesky", group: "social" },
+    { id: "whatsapp", name: "WhatsApp", group: "messaging" },
+    { id: "telegram", name: "Telegram", group: "messaging" },
+    { id: "discord", name: "Discord", group: "messaging" },
+    { id: "signal", name: "Signal", group: "messaging" },
+    { id: "youtube", name: "YouTube", group: "video" },
+    { id: "netflix", name: "Netflix", group: "video" },
+    { id: "twitch", name: "Twitch", group: "video" },
+    { id: "disneyplus", name: "Disney+", group: "video" },
+    { id: "hbomax", name: "HBO Max", group: "video" },
+    { id: "amazon_streaming", name: "Prime Video", group: "video" },
+    { id: "spotify", name: "Spotify", group: "video" },
+    { id: "roblox", name: "Roblox", group: "games" },
+    { id: "epic_games", name: "Epic Games (Fortnite)", group: "games" },
+    { id: "minecraft", name: "Minecraft", group: "games" },
+    { id: "steam", name: "Steam", group: "games" },
+    { id: "playstation", name: "PlayStation", group: "games" },
+    { id: "xboxlive", name: "Xbox Live", group: "games" },
+    { id: "nintendo", name: "Nintendo", group: "games" },
+    { id: "leagueoflegends", name: "League of Legends", group: "games" },
+    { id: "chatgpt", name: "ChatGPT", group: "other" },
+    { id: "tinder", name: "Tinder", group: "other" },
+    { id: "onlyfans", name: "OnlyFans", group: "other" }
+];
+
+const SERVICE_IDS: ReadonlySet<string> = new Set(DNS_SERVICES.map((service) => service.id));
+
+/** The engine's list group for a service. */
+export function dnsServiceList(id: string): string {
+    return `service-${id}`;
+}
+
 /** A resolver the blocker forwards allowed names to. */
 export interface DnsUpstreamPreset {
     readonly id: string;
@@ -170,6 +230,9 @@ export const DNS_LIMITS = {
     devices: 200,
     forwards: 50,
     groupClients: 50,
+    schedules: 20,
+    /** Names one service may block; the largest in the registry has under 500. */
+    serviceDomains: 1000,
     /** Days of lookups the engine keeps, which is as far back as the screen reads. */
     logDays: 30
 } as const;
@@ -337,6 +400,57 @@ export const dnsDeviceSchema = z.object({
         )
 });
 
+/** The engine's weekday names, Monday first as the screen lists them. */
+export const DNS_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+export type DnsWeekday = (typeof DNS_WEEKDAYS)[number];
+
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** A list group a schedule can switch: a category, or a service's own list. */
+const LIST_GROUP = /^[a-z0-9_-]{1,64}$/;
+
+/** Whether the runtime knows `zone` as an IANA time zone (`Europe/Madrid`). */
+export function isTimeZone(zone: string): boolean {
+    if (zone.length === 0 || zone.length > 64) return false;
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: zone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Hours in which some lists block, on some days, in the operator's own time.
+ * Outside them those lists let everything through. No start and end is the
+ * whole day; an end before the start runs past midnight into the next day.
+ */
+export const dnsScheduleSchema = z
+    .object({
+        lists: z
+            .array(
+                z
+                    .string()
+                    .refine((value) => LIST_GROUP.test(value) && value !== "default", "invalidList")
+            )
+            .min(1)
+            .max(40)
+            .transform((lists) => [...new Set(lists)]),
+        days: z
+            .array(z.enum(DNS_WEEKDAYS))
+            .min(1, "noDays")
+            .max(7)
+            .transform((days) => DNS_WEEKDAYS.filter((day) => days.includes(day))),
+        start: z.string().refine((value) => value === "" || TIME_OF_DAY.test(value), "invalidTime"),
+        end: z.string().refine((value) => value === "" || TIME_OF_DAY.test(value), "invalidTime")
+    })
+    .superRefine((schedule, ctx) => {
+        if ((schedule.start === "") !== (schedule.end === ""))
+            ctx.addIssue({ code: "custom", path: ["end"], message: "timePair" }); // i18n-ignore a key the screen says
+        else if (schedule.start !== "" && schedule.start === schedule.end)
+            ctx.addIssue({ code: "custom", path: ["end"], message: "sameTime" }); // i18n-ignore a key the screen says
+    });
+
 const clientSchema = z.string().transform((value, ctx) => {
     const client = normalizeDnsClient(value);
     if (!client) {
@@ -350,7 +464,14 @@ const clientSchema = z.string().transform((value, ctx) => {
 export const dnsClientGroupSchema = z.object({
     name: z.string().trim().min(1).max(40),
     clients: z.array(clientSchema).min(1).max(DNS_LIMITS.groupClients),
-    categories: z.array(z.enum(DNS_CATEGORIES)).max(DNS_CATEGORIES.length)
+    categories: z.array(z.enum(DNS_CATEGORIES)).max(DNS_CATEGORIES.length),
+    /** Services this group blocks besides its categories. Missing on a group
+     *  saved before services existed. */
+    services: z
+        .array(z.string().max(64))
+        .max(DNS_SERVICES.length)
+        .default([])
+        .transform((ids) => [...new Set(ids)].filter((id) => SERVICE_IDS.has(id)))
 });
 
 export const dnsCustomListSchema = z.object({
@@ -366,6 +487,53 @@ const upstreamSchema = z.string().transform((value, ctx) => {
     }
     return upstream;
 });
+
+/** Query types the engine can be told to answer empty, as Pi-hole's "block AAAA". */
+export const DNS_DROP_TYPES = ["AAAA", "HTTPS", "ANY"] as const;
+
+/**
+ * How the engine itself behaves, beyond what it blocks: how long answers are
+ * kept, which query types get an empty answer, what a blocked name answers, and
+ * whether a bare name (no dot) is sent out at all. Every default is what the
+ * engine ran before these could be set, so an install that never opens them
+ * runs exactly as it did.
+ */
+export const dnsEngineSchema = z
+    .object({
+        /** Keep every answer at least this long, in minutes; 0 follows its TTL. */
+        cacheMinMinutes: z.number().int().min(0).max(1440),
+        /** Keep no answer longer than this, in minutes; 0 follows its TTL. */
+        cacheMaxMinutes: z.number().int().min(0).max(1440),
+        /** Ask again ahead of time for names looked up often. */
+        prefetch: z.boolean(),
+        dropTypes: z
+            .array(z.enum(DNS_DROP_TYPES))
+            .max(DNS_DROP_TYPES.length)
+            .refine((types) => new Set(types).size === types.length, "duplicate"),
+        /** A blocked name answers 0.0.0.0 (zeroIp) or "no such name" (nxDomain). */
+        blockReply: z.enum(["zeroIp", "nxDomain"]),
+        /** Answer a bare name (no dot) here and never send it upstream. */
+        fqdnOnly: z.boolean(),
+        /** Check DNSSEC signatures; a forged or broken answer fails instead of resolving. */
+        dnssec: z.boolean().default(false)
+    })
+    .refine(
+        (engine) =>
+            engine.cacheMaxMinutes === 0 || engine.cacheMinMinutes <= engine.cacheMaxMinutes,
+        { message: "cacheRange", path: ["cacheMaxMinutes"] } // i18n-ignore a validation code, worded by the screen
+    );
+
+export type DnsEngine = z.infer<typeof dnsEngineSchema>;
+
+export const DEFAULT_DNS_ENGINE: DnsEngine = {
+    cacheMinMinutes: 0,
+    cacheMaxMinutes: 0,
+    prefetch: true,
+    dropTypes: [],
+    blockReply: "zeroIp",
+    fqdnOnly: false,
+    dnssec: false
+};
 
 export const dnsSettingsSchema = z.object({
     /** Ids from `DNS_LIST_SOURCES` that are on. Unknown ids are dropped on read. */
@@ -396,11 +564,27 @@ export const dnsSettingsSchema = z.object({
     youtube: z.enum(["off", "moderate", "strict"]),
     /** Devices named by hand, which win over a name the router reports. */
     devices: z.array(dnsDeviceSchema).max(DNS_LIMITS.devices),
+    /** When lists block, in `timeZone`. A list with no schedule always blocks. */
+    schedules: z.array(dnsScheduleSchema).max(DNS_LIMITS.schedules),
+    /** The zone schedules are written in, or "" before one was chosen (UTC). */
+    timeZone: z
+        .string()
+        .trim()
+        .refine((value) => value === "" || isTimeZone(value), "invalidTimeZone"),
+    /** Services blocked for every device, by id from `DNS_SERVICES`. */
+    services: z.array(z.string().max(64)).max(DNS_SERVICES.length),
+    /** The names each service blocks, downloaded when the settings were saved.
+     *  Written by the save path only, never taken from the screen. */
+    serviceDomains: z.record(
+        z.string().max(64),
+        z.array(z.string().max(256)).max(DNS_LIMITS.serviceDomains)
+    ),
     /** The router asked for device names (reverse lookups), or "" for none. */
     namesFrom: z
         .string()
         .trim()
-        .refine((value) => value === "" || IPV4.test(value), "invalidAddress")
+        .refine((value) => value === "" || IPV4.test(value), "invalidAddress"),
+    engine: dnsEngineSchema
 });
 
 export type DnsSettings = z.infer<typeof dnsSettingsSchema>;
@@ -410,6 +594,7 @@ export type DnsAlias = z.infer<typeof dnsAliasSchema>;
 export type DnsClientGroup = z.infer<typeof dnsClientGroupSchema>;
 export type DnsDevice = z.infer<typeof dnsDeviceSchema>;
 export type DnsForward = z.infer<typeof dnsForwardSchema>;
+export type DnsSchedule = z.infer<typeof dnsScheduleSchema>;
 
 export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     sources: DNS_LIST_SOURCES.filter((source) => source.recommended).map((source) => source.id),
@@ -427,8 +612,41 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     forwards: [],
     safeSearch: false,
     youtube: "off",
-    namesFrom: ""
+    schedules: [],
+    timeZone: "",
+    services: [],
+    serviceDomains: {},
+    namesFrom: "",
+    engine: DEFAULT_DNS_ENGINE
 };
+
+/** The categories that have a list on, in category order: the only ones the
+ *  engine has a group for, so the only ones a schedule can switch. */
+export function dnsListedCategories(
+    settings: Pick<DnsSettings, "sources" | "customLists">
+): DnsCategory[] {
+    const on = new Set<DnsCategory>(settings.customLists.map((list) => list.category));
+    for (const source of DNS_LIST_SOURCES)
+        if (settings.sources.includes(source.id)) on.add(source.category);
+    return DNS_CATEGORIES.filter((category) => on.has(category));
+}
+
+/** Every service some device blocks: for everybody, or in a group. */
+export function dnsServicesInUse(
+    settings: Pick<DnsSettings, "services" | "clientGroups">
+): string[] {
+    const ids = new Set(settings.services);
+    for (const group of settings.clientGroups) for (const id of group.services ?? []) ids.add(id);
+    return DNS_SERVICES.map((service) => service.id).filter((id) => ids.has(id));
+}
+
+/** Every list a schedule can switch: the categories with a list on, then the
+ *  services in use. */
+export function dnsSchedulableLists(
+    settings: Pick<DnsSettings, "sources" | "customLists" | "services" | "clientGroups">
+): string[] {
+    return [...dnsListedCategories(settings), ...dnsServicesInUse(settings).map(dnsServiceList)];
+}
 
 /**
  * Settings read back from storage, whole whatever was stored.
@@ -466,6 +684,21 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         forwards: field("forwards"),
         safeSearch: field("safeSearch"),
         youtube: field("youtube"),
-        namesFrom: field("namesFrom")
+        schedules: field("schedules"),
+        timeZone: field("timeZone"),
+        services: field("services").filter((id) => SERVICE_IDS.has(id)),
+        serviceDomains: Object.fromEntries(
+            Object.entries(field("serviceDomains"))
+                .filter(([id]) => SERVICE_IDS.has(id))
+                .map(([id, names]) => [
+                    id,
+                    names.flatMap((name) => {
+                        const rule = normalizeDnsRule(name);
+                        return rule && !rule.startsWith("/") ? [rule] : [];
+                    })
+                ])
+        ),
+        namesFrom: field("namesFrom"),
+        engine: field("engine")
     };
 }

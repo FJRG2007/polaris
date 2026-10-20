@@ -12,7 +12,9 @@
     },
     "status": {
         "title": "Estado",
-        "check": "Comprobar"
+        "check": "Comprobar",
+        "stale": "El servidor DNS usa ajustes anteriores a estos, de antes de un cambio de hora o una actualización.",
+        "apply": "Aplicar ya"
     },
     "states": {
         "off": {
@@ -123,7 +125,8 @@
         "refresh": "Actualizar listas cada (horas)",
         "save": "Guardar",
         "saveApply": "Guardar y aplicar",
-        "saved": "Guardado."
+        "saved": "Guardado.",
+        "unsaved": "Cambios sin guardar."
     },
     "validation": {
         "invalidUrl": "Escribe una dirección http o https.",
@@ -139,7 +142,13 @@
         "invalidDeviceAddress": "No es una dirección IP, como 192.168.1.20.",
         "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios.",
         "invalidDomain": "No es un dominio.",
-        "invalidForwardServer": "No es un servidor, como 192.168.1.1."
+        "invalidForwardServer": "No es un servidor, como 192.168.1.1.",
+        "invalidTime": "Escribe una hora como 21:00.",
+        "timePair": "Pon las dos horas, o ninguna para todo el día.",
+        "sameTime": "El inicio y el final no pueden ser la misma hora.",
+        "invalidTimeZone": "No es una zona horaria conocida.",
+        "cacheMinutes": "Escribe minutos enteros de 0 a 1440.",
+        "cacheRange": "El tiempo mínimo no puede pasar del máximo."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -151,7 +160,9 @@
         "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
         "generic": "No ha funcionado. Inténtalo de nuevo en un momento.",
         "notRunning": "El servidor DNS no está en marcha. Activa primero el bloqueo.",
-        "notAnswering": "El servidor DNS no ha respondido. Espera un momento y vuelve a intentarlo."
+        "notAnswering": "El servidor DNS no ha respondido. Espera un momento y vuelve a intentarlo.",
+        "servicesOffline": "No se pudieron descargar los dominios de los servicios y no se guardó nada. Revisa la conexión de esta máquina y guarda otra vez.",
+        "servicesMissing": "Algunos servicios ya no están en la lista pública y no se guardó nada. Desactívalos y guarda otra vez."
     },
     "insights": {
         "title": "Actividad",
@@ -254,13 +265,23 @@
         "name": "Nombre",
         "namePlaceholder": "Tablets niños",
         "clients": "Dispositivos: una dirección, un rango o un nombre, uno por línea",
-        "add": "Añadir grupo"
+        "add": "Añadir grupo",
+        "addService": "Bloquear un servicio",
+        "removeService": "Dejar de bloquear {name}"
     },
     "history": {
-        "title": "Historial y nombres",
+        "title": "Historial de un año",
         "days": "Días de consultas guardados",
         "namesFrom": "Router con nombres de equipos",
-        "namesFromHint": "Su dirección. Así los dispositivos se muestran por nombre en vez de por dirección. Déjalo vacío para ver direcciones."
+        "namesFromHint": "Su dirección. Así los dispositivos se muestran por nombre en vez de por dirección. Déjalo vacío para ver direcciones.",
+        "intro": "Cada día terminado, guardado un año. Hoy está en la tarjeta de arriba.",
+        "empty": "Los días aparecen aquí cuando cada uno termina.",
+        "perDay": "Consultas por día",
+        "ranges": {
+            "30d": "30 días",
+            "90d": "90 días",
+            "365d": "1 año"
+        }
     },
     "routerGuide": {
         "brand": "Tu router",
@@ -322,5 +343,133 @@
         "youtubeOff": "No",
         "youtubeModerate": "Moderado",
         "youtubeStrict": "Estricto"
+    },
+    "schedules": {
+        "title": "Horarios",
+        "intro": "Listas que bloquean solo a ciertas horas, en todos los equipos. Fuera de esas horas dejan pasar todo.",
+        "empty": "Sin horarios. Cada lista activa bloquea todo el día.",
+        "noLists": "Activa una lista arriba para programarla.",
+        "lists": "Bloquear",
+        "days": "Estos días",
+        "whole": "Día entero",
+        "from": "Desde",
+        "to": "Hasta",
+        "zone": "Zona horaria",
+        "zoneSearch": "Buscar zona horaria",
+        "zoneEmpty": "Ninguna zona coincide.",
+        "everyDay": "Cada día",
+        "allDay": "todo el día",
+        "notOn": "{name} (sin lista activa)",
+        "add": "Añadir horario",
+        "remove": "Quitar horario"
+    },
+    "weekdays": {
+        "mon": "Lun",
+        "tue": "Mar",
+        "wed": "Mié",
+        "thu": "Jue",
+        "fri": "Vie",
+        "sat": "Sáb",
+        "sun": "Dom"
+    },
+    "services": {
+        "title": "Servicios bloqueados",
+        "intro": "Bloquea una app o web por nombre en todos los equipos, o solo en un grupo. Sus dominios se descargan de la lista pública de AdGuard al guardar.",
+        "search": "Buscar servicio",
+        "none": "Ningún servicio coincide.",
+        "groups": {
+            "social": "Redes sociales",
+            "messaging": "Mensajería",
+            "video": "Vídeo y música",
+            "games": "Juegos",
+            "other": "Otros"
+        }
+    },
+    "log": {
+        "off": "Las consultas salen aquí con el bloqueo.",
+        "overview": "Ir al resumen"
+    },
+    "engine": {
+        "title": "Motor",
+        "intro": "Cómo responde el bloqueador, más allá de qué bloquea.",
+        "cacheMin": "Guardar respuestas mínimo (min)",
+        "cacheMax": "Guardar respuestas máximo (min)",
+        "cacheHint": "0 guarda cada respuesta lo que dure su propio TTL.",
+        "prefetch": "Volver a pedir antes los nombres usados",
+        "dropTypes": "Responder vacío a estos tipos",
+        "dropTypesHint": "AAAA deja los equipos solo en IPv4; HTTPS y ANY casi nunca hacen falta.",
+        "blockReply": "Un nombre bloqueado responde",
+        "zeroIp": "0.0.0.0 (rápido)",
+        "nxDomain": "No existe",
+        "fqdnOnly": "Dar por inexistentes los nombres sin punto",
+        "dnssec": "Comprobar la firma DNSSEC de cada respuesta"
+    },
+    "lookup": {
+        "title": "¿Se bloquea este nombre?",
+        "intro": "Pregunta al bloqueador por un nombre, como un equipo sin grupo propio.",
+        "domain": "Nombre a mirar",
+        "ask": "Mirar",
+        "invalid": "Escribe un nombre, como ads.example.com, sin * ni /.",
+        "blocked": "Bloqueado",
+        "allowed": "Permitido",
+        "byList": "Bloqueado por",
+        "answeredBy": "Respondió",
+        "answer": "Respuesta",
+        "allow": "Permitir",
+        "block": "Bloquear",
+        "inLog": "Ver registro"
+    },
+    "network": {
+        "title": "Vistos en la red",
+        "intro": "Cada equipo que ha preguntado. Abre uno para ver sus consultas.",
+        "refresh": "Refrescar",
+        "empty": "Ningún equipo preguntó en este rango.",
+        "device": "Equipo",
+        "firstSeen": "Primera vez",
+        "lastSeen": "Última vez",
+        "queries": "Consultas",
+        "blocked": "Bloqueadas",
+        "groups": "Grupo",
+        "everyone": "Todos",
+        "openLog": "Ver sus consultas",
+        "name": "Nombrar"
+    },
+    "transfer": {
+        "title": "Copia y restauración",
+        "intro": "Todos los ajustes del bloqueador en un archivo, para guardar o llevar a otro Polaris.",
+        "export": "Bajar ajustes",
+        "import": "Restaurar archivo",
+        "notJson": "Ese archivo no es de ajustes.",
+        "notExport": "Ese archivo no es una copia del bloqueador.",
+        "invalid": "No se cargó nada: estos ajustes del archivo no son válidos: {fields}.",
+        "same": "El archivo coincide con lo guardado.",
+        "changes": "Cargar este archivo cambia:",
+        "dropsEdits": "Se sustituyen tus cambios sin guardar.",
+        "load": "Cargar en el formulario",
+        "cancel": "Cancelar",
+        "loaded": "Cargado. Revísalo y pulsa Guardar.",
+        "fields": {
+            "sources": "Listas",
+            "customLists": "Tus listas",
+            "allow": "Permitidos",
+            "deny": "Bloqueados",
+            "upstream": "Resolvedor",
+            "customUpstreams": "Tus resolvedores",
+            "records": "Registros",
+            "refreshHours": "Recarga",
+            "aliases": "Alias",
+            "clientGroups": "Grupos",
+            "logDays": "Historial",
+            "devices": "Equipos",
+            "forwards": "Reenvíos",
+            "safeSearch": "Búsqueda segura",
+            "youtube": "Modo YouTube",
+            "schedules": "Horarios",
+            "timeZone": "Zona horaria",
+            "services": "Servicios",
+            "serviceDomains": "Nombres servicio",
+            "namesFrom": "Origen nombres",
+            "engine": "Motor"
+        }
     }
 }

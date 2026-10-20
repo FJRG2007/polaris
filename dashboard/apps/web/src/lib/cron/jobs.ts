@@ -69,6 +69,8 @@ import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping
 import { sweepReleaseImages } from "@/lib/deploy/release-retention";
 import { watchDisks } from "@/lib/deploy/disk-watch";
 import { runCutoverPass } from "@/lib/deploy/dns-cutover-service";
+import { reapplyAfterClockChange } from "@/lib/dns-blocker/service";
+import { rollUpHistory } from "@/lib/dns-blocker/insights";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
 const MINUTE = 60 * 1000;
@@ -181,6 +183,28 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once count every outage exactly once.
         leaseMs: null,
         run: compactOutages
+    },
+    {
+        key: "dns-blocker-clock",
+        // Every fifteen minutes, so a daylight-saving change has moved the ad
+        // blocker's schedules within minutes of the clock moving. A pass that
+        // finds the configuration current reads two rows and renders it once.
+        everyMs: 15 * MINUTE,
+        // Leased: two runners would each redeploy the DNS server, and the
+        // second restart would drop the answers the first had just resumed.
+        leaseMs: 20 * MINUTE,
+        run: () => reapplyAfterClockChange()
+    },
+    {
+        key: "dns-blocker-history",
+        // Hourly. A finished day is rolled up the first pass after midnight UTC,
+        // and the DNS server keeps each day a day past what is asked of it, so
+        // a pass that runs hours late still finds the file.
+        everyMs: HOUR,
+        // Leased: a pass reads whole days of log from the DNS server, and two at
+        // once would each read the same files (the row itself is written once).
+        leaseMs: 2 * HOUR,
+        run: () => rollUpHistory()
     },
     {
         key: "dns-cutovers",

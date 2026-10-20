@@ -349,7 +349,10 @@
         "Rollouts": "Despliegues",
         "Activity sharing": "Compartir actividad",
         "UPS": "SAI",
-        "Polar": "Polar"
+        "Polar": "Polar",
+        "Query log": "Consultas",
+        "Lists": "Listas",
+        "Local DNS": "DNS local"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

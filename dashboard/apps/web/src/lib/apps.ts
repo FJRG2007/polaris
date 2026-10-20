@@ -2445,6 +2445,73 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 keywords: ["help", "setup", "runs-on", "getting started", "guide", "docs"]
             }
         ]
+    },
+    {
+        // Laid out the way Pi-hole's own sidebar is, which is where somebody who
+        // has run one looks for each of these. Every screen is the installed
+        // app's and an administrator's, like the Apps entry that leads here.
+        id: "dns-blocker",
+        label: "Ad blocker", // i18n-ignore
+        icon: ShieldBan,
+        base: "/apps/dns-blocker",
+        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
+        sections: [
+            {
+                label: "Overview", // i18n-ignore
+                href: "/apps/dns-blocker",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: LayoutDashboard,
+                keywords: ["dashboard", "pause", "status", "router"]
+            },
+            {
+                label: "Query log", // i18n-ignore
+                href: "/apps/dns-blocker/log",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: ScrollText,
+                keywords: ["queries", "lookups", "live", "tail", "blocked domains"]
+            },
+            {
+                label: "Lists", // i18n-ignore
+                href: "/apps/dns-blocker/lists",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: ShieldBan,
+                keywords: [
+                    "blocklists",
+                    "adlists",
+                    "allowlist",
+                    "denylist",
+                    "services",
+                    "schedules"
+                ]
+            },
+            {
+                label: "Devices", // i18n-ignore
+                href: "/apps/dns-blocker/devices",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: MonitorSmartphone,
+                keywords: ["clients", "network", "groups", "names"]
+            },
+            {
+                label: "Local DNS", // i18n-ignore
+                href: "/apps/dns-blocker/local-dns",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: Network,
+                keywords: ["records", "cname", "aliases", "conditional forwarding"]
+            },
+            {
+                label: "Settings", // i18n-ignore
+                href: "/apps/dns-blocker/settings",
+                adminOnly: true,
+                requiresApp: "dns-blocker",
+                icon: SlidersHorizontal,
+                keywords: ["upstream", "safe search", "cache", "export", "import", "backup"]
+            }
+        ]
     }
 ];
 

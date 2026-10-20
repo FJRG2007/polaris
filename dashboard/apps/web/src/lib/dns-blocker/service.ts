@@ -29,6 +29,8 @@ import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
 import { encodeBlockyConfig } from "./render";
 import { DNS_CHECK_NAME } from "./settings";
+import { clockChangeDecision } from "./clock-change";
+import { resolveServiceNames } from "./services-registry";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -55,7 +57,9 @@ export type DnsRefusalCode =
     | "portBusy"
     | "notApplied"
     | "notRunning"
-    | "notAnswering";
+    | "notAnswering"
+    | "servicesOffline"
+    | "servicesMissing";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -87,6 +91,10 @@ export interface DnsBlockerStatus {
     /** The address devices are told to use as their DNS server. */
     readonly address: string | null;
     readonly settings: DnsSettings;
+    /** The DNS server runs another configuration than these settings render to
+     *  now: saved while it could not take them, rendered differently by a newer
+     *  Polaris, or with schedules a daylight-saving change has since moved. */
+    readonly stale: boolean;
 }
 
 interface EngineRow {
@@ -129,10 +137,13 @@ export function encodedConfig(settings: DnsSettings): string {
 /** Whether the engine was last given the configuration the stored settings
  *  render to now. False for an engine deployed before a change to what is
  *  rendered, which keeps running the old one until it is applied again. */
-export async function engineConfigCurrent(engine: EngineRow): Promise<boolean> {
+export async function engineConfigCurrent(
+    engine: EngineRow,
+    known?: DnsSettings
+): Promise<boolean> {
     if (!engine.applicationId) return false;
     const [settings, stored] = await Promise.all([
-        readSettings(),
+        known ?? readSettings(),
         prisma.envVar.findFirst({
             where: { scopeType: "application", scopeId: engine.applicationId, key: DNS_CONFIG_ENV },
             select: { value: true }
@@ -179,16 +190,18 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
         engineRow(),
         getHostLanIp().catch(() => null)
     ]);
-    const [answer, deployFailed] = await Promise.all([
+    const [answer, deployFailed, current] = await Promise.all([
         address
             ? probeDns(address, DNS_CHECK_NAME)
             : Promise.resolve<DnsProbeAnswer>({ kind: "silent" }),
-        engine ? lastDeployFailed(engine) : Promise.resolve(false)
+        engine ? lastDeployFailed(engine) : Promise.resolve(false),
+        engine?.applicationId ? engineConfigCurrent(engine, settings) : Promise.resolve(true)
     ]);
     return {
         state: stateOf({ address, engine: Boolean(engine), deployFailed, answer }),
         address,
-        settings
+        settings,
+        stale: !current
     };
 }
 
@@ -252,11 +265,27 @@ async function apply(
     }
 }
 
+/** The services' names for the settings, or the refusal that says why not. */
+async function serviceNamesOrRefuse(
+    settings: DnsSettings,
+    kept: Record<string, string[]>
+): Promise<Record<string, string[]>> {
+    const resolved = await resolveServiceNames(settings, kept);
+    if ("refusal" in resolved) throw new DnsBlockerRefusal(resolved.refusal);
+    return resolved.names;
+}
+
 /** Store new settings, and apply them at once when the blocker is on. Refused
  *  with `notApplied` when they were stored but the DNS server did not take them. */
 export async function saveSettings(input: unknown, actorId: string): Promise<DnsSettings> {
     const row = await requireApp();
-    const settings = readDnsSettings(dnsSettingsSchema.parse(input));
+    // The services' names are this path's to write, never the screen's.
+    const parsed = readDnsSettings({
+        ...dnsSettingsSchema.omit({ serviceDomains: true }).parse(input),
+        serviceDomains: {}
+    });
+    const kept = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]).serviceDomains;
+    const settings = { ...parsed, serviceDomains: await serviceNamesOrRefuse(parsed, kept) };
     const encoded = encodedConfig(settings);
     await patchInstallConfig(row.id, { [CONFIG_KEY]: settings });
     const engine = await engineRow();
@@ -347,4 +376,47 @@ export async function turnOff(): Promise<void> {
     const engine = await engineRow();
     if (!engine) return;
     await uninstallApp(engine.ownerId, engine.id, { deleteData: true });
+}
+
+/**
+ * Give the DNS server its configuration again when the only thing that moved is
+ * the clock: a daylight-saving change shifts every schedule's UTC hours, and the
+ * engine would run an hour off until somebody pressed Apply now. Run on a
+ * schedule (`dns-blocker-clock`); nothing at all when the blocker is not
+ * installed, is off, is not up, or already runs what the settings render to.
+ * Whether to is `clockChangeDecision`'s; every other cause of a stale
+ * configuration is left to the screen.
+ */
+export async function reapplyAfterClockChange(
+    now: Date = new Date()
+): Promise<{ applied: boolean }> {
+    const row = await appRow();
+    if (!row) return { applied: false };
+    const engine = await engineRow();
+    const applicationId = engine?.applicationId;
+    if (!engine || !applicationId) return { applied: false };
+    const settings = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]);
+    const storedValue = () =>
+        prisma.envVar.findFirst({
+            where: { scopeType: "application", scopeId: applicationId, key: DNS_CONFIG_ENV },
+            select: { value: true }
+        });
+    const [stored, deployFailed] = await Promise.all([storedValue(), lastDeployFailed(engine)]);
+    const decision = clockChangeDecision({
+        engine: { running: engine.status === "running" && !deployFailed },
+        stored: stored?.value ?? null,
+        settings,
+        now
+    });
+    if (!decision.apply || decision.encoded.length > ENV_VALUE_MAX) return { applied: false };
+    // A save that landed while this was deciding applies itself; this one must
+    // not then write the settings it read over the operator's.
+    const [again, storedAgain] = await Promise.all([appRow(), storedValue()]);
+    if (again?.config !== row.config || storedAgain?.value !== stored?.value)
+        return { applied: false };
+    console.info(
+        `polaris: the ad blocker's schedules moved with the clock in ${settings.timeZone}; applying them again`
+    );
+    await apply(engine, decision.encoded, engine.ownerId, await getHostLanIp().catch(() => null));
+    return { applied: true };
 }

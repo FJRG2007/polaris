@@ -15296,3 +15296,24 @@ model PolarAttachment {
     @@index([userId, createdAt])
     @@index([threadId, createdAt])
 }
+
+// One finished UTC day of the ad blocker's lookups, rolled up before the DNS
+// server deletes that day's log file, so the screen reaches back a year. One
+// row a day, kept DNS_HISTORY_DAYS (lib/dns-blocker/history.ts) and pruned by
+// the same job that writes it.
+model DnsBlockerDay {
+    day               DateTime @id @db.Date
+    queries           Int
+    blocked           Int
+    // Distinct devices that asked that day.
+    clients           Int
+    // 24 [allowed, blocked] pairs, UTC hour 0 first.
+    hourly            Json
+    // The day's top names, devices and lists: { name, count } arrays, bounded.
+    topPermitted      Json
+    topBlocked        Json
+    topClients        Json
+    topBlockedClients Json
+    blockedBy         Json
+    createdAt         DateTime @default(now())
+}

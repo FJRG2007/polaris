@@ -12,7 +12,9 @@
     },
     "status": {
         "title": "Status",
-        "check": "Check again"
+        "check": "Check again",
+        "stale": "The DNS server runs older settings than these, from before a clock change or an update.",
+        "apply": "Apply now"
     },
     "states": {
         "off": {
@@ -123,7 +125,8 @@
         "refresh": "Refresh lists every (hours)",
         "save": "Save",
         "saveApply": "Save and apply",
-        "saved": "Saved."
+        "saved": "Saved.",
+        "unsaved": "Changes not saved yet."
     },
     "validation": {
         "invalidUrl": "Enter an http or https address.",
@@ -139,7 +142,13 @@
         "invalidDeviceAddress": "Not an IP address, like 192.168.1.20.",
         "invalidDeviceName": "Letters, digits, dots and dashes; no spaces.",
         "invalidDomain": "Not a domain name.",
-        "invalidForwardServer": "Not a server address, like 192.168.1.1."
+        "invalidForwardServer": "Not a server address, like 192.168.1.1.",
+        "invalidTime": "Enter a time like 21:00.",
+        "timePair": "Set both times, or neither for the whole day.",
+        "sameTime": "The start and the end cannot be the same time.",
+        "invalidTimeZone": "Not a known time zone.",
+        "cacheMinutes": "Enter whole minutes from 0 to 1440.",
+        "cacheRange": "The least time cannot be more than the most."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -151,7 +160,9 @@
         "invalid": "Some values are not valid. Fix the marked fields and save again.",
         "generic": "That did not work. Try again in a moment.",
         "notRunning": "The DNS server is not running. Turn blocking on first.",
-        "notAnswering": "The DNS server did not answer. Wait a moment and try again."
+        "notAnswering": "The DNS server did not answer. Wait a moment and try again.",
+        "servicesOffline": "Could not download the services' domains, so nothing was saved. Check this machine's internet connection and save again.",
+        "servicesMissing": "Some services are no longer in the public list, so nothing was saved. Turn them off and save again."
     },
     "insights": {
         "title": "Activity",
@@ -254,13 +265,23 @@
         "name": "Group name",
         "namePlaceholder": "Kids' tablets",
         "clients": "Devices: an address, a range or a name, one per line",
-        "add": "Add group"
+        "add": "Add group",
+        "addService": "Block a service too",
+        "removeService": "Stop blocking {name}"
     },
     "history": {
-        "title": "History and device names",
+        "title": "Long-term statistics",
         "days": "Days of lookups to keep",
         "namesFrom": "Router that knows device names",
-        "namesFromHint": "Its address. Devices then show by name instead of address. Leave empty to show addresses."
+        "namesFromHint": "Its address. Devices then show by name instead of address. Leave empty to show addresses.",
+        "intro": "Each finished day, kept for a year. Today is in the card above.",
+        "empty": "Days show up here once each one has ended.",
+        "perDay": "Lookups per day",
+        "ranges": {
+            "30d": "30 days",
+            "90d": "90 days",
+            "365d": "1 year"
+        }
     },
     "routerGuide": {
         "brand": "Your router",
@@ -322,5 +343,133 @@
         "youtubeOff": "Off",
         "youtubeModerate": "Moderate",
         "youtubeStrict": "Strict"
+    },
+    "schedules": {
+        "title": "Schedules",
+        "intro": "Lists that block only at set hours, for every device. Outside those hours they let everything through.",
+        "empty": "No schedules. Every list that is on blocks all day.",
+        "noLists": "Turn on a list above to schedule it.",
+        "lists": "Block",
+        "days": "On these days",
+        "whole": "Whole day",
+        "from": "From",
+        "to": "Until",
+        "zone": "Time zone",
+        "zoneSearch": "Search time zones",
+        "zoneEmpty": "No time zone matches.",
+        "everyDay": "Every day",
+        "allDay": "the whole day",
+        "notOn": "{name} (no list on)",
+        "add": "Add schedule",
+        "remove": "Remove schedule"
+    },
+    "weekdays": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+    },
+    "services": {
+        "title": "Blocked services",
+        "intro": "Block an app or site by name for every device, or only for a device group. Its domains are downloaded from AdGuard's public list when you save.",
+        "search": "Search services",
+        "none": "No service matches.",
+        "groups": {
+            "social": "Social networks",
+            "messaging": "Messaging",
+            "video": "Video and music",
+            "games": "Games",
+            "other": "Other"
+        }
+    },
+    "log": {
+        "off": "Lookups show up here once blocking is on.",
+        "overview": "Go to Overview"
+    },
+    "engine": {
+        "title": "Engine",
+        "intro": "How the blocker answers, beyond what it blocks.",
+        "cacheMin": "Keep answers at least (min)",
+        "cacheMax": "Keep answers at most (min)",
+        "cacheHint": "0 keeps each answer as long as its own time to live.",
+        "prefetch": "Ask again early for popular names",
+        "dropTypes": "Answer these query types empty",
+        "dropTypesHint": "AAAA leaves devices on IPv4 only; HTTPS and ANY are rarely needed.",
+        "blockReply": "A blocked name answers",
+        "zeroIp": "0.0.0.0 (fastest)",
+        "nxDomain": "No such name",
+        "fqdnOnly": "Answer names without a dot as not found",
+        "dnssec": "Check the DNSSEC signature of each answer"
+    },
+    "lookup": {
+        "title": "Is this name blocked?",
+        "intro": "Ask the blocker about one name, as a device with no group of its own would.",
+        "domain": "Name to check",
+        "ask": "Check",
+        "invalid": "Type one name, like ads.example.com, with no * or /.",
+        "blocked": "Blocked",
+        "allowed": "Allowed",
+        "byList": "Blocked by",
+        "answeredBy": "Answered by",
+        "answer": "Answer",
+        "allow": "Allow it",
+        "block": "Block it",
+        "inLog": "See the log"
+    },
+    "network": {
+        "title": "Seen on the network",
+        "intro": "Every device that asked the blocker. Open one to see its lookups.",
+        "refresh": "Refresh",
+        "empty": "No device has asked in this range.",
+        "device": "Device",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "queries": "Lookups",
+        "blocked": "Blocked",
+        "groups": "Group",
+        "everyone": "Everyone",
+        "openLog": "Open its lookups",
+        "name": "Name it"
+    },
+    "transfer": {
+        "title": "Back up and restore",
+        "intro": "Every setting of the blocker as one file, to keep or to move to another Polaris.",
+        "export": "Download settings",
+        "import": "Restore from file",
+        "notJson": "That file is not a settings file.",
+        "notExport": "That file is not an ad blocker export.",
+        "invalid": "Nothing was loaded: these settings in the file are not valid: {fields}.",
+        "same": "The file matches what is saved.",
+        "changes": "Loading this file changes:",
+        "dropsEdits": "Your unsaved changes here are replaced.",
+        "load": "Load into the form",
+        "cancel": "Cancel",
+        "loaded": "Loaded. Check it, then Save to apply.",
+        "fields": {
+            "sources": "Blocklists",
+            "customLists": "Your lists",
+            "allow": "Allowed names",
+            "deny": "Blocked names",
+            "upstream": "Resolver",
+            "customUpstreams": "Your resolvers",
+            "records": "Local records",
+            "refreshHours": "List refresh",
+            "aliases": "Aliases",
+            "clientGroups": "Device groups",
+            "logDays": "Log history",
+            "devices": "Device names",
+            "forwards": "Forwarding",
+            "safeSearch": "Safe search mode",
+            "youtube": "YouTube mode",
+            "schedules": "Schedules",
+            "timeZone": "Time zone",
+            "services": "Services",
+            "serviceDomains": "Service names",
+            "namesFrom": "Names source",
+            "engine": "Engine"
+        }
     }
 }

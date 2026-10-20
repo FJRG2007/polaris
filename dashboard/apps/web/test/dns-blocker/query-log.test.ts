@@ -11,6 +11,8 @@ import {
     queryFilterSchema,
     queryLogPath,
     rangeWindow,
+    lookupSchema,
+    parseLookup,
     ruleFromLogSchema
 } from "@/lib/dns-blocker/query-log";
 
@@ -45,6 +47,12 @@ function reader(filter: Partial<ReturnType<typeof queryFilterSchema.parse>> = {}
 describe("query log", () => {
     it("names one UTC day's file", () => {
         expect(queryLogPath(new Date("2026-10-18T23:59:00Z"))).toBe("/logs/2026-10-18_ALL.log");
+    });
+
+    it("leaves out names Polaris looked up from inside the engine's container", () => {
+        expect(parseQueryLine(line("127.0.0.1", "example.com", "RESOLVED"))).toBeNull();
+        expect(parseQueryLine(line("::1", "example.com", "RESOLVED"))).toBeNull();
+        expect(parseQueryLine(line("10.0.0.127", "example.com", "RESOLVED"))).not.toBeNull();
     });
 
     it("parses a row, who answered it and what blocked it, and refuses a short line", () => {
@@ -224,5 +232,71 @@ describe("query log", () => {
             list: "allow"
         });
         expect(ruleFromLogSchema.safeParse({ domain: "/x/", list: "deny" }).success).toBe(false);
+    });
+});
+
+describe("name lookup", () => {
+    it("takes one plain name, normalized, and refuses patterns", () => {
+        expect(lookupSchema.parse({ domain: " HTTPS://Ads.Example.com/x " }).domain).toBe(
+            "ads.example.com"
+        );
+        for (const domain of ["", "*.example.com", "/ads/", "a b.com", "x;rm -rf /"])
+            expect(lookupSchema.safeParse({ domain }).success).toBe(false);
+    });
+
+    it("reads a blocked answer with the list that blocked it", () => {
+        const lookup = parseLookup(
+            "ads.example.com",
+            JSON.stringify({
+                reason: "BLOCKED (ads)",
+                response: "A (0.0.0.0)",
+                responseType: "BLOCKED",
+                returnCode: "NOERROR"
+            })
+        );
+        expect(lookup).toMatchObject({ outcome: "blocked", list: "ads", via: "blocked" });
+    });
+
+    it("reads an answered name with the resolver, and refuses anything else", () => {
+        const lookup = parseLookup(
+            "example.com",
+            JSON.stringify({
+                reason: "RESOLVED (tcp-tls:1.1.1.1:853)",
+                response: "A (93.184.215.14)",
+                responseType: "RESOLVED",
+                returnCode: "NOERROR"
+            })
+        );
+        expect(lookup).toMatchObject({ outcome: "allowed", list: "", via: "tcp-tls:1.1.1.1:853" });
+        expect(parseLookup("example.com", "Connection refused")).toBeNull();
+        expect(parseLookup("example.com", '{"reason":1}')).toBeNull();
+    });
+});
+
+describe("devices seen", () => {
+    it("counts each device with its first and last lookup, busiest first", () => {
+        const read = reader({ outcome: "blocked" });
+        read.add(line("192.168.1.20", "a.com", "RESOLVED", { time: "2026-10-18 09:00:00" }));
+        read.add(line("192.168.1.20", "ads.com", "BLOCKED", { time: "2026-10-18 11:00:00" }));
+        read.add(line("192.168.1.20", "b.com", "CACHED", { time: "2026-10-18 10:00:00" }));
+        read.add(line("192.168.1.30", "c.com", "RESOLVED", { name: "tv.lan" }));
+        expect(read.devices()).toEqual([
+            {
+                address: "192.168.1.20",
+                name: "",
+                queries: 3,
+                blocked: 1,
+                first: Date.parse("2026-10-18T09:00:00Z"),
+                last: Date.parse("2026-10-18T11:00:00Z")
+            },
+            {
+                address: "192.168.1.30",
+                name: "tv.lan",
+                queries: 1,
+                blocked: 0,
+                first: Date.parse("2026-10-18T10:00:00Z"),
+                last: Date.parse("2026-10-18T10:00:00Z")
+            }
+        ]);
     });
 });

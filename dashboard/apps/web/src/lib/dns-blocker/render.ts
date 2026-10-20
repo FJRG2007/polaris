@@ -11,12 +11,15 @@
  */
 
 import { QUERY_LOG_DIR } from "./query-log";
+import { engineSchedules } from "./schedules";
 import { safeSearchAliases } from "./safe-search";
 import {
     DNS_CATEGORIES,
     DNS_CHECK_NAME,
     DNS_LIST_SOURCES,
     DNS_UPSTREAM_PRESETS,
+    dnsServiceList,
+    dnsServicesInUse,
     type DnsCategory,
     type DnsSettings
 } from "./settings";
@@ -50,8 +53,12 @@ function upstreamsOf(settings: DnsSettings): { servers: string[]; bootstrap: str
     return { servers: [...preset.servers], bootstrap: [...preset.bootstrap] };
 }
 
-/** The configuration as an object, before it is written out. Exported for tests. */
-export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
+/** The configuration as an object, before it is written out. Exported for tests.
+ *  `now` places the schedules: they are written in UTC with the zone's offset then. */
+export function blockyConfig(
+    settings: DnsSettings,
+    now: Date = new Date()
+): Record<string, unknown> {
     const enabled = new Set(settings.sources);
     const denylists: Record<string, string[]> = {};
     const add = (category: DnsCategory, entry: string) => {
@@ -60,9 +67,21 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     for (const source of DNS_LIST_SOURCES)
         if (enabled.has(source.id)) add(source.category, source.url);
     for (const list of settings.customLists) add(list.category, list.url);
+    // One list per service some device blocks, so a group or a schedule can
+    // name it; a service whose names were never downloaded has none.
+    for (const id of dnsServicesInUse(settings)) {
+        const names = settings.serviceDomains[id] ?? [];
+        if (names.length > 0) denylists[dnsServiceList(id)] = [inline(names)];
+    }
+    const servicesOf = (ids: readonly string[]) =>
+        ids.map(dnsServiceList).filter((list) => denylists[list]);
     denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
 
-    const groups = [...DNS_CATEGORIES.filter((category) => denylists[category]), OWN_GROUP];
+    const groups = [
+        ...DNS_CATEGORIES.filter((category) => denylists[category]),
+        ...servicesOf(settings.services),
+        OWN_GROUP
+    ];
     const clientGroupsBlock: Record<string, string[]> = { default: groups };
     // A device in a group blocks that group's categories (of the ones that
     // have a list) and the operator's own names, which hold the check name.
@@ -72,6 +91,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
             ...DNS_CATEGORIES.filter(
                 (category) => denylists[category] && group.categories.includes(category)
             ),
+            ...servicesOf(group.services ?? []),
             OWN_GROUP
         ];
         for (const client of group.clients) clientGroupsBlock[client] ??= blocks;
@@ -81,6 +101,14 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     // has a deny list, covers them all.
     const allowlists =
         settings.allow.length > 0 ? { [OWN_GROUP]: [inline(settings.allow)] } : undefined;
+
+    // Never the operator's own group: it holds the name the status check asks for.
+    const scheduled = engineSchedules(
+        settings.schedules,
+        settings.timeZone,
+        new Set(Object.keys(denylists).filter((group) => group !== OWN_GROUP)),
+        now
+    );
 
     const { servers, bootstrap } = upstreamsOf(settings);
     const aliased = new Set(settings.aliases.map((alias) => alias.name));
@@ -114,7 +142,8 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
             denylists,
             ...(allowlists ? { allowlists } : {}),
             clientGroupsBlock,
-            blockType: "zeroIp",
+            ...(scheduled ?? {}),
+            blockType: settings.engine.blockReply,
             blockTTL: "1m",
             loading: {
                 refreshPeriod: `${settings.refreshHours}h`,
@@ -153,7 +182,20 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
         // published): how many names each category's lists hold, and when they
         // were last loaded.
         prometheus: { enable: true, path: "/metrics" },
-        caching: { prefetching: true },
+        caching: {
+            prefetching: settings.engine.prefetch,
+            ...(settings.engine.cacheMinMinutes > 0
+                ? { minTime: `${settings.engine.cacheMinMinutes}m` }
+                : {}),
+            ...(settings.engine.cacheMaxMinutes > 0
+                ? { maxTime: `${settings.engine.cacheMaxMinutes}m` }
+                : {})
+        },
+        ...(settings.engine.dropTypes.length > 0
+            ? { filtering: { queryTypes: [...settings.engine.dropTypes] } }
+            : {}),
+        ...(settings.engine.fqdnOnly ? { fqdnOnly: { enable: true } } : {}),
+        ...(settings.engine.dnssec ? { dnssec: { validate: true } } : {}),
         ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
         // One file a day on the engine's own volume, read back by the screen;
         // a day more than asked, so the oldest day is still whole.
@@ -197,11 +239,11 @@ function zoneOf(aliases: readonly { name: string; target: string }[]): string {
 }
 
 /** The configuration file's text. */
-export function renderBlockyConfig(settings: DnsSettings): string {
-    return `${JSON.stringify(blockyConfig(settings), null, 1)}\n`;
+export function renderBlockyConfig(settings: DnsSettings, now?: Date): string {
+    return `${JSON.stringify(blockyConfig(settings, now), null, 1)}\n`;
 }
 
 /** The configuration as the one environment value the image reads. */
-export function encodeBlockyConfig(settings: DnsSettings): string {
-    return Buffer.from(renderBlockyConfig(settings), "utf8").toString("base64");
+export function encodeBlockyConfig(settings: DnsSettings, now?: Date): string {
+    return Buffer.from(renderBlockyConfig(settings, now), "utf8").toString("base64");
 }

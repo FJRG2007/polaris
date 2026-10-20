@@ -20,6 +20,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { installApp } from "@/lib/apps/install-service";
 import { DNS_BLOCKER_APP, type DnsSettings } from "@/lib/dns-blocker/settings";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
+import { networkDevices, type NetworkDevice } from "@/lib/dns-blocker/devices";
+import { dnsHistoryInputSchema, type DnsHistory } from "@/lib/dns-blocker/history";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -226,6 +228,52 @@ export async function ruleFromLogAction(
         });
         refresh();
         return notApplied ? failed(notApplied) : { settings: next };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Whether the blocker blocks one name right now, and by which list. */
+export async function dnsLookupAction(
+    input: unknown
+): Promise<Result<{ lookup: queryLog.DnsLookup }>> {
+    await requireAdmin();
+    try {
+        const { domain } = queryLog.lookupSchema.parse(input);
+        return { lookup: await insights.lookupName(domain) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Every device the log saw over a range, with its name and groups as saved. */
+export async function dnsDevicesAction(
+    input: unknown
+): Promise<Result<{ devices: NetworkDevice[]; logOff: boolean }>> {
+    await requireAdmin();
+    try {
+        const { range, fresh } = z
+            .object({
+                range: queryLog.queryFilterSchema.shape.range,
+                fresh: z.boolean().default(false)
+            })
+            .parse(input);
+        const [seen, settings] = await Promise.all([
+            insights.seenDevices(range, fresh),
+            blocker.readSettings()
+        ]);
+        return { devices: networkDevices(seen.devices, settings), logOff: seen.logOff };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** The finished days of a range, added up from the rows kept for the long term. */
+export async function dnsHistoryAction(input: unknown): Promise<Result<{ history: DnsHistory }>> {
+    await requireAdmin();
+    try {
+        const { range } = dnsHistoryInputSchema.parse(input);
+        return { history: await insights.dnsHistory(range) };
     } catch (error) {
         return failed(error);
     }
