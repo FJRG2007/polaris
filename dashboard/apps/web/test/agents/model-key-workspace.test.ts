@@ -9,7 +9,11 @@ const state = vi.hoisted(() => ({
     checks: [] as Array<{ provider: string; workspaceId?: string | null }>,
     created: [] as Array<{ provider: string; config?: Record<string, unknown> }>,
     updated: [] as Array<{ workspaceId?: string | null }>,
-    verdict: { state: "valid" } as Record<string, unknown>
+    verdict: { state: "valid" } as Record<string, unknown>,
+    held: { secret: "sk-ant-usr-stored00", workspaceId: null } as {
+        secret: string | null;
+        workspaceId: string | null;
+    } | null
 }));
 
 vi.mock("@/lib/agents/model-keys", () => ({
@@ -26,6 +30,7 @@ vi.mock("@/lib/agents/model-keys", () => ({
         return true;
     },
     providerOfModelKey: async () => "anthropic",
+    heldModelKey: async () => state.held,
     isStorableProvider: () => true,
     ownerHasModelKeyName: async () => false,
     ownerHasModelSecret: async () => false,
@@ -63,6 +68,7 @@ beforeEach(() => {
     state.created = [];
     state.updated = [];
     state.verdict = { state: "valid" };
+    state.held = { secret: "sk-ant-usr-stored00", workspaceId: null };
 });
 
 describe("adding an Anthropic key with a workspace", () => {
@@ -115,6 +121,27 @@ describe("adding an Anthropic key with a workspace", () => {
 describe("editing an Anthropic key's workspace", () => {
     it("stores a new workspace without asking for the key again", async () => {
         expect(await editKey(scope, { id: ID, name: "work", workspaceId: WORKSPACE })).toEqual({});
+        expect(state.checks).toEqual([{ provider: "anthropic", workspaceId: WORKSPACE }]);
+        expect(state.updated[0]?.workspaceId).toBe(WORKSPACE);
+    });
+
+    it("refuses a new workspace the stored key cannot use", async () => {
+        state.verdict = { state: "rejected", code: "workspace", reason: "workspace not found" };
+        const result = await editKey(scope, { id: ID, name: "work", workspaceId: WORKSPACE });
+        expect(result).toEqual({ error: "workspace not found", needsWorkspace: true });
+        expect(state.updated).toEqual([]);
+    });
+
+    it("stores a workspace it could not check, with a warning", async () => {
+        state.verdict = { state: "unverified", code: "network", reason: "no answer" };
+        const result = await editKey(scope, { id: ID, name: "work", workspaceId: WORKSPACE });
+        expect(result).toEqual({ warning: "no answer" });
+        expect(state.updated[0]?.workspaceId).toBe(WORKSPACE);
+    });
+
+    it("does not check a workspace that did not change", async () => {
+        state.held = { secret: "sk-ant-usr-stored00", workspaceId: WORKSPACE };
+        await editKey(scope, { id: ID, name: "work", workspaceId: WORKSPACE });
         expect(state.checks).toEqual([]);
         expect(state.updated[0]?.workspaceId).toBe(WORKSPACE);
     });

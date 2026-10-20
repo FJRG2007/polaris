@@ -198,6 +198,28 @@ export async function providerOfModelKey(owner: KeyOwner, id: string): Promise<s
     return row?.provider ?? null;
 }
 
+/** The secret one of this owner's keys holds and the workspace it names, so a
+ *  new workspace can be checked against the key it will act with. Null when the
+ *  owner holds no such key; a secret of null when it cannot be read here. */
+export async function heldModelKey(
+    owner: KeyOwner,
+    id: string
+): Promise<{ secret: string | null; workspaceId: string | null } | null> {
+    const row = await prisma.userModelKey.findFirst({
+        where: { id, userId: owner },
+        select: {
+            id: true,
+            provider: true,
+            config: true,
+            encryptedSecret: true,
+            secretNonce: true,
+            secretKeyId: true
+        }
+    });
+    if (!row) return null;
+    return { secret: readSecret(row), workspaceId: workspaceOf(row.config) };
+}
+
 /**
  * What "the same credential" means, per provider.
  *

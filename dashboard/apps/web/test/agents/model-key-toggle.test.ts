@@ -21,6 +21,7 @@ vi.mock("@/lib/agents/model-keys", () => ({
     },
     createModelKey: vi.fn(),
     deleteModelKey: vi.fn(),
+    heldModelKey: vi.fn(),
     isStorableProvider: vi.fn(),
     ownerHasModelKeyName: vi.fn(),
     ownerHasModelSecret: vi.fn(),

@@ -512,6 +512,8 @@ export interface ProjectTokenView {
     expiresAt: string | null;
     lastUsedAt: string | null;
     revokedAt: string | null;
+    /** Switched off by whoever made it: refused like a revoked one until on. */
+    enabled: boolean;
     createdAt: string;
 }
 
@@ -527,6 +529,7 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
             expiresAt: true,
             lastUsedAt: true,
             revokedAt: true,
+            enabled: true,
             createdAt: true,
             user: { select: { name: true } }
         }
@@ -540,6 +543,7 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         revokedAt: row.revokedAt?.toISOString() ?? null,
+        enabled: row.enabled,
         createdAt: row.createdAt.toISOString()
     }));
 }

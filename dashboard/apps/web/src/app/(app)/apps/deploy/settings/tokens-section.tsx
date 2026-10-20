@@ -90,10 +90,13 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
         });
     }
 
-    function state(token: ProjectTokenView): { label: string; className: string } {
+    function state(token: ProjectTokenView): { label: string; className: string; title?: string } {
         if (token.revokedAt) return { label: t("tokens.revoked"), className: "text-danger" };
         if (token.expiresAt && new Date(token.expiresAt).getTime() < Date.now()) {
             return { label: t("tokens.expired"), className: "text-warning" };
+        }
+        if (!token.enabled) {
+            return { label: t("tokens.off"), className: "text-warning", title: t("tokens.offHint") };
         }
         return { label: t("tokens.active"), className: "text-success" };
     }
@@ -130,7 +133,9 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                             {token.prefix}...
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            <span className={status.className}>{status.label}</span>
+                                            <span className={status.className} title={status.title}>
+                                                {status.label}
+                                            </span>
                                             {token.scopes.includes("deploy.manage") ? t("tokens.canChange") : t("tokens.readOnly")}
                                             {t("tokens.madeBy", { name: token.madeBy })}
                                             {token.expiresAt ? t("tokens.expires", { date: display.date(token.expiresAt) }) : ""}

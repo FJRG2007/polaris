@@ -62,7 +62,7 @@ const NOT_SCOPED = JSON.stringify({
 
 describe("what the provider said", () => {
     it("asks for the workspace ID when Anthropic says the key needs one", () => {
-        const check = classify(400, providerMessage(NOT_SCOPED));
+        const check = classify(400, providerMessage(NOT_SCOPED), "anthropic");
         expect(check).toMatchObject({
             state: "rejected",
             code: "workspace",
@@ -73,17 +73,32 @@ describe("what the provider said", () => {
     it("reads the documented wording the same way", () => {
         const message =
             "anthropic-workspace-id is required when authenticating with an identity-linked API key; send the id of the workspace this request acts in.";
-        expect(classify(400, message)).toMatchObject({ state: "rejected", code: "workspace" });
+        expect(classify(400, message, "anthropic")).toMatchObject({
+            state: "rejected",
+            code: "workspace"
+        });
     });
 
     it("says a malformed workspace ID and an unknown one apart", () => {
         expect(
-            classify(400, "anthropic-workspace-id header must be a valid workspace ID.").reason
+            classify(
+                400,
+                "anthropic-workspace-id header must be a valid workspace ID.",
+                "anthropic"
+            ).reason
         ).toContain("not a workspace ID");
-        expect(classify(404, "Workspace `wrkspc_01abc` not found.")).toMatchObject({
+        expect(classify(404, "Workspace `wrkspc_01abc` not found.", "anthropic")).toMatchObject({
             state: "rejected",
             code: "workspace"
         });
+    });
+
+    it("never reads another provider's workspace sentence as Anthropic's", () => {
+        expect(classify(400, "workspace is required", "openai")).toMatchObject({
+            state: "unverified",
+            code: "unknown"
+        });
+        expect(classify(404, "Workspace abc not found.", "mistral").state).toBe("unverified");
     });
 
     it("still treats a bare 404 as an endpoint that moved", () => {

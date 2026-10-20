@@ -238,7 +238,7 @@ async function probeKey(
 
     if (response.ok) return classify(response.status);
     const body = await response.text().catch(() => "");
-    return classify(response.status, providerMessage(body, secret));
+    return classify(response.status, providerMessage(body, secret), provider);
 }
 
 /** How much of a provider's own sentence is shown: enough for any error message
@@ -296,9 +296,13 @@ export function providerMessage(body: string, secret = ""): string | null {
  * `sk-ant-usr-` key was answered with on 2026-10-20:
  * https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
  */
-export function classify(status: number, message: string | null = null): KeyCheck {
+export function classify(
+    status: number,
+    message: string | null = null,
+    provider?: string
+): KeyCheck {
     if (status >= 200 && status < 300) return { state: "valid" };
-    const workspace = workspaceVerdict(status, message);
+    const workspace = provider === "anthropic" ? workspaceVerdict(status, message) : null;
     if (workspace) return workspace;
     if (status === 401) {
         return {

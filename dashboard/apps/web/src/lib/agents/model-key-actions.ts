@@ -20,6 +20,7 @@ import { createModelKeySchema, reorderModelKeysSchema, updateModelKeySchema } fr
 import {
     createModelKey,
     deleteModelKey,
+    heldModelKey,
     isStorableProvider,
     ownerHasModelKeyName,
     ownerHasModelSecret,
@@ -196,6 +197,16 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
         const check = await checkProviderKey(provider, parsed.data.secret, { workspaceId });
         if (check.state === "rejected") return refusal(check);
         if (check.state === "unverified") warning = check.reason;
+    } else if (provider && workspaceId !== undefined) {
+        // A new workspace is checked with the key already held: a mistyped one
+        // would otherwise only show up as the next run's failure.
+        const held = await heldModelKey(scope.owner, parsed.data.id);
+        if (!held) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+        if (held.secret && (workspaceId ?? null) !== held.workspaceId) {
+            const check = await checkProviderKey(provider, held.secret, { workspaceId });
+            if (check.state === "rejected") return refusal(check);
+            if (check.state === "unverified") warning = check.reason;
+        }
     }
 
     let changed: boolean;

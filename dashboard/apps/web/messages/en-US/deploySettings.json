@@ -51,6 +51,8 @@
         },
         "revoked": "Revoked",
         "expired": "Expired",
+        "off": "Switched off",
+        "offHint": "Switched off on its maker's API keys page. Calls with it are refused until it is switched back on.",
         "active": "Active",
         "title": "Project tokens",
         "description": "Present one as `Authorization: Bearer ...`. It acts on this project only, with the access of whoever made it.",

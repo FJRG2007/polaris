@@ -51,6 +51,8 @@
         },
         "revoked": "Revocado",
         "expired": "Caducado",
+        "off": "Desactivado",
+        "offHint": "Desactivado en la página de claves de API de quien lo creó. Se rechazan sus llamadas hasta que se vuelva a activar.",
         "active": "Activo",
         "title": "Tokens",
         "description": "Preséntalo como `Authorization: Bearer ...`. Solo actúa sobre este proyecto, con el acceso de quien lo creó.",
