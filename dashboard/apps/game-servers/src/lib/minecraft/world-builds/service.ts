@@ -72,25 +72,6 @@ async function paced(server: ServerContainer, lines: readonly string[]): Promise
     }
 }
 
-/**
- * Each line's answer, read over one connection to the game where the server
- * takes several (`sayEach`), and one at a time otherwise. An answer that did
- * not come back whole is asked again alone through `ask`, which refuses the
- * way `say` does unless the caller says otherwise. Only reads go through here:
- * the survey judges the answers in the order it always did, and a line it no
- * longer needed was a question, never a change.
- */
-async function readAll(
-    server: ServerContainer,
-    lines: readonly string[],
-    ask: (line: string) => Promise<string> = (line) => server.say([line])
-): Promise<string[]> {
-    const replies = server.sayEach
-        ? await server.sayEach(lines.map((line) => [line])).catch(() => [])
-        : [];
-    return Promise.all(lines.map(async (line, index) => replies[index] ?? (await ask(line))));
-}
-
 /** `lines` run in chunks, each through the jar's batch or paced: false once one did not finish. */
 async function runChunks(
     server: ServerContainer,
@@ -128,7 +109,7 @@ const STANDING = "execute in minecraft:overworld as @a[distance=0..] run data ge
 /** Where players live in the overworld - where they stand only when nobody
  *  has a bed - in the same order every pass: what a build goes near. */
 async function homesOf(server: ServerContainer): Promise<{ x: number; z: number }[]> {
-    const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld, where] = await readAll(
+    const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld, where] = await commands.answersOf(
         server,
         [...commands.HOMES, STANDING],
         (line) => server.say([line]).catch(() => "")
@@ -183,7 +164,7 @@ async function unnatural(
     for (const names of commands.GROUND_NAMES) {
         if (open.length === 0) break;
         const asked = open.map((index) => groups[index]!(names));
-        const outputs = await readAll(server, asked.flat());
+        const outputs = await commands.answersOf(server, asked.flat());
         const refusedNow: number[] = [];
         let at = 0;
         for (const [position, index] of open.entries()) {
@@ -220,7 +201,7 @@ type SiteAnswer =
 
 /** Whether a box holds nothing but air. */
 async function allAir(server: ServerContainer, box: Box): Promise<boolean> {
-    const counts = await readAll(server, arena.slices(box).map(arena.solidCount));
+    const counts = await commands.answersOf(server, arena.slices(box).map(arena.solidCount));
     return counts.every((output) => arena.readCount(output) === 0);
 }
 
@@ -234,7 +215,7 @@ async function readTops(
     const strips = plan.stripsOf(columns);
     const inside = new Set(columns.map((one) => `${one.x},${one.z}`));
     const read = new Map<string, plan.Point>();
-    const outputs = await readAll(
+    const outputs = await commands.answersOf(
         server,
         strips.map((strip) => commands.readSamples(plan.stripTag(SAMPLE_TAG, strip)))
     );
@@ -255,7 +236,7 @@ async function anyCovered(server: ServerContainer, strips: readonly Box[]): Prom
         tags.map((tag) => (names: commands.GroundNames) => commands.builtUnderSamples(names, tag))
     );
     if (built.some((count) => count > 0)) return true;
-    const on = await readAll(
+    const on = await commands.answersOf(
         server,
         tags.flatMap((tag) =>
             [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"].map((block) =>

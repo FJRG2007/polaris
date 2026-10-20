@@ -50,6 +50,6 @@ const BUSY_VERBS = [
 
 export function BusyVerb() {
     const t = useTranslations("polar");
-    const [verb] = useState(() => BUSY_VERBS[Math.floor(Math.random() * BUSY_VERBS.length)]);
+    const [verb] = useState(() => BUSY_VERBS[Math.floor(Math.random() * BUSY_VERBS.length)]!);
     return <>{t(`busyVerbs.${verb}`)}</>;
 }

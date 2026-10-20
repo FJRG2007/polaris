@@ -535,14 +535,16 @@ const ANSWERS_PER_TRIP = 25;
  * take several (`sayEach`): a teleport for each of twenty players then lands on
  * the same moment instead of one round trip after another. An answer that did
  * not come back whole - or a trip that failed outright - is asked again on its
- * own, so only send lines that are safe to run twice (a teleport to a fixed spot).
+ * own through `ask` (`say` unless the caller says otherwise), so only send
+ * lines that are safe to run twice (a teleport to a fixed spot).
  */
 export async function answersOf(
     server: {
         say(argv: readonly string[]): Promise<string>;
         sayEach?(commands: readonly (readonly string[])[]): Promise<(string | null)[]>;
     },
-    lines: readonly string[]
+    lines: readonly string[],
+    ask: (line: string) => Promise<string> = (line) => server.say([line])
 ): Promise<string[]> {
     const answers: string[] = [];
     for (let start = 0; start < lines.length; start += ANSWERS_PER_TRIP) {
@@ -550,8 +552,7 @@ export async function answersOf(
         const replies = server.sayEach
             ? await server.sayEach(trip.map((line) => [line])).catch(() => [])
             : [];
-        for (const [at, line] of trip.entries())
-            answers.push(replies[at] ?? (await server.say([line])));
+        for (const [at, line] of trip.entries()) answers.push(replies[at] ?? (await ask(line)));
     }
     return answers;
 }
