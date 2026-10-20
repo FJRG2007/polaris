@@ -12,6 +12,17 @@ const AT_RACK = { latitude: 51.5007, longitude: -0.1246 };
 let reach: unknown = null;
 let limited = { ok: true, retryAfterMs: 0 };
 const runUpsCommand = vi.fn(async () => "ok" as const);
+const readUps = vi.fn(async () => ({
+    ok: true,
+    reading: {
+        status: { online: true },
+        charge: 98,
+        runtimeS: 1800,
+        load: 20,
+        testResult: null,
+        commands: ["test.battery.start.quick", "load.off"]
+    }
+}));
 const spendGrant = vi.fn(async () => true);
 
 vi.mock("@/lib/access/grants", () => ({
@@ -26,17 +37,7 @@ vi.mock("@/lib/ups/ups-data", () => ({ logAction: async () => undefined }));
 vi.mock("@polaris/db", () => ({ prisma: { place: { findUnique: async () => AT_RACK } } }));
 vi.mock("@/lib/ups/ups-service", () => ({
     getUps: async () => ({ id: UPS, name: "Rack", placeId: "p1", host: "10.0.0.5" }),
-    readUps: async () => ({
-        ok: true,
-        reading: {
-            status: { online: true },
-            charge: 98,
-            runtimeS: 1800,
-            load: 20,
-            testResult: null,
-            commands: ["test.battery.start.quick", "load.off"]
-        }
-    }),
+    readUps,
     runUpsCommand
 }));
 
@@ -81,7 +82,21 @@ describe("what a UPS link shows", () => {
 
     it("lists the UPS's commands for a control link", async () => {
         reach = live(["watch", "control"]);
-        expect((await upsGuestView("t"))?.commands).toContain("test.battery.start.quick");
+        const commands = (await upsGuestView("t"))?.commands;
+        expect(commands).toContain("test.battery.start.quick");
+        expect(commands).not.toContain("load.off");
+    });
+
+    it("asks the UPS once for every holder polling it within a few seconds", async () => {
+        reach = live(["watch"]);
+        const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 60_000);
+        await Promise.all([upsGuestView("t"), upsGuestView("t"), upsGuestView("t")]);
+        await upsGuestView("t");
+        expect(readUps).toHaveBeenCalledTimes(1);
+        clock.mockReturnValue(Date.now() + 120_000);
+        await upsGuestView("t");
+        expect(readUps).toHaveBeenCalledTimes(2);
+        clock.mockRestore();
     });
 
     it("is nothing for a door's link, or one taken back", async () => {
@@ -111,10 +126,21 @@ describe("driving a UPS through a link", () => {
         expect(spendGrant).toHaveBeenCalledOnce();
     });
 
+    it("never cuts the power through a link, even one with control", async () => {
+        reach = live(["watch", "control"]);
+        for (const command of ["load.off", "shutdown.stayoff", "bypass.start"]) {
+            expect(await pressUpsGuest("t", command, null, "1.2.3.4")).toEqual({
+                ok: false,
+                error: "notThat"
+            });
+        }
+        expect(runUpsCommand).not.toHaveBeenCalled();
+    });
+
     it("stops an address that sends too often", async () => {
         reach = live(["watch", "control"]);
         limited = { ok: false, retryAfterMs: 1 };
-        expect(await pressUpsGuest("t", "load.off", null, "1.2.3.4")).toEqual({
+        expect(await pressUpsGuest("t", "test.battery.start.quick", null, "1.2.3.4")).toEqual({
             ok: false,
             error: "tooMany"
         });
@@ -122,21 +148,26 @@ describe("driving a UPS through a link", () => {
 
     it("asks where the browser is for a fenced link, and refuses it far away", async () => {
         reach = live(["watch", "control"], 100);
-        expect(await pressUpsGuest("t", "load.off", null, "1.2.3.4")).toEqual({
+        expect(await pressUpsGuest("t", "test.battery.start.quick", null, "1.2.3.4")).toEqual({
             ok: false,
             error: "nearbyUnasked"
         });
         expect(
             await pressUpsGuest(
                 "t",
-                "load.off",
+                "test.battery.start.quick",
                 { latitude: 51.6, longitude: -0.1246, accuracy: 10 },
                 "1.2.3.4"
             )
         ).toEqual({ ok: false, error: "nearbyFar" });
         expect(runUpsCommand).not.toHaveBeenCalled();
         expect(
-            await pressUpsGuest("t", "load.off", { ...AT_RACK, accuracy: 10 }, "1.2.3.4")
+            await pressUpsGuest(
+                "t",
+                "test.battery.start.quick",
+                { ...AT_RACK, accuracy: 10 },
+                "1.2.3.4"
+            )
         ).toEqual({ ok: true, outcome: "ok" });
     });
 

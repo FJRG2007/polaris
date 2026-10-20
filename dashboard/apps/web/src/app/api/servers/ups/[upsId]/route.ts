@@ -6,7 +6,7 @@
 import { z } from "zod";
 import * as upsService from "@/lib/ups/ups-service";
 import { upsReached } from "../guard";
-import { visitorView } from "@/lib/ups/ups-access";
+import { visitorResult, visitorView } from "@/lib/ups/ups-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function GET(
     const view = upsService.toView(row);
     return Response.json({
         ups: standing.manage ? view : visitorView(view),
-        result,
+        result: standing.manage ? result : visitorResult(result, standing.control),
         history
     });
 }

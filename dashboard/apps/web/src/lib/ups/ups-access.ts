@@ -15,7 +15,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { liveGrants, type LiveGrant } from "@/lib/access/grants";
-import type { UpsView } from "@/lib/ups/ups-service";
+import type { UpsReadResult, UpsView } from "@/lib/ups/ups-service";
 
 export interface UpsStanding {
     /** Runs it: everything, settings included. */
@@ -55,10 +55,21 @@ export function visitorView(view: UpsView): UpsView {
         machineId: null,
         deviceId: null,
         host: null,
+        port: null,
+        upsName: null,
         username: null,
         hasSecret: false,
         shutdown: { ...view.shutdown, protectedMachineIds: [] }
     };
+}
+
+/**
+ * A reading as a visitor is shown it: the mapped status, never the raw dump
+ * (which carries the driver's port, the device's serials and the like), and
+ * the writable variables only to somebody lent control to set them.
+ */
+export function visitorResult(result: UpsReadResult, control: boolean): UpsReadResult {
+    return result.ok ? { ...result, vars: {}, rw: control ? result.rw : [] } : result;
 }
 
 /**

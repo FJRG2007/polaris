@@ -66,10 +66,10 @@ async function fenced(
     return { ok: false, error: `nearby${verdict[0]!.toUpperCase()}${verdict.slice(1)}` };
 }
 
-/** A visitor's use, counted after the UPS answered. Bookkeeping about an act
- *  that already happened, so a failure is logged rather than raised. */
-async function countUse(grant: LiveGrant | null): Promise<void> {
-    if (!grant) return;
+/** A visitor's use, counted once the UPS did what was asked. Bookkeeping about
+ *  an act that already happened, so a failure is logged rather than raised. */
+async function countUse(grant: LiveGrant | null, outcome: upsService.UpsSetResult): Promise<void> {
+    if (!grant || outcome !== "ok") return;
     await spendGrant(grant).catch((caught: unknown) =>
         console.error("polaris: a UPS use could not be counted:", caught)
     );
@@ -188,7 +188,7 @@ export async function runUpsCommandAction(
         const refusedNear = await fenced(grant, row.placeId, where);
         if (refusedNear) return refusedNear;
         const outcome = await upsService.runUpsCommand(row, parsed);
-        await countUse(grant);
+        await countUse(grant, outcome);
         await upsData.logAction({
             upsId,
             actorId: user.id,
@@ -292,7 +292,7 @@ export async function setUpsVarAction(
         const refusedNear = await fenced(grant, row.placeId, where);
         if (refusedNear) return refusedNear;
         const result = await upsService.setUpsVar(row, input.name, input.value);
-        await countUse(grant);
+        await countUse(grant, result.outcome);
         await upsData.logAction({
             upsId,
             actorId: user.id,

@@ -3,9 +3,10 @@
  *
  * The link is a grant like any other (principal `link`, see
  * `lib/access/grants.ts`): the same dates, hours, uses, actions and fence.
- * Watching reads its status; control also sends it the commands it lists
- * (the self-test among them), each rate-limited by link and address, recorded
- * with no actor, and counted only once the UPS answered.
+ * Watching reads its status, from a reading shared a few seconds between
+ * every holder; control also sends it the commands it lists (the self-test
+ * among them) except those that cut the power, each rate-limited by link and
+ * address, recorded with no actor, and counted only once the UPS answered.
  *
  * What it never shows a guest is where it is reached or what it shuts down:
  * only its name and how it is doing.
@@ -20,10 +21,16 @@ import { recordAudit } from "@/lib/audit-service";
 import * as upsService from "@/lib/ups/ups-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import type * as upsReading from "@/lib/ups/ups-reading";
+import { isDangerousCommand } from "@/app/(app)/places/ups/ups-words";
 import { linkReach, spendGrant, type LiveGrant } from "@/lib/access/grants";
 
 /** Commands per link and address, a minute. */
 const COMMANDS_PER_MINUTE = 6;
+
+/** How long one reading answers every link to the same UPS. */
+const READ_TTL_MS = 10_000;
+
+const readings = new Map<string, { at: number; result: Promise<upsService.UpsReadResult> }>();
 
 type UpsRow = NonNullable<Awaited<ReturnType<typeof upsService.getUps>>>;
 
@@ -56,6 +63,19 @@ async function reached(token: string): Promise<{ grant: LiveGrant; row: UpsRow }
     return row ? { grant: link.grant, row } : null;
 }
 
+/** The UPS's reading, asked of it at most once per `READ_TTL_MS` however many
+ *  links and tabs poll it. */
+function sharedReading(row: UpsRow): Promise<upsService.UpsReadResult> {
+    const now = Date.now();
+    const kept = readings.get(row.id);
+    if (kept && now - kept.at < READ_TTL_MS) return kept.result;
+    for (const [id, one] of readings) if (now - one.at >= READ_TTL_MS) readings.delete(id);
+    const result = upsService.readUps(row);
+    readings.set(row.id, { at: now, result });
+    result.catch(() => readings.delete(row.id));
+    return result;
+}
+
 /** Whether a UPS link's address names a UPS at all, and how it stands. */
 export async function upsLinkStanding(token: string): Promise<core.GrantStanding | null> {
     const link = await linkReach(token);
@@ -67,7 +87,7 @@ export async function upsGuestView(token: string): Promise<UpsGuestView | null> 
     const found = await reached(token);
     if (!found) return null;
     const control = found.grant.actions.includes("control");
-    const result = await upsService.readUps(found.row);
+    const result = await sharedReading(found.row);
     const reading = result.ok ? result.reading : null;
     return {
         name: found.row.name,
@@ -83,7 +103,10 @@ export async function upsGuestView(token: string): Promise<UpsGuestView | null> 
                   testResult: reading.testResult
               }
             : null,
-        commands: control && reading ? reading.commands : []
+        commands:
+            control && reading
+                ? reading.commands.filter((command) => !isDangerousCommand(command))
+                : []
     };
 }
 
@@ -99,7 +122,8 @@ export async function pressUpsGuest(
     const found = await reached(token);
     if (!found) return { ok: false, error: "closed" };
     const { grant, row } = found;
-    if (!grant.actions.includes("control")) return { ok: false, error: "notThat" };
+    if (!grant.actions.includes("control") || isDangerousCommand(command))
+        return { ok: false, error: "notThat" };
     const limited = await rateLimit(`guest-ups:${grant.id}:${ip}`, COMMANDS_PER_MINUTE, 60_000);
     if (!limited.ok) return { ok: false, error: "tooMany" };
     const verdict = await upsNearby(grant, row.placeId, where);

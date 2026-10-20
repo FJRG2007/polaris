@@ -36,7 +36,7 @@ vi.mock("@/lib/ups/ups-service", () => ({
 }));
 vi.mock("@/app/(app)/apps/servers/server-rows", () => ({ listServerRows: async () => [] }));
 
-const { upsStanding, visitorView } = await import("@/lib/ups/ups-access");
+const { upsStanding, visitorResult, visitorView } = await import("@/lib/ups/ups-access");
 const actions = await import("@/app/(app)/places/ups/actions");
 
 const VISITOR = { id: "visitor", isAdmin: false } as unknown as SessionUser;
@@ -102,6 +102,18 @@ describe("driving it", () => {
         expect(spendGrant).toHaveBeenCalledOnce();
     });
 
+    it("spends no use on a command or a variable the UPS did not take", async () => {
+        lent = [{ id: "g2", capability: "control", actions: ["watch", "control"], counted: true }];
+        runUpsCommand.mockResolvedValueOnce("refused" as never);
+        expect(await actions.runUpsCommandAction(UPS, "test.battery.start")).toEqual({
+            ok: true,
+            value: "refused"
+        });
+        setUpsVar.mockResolvedValueOnce({ outcome: "invalid" } as never);
+        await actions.setUpsVarAction(UPS, { name: "battery.charge.low", value: "20" });
+        expect(spendGrant).not.toHaveBeenCalled();
+    });
+
     it("refuses writing a variable on a watching grant", async () => {
         lent = [{ id: "g1", capability: "view", actions: ["watch"], counted: false }];
         const outcome = await actions.setUpsVarAction(UPS, {
@@ -126,14 +138,34 @@ describe("what a visitor is shown", () => {
             machineId: "host:1",
             deviceId: "usb-1",
             host: "10.0.0.5",
+            port: 3493,
+            upsName: "rack",
             username: "monuser",
             hasSecret: true,
             shutdown: { protectedMachineIds: ["host:1"] }
         } as never);
         expect(view.host).toBeNull();
+        expect(view.port).toBeNull();
+        expect(view.upsName).toBeNull();
         expect(view.username).toBeNull();
         expect(view.machineId).toBeNull();
         expect(view.hasSecret).toBe(false);
         expect(view.shutdown.protectedMachineIds).toEqual([]);
+    });
+
+    it("reads the mapped status, never the raw dump, and writable variables only with control", () => {
+        const read = {
+            ok: true,
+            reading: { charge: 98 },
+            vars: { "driver.parameter.port": "/dev/ttyS0", "ups.serial": "ABC123" },
+            rw: [{ name: "battery.charge.low", value: "20" }]
+        } as never;
+        const watched = visitorResult(read, false);
+        expect(JSON.stringify(watched)).not.toContain("/dev/ttyS0");
+        expect(JSON.stringify(watched)).not.toContain("ABC123");
+        expect(watched.ok && watched.rw).toEqual([]);
+        const driven = visitorResult(read, true);
+        expect(driven.ok && driven.vars).toEqual({});
+        expect(driven.ok && driven.rw).toHaveLength(1);
     });
 });
