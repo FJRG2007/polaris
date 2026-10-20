@@ -14,6 +14,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import {
     convertToModelMessages,
+    generateId,
     isStepCount,
     safeValidateUIMessages,
     streamText,
@@ -239,6 +240,11 @@ export async function POST(request: Request): Promise<Response> {
 
     return result.toUIMessageStreamResponse({
         originalMessages: messages,
+        // The answer's id is decided here and sent with its first chunk, so the
+        // screen and the stored row share it. Without it the row is saved under
+        // an empty id, which every later answer collides with and is dropped.
+        // A turn that continues an answer keeps that answer's id.
+        generateMessageId: generateId,
         sendReasoning: true,
         // A provider's own search reports what it read as sources.
         sendSources: true,

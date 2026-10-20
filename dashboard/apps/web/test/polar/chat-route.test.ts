@@ -343,6 +343,45 @@ describe("what a request has to look like", () => {
         expect(state.saved).toHaveLength(1);
     });
 
+    it("saves the answer under the id the screen is told, so a reload finds it", async () => {
+        const text = await (await post(body())).text();
+        const start = /"type":"start"[^\n]*?"messageId":"([^"]+)"/.exec(text);
+        expect(start?.[1]).toBeTruthy();
+        const [, , finished] = state.saved[0] as [string, string, UIMessage[]];
+        const answer = finished.at(-1);
+        expect(answer?.role).toBe("assistant");
+        expect(answer?.id).toBe(start?.[1]);
+    });
+
+    it("gives every answer an id of its own", async () => {
+        await (await post(body())).text();
+        await (await post(body())).text();
+        const ids = state.saved.map(
+            (entry) => (entry as [string, string, UIMessage[]])[2].at(-1)?.id
+        );
+        expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it("keeps the answer's id when a turn continues it", async () => {
+        const text = await (
+            await post(
+                body({
+                    messages: [
+                        {
+                            id: "u1",
+                            role: "user",
+                            parts: [{ type: "text", text: "Tidy my tasks" }]
+                        },
+                        { id: "a1", role: "assistant", parts: [{ type: "text", text: "Sure." }] }
+                    ]
+                })
+            )
+        ).text();
+        expect(text).toContain('"messageId":"a1"');
+        const [, , finished] = state.saved[0] as [string, string, UIMessage[]];
+        expect(finished.map((message) => message.id)).toEqual(["u1", "a1"]);
+    });
+
     it("asks for the thread's title once the reply has finished, not before", async () => {
         const answer = await post(body());
         expect(state.titled).toHaveLength(0);
