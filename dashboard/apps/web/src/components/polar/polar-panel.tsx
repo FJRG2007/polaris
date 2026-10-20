@@ -1787,15 +1787,6 @@ export function PolarChat({
                                     textarea.current?.focus();
                                 }}
                             />
-                            <VoiceModeButton
-                                available={voice.dictation}
-                                disabled={noKeys || !choice}
-                                onNotice={setVoiceNotice}
-                                onOpen={() => {
-                                    answerActions.stopReading();
-                                    setInCall(true);
-                                }}
-                            />
                             <ModelSelector
                                 providers={providers ?? []}
                                 choice={choice}
@@ -1804,17 +1795,29 @@ export function PolarChat({
                                 onOpenChange={setModelOpen}
                             />
                         </PromptInputTools>
-                        <PromptInputSubmit
-                            busy={busy}
-                            disabled={
-                                (!input.trim() && files.length === 0) ||
-                                !choice ||
-                                files.some(stillStaging)
-                            }
-                            sendLabel={t("actions.send")}
-                            stopLabel={t("actions.stop")}
-                            onStop={() => void chat.stop()}
-                        />
+                        {/* One button, as in ChatGPT: with nothing typed or
+                            attached it starts a voice conversation, and it
+                            sends once there is something to send. */}
+                        {!busy && !input.trim() && files.length === 0 ? (
+                            <VoiceModeButton
+                                primary
+                                available={voice.dictation}
+                                disabled={noKeys || !choice}
+                                onNotice={setVoiceNotice}
+                                onOpen={() => {
+                                    answerActions.stopReading();
+                                    setInCall(true);
+                                }}
+                            />
+                        ) : (
+                            <PromptInputSubmit
+                                busy={busy}
+                                disabled={!choice || files.some(stillStaging)}
+                                sendLabel={t("actions.send")}
+                                stopLabel={t("actions.stop")}
+                                onStop={() => void chat.stop()}
+                            />
+                        )}
                     </PromptInputFooter>
                 </PromptInput>
             </BorderBeam>

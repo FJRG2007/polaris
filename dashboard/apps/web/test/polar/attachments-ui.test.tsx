@@ -157,6 +157,23 @@ describe("attaching", () => {
         expect(screen.getByText("1.5 KB")).toBeTruthy();
     });
 
+    it("starts a voice conversation from the send button until there is something to send", async () => {
+        const box = await mount();
+        expect(screen.queryByRole("button", { name: "Send (Enter)" })).toBeNull();
+        // Dictation shares the "needs a key" wording; voice mode is the other one.
+        const voice = () =>
+            screen.queryAllByRole("button", { name: /Voice mode|Speaking to Polar/ });
+        expect(voice()).toHaveLength(2);
+        fireEvent.change(box, { target: { value: "   " } });
+        expect(screen.queryByRole("button", { name: "Send (Enter)" })).toBeNull();
+        fireEvent.change(box, { target: { value: "Hello" } });
+        expect(screen.getByRole("button", { name: "Send (Enter)" })).toBeTruthy();
+        expect(voice()).toHaveLength(1);
+        fireEvent.change(box, { target: { value: "" } });
+        paste(box, [png()]);
+        expect(await screen.findByRole("button", { name: "Send (Enter)" })).toBeTruthy();
+    });
+
     it("takes a dropped file", async () => {
         const box = await mount();
         const form = box.closest("form")!;
