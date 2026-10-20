@@ -121,6 +121,7 @@ import {
 } from "@/components/polar/elements/prompt-input";
 import {
     cleanContextText,
+    isAutomatic,
     MAX_QUEUE,
     polarAttachmentId,
     POLAR_ATTACHMENT_MAX_BYTES,
@@ -637,6 +638,8 @@ export function PolarChat({
                     setSpendsDeployment(data.spendsDeployment ?? true);
                     setVoice(data.voice ?? NO_VOICE);
                     setChoice((current) => {
+                        // Automatic stays while there is any model to pick from.
+                        if (isAutomatic(current) && data.providers.length > 0) return current;
                         const known = data.providers.some((entry) =>
                             entry.models.some(
                                 (model) =>
@@ -1634,6 +1637,8 @@ function MessageView({
     const meta = (message.metadata ?? {}) as {
         fellBackFrom?: string | null;
         workedMs?: number;
+        model?: string;
+        automatic?: boolean;
     };
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
@@ -1793,6 +1798,13 @@ function MessageView({
                 }
                 return null;
             })}
+            {!mine && typeof meta.model === "string" ? (
+                <p className="text-xs text-foreground-subtle">
+                    {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {
+                        model: meta.model
+                    })}
+                </p>
+            ) : null}
             {!streaming ? (
                 <MessageActions className="opacity-0 transition-opacity duration-fast focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
                     <MessageBranchSelector

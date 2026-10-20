@@ -162,6 +162,10 @@
         "placeholder": "Ask Polar, or type / for commands"
     },
     "picker": {
+        "automatic": "Automatic",
+        "automaticHint": "Picks a fast or a reasoning model for each message",
+        "answeredBy": "Answered by {model}",
+        "autoPicked": "Automatic chose {model}",
         "none": "No model",
         "title": "Model, intelligence and key",
         "intelligence": "Intelligence",

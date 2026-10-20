@@ -162,6 +162,10 @@
         "placeholder": "Pregunta a Polar o escribe / para comandos"
     },
     "picker": {
+        "automatic": "Automático",
+        "automaticHint": "Elige un modelo rápido o uno que razona por mensaje",
+        "answeredBy": "Respondió {model}",
+        "autoPicked": "Automático eligió {model}",
         "none": "Sin modelo",
         "title": "Modelo, inteligencia y clave",
         "intelligence": "Inteligencia",

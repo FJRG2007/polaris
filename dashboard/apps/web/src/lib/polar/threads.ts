@@ -275,7 +275,7 @@ export async function ensurePolarThread(
     userId: string,
     id: string,
     firstText: string,
-    choice: ModelChoice,
+    choice: ModelChoice | null,
     projectId: string | null = null,
     temporary = false
 ): Promise<{ temporary: boolean } | null> {
@@ -285,10 +285,13 @@ export async function ensurePolarThread(
     });
     if (existing) {
         if (existing.userId !== userId) return null;
-        await prisma.polarThread.update({
-            where: { id },
-            data: { choice: choice as unknown as Prisma.InputJsonValue }
-        });
+        // Null for a turn on a command's own model: the thread keeps its model.
+        if (choice) {
+            await prisma.polarThread.update({
+                where: { id },
+                data: { choice: choice as unknown as Prisma.InputJsonValue }
+            });
+        }
         return { temporary: existing.temporary };
     }
     await prisma.polarThread.create({
@@ -301,7 +304,7 @@ export async function ensurePolarThread(
                 !temporary && projectId && (await ownsProject(userId, projectId))
                     ? projectId
                     : null,
-            choice: choice as unknown as Prisma.InputJsonValue,
+            ...(choice ? { choice: choice as unknown as Prisma.InputJsonValue } : {}),
             temporary
         }
     });

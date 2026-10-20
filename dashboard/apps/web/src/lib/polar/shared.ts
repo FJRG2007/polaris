@@ -37,6 +37,19 @@ export const modelChoiceSchema = z.object({
 });
 export type ModelChoice = z.infer<typeof modelChoiceSchema>;
 
+/** The provider and model a choice names when it is "Automatic": Polar picks
+ *  the model each turn (`automatic.ts`). No integration has this slug. */
+export const AUTOMATIC = { provider: "auto", model: "auto" } as const;
+
+export function isAutomatic(choice: Pick<ModelChoice, "provider" | "model"> | null | undefined) {
+    return choice?.provider === AUTOMATIC.provider && choice.model === AUTOMATIC.model;
+}
+
+/** The Automatic choice, at the default intelligence. */
+export function automaticChoice(intelligence: Intelligence = "balanced"): ModelChoice {
+    return { kind: "language", ...AUTOMATIC, intelligence, payer: null };
+}
+
 /** Longest string any page-context field keeps. */
 const CONTEXT_TEXT = 200;
 /** Most ids or selected items one page can hand over. */

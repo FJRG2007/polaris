@@ -32,6 +32,7 @@ import {
     polarMemoryTools
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
+import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -65,7 +66,10 @@ const bodySchema = z.object({
     /** The project a new thread is filed under; ignored for an existing one. */
     projectId: z.string().uuid().nullable().default(null),
     /** A new thread made temporary: not listed, no memory, deleted on leave. */
-    temporary: z.boolean().default(false)
+    temporary: z.boolean().default(false),
+    /** False for a turn sent on a command's own model: the thread keeps the
+     *  model it was on, so the next message goes back to it. */
+    remember: z.boolean().default(true)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -114,14 +118,15 @@ export async function POST(request: Request): Promise<Response> {
     // the first model this person can use, and the answer says so.
     let choice: ModelChoice = body.data.choice;
     const access = await polarAccessFor(user.id);
-    let resolved = await resolvePolarModel(user.id, choice, access);
+    const signals = turnSignals(messages);
+    let resolved = await resolvePolarModel(user.id, choice, signals, access);
     let fellBackFrom: string | null = null;
     if (resolved === "unknown_model") {
         const first = (await polarModelOptions(user.id, access))[0]?.models[0];
         if (first) {
             fellBackFrom = choice.model;
             choice = { ...choice, provider: first.provider, model: first.model, payer: null };
-            resolved = await resolvePolarModel(user.id, choice, access);
+            resolved = await resolvePolarModel(user.id, choice, signals, access);
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
@@ -130,7 +135,7 @@ export async function POST(request: Request): Promise<Response> {
         user.id,
         body.data.threadId,
         firstText(messages[0]),
-        choice,
+        body.data.remember ? choice : null,
         body.data.projectId,
         body.data.temporary
     );
@@ -162,7 +167,11 @@ export async function POST(request: Request): Promise<Response> {
         tools,
         toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
         stopWhen: isStepCount(STEP_MAX),
-        reasoning: reasoningFor(choice.intelligence, resolved.option),
+        // Automatic sends a quick question at the lowest effort.
+        reasoning: reasoningFor(
+            resolved.automatic === "fast" ? "fast" : choice.intelligence,
+            resolved.option
+        ),
         abortSignal: request.signal
     });
 
@@ -175,6 +184,7 @@ export async function POST(request: Request): Promise<Response> {
                       model: resolved.option.name,
                       provider: resolved.option.providerName,
                       payer: resolved.credential.source,
+                      automatic: !!resolved.automatic,
                       fellBackFrom
                   }
                 : part.type === "finish"
@@ -203,13 +213,15 @@ export async function POST(request: Request): Promise<Response> {
         // The provider's refusal is classified and named, never forwarded: its
         // body is the provider's own words about the account it belongs to.
         onError: (error) => {
+            // Automatic tries this provider last for a few minutes.
+            noteProviderFailure(user.id, resolved.option.provider);
             const failure = classifyProviderFailure(error);
             console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
             return encodePolarFailure({
                 code: "provider",
                 kind: failure.kind,
                 provider: resolved.option.providerName,
-                slug: choice.provider,
+                slug: resolved.option.provider,
                 payer: resolved.credential.source
             });
         }
