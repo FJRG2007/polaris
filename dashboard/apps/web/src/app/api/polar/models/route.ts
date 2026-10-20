@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { polarCaller } from "@/lib/polar/access";
+import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarModelOptions } from "@/lib/polar/models";
 import { polarVoiceAvailability } from "@/lib/polar/voice";
@@ -16,10 +16,19 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
-    const [providers, toolset, voice] = await Promise.all([
+    const [providers, toolset, voice, access] = await Promise.all([
         polarModelOptions(user.id),
         polarTools(user),
-        polarVoiceAvailability(user.id)
+        polarVoiceAvailability(user.id),
+        polarAccessFor(user.id)
     ]);
-    return NextResponse.json({ providers, tools: toolset.described, isAdmin: user.isAdmin, voice });
+    // Whether the deployment's keys are this person's to spend, so a picker with
+    // nothing in it can say their own key is the way in rather than "ask".
+    return NextResponse.json({
+        providers,
+        tools: toolset.described,
+        isAdmin: user.isAdmin,
+        voice,
+        spendsDeployment: access.spend
+    });
 }

@@ -98,7 +98,8 @@
         "title": "Polar necesita una clave de IA",
         "body": "Añade una clave de un proveedor como Anthropic, OpenAI o Google, o pide a un administrador que comparta las de este Polaris.",
         "own": "Añade tu clave",
-        "admin": "Gestionar claves de Polaris"
+        "admin": "Gestionar claves de Polaris",
+        "ownOnly": "Las claves de este Polaris no se comparten contigo. Para usar Polar, añade una clave tuya de un proveedor como Anthropic, OpenAI o Google."
     },
     "empty": "Pregunta por esta página o por lo que puedes hacer en Polaris.",
     "status": {
@@ -106,7 +107,20 @@
     },
     "errors": {
         "failed": "Polar no pudo responder. Reintenta o elige otro modelo.",
-        "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible."
+        "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible.",
+        "provider": {
+            "key": "{provider} rechazó la clave que usó Polar. Puede ser incorrecta, estar revocada o no tener un permiso.",
+            "credit": "{provider} dice que la cuenta de esta clave se ha quedado sin crédito. Añade crédito o un método de pago en su facturación.",
+            "rate": "{provider} está limitando cuántas veces se usa esta clave. Espera un minuto y vuelve a probar.",
+            "down": "{provider} tiene problemas para responder ahora mismo. Vuelve a probar en unos minutos.",
+            "model": "{provider} ya no ofrece este modelo. Elige otro.",
+            "other": "{provider} no pudo responder. Reintenta o elige otro modelo.",
+            "askAdmin": "Pide a tu administrador que revise la clave de {provider} de este Polaris.",
+            "openKey": "Abrir la clave",
+            "ownKey": "Revisar tu clave",
+            "tryWith": "Probar con {model}",
+            "retry": "Reintentar"
+        }
     },
     "queue": {
         "title": "Van después",

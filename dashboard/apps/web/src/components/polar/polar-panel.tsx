@@ -13,6 +13,7 @@
  */
 
 import Link from "next/link";
+import { PolarFailureNotice } from "./polar-failure";
 import { useChat } from "@ai-sdk/react";
 import { usePathname } from "next/navigation";
 import {
@@ -506,6 +507,7 @@ export function PolarChat({
     const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
     const [tools, setTools] = useState<Record<string, ToolDescription>>({});
     const [isAdmin, setIsAdmin] = useState(false);
+    const [spendsDeployment, setSpendsDeployment] = useState(true);
     const [voice, setVoice] = useState<VoiceAvailability>(NO_VOICE);
     const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
     const [inCall, setInCall] = useState(false);
@@ -614,12 +616,14 @@ export function PolarChat({
                         tools?: Record<string, ToolDescription>;
                         isAdmin: boolean;
                         voice?: VoiceAvailability;
+                        spendsDeployment?: boolean;
                     } | null
                 ) => {
                     if (!data) return setProviders([]);
                     setProviders(data.providers);
                     setTools(data.tools ?? {});
                     setIsAdmin(data.isAdmin);
+                    setSpendsDeployment(data.spendsDeployment ?? true);
                     setVoice(data.voice ?? NO_VOICE);
                     setChoice((current) => {
                         const known = data.providers.some((entry) =>
@@ -1434,7 +1438,9 @@ export function PolarChat({
                                 {noKeys ? (
                                     <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
                                         <p className="text-foreground">{t("noKeys.title")}</p>
-                                        <p className="mt-1">{t("noKeys.body")}</p>
+                                        <p className="mt-1">
+                                            {t(spendsDeployment ? "noKeys.body" : "noKeys.ownOnly")}
+                                        </p>
                                         <div className="mt-2 flex flex-wrap gap-3">
                                             <Link
                                                 href="/account/ai-keys"
@@ -1496,12 +1502,27 @@ export function PolarChat({
                                     </div>
                                 ) : null}
                                 {chat.error ? (
-                                    <p
-                                        role="alert"
-                                        className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
-                                    >
-                                        {t("errors.failed")}
-                                    </p>
+                                    <PolarFailureNotice
+                                        error={chat.error.message}
+                                        isAdmin={isAdmin}
+                                        providers={providers ?? []}
+                                        failedModel={choice?.model ?? null}
+                                        onRetry={() => void chat.regenerate()}
+                                        onTryWith={(model) => {
+                                            if (!choice) return;
+                                            const next: ModelChoice = {
+                                                ...choice,
+                                                provider: model.provider,
+                                                model: model.model,
+                                                payer: null
+                                            };
+                                            // Read by the transport on this very send,
+                                            // before the state below has rendered.
+                                            live.current = { ...live.current, choice: next };
+                                            setChoice(next);
+                                            void chat.regenerate();
+                                        }}
+                                    />
                                 ) : null}
                             </ConversationContent>
                         </Conversation>

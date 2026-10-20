@@ -34,6 +34,7 @@ import {
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
+import { classifyProviderFailure, encodePolarFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import {
     fencePageContext,
     modelChoiceSchema,
@@ -194,6 +195,18 @@ export async function POST(request: Request): Promise<Response> {
                 reasoningFor("fast", resolved.option)
             );
         },
-        onError: () => "polar_failed"
+        // The provider's refusal is classified and named, never forwarded: its
+        // body is the provider's own words about the account it belongs to.
+        onError: (error) => {
+            const failure = classifyProviderFailure(error);
+            console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
+            return encodePolarFailure({
+                code: "provider",
+                kind: failure.kind,
+                provider: resolved.option.providerName,
+                slug: choice.provider,
+                payer: resolved.credential.source
+            });
+        }
     });
 }
