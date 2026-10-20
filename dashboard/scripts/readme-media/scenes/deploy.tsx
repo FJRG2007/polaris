@@ -29,6 +29,8 @@ function DeployFrame({ children }: { children: ReactNode }) {
 export const deploy = defineScene({
     id: "deploy",
     path: "/apps/deploy",
+    // No site import from a cPanel backup in the last day.
+    api: () => ({ "GET /api/deploy/import/cpanel": () => ({ imports: [] }) }),
     render: (ctx) => (
         <DeployFrame>
             <ProjectsGrid projects={projectCards(ctx)} canManage localReady viewerId={VIEWER.id} />
