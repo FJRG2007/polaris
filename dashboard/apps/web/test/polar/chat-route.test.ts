@@ -277,7 +277,8 @@ describe("what a request has to look like", () => {
         [
             "an unknown intelligence",
             body({ choice: { provider: "anthropic", model: "m-1", intelligence: "huge" } })
-        ]
+        ],
+        ["an unknown way to answer again", body({ refine: "funnier" })]
     ])("refuses %s", async (_name, payload) => {
         const answer = await post(payload);
         expect(answer.status).toBe(400);

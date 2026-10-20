@@ -98,7 +98,16 @@
         "copy": "Copy message",
         "regenerate": "Answer again",
         "copied": "Copied",
-        "branch": "Branch into new chat"
+        "branch": "Branch into new chat",
+        "good": "Good answer",
+        "bad": "Bad answer",
+        "readAloud": "Read aloud",
+        "stopReading": "Stop reading",
+        "share": "Share up to here",
+        "tryAgain": "Try again",
+        "longer": "Add details",
+        "shorter": "More concise",
+        "otherModel": "Try another model"
     },
     "noKeys": {
         "title": "Polar needs an AI provider key",
@@ -492,7 +501,8 @@
         "kind": "shared chat",
         "file": "Open {name}",
         "unnamedFile": "File",
-        "close": "Close"
+        "close": "Close",
+        "upToIntro": "Anyone with the link can read this conversation up to this answer. Later messages stay private, and updating the link keeps this end point."
     },
     "busyVerbs": {
         "pondering": "Pondering",
@@ -575,5 +585,24 @@
         "detail": "{used} of {window} tokens ({share}%), {draft} of them in your message",
         "short": "{share}% of context",
         "over": "This chat no longer fits this model. Compact it before sending."
+    },
+    "feedback": {
+        "reasons": {
+            "incorrect": "Not correct",
+            "instructions": "Ignored what I asked",
+            "incomplete": "Incomplete",
+            "style": "Wrong tone or style",
+            "slow": "Too slow",
+            "unsafe": "Harmful or unsafe",
+            "other": "Something else"
+        },
+        "title": "What went wrong?",
+        "intro": "Pick what applies. It helps whoever runs Polaris see where Polar falls short.",
+        "note": "Details",
+        "notePlaceholder": "Add details (optional)",
+        "send": "Send",
+        "skip": "Skip",
+        "thanks": "Thanks for telling us.",
+        "failed": "Couldn't save your rating. Try again."
     }
 }

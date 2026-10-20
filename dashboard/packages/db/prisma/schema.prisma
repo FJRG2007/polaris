@@ -41,6 +41,7 @@ model User {
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
     polarSharesIn     PolarShareRecipient[]
+    polarFeedback     PolarAnswerFeedback[]
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
     automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
@@ -15155,6 +15156,9 @@ model PolarThreadShare {
     // only sent to people: the row (and its snapshot time) exists for them, and
     // nobody holding a link reads it. Rows older than this column were links.
     linkEnabled    Boolean     @default(true)
+    // The answer the snapshot ends at, when it was shared from that answer's
+    // own row: the path to it, not the newest one. Null shows the whole chat.
+    upToMessageId  String?
     recipients     PolarShareRecipient[]
 }
 
@@ -15186,8 +15190,31 @@ model PolarMessage {
     parts     Json
     metadata  Json?
     createdAt DateTime    @default(now())
+    feedback  PolarAnswerFeedback[]
 
     @@index([threadId, createdAt])
+}
+
+// One person's good or bad mark on one Polar answer, with what was wrong and a
+// note when they said. It never changes the answer; the administrator reads
+// them on the Consumption screen. Gone with the message (and its chat).
+model PolarAnswerFeedback {
+    id        String       @id @default(uuid(7)) @db.Uuid
+    userId    String       @db.Uuid
+    user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messageId String
+    message   PolarMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    // "good" or "bad".
+    rating    String
+    reasons   String[]     @default([])
+    note      String?
+    // The model that wrote the answer, as its metadata named it.
+    model     String?
+    createdAt DateTime     @default(now())
+    updatedAt DateTime     @updatedAt
+
+    @@unique([userId, messageId])
+    @@index([updatedAt(sort: Desc)])
 }
 
 // What one Polar answer spent: the provider's own token counts and, when the

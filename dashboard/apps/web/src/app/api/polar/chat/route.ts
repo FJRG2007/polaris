@@ -25,7 +25,7 @@ import {
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
-import { polarSystemPrompt } from "@/lib/polar/prompt";
+import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import {
     NATIVE_SEARCH_STAND_INS,
     WEB_APPROVAL,
@@ -89,7 +89,9 @@ const bodySchema = z.object({
     /** Whether the person left web search on for this turn. */
     web: z.boolean().default(true),
     /** Polar's tools the person switched off in its settings: not offered. */
-    off: z.array(z.string().max(200)).max(500).default([])
+    off: z.array(z.string().max(200)).max(500).default([]),
+    /** An answer asked again from its row with more detail or fewer words. */
+    refine: z.enum(POLAR_REFINES).nullable().default(null)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -274,7 +276,8 @@ export async function POST(request: Request): Promise<Response> {
                 memories,
                 web
             ),
-            fenceSummary(compacted.summary)
+            fenceSummary(compacted.summary),
+            refineLine(body.data.refine)
         ]
             .filter(Boolean)
             .join("\n\n"),

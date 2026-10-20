@@ -61,8 +61,10 @@ import {
     Phone,
     Plus,
     Reply,
-    RotateCcw,
+    Share2,
+    Square,
     SquarePen,
+    Volume2,
     Wrench,
     BookmarkPlus,
     Brain,
@@ -163,6 +165,10 @@ import {
 } from "@/lib/polar/shared";
 import { titleWithBadge } from "@/lib/favicon-style";
 import { NO_VOICE, type VoiceAvailability } from "@/lib/polar/voice-call";
+import { PolarShareDialog } from "@/components/polar/polar-sharing";
+import type { PolarMark } from "@/lib/polar/answer-feedback";
+import type { PolarRefine } from "@/lib/polar/prompt";
+import * as answerActions from "@/components/polar/polar-answer-actions";
 import {
     DictationButton,
     VoiceCall,
@@ -694,6 +700,12 @@ export function PolarChat({
     const display = usePolarDisplay();
     /** The model one turn is sent on instead of the chosen one: a command's. */
     const turnChoice = useRef<ModelChoice | null>(null);
+    /** How the next answer asked again from its row should change; read once. */
+    const refine = useRef<PolarRefine | null>(null);
+    /** This person's marks on the answers of the open chat, by message id. */
+    const [marks, setMarks] = useState<Record<string, PolarMark>>({});
+    /** The answer a share is being made from. */
+    const [sharingFrom, setSharingFrom] = useState<string | null>(null);
     const wide = useWide();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
@@ -721,32 +733,51 @@ export function PolarChat({
         newProject,
         temporary,
         turnChoice,
+        refine,
         web,
         toolsOff
     });
-    live.current = { threadId, choice, context, newProject, temporary, turnChoice, web, toolsOff };
+    live.current = {
+        threadId,
+        choice,
+        context,
+        newProject,
+        temporary,
+        turnChoice,
+        refine,
+        web,
+        toolsOff
+    };
 
     const transport = useMemo(
         () =>
             new DefaultChatTransport({
                 api: "/api/polar/chat",
-                prepareSendMessagesRequest: ({ messages }) => ({
-                    body: {
-                        threadId: live.current.threadId,
-                        messages: sendableMessages(messages),
-                        // A command's model answers its own turn only; the
-                        // thread stays on the chosen one.
-                        choice: live.current.turnChoice.current ?? live.current.choice,
-                        remember: live.current.turnChoice.current === null,
-                        context: live.current.context,
-                        projectId: live.current.newProject,
-                        temporary: live.current.temporary,
-                        web: live.current.web,
-                        off: live.current.toolsOff,
-                        parentId:
-                            messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
-                    }
-                })
+                prepareSendMessagesRequest: ({ messages }) => {
+                    // Asked for one answer: the turns after it are plain.
+                    const refining = live.current.refine.current;
+                    live.current.refine.current = null;
+                    return {
+                        body: {
+                            threadId: live.current.threadId,
+                            messages: sendableMessages(messages),
+                            // A command's model answers its own turn only; the
+                            // thread stays on the chosen one.
+                            choice: live.current.turnChoice.current ?? live.current.choice,
+                            remember: live.current.turnChoice.current === null,
+                            context: live.current.context,
+                            projectId: live.current.newProject,
+                            temporary: live.current.temporary,
+                            web: live.current.web,
+                            off: live.current.toolsOff,
+                            refine: refining,
+                            parentId:
+                                messages.length > 1
+                                    ? (messages[messages.length - 2]?.id ?? null)
+                                    : null
+                        }
+                    };
+                }
             }),
         []
     );
@@ -879,6 +910,76 @@ export function PolarChat({
         },
         [chat.messages.length]
     );
+
+    // An answer being read stops with the chat that shows it.
+    useEffect(() => () => answerActions.stopReading(), []);
+
+    // This person's marks on the open chat's answers, read once per chat.
+    useEffect(() => {
+        setMarks({});
+        let current = true;
+        fetch(`/api/polar/feedback?thread=${threadId}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { marks?: Record<string, PolarMark> } | null) => {
+                if (current && data?.marks) setMarks(data.marks);
+            })
+            .catch(() => undefined);
+        return () => {
+            current = false;
+        };
+    }, [threadId]);
+
+    /** Marks an answer at once, and puts the mark back if the server refuses. */
+    const markAnswer = async (
+        messageId: string,
+        change: answerActions.MarkChange
+    ): Promise<boolean> => {
+        const before = marks[messageId];
+        const next = change.rating
+            ? {
+                  rating: change.rating,
+                  reasons: change.rating === "bad" ? (change.reasons ?? []) : [],
+                  note: change.rating === "bad" ? (change.note ?? null) : null
+              }
+            : null;
+        const put = (mark: PolarMark | null | undefined) =>
+            setMarks((current) => {
+                const { [messageId]: _gone, ...rest } = current;
+                return mark ? { ...rest, [messageId]: mark } : rest;
+            });
+        put(next);
+        const response = await fetch("/api/polar/feedback", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messageId, ...(next ?? { rating: null }) })
+        }).catch(() => null);
+        if (!response?.ok) {
+            put(before);
+            toast.show({ title: t("feedback.failed") });
+            return false;
+        }
+        if (next?.rating === "bad" && (next.reasons.length > 0 || next.note)) {
+            toast.show({ title: t("feedback.thanks") });
+        }
+        return true;
+    };
+
+    /** The last answer again: as it was, longer, shorter, or on another model
+     *  for this turn only (the chat stays on the one chosen). */
+    const regenerateWith = (options: answerActions.RegenerateOptions) => {
+        if (!live.current.choice) return;
+        answerActions.stopReading();
+        refine.current = options.refine ?? null;
+        turnChoice.current = options.model
+            ? {
+                  ...live.current.choice,
+                  provider: options.model.provider,
+                  model: options.model.model,
+                  payer: null
+              }
+            : null;
+        void chat.regenerate();
+    };
 
     // The queue drains one message at a time once a turn has finished.
     useEffect(() => {
@@ -1126,6 +1227,7 @@ export function PolarChat({
         // Read by the transport on this very send, before the state below has rendered.
         live.current = { ...live.current, choice: next };
         setChoice(next);
+        turnChoice.current = null;
         void chat.regenerate();
     };
 
@@ -1664,7 +1766,10 @@ export function PolarChat({
                                 available={voice.dictation}
                                 disabled={noKeys || !choice}
                                 onNotice={setVoiceNotice}
-                                onOpen={() => setInCall(true)}
+                                onOpen={() => {
+                                    answerActions.stopReading();
+                                    setInCall(true);
+                                }}
                             />
                             <ModelSelector
                                 providers={providers ?? []}
@@ -1951,7 +2056,17 @@ export function PolarChat({
                                                     )
                                                 })
                                             }
-                                            onRegenerate={() => void chat.regenerate()}
+                                            onRegenerate={regenerateWith}
+                                            providers={providers ?? []}
+                                            mark={marks[message.id] ?? null}
+                                            onMark={(change) => markAnswer(message.id, change)}
+                                            speech={voice.speech}
+                                            payer={choice?.payer ?? null}
+                                            onShare={
+                                                temporary
+                                                    ? undefined
+                                                    : () => setSharingFrom(message.id)
+                                            }
                                             renderFailure={(failure) => (
                                                 <PolarFailureNotice
                                                     failure={failure}
@@ -2052,6 +2167,13 @@ export function PolarChat({
                     providers={providers ?? []}
                     onClose={() => setManaging(false)}
                     onEdit={setCommandDraft}
+                />
+            ) : null}
+            {sharingFrom ? (
+                <PolarShareDialog
+                    row={{ id: threadId }}
+                    upTo={sharingFrom}
+                    onClose={() => setSharingFrom(null)}
                 />
             ) : null}
             {commandDraft ? (
@@ -2156,6 +2278,12 @@ function MessageView({
     onQuote,
     onSaveCommand,
     onRegenerate,
+    providers,
+    mark,
+    onMark,
+    speech,
+    payer,
+    onShare,
     onBranch,
     renderFailure
 }: {
@@ -2169,7 +2297,14 @@ function MessageView({
     onEdit: () => void;
     onQuote: () => void;
     onSaveCommand: () => void;
-    onRegenerate: () => void;
+    onRegenerate: (options: answerActions.RegenerateOptions) => void;
+    providers: ModelSelectorProvider[];
+    mark: PolarMark | null;
+    onMark: (change: answerActions.MarkChange) => Promise<boolean>;
+    /** Whether this person has a voice to read answers aloud with. */
+    speech: boolean;
+    payer: string | null;
+    onShare?: () => void;
     onBranch?: () => void;
     /** Why this answer has nothing else to show, drawn the way the panel words it. */
     renderFailure: (failure: polarFailure.StoredFailure) => ReactNode;
@@ -2203,6 +2338,8 @@ function MessageView({
     };
     const sources = mine ? [] : sourcesOf(message.parts as never);
     const { copied, copy } = useCopied();
+    const toast = useToast();
+    const reading = answerActions.useReading(message.id);
     const toolOf = (part: UIMessage["parts"][number]) => {
         if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
         const tool = part as unknown as ToolPart;
@@ -2400,10 +2537,41 @@ function MessageView({
                             <GitBranchPlus />
                         </MessageAction>
                     ) : null}
-                    {!mine && last ? (
-                        <MessageAction label={t("actions.regenerate")} onClick={onRegenerate}>
-                            <RotateCcw />
+                    {!mine ? <answerActions.AnswerMarks mark={mark} onMark={onMark} /> : null}
+                    {!mine && speech && textOf(message).trim() ? (
+                        <MessageAction
+                            label={
+                                reading.active ? t("actions.stopReading") : t("actions.readAloud")
+                            }
+                            aria-pressed={reading.active}
+                            aria-busy={reading.loading}
+                            className={cn(reading.loading && "motion-safe:animate-pulse")}
+                            onClick={() =>
+                                reading.active
+                                    ? answerActions.stopReading()
+                                    : answerActions.readAloud(
+                                          message.id,
+                                          textOf(message),
+                                          payer,
+                                          (error) =>
+                                              toast.show({ title: t(`voice.errors.${error}`) })
+                                      )
+                            }
+                        >
+                            {reading.active ? <Square /> : <Volume2 />}
                         </MessageAction>
+                    ) : null}
+                    {!mine && onShare ? (
+                        <MessageAction label={t("actions.share")} onClick={onShare}>
+                            <Share2 />
+                        </MessageAction>
+                    ) : null}
+                    {!mine && last && !busy ? (
+                        <answerActions.RegenerateMenu
+                            providers={providers}
+                            currentModel={typeof meta.model === "string" ? meta.model : null}
+                            onRegenerate={onRegenerate}
+                        />
                     ) : null}
                 </MessageActions>
             ) : null}
