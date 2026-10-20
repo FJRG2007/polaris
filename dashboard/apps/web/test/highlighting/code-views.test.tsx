@@ -19,9 +19,8 @@ vi.mock("next/link", () => ({
 const { MessagesWrapper } = await import("../setup/i18n");
 const { CodeEditor, CodeView } = await import("@/components/json-view");
 const { ToolInput, ToolOutput } = await import("@/components/polar/elements/tool");
-const { ApiReferenceView } = await import(
-    "@/app/(app)/account/api-keys/reference/api-reference-view"
-);
+const { ApiReferenceView } =
+    await import("@/app/(app)/account/api-keys/reference/api-reference-view");
 
 afterEach(cleanup);
 
