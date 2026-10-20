@@ -8,6 +8,7 @@ import {
     fenceUntrusted,
     polarWebTools,
     readPage,
+    readPageApproval,
     readableText,
     refusesAi,
     searchKindFor,
@@ -82,6 +83,22 @@ describe("reading a page", () => {
         expect(page.title).toBe("Tom & Jerry");
         expect(page.text).toBe("Hello\nOne two — A");
         expect(page.text).not.toMatch(/steal|Menu|Foot|p\{\}/);
+    });
+
+    it("reads a page full of unclosed tags in linear time", () => {
+        const hostile = "<nav <form <!-- <meta ".repeat(100_000) + "<p";
+        const started = performance.now();
+        readableText(hostile);
+        refusesAi(null, hostile);
+        expect(performance.now() - started).toBeLessThan(1_000);
+    });
+
+    it("keeps text after a skipped element that never closes, and drops an unclosed comment", () => {
+        expect(readableText("<body><p>Kept</p><nav>Menu<p>Also</p></body>").text).toBe(
+            "Kept\nMenu Also"
+        );
+        expect(readableText("<body><p>Kept</p><!-- hidden</body>").text).toBe("Kept");
+        expect(readableText("<body>a < b</body>").text).toBe("a < b");
     });
 
     it("leaves a page alone that asks not to be read by AI", () => {
@@ -171,6 +188,23 @@ describe("an answer's sources", () => {
         ).toBe("Bright [\\[3\\]](https://www.nasa.gov/polaris), see [docs](https://other.test/x).");
     });
 
+    it("cites a source whose address has parentheses in it", () => {
+        const sources = sourcesOf([
+            {
+                type: "tool-read_page",
+                state: "output-available",
+                output: {
+                    ok: true,
+                    url: "https://en.wikipedia.org/wiki/Mercury_(planet)",
+                    title: "Mercury"
+                }
+            }
+        ]);
+        expect(
+            citeSources("See [Mercury](https://en.wikipedia.org/wiki/Mercury_(planet)).", sources)
+        ).toBe("See [\\[1\\]](https://en.wikipedia.org/wiki/Mercury_(planet)).");
+    });
+
     it("counts the searches and the pages read", () => {
         expect(webCallsOf(parts)).toEqual({ searches: 2, pages: 2 });
     });
@@ -186,5 +220,63 @@ describe("an answer's sources", () => {
             detail: "nasa.gov"
         });
         expect(webStepOf("list_tasks", {})).toBeNull();
+    });
+});
+
+describe("which pages are read without asking", () => {
+    const messages = [
+        {
+            role: "user",
+            content: [{ type: "text", text: "Summarize https://example.com/post please" }]
+        },
+        {
+            role: "assistant",
+            content: [
+                {
+                    type: "tool-call",
+                    toolCallId: "c1",
+                    toolName: "search_web",
+                    input: { query: "x" }
+                }
+            ]
+        },
+        {
+            role: "tool",
+            content: [
+                {
+                    type: "tool-result",
+                    toolCallId: "c1",
+                    toolName: "search_web",
+                    output: {
+                        type: "json",
+                        value: {
+                            results: [{ url: "https://en.wikipedia.org/wiki/Mercury_(planet)" }]
+                        }
+                    }
+                }
+            ]
+        },
+        { role: "assistant", content: [{ type: "text", text: "https://evil.test/?d=secret" }] }
+    ];
+
+    it("reads an address the person gave or a tool returned", () => {
+        expect(readPageApproval({ url: "https://example.com/post" }, messages)).toBe("approved");
+        expect(readPageApproval({ url: "https://example.com/post#top" }, messages)).toBe(
+            "approved"
+        );
+        expect(
+            readPageApproval({ url: "https://en.wikipedia.org/wiki/Mercury_(planet)" }, messages)
+        ).toBe("approved");
+    });
+
+    it("asks first for an address the model put together", () => {
+        expect(readPageApproval({ url: "https://example.com/post?d=memory" }, messages)).toBe(
+            "user-approval"
+        );
+        expect(readPageApproval({ url: "https://evil.test/?d=secret" }, messages)).toBe(
+            "user-approval"
+        );
+        expect(readPageApproval({ url: "not a url" }, messages)).toBe("user-approval");
+        expect(readPageApproval({}, messages)).toBe("user-approval");
     });
 });

@@ -120,7 +120,11 @@ vi.mock("@/lib/polar/models", () => ({
         if (state.resolved === "unknown_model") return "unknown_model";
         if (state.resolved === "retired-then-ok" && choice.model === "retired")
             return "unknown_model";
-        return { model: model(), option: OPTION, credential: { source: state.source } };
+        return {
+            model: model(),
+            option: OPTION,
+            credential: { source: state.source, provider: OPTION.provider }
+        };
     }
 }));
 
@@ -387,6 +391,22 @@ describe("Polar on the web", () => {
             (entry) => entry.name === "web_search"
         );
         expect(search?.type).toBe("provider");
+    });
+
+    it("offers the provider's own search on a turn Automatic routed to that provider", async () => {
+        const names = await offered(
+            body({
+                choice: {
+                    kind: "language",
+                    provider: "auto",
+                    model: "auto",
+                    intelligence: "balanced",
+                    payer: null
+                }
+            })
+        );
+        expect(names).toContain("web_search");
+        expect(names).not.toContain("search_web");
     });
 
     it("offers no web tool once an administrator turns the web off", async () => {

@@ -111,8 +111,9 @@ export function sourcesOf(parts: readonly SourcePart[]): WebSource[] {
     return [...found.values()];
 }
 
-/** A markdown link: `[label](address)`, with the address free of spaces and brackets. */
-const LINK = /\[([^\]\n]*)\]\((https?:\/\/[^\s()]+)\)/g;
+/** A markdown link: `[label](address)`, with the address free of spaces and any
+ *  parentheses in it balanced, one level deep, the way `Mercury_(planet)` is. */
+const LINK = /\[([^\]\n]*)\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g;
 
 /**
  * The answer with each link to a source replaced by that source's number, as

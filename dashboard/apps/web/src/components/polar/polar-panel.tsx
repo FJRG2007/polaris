@@ -97,7 +97,7 @@ import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
-import { citeSources, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
+import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
 import { sendFile } from "@/components/transfers/move-file";
@@ -2092,7 +2092,7 @@ function MessageView({
                                 key={index}
                                 state={tool.state}
                                 approval={tool.approval}
-                                action={toolName(name)}
+                                action={stepTitle(name, tool.input)}
                                 affects={
                                     name === "polar_remember"
                                         ? affectedBy({
@@ -2101,7 +2101,10 @@ function MessageView({
                                           })
                                         : affectedBy(tool.input)
                                 }
-                                destructive={described?.destructive ?? name !== "polar_remember"}
+                                destructive={
+                                    described?.destructive ??
+                                    (name !== "polar_remember" && !isWebTool(name))
+                                }
                                 input={tool.input}
                                 tool={described?.writes ? name : undefined}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}

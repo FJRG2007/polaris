@@ -22,7 +22,7 @@ import {
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
-import { NATIVE_SEARCH_STAND_INS, polarWebTools, withoutPastProviderSearches } from "@/lib/polar/web";
+import { NATIVE_SEARCH_STAND_INS, WEB_APPROVAL, polarWebTools, withoutPastProviderSearches } from "@/lib/polar/web";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
@@ -165,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
     // The web is the administrator's to allow and the person's to switch off
     // for a turn; either one off and the tools are simply not offered.
     const web = access.web && body.data.web;
-    const webTools = web ? polarWebTools(choice.provider, resolved.option.model) : {};
+    const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
     const tools = {
         ...toolset.tools,
         ...(remembers ? memoryTools : {}),
@@ -206,7 +206,11 @@ export async function POST(request: Request): Promise<Response> {
         ),
         messages: await convertToModelMessages(sendable),
         tools,
-        toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
+        toolApproval: {
+            ...toolset.approval,
+            ...(remembers ? MEMORY_APPROVAL : {}),
+            ...(web ? WEB_APPROVAL : {})
+        },
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.
         reasoning: reasoningFor(

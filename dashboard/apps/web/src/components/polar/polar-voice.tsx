@@ -12,6 +12,7 @@
 
 import type { Payer } from "@/lib/polar/shared";
 import type { ChatStatus, UIMessage } from "ai";
+import { isWebTool, webStepOf } from "@/lib/polar/web-sources";
 import { micConstraints } from "@/app/(app)/chat/mic-cleanup";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ToolState } from "@/components/polar/elements/tool";
@@ -532,6 +533,10 @@ export function VoiceCall(props: VoiceCallProps) {
         props.onEnd();
     };
     const waiting = state.phase === "approval" ? waitingParts(props.messages.at(-1)) : [];
+    const webAction = (name: string, input: unknown) => {
+        const step = webStepOf(name, input);
+        return step?.kind === "read" ? t("web.reading", { site: step.detail }) : null;
+    };
     const lively = state.phase === "hearing" || state.phase === "speaking";
     const errorText =
         state.error === "mic_denied"
@@ -610,9 +615,9 @@ export function VoiceCall(props: VoiceCallProps) {
                         key={part.approval!.id}
                         state={part.state}
                         approval={part.approval}
-                        action={props.tools[name]?.title ?? name}
+                        action={props.tools[name]?.title ?? webAction(name, part.input) ?? name}
                         affects={affectedBy(part.input)}
-                        destructive={props.tools[name]?.destructive ?? true}
+                        destructive={props.tools[name]?.destructive ?? !isWebTool(name)}
                         input={part.input}
                         className="text-left"
                         onApprove={() => {

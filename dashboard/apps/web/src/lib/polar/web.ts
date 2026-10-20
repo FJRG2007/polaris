@@ -127,30 +127,109 @@ function decodeEntities(text: string): string {
     });
 }
 
+/** Elements whose whole content is left out of a page's text. */
+const SKIPPED = new Set(["script", "style", "noscript", "svg", "nav", "footer", "header", "aside", "form", "template", "iframe"]);
+/** Tags that end a line of text. */
+const BREAKS = new Set(["br", "/p", "/div", "/li", "/h1", "/h2", "/h3", "/h4", "/h5", "/h6", "/tr", "/section", "/article", "/blockquote"]);
+
+/** A tag's name as written after `<`, lowercased, with a leading `/` kept. */
+function tagName(lower: string, at: number): string {
+    let end = at + (lower[at] === "/" ? 1 : 0);
+    while (end < lower.length && /[a-z0-9]/.test(lower[end]!)) end += 1;
+    return lower.slice(at, end);
+}
+
+/**
+ * Every tag in a page, each once, in order. One pass with `indexOf`: a page is
+ * somebody else's input, and a backtracking pattern over it is quadratic on a
+ * page full of unclosed tags.
+ */
+function* tagsOf(lower: string): Generator<{ start: number; end: number; name: string }> {
+    let at = 0;
+    while (at < lower.length) {
+        const start = lower.indexOf("<", at);
+        if (start < 0) return;
+        if (lower.startsWith("<!--", start)) {
+            const close = lower.indexOf("-->", start + 4);
+            const end = close < 0 ? lower.length : close + 3;
+            yield { start, end, name: "!--" };
+            at = end;
+            continue;
+        }
+        const close = lower.indexOf(">", start + 1);
+        if (close < 0) return;
+        yield { start, end: close + 1, name: tagName(lower, start + 1) };
+        at = close + 1;
+    }
+}
+
 /** A page's title and readable text: no scripts, styles, menus or markup. Pure. */
 export function readableText(html: string): { title: string; text: string } {
-    const title = decodeEntities(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "")
-        .replace(/\s+/g, " ")
-        .trim();
-    const body = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html)?.[1] ?? html;
-    const text = decodeEntities(
-        body
-            .replace(/<!--[\s\S]*?-->/g, " ")
-            .replace(/<(script|style|noscript|svg|nav|footer|header|aside|form|template|iframe)\b[\s\S]*?<\/\1>/gi, " ")
-            .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/article|\/blockquote)\b[^>]*>/gi, "\n")
-            .replace(/<[^>]+>/g, " ")
-    )
+    const lower = html.toLowerCase();
+    let title: string | null = null;
+    let bodyStart = 0;
+    for (const tag of tagsOf(lower)) {
+        if (tag.name === "title" && title === null) {
+            const close = lower.indexOf("</title>", tag.end);
+            title = close >= 0 ? html.slice(tag.end, close) : "";
+        } else if (tag.name === "body") {
+            bodyStart = tag.end;
+            break;
+        }
+    }
+    const heading = decodeEntities(title ?? "").replace(/\s+/g, " ").trim();
+    const bodyClose = bodyStart > 0 ? lower.lastIndexOf("</body>") : -1;
+    const bodyEnd = bodyClose >= bodyStart ? bodyClose : html.length;
+    const from = bodyClose >= bodyStart ? bodyStart : 0;
+
+    const pieces: string[] = [];
+    // Where each skipped element next closes, so an unclosed one is searched
+    // for once, not once per opener.
+    const closes = new Map<string, number>();
+    let at = from;
+    const scope = lower.slice(0, bodyEnd);
+    for (const tag of tagsOf(scope.slice(from))) {
+        const start = from + tag.start;
+        const end = from + tag.end;
+        if (start < at) continue;
+        pieces.push(html.slice(at, start));
+        at = end;
+        if (SKIPPED.has(tag.name)) {
+            const marker = `</${tag.name}>`;
+            let close = closes.get(tag.name);
+            if (close === undefined || (close >= 0 && close < end)) {
+                close = scope.indexOf(marker, end);
+                closes.set(tag.name, close);
+            }
+            if (close >= 0) at = close + marker.length;
+            pieces.push(" ");
+        } else {
+            pieces.push(BREAKS.has(tag.name) ? "\n" : " ");
+        }
+    }
+    pieces.push(html.slice(at, bodyEnd));
+    const text = decodeEntities(pieces.join(""))
         .replace(/[ \t\f\v\r]+/g, " ")
         .replace(/ *\n */g, "\n")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
-    return { title, text };
+    return { title: heading, text };
+}
+
+/** Every `<meta>` tag of a page, found in one pass. */
+function metaTags(html: string): string[] {
+    const tags: string[] = [];
+    const lower = html.toLowerCase();
+    for (const tag of tagsOf(lower)) {
+        if (tag.name === "meta") tags.push(html.slice(tag.start, tag.end));
+    }
+    return tags;
 }
 
 /** Whether a page asked not to be used by AI. Pure. */
 export function refusesAi(robotsHeader: string | null, html: string): boolean {
     if (robotsHeader && /\bnoai\b/i.test(robotsHeader)) return true;
-    for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    for (const tag of metaTags(html)) {
         if (!/name\s*=\s*["']?(robots|googlebot|bingbot)/i.test(tag)) continue;
         if (/content\s*=\s*["'][^"']*\bnoai\b/i.test(tag)) return true;
     }
@@ -285,6 +364,70 @@ const readPageTool = tool({
         };
     }
 });
+
+/** The slice of a model message an approval reads. */
+interface ModelMessageLike {
+    role: string;
+    content: unknown;
+}
+
+/**
+ * Text the model did not write: what the person typed and what tools returned.
+ * An address found here was handed to the model, not put together by it.
+ */
+function givenText(messages: readonly ModelMessageLike[]): string {
+    const pieces: string[] = [];
+    for (const message of messages) {
+        if (message.role === "system") continue;
+        if (typeof message.content === "string") {
+            if (message.role === "user") pieces.push(message.content);
+            continue;
+        }
+        if (!Array.isArray(message.content)) continue;
+        for (const part of message.content as { type?: unknown; text?: unknown; output?: unknown }[]) {
+            if (message.role === "user" && part.type === "text" && typeof part.text === "string") {
+                pieces.push(part.text);
+            } else if (part.type === "tool-result") {
+                pieces.push(JSON.stringify(part.output ?? null));
+            }
+        }
+    }
+    return pieces.join("\n");
+}
+
+/**
+ * Whether `read_page` may open an address without asking. Only one that came
+ * verbatim from the person or from a tool's answer: an address the model
+ * composed itself could carry what it read elsewhere in this chat to a site,
+ * so the person sees it first. Pure.
+ */
+export function readPageApproval(
+    input: unknown,
+    messages: readonly ModelMessageLike[]
+): "approved" | "user-approval" {
+    const address = (input as { url?: unknown } | null)?.url;
+    if (typeof address !== "string" || !address.trim()) return "user-approval";
+    const given = givenText(messages);
+    const candidates = new Set([address.trim()]);
+    try {
+        const url = new URL(address.trim());
+        candidates.add(url.href);
+        url.hash = "";
+        candidates.add(url.href);
+    } catch {
+        return "user-approval";
+    }
+    for (const candidate of candidates) {
+        if (given.includes(candidate) || given.includes(JSON.stringify(candidate).slice(1, -1))) return "approved";
+    }
+    return "user-approval";
+}
+
+/** The approvals the web tools need, for streamText's `toolApproval`. */
+export const WEB_APPROVAL = {
+    [READ_TOOL]: (input: unknown, options: { messages: readonly ModelMessageLike[] }) =>
+        readPageApproval(input, options.messages)
+};
 
 /** The slice of a chat message this needs. */
 interface PartsOf {
