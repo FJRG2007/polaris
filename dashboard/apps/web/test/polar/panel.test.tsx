@@ -59,6 +59,7 @@ const PROVIDERS = [
 let providers: unknown[] = PROVIDERS;
 const patches: unknown[] = [];
 let storedThread: unknown = null;
+let ownCommands: unknown[] = [];
 
 beforeEach(() => {
     chat.status = "ready";
@@ -68,6 +69,7 @@ beforeEach(() => {
     providers = PROVIDERS;
     patches.length = 0;
     storedThread = null;
+    ownCommands = [];
     try {
         window.localStorage.clear();
         window.sessionStorage.clear();
@@ -80,6 +82,7 @@ beforeEach(() => {
             if (url === "/api/polar/models") {
                 return Response.json({ providers, tools: {}, isAdmin: false });
             }
+            if (url === "/api/polar/commands") return Response.json({ commands: ownCommands });
             if (url === "/api/polar/threads") {
                 return Response.json({
                     threads: [{ id: "t-old", title: "Old chat", updatedAt: "2026-10-19T00:00:00Z" }]
@@ -100,7 +103,9 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const { PolarAside, PolarChat, PolarProvider } = await import("@/components/polar/polar-panel");
+const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } = await import(
+    "@/components/polar/polar-panel"
+);
 
 function mount() {
     const view = render(<PolarChat />, { wrapper: MessagesWrapper });
@@ -176,14 +181,16 @@ describe("the / commands", () => {
         mount();
         await ready();
         slash("/");
-        expect(options()).toHaveLength(6);
+        // Polar's six, then the entry that writes a new one.
+        expect(options()).toHaveLength(7);
+        expect(options()[6]).toMatch(/^New command/);
         expect(highlighted()).toMatch(/^\/new/);
         const box = screen.getByLabelText("Message Polar");
         expect(box.getAttribute("aria-activedescendant")).toBe(
             screen.getAllByRole("option")[0]!.id
         );
         slash("/mo");
-        expect(options()).toHaveLength(1);
+        expect(options()).toHaveLength(2);
         expect(options()[0]).toMatch(/^\/model/);
         slash("/model now");
         expect(screen.queryByRole("listbox")).toBeNull();
@@ -197,10 +204,15 @@ describe("the / commands", () => {
         slash("/");
         const box = screen.getByLabelText("Message Polar");
         fireEvent.keyDown(box, { key: "ArrowUp" });
-        // "/call" is last but not ready yet, so up from the first wraps past it.
+        // Up from the first wraps to the last row, the new command entry.
+        expect(highlighted()).toMatch(/^New command/);
+        // "/call" is not ready yet, so up from there skips it.
+        fireEvent.keyDown(box, { key: "ArrowUp" });
         expect(highlighted()).toMatch(/^\/tools/);
         fireEvent.keyDown(box, { key: "ArrowDown" });
+        fireEvent.keyDown(box, { key: "ArrowDown" });
         expect(highlighted()).toMatch(/^\/new/);
+        fireEvent.keyDown(box, { key: "ArrowUp" });
         fireEvent.keyDown(box, { key: "ArrowUp" });
         fireEvent.keyDown(box, { key: "Enter" });
         expect(chat.sent.map((message) => message.text)).toEqual([
@@ -242,6 +254,69 @@ describe("the / commands", () => {
     });
 });
 
+describe("your own / commands", () => {
+    const COMMAND = {
+        id: "c1",
+        shortcut: "tldr",
+        prompt: "Sum this up in three lines\nThen list the open questions",
+        choice: {
+            kind: "language",
+            provider: "auto",
+            model: "auto",
+            intelligence: "balanced",
+            payer: null
+        }
+    };
+    const box = () => screen.getByLabelText("Message Polar") as HTMLTextAreaElement;
+
+    it("lists them after Polar's, by a fuzzy match, with the prompt's first line", async () => {
+        ownCommands = [COMMAND];
+        mount();
+        await ready();
+        fireEvent.change(box(), { target: { value: "/tdr" } });
+        await waitFor(() =>
+            expect(screen.getAllByRole("option")[0]!.textContent).toMatch(/^\/tldr/)
+        );
+        expect(screen.getAllByRole("option")[0]!.textContent).toContain(
+            "Sum this up in three lines"
+        );
+        expect(screen.getAllByRole("option")[0]!.textContent).not.toContain("open questions");
+    });
+
+    it("puts the shortcut in the box when picked, and sends its prompt with what follows", async () => {
+        ownCommands = [COMMAND];
+        mount();
+        await ready();
+        fireEvent.change(box(), { target: { value: "/tld" } });
+        await waitFor(() =>
+            expect(screen.getAllByRole("option")[0]!.textContent).toMatch(/^\/tldr/)
+        );
+        fireEvent.keyDown(box(), { key: "Enter" });
+        expect(box().value).toBe("/tldr ");
+        expect(chat.sent).toEqual([]);
+        fireEvent.change(box(), { target: { value: "/tldr the release notes" } });
+        fireEvent.keyDown(box(), { key: "Enter" });
+        expect(chat.sent.map((message) => message.text)).toEqual([
+            "Sum this up in three lines\nThen list the open questions\n\nthe release notes"
+        ]);
+    });
+
+    it("opens the form from the end of the list with the typed shortcut", async () => {
+        mount();
+        await ready();
+        fireEvent.change(box(), { target: { value: "/review" } });
+        const entry = screen
+            .getAllByRole("option")
+            .find((option) => option.textContent?.startsWith("New command"))!;
+        fireEvent.mouseDown(entry);
+        const shortcut = (await screen.findByLabelText("Shortcut *")) as HTMLInputElement;
+        expect(shortcut.value).toBe("review");
+        expect(screen.getByText("Automatic")).toBeTruthy();
+        fireEvent.change(shortcut, { target: { value: "new" } });
+        expect(screen.getByText("Polar already has a command with this name.")).toBeTruthy();
+    });
+});
+
 describe("/model", () => {
     it("opens the model menu, typed whole or picked from the list", async () => {
         mount();
@@ -252,7 +327,7 @@ describe("/model", () => {
         fireEvent.keyDown(screen.getByPlaceholderText("Find a model"), { key: "Escape" });
         await waitFor(() => expect(screen.queryByPlaceholderText("Find a model")).toBeNull());
         fireEvent.change(screen.getByLabelText("Message Polar"), { target: { value: "/mo" } });
-        fireEvent.mouseDown(screen.getByRole("option"));
+        fireEvent.mouseDown(screen.getAllByRole("option")[0]!);
         expect(await screen.findByPlaceholderText("Find a model")).toBeTruthy();
     });
 });
@@ -434,5 +509,41 @@ describe("the queue", () => {
                 "waiting since before the reload"
             )
         );
+    });
+});
+
+describe("matching the / list", () => {
+    const row = (shortcut: string) => ({
+        id: shortcut,
+        shortcut,
+        prompt: "p",
+        choice: {
+            kind: "language" as const,
+            provider: "auto",
+            model: "auto",
+            intelligence: "balanced" as const,
+            payer: null
+        }
+    });
+    const labels = (input: string, own = [row("tldr"), row("translate"), row("fix-tests")]) =>
+        slashMatches(input, own).map((match) =>
+            match.kind === "builtin" ? match.command : match.row.shortcut
+        );
+
+    it("ranks a prefix over a contained run over letters in order, Polar's first", () => {
+        expect(labels("/t")).toEqual(["tools", "tldr", "translate", "fix-tests"]);
+        expect(labels("/ft")).toEqual(["fix-tests"]);
+        expect(labels("/zz")).toEqual([]);
+        expect(labels("/tldr now")).toEqual([]);
+    });
+
+    it("finds the command a message starts with, and nothing for any other", () => {
+        expect(ownCommandIn("/TLDR  the notes\nand more", [row("tldr")])).toEqual({
+            row: row("tldr"),
+            rest: "the notes\nand more"
+        });
+        expect(ownCommandIn("/tldr", [row("tldr")])?.rest).toBe("");
+        expect(ownCommandIn("/other x", [row("tldr")])).toBeNull();
+        expect(ownCommandIn("tldr x", [row("tldr")])).toBeNull();
     });
 });

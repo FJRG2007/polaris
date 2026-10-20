@@ -60,10 +60,15 @@ import {
     RotateCcw,
     SquarePen,
     Wrench,
+    BookmarkPlus,
+    SquareSlash,
+    Zap,
     X
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import { PolarSettings } from "@/components/polar/polar-settings";
+import * as polarShared from "@/lib/polar/shared";
+import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
 import {
     firstPickable,
@@ -387,8 +392,8 @@ function textOf(message: UIMessage): string {
 type ToolDescription = { title: string; writes: boolean; destructive: boolean };
 type StoredMessage = UIMessage & { parentId: string | null };
 
-const COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
-type Command = (typeof COMMANDS)[number];
+const COMMANDS = polarShared.POLAR_BUILTIN_COMMANDS;
+type Command = polarShared.BuiltinCommand;
 /** Commands that exist but belong to a later phase. */
 const LATER = new Set<Command>(["call"]);
 const COMMAND_ICONS: Record<Command, SuggestionListItem["icon"]> = {
@@ -400,13 +405,62 @@ const COMMAND_ICONS: Record<Command, SuggestionListItem["icon"]> = {
     call: Phone
 };
 
-/** The "/" commands that start with what has been typed, or none once the
- *  token has a space in it (a command with words after it is a message). */
-export function slashMatches(input: string): Command[] {
-    if (!input.startsWith("/") || /\s/.test(input)) return [];
-    const typed = input.toLowerCase();
-    return COMMANDS.filter((command) => `/${command}`.startsWith(typed));
+/** One row of the "/" list: a command of Polar's, or one of the person's own. */
+export type SlashMatch =
+    | { kind: "builtin"; command: Command }
+    | { kind: "own"; row: polarShared.PolarCommandRow };
+
+/** How well a shortcut answers what was typed after the "/": 0 when it starts
+ *  with it, 1 when it holds it, 2 when it holds its letters in order; null when
+ *  it does not match at all. */
+export function shortcutRank(shortcut: string, query: string): number | null {
+    if (shortcut.startsWith(query)) return 0;
+    if (shortcut.includes(query)) return 1;
+    let at = 0;
+    for (const letter of shortcut) if (letter === query[at]) at++;
+    return at === query.length ? 2 : null;
 }
+
+function ranked<T>(items: readonly T[], key: (item: T) => string, query: string): T[] {
+    return items
+        .map((item, index) => ({ item, index, rank: shortcutRank(key(item), query) }))
+        .filter((entry): entry is { item: T; index: number; rank: number } => entry.rank !== null)
+        .sort((a, b) => a.rank - b.rank || a.index - b.index)
+        .map((entry) => entry.item);
+}
+
+/** The "/" commands that match what has been typed, Polar's first and the
+ *  person's own after, or none once the token has a space in it (a command
+ *  with words after it is a message). */
+export function slashMatches(
+    input: string,
+    own: readonly polarShared.PolarCommandRow[] = []
+): SlashMatch[] {
+    if (!input.startsWith("/") || /\s/.test(input)) return [];
+    const query = input.slice(1).toLowerCase();
+    return [
+        ...ranked(COMMANDS, (command) => command, query).map(
+            (command): SlashMatch => ({ kind: "builtin", command })
+        ),
+        ...ranked(own, (row) => row.shortcut, query).map(
+            (row): SlashMatch => ({ kind: "own", row })
+        )
+    ];
+}
+
+/** The person's command a message starts with, and what follows its shortcut. */
+export function ownCommandIn(
+    raw: string,
+    own: readonly polarShared.PolarCommandRow[]
+): { row: polarShared.PolarCommandRow; rest: string } | null {
+    const found = /^\/(\S+)(?:\s+([\s\S]*))?$/.exec(raw.trim());
+    if (!found) return null;
+    const shortcut = polarShared.normalizeShortcut(found[1] ?? "");
+    const row = own.find((entry) => entry.shortcut === shortcut);
+    return row ? { row, rest: found[2] ?? "" } : null;
+}
+
+const NEW_COMMAND = "new-command";
 
 const SIDEBAR_KEY = "polar.sidebar";
 const WIDE_QUERY = "(min-width: 768px)";
@@ -553,6 +607,11 @@ export function PolarChat({
     const [temporary, setTemporary] = useState(false);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
+    const commands = polarCommands.usePolarCommands();
+    const [commandDraft, setCommandDraft] = useState<polarCommands.CommandDraft | null>(null);
+    const [managing, setManaging] = useState(false);
+    /** The model one turn is sent on instead of the chosen one: a command's. */
+    const turnChoice = useRef<ModelChoice | null>(null);
     const wide = useWide();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
@@ -571,8 +630,8 @@ export function PolarChat({
                 : null,
         [withPage, pathname, state?.extra]
     );
-    const live = useRef({ threadId, choice, context, newProject, temporary });
-    live.current = { threadId, choice, context, newProject, temporary };
+    const live = useRef({ threadId, choice, context, newProject, temporary, turnChoice });
+    live.current = { threadId, choice, context, newProject, temporary, turnChoice };
 
     const transport = useMemo(
         () =>
@@ -582,7 +641,10 @@ export function PolarChat({
                     body: {
                         threadId: live.current.threadId,
                         messages: sendableTail(messages),
-                        choice: live.current.choice,
+                        // A command's model answers its own turn only; the
+                        // thread stays on the chosen one.
+                        choice: live.current.turnChoice.current ?? live.current.choice,
+                        remember: live.current.turnChoice.current === null,
                         context: live.current.context,
                         projectId: live.current.newProject,
                         temporary: live.current.temporary,
@@ -722,6 +784,7 @@ export function PolarChat({
         if (busy || waitingApproval || queue.length === 0 || chat.status === "error") return;
         const [next, ...rest] = queue;
         saveQueue(rest);
+        turnChoice.current = null;
         if (next) void chat.sendMessage({ text: next.text });
     }, [busy, waitingApproval, queue.length, chat.status]);
 
@@ -930,6 +993,7 @@ export function PolarChat({
                 ?.click();
         }
         if (command === "tools" && choice && !busy) {
+            turnChoice.current = null;
             void chat.sendMessage({ text: t("slash.toolsPrompt") });
         }
     };
@@ -940,7 +1004,16 @@ export function PolarChat({
         if ((!raw && ready.length === 0) || !choice || files.some(stillStaging)) return;
         const typed = COMMANDS.find((command) => raw === `/${command}`);
         if (typed) return runCommand(typed);
-        const text = quote ? `> ${quote}\n\n${raw}` : raw;
+        // One of the person's own: its prompt, with what followed the shortcut,
+        // on its model for this turn - unless that model is gone, then the
+        // chosen one answers.
+        const own = ownCommandIn(raw, commands.commands);
+        const body = own ? polarShared.commandText(own.row.prompt, own.rest) : raw;
+        const ownChoice =
+            own && (polarShared.isAutomatic(own.row.choice) || offered(providers, own.row.choice))
+                ? own.row.choice
+                : null;
+        const text = quote ? `> ${quote}\n\n${body}` : body;
         const message = {
             text,
             files: ready.map((file) => ({
@@ -961,6 +1034,7 @@ export function PolarChat({
             setEditing(null);
             if (index >= 0 && !busy) {
                 // The edited message stays in the tree as the earlier version.
+                turnChoice.current = ownChoice;
                 chat.setMessages(chat.messages.slice(0, index));
                 return void chat.sendMessage(message);
             }
@@ -970,6 +1044,7 @@ export function PolarChat({
             return;
         }
         setLastApproved(false);
+        turnChoice.current = ownChoice;
         void chat.sendMessage(message);
     };
 
@@ -977,6 +1052,7 @@ export function PolarChat({
     const sendSpoken = async (text: string) => {
         if (!live.current.choice) return;
         if (chat.status === "submitted" || chat.status === "streaming") await chat.stop();
+        turnChoice.current = null;
         setLastApproved(false);
         void chat.sendMessage({ text });
     };
@@ -996,13 +1072,44 @@ export function PolarChat({
                     ? "done"
                     : "idle";
     const noKeys = providers !== null && providers.length === 0;
-    const slashItems: SuggestionListItem[] = slashMatches(input).map((command) => ({
-        key: command,
-        label: `/${command}`,
-        detail: LATER.has(command) ? t("slash.later") : t(`slash.${command}`),
-        icon: COMMAND_ICONS[command],
-        disabled: LATER.has(command)
-    }));
+    const commandsFull = commands.commands.length >= polarShared.POLAR_COMMAND_MOST;
+    const slashFound = slashMatches(input, commands.commands);
+    const slashItems: SuggestionListItem[] = [
+        ...slashFound.map(
+            (match): SuggestionListItem =>
+                match.kind === "builtin"
+                    ? {
+                          key: match.command,
+                          label: `/${match.command}`,
+                          detail: LATER.has(match.command)
+                              ? t("slash.later")
+                              : t(`slash.${match.command}`),
+                          icon: COMMAND_ICONS[match.command],
+                          disabled: LATER.has(match.command)
+                      }
+                    : {
+                          key: `own:${match.row.id}`,
+                          label: `/${match.row.shortcut}`,
+                          detail: polarShared.firstLine(match.row.prompt),
+                          icon: Zap
+                      }
+        ),
+        ...(input.startsWith("/") && !/\s/.test(input)
+            ? [
+                  {
+                      key: NEW_COMMAND,
+                      label: t("commands.new"),
+                      detail: commandsFull
+                          ? t("commands.errors.too_many", {
+                                most: polarShared.POLAR_COMMAND_MOST
+                            })
+                          : t("commands.newDetail"),
+                      icon: Plus,
+                      disabled: commandsFull
+                  }
+              ]
+            : [])
+    ];
     const slashOpen = !slashDismissed && slashItems.length > 0;
     const slashHighlight =
         slashItems[slashActive]?.disabled === false ? slashActive : firstPickable(slashItems);
@@ -1010,8 +1117,23 @@ export function PolarChat({
         ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
         : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
     const pickSlash = (index: number) => {
-        const command = slashItems[index]?.key as Command | undefined;
-        if (command) runCommand(command);
+        const key = slashItems[index]?.key;
+        if (!key) return;
+        if (key === NEW_COMMAND) {
+            // What was typed after the "/" is the shortcut it was looking for.
+            setCommandDraft({ shortcut: input.slice(1) });
+            setInput("");
+            return;
+        }
+        const match = slashFound[index];
+        if (match?.kind === "own") {
+            // The shortcut goes into the box, and what is typed after it is
+            // added to the prompt when the message is sent.
+            setInput(`/${match.row.shortcut} `);
+            textarea.current?.focus();
+            return;
+        }
+        if (match?.kind === "builtin") runCommand(match.command);
     };
     // The keys the "/" list answers while it is open, as Chat's does: arrows
     // walk the commands that can run, Enter and Tab run the highlighted one,
@@ -1383,6 +1505,9 @@ export function PolarChat({
                     >
                         <Ghost />
                     </MessageAction>
+                    <MessageAction label={t("commands.manage")} onClick={() => setManaging(true)}>
+                        <SquareSlash />
+                    </MessageAction>
                     <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
                         <Settings2 />
                     </MessageAction>
@@ -1508,6 +1633,14 @@ export function PolarChat({
                                                 textarea.current?.focus();
                                             }}
                                             onQuote={() => setQuote(textOf(message).slice(0, 200))}
+                                            onSaveCommand={() =>
+                                                setCommandDraft({
+                                                    prompt: textOf(message).slice(
+                                                        0,
+                                                        polarShared.POLAR_COMMAND_PROMPT_MAX
+                                                    )
+                                                })
+                                            }
                                             onRegenerate={() => void chat.regenerate()}
                                         />
                                     );
@@ -1557,9 +1690,36 @@ export function PolarChat({
                     </>
                 )}
             </div>
+            {managing ? (
+                <polarCommands.CommandsDialog
+                    store={commands}
+                    providers={providers ?? []}
+                    onClose={() => setManaging(false)}
+                    onEdit={setCommandDraft}
+                />
+            ) : null}
+            {commandDraft ? (
+                <polarCommands.CommandForm
+                    draft={commandDraft}
+                    commands={commands.commands}
+                    providers={providers ?? []}
+                    onClose={() => setCommandDraft(null)}
+                    onSaved={commands.saved}
+                />
+            ) : null}
         </div>
     );
 }
+
+/** Whether the picker offers this model to the person now. */
+function offered(providers: ModelSelectorProvider[] | null, choice: ModelChoice): boolean {
+    return (providers ?? []).some((entry) =>
+        entry.models.some(
+            (model) => model.provider === choice.provider && model.model === choice.model
+        )
+    );
+}
+
 function moveItem<T>(list: T[], from: number, to: number): T[] {
     const next = [...list];
     const [moved] = next.splice(from, 1);
@@ -1618,6 +1778,7 @@ function MessageView({
     onApprove,
     onEdit,
     onQuote,
+    onSaveCommand,
     onRegenerate
 }: {
     message: UIMessage;
@@ -1629,6 +1790,7 @@ function MessageView({
     onApprove: (id: string, approved: boolean) => void;
     onEdit: () => void;
     onQuote: () => void;
+    onSaveCommand: () => void;
     onRegenerate: () => void;
 }) {
     const t = useTranslations("polar");
@@ -1814,9 +1976,14 @@ function MessageView({
                         onNext={() => onVersion(1)}
                     />
                     {mine ? (
-                        <MessageAction label={t("actions.edit")} onClick={onEdit}>
-                            <Pencil />
-                        </MessageAction>
+                        <>
+                            <MessageAction label={t("actions.edit")} onClick={onEdit}>
+                                <Pencil />
+                            </MessageAction>
+                            <MessageAction label={t("commands.saveAs")} onClick={onSaveCommand}>
+                                <BookmarkPlus />
+                            </MessageAction>
+                        </>
                     ) : null}
                     <MessageAction label={t("actions.reply")} onClick={onQuote}>
                         <Reply />
