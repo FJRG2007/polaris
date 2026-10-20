@@ -472,7 +472,11 @@ const grantBounds = z.object({
 });
 
 /** The facts about how a grant's bounds go together, for either kind of grant. */
-function withGrantRules<T extends typeof grantBounds>(schema: T) {
+function withGrantRules<T extends typeof grantBounds>(
+    schema: T
+): z.ZodEffects<z.ZodEffects<z.ZodEffects<T>>> {
+    // Typed from T because `refine` reads its output from the constraint, which
+    // would drop whatever the caller extended the bounds with.
     return (
         schema
             // On the object because they are facts about the pair. Half an hour window
@@ -495,7 +499,7 @@ function withGrantRules<T extends typeof grantBounds>(schema: T) {
                     !grant.endsAt ||
                     new Date(grant.startsAt) < new Date(grant.endsAt),
                 { message: "The last day is before the first", path: ["endsAt"] }
-            )
+            ) as z.ZodEffects<z.ZodEffects<z.ZodEffects<T>>>
     );
 }
 

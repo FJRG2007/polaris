@@ -42,7 +42,7 @@ const PLAYER_ORIGINS = [
 
 /**
  * The top-level paths whose address is itself the credential: a shared chat,
- * a Drive link, a drop point, a form, a published note, a vote... Their pages
+ * a Drive link, a drop point, a form, a published note, a vote, a lent door or UPS... Their pages
  * send no Referer at all, so following a link out of one never hands the token
  * to the site at the other end. `test/seo/never-indexed.test.ts` holds every
  * public route folder to this list.
@@ -51,6 +51,7 @@ export const TOKEN_PATH_PREFIXES = [
     "c",
     "cal",
     "forms",
+    "k",
     "m",
     "n",
     "od",
