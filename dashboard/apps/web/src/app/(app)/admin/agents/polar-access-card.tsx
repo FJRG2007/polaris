@@ -221,6 +221,20 @@ export function PolarAccessCard({
             <CardBody className="space-y-4">
                 {audience("use")}
                 {audience("spend")}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">{t("agents.polarAccess.web.label")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("agents.polarAccess.web.hint")}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={current.web}
+                        onChange={(web) => save({ ...current, web })}
+                        disabled={pending}
+                        aria-label={t("agents.polarAccess.web.label")}
+                    />
+                </div>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>

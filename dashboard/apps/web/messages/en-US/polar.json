@@ -494,5 +494,13 @@
         "hatching": "Hatching a plan",
         "unfolding": "Unfolding",
         "snowballing": "Snowballing"
+    },
+    "web": {
+        "toggle": "Search the web",
+        "searching": "Searching: {query}",
+        "searched": "Searched the web",
+        "reading": "Reading {site}",
+        "sources": "Sources",
+        "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
     }
 }

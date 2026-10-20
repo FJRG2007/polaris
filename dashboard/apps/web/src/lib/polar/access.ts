@@ -43,7 +43,13 @@ const audienceSchema = z.object({
 });
 export type PolarAudience = z.infer<typeof audienceSchema>;
 
-export const polarPolicySchema = z.object({ use: audienceSchema, spend: audienceSchema });
+export const polarPolicySchema = z.object({
+    use: audienceSchema,
+    spend: audienceSchema,
+    /** Whether Polar may search and read the web. On unless an administrator
+     *  turned it off, so a policy saved before this existed keeps it on. */
+    web: z.boolean().default(true)
+});
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
 /**
@@ -58,7 +64,8 @@ export type PolarPolicy = z.infer<typeof polarPolicySchema>;
  */
 export const DEFAULT_POLAR_POLICY: PolarPolicy = {
     use: { who: "everyone", userIds: [], groupIds: [], guests: false },
-    spend: { who: "admins", userIds: [], groupIds: [], guests: false }
+    spend: { who: "admins", userIds: [], groupIds: [], guests: false },
+    web: true
 };
 
 /**
@@ -110,12 +117,14 @@ export function audienceAdmits(audience: PolarAudience, facts: AccessFacts): boo
 export interface PolarAccess {
     use: boolean;
     spend: boolean;
+    /** Whether this account's turns may search and read the web. */
+    web: boolean;
 }
 
 /** One account's answer to both questions. Pure. */
 export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): PolarAccess {
     const use = audienceAdmits(policy.use, facts);
-    return { use, spend: use && audienceAdmits(policy.spend, facts) };
+    return { use, spend: use && audienceAdmits(policy.spend, facts), web: use && policy.web };
 }
 
 const FACTS_SELECT = {
@@ -154,7 +163,7 @@ export async function polarAccessFor(userId: string): Promise<PolarAccess> {
         return decidePolarAccess(policy, facts);
     } catch (error) {
         console.error("polar: could not read the access policy", error);
-        return { use: false, spend: false };
+        return { use: false, spend: false, web: false };
     }
 }
 

@@ -131,7 +131,11 @@
             "findGroup": "Find a group",
             "moreGroups": "Only the first 200 groups are listed. Search to find the rest.",
             "noGroupFound": "No group matches that name.",
-            "guests": "Include guest accounts"
+            "guests": "Include guest accounts",
+            "web": {
+                "label": "Polar on the web",
+                "hint": "Lets Polar search the web and read public pages. Searches run on the key the chat uses."
+            }
         }
     },
     "billing": {

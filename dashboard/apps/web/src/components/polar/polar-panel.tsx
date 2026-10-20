@@ -48,6 +48,7 @@ import {
     Gauge,
     FileText,
     GitBranchPlus,
+    Globe,
     History,
     Ghost,
     Maximize2,
@@ -95,6 +96,8 @@ import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
+import { WebSources } from "@/components/polar/elements/sources";
+import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
 import { sendFile } from "@/components/transfers/move-file";
@@ -124,6 +127,7 @@ import {
 import {
     PromptInput,
     PromptInputAttach,
+    PromptInputButton,
     PromptInputFooter,
     PromptInputHeader,
     PromptInputSubmit,
@@ -234,6 +238,8 @@ export function pageContextFrom(
 
 const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
+/** Whether this viewer left web search on in the composer. */
+const WEB_KEY = "polar.web";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
 
@@ -620,6 +626,11 @@ export function PolarChat({
     // New chats are temporary while this is on: not listed, no memory, deleted
     // when the chat is left. It stays on for the next new chat, as ChatGPT's does.
     const [temporary, setTemporary] = useState(false);
+    // Web search: the administrator's to allow (`webAllowed`, from the server)
+    // and this viewer's to switch off; on unless they did.
+    const [webAllowed, setWebAllowed] = useState(false);
+    const [webOn, setWebOn] = useState(true);
+    useEffect(() => setWebOn(readStored(WEB_KEY) !== "off"), []);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const commands = polarCommands.usePolarCommands();
@@ -647,8 +658,9 @@ export function PolarChat({
                 : null,
         [withPage, pathname, state?.extra]
     );
-    const live = useRef({ threadId, choice, context, newProject, temporary, turnChoice });
-    live.current = { threadId, choice, context, newProject, temporary, turnChoice };
+    const web = webAllowed && webOn;
+    const live = useRef({ threadId, choice, context, newProject, temporary, turnChoice, web });
+    live.current = { threadId, choice, context, newProject, temporary, turnChoice, web };
 
     const transport = useMemo(
         () =>
@@ -665,6 +677,7 @@ export function PolarChat({
                         context: live.current.context,
                         projectId: live.current.newProject,
                         temporary: live.current.temporary,
+                        web: live.current.web,
                         parentId:
                             messages.length > 1 ? (messages[messages.length - 2]?.id ?? null) : null
                     }
@@ -709,6 +722,7 @@ export function PolarChat({
                         isAdmin: boolean;
                         voice?: VoiceAvailability;
                         spendsDeployment?: boolean;
+                        web?: boolean;
                     } | null
                 ) => {
                     if (!data) return setProviders([]);
@@ -717,6 +731,7 @@ export function PolarChat({
                     setIsAdmin(data.isAdmin);
                     setSpendsDeployment(data.spendsDeployment ?? true);
                     setVoice(data.voice ?? NO_VOICE);
+                    setWebAllowed(data.web === true);
                     setChoice((current) => {
                         // Automatic stays while there is any model to pick from.
                         if (isAutomatic(current) && data.providers.length > 0) return current;
@@ -1434,6 +1449,19 @@ export function PolarChat({
                                 onNotice={setVoiceNotice}
                                 onOpen={() => setInCall(true)}
                             />
+                            {webAllowed ? (
+                                <PromptInputButton
+                                    label={t("web.toggle")}
+                                    aria-pressed={webOn}
+                                    className={cn(webOn && "bg-muted text-foreground")}
+                                    onClick={() => {
+                                        writeStored(WEB_KEY, webOn ? "off" : "on");
+                                        setWebOn(!webOn);
+                                    }}
+                                >
+                                    <Globe />
+                                </PromptInputButton>
+                            ) : null}
                             <ModelSelector
                                 providers={providers ?? []}
                                 choice={choice}
@@ -1929,6 +1957,14 @@ function MessageView({
             : name === "polar_forget"
               ? t("memory.forget")
               : name);
+    // A web step names what it searched for or which site it read.
+    const stepTitle = (name: string, input: unknown) => {
+        const step = webStepOf(name, input);
+        if (!step) return toolName(name);
+        if (step.kind === "read") return t("web.reading", { site: step.detail });
+        return step.detail ? t("web.searching", { query: step.detail }) : t("web.searched");
+    };
+    const sources = mine ? [] : sourcesOf(message.parts as never);
     const { copied, copy } = useCopied();
     const toolOf = (part: UIMessage["parts"][number]) => {
         if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;
@@ -1959,7 +1995,7 @@ function MessageView({
     const current =
         lastTool &&
         (lastTool.tool.state === "input-streaming" || lastTool.tool.state === "input-available")
-            ? toolName(lastTool.name)
+            ? stepTitle(lastTool.name, lastTool.tool.input)
             : null;
     const workIndex = message.parts.findIndex(folded);
     const renderTool = (part: UIMessage["parts"][number], index: number, opened = false) => {
@@ -1969,7 +2005,7 @@ function MessageView({
         return (
             <Tool
                 key={index}
-                title={toolName(name)}
+                title={stepTitle(name, tool.input)}
                 state={tool.state}
                 orb={orbForTool(part)}
                 defaultOpen={opened}
@@ -2041,7 +2077,7 @@ function MessageView({
                             {mine ? (
                                 <p className="whitespace-pre-wrap">{part.text}</p>
                             ) : (
-                                <MessageResponse>{part.text}</MessageResponse>
+                                <MessageResponse>{citeSources(part.text, sources)}</MessageResponse>
                             )}
                         </MessageContent>
                     );
@@ -2056,7 +2092,7 @@ function MessageView({
                                 key={index}
                                 state={tool.state}
                                 approval={tool.approval}
-                                action={toolName(name)}
+                                action={stepTitle(name, tool.input)}
                                 affects={
                                     name === "polar_remember"
                                         ? affectedBy({
@@ -2065,7 +2101,10 @@ function MessageView({
                                           })
                                         : affectedBy(tool.input)
                                 }
-                                destructive={described?.destructive ?? name !== "polar_remember"}
+                                destructive={
+                                    described?.destructive ??
+                                    (name !== "polar_remember" && !isWebTool(name))
+                                }
                                 input={tool.input}
                                 tool={described?.writes ? name : undefined}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
@@ -2079,6 +2118,9 @@ function MessageView({
                 }
                 return null;
             })}
+            {sources.length > 0 ? (
+                <WebSources sources={sources} calls={webCallsOf(message.parts as never)} />
+            ) : null}
             {!mine && typeof meta.model === "string" ? (
                 <p className="text-xs text-foreground-subtle">
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {

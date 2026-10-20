@@ -22,6 +22,12 @@ import {
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
+import {
+    NATIVE_SEARCH_STAND_INS,
+    WEB_APPROVAL,
+    polarWebTools,
+    withoutPastProviderSearches
+} from "@/lib/polar/web";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
@@ -70,7 +76,9 @@ const bodySchema = z.object({
     temporary: z.boolean().default(false),
     /** False for a turn sent on a command's own model: the thread keeps the
      *  model it was on, so the next message goes back to it. */
-    remember: z.boolean().default(true)
+    remember: z.boolean().default(true),
+    /** Whether the person left web search on for this turn. */
+    web: z.boolean().default(true)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -110,7 +118,12 @@ export async function POST(request: Request): Promise<Response> {
     const memoryTools = polarMemoryTools(user.id, body.data.threadId);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
-        tools: { ...toolset.tools, ...memoryTools } as never
+        tools: {
+            ...toolset.tools,
+            ...memoryTools,
+            ...NATIVE_SEARCH_STAND_INS,
+            ...polarWebTools("", "")
+        } as never
     });
     if (!checked.success) return refuse("invalid", 400);
     const messages = checked.data as UIMessage[];
@@ -154,7 +167,15 @@ export async function POST(request: Request): Promise<Response> {
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
     ]);
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
-    const tools = remembers ? { ...toolset.tools, ...memoryTools } : toolset.tools;
+    // The web is the administrator's to allow and the person's to switch off
+    // for a turn; either one off and the tools are simply not offered.
+    const web = access.web && body.data.web;
+    const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
+    const tools = {
+        ...toolset.tools,
+        ...(remembers ? memoryTools : {}),
+        ...webTools
+    };
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -164,7 +185,12 @@ export async function POST(request: Request): Promise<Response> {
     // A file the model cannot read is sent as its text; one with no text to
     // take out stops the turn with its name instead of being dropped unseen.
     const unreadable: string[] = [];
-    const sendable = await inlinePolarFiles(user.id, messages, resolved.option, unreadable);
+    const sendable = await inlinePolarFiles(
+        user.id,
+        withoutPastProviderSearches(messages),
+        resolved.option,
+        unreadable
+    );
     if (unreadable.length > 0) {
         return NextResponse.json(
             { error: "file_unreadable", name: unreadable[0] },
@@ -180,11 +206,16 @@ export async function POST(request: Request): Promise<Response> {
             user.name,
             fencePageContext(body.data.context),
             instructions,
-            memories
+            memories,
+            web
         ),
         messages: await convertToModelMessages(sendable),
         tools,
-        toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
+        toolApproval: {
+            ...toolset.approval,
+            ...(remembers ? MEMORY_APPROVAL : {}),
+            ...(web ? WEB_APPROVAL : {})
+        },
         stopWhen: isStepCount(STEP_MAX),
         // Automatic sends a quick question at the lowest effort.
         reasoning: reasoningFor(
@@ -197,6 +228,8 @@ export async function POST(request: Request): Promise<Response> {
     return result.toUIMessageStreamResponse({
         originalMessages: messages,
         sendReasoning: true,
+        // A provider's own search reports what it read as sources.
+        sendSources: true,
         messageMetadata: ({ part }) =>
             part.type === "start"
                 ? {

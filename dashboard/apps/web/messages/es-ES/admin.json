@@ -131,7 +131,11 @@
             "findGroup": "Buscar un grupo",
             "moreGroups": "Solo se listan los 200 primeros grupos. Busca para encontrar el resto.",
             "noGroupFound": "Ningún grupo coincide con ese nombre.",
-            "guests": "Incluir cuentas de invitado"
+            "guests": "Incluir cuentas de invitado",
+            "web": {
+                "label": "Polar en la web",
+                "hint": "Polar busca en la web y lee páginas públicas. Las búsquedas usan la clave del chat."
+            }
         }
     },
     "billing": {

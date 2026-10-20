@@ -246,6 +246,7 @@ export async function setPolarAccessAction(input: unknown): Promise<{ error?: st
         metadata: {
             use: parsed.data.use.who,
             spend: parsed.data.spend.who,
+            web: parsed.data.web,
             people: parsed.data.use.userIds.length + parsed.data.spend.userIds.length,
             groups: parsed.data.use.groupIds.length + parsed.data.spend.groupIds.length
         }

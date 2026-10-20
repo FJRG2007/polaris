@@ -46,27 +46,30 @@ const audience = (patch: Partial<PolarAudience>): PolarAudience => ({
 
 describe("Polar access policy", () => {
     it("defaults to Polar for everybody signed in but the deployment's keys for administrators only", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toEqual({
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toMatchObject({
             use: true,
             spend: false
         });
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toEqual({ use: true, spend: true });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toMatchObject({
+            use: true,
+            spend: true
+        });
     });
 
     it("carries the deployment's key sharing over to a policy that was never saved", () => {
         expect(unsavedPolarPolicy(false)).toEqual(DEFAULT_POLAR_POLICY);
-        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toEqual({
+        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toMatchObject({
             use: true,
             spend: true
         });
-        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toEqual({
+        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toMatchObject({
             use: false,
             spend: false
         });
     });
 
     it("keeps guests out unless the audience lets them in or names them", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest)).toEqual({
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest)).toMatchObject({
             use: false,
             spend: false
         });
@@ -91,9 +94,27 @@ describe("Polar access policy", () => {
     });
 
     it("never lets anybody spend the keys of a Polar they may not use", () => {
-        const policy = { use: audience({ who: "admins" }), spend: audience({ who: "everyone" }) };
-        expect(decidePolarAccess(policy, member)).toEqual({ use: false, spend: false });
-        expect(decidePolarAccess(policy, admin)).toEqual({ use: true, spend: true });
+        const policy = {
+            use: audience({ who: "admins" }),
+            spend: audience({ who: "everyone" }),
+            web: true
+        };
+        expect(decidePolarAccess(policy, member)).toMatchObject({ use: false, spend: false });
+        expect(decidePolarAccess(policy, admin)).toMatchObject({ use: true, spend: true });
+    });
+
+    it("lets Polar on the web by default, and not once an administrator turns it off", () => {
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).web).toBe(true);
+        // A policy saved before the setting existed reads as on.
+        const saved = polarPolicySchema.parse({
+            use: { who: "everyone" },
+            spend: { who: "admins" }
+        });
+        expect(saved.web).toBe(true);
+        expect(decidePolarAccess({ ...saved, web: false }, member).web).toBe(false);
+        expect(decidePolarAccess({ ...saved, web: false }, admin).web).toBe(false);
+        // Nobody barred from Polar reaches its web tools.
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest).web).toBe(false);
     });
 
     it("rejects a policy that is not one of the audiences", () => {
