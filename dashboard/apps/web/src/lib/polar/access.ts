@@ -24,6 +24,7 @@ import type { SessionUser } from "@/lib/session";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
     chatCredentialFor,
+    instanceKeysAreShared,
     keySourcesFor,
     type ChatCredential,
     type KeySource
@@ -46,7 +47,8 @@ export const polarPolicySchema = z.object({ use: audienceSchema, spend: audience
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
 /**
- * What a deployment that never saved a policy gets.
+ * What a deployment that never saved a policy gets when its keys are not
+ * shared, and what a stored policy that no longer reads falls back to.
  *
  * Using Polar stays open to everybody signed in, which is what every install
  * already did - minus guests, who reach no other app either. Spending the
@@ -59,9 +61,20 @@ export const DEFAULT_POLAR_POLICY: PolarPolicy = {
     spend: { who: "admins", userIds: [], groupIds: [], guests: false }
 };
 
+/**
+ * The policy of a deployment that never saved one, given whether its
+ * administrator shares the deployment's keys. Sharing them is a decision
+ * somebody already made about who spends them, so it carries over: everybody
+ * signed in, as before, rather than taking the keys away on an update.
+ */
+export function unsavedPolarPolicy(keysShared: boolean): PolarPolicy {
+    if (!keysShared) return DEFAULT_POLAR_POLICY;
+    return { ...DEFAULT_POLAR_POLICY, spend: { ...DEFAULT_POLAR_POLICY.spend, who: "everyone" } };
+}
+
 export async function readPolarPolicy(): Promise<PolarPolicy> {
     const raw = await getSetting(POLICY_KEY);
-    if (!raw) return DEFAULT_POLAR_POLICY;
+    if (!raw) return unsavedPolarPolicy(await instanceKeysAreShared());
     try {
         const parsed = polarPolicySchema.safeParse(JSON.parse(raw));
         // A row that no longer reads is not a reason to open anything up.
@@ -151,9 +164,15 @@ export async function polarCaller(): Promise<SessionUser | NextResponse> {
 
 /** The providers Polar may use for this person, with the deployment's keys left
  *  out unless the policy lets them spend those. */
-export async function polarKeySources(userId: string): Promise<Map<string, KeySource>> {
-    const [sources, access] = await Promise.all([keySourcesFor(userId), polarAccessFor(userId)]);
-    if (access.spend) return sources;
+export async function polarKeySources(
+    userId: string,
+    access?: PolarAccess
+): Promise<Map<string, KeySource>> {
+    const [sources, granted] = await Promise.all([
+        keySourcesFor(userId),
+        access ?? polarAccessFor(userId)
+    ]);
+    if (granted.spend) return sources;
     return new Map([...sources].filter(([, source]) => source === "own"));
 }
 
@@ -161,9 +180,10 @@ export async function polarKeySources(userId: string): Promise<Map<string, KeySo
 export async function polarCredentialFor(
     userId: string,
     provider: string,
-    payer: KeySource | null = null
+    payer: KeySource | null = null,
+    access?: PolarAccess
 ): Promise<ChatCredential | null> {
-    if ((await polarAccessFor(userId)).spend) return chatCredentialFor(userId, provider, payer);
+    if ((access ?? (await polarAccessFor(userId))).spend) return chatCredentialFor(userId, provider, payer);
     if (payer === "instance") return null;
     return chatCredentialFor(userId, provider, "own");
 }

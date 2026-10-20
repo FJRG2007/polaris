@@ -19,7 +19,7 @@ import {
     streamText,
     type UIMessage
 } from "ai";
-import { polarCaller } from "@/lib/polar/access";
+import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
@@ -109,14 +109,15 @@ export async function POST(request: Request): Promise<Response> {
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
     let choice: ModelChoice = body.data.choice;
-    let resolved = await resolvePolarModel(user.id, choice);
+    const access = await polarAccessFor(user.id);
+    let resolved = await resolvePolarModel(user.id, choice, access);
     let fellBackFrom: string | null = null;
     if (resolved === "unknown_model") {
-        const first = (await polarModelOptions(user.id))[0]?.models[0];
+        const first = (await polarModelOptions(user.id, access))[0]?.models[0];
         if (first) {
             fellBackFrom = choice.model;
             choice = { ...choice, provider: first.provider, model: first.model, payer: null };
-            resolved = await resolvePolarModel(user.id, choice);
+            resolved = await resolvePolarModel(user.id, choice, access);
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);

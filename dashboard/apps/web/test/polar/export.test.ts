@@ -24,6 +24,7 @@ vi.mock("@/lib/api-session", () => ({
             ? NextResponse.json({ error: "unauthorized" }, { status: 401 })
             : { id: "u1", name: "Ana", viewingAs: null }
 }));
+vi.mock("@/lib/polar/access", async () => (await import("./fixtures/open-polar-access")).openPolarAccess());
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string, values?: Record<string, unknown>) =>

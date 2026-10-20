@@ -9,30 +9,69 @@
  */
 
 import { runAction } from "@/lib/run-action";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { findPolarPeopleAction, setPolarAccessAction } from "./actions";
-import { Card, CardBody, SegmentedControl, Switch, cn } from "@polaris/ui";
+import { findPolarGroupsAction, findPolarPeopleAction, setPolarAccessAction } from "./actions";
+import { Card, CardBody, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import type { AudienceKind, PolarAudience, PolarPolicy } from "@/lib/polar/access";
 
 type Part = "use" | "spend";
+type Group = { id: string; name: string };
+
+/** How long the group search sits still before it asks. */
+const SEARCH_AFTER = 220;
 
 export function PolarAccessCard({
     policy,
     groups,
+    moreGroups = false,
+    chosenGroups = [],
     people
 }: {
     policy: PolarPolicy;
-    groups: readonly { id: string; name: string }[];
+    groups: readonly Group[];
+    /** Whether the deployment has more groups than `groups` lists, so the rest
+     *  are found by searching. */
+    moreGroups?: boolean;
+    /** Names for the groups the policy already holds. */
+    chosenGroups?: readonly Group[];
     /** Names for the people the policy already holds. */
     people: readonly PickedPerson[];
 }) {
     const t = useTranslations("admin");
     const [current, setCurrent] = useState(policy);
     const [names, setNames] = useState<readonly PickedPerson[]>(people);
+    const [groupNames, setGroupNames] = useState<readonly Group[]>(() => [...chosenGroups, ...groups]);
+    const [groupQuery, setGroupQuery] = useState("");
+    const [foundGroups, setFoundGroups] = useState<readonly Group[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+
+    useEffect(() => {
+        const term = groupQuery.trim();
+        if (!moreGroups || term.length < 2) {
+            setFoundGroups(null);
+            return;
+        }
+        let live = true;
+        const timer = setTimeout(() => {
+            void findPolarGroupsAction(term)
+                .then(({ results }) => {
+                    if (!live) return;
+                    setFoundGroups(results);
+                    setGroupNames((known) => [
+                        ...known.filter((group) => !results.some((entry) => entry.id === group.id)),
+                        ...results
+                    ]);
+                })
+                .catch(() => live && setFoundGroups([]));
+        }, SEARCH_AFTER);
+        return () => {
+            live = false;
+            clearTimeout(timer);
+        };
+    }, [groupQuery, moreGroups]);
 
     const save = (next: PolarPolicy) => {
         const before = current;
@@ -59,6 +98,13 @@ export function PolarAccessCard({
         const picked = value.userIds.map(
             (id) => names.find((person) => person.id === id) ?? { id, name: id }
         );
+        const listed = foundGroups ?? groups;
+        const shownGroups = [
+            ...value.groupIds
+                .filter((id) => !listed.some((group) => group.id === id))
+                .map((id) => groupNames.find((group) => group.id === id) ?? { id, name: id }),
+            ...listed
+        ];
         return (
             <div className="space-y-2">
                 <div className="min-w-0 space-y-1">
@@ -88,9 +134,24 @@ export function PolarAccessCard({
                                 change(part, { userIds: next.map((person) => person.id) });
                             }}
                         />
-                        {groups.length > 0 ? (
+                        {moreGroups ? (
+                            <div className="space-y-1">
+                                <Input
+                                    type="search"
+                                    value={groupQuery}
+                                    onChange={(event) => setGroupQuery(event.target.value)}
+                                    placeholder={t("agents.polarAccess.findGroup")}
+                                    aria-label={t("agents.polarAccess.findGroup")}
+                                    maxLength={100}
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    {t("agents.polarAccess.moreGroups")}
+                                </p>
+                            </div>
+                        ) : null}
+                        {shownGroups.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5" aria-label={t("agents.polarAccess.groups")}>
-                                {groups.map((group) => {
+                                {shownGroups.map((group) => {
                                     const on = value.groupIds.includes(group.id);
                                     return (
                                         <button
@@ -117,6 +178,10 @@ export function PolarAccessCard({
                                     );
                                 })}
                             </div>
+                        ) : foundGroups ? (
+                            <p className="text-muted-foreground text-xs">
+                                {t("agents.polarAccess.noGroupFound")}
+                            </p>
                         ) : (
                             <p className="text-muted-foreground text-xs">
                                 {t("agents.polarAccess.noGroups")}

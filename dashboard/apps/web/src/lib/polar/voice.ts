@@ -17,7 +17,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import type { SpeechModel, TranscriptionModel } from "ai";
 import type { VoiceAvailability } from "@/lib/polar/voice-call";
 import type { ChatCredential } from "@/lib/agents/model-keys";
-import { polarCredentialFor, polarKeySources } from "@/lib/polar/access";
+import {
+    polarAccessFor,
+    polarCredentialFor,
+    polarKeySources,
+    type PolarAccess
+} from "@/lib/polar/access";
 
 interface VoiceProvider {
     slug: string;
@@ -64,10 +69,11 @@ async function voiceProviderFor(userId: string, payer: Payer | null): Promise<Fo
     const cached = found.get(key);
     if (cached && now - cached.at < FOUND_TTL_MS) return cached.value;
     found.delete(key);
-    const sources = await polarKeySources(userId);
+    const access = await polarAccessFor(userId);
+    const sources = await polarKeySources(userId, access);
     for (const provider of VOICE_PROVIDERS) {
         if (!sources.has(provider.slug)) continue;
-        const credential = await polarCredentialFor(userId, provider.slug, payer);
+        const credential = await polarCredentialFor(userId, provider.slug, payer, access);
         if (!credential) continue;
         const value = { provider, credential };
         for (const [entry, { at }] of found) {
@@ -82,9 +88,12 @@ async function voiceProviderFor(userId: string, payer: Payer | null): Promise<Fo
 
 /** What this person can do with their voice in Polar. Both go together today:
  *  every provider here does both. */
-export async function polarVoiceAvailability(userId: string): Promise<VoiceAvailability> {
+export async function polarVoiceAvailability(
+    userId: string,
+    access?: PolarAccess
+): Promise<VoiceAvailability> {
     try {
-        const sources = await polarKeySources(userId);
+        const sources = await polarKeySources(userId, access);
         const any = VOICE_PROVIDERS.some((provider) => sources.has(provider.slug));
         return { dictation: any, speech: any };
     } catch {

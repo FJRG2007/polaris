@@ -128,6 +128,9 @@
             "people": "People",
             "groups": "Groups",
             "noGroups": "No groups yet. Create them under Groups to pick one here.",
+            "findGroup": "Find a group",
+            "moreGroups": "Only the first 200 groups are listed. Search to find the rest.",
+            "noGroupFound": "No group matches that name.",
             "guests": "Include guest accounts"
         }
     },

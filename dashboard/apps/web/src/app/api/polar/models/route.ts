@@ -16,11 +16,11 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
-    const [providers, toolset, voice, access] = await Promise.all([
-        polarModelOptions(user.id),
+    const access = await polarAccessFor(user.id);
+    const [providers, toolset, voice] = await Promise.all([
+        polarModelOptions(user.id, access),
         polarTools(user),
-        polarVoiceAvailability(user.id),
-        polarAccessFor(user.id)
+        polarVoiceAvailability(user.id, access)
     ]);
     // Whether the deployment's keys are this person's to spend, so a picker with
     // nothing in it can say their own key is the way in rather than "ask".

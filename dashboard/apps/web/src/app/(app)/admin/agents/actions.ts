@@ -257,3 +257,18 @@ export async function findPolarPeopleAction(query: unknown): Promise<{ results: 
     });
     return { results: found };
 }
+
+/** Groups an administrator may name in a Polar audience, for a deployment with
+ *  more of them than the card lists. */
+export async function findPolarGroupsAction(query: unknown): Promise<{ results: { id: string; name: string }[] }> {
+    await requireAdmin();
+    const term = z.string().trim().min(2).max(100).safeParse(query);
+    if (!term.success) return { results: [] };
+    const found = await prisma.group.findMany({
+        where: { name: { contains: term.data, mode: "insensitive" } },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: 20
+    });
+    return { results: found };
+}

@@ -6,6 +6,7 @@ import {
     audienceAdmits,
     decidePolarAccess,
     polarPolicySchema,
+    unsavedPolarPolicy,
     type AccessFacts,
     type PolarAudience
 } from "@/lib/polar/access";
@@ -34,6 +35,12 @@ describe("Polar access policy", () => {
     it("defaults to Polar for everybody signed in but the deployment's keys for administrators only", () => {
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toEqual({ use: true, spend: false });
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toEqual({ use: true, spend: true });
+    });
+
+    it("carries the deployment's key sharing over to a policy that was never saved", () => {
+        expect(unsavedPolarPolicy(false)).toEqual(DEFAULT_POLAR_POLICY);
+        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toEqual({ use: true, spend: true });
+        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toEqual({ use: false, spend: false });
     });
 
     it("keeps guests out unless the audience lets them in or names them", () => {

@@ -44,6 +44,11 @@ describe("reachableAppIds", () => {
         ]);
     });
 
+    it("withholds an app its own policy closes to this person", async () => {
+        const closesPolar = { ...holding("drive.read"), closes: async (app: string) => app === "polar" };
+        expect(await reachableAppIds(closesPolar)).toEqual(["overview", "drive"]);
+    });
+
     it("gives an administrator Management, and withholds it from everyone else", async () => {
         expect(await reachableAppIds(ADMIN)).toContain("admin");
         expect(await reachableAppIds(holding("drive.read", "deploy.read"))).not.toContain("admin");

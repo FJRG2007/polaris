@@ -54,6 +54,14 @@ export interface AppAccessInput {
      * grant written for one person is not part of it.
      */
     alsoReaches?: (appId: string) => Promise<boolean>;
+    /**
+     * Whether an app is closed to this person by a policy of its own rather
+     * than a permission - Polar's audience, chosen by the administrator.
+     *
+     * Optional, and absent means nothing is closed this way. A role preview
+     * passes nothing, for the same reason it passes no `alsoReaches`.
+     */
+    closes?: (appId: string) => Promise<boolean>;
 }
 
 /** The apps this person may open, in registry order. Hidden apps (the account
@@ -72,7 +80,8 @@ export async function reachableApps({
     isAdmin,
     can,
     isInstalled,
-    alsoReaches
+    alsoReaches,
+    closes
 }: AppAccessInput): Promise<AppEntry[]> {
     const decided = await Promise.all(
         POLARIS_APPS.map(async (app) => {
@@ -96,6 +105,7 @@ export async function reachableApps({
                 // answer is a database query. The caller knows.
                 if (!alsoReaches || !(await alsoReaches(app.id))) return null;
             }
+            if (closes && (await closes(app.id))) return null;
             return app;
         })
     );
