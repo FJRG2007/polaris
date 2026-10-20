@@ -44,7 +44,8 @@ import {
     Input,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    isDirty
 } from "@polaris/ui";
 
 export function SettingsView({
@@ -202,7 +203,10 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
     const parsed = core.organizationProfileSchema.safeParse({ name, description });
     // Dirty means the values differ from what was loaded, not that a field was
     // touched: something edited and put back leaves Save disabled.
-    const changed = name !== org.name || description !== org.description;
+    const changed = isDirty(
+        { name: org.name, description: org.description },
+        { name, description }
+    );
 
     return (
         <Card>

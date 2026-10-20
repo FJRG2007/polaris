@@ -28,7 +28,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
-import { Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Textarea, isDirty } from "@polaris/ui";
 import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
 import {
     AccessRulesEditor,
@@ -164,6 +164,18 @@ export function KeyForm({
     const keeping = expiry === KEEP_EXPIRY;
     const chosenDate = custom ? endOfDay(expiryDate) : null;
     const dateReady = !custom || (chosenDate !== null && chosenDate.getTime() > Date.now());
+    const values = {
+        name,
+        description,
+        environment,
+        scopes: new Set(scopes),
+        keeping,
+        rules,
+        clients
+    };
+    // What the key held when this page opened: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = editing !== null && !isDirty(loaded, values);
 
     async function submit() {
         setBusy(true);
@@ -373,7 +385,9 @@ export function KeyForm({
                 </Button>
                 <Button
                     onClick={() => void submit()}
-                    disabled={busy || name.trim() === "" || scopes.length === 0 || !dateReady}
+                    disabled={
+                        busy || unchanged || name.trim() === "" || scopes.length === 0 || !dateReady
+                    }
                 >
                     <KeyRound className="size-4" />
                     {busy
