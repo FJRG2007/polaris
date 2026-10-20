@@ -87,7 +87,7 @@ export function Work({
                 className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:text-foreground"
             >
                 {streaming ? (
-                    <ThinkingOrb state={orb} size={20} />
+                    <ThinkingOrb state={orb} size={20} decorative />
                 ) : (
                     <Layers className="h-3.5 w-3.5 shrink-0" />
                 )}

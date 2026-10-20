@@ -105,6 +105,13 @@ describe("the orb", () => {
         expect(screen.getByRole("img", { name: "Searching" })).toBeTruthy();
     });
 
+    it("stays silent when the text beside it already names the state", () => {
+        motion(false);
+        const view = render(withMessages(<ThinkingOrb state="searching" decorative />));
+        expect(screen.queryByRole("img")).toBeNull();
+        expect(view.container.querySelector("canvas")?.getAttribute("aria-hidden")).toBe("true");
+    });
+
     it("speaks Spanish too", () => {
         motion(false);
         render(withMessages(<ThinkingOrb state="composing" />, "es-ES"));

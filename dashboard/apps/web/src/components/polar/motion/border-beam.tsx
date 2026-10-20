@@ -183,7 +183,7 @@ export function BorderBeam({
         const child = el.firstElementChild;
         const raw = child ? parseFloat(getComputedStyle(child).borderTopLeftRadius) : NaN;
         if (raw > 0) setRadius(raw);
-    }, [theme, children]);
+    }, [theme, active]);
 
     useEffect(() => {
         const el = ref.current;

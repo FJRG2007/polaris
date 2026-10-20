@@ -78,7 +78,6 @@ import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
-import { type PolarMood } from "@/components/polar/polar-mascot";
 import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
 import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-avatar";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
@@ -146,6 +145,7 @@ import {
 // ---------------------------------------------------------------------------
 
 type ExtraContext = Pick<PageContext, "record" | "selection">;
+type PolarMood = "idle" | "thinking" | "listening" | "speaking" | "done" | "trouble";
 
 interface PolarState {
     /** Whether this account may use Polar at all: the same answer every Polar
@@ -1509,7 +1509,7 @@ export function PolarChat({
                                 })}
                                 {chat.status === "submitted" ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <ThinkingOrb state="breathing" size={20} />
+                                        <ThinkingOrb state="breathing" size={20} decorative />
                                         <Shimmer>{t("status.thinking")}</Shimmer>
                                     </div>
                                 ) : null}
@@ -1716,8 +1716,12 @@ function MessageView({
                             streaming={streaming && !answering}
                             current={current}
                             orb={
-                                orbForActivity({ status: "streaming", parts: message.parts }) ??
-                                "solving"
+                                streaming && !answering
+                                    ? (orbForActivity({
+                                          status: "streaming",
+                                          parts: message.parts
+                                      }) ?? undefined)
+                                    : undefined
                             }
                             tools={toolParts.length}
                             failed={failed}

@@ -22,7 +22,7 @@ export const OVERSCAN = 1.5;
     hops need the room above, not below. */
 export const RISE = 0.1;
 
-// Polar's identity colours, fixed in every theme like a logo's (polar-mascot.tsx).
+// Polar's identity colours, fixed in every theme like a logo's.
 const VIOLET = "#7E4FEE";
 const FUR = "#F4F6FB";
 const INK = "#161A24";

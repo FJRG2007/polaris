@@ -73,11 +73,7 @@ export function Tool({
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground">
                     {orb && (state === "input-streaming" || state === "input-available") ? (
-                        <ThinkingOrb
-                            state={orb}
-                            size={20}
-                            label={t(`elements.toolState.${state}`)}
-                        />
+                        <ThinkingOrb state={orb} size={20} decorative />
                     ) : (
                         ICONS[state]
                     )}

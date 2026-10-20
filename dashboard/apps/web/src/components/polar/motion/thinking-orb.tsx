@@ -40,6 +40,7 @@ export function ThinkingOrb({
     paused = false,
     tone = "ink",
     label,
+    decorative = false,
     className
 }: {
     state?: OrbState;
@@ -52,6 +53,8 @@ export function ThinkingOrb({
     tone?: "ink" | "primary";
     /** Accessible name; the state's own words when absent. */
     label?: string;
+    /** Hidden from assistive technology, for when visible text beside it already names the state. */
+    decorative?: boolean;
     className?: string;
 }) {
     const t = useTranslations("polar");
@@ -90,8 +93,9 @@ export function ThinkingOrb({
     return (
         <canvas
             ref={ref}
-            role="img"
-            aria-label={label ?? t(`orb.${state}`)}
+            role={decorative ? undefined : "img"}
+            aria-label={decorative ? undefined : (label ?? t(`orb.${state}`))}
+            aria-hidden={decorative || undefined}
             data-orb-state={state}
             data-still={reduced ? "" : undefined}
             className={cn("block shrink-0", className)}
