@@ -246,6 +246,21 @@ export const gatewayKeyConfigSchema = z.object({
 });
 
 /**
+ * The Anthropic workspace a key acts in, for a key that is not tied to one.
+ *
+ * A personal or service account key can be granted several workspaces, and then
+ * every request has to name one in the `anthropic-workspace-id` header or the API
+ * answers 400. Workspace IDs carry the `wrkspc_` prefix, e.g.
+ * `wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ`.
+ * https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
+ * https://platform.claude.com/docs/en/manage-claude/workspaces
+ */
+export const anthropicWorkspaceIdSchema = z
+    .string()
+    .trim()
+    .regex(/^wrkspc_[A-Za-z0-9]{1,64}$/, "A workspace ID starts with wrkspc_");
+
+/**
  * The day the key stops working, as its owner set it at the provider.
  *
  * Null is the common case and means no end. A date already gone is refused: a
@@ -266,6 +281,8 @@ export const createModelKeySchema = z.object({
     name: modelKeyNameSchema,
     secret: modelKeySecretSchema,
     config: gatewayKeyConfigSchema.optional(),
+    /** Anthropic only: the workspace a key not tied to one acts in. */
+    workspaceId: anthropicWorkspaceIdSchema.optional(),
     /**
      * Whose account a credential turned out to belong to.
      *
@@ -297,6 +314,8 @@ export const updateModelKeySchema = z.object({
     name: modelKeyNameSchema,
     secret: modelKeySecretSchema.optional(),
     config: gatewayKeyConfigSchema.optional(),
+    /** Anthropic only. Absent leaves the stored one alone; null clears it. */
+    workspaceId: anthropicWorkspaceIdSchema.nullable().optional(),
     expiresAt: modelKeyExpirySchema
 });
 

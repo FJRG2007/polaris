@@ -217,6 +217,11 @@
                 "soon": "Expiring in {days} days",
                 "expired": "Expired"
             },
+            "off": "Switched off",
+            "offHint": "A key switched off is refused like a revoked one until you switch it back on.",
+            "toggleNamed": "Accept calls made with {name}",
+            "toggleGone": "That key is gone or revoked, so it cannot be switched.",
+            "toggleFailed": "The key could not be switched. Try again.",
             "revokeTitle": "Revoke \"{name}\"?",
             "revokeDescription": "Anything using this key stops working immediately.",
             "revoke": "Revoke",

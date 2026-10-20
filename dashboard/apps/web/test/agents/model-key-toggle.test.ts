@@ -21,6 +21,7 @@ vi.mock("@/lib/agents/model-keys", () => ({
     },
     createModelKey: vi.fn(),
     deleteModelKey: vi.fn(),
+    heldModelKey: vi.fn(),
     isStorableProvider: vi.fn(),
     ownerHasModelKeyName: vi.fn(),
     ownerHasModelSecret: vi.fn(),
@@ -79,5 +80,21 @@ describe("toggleKey", () => {
         expect(await toggleKey(scope, { id: ID, enabled: "no" })).toEqual({
             error: "refusals.aiKeys.pickKey"
         });
+    });
+
+    it("switches a person's own key off on their own screen, and no one else's", async () => {
+        const own = {
+            owner: "user-1",
+            actorId: "user-1",
+            path: "/account/ai-keys",
+            audit: "account" as const
+        };
+        state.rows.set(ID, { userId: "user-1", enabled: true });
+        expect(await toggleKey(own, { id: ID, enabled: false })).toEqual({});
+        expect(state.rows.get(ID)?.enabled).toBe(false);
+        expect(state.audits[0]?.action).toBe("account.ai-key.disabled");
+        state.rows.set(ID, { userId: "user-2", enabled: true });
+        expect((await toggleKey(own, { id: ID, enabled: false })).error).toBeTruthy();
+        expect(state.rows.get(ID)?.enabled).toBe(true);
     });
 });

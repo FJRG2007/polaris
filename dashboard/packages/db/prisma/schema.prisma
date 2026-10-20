@@ -1463,6 +1463,8 @@ model ApiKey {
     // unexpected can be recognised as such rather than only dated.
     lastUsedUserAgent String?
     revokedAt         DateTime?
+    // Switched off by its owner: refused like a revoked key, but reversible.
+    enabled           Boolean   @default(true)
     // Set on a token minted from a project's settings, which is where it is
     // listed and revoked. It records where the key came from and does not narrow
     // what the key can reach - that is still its scopes and its owner's

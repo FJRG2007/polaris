@@ -27,6 +27,7 @@ import {
     editKey,
     removeKey,
     reorderKeys,
+    toggleKey,
     type KeyActionResult,
     type KeyScope
 } from "@/lib/agents/model-key-actions";
@@ -53,6 +54,10 @@ export async function reorderModelKeysAction(input: unknown): Promise<KeyActionR
     return reorderKeys(await scope(), input);
 }
 
+export async function toggleModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return toggleKey(await scope(), input);
+}
+
 // ---------------------------------------------------------------------------
 // Signing an agent in, with Polaris supplying the machine
 // ---------------------------------------------------------------------------
@@ -68,7 +73,9 @@ export async function reorderModelKeysAction(input: unknown): Promise<KeyActionR
  * Errors are said rather than shown: what comes back from a daemon that would
  * not start a container is not a sentence for a screen.
  */
-export async function beginAgentSigninAction(env: unknown): Promise<{ id?: string; error?: string }> {
+export async function beginAgentSigninAction(
+    env: unknown
+): Promise<{ id?: string; error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninEnvSchema.safeParse(env);
     const t = await getTranslations("account");
@@ -93,7 +100,8 @@ export async function agentSigninScreenAction(
 ): Promise<{ view?: SigninView; error?: string }> {
     const user = await requireUser();
     const parsed = agentSigninIdSchema.safeParse(id);
-    if (!parsed.success) return { error: (await getTranslations("account"))("aiKeys.errors.notOpen") };
+    if (!parsed.success)
+        return { error: (await getTranslations("account"))("aiKeys.errors.notOpen") };
     try {
         return { view: await signinScreen(user.id, parsed.data) };
     } catch {
@@ -107,7 +115,11 @@ export async function answerAgentSigninAction(input: unknown): Promise<{ error?:
     const user = await requireUser();
     const parsed = agentSigninAnswerSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("aiKeys.errors.typeSomething") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("account"))("aiKeys.errors.typeSomething")
+        };
     }
     try {
         await answerSignin(user.id, parsed.data.id, parsed.data.text);

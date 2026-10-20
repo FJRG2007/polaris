@@ -20,6 +20,7 @@ import { createModelKeySchema, reorderModelKeysSchema, updateModelKeySchema } fr
 import {
     createModelKey,
     deleteModelKey,
+    heldModelKey,
     isStorableProvider,
     ownerHasModelKeyName,
     ownerHasModelSecret,
@@ -36,6 +37,25 @@ import { readerWords } from "@/lib/i18n/reader-words";
 export interface KeyActionResult {
     error?: string;
     warning?: string;
+    /** Set when Anthropic answered that the key has to name a workspace, or
+     *  named one it cannot use, so the form can ask for the Workspace ID. */
+    needsWorkspace?: boolean;
+}
+
+/** A refusal from the provider check, with the hint the form acts on. */
+function refusal(check: { code: string; reason: string }): KeyActionResult {
+    return check.code === "workspace"
+        ? { error: check.reason, needsWorkspace: true }
+        : { error: check.reason };
+}
+
+/** The workspace a write names, for Anthropic only: anywhere else the field has
+ *  no meaning and is dropped rather than stored. */
+function workspaceFor<T extends string | null | undefined>(
+    provider: string,
+    value: T
+): T | undefined {
+    return provider === "anthropic" ? value : undefined;
 }
 
 /** Whose keys are being written, who is writing them, and where that is read. */
@@ -95,8 +115,11 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
 
     // Asked before it is stored: a key the provider refuses outright is a typo,
     // and storing it would turn that into a failed run somebody has to trace.
-    const check = await checkProviderKey(parsed.data.provider, parsed.data.secret);
-    if (check.state === "rejected") return { error: check.reason };
+    const workspaceId = workspaceFor(parsed.data.provider, parsed.data.workspaceId);
+    const check = await checkProviderKey(parsed.data.provider, parsed.data.secret, {
+        workspaceId
+    });
+    if (check.state === "rejected") return refusal(check);
 
     try {
         await createModelKey(scope.owner, {
@@ -114,7 +137,9 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
                 ? { ...readGatewayConfig(parsed.data.config) }
                 : parsed.data.identity && Object.keys(parsed.data.identity).length > 0
                   ? { ...parsed.data.identity }
-                  : undefined,
+                  : workspaceId
+                    ? { workspaceId }
+                    : undefined,
             expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null
         });
     } catch (caught) {
@@ -151,9 +176,14 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
     // Only a key that was actually retyped is checked. A rename, or moving the
     // end date, should not fail because the provider is having a bad morning.
     let warning: string | undefined;
-    if (parsed.data.secret !== undefined) {
-        const provider = await providerOfModelKey(scope.owner, parsed.data.id);
+    // Read once a key or a workspace changes: both are told apart by provider.
+    let provider: string | null = null;
+    if (parsed.data.secret !== undefined || parsed.data.workspaceId !== undefined) {
+        provider = await providerOfModelKey(scope.owner, parsed.data.id);
         if (!provider) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    }
+    const workspaceId = provider ? workspaceFor(provider, parsed.data.workspaceId) : undefined;
+    if (provider && parsed.data.secret !== undefined) {
         // Excluding this row: retyping the same key it already holds is a
         // no-op, not somebody's second copy of it.
         if (
@@ -164,9 +194,19 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
         ) {
             return { error: SECRET_TAKEN };
         }
-        const check = await checkProviderKey(provider, parsed.data.secret);
-        if (check.state === "rejected") return { error: check.reason };
+        const check = await checkProviderKey(provider, parsed.data.secret, { workspaceId });
+        if (check.state === "rejected") return refusal(check);
         if (check.state === "unverified") warning = check.reason;
+    } else if (provider && workspaceId !== undefined) {
+        // A new workspace is checked with the key already held: a mistyped one
+        // would otherwise only show up as the next run's failure.
+        const held = await heldModelKey(scope.owner, parsed.data.id);
+        if (!held) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+        if (held.secret && (workspaceId ?? null) !== held.workspaceId) {
+            const check = await checkProviderKey(provider, held.secret, { workspaceId });
+            if (check.state === "rejected") return refusal(check);
+            if (check.state === "unverified") warning = check.reason;
+        }
     }
 
     let changed: boolean;
@@ -175,6 +215,7 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
             name: parsed.data.name,
             secret: parsed.data.secret,
             config: parsed.data.config ? { ...readGatewayConfig(parsed.data.config) } : undefined,
+            workspaceId,
             expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null
         });
     } catch (caught) {

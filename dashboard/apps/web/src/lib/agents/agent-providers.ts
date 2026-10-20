@@ -31,10 +31,20 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
     { slug: "google-ai", name: "Google AI", envVar: "GEMINI_API_KEY", modelPrefix: "google" },
     { slug: "xai", name: "xAI", envVar: "XAI_API_KEY", modelPrefix: "xai" },
     { slug: "deepseek", name: "DeepSeek", envVar: "DEEPSEEK_API_KEY", modelPrefix: "deepseek" },
-    { slug: "moonshot", name: "Moonshot AI", envVar: "MOONSHOT_API_KEY", modelPrefix: "moonshotai" },
+    {
+        slug: "moonshot",
+        name: "Moonshot AI",
+        envVar: "MOONSHOT_API_KEY",
+        modelPrefix: "moonshotai"
+    },
     { slug: "groq", name: "Groq", envVar: "GROQ_API_KEY", modelPrefix: "groq" },
     { slug: "cerebras", name: "Cerebras", envVar: "CEREBRAS_API_KEY", modelPrefix: "cerebras" },
-    { slug: "openrouter", name: "OpenRouter", envVar: "OPENROUTER_API_KEY", modelPrefix: "openrouter" },
+    {
+        slug: "openrouter",
+        name: "OpenRouter",
+        envVar: "OPENROUTER_API_KEY",
+        modelPrefix: "openrouter"
+    },
 
     // The long tail, from the one table that also decides what the marketplace
     // lists. Their slugs are their ids in the public model index, so the prefix
@@ -56,6 +66,24 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
  * why it contributes a base URL as well as a key.
  */
 export const GATEWAY_SLUG = "enigma";
+
+/**
+ * The header an Anthropic key that is not tied to one workspace names its
+ * workspace in. Without it such a key is answered 400 on every request.
+ * https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
+ */
+export const ANTHROPIC_WORKSPACE_HEADER = "anthropic-workspace-id";
+
+/** Where Claude Code reads extra request headers from, one `Name: Value` per
+ *  line. https://code.claude.com/docs/en/env-vars */
+export const ANTHROPIC_HEADERS_ENV = "ANTHROPIC_CUSTOM_HEADERS";
+
+/** The headers that carry a workspace, or none when there is no workspace. */
+export function anthropicWorkspaceHeaders(
+    workspaceId: string | null | undefined
+): Record<string, string> {
+    return workspaceId ? { [ANTHROPIC_WORKSPACE_HEADER]: workspaceId } : {};
+}
 
 /** Which provider a model slug needs a key for, or null when nothing here serves
  *  it (a raw specifier, or a provider Polaris does not carry a credential for). */

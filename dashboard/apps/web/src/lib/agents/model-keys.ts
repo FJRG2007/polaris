@@ -31,7 +31,12 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { readGatewayConfig } from "@/lib/integrations/registry";
-import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import {
+    GATEWAY_SLUG,
+    MODEL_PROVIDERS,
+    ANTHROPIC_HEADERS_ENV,
+    ANTHROPIC_WORKSPACE_HEADER
+} from "@/lib/agents/agent-providers";
 import { agentSignins, isSigninRow, isSigninSlug, signinSlug } from "@/lib/agents/agent-signins";
 import {
     encryptSecret,
@@ -145,6 +150,21 @@ const spendable = () => ({
     OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
 });
 
+/** A config naming this workspace, or naming none when it is null. */
+function withWorkspace(
+    config: Record<string, unknown>,
+    workspaceId: string | null
+): Record<string, unknown> {
+    const { workspaceId: _previous, ...rest } = config;
+    return workspaceId ? { ...rest, workspaceId } : rest;
+}
+
+/** The Anthropic workspace a stored key names, or null when it names none. */
+export function workspaceOf(config: Record<string, unknown> | string): string | null {
+    const read = typeof config === "string" ? parseConfig(config) : config;
+    return typeof read.workspaceId === "string" && read.workspaceId ? read.workspaceId : null;
+}
+
 function parseConfig(json: string): Record<string, unknown> {
     try {
         const parsed: unknown = JSON.parse(json);
@@ -176,6 +196,28 @@ export async function providerOfModelKey(owner: KeyOwner, id: string): Promise<s
         select: { provider: true }
     });
     return row?.provider ?? null;
+}
+
+/** The secret one of this owner's keys holds and the workspace it names, so a
+ *  new workspace can be checked against the key it will act with. Null when the
+ *  owner holds no such key; a secret of null when it cannot be read here. */
+export async function heldModelKey(
+    owner: KeyOwner,
+    id: string
+): Promise<{ secret: string | null; workspaceId: string | null } | null> {
+    const row = await prisma.userModelKey.findFirst({
+        where: { id, userId: owner },
+        select: {
+            id: true,
+            provider: true,
+            config: true,
+            encryptedSecret: true,
+            secretNonce: true,
+            secretKeyId: true
+        }
+    });
+    if (!row) return null;
+    return { secret: readSecret(row), workspaceId: workspaceOf(row.config) };
 }
 
 /**
@@ -319,6 +361,10 @@ export async function updateModelKey(
         name?: string;
         secret?: string;
         config?: Record<string, unknown>;
+        /** Anthropic only: a workspace to name, null to stop naming one,
+         *  undefined to leave it as it is. Kept beside whatever else the config
+         *  holds rather than replacing it. */
+        workspaceId?: string | null;
         expiresAt?: Date | null;
     }
 ): Promise<boolean> {
@@ -330,14 +376,16 @@ export async function updateModelKey(
 
     // The gateway's fingerprint takes in its endpoint, so a key rewritten
     // alongside a new endpoint has to be fingerprinted against the new one.
-    const config = input.config ?? parseConfig(held.config);
+    const base = input.config ?? parseConfig(held.config);
+    const config = input.workspaceId === undefined ? base : withWorkspace(base, input.workspaceId);
+    const configChanged = input.config !== undefined || input.workspaceId !== undefined;
 
     await prisma.userModelKey.update({
         where: { id },
         data: {
             ...(input.name === undefined ? {} : { name: input.name }),
             ...(input.secret === undefined ? {} : envelope(input.secret, held.provider, config)),
-            ...(input.config === undefined ? {} : { config: JSON.stringify(input.config) }),
+            ...(configChanged ? { config: JSON.stringify(config) } : {}),
             // A date pushed out has to start the warnings over, or the one already
             // sent would be the last thing said about a key that is fine now.
             ...(input.expiresAt === undefined
@@ -579,6 +627,7 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
             if (!picked || !picked.secret) continue;
             secrets[provider.envVar] = picked.secret;
             used.push(picked.row.id);
+            if (provider.slug === "anthropic") applyWorkspace(secrets, picked.row);
         }
 
         applyGateway(secrets, own, instance, used);
@@ -586,6 +635,21 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
         return secrets;
     } catch {
         return null;
+    }
+}
+
+/**
+ * The workspace an Anthropic key acts in, for the agent CLIs.
+ *
+ * Claude Code adds every `Name: Value` line of ANTHROPIC_CUSTOM_HEADERS to its
+ * requests, which is the only way to hand it the header a key not tied to one
+ * workspace needs: https://code.claude.com/docs/en/env-vars
+ * The header itself: https://platform.claude.com/docs/en/manage-claude/authentication#select-a-workspace
+ */
+function applyWorkspace(secrets: Record<string, string>, row: StoredKey): void {
+    const workspaceId = workspaceOf(row.config);
+    if (workspaceId) {
+        secrets[ANTHROPIC_HEADERS_ENV] = `${ANTHROPIC_WORKSPACE_HEADER}: ${workspaceId}`;
     }
 }
 
@@ -598,6 +662,9 @@ export interface ChatCredential {
     baseUrl: string | null;
     /** Set for the gateway only: the one model it serves. */
     gatewayModel: string | null;
+    /** Set for an Anthropic key that is not tied to one workspace: the one it
+     *  acts in, sent with every request. */
+    workspaceId?: string | null;
 }
 
 /**
@@ -632,7 +699,14 @@ export async function chatCredentialFor(
             }
             if (!picked.secret) continue;
             await noteUsed([picked.row.id]);
-            return { provider, source, secret: picked.secret, baseUrl: null, gatewayModel: null };
+            return {
+                provider,
+                source,
+                secret: picked.secret,
+                baseUrl: null,
+                gatewayModel: null,
+                workspaceId: provider === "anthropic" ? workspaceOf(picked.row.config) : null
+            };
         }
         return null;
     } catch {

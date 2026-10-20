@@ -188,6 +188,7 @@ export {
     createApiKey,
     listApiKeys,
     revokeApiKey,
+    setApiKeyEnabled,
     updateApiKey,
     deleteApiKey,
     verifyApiKey,

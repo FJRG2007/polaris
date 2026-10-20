@@ -15,7 +15,7 @@
  */
 
 import * as core from "@polaris/core";
-import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { ANTHROPIC_HEADERS_ENV, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import {
     keySourcesFor,
     signinAccountsFor,
@@ -139,6 +139,10 @@ export function credentialsForAgent(
         const value = available[credential.env];
         if (value) chosen[credential.env] = value;
     }
+    // The workspace an Anthropic key acts in travels with that key and nothing
+    // else: without it a key not tied to one workspace is refused every request.
+    const headers = available[ANTHROPIC_HEADERS_ENV];
+    if (chosen.ANTHROPIC_API_KEY && headers) chosen[ANTHROPIC_HEADERS_ENV] = headers;
     return chosen;
 }
 

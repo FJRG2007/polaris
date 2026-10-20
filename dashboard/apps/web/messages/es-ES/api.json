@@ -171,7 +171,21 @@
             "keyGone": "Esa clave ya no existe.",
             "pickKey": "Elige una clave",
             "orderUnreadable": "No se pudo leer el nuevo orden.",
-            "catalogAnswered": "El catálogo respondió {status}."
+            "catalogAnswered": "El catálogo respondió {status}.",
+            "check": {
+                "ownEndpoint": "Un endpoint propio se comprueba con la primera ejecución, no desde aquí.",
+                "noProbe": "Polaris no tiene forma de comprobar las claves de este proveedor.",
+                "timedOut": "El proveedor no respondió a tiempo, así que no se pudo comprobar la clave.",
+                "unreachable": "No se pudo contactar con el proveedor para comprobar la clave.",
+                "invalid": "El proveedor no aceptó esa clave.",
+                "forbidden": "Esa clave no tiene el acceso que necesita este proveedor.",
+                "rateLimited": "El proveedor está limitando esta cuenta, así que no se pudo comprobar la clave.",
+                "status": "El proveedor respondió {status}, así que no se pudo comprobar la clave.",
+                "providerSaid": "El proveedor respondió {status}: {message}",
+                "workspaceMissing": "Esta clave necesita el ID del workspace de Anthropic que debe usar. Añádelo en ID de workspace.",
+                "workspaceMalformed": "Eso no es un ID de workspace. Cópialo de la página Workspaces de la Claude Console.",
+                "workspaceNotFound": "Esta clave no puede usar un workspace con ese ID. Revisa el ID, o que la clave tenga acceso a él."
+            }
         },
         "sharing": {
             "enterWho": "Escribe una dirección de correo o un nombre de usuario",

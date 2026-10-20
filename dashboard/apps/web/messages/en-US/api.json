@@ -171,7 +171,21 @@
             "keyGone": "That key is gone.",
             "pickKey": "Pick a key",
             "orderUnreadable": "Could not read the new order.",
-            "catalogAnswered": "The catalog answered {status}."
+            "catalogAnswered": "The catalog answered {status}.",
+            "check": {
+                "ownEndpoint": "An endpoint of your own is proven by the first run, not from here.",
+                "noProbe": "Polaris has no way to check this provider's keys.",
+                "timedOut": "The provider did not answer in time, so the key could not be checked.",
+                "unreachable": "Could not reach the provider to check the key.",
+                "invalid": "The provider did not accept that key.",
+                "forbidden": "That key does not carry the access this provider needs.",
+                "rateLimited": "The provider is rate limiting this account, so the key could not be checked.",
+                "status": "The provider answered {status}, so the key could not be checked.",
+                "providerSaid": "The provider answered {status}: {message}",
+                "workspaceMissing": "This key needs the ID of the Anthropic workspace to use. Add it under Workspace ID.",
+                "workspaceMalformed": "That is not a workspace ID. Copy it from the Workspaces page of the Claude Console.",
+                "workspaceNotFound": "This key cannot use a workspace with that ID. Check the ID, or that the key has access to it."
+            }
         },
         "sharing": {
             "enterWho": "Enter an email address or a username",
