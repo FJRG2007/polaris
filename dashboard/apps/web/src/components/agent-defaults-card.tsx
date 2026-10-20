@@ -18,7 +18,7 @@ import * as core from "@polaris/core";
 import { Trash2 } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { useState, useTransition } from "react";
-import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, isDirty, Select } from "@polaris/ui";
 import { ModelFallbackList } from "@/components/model-fallback-list";
 import { ModelPicker, type PickerModel } from "@/components/model-picker";
 import type { AgentDefaultsView } from "@/lib/agents/agent-defaults-service";
@@ -97,6 +97,26 @@ export interface AgentDefaultsCardProps {
     onError: (message: string | null) => void;
 }
 
+/** What a save writes for a tier, and so what decides whether there is one. */
+function storedOf(tier: AgentDefaultsView) {
+    return {
+        scope: tier.scope,
+        execution: tier.execution,
+        poolId: tier.poolId,
+        model: tier.model,
+        fallback: tier.fallback,
+        enigma: tier.enigma,
+        effort: tier.effort,
+        push: tier.push,
+        shell: tier.shell,
+        publicRepos: tier.publicRepos,
+        privateRepos: tier.privateRepos,
+        pullRequests: tier.pullRequests,
+        issues: tier.issues,
+        gate: tier.gate
+    };
+}
+
 export function AgentDefaultsCard({
     tier,
     title,
@@ -114,6 +134,10 @@ export function AgentDefaultsCard({
     const t = useTranslations("agents");
     const [pending, startTransition] = useTransition();
     const [saved, setSaved] = useState(false);
+    // The tier as it is stored: put back to it, the card has nothing to save.
+    const [stored, setStored] = useState(tier);
+    if (stored.scope !== tier.scope) setStored(tier);
+    const unchanged = !isDirty(storedOf(stored), storedOf(tier));
 
     const set = <K extends keyof AgentDefaultsView>(key: K, value: AgentDefaultsView[K]) => {
         setSaved(false);
@@ -132,29 +156,14 @@ export function AgentDefaultsCard({
 
     const save = () => {
         onError(null);
+        const saving = tier;
         startTransition(() => {
             void (async () => {
-                const result = await runAction(
-                    () =>
-                        store({
-                            scope: tier.scope,
-                            execution: tier.execution,
-                            poolId: tier.poolId,
-                            model: tier.model,
-                            fallback: tier.fallback,
-                            enigma: tier.enigma,
-                            effort: tier.effort,
-                            push: tier.push,
-                            shell: tier.shell,
-                            publicRepos: tier.publicRepos,
-                            privateRepos: tier.privateRepos,
-                            pullRequests: tier.pullRequests,
-                            issues: tier.issues,
-                            gate: tier.gate
-                        }),
-                    onError
-                );
-                if (result && !result.error) setSaved(true);
+                const result = await runAction(() => store(storedOf(saving)), onError);
+                if (result && !result.error) {
+                    setSaved(true);
+                    setStored(saving);
+                }
             })();
         });
     };
@@ -381,7 +390,7 @@ export function AgentDefaultsCard({
 
                 <div className="flex items-center justify-end gap-3">
                     {saved ? <span className="text-xs text-success">{t("defaultsCard.saved")}</span> : null}
-                    <Button size="sm" onClick={save} disabled={pending}>
+                    <Button size="sm" onClick={save} disabled={pending || unchanged}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </div>
