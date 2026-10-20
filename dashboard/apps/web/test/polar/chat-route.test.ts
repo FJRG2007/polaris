@@ -30,7 +30,9 @@ const state = {
     executed: [] as string[],
     saved: [] as unknown[],
     titled: [] as unknown[][],
-    resolveCalls: 0
+    resolveCalls: 0,
+    ensured: [] as unknown[][],
+    signals: [] as unknown[]
 };
 
 vi.mock("@/lib/polar/access", async () =>
@@ -53,7 +55,10 @@ vi.mock("@/lib/polar/memory", () => ({
     polarMemoryTools: () => ({})
 }));
 vi.mock("@/lib/polar/threads", () => ({
-    ensurePolarThread: async () => (state.owned ? { temporary: false } : null),
+    ensurePolarThread: async (...args: unknown[]) => {
+        state.ensured.push(args);
+        return state.owned ? { temporary: false } : null;
+    },
     polarThreadInstructions: async () => null,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
 }));
@@ -90,8 +95,9 @@ vi.mock("@/lib/polar/models", () => ({
         { provider: "anthropic", models: [{ provider: "anthropic", model: "m-1" }] }
     ],
     reasoningFor: () => undefined,
-    resolvePolarModel: async (_user: string, choice: { model: string }) => {
+    resolvePolarModel: async (_user: string, choice: { model: string }, signals?: unknown) => {
         state.resolveCalls++;
+        state.signals.push(signals);
         if (state.resolved === "no_key") return "no_key";
         if (state.resolved === "unknown_model") return "unknown_model";
         if (state.resolved === "retired-then-ok" && choice.model === "retired")
@@ -186,6 +192,8 @@ beforeEach(() => {
     state.saved = [];
     state.titled = [];
     state.resolveCalls = 0;
+    state.ensured = [];
+    state.signals = [];
 });
 
 describe("who may talk to Polar", () => {
@@ -251,6 +259,23 @@ describe("what a request has to look like", () => {
         expect(answer.status).toBe(200);
         const text = await answer.text();
         expect(text).toContain('"fellBackFrom":"retired"');
+    });
+
+    it("keeps the thread's model for a command's turn, and stores it otherwise", async () => {
+        await (await post(body({ remember: false }))).text();
+        expect(state.ensured[0]?.[3]).toBeNull();
+        await (await post(body())).text();
+        expect(state.ensured[1]?.[3]).toMatchObject({ provider: "anthropic", model: "m-1" });
+    });
+
+    it("hands the model resolver what the turn carries, for Automatic", async () => {
+        await (await post(body())).text();
+        expect(state.signals[0]).toEqual({
+            files: 0,
+            tools: false,
+            contextChars: "Tidy my tasks".length,
+            lastChars: "Tidy my tasks".length
+        });
     });
 
     it("streams an answer and saves the turn", async () => {
