@@ -42,6 +42,7 @@ import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
 import { callDeviceId } from "./call-device";
 import * as actions from "./meeting-actions";
+import * as callRequests from "./call-requests";
 import { callServerUrl } from "./call-address";
 import { holdSeat, keepSeat, leaveSeat, type VoiceState } from "./call-seat";
 import { NEARBY_SLOTS, nearbyEnabled, scanNearby } from "./call-nearby";
@@ -816,26 +817,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
     const refresh = useCallback(() => {
         if (!meetingId) return;
-        void actions.readCallAction(meetingId).then((result) => {
-            // No seat. This browser is not in that call - it ended, the seat was
-            // swept, or another device took it over - and the honest thing is to
-            // let go rather than draw a sentence under a bar for a room nobody
-            // is in.
-            if (result.gone) {
-                setEnded(true);
-                return;
-            }
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setMeeting(result.meeting ?? null);
-            if (result.participantId) {
-                me.current = result.participantId;
-                setParticipantId(result.participantId);
-            }
-            if (result.meeting?.ended) setEnded(true);
-        });
+        void callRequests
+            .readCall(meetingId)
+            .then((result) => {
+                // No seat. This browser is not in that call - it ended, the seat was
+                // swept, or another device took it over - and the honest thing is to
+                // let go rather than draw a sentence under a bar for a room nobody
+                // is in.
+                if (result.gone) {
+                    setEnded(true);
+                    return;
+                }
+                if (result.error) {
+                    setError(result.error);
+                    return;
+                }
+                setMeeting(result.meeting ?? null);
+                if (result.participantId) {
+                    me.current = result.participantId;
+                    setParticipantId(result.participantId);
+                }
+                if (result.meeting?.ended) setEnded(true);
+            })
+            // Not answered this time: what is on screen stays, and the next
+            // roster change asks again.
+            .catch(() => undefined);
     }, [meetingId]);
 
     /**
@@ -1544,8 +1550,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // which that tab reports as having lost the call server: a call that
             // connects, publishes, and is then thrown out of itself.
             connecting = true;
-            const ticket = await actions
-                .callTokenAction(inCall)
+            const ticket = await callRequests
+                .callTicket(inCall)
                 .catch(() => ({ error: t("errors.callUnreachable") }) as CallTicket);
             // Released on every path that gives up before there is a room to guard
             // the attempt instead. `waiting` in particular: somebody in the lobby is
@@ -1957,8 +1963,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
         async function start(): Promise<void> {
             const [filter, seatVoice] = await Promise.all([
-                actions.licensedFilterAction(inCall).catch(() => null),
-                actions.ownVoiceAction(inCall).catch(() => null)
+                callRequests.licensedFilter(inCall).catch(() => null),
+                callRequests.ownVoice(inCall).catch(() => null)
             ]);
             licensed.current = filter;
             setLicensedFilter(licensed.current !== null);
@@ -2056,7 +2062,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // on hearing it - one seat, one device, and the newest press
                     // is the one that meant it.
                     if (frame.data.admission === "admitted") {
-                        void actions.claimCallAction(inCall, callDeviceId());
+                        void callRequests.claimCall(inCall, callDeviceId()).catch(() => undefined);
                     }
                     return;
                 }

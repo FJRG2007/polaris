@@ -29,6 +29,25 @@ export async function readPoll<T>(
 }
 
 /**
+ * A press sent to an `actionRoute`, answered the way the server action it
+ * replaces answered. Rejects like `readPoll` does, so `runAction` and every
+ * existing `.catch` keep working unchanged.
+ */
+export async function sendAction<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+    const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+        signal
+    });
+    if (!response.ok) throw new Error(`${path} answered ${response.status}`);
+    const parsed = answerSchema.safeParse(await response.json());
+    if (!parsed.success) throw new Error(`${path} answered something unreadable`);
+    return fromWire(parsed.data.value) as T;
+}
+
+/**
  * A signal that aborts when the component unmounts, read at the moment of each
  * ask so a remount (Strict Mode's included) gets a fresh one.
  */

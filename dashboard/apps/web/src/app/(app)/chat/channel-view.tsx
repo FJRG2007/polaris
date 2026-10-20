@@ -31,6 +31,7 @@ import { SidePane } from "./side-pane";
 import { threadRootFor } from "./links";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
+import * as callRequests from "./call-requests";
 import { channelDraftKey } from "./drafts";
 import { posterFor } from "./video-poster";
 import { ThreadPanel } from "./thread-panel";
@@ -844,7 +845,7 @@ export function ChannelView({
         if (!answering || answered.current === answering) return;
         answered.current = answering;
         router.replace(`/chat/c/${channelId}`, { scroll: false });
-        void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
+        void runAction(() => callRequests.startCall(channelId), setError).then((result) => {
             if (result?.error) setError(result.error);
             if (result?.meetingId) {
                 enter(
@@ -1188,7 +1189,7 @@ export function ChannelView({
         if (channel.kind !== "voice" || callsOff || session) return;
 
         setJoining(true);
-        void runAction(() => calls.startCallAction(channelId), setError).then((result) => {
+        void runAction(() => callRequests.startCall(channelId), setError).then((result) => {
             setJoining(false);
             if (!result) return;
             // Said, not swallowed: a full voice room or a person who takes no calls
@@ -2278,7 +2279,7 @@ export function ChannelView({
         // says what went wrong and one that appears to do nothing: an action
         // that throws rather than returning an error would otherwise reject into
         // nowhere, and pressing Join would be silence.
-        const result = await runAction(() => calls.startCallAction(channelId), setError);
+        const result = await runAction(() => callRequests.startCall(channelId), setError);
         if (!result) return;
         // Said, not swallowed: a full voice room or a person who takes no calls
         // is a refusal the reader has to be able to read.
@@ -2390,8 +2391,11 @@ export function ChannelView({
                                 });
                                 if (!sure) return;
                             }
-                            void runAction(() => calls.startCallAction(channelId), setError).then(
+                            // Said while it happens, so the button is not pressed twice.
+                            setJoining(true);
+                            void runAction(() => callRequests.startCall(channelId), setError).then(
                                 (result) => {
+                                    setJoining(false);
                                     if (!result) return;
                                     // Said, not swallowed: a full voice room or a person who takes no calls
                                     // is a refusal the reader has to be able to read.

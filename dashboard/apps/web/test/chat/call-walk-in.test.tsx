@@ -17,12 +17,14 @@
  */
 
 import { MessagesWrapper } from "../setup/i18n";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let session: { channelId: string; meetingId: string } | null = null;
 let started: string[] = [];
+/** The next start fails the way a request that never got an answer does. */
+let failStart = false;
 let params = new URLSearchParams();
 let replaced: string[] = [];
 
@@ -54,6 +56,7 @@ vi.mock("@/app/(app)/chat/meeting-actions", () => ({
     liveCallAction: async () => null,
     startCallAction: async (channelId: string) => {
         started.push(channelId);
+        if (failStart) throw new Error("no answer");
         return { meetingId: `meeting-${channelId}` };
     }
 }));
@@ -137,6 +140,7 @@ vi.mock("@/app/(app)/chat/members-panel", () => ({
 beforeEach(() => {
     session = null;
     started = [];
+    failStart = false;
     replaced = [];
     params = new URLSearchParams("join=1");
     entered.length = 0;
@@ -166,6 +170,26 @@ describe("pressing a voice channel", () => {
         render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
 
         await vi.waitFor(() => expect(replaced).toEqual(["/chat/c/c1"]));
+    });
+
+    it("gives the Join button back when the way in fails, instead of Going in for good", async () => {
+        failStart = true;
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        render(<ChannelView channelId="c1" />, { wrapper: MessagesWrapper });
+
+        await vi.waitFor(() => expect(started).toEqual(["c1"]));
+        await vi.waitFor(() => expect(screen.queryByText("Going in")).toBeNull());
+        expect(screen.getAllByRole("button", { name: /^Join$/ }).length).toBeGreaterThan(0);
+        expect(entered).toEqual([]);
+
+        // And the button works: pressed, it is said while it happens and then walks in.
+        failStart = false;
+        fireEvent.click(screen.getAllByRole("button", { name: /^Join$/ })[0]!);
+        await vi.waitFor(() =>
+            expect(entered).toEqual([
+                [{ meetingId: "meeting-c1", channelId: "c1", title: "General voice" }, false]
+            ])
+        );
     });
 
     it("does not touch a call already held somewhere else", async () => {

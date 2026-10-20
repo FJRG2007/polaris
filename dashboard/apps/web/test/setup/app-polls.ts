@@ -141,3 +141,17 @@ vi.mock("@/app/m/[token]/guest-polls", () => ({
 vi.mock("@/app/oauth/recover/recover-polls", () => ({
     recoveryStatus: forward(() => import("@/app/oauth/recover/actions"), "recoveryStatusAction", 1)
 }));
+
+vi.mock("@/app/(app)/chat/call-requests", () => {
+    const calls = () => import("@/app/(app)/chat/meeting-actions");
+    return {
+        startCall: forward(calls, "startCallAction", 1),
+        joinCall: forward(calls, "joinCallAction", 1),
+        joinMeeting: forward(calls, "joinMeetingAction", 1),
+        callTicket: forward(calls, "callTokenAction", 1),
+        readCall: forward(calls, "readCallAction", 1),
+        ownVoice: forward(calls, "ownVoiceAction", 1),
+        licensedFilter: forward(calls, "licensedFilterAction", 1),
+        claimCall: forward(calls, "claimCallAction", 2)
+    };
+});

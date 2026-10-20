@@ -28,7 +28,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // The shape from the module that defines it: a "use server" file exports only
 // the actions themselves.
 import type { CallElsewhere as Found } from "@/lib/chat/meetings";
-import { joinCallAction } from "./meeting-actions";
+import { joinCall } from "./call-requests";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
 
 /**
@@ -143,7 +143,7 @@ export function CallElsewhere() {
     const move = async () => {
         setMoving(true);
         setFailed("");
-        const result = await joinCallAction(found.meetingId).catch(() => ({
+        const result = await joinCall(found.meetingId).catch(() => ({
             error: t("elsewhere.thatCallCouldNotBe")
         }));
         setMoving(false);
