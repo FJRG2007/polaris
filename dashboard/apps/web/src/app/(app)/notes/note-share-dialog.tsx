@@ -29,6 +29,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Switch
 } from "@polaris/ui";
 
@@ -91,6 +92,30 @@ export function NoteShareDialog({
             alive = false;
         };
     }, [open, noteId]);
+
+    // The link as it is already published: a new password is the one thing that
+    // cannot be read back, so typing one is always a change.
+    const unchanged =
+        share !== null &&
+        !password &&
+        !isDirty(
+            {
+                includeChildren: share.includeChildren,
+                maxViews: share.maxViews,
+                expires: asDateField(share.expiresAt),
+                allowedCidrs: share.allowedCidrs,
+                allowedCountries: share.allowedCountries,
+                allowedContinents: share.allowedContinents
+            },
+            {
+                includeChildren,
+                maxViews,
+                expires,
+                allowedCidrs: rules.allowedCidrs,
+                allowedCountries: rules.allowedCountries,
+                allowedContinents: rules.allowedContinents
+            }
+        );
 
     async function save(): Promise<void> {
         setBusy(true);
@@ -227,7 +252,7 @@ export function NoteShareDialog({
                                 <Button variant="ghost" disabled={busy} onClick={() => void unpublish()}>
                                     {t("share.stop")}
                                 </Button>
-                                <Button disabled={busy} onClick={() => void save()}>
+                                <Button disabled={busy || unchanged} onClick={() => void save()}>
                                     {t("share.save")}
                                 </Button>
                             </div>
