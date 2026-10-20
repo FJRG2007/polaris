@@ -15,12 +15,13 @@
  * Server-only.
  */
 
-import { tool, type FlexibleSchema, type ToolSet } from "ai";
+import { tool, type ToolSet } from "ai";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { MCP_SCOPES, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
 import { McpRefusal, callerMayUse, type McpCaller, type McpTool } from "@/lib/mcp/protocol";
 import { callTarget, grantCovers, grantKeys } from "@/lib/polar/tool-grants";
+import { polarInputSchema } from "@/lib/polar/tool-input";
 
 /** The scopes this person holds, worked out once per request. */
 export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
@@ -77,16 +78,24 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
         const writes = needsApproval(entry);
         result.tools[entry.name] = tool({
             description: entry.description,
-            inputSchema: entry.input as unknown as FlexibleSchema<unknown>,
-            async execute(input: unknown) {
+            inputSchema: polarInputSchema(entry.input),
+            async execute(written: unknown) {
                 // Checked again at the moment it runs: an approval can sit for a
                 // while, and a permission removed in between must hold.
                 const fresh = { ...caller, scopes: await sessionScopes(user) };
                 if (!callerMayUse(entry, fresh)) {
                     return { ok: false, text: `You no longer have access to ${entry.name}.` };
                 }
+                // Checked as the model wrote it, parsed here: see `tool-input.ts`.
+                const parsed = entry.input.safeParse(written);
+                if (!parsed.success) {
+                    return {
+                        ok: false,
+                        text: `${entry.name} was called with input it does not take.`
+                    };
+                }
                 try {
-                    const answer = await entry.run(input as never, fresh);
+                    const answer = await entry.run(parsed.data as never, fresh);
                     return { ok: true, text: answer.text, data: answer.structured ?? null };
                 } catch (error) {
                     return { ok: false, text: failure(entry, error) };
