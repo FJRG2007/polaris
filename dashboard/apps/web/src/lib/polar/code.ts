@@ -1,7 +1,6 @@
-"use server";
-
 /**
- * Polar's Code side: the person's agent sessions, read for the sidebar.
+ * Polar's Code side: the person's agent sessions, read for the sidebar, and
+ * the start and reply that go with them. Asked through `/api/polar/code/*`.
  *
  * Code work in Polar is an Agents session - the harness, the repository, the
  * branch - and never an answer from the chat model. So everything here is the
@@ -16,9 +15,15 @@
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { requireUser, userHasManage } from "@/lib/session";
+import { userHasManage, type SessionUser } from "@/lib/session";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
-import { listSessionsAction, sessionDetailAction } from "@/app/(app)/apps/agents/sessions/actions";
+import {
+    listSessionsAction,
+    promptSessionAction,
+    sessionChoicesAction,
+    sessionDetailAction,
+    startSessionAction
+} from "@/app/(app)/apps/agents/sessions/actions";
 
 /** What this account may do on the Code side: nothing, read sessions, or start them. */
 export type PolarCodeAccess = "none" | "read" | "manage";
@@ -64,8 +69,7 @@ const LISTED = 50;
  *  the rest. */
 const EVENTS_SHOWN = 80;
 
-async function accessOf(): Promise<PolarCodeAccess> {
-    const user = await requireUser();
+async function accessOf(user: SessionUser): Promise<PolarCodeAccess> {
     if (await userHasManage(user, "agents.manage")) return "manage";
     if (await userHasManage(user, "agents.read")) return "read";
     return "none";
@@ -96,16 +100,19 @@ function rowOf(
 }
 
 /** Whether Code is open to this account, and its sessions when it is. */
-export async function polarCodeAction(): Promise<PolarCodeOverview> {
-    const access = await accessOf();
+export async function polarCodeOverview(user: SessionUser): Promise<PolarCodeOverview> {
+    const access = await accessOf(user);
     if (access === "none") return { access, sessions: [] };
     const [list, t] = await Promise.all([listSessionsAction(), getTranslations("agents")]);
     return { access, sessions: list.slice(0, LISTED).map((session) => rowOf(t, session)) };
 }
 
 /** One session as the thread shows it, or null when it is not this account's. */
-export async function polarCodeThreadAction(sessionId: string): Promise<PolarCodeThread | null> {
-    if ((await accessOf()) === "none") return null;
+export async function polarCodeThread(
+    user: SessionUser,
+    sessionId: string
+): Promise<PolarCodeThread | null> {
+    if ((await accessOf(user)) === "none") return null;
     const [detail, t] = await Promise.all([sessionDetailAction(sessionId), getTranslations("agents")]);
     if (!detail) return null;
     const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
@@ -133,4 +140,29 @@ export async function polarCodeThreadAction(sessionId: string): Promise<PolarCod
         entries,
         error: detail.session.error ? agentText(t, detail.session.error) : null
     };
+}
+
+export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>>;
+
+/** What the composer offers - repositories and agents - or null for somebody
+ *  who cannot start a session. */
+export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoices | null> {
+    return (await accessOf(user)) === "manage" ? sessionChoicesAction() : null;
+}
+
+/** Start a session: the Agents app's own start, with its own validation. */
+export async function polarCodeStart(
+    user: SessionUser,
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return startSessionAction(input);
+}
+
+/** Say the next thing to a running session, through the Agents app's own reply. */
+export async function polarCodePrompt(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return promptSessionAction(input);
 }

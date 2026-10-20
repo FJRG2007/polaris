@@ -25,13 +25,14 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MessageAction } from "@/components/polar/elements/message";
 import { Button, cn, Input, SegmentedControl, Select, Textarea } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import type { PolarCodeOverview, PolarCodeRow, PolarCodeThread } from "@/app/(app)/polar/code-actions";
+import { fromWire } from "@/lib/app-bundles/wire";
+import type {
+    PolarCodeChoices,
+    PolarCodeOverview,
+    PolarCodeRow,
+    PolarCodeThread
+} from "@/lib/polar/code";
 import { ArrowLeft, ArrowUp, Code2, ExternalLink, MessageSquare, Plus, TriangleAlert } from "lucide-react";
-import {
-    promptSessionAction,
-    sessionChoicesAction,
-    startSessionAction
-} from "@/app/(app)/apps/agents/sessions/actions";
 
 export type PolarMode = "chat" | "code";
 
@@ -62,6 +63,19 @@ function writeStored(storage: () => Storage, key: string, value: string): void {
         // A private window or blocked storage: the switch still works, it is only
         // not remembered.
     }
+}
+
+/** A change sent to one of the `/api/polar/code` routes; rejects when it was
+ *  not answered, the way `runAction` expects. */
+async function postCode<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+    });
+    if (!response.ok) throw new Error(`${path} answered ${response.status}`);
+    const answer = (await response.json()) as { value?: unknown };
+    return fromWire(answer.value) as T;
 }
 
 /** A title for a session started from a prompt: its first line, cut to fit. */
@@ -292,7 +306,7 @@ function StateDot({ state }: { state: PolarCodeRow["state"] }) {
     return <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", DOT[state])} />;
 }
 
-type Choices = Awaited<ReturnType<typeof sessionChoicesAction>>;
+type Choices = PolarCodeChoices;
 
 /** A new task: what to do, and where - repository, branch and agent. */
 function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: string) => void }) {
@@ -307,7 +321,7 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
 
     useEffect(() => {
         if (!canStart) return;
-        void runAction(() => sessionChoicesAction(), setError).then((loaded) => {
+        void runAction(() => readPoll<Choices | null>("/api/polar/code/choices", {}), setError).then((loaded) => {
             if (!loaded) return;
             setChoices(loaded);
             setRepoId((current) => current || (loaded.repos[0]?.id ?? NO_REPO));
@@ -328,7 +342,7 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
         startTransition(() => {
             void runAction(
                 () =>
-                    startSessionAction({
+                    postCode<{ id?: string; error?: string }>("/api/polar/code/start", {
                         repoId: workspace ? null : repoId,
                         title: titleFromPrompt(text),
                         cli: agent.cli,
@@ -505,7 +519,10 @@ function CodeThread({
         if (!text || busy) return;
         setError(null);
         startTransition(() => {
-            void runAction(() => promptSessionAction({ sessionId, text }), setError).then((result) => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/prompt", { sessionId, text }),
+                setError
+            ).then((result) => {
                 if (!result) return;
                 if (result.error) setError(result.error);
                 else setReply("");
