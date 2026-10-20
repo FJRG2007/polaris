@@ -27,6 +27,7 @@ function option(provider: string, model: string, extra: Partial<PolarModelOption
         reasoning: false,
         attachment: false,
         contextTokens: 0,
+        providerContextTokens: null,
         costInput: null,
         releaseDate: null,
         ...extra

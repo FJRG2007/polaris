@@ -31,28 +31,66 @@ import type { LimitPeriod, LimitSubject } from "@polaris/core";
 export interface AnswerUsage {
     inputTokens: number;
     outputTokens: number;
+    /** Input read from the provider's prompt cache, when it reports it. */
+    cachedTokens?: number;
+    /** Output spent thinking, when the provider reports it. */
+    reasoningTokens?: number;
+    /** What the turn's last step read and wrote: the conversation as the
+     *  next turn will send it, for the context bar. */
+    contextTokens?: number;
     /** Estimated from the catalogue's prices; null when it has none. */
     costUsd: number | null;
 }
 
 const PER_MILLION = 1_000_000;
 
-/** The tokens and estimated cost of a turn on this model. */
+/** A count the provider reported, or undefined when it did not. */
+function reported(value: number | undefined): number | undefined {
+    return typeof value === "number" && Number.isFinite(value)
+        ? Math.max(0, Math.round(value))
+        : undefined;
+}
+
+/**
+ * The tokens and estimated cost of a turn on this model. The cached and
+ * reasoning counts are the AI SDK's `inputTokenDetails.cacheReadTokens` and
+ * `outputTokenDetails.reasoningTokens` (ai-sdk.dev/docs/reference/ai-sdk-core/stream-text,
+ * `LanguageModelUsage`), kept only when the provider filled them in.
+ */
 export function answerUsage(
-    usage: Pick<LanguageModelUsage, "inputTokens" | "outputTokens"> | undefined,
+    usage:
+        | (Pick<LanguageModelUsage, "inputTokens" | "outputTokens"> & {
+              inputTokenDetails?: Partial<LanguageModelUsage["inputTokenDetails"]>;
+              outputTokenDetails?: Partial<LanguageModelUsage["outputTokenDetails"]>;
+          })
+        | undefined,
     option: Pick<PolarModelOption, "costInput" | "costOutput">
 ): AnswerUsage {
     const inputTokens = Math.max(0, Math.round(usage?.inputTokens ?? 0));
     const outputTokens = Math.max(0, Math.round(usage?.outputTokens ?? 0));
+    const cachedTokens = reported(usage?.inputTokenDetails?.cacheReadTokens);
+    const reasoningTokens = reported(usage?.outputTokenDetails?.reasoningTokens);
     const { costInput, costOutput } = option;
     return {
         inputTokens,
         outputTokens,
+        ...(cachedTokens !== undefined ? { cachedTokens } : {}),
+        ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
         costUsd:
             typeof costInput === "number" && typeof costOutput === "number"
                 ? (inputTokens * costInput + outputTokens * costOutput) / PER_MILLION
                 : null
     };
+}
+
+/** The context a turn ends with, from its last step's counts, or nothing
+ *  when the provider reported none. */
+export function stepContext(
+    step: { inputTokens?: number | undefined; outputTokens?: number | undefined } | undefined
+): { contextTokens: number } | Record<string, never> {
+    const input = reported(step?.inputTokens);
+    if (input === undefined) return {};
+    return { contextTokens: input + (reported(step?.outputTokens) ?? 0) };
 }
 
 export async function recordPolarUsage(input: {
@@ -137,6 +175,37 @@ export async function polarMonthUsage(userId: string, now = new Date()): Promise
         }))
         .sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
     return { from: from.toISOString(), models };
+}
+
+/** What one chat has spent, every answer and compaction in it. */
+export interface ThreadUsage {
+    answers: number;
+    inputTokens: number;
+    outputTokens: number;
+    /** The priced answers' cost; `unpriced` counts the answers left out. */
+    costUsd: number;
+    unpriced: number;
+}
+
+/** This person's spend in one of their chats. Owner-scoped: another person's
+ *  chat sums to nothing. */
+export async function polarThreadUsage(userId: string, threadId: string): Promise<ThreadUsage> {
+    const where = { userId, threadId };
+    const [totals, unpriced] = await Promise.all([
+        prisma.polarUsage.aggregate({
+            where,
+            _count: { _all: true },
+            _sum: { inputTokens: true, outputTokens: true, costUsd: true }
+        }),
+        prisma.polarUsage.count({ where: { ...where, costUsd: null } })
+    ]);
+    return {
+        answers: totals._count._all,
+        inputTokens: totals._sum.inputTokens ?? 0,
+        outputTokens: totals._sum.outputTokens ?? 0,
+        costUsd: totals._sum.costUsd ?? 0,
+        unpriced
+    };
 }
 
 export interface SharedKeySpender {

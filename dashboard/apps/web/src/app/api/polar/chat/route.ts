@@ -38,8 +38,9 @@ import {
     polarMemoryTools
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
+import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
 import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
-import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
+import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -185,9 +186,12 @@ export async function POST(request: Request): Promise<Response> {
     // A file the model cannot read is sent as its text; one with no text to
     // take out stops the turn with its name instead of being dropped unseen.
     const unreadable: string[] = [];
+    // After a compaction marker the model reads its summary and what follows
+    // it, never the history it replaced (`compaction.ts`).
+    const compacted = splitAtCompaction(messages);
     const sendable = await inlinePolarFiles(
         user.id,
-        withoutPastProviderSearches(messages),
+        withoutPastProviderSearches(compacted.messages),
         resolved.option,
         unreadable
     );
@@ -200,15 +204,23 @@ export async function POST(request: Request): Promise<Response> {
 
     const startedAt = Date.now();
     let spent: ReturnType<typeof answerUsage> | undefined;
+    // The newest step's own counts: what the conversation measures now, for
+    // the context bar. `totalUsage` sums every step and overstates it.
+    let lastStep: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined;
     const result = streamText({
         model: resolved.model,
-        system: polarSystemPrompt(
-            user.name,
-            fencePageContext(body.data.context),
-            instructions,
-            memories,
-            web
-        ),
+        system: [
+            polarSystemPrompt(
+                user.name,
+                fencePageContext(body.data.context),
+                instructions,
+                memories,
+                web
+            ),
+            fenceSummary(compacted.summary)
+        ]
+            .filter(Boolean)
+            .join("\n\n"),
         messages: await convertToModelMessages(sendable),
         tools,
         toolApproval: {
@@ -230,8 +242,9 @@ export async function POST(request: Request): Promise<Response> {
         sendReasoning: true,
         // A provider's own search reports what it read as sources.
         sendSources: true,
-        messageMetadata: ({ part }) =>
-            part.type === "start"
+        messageMetadata: ({ part }) => {
+            if (part.type === "finish-step") lastStep = part.usage;
+            return part.type === "start"
                 ? {
                       model: resolved.option.name,
                       provider: resolved.option.providerName,
@@ -244,9 +257,13 @@ export async function POST(request: Request): Promise<Response> {
                     // into, and what it spent, for the line under the answer.
                     {
                         workedMs: Date.now() - startedAt,
-                        usage: (spent = answerUsage(part.totalUsage, resolved.option))
+                        usage: (spent = {
+                            ...answerUsage(part.totalUsage, resolved.option),
+                            ...stepContext(lastStep)
+                        })
                     }
-                  : undefined,
+                  : undefined;
+        },
         onFinish: async ({ messages: finished, responseMessage }) => {
             try {
                 await savePolarMessages(user.id, body.data.threadId, finished, (index) =>

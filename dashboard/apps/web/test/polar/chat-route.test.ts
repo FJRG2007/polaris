@@ -50,6 +50,7 @@ vi.mock("@/lib/polar/usage", () => ({
         outputTokens: usage?.outputTokens ?? 0,
         costUsd: null
     }),
+    stepContext: () => ({}),
     polarLimitReached: async () => state.hit,
     recordPolarUsage: async (entry: unknown) => void state.recorded.push(entry)
 }));

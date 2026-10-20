@@ -165,7 +165,11 @@ jobs:
           key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
       - if: steps.packages.outputs.cache-hit != 'true'
         run: npm run build:packages
+      # The web app's tsc holds about as much as the build does and sits right at
+      # Node's ~4 GB default heap, so it gets the same room the build step has.
       - run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
       - run: npm run lint --if-present
       # Every workspace's tests but the web app's, which the shards below run.
       - name: Test the packages and the other apps

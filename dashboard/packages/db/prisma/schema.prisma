@@ -15088,11 +15088,18 @@ model PolarMemory {
 // Polar's per-person settings. No row reads as the defaults, so nobody needs
 // one written for them.
 model PolarPreference {
-    userId    String   @id @db.Uuid
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId         String   @id @db.Uuid
+    user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     // Whether Polar reads and writes memories at all. Off keeps what is saved.
-    memory    Boolean  @default(true)
-    updatedAt DateTime @updatedAt
+    memory         Boolean  @default(true)
+    // What a chat shows: tokens and estimated cost under each answer, the
+    // context bar above the composer, and whether a turn that would fill the
+    // model's window compacts the chat first.
+    showTokens     Boolean  @default(true)
+    showCost       Boolean  @default(true)
+    showContextBar Boolean  @default(true)
+    autoCompact    Boolean  @default(true)
+    updatedAt      DateTime @updatedAt
 }
 
 // A "/" command somebody wrote for themselves: typing /shortcut sends the
@@ -15192,6 +15199,7 @@ model PolarUsage {
 
     @@index([userId, createdAt])
     @@index([payer, createdAt])
+    @@index([threadId])
 }
 
 // A picture or file somebody gave Polar. The bytes live on the storage chat

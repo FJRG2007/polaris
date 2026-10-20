@@ -144,7 +144,24 @@
         "tools": "See what Polar can do here",
         "call": "Talk to Polar out loud",
         "later": "Coming in a later update",
-        "toolsPrompt": "What can you do for me on this page? List the tools you have, briefly."
+        "toolsPrompt": "What can you do for me on this page? List the tools you have, briefly.",
+        "groups": {
+            "polar": "Polar",
+            "control": "This chat",
+            "own": "Yours"
+        },
+        "control": {
+            "clear": "Start over; this chat stays in your history",
+            "compact": "Summarize the chat so far to free up room",
+            "context": "See how full this chat's context is",
+            "usage": "Tokens and cost of this chat",
+            "rename": "Rename this chat",
+            "export": "Download this chat as Markdown",
+            "branch": "Continue from here in a new chat",
+            "temp": "Start a temporary chat, or leave one",
+            "memory": "Open what Polar remembers",
+            "help": "Show every command"
+        }
     },
     "context": {
         "title": "Polar sees this page",
@@ -302,7 +319,7 @@
     "settings": {
         "open": "Polar settings",
         "title": "Polar settings",
-        "intro": "What Polar remembers and what you keep from your chats.",
+        "intro": "What Polar remembers, what your chats show, and what you keep.",
         "memory": {
             "title": "Memory",
             "intro": "Facts Polar keeps in mind across chats. Ask it to remember or forget something, or edit them here.",
@@ -331,6 +348,16 @@
             "title": "Your chats",
             "intro": "Download every saved chat as Markdown and JSON in one zip.",
             "exportAll": "Export all chats"
+        },
+        "display": {
+            "title": "Chat display",
+            "intro": "What your chats show, and when they compact.",
+            "showTokens": "Tokens under answers",
+            "showCost": "Estimated cost",
+            "showContextBar": "Context usage bar",
+            "autoCompact": "Compact automatically",
+            "autoCompactHint": "Near the model's limit, older messages are summarized before sending.",
+            "failed": "Couldn't save that setting. Try again."
         }
     },
     "temporary": {
@@ -413,7 +440,11 @@
             "day": "day",
             "week": "week",
             "month": "30 days"
-        }
+        },
+        "breakdownInput": "Input: {count}",
+        "breakdownCached": "Cached input: {count}",
+        "breakdownOutput": "Output: {count}",
+        "breakdownReasoning": "Reasoning: {count}"
     },
     "sharing": {
         "notice": "{name} shared a Polar chat with you",
@@ -502,5 +533,42 @@
         "reading": "Reading {site}",
         "sources": "Sources",
         "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
+    },
+    "control": {
+        "busy": "Wait for the answer to finish first.",
+        "empty": "Send a message first.",
+        "temporary": "Temporary chats can't do that.",
+        "renameHow": "Type the new name after /rename.",
+        "renamed": "Chat renamed.",
+        "renameFailed": "Couldn't rename the chat. Try again."
+    },
+    "compact": {
+        "divider": "Conversation compacted",
+        "dividerAuto": "Compacted automatically",
+        "working": "Compacting the conversation...",
+        "failed": "Couldn't compact the chat. Try again.",
+        "nothing": "Nothing new to compact yet.",
+        "now": "Compact now"
+    },
+    "contextUsage": {
+        "title": "Context",
+        "used": "{used} of {window} tokens ({share}%)",
+        "unknown": "About {used} tokens. This model's limit isn't known.",
+        "month": "Usage this month",
+        "levels": {
+            "ok": "Plenty of room left.",
+            "warn": "Getting full. Compact soon to keep going.",
+            "over": "Doesn't fit this model. Compact or pick a bigger one."
+        },
+        "chat": "This chat",
+        "chatTotal": "{tokens} tokens in {answers, plural, one {# answer} other {# answers}}",
+        "chatEmpty": "Nothing used in this chat yet.",
+        "chatFailed": "This chat's usage couldn't be loaded."
+    },
+    "contextBar": {
+        "label": "Context used",
+        "detail": "{used} of {window} tokens ({share}%), {draft} of them in your message",
+        "short": "{share}% of context",
+        "over": "This chat no longer fits this model. Compact it before sending."
     }
 }

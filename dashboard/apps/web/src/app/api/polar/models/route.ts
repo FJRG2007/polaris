@@ -18,7 +18,7 @@ export async function GET(): Promise<Response> {
     if (user instanceof NextResponse) return user;
     const access = await polarAccessFor(user.id);
     const [providers, toolset, voice] = await Promise.all([
-        polarModelOptions(user.id, access),
+        polarModelOptions(user.id, access, { waitForWindows: true }),
         polarTools(user),
         polarVoiceAvailability(user.id, access)
     ]);

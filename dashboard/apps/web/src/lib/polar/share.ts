@@ -25,6 +25,7 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { blockedBetween } from "@/lib/blocks";
 import { translatorFor } from "@/lib/i18n/translate";
 import { discoverableBy } from "@/lib/privacy-service";
+import { compactionOf } from "@/lib/polar/compaction";
 import { polarAttachmentId } from "@/lib/polar/shared";
 import type {
     OwnedPolarShare,
@@ -227,7 +228,7 @@ async function snapshotOf(share: {
 }): Promise<SharedPolarThread> {
     const rows = await prisma.polarMessage.findMany({
         where: { threadId: share.threadId, createdAt: { lte: share.sharedAt } },
-        select: { id: true, parentId: true, role: true, parts: true },
+        select: { id: true, parentId: true, role: true, parts: true, metadata: true },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         take: SHARED_MOST
     });
@@ -236,6 +237,7 @@ async function snapshotOf(share: {
         sharedAt: share.sharedAt.toISOString(),
         messages: newestPath(rows)
             .filter((row) => row.role === "user" || row.role === "assistant")
+            .filter((row) => !compactionOf(row))
             .map((row) => ({
                 id: row.id,
                 role: row.role as "user" | "assistant",

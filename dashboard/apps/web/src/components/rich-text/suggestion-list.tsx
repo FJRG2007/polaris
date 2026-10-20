@@ -20,6 +20,8 @@ export interface SuggestionListItem {
     readonly detail?: string;
     readonly icon: ComponentType<{ className?: string }>;
     readonly disabled?: boolean;
+    /** A heading shown above the first row of a run of rows that share it. */
+    readonly group?: string;
 }
 
 /** The id of one row, for the field's `aria-activedescendant`. */
@@ -68,6 +70,14 @@ export function SuggestionList({
         <ul id={id} role="listbox" aria-label={label} className={cn(POPUP_CLASS, className)}>
             {items.map((item, index) => (
                 <li key={item.key} role="presentation">
+                    {item.group && item.group !== items[index - 1]?.group ? (
+                        <p
+                            aria-hidden
+                            className="px-2 pb-0.5 pt-1.5 text-[11px] font-medium uppercase tracking-wide text-foreground-subtle"
+                        >
+                            {item.group}
+                        </p>
+                    ) : null}
                     <button
                         type="button"
                         id={suggestionOptionId(id, index)}

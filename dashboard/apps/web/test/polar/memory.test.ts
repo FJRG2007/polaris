@@ -26,15 +26,14 @@ vi.mock("@/lib/polar/access", async () =>
 );
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@polaris/db", () => {
-    const record = (op: string) => async (args: unknown) => {
-        state.calls.push({ op, args });
-        return undefined;
-    };
     return {
         prisma: {
             polarPreference: {
                 findUnique: async () => state.preference,
-                upsert: record("upsert")
+                upsert: async (args: { update: Record<string, boolean> }) => {
+                    state.calls.push({ op: "upsert", args });
+                    return { memory: true, ...args.update };
+                }
             },
             polarMemory: {
                 findMany: async (args: unknown) => {
@@ -206,7 +205,7 @@ describe("routes", () => {
 
     it("turns memory off", async () => {
         const response = await preferences.PATCH(json("http://x", "PATCH", { memory: false }));
-        expect(await response.json()).toEqual({ memory: false });
+        expect(await response.json()).toMatchObject({ memory: false, showTokens: true });
         expect(state.calls.find((call) => call.op === "upsert")?.args).toMatchObject({
             where: { userId: "u1" }
         });
