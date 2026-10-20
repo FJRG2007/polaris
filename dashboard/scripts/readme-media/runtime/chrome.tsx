@@ -46,7 +46,10 @@ import {
 } from "@polaris/ui";
 import { shelfKey } from "@/lib/shelf";
 import { ORG, VIEWER } from "../fixtures/people";
+import { scenePath } from "./route";
+import { drawsPlainly } from "../plain-routes.mjs";
 import { shellUnread } from "../fixtures/chrome";
+import { PlainNames } from "@/components/person-name";
 
 /** Every app a full install shows its administrator. */
 export const APP_IDS = [
@@ -204,7 +207,8 @@ function Frame({ children }: { children: ReactNode }) {
                 {/* As the app layout does: an installable app's screens find the
                     dashboard's pieces through it. */}
                 <ProvideAppHostUi />
-                {children}
+                {/* As the route's own layout does under /admin and /tasks. */}
+                {drawsPlainly(scenePath.current()) ? <PlainNames>{children}</PlainNames> : children}
             </AppShell>
         </>
     );

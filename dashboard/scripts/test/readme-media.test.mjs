@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { bundle } from "../readme-media/bundle.mjs";
+import { PLAIN_ROUTES, drawsPlainly } from "../readme-media/plain-routes.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import {
@@ -152,6 +153,24 @@ test("each scene is drawn at the route its screen lives at", () => {
             );
         }
     }
+});
+
+test("the frame draws people plainly exactly where the app's layouts do", () => {
+    const app = join(dashboard, "apps", "web", "src", "app");
+    const plain = readdirSync(app, { recursive: true })
+        .map(String)
+        .filter((file) => /(^|[\\/])layout\.tsx$/.test(file))
+        .filter((file) => /<PlainNames>/.test(readFileSync(join(app, file), "utf8")))
+        .map((file) => {
+            // Route groups like `(app)` are not part of the URL.
+            const segments = file.split(/[\\/]/).slice(0, -1);
+            return `/${segments.filter((segment) => !/^\(.*\)$/.test(segment)).join("/")}`;
+        })
+        .sort();
+    assert.deepEqual(plain, [...PLAIN_ROUTES].sort());
+    assert.ok(drawsPlainly("/admin/users"));
+    assert.ok(!drawsPlainly("/administrator"));
+    assert.ok(!drawsPlainly("/chat"));
 });
 
 test("every action, route and stream answers in every language and theme", async () => {
