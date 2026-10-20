@@ -10,11 +10,21 @@
  * (Drive paths are served under `/proxy/drive` through UniFi OS).
  */
 
-import { Agent, fetch } from "undici";
+import { fetch } from "undici";
+import { createHash } from "node:crypto";
 
-import type { UnasMetrics, UnasTarget } from "@/lib/unifi-unas";
+import {
+    insecure,
+    signIn,
+    type ConsoleSession,
+    type UnasMetrics,
+    type UnasTarget
+} from "@/lib/unifi-unas";
 
-const insecure = new Agent({ connect: { rejectUnauthorized: false } });
+/** How long one console request may take before it is given up on. */
+const REQUEST_TIMEOUT_MS = 15_000;
+/** Accounts whose sessions are kept; past this the oldest is dropped. */
+const MAX_SESSIONS = 32;
 
 export const FAN_CONTROL_PATH = "/proxy/drive/api/v2/systems/fan-control";
 export const BACKUP_TASKS_PATH = "/proxy/drive/api/v2/remote-backup/tasks";
@@ -197,70 +207,87 @@ export function newAlerts(
     return current.filter((alert) => !before.has(alert.key));
 }
 
-interface ConsoleSession {
-    readonly base: string;
-    readonly cookie: string;
-    readonly csrf: string | null;
+/**
+ * One console session per account, reused until the console stops taking it,
+ * so a poll does not open a new `rememberMe` session on the NAS every time.
+ */
+const sessions = new Map<string, Promise<ConsoleSession>>();
+
+function sessionKey(target: UnasTarget): string {
+    return createHash("sha256")
+        .update(
+            JSON.stringify([
+                target.host,
+                target.port ?? null,
+                target.secure ?? null,
+                target.username,
+                target.password
+            ])
+        )
+        .digest("hex");
 }
 
-async function signIn(target: UnasTarget): Promise<ConsoleSession> {
-    const scheme = target.secure === false ? "http" : "https";
-    const port = target.port && target.port !== 443 ? `:${target.port}` : "";
-    const base = `${scheme}://${target.host}${port}`;
-    const response = await fetch(`${base}/api/auth/login`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-            username: target.username,
-            password: target.password,
-            rememberMe: true
-        }),
-        dispatcher: insecure
+function session(key: string, target: UnasTarget): Promise<ConsoleSession> {
+    const kept = sessions.get(key);
+    if (kept) return kept;
+    const pending = signIn(target);
+    sessions.set(key, pending);
+    if (sessions.size > MAX_SESSIONS) sessions.delete(sessions.keys().next().value!);
+    pending.catch(() => {
+        if (sessions.get(key) === pending) sessions.delete(key);
     });
-    if (!response.ok) throw new Error(`UNAS login failed (${response.status})`);
-    const token = /TOKEN=([^;]+)/.exec(response.headers.get("set-cookie") ?? "")?.[1];
-    if (!token) throw new Error("UNAS login returned no session cookie");
-    const csrf =
-        response.headers.get("x-csrf-token") ?? response.headers.get("x-updated-csrf-token");
-    return { base, cookie: `TOKEN=${token}`, csrf };
+    return pending;
 }
 
 async function call(
-    session: ConsoleSession,
+    target: UnasTarget,
     method: string,
     path: string,
     body?: unknown
 ): Promise<unknown> {
-    const headers: Record<string, string> = { cookie: session.cookie };
-    if (body !== undefined) headers["content-type"] = "application/json";
-    if (method !== "GET" && session.csrf) headers["x-csrf-token"] = session.csrf;
-    const response = await fetch(`${session.base}${path}`, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        dispatcher: insecure
-    });
-    if (!response.ok) throw new Error(`UNAS ${method} ${path} failed (${response.status})`);
-    const text = await response.text();
-    return text ? JSON.parse(text) : null;
+    const key = sessionKey(target);
+    for (let attempt = 0; ; attempt++) {
+        const pending = session(key, target);
+        const current = await pending;
+        const headers: Record<string, string> = { cookie: current.cookie };
+        if (body !== undefined) headers["content-type"] = "application/json";
+        if (method !== "GET" && current.csrf) headers["x-csrf-token"] = current.csrf;
+        const response = await fetch(`${current.base}${path}`, {
+            method,
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            dispatcher: insecure,
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+        });
+        if (response.status === 401 || response.status === 403) {
+            if (sessions.get(key) === pending) sessions.delete(key);
+            if (attempt === 0) continue;
+        }
+        const rotated = response.headers.get("x-updated-csrf-token");
+        if (rotated && rotated !== current.csrf && sessions.get(key) === pending)
+            sessions.set(key, Promise.resolve({ ...current, csrf: rotated }));
+        if (!response.ok) throw new Error(`UNAS ${method} ${path} failed (${response.status})`);
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+    }
 }
 
 export async function readFanProfile(target: UnasTarget): Promise<UnasFanProfile | null> {
-    return parseFanProfile(await call(await signIn(target), "GET", FAN_CONTROL_PATH));
+    return parseFanProfile(await call(target, "GET", FAN_CONTROL_PATH));
 }
 
 export async function writeFanProfile(target: UnasTarget, profile: UnasFanProfile): Promise<void> {
-    await call(await signIn(target), "PUT", FAN_CONTROL_PATH, {
+    await call(target, "PUT", FAN_CONTROL_PATH, {
         profile: FAN_PROFILE_API[profile]
     });
 }
 
 export async function listBackupTasks(target: UnasTarget): Promise<UnasBackupTask[]> {
-    return parseBackupTasks(await call(await signIn(target), "GET", BACKUP_TASKS_PATH));
+    return parseBackupTasks(await call(target, "GET", BACKUP_TASKS_PATH));
 }
 
 export async function runBackupTask(target: UnasTarget, taskId: string): Promise<void> {
-    await call(await signIn(target), "POST", backupRunPath(taskId), {});
+    await call(target, "POST", backupRunPath(taskId), {});
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

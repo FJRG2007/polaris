@@ -15,7 +15,7 @@
 import { Agent, WebSocket, fetch } from "undici";
 
 /** Self-signed console cert: don't verify, but only for these requests. */
-const insecure = new Agent({ connect: { rejectUnauthorized: false } });
+export const insecure = new Agent({ connect: { rejectUnauthorized: false } });
 
 /** How long to wait for the first device-state frame before giving up. */
 const SNAPSHOT_TIMEOUT_MS = 9000;
@@ -74,18 +74,30 @@ export interface UnasTarget {
     readonly secure?: boolean;
 }
 
-function httpBase(target: UnasTarget): string {
+export function httpBase(target: UnasTarget): string {
     const scheme = target.secure === false ? "http" : "https";
     const port = target.port && target.port !== 443 ? `:${target.port}` : "";
     return `${scheme}://${target.host}${port}`;
 }
 
-/** Log in to the console and return the session cookie header. */
-async function login(base: string, username: string, password: string): Promise<string> {
+/** A signed-in console session: where it is, its cookie, and its CSRF token. */
+export interface ConsoleSession {
+    readonly base: string;
+    readonly cookie: string;
+    readonly csrf: string | null;
+}
+
+/** Log in to the console and return the session it opened. */
+export async function signIn(target: UnasTarget): Promise<ConsoleSession> {
+    const base = httpBase(target);
     const response = await fetch(`${base}/api/auth/login`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password, rememberMe: true }),
+        body: JSON.stringify({
+            username: target.username,
+            password: target.password,
+            rememberMe: true
+        }),
         dispatcher: insecure
     });
     if (response.status === 401) {
@@ -97,7 +109,9 @@ async function login(base: string, username: string, password: string): Promise<
     const setCookie = response.headers.get("set-cookie") ?? "";
     const token = /TOKEN=([^;]+)/.exec(setCookie)?.[1];
     if (!token) throw new Error("UNAS login returned no session cookie");
-    return `TOKEN=${token}`;
+    const csrf =
+        response.headers.get("x-csrf-token") ?? response.headers.get("x-updated-csrf-token");
+    return { base, cookie: `TOKEN=${token}`, csrf };
 }
 
 /**
@@ -242,8 +256,7 @@ export function parseSystemInfo(info: Record<string, unknown>): UnasMetrics {
 
 /** Native UniFi UNAS metrics: log in, read one device-state snapshot, parse it. */
 export async function fetchUnasMetrics(target: UnasTarget): Promise<UnasMetrics> {
-    const base = httpBase(target);
-    const cookie = await login(base, target.username, target.password);
-    const info = await readSystemInfo(base, cookie);
+    const session = await signIn(target);
+    const info = await readSystemInfo(session.base, session.cookie);
     return parseSystemInfo(info);
 }

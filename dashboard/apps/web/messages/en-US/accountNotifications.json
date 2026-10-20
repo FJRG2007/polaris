@@ -460,6 +460,10 @@
             "label": "Storage moved to a new address",
             "description": "A NAS took a new address on the local network and Polaris found it and follows it. Only reaches administrators."
         },
+        "storageNasAlert": {
+            "label": "A UniFi NAS needs attention",
+            "description": "A storage pool lost its protection or is nearly full, a disk is failing or running hot, or a backup failed or did not run."
+        },
         "automationsMessage": {
             "label": "Message from an automation",
             "description": "A Notify step in one of your automations sent you a message."

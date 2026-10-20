@@ -1,7 +1,7 @@
 import type { StorageProviderKind } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { connectionWebUrl, listConnections } from "@/lib/storage-service";
 import type { ConnectionSummary } from "../types";
 import { OverviewView } from "./overview-view";
@@ -27,7 +27,10 @@ export default async function OverviewPage() {
                 title={t("pages.overview.title")}
                 description={t("pages.overview.description")}
             />
-            <OverviewView connections={connections} />
+            <OverviewView
+                connections={connections}
+                canManage={await sessionCan(user, "connections.manage")}
+            />
         </>
     );
 }

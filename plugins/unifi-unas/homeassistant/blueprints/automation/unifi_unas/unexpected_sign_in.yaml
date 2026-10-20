@@ -14,12 +14,14 @@ blueprint:
               domain: event
     expected_users:
       name: Expected users
+      description: Left empty, every SMB sign-in counts as unexpected.
       default: []
       selector:
         text:
           multiple: true
     expected_ips:
       name: Expected IP addresses
+      description: Left empty, the address is not checked.
       default: []
       selector:
         text:

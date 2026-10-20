@@ -14,6 +14,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useMemo } from "react";
 import { isPersonalKind } from "@polaris/core";
 import { UnasMetrics } from "../unas-metrics";
+import { UnasControl } from "../unas-control";
 import { HardwarePanel } from "../hardware-panel";
 import type { ConnectionSummary } from "../types";
 import { FolderOpen, HardDrive } from "lucide-react";
@@ -116,7 +117,13 @@ function DeviceHistory({ connection }: { connection: ConnectionSummary }) {
  * once, then kept current on its own: a NAS reports the same seven bays and the
  * same firmware every time, so only the readings that actually moved re-render.
  */
-function UnasSection({ connection }: { connection: ConnectionSummary }) {
+function UnasSection({
+    connection,
+    canManage
+}: {
+    connection: ConnectionSummary;
+    canManage: boolean;
+}) {
     const { data, loading, error, stale, refreshing, updatedAt } = useLiveResource<UnasMetricsData>(
         {
             url: `/api/drive/unas-metrics?c=${encodeURIComponent(connection.id)}`,
@@ -149,11 +156,26 @@ function UnasSection({ connection }: { connection: ConnectionSummary }) {
         );
     }
     return data ? (
-        <UnasMetrics metrics={data} refreshing={refreshing} updatedAt={updatedAt} stale={stale} />
+        <div className="flex flex-col gap-4">
+            <UnasMetrics
+                metrics={data}
+                refreshing={refreshing}
+                updatedAt={updatedAt}
+                stale={stale}
+            />
+            <UnasControl connectionId={connection.id} canManage={canManage} />
+        </div>
     ) : null;
 }
 
-export function OverviewView({ connections }: { connections: ConnectionSummary[] }) {
+export function OverviewView({
+    connections,
+    canManage
+}: {
+    connections: ConnectionSummary[];
+    /** May change a device's settings (fans, backups), not only read them. */
+    canManage: boolean;
+}) {
     const t = useTranslations("drive");
     if (connections.length === 0) {
         return (
@@ -182,7 +204,7 @@ export function OverviewView({ connections }: { connections: ConnectionSummary[]
                         </Button>
                     </div>
                     {connection.kind === "unifi-unas" ? (
-                        <UnasSection connection={connection} />
+                        <UnasSection connection={connection} canManage={canManage} />
                     ) : (
                         <HardwarePanel connection={connection} />
                     )}

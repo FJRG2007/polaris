@@ -93,8 +93,9 @@ impl ApiClient {
     }
 }
 
-/// Perform the GET and parse the body as JSON. `Ok(None)` means a non-200
-/// status or an empty/unparseable body; `Err` means a transport failure.
+/// Perform the request and parse the body as JSON. `Ok(Some(Value::Null))`
+/// means an accepted status with an empty body; `Ok(None)` means another
+/// status or an unparseable body; `Err` means a transport failure.
 fn http_request(
     method: &str,
     path: &str,
@@ -135,10 +136,14 @@ fn http_request(
         }
     }
 
-    let split = buf.windows(4).position(|w| w == b"\r\n\r\n");
-    let Some(idx) = split else {
-        return Ok(None);
-    };
+    Ok(parse_response(&buf))
+}
+
+/// The JSON body of a raw HTTP response. `Some(Value::Null)` for an accepted
+/// status with an empty body (a 204, or a 200 with nothing in it); `None` for
+/// any other status or a body that is not JSON.
+fn parse_response(buf: &[u8]) -> Option<Value> {
+    let idx = buf.windows(4).position(|w| w == b"\r\n\r\n")?;
     let head = &buf[..idx];
     let body = &buf[idx + 4..];
 
@@ -149,8 +154,38 @@ fn http_request(
         .map(|line| line.contains(" 200") || line.contains(" 204"))
         .unwrap_or(false);
     if !status_ok {
-        return Ok(None);
+        return None;
+    }
+    if body.iter().all(u8::is_ascii_whitespace) {
+        return Some(Value::Null);
+    }
+    serde_json::from_slice::<Value>(body).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accepted_empty_body_is_not_a_failure() {
+        assert_eq!(
+            parse_response(b"HTTP/1.1 204 No Content\r\n\r\n"),
+            Some(Value::Null)
+        );
+        assert_eq!(
+            parse_response(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"),
+            Some(Value::Null)
+        );
     }
 
-    Ok(serde_json::from_slice::<Value>(body).ok())
+    #[test]
+    fn json_body_is_parsed_and_errors_are_none() {
+        assert_eq!(
+            parse_response(b"HTTP/1.1 200 OK\r\n\r\n{\"a\":1}"),
+            Some(serde_json::json!({"a": 1}))
+        );
+        assert_eq!(parse_response(b"HTTP/1.1 401 Unauthorized\r\n\r\n"), None);
+        assert_eq!(parse_response(b"HTTP/1.1 200 OK\r\n\r\nnot json"), None);
+        assert_eq!(parse_response(b"garbage"), None);
+    }
 }

@@ -856,6 +856,15 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "storage.nasAlert",
+        group: "system",
+        label: "A UniFi NAS needs attention",
+        description:
+            "A storage pool lost its protection or is nearly full, a disk is failing or running hot, or a backup failed or did not run.",
+        level: "warning",
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "automations.message",
         group: "system",
         label: "Message from an automation",
