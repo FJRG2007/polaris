@@ -317,12 +317,14 @@ export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClos
                                         >
                                             <span
                                                 className="min-w-0 flex-1 truncate text-sm text-foreground"
-                                                title={person.name}
+                                                title={person.name ?? t("sharing.somebody")}
                                             >
-                                                {person.name}
+                                                {person.name ?? t("sharing.somebody")}
                                             </span>
                                             <IconAction
-                                                label={t("sharing.remove", { name: person.name })}
+                                                label={t("sharing.remove", {
+                                                    name: person.name ?? t("sharing.somebody")
+                                                })}
                                                 onClick={() => void takeBack(person)}
                                             >
                                                 <X className="size-4" />
@@ -370,12 +372,12 @@ export function SharedWithYou({ rowClass }: { rowClass: string }) {
                 <Link
                     key={row.id}
                     href={`/polar/shared/${row.id}`}
-                    title={`${row.title} - ${t("sharing.from", { name: row.from })}`}
+                    title={`${row.title} - ${t("sharing.from", { name: row.from ?? t("sharing.somebody") })}`}
                     className={rowClass}
                 >
                     <span className="min-w-0 flex-1 truncate">{row.title}</span>
                     <span className="max-w-[40%] shrink-0 truncate text-xs text-muted-foreground">
-                        {row.from}
+                        {row.from ?? t("sharing.somebody")}
                     </span>
                 </Link>
             ))}

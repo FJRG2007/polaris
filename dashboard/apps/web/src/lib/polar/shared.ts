@@ -432,7 +432,8 @@ export interface PolarShareLink {
 
 export interface SharedPolarFile {
     id: string;
-    name: string;
+    /** Null when the file was sent with no name. */
+    name: string | null;
     mediaType: string;
 }
 
@@ -449,9 +450,11 @@ export interface SharedPolarThread {
     messages: SharedPolarMessage[];
 }
 
+/** A person's name as a shared chat shows it: their name, else their handle,
+ *  else null for the reader's own word for "somebody". */
 export interface PolarShareRecipientView {
     userId: string;
-    name: string;
+    name: string | null;
     sentAt: string;
 }
 
@@ -467,12 +470,12 @@ export interface OwnedPolarShare {
 export interface PolarSharedWithMe {
     id: string;
     title: string;
-    from: string;
+    from: string | null;
     note: string | null;
     sharedAt: string;
 }
 
 export interface ReceivedPolarThread extends SharedPolarThread {
-    from: string;
+    from: string | null;
     note: string | null;
 }

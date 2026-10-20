@@ -434,6 +434,7 @@
         "continue": "Continue in my own chat",
         "continueFailed": "Couldn't copy the chat. Try again.",
         "dismiss": "Remove from my list",
+        "dismissFailed": "Couldn't remove the chat. Try again.",
         "readOnly": "A read-only copy. Continue it to ask Polar more.",
         "you": "You",
         "assistant": "Polar",
@@ -451,6 +452,7 @@
         "stopAllQuestion": "The link stops working and everyone it was sent to loses access to \"{title}\".",
         "kind": "shared chat",
         "file": "Open {name}",
+        "unnamedFile": "File",
         "close": "Close"
     }
 }

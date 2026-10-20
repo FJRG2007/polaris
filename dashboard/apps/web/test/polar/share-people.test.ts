@@ -25,7 +25,10 @@ const state = {
     created: [] as Array<{ userId: string }>,
     messagesMade: [] as Array<{ role: string; parts: unknown }>,
     notified: [] as Array<{ userId: string; href?: string }>,
-    fileReads: [] as string[]
+    fileReads: [] as string[],
+    messageReads: 0,
+    transactions: 0,
+    failCopy: false
 };
 
 const SHARE = { threadId: THREAD, sharedAt: new Date(), thread: { title: "Disk", user: { name: "Ada", username: "ada" } } };
@@ -47,6 +50,10 @@ vi.mock("@polaris/db", () => ({
     VISIBLE_USER: {},
     Prisma: {},
     prisma: {
+        $transaction: async (run: (tx: unknown) => Promise<unknown>) => {
+            state.transactions += 1;
+            return run((await import("@polaris/db")).prisma);
+        },
         polarThread: {
             findFirst: async ({ where }: { where: { userId: string; temporary?: boolean } }) =>
                 where.userId === OWNER && !(state.temporary && where.temporary === false) ? { title: "Disk" } : null,
@@ -77,8 +84,12 @@ vi.mock("@polaris/db", () => ({
                     : null
         },
         polarMessage: {
-            findMany: async () => MESSAGES,
+            findMany: async () => {
+                state.messageReads += 1;
+                return MESSAGES;
+            },
             createMany: async ({ data }: { data: Array<{ role: string; parts: unknown }> }) => {
+                if (state.failCopy) throw new Error("copy failed");
                 state.messagesMade.push(...data);
             }
         }
@@ -122,6 +133,9 @@ beforeEach(() => {
     state.messagesMade = [];
     state.notified = [];
     state.fileReads = [];
+    state.messageReads = 0;
+    state.transactions = 0;
+    state.failCopy = false;
 });
 
 describe("sending a chat to people", () => {
@@ -179,6 +193,25 @@ describe("reading what was sent", () => {
         expect(state.fileReads).toEqual([FILE]);
     });
 
+    it("reads the thread once for every file of the same snapshot", async () => {
+        state.recipient = { userId: FRIEND };
+        const reads = state.messageReads;
+        await Promise.all([1, 2, 3].map(() => share.readReceivedPolarFile(FRIEND, ROW, FILE)));
+        expect(state.messageReads - reads).toBeLessThanOrEqual(1);
+        expect(state.fileReads).toEqual([FILE, FILE, FILE]);
+    });
+
+    it("leaves a missing name to the reader's language", async () => {
+        state.recipient = { userId: FRIEND };
+        const owner = SHARE.thread.user;
+        SHARE.thread.user = { name: "", username: null as unknown as string };
+        try {
+            expect((await share.readReceivedPolarThread(FRIEND, ROW))?.from).toBeNull();
+        } finally {
+            SHARE.thread.user = owner;
+        }
+    });
+
     it("continues into a chat of the reader's, words only", async () => {
         state.recipient = { userId: FRIEND };
         expect(await share.continueReceivedPolarThread(STRANGER, ROW)).toBeNull();
@@ -187,6 +220,14 @@ describe("reading what was sent", () => {
             [{ type: "text", text: "Look at this" }],
             [{ type: "text", text: "Half full." }]
         ]);
+        expect(state.transactions).toBe(1);
+    });
+
+    it("copies the chat and its words in one transaction", async () => {
+        state.recipient = { userId: FRIEND };
+        state.failCopy = true;
+        await expect(share.continueReceivedPolarThread(FRIEND, ROW)).rejects.toThrow("copy failed");
+        expect(state.transactions).toBe(1);
     });
 });
 

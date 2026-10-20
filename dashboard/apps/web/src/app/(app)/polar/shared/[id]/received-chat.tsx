@@ -37,7 +37,14 @@ export function ReceivedChat({ id, thread }: { id: string; thread: ReceivedPolar
 
     const dismiss = async () => {
         setWorking(true);
-        await fetch(`/api/polar/shared/${id}`, { method: "DELETE" }).catch(() => null);
+        const response = await fetch(`/api/polar/shared/${id}`, { method: "DELETE" }).catch(
+            () => null
+        );
+        if (!response?.ok) {
+            setWorking(false);
+            toast.show({ title: t("sharing.dismissFailed") });
+            return;
+        }
         router.push("/polar");
     };
 
@@ -49,7 +56,7 @@ export function ReceivedChat({ id, thread }: { id: string; thread: ReceivedPolar
                         {thread.title}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        {t("sharing.from", { name: thread.from })}
+                        {t("sharing.from", { name: thread.from ?? t("sharing.somebody") })}
                         {" - "}
                         {t("sharing.sharedOn", { date })}
                     </p>

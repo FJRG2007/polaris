@@ -166,8 +166,7 @@ export async function generateMetadata(): Promise<Metadata> {
         description: t("meta.description"),
         // Every page, public or not, stays out of search engines and their
         // caches; next.config's X-Robots-Tag says the same on every response.
-        robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false, noimageindex: true } },
-        referrer: "strict-origin-when-cross-origin"
+        robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false, noimageindex: true } }
     };
 }
 

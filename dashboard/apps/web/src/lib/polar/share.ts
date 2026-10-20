@@ -180,7 +180,7 @@ function filesOf(parts: unknown): SharedPolarFile[] {
         return [
             {
                 id,
-                name: typeof file.filename === "string" && file.filename ? file.filename : "file",
+                name: typeof file.filename === "string" && file.filename ? file.filename : null,
                 mediaType: typeof file.mediaType === "string" ? file.mediaType : ""
             }
         ];
@@ -259,15 +259,50 @@ export async function readSharedPolarThread(token: string): Promise<SharedPolarT
 
 type FileStream = Awaited<ReturnType<typeof readThreadAttachment>>;
 
+/** How long a snapshot's file list is reused, and how many are kept. */
+const SNAPSHOT_FILES_TTL_MS = 60_000;
+const SNAPSHOT_FILES_MOST = 500;
+
+/**
+ * The ids of the files a snapshot shows, read once per snapshot for a minute:
+ * a page with a dozen pictures asks for a dozen files at once, and each would
+ * otherwise read the whole thread again. Keyed by the snapshot's moment, so
+ * moving the snapshot reads afresh.
+ */
+const snapshotFiles = new Map<string, { at: number; ids: Promise<Set<string>> }>();
+
+function filesShownBy(share: {
+    threadId: string;
+    sharedAt: Date;
+    thread: { title: string };
+}): Promise<Set<string>> {
+    const key = `${share.threadId}:${share.sharedAt.getTime()}`;
+    const now = Date.now();
+    const hit = snapshotFiles.get(key);
+    if (hit && now - hit.at < SNAPSHOT_FILES_TTL_MS) return hit.ids;
+    snapshotFiles.delete(key);
+    while (snapshotFiles.size >= SNAPSHOT_FILES_MOST) {
+        const oldest = snapshotFiles.keys().next().value;
+        if (oldest === undefined) break;
+        snapshotFiles.delete(oldest);
+    }
+    const ids = snapshotOf(share).then(
+        (snapshot) =>
+            new Set(snapshot.messages.flatMap((message) => message.files.map((file) => file.id)))
+    );
+    snapshotFiles.set(key, { at: now, ids });
+    ids.catch(() => {
+        if (snapshotFiles.get(key)?.ids === ids) snapshotFiles.delete(key);
+    });
+    return ids;
+}
+
 /** A file the snapshot shows, read only because the snapshot shows it. */
 async function fileInSnapshot(
     share: { threadId: string; sharedAt: Date; thread: { title: string } },
     fileId: string
 ): Promise<FileStream> {
-    const snapshot = await snapshotOf(share);
-    const shown = snapshot.messages.some((message) =>
-        message.files.some((file) => file.id === fileId)
-    );
+    const shown = (await filesShownBy(share)).has(fileId);
     return shown ? readThreadAttachment(share.threadId, fileId) : null;
 }
 
@@ -292,6 +327,11 @@ export const POLAR_SHARE_NOTE_MAX = 500;
 /** Most rows a list of shares reads. */
 const LIST_MOST = 100;
 
+/** Their name, else their handle; null leaves the word to the reader's language. */
+function personName(user: { name: string | null; username: string | null }): string | null {
+    return user.name || (user.username ? `@${user.username}` : null);
+}
+
 /** Who the chat was sent to, oldest first. Null when the chat is not theirs. */
 export async function listShareRecipients(
     userId: string,
@@ -307,7 +347,7 @@ export async function listShareRecipients(
     });
     return rows.map((row) => ({
         userId: row.userId,
-        name: row.user.name || (row.user.username ? `@${row.user.username}` : "Somebody"),
+        name: personName(row.user),
         sentAt: row.createdAt.toISOString()
     }));
 }
@@ -485,7 +525,7 @@ export async function listSharedWithMe(userId: string): Promise<PolarSharedWithM
     return rows.map((row) => ({
         id: row.id,
         title: row.share.thread.title,
-        from: row.share.thread.user.name || `@${row.share.thread.user.username ?? "?"}`,
+        from: personName(row.share.thread.user),
         note: row.note,
         sharedAt: row.share.sharedAt.toISOString()
     }));
@@ -524,10 +564,9 @@ export async function readReceivedPolarThread(
 ): Promise<ReceivedPolarThread | null> {
     const row = await receivedShare(userId, recipientId);
     if (!row) return null;
-    const owner = row.share.thread.user;
     return {
         ...(await snapshotOf(row.share)),
-        from: owner.name || `@${owner.username ?? "?"}`,
+        from: personName(row.share.thread.user),
         note: row.note
     };
 }
@@ -564,26 +603,28 @@ export async function continueReceivedPolarThread(
     const shared = await readReceivedPolarThread(userId, recipientId);
     if (!shared) return null;
     const messages = shared.messages.filter((message) => message.text.length > 0);
-    const thread = await prisma.polarThread.create({
-        data: { userId, title: shared.title, titleSource: "user" },
-        select: { id: true }
+    return prisma.$transaction(async (tx) => {
+        const thread = await tx.polarThread.create({
+            data: { userId, title: shared.title, titleSource: "user" },
+            select: { id: true }
+        });
+        const base = Date.now();
+        let parentId: string | null = null;
+        const data = messages.map((message, index) => {
+            const id = randomUUID();
+            const row = {
+                id,
+                threadId: thread.id,
+                parentId,
+                role: message.role,
+                parts: [{ type: "text", text: message.text }] as Prisma.InputJsonValue,
+                // One millisecond apart, so the order they were written in is kept.
+                createdAt: new Date(base + index)
+            };
+            parentId = id;
+            return row;
+        });
+        if (data.length > 0) await tx.polarMessage.createMany({ data });
+        return thread.id;
     });
-    const base = Date.now();
-    let parentId: string | null = null;
-    const data = messages.map((message, index) => {
-        const id = randomUUID();
-        const row = {
-            id,
-            threadId: thread.id,
-            parentId,
-            role: message.role,
-            parts: [{ type: "text", text: message.text }] as Prisma.InputJsonValue,
-            // One millisecond apart, so the order they were written in is kept.
-            createdAt: new Date(base + index)
-        };
-        parentId = id;
-        return row;
-    });
-    if (data.length > 0) await prisma.polarMessage.createMany({ data });
-    return thread.id;
 }

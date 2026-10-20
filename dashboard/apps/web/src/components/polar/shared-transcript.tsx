@@ -64,6 +64,7 @@ function Files({
     fileUrl: (id: string) => string;
 }) {
     const t = useTranslations("polar");
+    const nameOf = (file: SharedPolarFile) => file.name ?? t("sharing.unnamedFile");
     return (
         <ul className="flex min-w-0 flex-wrap justify-end gap-2">
             {files.map((file) => (
@@ -73,8 +74,8 @@ function Files({
                         href={fileUrl(file.id)}
                         target="_blank"
                         rel="noreferrer"
-                        title={t("sharing.file", { name: file.name })}
-                        aria-label={t("sharing.file", { name: file.name })}
+                        title={t("sharing.file", { name: nameOf(file) })}
+                        aria-label={t("sharing.file", { name: nameOf(file) })}
                         className="flex min-w-0 max-w-[16rem] items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-sm text-foreground hover:bg-card-hover"
                     >
                         {PICTURES.has(file.mediaType) ? (
@@ -87,7 +88,9 @@ function Files({
                         ) : (
                             <FileText className="size-4 shrink-0" />
                         )}
-                        <span className="min-w-0 truncate" title={file.name}>{file.name}</span>
+                        <span className="min-w-0 truncate" title={nameOf(file)}>
+                            {nameOf(file)}
+                        </span>
                     </a>
                 </li>
             ))}

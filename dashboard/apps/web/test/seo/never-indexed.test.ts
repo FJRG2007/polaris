@@ -65,6 +65,17 @@ function routeAddresses(directory: string): string[] {
     return out;
 }
 
+/** Every layout and page, the files whose metadata reaches the document. */
+function metadataFiles(directory: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(directory)) {
+        const full = join(directory, entry);
+        if (statSync(full).isDirectory()) out.push(...metadataFiles(full));
+        else if (/^(layout|page)\.tsx?$/.test(entry)) out.push(full);
+    }
+    return out;
+}
+
 describe("search engines", () => {
     const addresses = routeAddresses(APP);
 
@@ -104,6 +115,11 @@ describe("links out of a public page", () => {
             expect(headers["Referrer-Policy"], prefix).toBe("no-referrer");
         }
         expect((await headersFor("/home"))["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    });
+
+    it("leave the referrer to the header, which a page's meta referrer would override", () => {
+        const offenders = metadataFiles(APP).filter((file) => /\breferrer\s*:/.test(readFileSync(file, "utf8")));
+        expect(offenders).toEqual([]);
     });
 
     it("every top-level public folder is a token path or says why not", () => {

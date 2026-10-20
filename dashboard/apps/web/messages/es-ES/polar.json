@@ -434,6 +434,7 @@
         "continue": "Seguir en un chat mío",
         "continueFailed": "No se pudo copiar el chat. Inténtalo de nuevo.",
         "dismiss": "Quitar de mi lista",
+        "dismissFailed": "No se pudo quitar el chat. Inténtalo de nuevo.",
         "readOnly": "Copia de solo lectura. Síguela para preguntar más a Polar.",
         "you": "Tú",
         "assistant": "Polar",
@@ -451,6 +452,7 @@
         "stopAllQuestion": "El enlace deja de funcionar y quien lo recibió pierde el acceso a \"{title}\".",
         "kind": "compartido",
         "file": "Abrir {name}",
+        "unnamedFile": "Archivo",
         "close": "Cerrar"
     }
 }
