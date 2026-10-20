@@ -588,7 +588,7 @@ export function VoiceCall(props: VoiceCallProps) {
                 ) : null}
                 <section
                     aria-label={t("voice.captions")}
-                    className="max-h-48 w-full min-w-0 space-y-2 overflow-y-auto text-left text-sm"
+                    className="max-h-48 w-full min-w-0 space-y-2 overflow-y-auto overscroll-contain text-left text-sm"
                 >
                     {state.heard ? (
                         <p className="break-words">
