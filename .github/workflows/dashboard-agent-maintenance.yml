@@ -84,7 +84,7 @@ jobs:
 
           echo "### typecheck" >> "$report"
           echo '```' >> "$report"
-          npm run typecheck >> "$report" 2>&1 || problems=1
+          NODE_OPTIONS=--max-old-space-size=8192 npm run typecheck >> "$report" 2>&1 || problems=1
           echo '```' >> "$report"
 
           echo "### npm outdated" >> "$report"
