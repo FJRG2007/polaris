@@ -63,6 +63,9 @@ export interface DnsForm {
     youtube: dns.DnsSettings["youtube"];
     schedules: dns.DnsSettings["schedules"];
     timeZone: string;
+    engine: dns.DnsEngine;
+    cacheMinText: string;
+    cacheMaxText: string;
 }
 
 export function formFrom(settings: dns.DnsSettings): DnsForm {
@@ -85,7 +88,10 @@ export function formFrom(settings: dns.DnsSettings): DnsForm {
         safeSearch: settings.safeSearch,
         youtube: settings.youtube,
         schedules: settings.schedules,
-        timeZone: settings.timeZone || "UTC"
+        timeZone: settings.timeZone || "UTC",
+        engine: settings.engine,
+        cacheMinText: String(settings.engine.cacheMinMinutes),
+        cacheMaxText: String(settings.engine.cacheMaxMinutes)
     };
 }
 
@@ -121,6 +127,7 @@ export interface DnsBlockerContextValue {
         customEmpty: boolean;
         tooMany: boolean;
         aliasClash: string[];
+        engineIssue: "cacheRange" | "cacheMinutes" | null;
     };
     notice: Notice;
     save: () => void;
@@ -280,7 +287,12 @@ export function DnsBlockerProvider({
             services: form.services,
             // Written by the save path; carried so an unchanged form compares equal.
             serviceDomains: saved.serviceDomains,
-            namesFrom: form.namesFrom.trim()
+            namesFrom: form.namesFrom.trim(),
+            engine: {
+                ...form.engine,
+                cacheMinMinutes: Number(form.cacheMinText),
+                cacheMaxMinutes: Number(form.cacheMaxText)
+            }
         }),
         [form, saved.serviceDomains, saved.timeZone]
     );
@@ -290,6 +302,12 @@ export function DnsBlockerProvider({
             ...saved,
             customUpstreams: saved.upstream === "custom" ? saved.customUpstreams : []
         });
+    const engineCheck = dns.dnsEngineSchema.safeParse(draft.engine);
+    const engineIssue = engineCheck.success
+        ? null
+        : engineCheck.error.issues[0]?.message === "cacheRange"
+          ? "cacheRange"
+          : "cacheMinutes";
     const tooMany =
         draft.allow.length > dns.DNS_LIMITS.rules || draft.deny.length > dns.DNS_LIMITS.rules;
     const valid =
@@ -301,6 +319,7 @@ export function DnsBlockerProvider({
         namesFromValid &&
         aliasClash.length === 0 &&
         !customEmpty &&
+        engineIssue === null &&
         !tooMany;
 
     const engineExists = status ? ENGINE_STATES.includes(status.state) : false;
@@ -358,7 +377,8 @@ export function DnsBlockerProvider({
             namesFromValid,
             customEmpty,
             tooMany,
-            aliasClash
+            aliasClash,
+            engineIssue
         },
         notice,
         save,

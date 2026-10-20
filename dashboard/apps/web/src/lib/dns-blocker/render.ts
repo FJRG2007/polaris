@@ -143,7 +143,7 @@ export function blockyConfig(
             ...(allowlists ? { allowlists } : {}),
             clientGroupsBlock,
             ...(scheduled ?? {}),
-            blockType: "zeroIp",
+            blockType: settings.engine.blockReply,
             blockTTL: "1m",
             loading: {
                 refreshPeriod: `${settings.refreshHours}h`,
@@ -182,7 +182,19 @@ export function blockyConfig(
         // published): how many names each category's lists hold, and when they
         // were last loaded.
         prometheus: { enable: true, path: "/metrics" },
-        caching: { prefetching: true },
+        caching: {
+            prefetching: settings.engine.prefetch,
+            ...(settings.engine.cacheMinMinutes > 0
+                ? { minTime: `${settings.engine.cacheMinMinutes}m` }
+                : {}),
+            ...(settings.engine.cacheMaxMinutes > 0
+                ? { maxTime: `${settings.engine.cacheMaxMinutes}m` }
+                : {})
+        },
+        ...(settings.engine.dropTypes.length > 0
+            ? { filtering: { queryTypes: [...settings.engine.dropTypes] } }
+            : {}),
+        ...(settings.engine.fqdnOnly ? { fqdnOnly: { enable: true } } : {}),
         ports: { dns: 53, http: DNS_ENGINE_HTTP_PORT },
         // One file a day on the engine's own volume, read back by the screen;
         // a day more than asked, so the oldest day is still whole.

@@ -146,7 +146,9 @@
         "invalidTime": "Escribe una hora como 21:00.",
         "timePair": "Pon las dos horas, o ninguna para todo el día.",
         "sameTime": "El inicio y el final no pueden ser la misma hora.",
-        "invalidTimeZone": "No es una zona horaria conocida."
+        "invalidTimeZone": "No es una zona horaria conocida.",
+        "cacheMinutes": "Escribe minutos enteros de 0 a 1440.",
+        "cacheRange": "El tiempo mínimo no puede pasar del máximo."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -378,5 +380,19 @@
     "log": {
         "off": "Las consultas salen aquí con el bloqueo.",
         "overview": "Ir al resumen"
+    },
+    "engine": {
+        "title": "Motor",
+        "intro": "Cómo responde el bloqueador, más allá de qué bloquea.",
+        "cacheMin": "Guardar respuestas mínimo (min)",
+        "cacheMax": "Guardar respuestas máximo (min)",
+        "cacheHint": "0 guarda cada respuesta lo que dure su propio TTL.",
+        "prefetch": "Volver a pedir antes los nombres usados",
+        "dropTypes": "Responder vacío a estos tipos",
+        "dropTypesHint": "AAAA deja los equipos solo en IPv4; HTTPS y ANY casi nunca hacen falta.",
+        "blockReply": "Un nombre bloqueado responde",
+        "zeroIp": "0.0.0.0 (rápido)",
+        "nxDomain": "No existe",
+        "fqdnOnly": "No enviar fuera nombres sin un punto"
     }
 }

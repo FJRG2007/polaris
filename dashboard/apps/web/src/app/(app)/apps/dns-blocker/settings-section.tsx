@@ -5,7 +5,7 @@
  * and how long it keeps what it saw and how often it reads its lists again.
  */
 
-import { Card, CardBody, CardHeader, CardTitle, Input, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select, Switch } from "@polaris/ui";
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -22,8 +22,11 @@ export function DnsSettingsSection() {
     const [logDays, setLogDays] = useField("logDays");
     const [namesFrom, setNamesFrom] = useField("namesFrom");
     const [refreshHours, setRefreshHours] = useField("refreshHours");
+    const [engine, setEngine] = useField("engine");
+    const [cacheMinText, setCacheMinText] = useField("cacheMinText");
+    const [cacheMaxText, setCacheMaxText] = useField("cacheMaxText");
 
-    const { badUpstreams, customEmpty, daysValid, namesFromValid, hoursValid } =
+    const { badUpstreams, customEmpty, daysValid, namesFromValid, hoursValid, engineIssue } =
         useDnsBlocker().checks;
 
     return (
@@ -144,6 +147,112 @@ export function DnsSettingsSection() {
                         {!hoursValid ? (
                             <span className="text-xs text-danger">{t("validation.refresh")}</span>
                         ) : null}
+                    </label>
+                </CardBody>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("engine.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("engine.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-start gap-4">
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span>{t("engine.cacheMin")}</span>
+                            <Input
+                                className="w-28"
+                                type="number"
+                                min={0}
+                                max={1440}
+                                value={cacheMinText}
+                                aria-invalid={engineIssue === "cacheMinutes"}
+                                onChange={(event) => setCacheMinText(event.target.value)}
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span>{t("engine.cacheMax")}</span>
+                            <Input
+                                className="w-28"
+                                type="number"
+                                min={0}
+                                max={1440}
+                                value={cacheMaxText}
+                                aria-invalid={engineIssue !== null}
+                                onChange={(event) => setCacheMaxText(event.target.value)}
+                            />
+                        </label>
+                        <label className="flex items-center gap-2 self-center text-sm">
+                            <Switch
+                                checked={engine.prefetch}
+                                onChange={(prefetch: boolean) =>
+                                    setEngine((current) => ({ ...current, prefetch }))
+                                }
+                            />
+                            <span>{t("engine.prefetch")}</span>
+                        </label>
+                    </div>
+                    <p
+                        className={`text-xs ${engineIssue ? "text-danger-ink" : "text-muted-foreground"}`}
+                    >
+                        {engineIssue ? t(`validation.${engineIssue}`) : t("engine.cacheHint")}
+                    </p>
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span>{t("engine.dropTypes")}</span>
+                        <div className="flex flex-wrap gap-1">
+                            {dns.DNS_DROP_TYPES.map((type) => {
+                                const on = engine.dropTypes.includes(type);
+                                return (
+                                    <Button
+                                        key={type}
+                                        size="sm"
+                                        variant={on ? "primary" : "outline"}
+                                        aria-pressed={on}
+                                        onClick={() =>
+                                            setEngine((current) => ({
+                                                ...current,
+                                                dropTypes: on
+                                                    ? current.dropTypes.filter(
+                                                          (item) => item !== type
+                                                      )
+                                                    : [...current.dropTypes, type]
+                                            }))
+                                        }
+                                    >
+                                        {type}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                            {t("engine.dropTypesHint")}
+                        </span>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2">
+                        <span aria-hidden>{t("engine.blockReply")}</span>
+                        <Select
+                            className="w-full sm:w-56"
+                            value={engine.blockReply}
+                            aria-label={t("engine.blockReply")}
+                            onValueChange={(value) =>
+                                setEngine((current) => ({
+                                    ...current,
+                                    blockReply: value as dns.DnsEngine["blockReply"]
+                                }))
+                            }
+                            options={[
+                                { value: "zeroIp", label: t("engine.zeroIp") },
+                                { value: "nxDomain", label: t("engine.nxDomain") }
+                            ]}
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                            checked={engine.fqdnOnly}
+                            onChange={(fqdnOnly: boolean) =>
+                                setEngine((current) => ({ ...current, fqdnOnly }))
+                            }
+                        />
+                        <span>{t("engine.fqdnOnly")}</span>
                     </label>
                 </CardBody>
             </Card>

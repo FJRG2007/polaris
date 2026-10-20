@@ -296,3 +296,44 @@ describe("safe search", () => {
         expect(encoded.length).toBeLessThan(ENV_VALUE_MAX);
     });
 });
+
+describe("engine settings", () => {
+    it("renders what an install never set exactly as before", () => {
+        const config = render.blockyConfig(settings({}));
+        expect(config.caching).toEqual({ prefetching: true });
+        expect(config).not.toHaveProperty("filtering");
+        expect(config).not.toHaveProperty("fqdnOnly");
+        expect((config.blocking as { blockType: string }).blockType).toBe("zeroIp");
+    });
+
+    it("writes the cache, the dropped types, the block reply and bare names", () => {
+        const config = render.blockyConfig(
+            settings({
+                engine: {
+                    cacheMinMinutes: 5,
+                    cacheMaxMinutes: 60,
+                    prefetch: false,
+                    dropTypes: ["AAAA"],
+                    blockReply: "nxDomain",
+                    fqdnOnly: true
+                }
+            })
+        );
+        expect(config.caching).toEqual({ prefetching: false, minTime: "5m", maxTime: "60m" });
+        expect(config.filtering).toEqual({ queryTypes: ["AAAA"] });
+        expect(config.fqdnOnly).toEqual({ enable: true });
+        expect((config.blocking as { blockType: string }).blockType).toBe("nxDomain");
+    });
+
+    it("keeps the defaults for a row stored before, and refuses a min above the max", async () => {
+        const dns = await import("@/lib/dns-blocker/settings");
+        expect(dns.readDnsSettings({}).engine).toEqual(dns.DEFAULT_DNS_ENGINE);
+        expect(
+            dns.dnsEngineSchema.safeParse({
+                ...dns.DEFAULT_DNS_ENGINE,
+                cacheMinMinutes: 30,
+                cacheMaxMinutes: 10
+            }).success
+        ).toBe(false);
+    });
+});

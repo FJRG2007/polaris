@@ -146,7 +146,9 @@
         "invalidTime": "Enter a time like 21:00.",
         "timePair": "Set both times, or neither for the whole day.",
         "sameTime": "The start and the end cannot be the same time.",
-        "invalidTimeZone": "Not a known time zone."
+        "invalidTimeZone": "Not a known time zone.",
+        "cacheMinutes": "Enter whole minutes from 0 to 1440.",
+        "cacheRange": "The least time cannot be more than the most."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -378,5 +380,19 @@
     "log": {
         "off": "Lookups show up here once blocking is on.",
         "overview": "Go to Overview"
+    },
+    "engine": {
+        "title": "Engine",
+        "intro": "How the blocker answers, beyond what it blocks.",
+        "cacheMin": "Keep answers at least (min)",
+        "cacheMax": "Keep answers at most (min)",
+        "cacheHint": "0 keeps each answer as long as its own time to live.",
+        "prefetch": "Ask again early for popular names",
+        "dropTypes": "Answer these query types empty",
+        "dropTypesHint": "AAAA leaves devices on IPv4 only; HTTPS and ANY are rarely needed.",
+        "blockReply": "A blocked name answers",
+        "zeroIp": "0.0.0.0 (fastest)",
+        "nxDomain": "No such name",
+        "fqdnOnly": "Never send names without a dot upstream"
     }
 }

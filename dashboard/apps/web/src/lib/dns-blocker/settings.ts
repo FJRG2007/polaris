@@ -488,6 +488,50 @@ const upstreamSchema = z.string().transform((value, ctx) => {
     return upstream;
 });
 
+/** Query types the engine can be told to answer empty, as Pi-hole's "block AAAA". */
+export const DNS_DROP_TYPES = ["AAAA", "HTTPS", "ANY"] as const;
+
+/**
+ * How the engine itself behaves, beyond what it blocks: how long answers are
+ * kept, which query types get an empty answer, what a blocked name answers, and
+ * whether a bare name (no dot) is sent out at all. Every default is what the
+ * engine ran before these could be set, so an install that never opens them
+ * runs exactly as it did.
+ */
+export const dnsEngineSchema = z
+    .object({
+        /** Keep every answer at least this long, in minutes; 0 follows its TTL. */
+        cacheMinMinutes: z.number().int().min(0).max(1440),
+        /** Keep no answer longer than this, in minutes; 0 follows its TTL. */
+        cacheMaxMinutes: z.number().int().min(0).max(1440),
+        /** Ask again ahead of time for names looked up often. */
+        prefetch: z.boolean(),
+        dropTypes: z
+            .array(z.enum(DNS_DROP_TYPES))
+            .max(DNS_DROP_TYPES.length)
+            .refine((types) => new Set(types).size === types.length, "duplicate"),
+        /** A blocked name answers 0.0.0.0 (zeroIp) or "no such name" (nxDomain). */
+        blockReply: z.enum(["zeroIp", "nxDomain"]),
+        /** Answer a bare name (no dot) here and never send it upstream. */
+        fqdnOnly: z.boolean()
+    })
+    .refine(
+        (engine) =>
+            engine.cacheMaxMinutes === 0 || engine.cacheMinMinutes <= engine.cacheMaxMinutes,
+        { message: "cacheRange", path: ["cacheMaxMinutes"] } // i18n-ignore a validation code, worded by the screen
+    );
+
+export type DnsEngine = z.infer<typeof dnsEngineSchema>;
+
+export const DEFAULT_DNS_ENGINE: DnsEngine = {
+    cacheMinMinutes: 0,
+    cacheMaxMinutes: 0,
+    prefetch: true,
+    dropTypes: [],
+    blockReply: "zeroIp",
+    fqdnOnly: false
+};
+
 export const dnsSettingsSchema = z.object({
     /** Ids from `DNS_LIST_SOURCES` that are on. Unknown ids are dropped on read. */
     sources: z.array(z.string().max(64)).max(DNS_LIST_SOURCES.length),
@@ -536,7 +580,8 @@ export const dnsSettingsSchema = z.object({
     namesFrom: z
         .string()
         .trim()
-        .refine((value) => value === "" || IPV4.test(value), "invalidAddress")
+        .refine((value) => value === "" || IPV4.test(value), "invalidAddress"),
+    engine: dnsEngineSchema
 });
 
 export type DnsSettings = z.infer<typeof dnsSettingsSchema>;
@@ -568,7 +613,8 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     timeZone: "",
     services: [],
     serviceDomains: {},
-    namesFrom: ""
+    namesFrom: "",
+    engine: DEFAULT_DNS_ENGINE
 };
 
 /** The categories that have a list on, in category order: the only ones the
@@ -649,6 +695,7 @@ export function readDnsSettings(raw: unknown): DnsSettings {
                     })
                 ])
         ),
-        namesFrom: field("namesFrom")
+        namesFrom: field("namesFrom"),
+        engine: field("engine")
     };
 }
