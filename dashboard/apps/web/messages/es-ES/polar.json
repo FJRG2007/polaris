@@ -648,5 +648,27 @@
         "noAccessTitle": "Polar no está activo en tu cuenta",
         "noAccessBody": "Un administrador decide quién usa Polar en este Polaris.",
         "openPolaris": "Abrir Polaris"
+    },
+    "visual": {
+        "tool": "Vista dibujada",
+        "drawing": "Dibujando una vista...",
+        "copy": "Copiar texto",
+        "copied": "Copiado",
+        "download": "Bajar CSV",
+        "expand": "Ver todo",
+        "collapse": "Ver menos",
+        "recommended": "Recomendada",
+        "between": "Entre {min} y {max}",
+        "atLeast": "Como mínimo {min}",
+        "atMost": "Como máximo {max}",
+        "kinds": {
+            "table": "Tabla",
+            "chart": "Gráfico",
+            "stats": "Cifras",
+            "steps": "Pasos",
+            "comparison": "Comparativa",
+            "diagram": "Diagrama",
+            "calculator": "Calculadora"
+        }
     }
 }

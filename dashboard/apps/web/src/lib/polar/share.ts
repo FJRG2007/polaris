@@ -27,12 +27,14 @@ import { translatorFor } from "@/lib/i18n/translate";
 import { discoverableBy } from "@/lib/privacy-service";
 import { compactionOf } from "@/lib/polar/compaction";
 import { polarAttachmentId } from "@/lib/polar/shared";
+import { isVisualPart, visualOf, visualPartMarkdown } from "@/lib/polar/visuals";
 import type {
     OwnedPolarShare,
     PolarShareLink,
     PolarShareRecipientView,
     PolarSharedWithMe,
     ReceivedPolarThread,
+    SharedPolarBlock,
     SharedPolarFile,
     SharedPolarThread
 } from "@/lib/polar/shared";
@@ -187,16 +189,42 @@ const SHARED_MOST = 500;
 
 type Row = { id: string; parentId: string | null; role: string; parts: unknown };
 
+/** A stored message's words, each view it drew as its Markdown. */
 function textOf(parts: unknown): string {
     if (!Array.isArray(parts)) return "";
     return parts
-        .map((part) =>
-            part && typeof part === "object" && (part as { type?: unknown }).type === "text"
-                ? String((part as { text?: unknown }).text ?? "")
-                : ""
-        )
+        .map((part) => {
+            if (part && typeof part === "object" && (part as { type?: unknown }).type === "text") {
+                return String((part as { text?: unknown }).text ?? "");
+            }
+            const visual = visualPartMarkdown(part as never);
+            return visual ? `\n\n${visual}\n\n` : "";
+        })
         .join("")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
+}
+
+/** A stored message's words and views in order, or undefined when it drew none. */
+function blocksOf(parts: unknown): SharedPolarBlock[] | undefined {
+    if (!Array.isArray(parts)) return undefined;
+    const blocks: SharedPolarBlock[] = [];
+    let drew = false;
+    for (const part of parts) {
+        if (part && typeof part === "object" && (part as { type?: unknown }).type === "text") {
+            const text = String((part as { text?: unknown }).text ?? "");
+            const last = blocks.at(-1);
+            if (last?.kind === "text") last.text += text;
+            else if (text.trim()) blocks.push({ kind: "text", text });
+            continue;
+        }
+        if (!isVisualPart(part as never)) continue;
+        const visual = visualOf((part as { input?: unknown }).input);
+        if (!visual) continue;
+        drew = true;
+        blocks.push({ kind: "visual", visual });
+    }
+    return drew ? blocks : undefined;
 }
 
 /** Polar's own files a message carries; any other address is left out. */
@@ -292,7 +320,8 @@ async function snapshotOf(share: SnapshotShare): Promise<SharedPolarThread> {
                 id: row.id,
                 role: row.role as "user" | "assistant",
                 text: textOf(row.parts),
-                files: filesOf(row.parts)
+                files: filesOf(row.parts),
+                blocks: blocksOf(row.parts)
             }))
             .filter((row) => row.text.length > 0 || row.files.length > 0)
     };

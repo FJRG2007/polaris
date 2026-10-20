@@ -495,6 +495,47 @@ describe("a message's copy button", () => {
         expect(writeText).toHaveBeenCalledWith("Here you go");
     });
 
+    it("draws a view in the answer, outside the folded work, and copies it as text", async () => {
+        const writeText = vi.fn(async () => undefined);
+        Object.defineProperty(navigator, "clipboard", {
+            value: { writeText },
+            configurable: true
+        });
+        chat.messages = [
+            {
+                id: "a1",
+                role: "assistant",
+                parts: [
+                    { type: "text", text: "Two plans:" },
+                    {
+                        type: "tool-polar_show",
+                        toolCallId: "v1",
+                        state: "output-available",
+                        input: {
+                            title: "Plans",
+                            view: {
+                                kind: "table",
+                                columns: [{ label: "Plan" }, { label: "Price" }],
+                                rows: [["Pro", 12]]
+                            }
+                        },
+                        output: { ok: true, text: "Shown to the person." }
+                    } as never
+                ]
+            }
+        ];
+        mount();
+        await ready();
+        expect(screen.getByRole("table", { name: "Plans" })).toBeTruthy();
+        expect(screen.getByRole("cell", { name: "Pro" })).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("Copy message"));
+        await vi.waitFor(() =>
+            expect(writeText).toHaveBeenCalledWith(
+                "Two plans:\n\n**Plans**\n\n| Plan | Price |\n| --- | --- |\n| Pro | 12 |"
+            )
+        );
+    });
+
     it("stays a copy icon when the clipboard refuses", async () => {
         Object.defineProperty(navigator, "clipboard", {
             value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },

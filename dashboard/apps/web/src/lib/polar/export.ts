@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import { getTranslations } from "@/lib/i18n/request";
 import { compactionOf } from "@/lib/polar/compaction";
+import { isVisualPart, visualPartMarkdown } from "@/lib/polar/visuals";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 
 /** Most messages one exported chat carries; the newest ones. */
@@ -93,7 +94,8 @@ export function newestPath(messages: readonly ExportMessage[]): ExportMessage[] 
 type Part = { type?: unknown; text?: unknown; filename?: unknown; toolName?: unknown };
 
 /** One message's parts as Markdown: its words, the files it carried by name,
- *  and the tools it used by name. Tool inputs and outputs stay in the JSON. */
+ *  the tools it used by name, and each view it drew as Markdown. Tool inputs
+ *  and outputs stay in the JSON. */
 function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
     const lines: string[] = [];
     for (const raw of parts) {
@@ -105,6 +107,10 @@ function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
             lines.push(
                 `> ${names.file(typeof part.filename === "string" ? part.filename : names.attachment)}`
             );
+        } else if (isVisualPart(part)) {
+            // A view Polar drew is kept as its Markdown; one that never drew is left out.
+            const visual = visualPartMarkdown(part as never);
+            if (visual) lines.push(visual);
         } else if (type.startsWith("tool-") || type === "dynamic-tool") {
             const name = type === "dynamic-tool" ? String(part.toolName ?? "tool") : type.slice(5);
             lines.push(`> ${names.used(name)}`);

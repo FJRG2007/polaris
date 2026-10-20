@@ -170,6 +170,8 @@ import {
 } from "@/lib/polar/shared";
 import { screenFor } from "@/lib/polar/screen";
 import { titleWithBadge } from "@/lib/favicon-style";
+import { isVisualPart, visualOf, visualPartMarkdown } from "@/lib/polar/visuals";
+import { PolarVisualView, VisualDrawing } from "@/components/polar/visuals/visual-view";
 import { NO_VOICE, type VoiceAvailability } from "@/lib/polar/voice-call";
 import { PolarShareDialog } from "@/components/polar/polar-sharing";
 import type { PolarMark } from "@/lib/polar/answer-feedback";
@@ -457,10 +459,16 @@ function newId(): string {
     return crypto.randomUUID();
 }
 
+/** A message as text: its words, and each view it drew as Markdown. */
 function textOf(message: UIMessage): string {
     return message.parts
-        .map((part) => (part.type === "text" ? part.text : ""))
+        .map((part) => {
+            if (part.type === "text") return part.text;
+            const visual = visualPartMarkdown(part as never);
+            return visual ? `\n\n${visual}\n\n` : "";
+        })
         .join("")
+        .replace(/\n{3,}/g, "\n\n")
         .trim();
 }
 
@@ -2632,7 +2640,9 @@ function MessageView({
             ? t("memory.remember")
             : name === "polar_forget"
               ? t("memory.forget")
-              : name);
+              : name === "polar_show"
+                ? t("visual.tool")
+                : name);
     // A web step names what it searched for or which site it read.
     const stepTitle = (name: string, input: unknown) => {
         const step = webStepOf(name, input);
@@ -2652,14 +2662,19 @@ function MessageView({
     };
     // Thinking and tool calls fold into one line above the answer. A call
     // waiting for (or given) an approval and a call that failed stay in view.
+    // A view Polar drew is part of the answer, not of the work; one the model
+    // got wrong is a failed step like any other and folds with them.
+    const drawn = (part: UIMessage["parts"][number]) =>
+        isVisualPart(part) && (part as unknown as ToolPart).state !== "output-error";
     const folded = (part: UIMessage["parts"][number]) => {
         if (part.type === "reasoning") return true;
+        if (isVisualPart(part)) return !drawn(part);
         const found = toolOf(part);
         return !!found && !found.tool.approval && found.tool.state !== "output-error";
     };
     const work = message.parts.filter(folded);
     const toolParts = message.parts.flatMap((part) => {
-        const found = toolOf(part);
+        const found = drawn(part) ? null : toolOf(part);
         return found ? [found] : [];
     });
     const failed = toolParts.filter(({ tool }) => tool.state === "output-error").length;
@@ -2761,6 +2776,12 @@ function MessageView({
                             )}
                         </MessageContent>
                     );
+                }
+                if (drawn(part)) {
+                    const tool = part as unknown as ToolPart;
+                    if (tool.state === "input-streaming") return <VisualDrawing key={index} />;
+                    const visual = visualOf(tool.input);
+                    return visual ? <PolarVisualView key={index} visual={visual} /> : null;
                 }
                 const found = toolOf(part);
                 if (found) {
