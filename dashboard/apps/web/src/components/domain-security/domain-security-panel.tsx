@@ -392,6 +392,7 @@ export function DomainSecurityPanel({ scope, domain }: { scope: SecurityRef; dom
                     scope={scope}
                     domain={domain}
                     report={report}
+                    view={view}
                     onClose={() => setFixing(false)}
                     onApplied={(next) => accept(next)}
                 />

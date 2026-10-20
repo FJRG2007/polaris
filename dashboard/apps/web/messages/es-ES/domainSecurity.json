@@ -71,7 +71,19 @@
         "applied": "{ok, plural, one {# cambio hecho} other {# cambios hechos}}",
         "someFailed": "{failed, plural, one {# cambio no se hizo} other {# cambios no se hicieron}}: {detail}",
         "cannotOwner": "Polaris los publica por ti cuando este dominio tenga un token de Cloudflare (en su certificado).",
-        "cannotAdmin": "Polaris los publica por ti cuando la cuenta de Cloudflare conectada en Integraciones tenga esta zona."
+        "cannotAdmin": "Polaris los publica por ti cuando la cuenta de Cloudflare conectada en Integraciones tenga esta zona.",
+        "noneButPolicy": "Nada más que cambiar. La política DMARC de arriba es lo único que queda.",
+        "advice": {
+            "title": "Recomendado",
+            "use": "Usar la recomendada",
+            "option": "{label} (recomendada)",
+            "tightenQuarantine": "Pasa a Cuarentena. Todos los remitentes de los informes de los últimos 30 días pasan, así que el correo que aún falla es falso y va a spam. Pasa a Rechazar tras unas semanas sin nada legítimo en spam.",
+            "tightenReject": "Pasa a Rechazar. Todos los remitentes de los informes de los últimos 30 días pasan, así que el correo que aún falla es falso y se rechaza.",
+            "fixSenders": "Mantenla por ahora. {count, plural, one {# servicio envía como {domain} y falla} other {# servicios envían como {domain} y fallan}}: añádelos a SPF o haz que firmen con DKIM (salen como Sin configurar en la lista de remitentes) y luego endurécela.",
+            "waitReports": "Mantenla por ahora. Los receptores mandan sus primeros informes en un día; cuando muestren que todos los remitentes pasan, aquí se recomienda el siguiente paso.",
+            "readElsewhere": "Mantenla hasta revisar los informes en {hosts}. Cuando todos los remitentes de allí pasen, elige Cuarentena.",
+            "noReports": "Mantenla por ahora. Nadie recibe informes de {domain}, así que no hay forma de saber si todos los remitentes pasan. Añade antes una dirección de informes (rua) a su registro DMARC."
+        }
     },
     "dedicated": {
         "label": "Mantenerlo arreglado solo",

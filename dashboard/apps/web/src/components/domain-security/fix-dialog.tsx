@@ -6,13 +6,17 @@
  * Every change shows what is there now beside what would be there after, and
  * each can be left out. A stricter DMARC policy is never in the plan by itself:
  * it appears only once somebody picks one here, because moving to quarantine or
- * reject before every sender passes is how real mail gets lost.
+ * reject before every sender passes is how real mail gets lost. What it does
+ * offer is a recommendation, read from who the DMARC reports say sends as the
+ * domain, so the choice is never left without an answer.
  */
 
 import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { reportHost } from "@/lib/domain-security/records";
+import { dmarcAdvice } from "@/lib/domain-security/dmarc-advice";
 import type { SecurityReport } from "@/lib/domain-security/types";
 import type { DomainSecurityView } from "@/lib/domain-security/service";
 import {
@@ -114,12 +118,15 @@ export function FixDialog({
     scope,
     domain,
     report,
+    view,
     onClose,
     onApplied
 }: {
     scope: SecurityRef;
     domain: string;
     report: SecurityReport;
+    /** Null until the panel has read the domain once. */
+    view: DomainSecurityView | null;
     onClose: () => void;
     onApplied: (view: DomainSecurityView) => void;
 }) {
@@ -130,6 +137,12 @@ export function FixDialog({
         : report.findings.some((finding) => finding.code === "dmarcQuarantine")
           ? "quarantine"
           : null;
+    const advice = current
+        ? dmarcAdvice(current, view ?? { reportAddress: null, sources: null }, [
+              ...new Set(report.rua.map(reportHost).filter((host): host is string => host !== null))
+          ])
+        : null;
+    const recommended = advice?.kind === "tighten" ? advice.to : "keep";
     const [policy, setPolicy] = useState<Policy>("keep");
     const [changes, setChanges] = useState<PreviewChange[] | null>(null);
     const [left, setLeft] = useState<Set<string>>(new Set());
@@ -203,11 +216,15 @@ export function FixDialog({
         if (again?.changes) setChanges(again.changes);
     }
 
-    const policyOptions = [
-        { value: "keep", label: t("fix.policy.keep") },
-        ...(current === "none" ? [{ value: "quarantine", label: t("fix.policy.quarantine") }] : []),
-        { value: "reject", label: t("fix.policy.reject") }
-    ];
+    const policyOptions = (
+        ["keep", ...(current === "none" ? (["quarantine"] as const) : []), "reject"] as const
+    ).map((value) => ({
+        value,
+        label:
+            value === recommended
+                ? t("fix.advice.option", { label: t(`fix.policy.${value}`) })
+                : t(`fix.policy.${value}`)
+    }));
 
     return (
         <Dialog open onOpenChange={(open) => !open && !applying && onClose()}>
@@ -232,6 +249,39 @@ export function FixDialog({
                                 className="w-44"
                             />
                         </label>
+                        {advice && (
+                            <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border bg-card px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
+                                <p className="min-w-0 text-sm">
+                                    <span className="font-medium">{t("fix.advice.title")}: </span>
+                                    {advice.kind === "tighten"
+                                        ? advice.to === "quarantine"
+                                            ? t("fix.advice.tightenQuarantine")
+                                            : t("fix.advice.tightenReject")
+                                        : advice.kind === "fixSenders"
+                                          ? t("fix.advice.fixSenders", {
+                                                count: advice.count,
+                                                domain
+                                            })
+                                          : advice.kind === "readElsewhere"
+                                            ? t("fix.advice.readElsewhere", {
+                                                  hosts: advice.hosts.join(", ")
+                                              })
+                                            : advice.kind === "waitReports"
+                                              ? t("fix.advice.waitReports")
+                                              : t("fix.advice.noReports", { domain })}
+                                </p>
+                                {advice.kind === "tighten" && policy !== advice.to && (
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        className="shrink-0"
+                                        onClick={() => setPolicy(advice.to)}
+                                    >
+                                        {t("fix.advice.use")}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                         <p className="text-muted-foreground text-xs">
                             {t("fix.policy.hint", { domain })}
                         </p>
@@ -265,7 +315,9 @@ export function FixDialog({
                         <Skeleton className="h-12 w-full" />
                     </div>
                 ) : changes.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">{t("fix.none")}</p>
+                    <p className="text-muted-foreground text-sm">
+                        {current && policy === "keep" ? t("fix.noneButPolicy") : t("fix.none")}
+                    </p>
                 ) : (
                     <ul className="flex min-w-0 flex-col">
                         {changes.map((change) => (
