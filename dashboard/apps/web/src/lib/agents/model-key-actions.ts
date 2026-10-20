@@ -25,6 +25,7 @@ import {
     ownerHasModelSecret,
     providerOfModelKey,
     reorderModelKeys,
+    setModelKeyEnabled,
     updateModelKey,
     type KeyOwner
 } from "@/lib/agents/model-keys";
@@ -188,6 +189,24 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
     await recordAudit({
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,
+        targetType: "modelKey",
+        targetId: parsed.data.id
+    });
+    revalidatePath(scope.path);
+    return {};
+}
+
+/** Switch one on or off. Off keeps the key and its place; no run spends it. */
+export async function toggleKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
+    const parsed = z.object({ id: z.string().uuid(), enabled: z.boolean() }).safeParse(input);
+    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+
+    if (!(await setModelKeyEnabled(scope.owner, parsed.data.id, parsed.data.enabled))) {
+        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    }
+    await recordAudit({
+        actorId: scope.actorId,
+        action: `${scope.audit}.ai-key.${parsed.data.enabled ? "enabled" : "disabled"}`,
         targetType: "modelKey",
         targetId: parsed.data.id
     });

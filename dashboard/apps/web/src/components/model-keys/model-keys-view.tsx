@@ -45,7 +45,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Switch
 } from "@polaris/ui";
 
 /** The four writes, as the screen that owns them exposes them. Each one is a
@@ -55,6 +56,8 @@ export interface ModelKeyActions {
     update: (input: unknown) => Promise<KeyActionResult>;
     remove: (input: unknown) => Promise<KeyActionResult>;
     reorder: (input: unknown) => Promise<KeyActionResult>;
+    /** Switching one on or off. Absent where the screen offers no switch. */
+    toggle?: (input: unknown) => Promise<KeyActionResult>;
 }
 
 /** The words that differ between the two owners. Everything else the table says
@@ -227,6 +230,23 @@ export function ModelKeysView({
         persistOrder(next);
     };
 
+    // Flipped at once and put back if the server refuses: the switch is the
+    // state, and one that waits for a round trip reads as broken.
+    const toggle = actions.toggle
+        ? async (key: ModelKeyView, enabled: boolean) => {
+              const previous = rows;
+              setRows(rows.map((row) => (row.id === key.id ? { ...row, enabled } : row)));
+              setError(null);
+              const result = await runAction(() => actions.toggle!({ id: key.id, enabled }), setError);
+              if (!result || result.error) {
+                  setRows(previous);
+                  if (result?.error) setError(result.error);
+                  return;
+              }
+              router.refresh();
+          }
+        : null;
+
     const remove = async (key: ModelKeyView) => {
         const provider = byslug.get(key.provider);
         const ok = await confirm({
@@ -317,6 +337,7 @@ export function ModelKeysView({
                                             onMove={move}
                                             onEdit={() => setEditing(row)}
                                             onRemove={() => void remove(row)}
+                                            onToggle={toggle ? (enabled) => void toggle(row, enabled) : null}
                                         />
                                     ))
                                 )}
@@ -378,7 +399,8 @@ function KeyRow({
     total,
     onMove,
     onEdit,
-    onRemove
+    onRemove,
+    onToggle
 }: {
     row: ModelKeyView;
     provider: ProviderRow | null;
@@ -387,6 +409,7 @@ function KeyRow({
     onMove: (from: number, to: number) => void;
     onEdit: () => void;
     onRemove: () => void;
+    onToggle: ((enabled: boolean) => void) | null;
 }) {
     const t = useTranslations("components");
     const [over, setOver] = useState(false);
@@ -411,7 +434,7 @@ function KeyRow({
                 const from = Number(event.dataTransfer.getData("text/plain"));
                 if (Number.isInteger(from)) onMove(from, index);
             }}
-            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired ? "opacity-60" : ""}`}
+            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired || !row.enabled ? "opacity-60" : ""}`}
         >
             <td className="px-2 py-2">
                 <div className="flex items-center gap-1">
@@ -443,6 +466,7 @@ function KeyRow({
                             {standing.label}
                         </Badge>
                     ) : null}
+                    {row.enabled ? null : <Badge className="shrink-0">{t("modelKeys.off")}</Badge>}
                 </span>
             </td>
             <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
@@ -462,6 +486,15 @@ function KeyRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-1">
+                    {onToggle ? (
+                        <span className="mr-1 inline-flex" title={row.enabled ? t("modelKeys.turnOff") : t("modelKeys.turnOn")}>
+                            <Switch
+                                checked={row.enabled}
+                                onChange={onToggle}
+                                aria-label={t("modelKeys.useNamed", { name: row.name })}
+                            />
+                        </span>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="icon"

@@ -24,6 +24,7 @@ import {
     addInstanceModelKeyAction,
     deleteInstanceModelKeyAction,
     reorderInstanceModelKeysAction,
+    toggleInstanceModelKeyAction,
     updateInstanceModelKeyAction
 } from "./actions";
 
@@ -56,7 +57,8 @@ export default async function ModelProvidersPage() {
                     add: addInstanceModelKeyAction,
                     update: updateInstanceModelKeyAction,
                     remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction
+                    reorder: reorderInstanceModelKeysAction,
+                    toggle: toggleInstanceModelKeyAction
                 }}
                 copy={{
                     title: t("integrationsModels.keys.title"),
@@ -95,7 +97,8 @@ export default async function ModelProvidersPage() {
                     add: addInstanceModelKeyAction,
                     update: updateInstanceModelKeyAction,
                     remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction
+                    reorder: reorderInstanceModelKeysAction,
+                    toggle: toggleInstanceModelKeyAction
                 }}
                 copy={{
                     title: t("integrationsModels.accounts.title"),

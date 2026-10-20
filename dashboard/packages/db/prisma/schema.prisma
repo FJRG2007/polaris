@@ -8169,6 +8169,10 @@ model UserModelKey {
     // so a daily sweep announces each step once, and pushing the date out starts
     // the announcements over.
     expiryNotice    String   @default("")
+    // Whether runs may spend it. Off keeps the key, its name and its place in
+    // the order, and hands it to nothing until it is switched back on. Defaults
+    // on so every key stored before this existed keeps working.
+    enabled         Boolean  @default(true)
     // Non-secret settings this credential needs, as stringified JSON. Only the
     // gateway shape uses it - a base URL, a model, and the two token limits an
     // endpoint publishes no catalogue for.
