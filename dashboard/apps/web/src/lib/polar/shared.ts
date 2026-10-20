@@ -59,7 +59,7 @@ const CONTEXT_ITEMS = 20;
 export function cleanContextText(value: string): string {
     return value
         .replace(/[\u0000-\u001f\u007f]+/g, " ")
-        .replace(/`{3,}|<\/?page_context>/gi, "")
+        .replace(/`{3,}|<\/?(?:page_context|screen)>/gi, "")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, CONTEXT_TEXT);
@@ -78,6 +78,9 @@ export const pageContextSchema = z.object({
         .max(512)
         .regex(/^\/[^?#]*$/),
     title: contextText.optional(),
+    /** The app and the section of its rail (`screen.ts`). */
+    app: contextText.optional(),
+    section: contextText.optional(),
     /** What the URL names: `{ server: "lirio-0" }`. */
     ids: z.record(z.string().max(40), contextText).optional(),
     /** The record open on the page, as the page describes it. */
@@ -167,6 +170,52 @@ export function fencePageContext(context: PageContext | null | undefined): strin
         ...lines,
         "</page_context>"
     ].join("\n");
+}
+
+/**
+ * Where a question was asked, as the model reads it before that question: a
+ * short pointer (`screen.ts`), fenced as data. It travels with the message, not
+ * in the system prompt, so the prompt and the tools stay byte-identical from
+ * one screen to the next and a provider's prompt cache keeps hitting.
+ */
+export function fenceScreen(context: PageContext | null | undefined): string {
+    if (!context) return "";
+    const lines: string[] = [];
+    const where = [context.app, context.section].filter(Boolean).join(" > ");
+    lines.push(where ? `${where} (${context.route})` : context.route);
+    if (context.record) {
+        const name = context.record.name ? ` "${context.record.name}"` : "";
+        lines.push(`open ${context.record.kind} ${context.record.id}${name}`);
+    } else if (context.title) {
+        lines.push(`title: ${context.title}`);
+    }
+    if (context.selection?.length) lines.push(`selected: ${context.selection.join(", ")}`);
+    return ["<screen>", ...lines, "</screen>"].join("\n");
+}
+
+/** The screen a stored message was asked on, or null for an older one. */
+export function screenOf(metadata: unknown): PageContext | null {
+    const screen = (metadata as { screen?: unknown } | null | undefined)?.screen;
+    if (!screen) return null;
+    const parsed = pageContextSchema.safeParse(screen);
+    return parsed.success ? parsed.data : null;
+}
+
+/**
+ * The messages as the model reads them: each question of the person's that was
+ * asked on a screen starts with that screen's note, so the history keeps where
+ * every question was asked. A message without one (older, or with the page
+ * left out) reads as it always did.
+ */
+export function withScreenNotes<
+    T extends { role: string; metadata?: unknown; parts: readonly unknown[] }
+>(messages: readonly T[]): T[] {
+    return messages.map((message) => {
+        if (message.role !== "user") return message;
+        const note = fenceScreen(screenOf(message.metadata));
+        if (!note) return message;
+        return { ...message, parts: [{ type: "text", text: note }, ...message.parts] };
+    });
 }
 
 /** A conversation's name, as the list shows it and the rename field takes it. */

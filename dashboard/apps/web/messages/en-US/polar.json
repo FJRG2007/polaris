@@ -174,7 +174,8 @@
     },
     "context": {
         "title": "Polar sees this page",
-        "remove": "Stop sharing this page"
+        "remove": "Stop sharing this page",
+        "askedOn": "Asked on {place}"
     },
     "reply": {
         "to": "Replying to:",

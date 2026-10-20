@@ -97,6 +97,7 @@ import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
+import { usePolarContext } from "@/components/polar/polar-panel";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -451,6 +452,9 @@ export function ChannelView({
             ? `#${channel.name}`
             : channel.name
         : "Call";
+    usePolarContext(
+        channel ? { record: { kind: "chat channel", id: channelId, name: callTitle } } : null
+    );
     const canPost = channel ? !channel.archived : true;
 
     /**

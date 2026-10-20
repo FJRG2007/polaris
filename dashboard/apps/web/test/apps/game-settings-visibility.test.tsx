@@ -65,8 +65,9 @@ const { default: InstalledAppPage } = await import(
 async function sentKeys(): Promise<string[]> {
     const page = (await InstalledAppPage({
         params: Promise.resolve({ id: "install-1" })
-    })) as ReactElement<{ children: ReactElement<{ settings: { key: string }[] }> }>;
-    return page.props.children.props.settings.map((setting) => setting.key);
+    })) as ReactElement<{ children: ReactElement<{ settings?: { key: string }[] }>[] }>;
+    const dashboard = page.props.children.find((child) => child.props.settings);
+    return dashboard!.props.settings!.map((setting) => setting.key);
 }
 
 describe("the settings an installed game server's page sends", () => {
