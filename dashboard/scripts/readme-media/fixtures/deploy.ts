@@ -29,7 +29,9 @@ export function projectCards(ctx: SceneContext): ProjectCardData[] {
         services,
         online,
         deploying,
-        total: services.length
+        total: services.length,
+        tags: [],
+        serviceTags: []
     });
     return [
         card(1, "storefront", ["github", "github", "image", "database", "database"], 5),

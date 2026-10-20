@@ -4,6 +4,7 @@ import { Chrome } from "../runtime/chrome";
 import { defineScene, type SceneContext } from "../runtime/scene";
 import { label, press } from "../runtime/interact";
 import { VIEWER } from "../fixtures/people";
+import { toWire } from "@/lib/app-bundles/wire";
 import { ProjectsGrid } from "@/app/(app)/apps/deploy/projects-grid";
 import { ProjectShell } from "@/app/(app)/apps/deploy/project-shell";
 import { ProjectDetail } from "@/app/(app)/apps/deploy/project-detail";
@@ -74,9 +75,11 @@ export const deployLogs = defineScene({
     actions: (ctx) => ({
         serviceFollowStateAction: () => ({ following: true }),
         serviceHistoryAction: () => [],
-        listDeploymentsAction: () => deployments(ctx),
         deployFreshnessAction: () => null,
         imageUpdateAction: () => null
+    }),
+    api: (ctx) => ({
+        "GET /api/deploy/deployments": () => ({ value: toWire(deployments(ctx)) })
     }),
     streams: (ctx) => ({
         "/api/deploy/logs/stream": [

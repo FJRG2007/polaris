@@ -7,7 +7,7 @@
 import { TEAM, VIEWER } from "../fixtures/people";
 import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
-import { ChatScreen, chatActions } from "./chat";
+import { ChatScreen, chatActions, chatApi } from "./chat";
 import { MeetingRoom } from "@/app/(app)/chat/meetings/[meetingId]/meeting-room";
 import { ANA_DM_ID, GROUP_ID } from "../fixtures/chat";
 import {
@@ -27,6 +27,7 @@ export const inCall = defineScene({
     path: `/chat/c/${VOICE_CHANNEL_ID}`,
     params: { channelId: VOICE_CHANNEL_ID },
     actions: (ctx) => chatActions(ctx, VOICE_CHANNEL_ID),
+    api: chatApi,
     render: (ctx) => (
         <ChatScreen channelId={VOICE_CHANNEL_ID} hold={callHold(ctx, standupShape(ctx))} />
     )
@@ -41,6 +42,7 @@ export const callMeeting = defineScene({
         listMeetingsAction: () => ({ meetings: [meetingSummary(ctx, planningShape(ctx))] }),
         saidInMeetingAction: () => ({ lines: meetingLines(ctx) })
     }),
+    api: chatApi,
     render: (ctx) => (
         <ChatScreen channelId="" hold={callHold(ctx, planningShape(ctx))}>
             <MeetingRoom meetingId={PLANNING_ID} viewerId={VIEWER.id} />
@@ -53,6 +55,7 @@ export const callGroup = defineScene({
     path: `/chat/c/${GROUP_ID}`,
     params: { channelId: GROUP_ID },
     actions: (ctx) => chatActions(ctx, GROUP_ID),
+    api: chatApi,
     render: (ctx) => <ChatScreen channelId={GROUP_ID} hold={callHold(ctx, groupShape(ctx))} />,
     // A screen arriving in a group call is offered rather than taken; the
     // picture is of one being watched, among the people.
@@ -73,5 +76,6 @@ export const callDirect = defineScene({
     path: `/chat/c/${ANA_DM_ID}`,
     params: { channelId: ANA_DM_ID },
     actions: (ctx) => chatActions(ctx, ANA_DM_ID),
+    api: chatApi,
     render: (ctx) => <ChatScreen channelId={ANA_DM_ID} hold={callHold(ctx, directShape(ctx))} />
 });
