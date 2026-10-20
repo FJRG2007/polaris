@@ -19,6 +19,8 @@ import { themeIsDark, useReducedMotion, useThemeVersion } from "./motion-runtime
 
 /** One lap, in seconds, and the hue drift either side of the token's own. */
 export const BEAM_LAP = 1.96;
+/** How long the beam takes to fade out once Polar stops. */
+const FADE_MS = 500;
 const HUE_RANGE = 30;
 
 // The library's colour patches: where each sits and how big it is. Its fixed
@@ -97,7 +99,7 @@ export function beamCss(id: string, radius: number, dark: boolean): string {
 @property ${opacity} { syntax: "<number>"; initial-value: 0; inherits: true; }
 ${scope} { position: relative; border-radius: ${radius}px; }
 ${scope}[data-active] { animation: beam-spin-${id} ${BEAM_LAP}s linear infinite, beam-in-${id} 0.6s ease forwards; }
-${scope}[data-fading] { animation: beam-spin-${id} ${BEAM_LAP}s linear infinite, beam-out-${id} 0.5s ease forwards; }
+${scope}[data-fading] { animation: beam-spin-${id} ${BEAM_LAP}s linear infinite, beam-out-${id} ${FADE_MS / 1000}s ease forwards; }
 ${scope}[data-active]::after, ${scope}[data-fading]::after {
   content: ""; position: absolute; inset: 0; border-radius: ${inner}px; padding: 1px;
   clip-path: inset(0 round ${radius}px);
@@ -176,6 +178,15 @@ export function BorderBeam({
         setPhase((current) => (active ? "on" : current === "on" ? "fading" : current));
     }, [active]);
 
+    // The fade ends on its own clock too. Waiting only for its animationend left
+    // the beam frozen on one side whenever that event never came - a fade that
+    // started off screen, in a tab in the background, or one the browser dropped.
+    useEffect(() => {
+        if (phase !== "fading") return;
+        const timer = window.setTimeout(() => setPhase("off"), FADE_MS + 100);
+        return () => window.clearTimeout(timer);
+    }, [phase]);
+
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
@@ -200,7 +211,7 @@ export function BorderBeam({
             data-beam={id}
             data-active={shown && phase === "on" ? "" : undefined}
             data-fading={shown && phase === "fading" ? "" : undefined}
-            data-paused={shown && !visible ? "" : undefined}
+            data-paused={shown && phase === "on" && !visible ? "" : undefined}
             className={cn("relative", className)}
             onAnimationEnd={(event) => {
                 if (event.animationName === `beam-out-${id}`) setPhase("off");

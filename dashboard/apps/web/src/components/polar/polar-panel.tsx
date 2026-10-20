@@ -1752,9 +1752,7 @@ export function PolarChat({
                         <div
                             className={cn(
                                 "shrink-0",
-                                fullPage
-                                    ? "mx-auto w-full max-w-3xl px-4 pb-3"
-                                    : "border-t border-border p-3"
+                                fullPage ? "mx-auto w-full max-w-3xl px-4 pb-3" : "p-3"
                             )}
                         >
                             {queueView}
