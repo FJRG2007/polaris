@@ -40,6 +40,7 @@ import {
     Select,
     Switch,
     Textarea,
+    isDirty,
     useToast
 } from "@polaris/ui";
 import * as core from "@polaris/core";
@@ -724,6 +725,8 @@ function TagsDialog({
     const [draft, setDraft] = useState("");
     const typed = core.automationTagSchema.safeParse(draft);
     const full = tags.length >= core.AUTOMATION_ORGANIZE_LIMITS.tagsPerAutomation;
+    // The same tags, in any order, are nothing to save.
+    const unchanged = !isDirty(new Set(row.tags), new Set(tags));
     const add = (value: string) => {
         const parsed = core.automationTagSchema.safeParse(value);
         if (!parsed.success || tags.includes(parsed.data) || full) return;
@@ -816,7 +819,9 @@ function TagsDialog({
                     <Button variant="ghost" onClick={onClose}>
                         {t("create.cancel")}
                     </Button>
-                    <Button onClick={() => onSave(tags)}>{t("tags.save")}</Button>
+                    <Button onClick={() => onSave(tags)} disabled={unchanged}>
+                        {t("tags.save")}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
