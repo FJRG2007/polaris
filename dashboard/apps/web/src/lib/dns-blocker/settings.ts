@@ -325,7 +325,7 @@ export const dnsDeviceSchema = z.object({
         .toLowerCase()
         .refine(
             (value) => IPV4.test(value) || (value.includes(":") && IPV6.test(value)),
-            "invalidAddress"
+            "invalidDeviceAddress"
         )
 });
 

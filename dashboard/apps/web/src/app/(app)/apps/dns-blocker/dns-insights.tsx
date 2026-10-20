@@ -939,7 +939,7 @@ function QueryRows({
                                 className="border-t border-border"
                             >
                                 <td
-                                    className="relative truncate p-2 pl-3 align-top tabular-nums text-muted-foreground"
+                                    className="relative break-words p-2 pl-3 align-top tabular-nums text-muted-foreground"
                                     title={`${full} - ${outcome}`}
                                 >
                                     <span
@@ -953,7 +953,7 @@ function QueryRows({
                                     <button
                                         type="button"
                                         title={`${row.domain} - ${outcome}`}
-                                        className={`block w-full break-all text-left hover:underline ${blocked ? "text-danger-ink" : ""}`}
+                                        className={`block w-full break-all text-left hover:underline ${blocked ? "text-danger-ink line-through" : ""}`}
                                         onClick={() => onDomain(row.domain)}
                                     >
                                         <span className="sr-only">{outcome}: </span>

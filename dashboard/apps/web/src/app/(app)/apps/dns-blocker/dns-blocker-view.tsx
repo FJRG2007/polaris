@@ -935,7 +935,7 @@ export function DnsBlockerView({
                             value={deviceAddress}
                             placeholder="192.168.1.20"
                             aria-label={t("devices.address")}
-                            aria-invalid={deviceIssue === "invalidAddress"}
+                            aria-invalid={deviceIssue === "invalidDeviceAddress"}
                             onChange={(event) => setDeviceAddress(event.target.value)}
                         />
                         <Button
@@ -957,7 +957,7 @@ export function DnsBlockerView({
                         <span className="text-xs text-danger-ink">
                             {deviceIssue === "invalidDeviceName"
                                 ? t("validation.invalidDeviceName")
-                                : t("validation.invalidAddress")}
+                                : t("validation.invalidDeviceAddress")}
                         </span>
                     ) : null}
                 </CardBody>

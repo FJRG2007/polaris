@@ -204,7 +204,9 @@ describe("DnsBlockerView query log", () => {
         const blocked = button("Blocked: tracker.blocked.example");
         expect(blocked.className).toContain("text-danger-ink");
         const allowed = button("Allowed: fine.allowed.example");
+        expect(blocked.className).toContain("line-through");
         expect(allowed.className).not.toContain("text-danger-ink");
+        expect(allowed.className).not.toContain("line-through");
         expect(blocked.className).not.toContain("truncate");
         const headers = [...document.querySelectorAll("th")].map((cell) => cell.textContent);
         expect(headers).not.toContain("Result");
@@ -212,6 +214,8 @@ describe("DnsBlockerView query log", () => {
             (bar) => bar.getAttribute("data-outcome")
         );
         expect(bars).toEqual(["blocked", "allowed"]);
+        const time = document.querySelector("[data-outcome]")?.parentElement;
+        expect(time?.className).not.toContain("truncate");
     });
 });
 
@@ -242,6 +246,15 @@ describe("DnsBlockerView device names", () => {
         expect(screen.getByText("Letters, digits, dots and dashes; no spaces.")).toBeTruthy();
         fireEvent.change(screen.getByRole("textbox", { name: "Device name" }), {
             target: { value: "Ana-Laptop" }
+        });
+        expect(add).toHaveProperty("disabled", false);
+        fireEvent.change(screen.getByRole("textbox", { name: "Device address" }), {
+            target: { value: "fd00::zz" }
+        });
+        expect(add).toHaveProperty("disabled", true);
+        expect(screen.getByText("Not an IP address, like 192.168.1.20.")).toBeTruthy();
+        fireEvent.change(screen.getByRole("textbox", { name: "Device address" }), {
+            target: { value: "fd00::20" }
         });
         expect(add).toHaveProperty("disabled", false);
         fireEvent.click(add);

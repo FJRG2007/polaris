@@ -136,6 +136,7 @@
         "invalidClient": "Not an address, a range or a device name:",
         "logDays": "Between 1 and {max} days.",
         "invalidAddress": "Not an IPv4 address.",
+        "invalidDeviceAddress": "Not an IP address, like 192.168.1.20.",
         "invalidDeviceName": "Letters, digits, dots and dashes; no spaces.",
         "invalidDomain": "Not a domain name.",
         "invalidForwardServer": "Not a server address, like 192.168.1.1."
