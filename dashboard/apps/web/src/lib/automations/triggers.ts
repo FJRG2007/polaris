@@ -39,7 +39,7 @@ interface Armed {
     subjectKey: string | null;
     hookHash: string | null;
     nextDueAt: Date | null;
-    state: { config: string };
+    state: { config: string } & Record<string, unknown>;
 }
 
 /** The rows a graph's triggers arm, given the ones already there. Pure apart from the clock. */
@@ -104,6 +104,22 @@ export function armedTriggers(
                 nextDueAt: null,
                 state: { config: configKey }
             });
+        } else if (node.type === "core.threshold") {
+            // Polled (thresholds.ts). Its memory - ok or alarm, the streak, the
+            // open episode - survives a publish that left its config alone.
+            const config = core.thresholdConfigSchema.safeParse(node.config);
+            if (!config.success) continue;
+            const before = existing.find((row) => row.nodeId === node.id);
+            const kept = before?.state as ({ config?: string } & Record<string, unknown>) | null;
+            const same = kept?.config === configKey;
+            out.push({
+                nodeId: node.id,
+                eventType: "core.threshold",
+                subjectKey: `${config.data.source}:${config.data.subjectId}`,
+                hookHash: null,
+                nextDueAt: same && before?.nextDueAt ? before.nextDueAt : now,
+                state: same && kept ? { ...kept, config: configKey } : { config: configKey }
+            });
         } else if (node.type === "core.schedule") {
             const config = core.scheduleConfigSchema.parse(node.config);
             const before = existing.find((row) => row.nodeId === node.id);
@@ -147,7 +163,7 @@ export async function armVersion(
             subjectKey: row.subjectKey,
             hookHash: row.hookHash,
             nextDueAt: row.nextDueAt,
-            state: row.state
+            state: row.state as object
         };
         await prisma.automationTrigger.upsert({
             where: { automationId_nodeId: { automationId, nodeId: row.nodeId } },

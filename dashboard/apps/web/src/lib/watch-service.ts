@@ -110,7 +110,7 @@ export async function listAlarms(ownerId: string): Promise<AlarmView[]> {
 }
 
 /** Confirm the target belongs to the owner before creating an alarm. */
-async function assertOwnsTarget(ownerId: string, targetType: string, targetId: string): Promise<void> {
+export async function assertOwnsTarget(ownerId: string, targetType: string, targetId: string): Promise<void> {
     if (targetType === "host") {
         // The machine Polaris runs on has no row to own until it is enrolled, and
         // belongs to whoever is watching it - as its metrics already do.

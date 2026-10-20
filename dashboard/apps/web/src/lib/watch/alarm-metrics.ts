@@ -16,6 +16,7 @@
  * Pure - no Prisma - so the client form and the server evaluator share it.
  */
 
+import { compare } from "@/lib/alarm-state";
 import { counterRate } from "@/lib/metrics-shared";
 
 export const ALARM_TARGET_TYPES = ["application", "host", "domain"] as const;
@@ -116,7 +117,7 @@ export function volumeDiskGb(readings: readonly { diskUsedBytes: bigint | null }
 }
 
 export function breaches(value: number, operator: string, threshold: number): boolean {
-    return operator === "lt" ? value < threshold : value > threshold;
+    return compare(value, operator, threshold);
 }
 
 /** A value in its unit, for an event line and a notification. */
