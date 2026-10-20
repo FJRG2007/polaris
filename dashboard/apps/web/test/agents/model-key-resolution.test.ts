@@ -105,9 +105,8 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async () => undefined
 }));
 
-const { chatCredentialFor, connectedProviders, keySourcesFor, runSecretsFor } = await import(
-    "@/lib/agents/model-keys"
-);
+const { chatCredentialFor, connectedProviders, keySourcesFor, runSecretsFor } =
+    await import("@/lib/agents/model-keys");
 
 beforeEach(() => {
     state.ownKeys = [];

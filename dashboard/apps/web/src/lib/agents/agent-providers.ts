@@ -31,10 +31,20 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
     { slug: "google-ai", name: "Google AI", envVar: "GEMINI_API_KEY", modelPrefix: "google" },
     { slug: "xai", name: "xAI", envVar: "XAI_API_KEY", modelPrefix: "xai" },
     { slug: "deepseek", name: "DeepSeek", envVar: "DEEPSEEK_API_KEY", modelPrefix: "deepseek" },
-    { slug: "moonshot", name: "Moonshot AI", envVar: "MOONSHOT_API_KEY", modelPrefix: "moonshotai" },
+    {
+        slug: "moonshot",
+        name: "Moonshot AI",
+        envVar: "MOONSHOT_API_KEY",
+        modelPrefix: "moonshotai"
+    },
     { slug: "groq", name: "Groq", envVar: "GROQ_API_KEY", modelPrefix: "groq" },
     { slug: "cerebras", name: "Cerebras", envVar: "CEREBRAS_API_KEY", modelPrefix: "cerebras" },
-    { slug: "openrouter", name: "OpenRouter", envVar: "OPENROUTER_API_KEY", modelPrefix: "openrouter" },
+    {
+        slug: "openrouter",
+        name: "OpenRouter",
+        envVar: "OPENROUTER_API_KEY",
+        modelPrefix: "openrouter"
+    },
 
     // The long tail, from the one table that also decides what the marketplace
     // lists. Their slugs are their ids in the public model index, so the prefix

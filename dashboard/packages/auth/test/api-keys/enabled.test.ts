@@ -74,9 +74,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("../../src/roles.js", () => ({ getUserPermissions: async () => new Set(held) }));
 
-const { createApiKey, revokeApiKey, setApiKeyEnabled, verifyApiKey } = await import(
-    "../../src/api-keys.js"
-);
+const { createApiKey, revokeApiKey, setApiKeyEnabled, verifyApiKey } =
+    await import("../../src/api-keys.js");
 
 async function makeKey() {
     return createApiKey(

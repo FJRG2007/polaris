@@ -312,8 +312,7 @@ export async function listProjectMembers(
                 PROJECT_PRINCIPAL_LABELS.everyone,
             contact: member.userId ? (contacts.get(member.userId) ?? "") : "",
             role: (projectRoleFor(parseProjectCapabilities(member.capabilities)) ?? "custom") as
-                | ProjectRole
-                | "custom",
+                ProjectRole | "custom",
             capabilities: parseProjectCapabilities(member.capabilities),
             environmentIds: parseEnvironmentScope(member.environments),
             expiresAt: member.expiresAt?.toISOString() ?? null,

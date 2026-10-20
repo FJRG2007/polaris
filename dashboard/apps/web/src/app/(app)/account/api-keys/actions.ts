@@ -38,7 +38,8 @@ export async function createApiKeyAction(
 
     const allowed = new Set(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = parsed.data.scopes.filter((scope) => allowed.has(scope));
-    if (scopes.length === 0) return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
+    if (scopes.length === 0)
+        return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
 
     const created = await createApiKey(user.id, { ...parsed.data, scopes });
     await recordAudit({
@@ -68,7 +69,8 @@ export async function updateApiKeyAction(input: unknown): Promise<{ error?: stri
 
     const allowed = new Set(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = parsed.data.scopes.filter((scope) => allowed.has(scope));
-    if (scopes.length === 0) return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
+    if (scopes.length === 0)
+        return { error: (await getTranslations("account"))("apiKeys.form.noneHeld") };
 
     await updateApiKey(user.id, { ...parsed.data, scopes });
     await recordAudit({

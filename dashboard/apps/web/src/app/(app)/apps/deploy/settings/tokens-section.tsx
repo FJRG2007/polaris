@@ -96,17 +96,18 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
             return { label: t("tokens.expired"), className: "text-warning" };
         }
         if (!token.enabled) {
-            return { label: t("tokens.off"), className: "text-warning", title: t("tokens.offHint") };
+            return {
+                label: t("tokens.off"),
+                className: "text-warning",
+                title: t("tokens.offHint")
+            };
         }
         return { label: t("tokens.active"), className: "text-success" };
     }
 
     return (
         <div className="flex flex-col gap-4">
-            <SettingsCard
-                title={t("tokens.title")}
-                description={t("tokens.description")}
-            >
+            <SettingsCard title={t("tokens.title")} description={t("tokens.description")}>
                 {error && <p className="text-sm text-danger">{error}</p>}
 
                 <div className="overflow-hidden rounded-md border border-border/60">
@@ -136,18 +137,31 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                             <span className={status.className} title={status.title}>
                                                 {status.label}
                                             </span>
-                                            {token.scopes.includes("deploy.manage") ? t("tokens.canChange") : t("tokens.readOnly")}
+                                            {token.scopes.includes("deploy.manage")
+                                                ? t("tokens.canChange")
+                                                : t("tokens.readOnly")}
                                             {t("tokens.madeBy", { name: token.madeBy })}
-                                            {token.expiresAt ? t("tokens.expires", { date: display.date(token.expiresAt) }) : ""}
+                                            {token.expiresAt
+                                                ? t("tokens.expires", {
+                                                      date: display.date(token.expiresAt)
+                                                  })
+                                                : ""}
                                             {token.lastUsedAt
-                                                ? t("tokens.lastUsed", { date: display.dateTime(token.lastUsedAt) })
+                                                ? t("tokens.lastUsed", {
+                                                      date: display.dateTime(token.lastUsedAt)
+                                                  })
                                                 : t("tokens.neverUsed")}
                                         </p>
                                     </div>
                                     {canManage && (
                                         <div className="flex shrink-0 items-center gap-1">
                                             {!token.revokedAt && (
-                                                <Button variant="ghost" size="sm" onClick={() => revoke(token)} disabled={pending}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => revoke(token)}
+                                                    disabled={pending}
+                                                >
                                                     {t("tokens.revoke")}
                                                 </Button>
                                             )}
@@ -155,7 +169,9 @@ export function TokensSection({ projectId, canManage }: { projectId: string; can
                                                 variant="ghost"
                                                 size="icon"
                                                 onClick={() => setDeleting(token)}
-                                                aria-label={t("tokens.deleteNamed", { name: token.name })}
+                                                aria-label={t("tokens.deleteNamed", {
+                                                    name: token.name
+                                                })}
                                                 title={t("tokens.delete")}
                                             >
                                                 <Trash2 className="size-4" />
@@ -251,7 +267,9 @@ function CreateTokenDialog({
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("tokens.name")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("tokens.name")}
+                        </span>
                         <Input
                             autoFocus
                             value={name}
@@ -260,19 +278,29 @@ function CreateTokenDialog({
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("tokens.expiresLabel")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("tokens.expiresLabel")}
+                        </span>
                         <Select
                             value={lifetime}
                             onValueChange={(value) => setLifetime(value as TokenLifetime)}
-                            options={TOKEN_LIFETIMES.map((value) => ({ value, label: t(LIFETIME_LABELS[value]) }))}
+                            options={TOKEN_LIFETIMES.map((value) => ({
+                                value,
+                                label: t(LIFETIME_LABELS[value])
+                            }))}
                             aria-label={t("tokens.expiresLabel")}
                         />
                     </label>
                     <label className="flex items-start gap-2 text-sm">
-                        <Checkbox checked={canManage} onChange={(event) => setCanManage(event.target.checked)} />
+                        <Checkbox
+                            checked={canManage}
+                            onChange={(event) => setCanManage(event.target.checked)}
+                        />
                         <span>
                             {t("tokens.allowChanges")}
-                            <span className="block text-xs text-muted-foreground">{t("tokens.allowChangesHint")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("tokens.allowChangesHint")}
+                            </span>
                         </span>
                     </label>
                     {error && <p className="text-sm text-danger">{error}</p>}
@@ -281,7 +309,8 @@ function CreateTokenDialog({
                             {t("tokens.cancel")}
                         </Button>
                         <Button onClick={submit} disabled={pending || !name.trim()}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("tokens.create")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("tokens.create")}
                         </Button>
                     </div>
                 </div>
@@ -314,8 +343,18 @@ function IssuedTokenDialog({ secret, onClose }: { secret: string | null; onClose
                         <code className="min-w-0 flex-1 break-all rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 font-mono text-xs">
                             {secret}
                         </code>
-                        <Button variant="ghost" size="icon" onClick={copy} aria-label={t("tokens.copyToken")} title={t("tokens.copy")}>
-                            {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={copy}
+                            aria-label={t("tokens.copyToken")}
+                            title={t("tokens.copy")}
+                        >
+                            {copied ? (
+                                <Check className="size-4 text-success" />
+                            ) : (
+                                <Copy className="size-4" />
+                            )}
                         </Button>
                     </div>
                     <div className="flex justify-end">

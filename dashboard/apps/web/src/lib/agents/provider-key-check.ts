@@ -26,13 +26,7 @@ import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 /** Why a key was not accepted, in the terms a caller can branch on. `workspace`
  *  is an Anthropic key that needs a workspace ID, or was given a wrong one. */
 export type KeyCheckCode =
-    | "invalid"
-    | "forbidden"
-    | "workspace"
-    | "rate_limited"
-    | "network"
-    | "unknown"
-    | "unsupported";
+    "invalid" | "forbidden" | "workspace" | "rate_limited" | "network" | "unknown" | "unsupported";
 
 /** The catalog sentence behind a reason, under `refusals.aiKeys.check` in the
  *  api namespace, so the screen says it in the reader's language. */
@@ -144,7 +138,12 @@ const PROBES: Record<string, Probe> = {
     ...Object.fromEntries(
         MODEL_PROVIDER_SEEDS.filter((seed) => seed.probe).map((seed) => [
             seed.slug,
-            { endpoint: seed.probe as string, method: "GET" as const, header: "Authorization", prefix: "Bearer " }
+            {
+                endpoint: seed.probe as string,
+                method: "GET" as const,
+                header: "Authorization",
+                prefix: "Bearer "
+            }
         ])
     )
 };
