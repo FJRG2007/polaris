@@ -53,7 +53,9 @@ const bodySchema = z.object({
     /** The message the newest one follows: its parent, for edit versions. */
     parentId: z.string().max(64).nullable().default(null),
     /** The project a new thread is filed under; ignored for an existing one. */
-    projectId: z.string().uuid().nullable().default(null)
+    projectId: z.string().uuid().nullable().default(null),
+    /** A new thread made temporary: not listed, no memory, deleted on leave. */
+    temporary: z.boolean().default(false)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -118,12 +120,15 @@ export async function POST(request: Request): Promise<Response> {
         body.data.threadId,
         firstText(messages[0]),
         choice,
-        body.data.projectId
+        body.data.projectId,
+        body.data.temporary
     );
     if (!owned) return refuse("not_found", 404);
+    // The stored kind decides, whatever this request said.
+    const temporary = owned.temporary;
     const [instructions, remembers] = await Promise.all([
         polarThreadInstructions(user.id, body.data.threadId),
-        polarMemoryEnabled(user.id)
+        temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id)
     ]);
     const memories = remembers ? await polarMemoryPrompt(user.id) : "";
     const tools = remembers
@@ -177,6 +182,7 @@ export async function POST(request: Request): Promise<Response> {
             }
             // A new thread is named by its model once the first answer is in,
             // behind the reply; the screen asks for the title when it is ready.
+            if (temporary) return;
             startPolarTitle(
                 user.id,
                 body.data.threadId,

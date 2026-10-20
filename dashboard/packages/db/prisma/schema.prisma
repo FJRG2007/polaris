@@ -15002,6 +15002,9 @@ model PolarThread {
     // The project the chat is filed under. Its instructions reach the model.
     projectId   String?           @db.Uuid
     project     PolarProject?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    // A temporary chat: out of every list and search, never read or written to
+    // memory, deleted when its tab leaves it and swept after a day otherwise.
+    temporary   Boolean           @default(false)
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]
@@ -15010,6 +15013,7 @@ model PolarThread {
 
     @@index([userId, updatedAt(sort: Desc)])
     @@index([userId, archivedAt, pinnedAt])
+    @@index([temporary, updatedAt])
     @@index([projectId, updatedAt(sort: Desc)])
 }
 

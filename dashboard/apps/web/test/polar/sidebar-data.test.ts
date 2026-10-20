@@ -58,16 +58,19 @@ describe("where a chat is listed", () => {
     it("reads each list on the server by the same rule", () => {
         expect(viewQuery("u", "recent").where).toEqual({
             userId: "u",
+            temporary: false,
             archivedAt: null,
             pinnedAt: null,
             projectId: null
         });
         expect(viewQuery("u", "archived").where).toEqual({
             userId: "u",
+            temporary: false,
             archivedAt: { not: null }
         });
         expect(viewQuery("u", "project", "p").where).toEqual({
             userId: "u",
+            temporary: false,
             archivedAt: null,
             projectId: "p"
         });

@@ -298,5 +298,12 @@
                 "failed": "Couldn't save the change. Try again."
             }
         }
+    },
+    "temporary": {
+        "on": "Temporary chat",
+        "off": "Leave temporary chat",
+        "title": "Temporary chat",
+        "body": "Not saved in your chats or used for memory. It's deleted when you leave it.",
+        "banner": "Temporary chat: not in your history or memory, deleted when you leave it."
     }
 }

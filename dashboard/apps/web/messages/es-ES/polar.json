@@ -298,5 +298,12 @@
                 "failed": "No se pudo guardar el cambio. Reinténtalo."
             }
         }
+    },
+    "temporary": {
+        "on": "Chat temporal",
+        "off": "Salir del chat temporal",
+        "title": "Chat temporal",
+        "body": "No se guarda en tus chats ni se usa para la memoria. Se borra al salir.",
+        "banner": "Chat temporal: fuera del historial y la memoria, se borra al salir."
     }
 }

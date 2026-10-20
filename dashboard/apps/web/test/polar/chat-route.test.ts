@@ -49,7 +49,7 @@ vi.mock("@/lib/polar/memory", () => ({
     polarMemoryTools: () => ({})
 }));
 vi.mock("@/lib/polar/threads", () => ({
-    ensurePolarThread: async () => state.owned,
+    ensurePolarThread: async () => (state.owned ? { temporary: false } : null),
     polarThreadInstructions: async () => null,
     savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
 }));
