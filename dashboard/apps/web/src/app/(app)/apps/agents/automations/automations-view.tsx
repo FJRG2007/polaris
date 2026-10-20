@@ -24,7 +24,8 @@ import {
     Input,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    isDirty
 } from "@polaris/ui";
 
 interface Rule {
@@ -221,6 +222,27 @@ function RuleDialog({
             .split(",")
             .map((entry) => entry.trim())
             .filter(Boolean);
+    // An edit that ends where it started saves nothing.
+    const unchanged =
+        rule !== null &&
+        !isDirty(
+            {
+                repoId: rule.repoId,
+                trigger: rule.trigger,
+                labels: existing.labels,
+                branches: existing.branches,
+                instructions: rule.instructions,
+                enabled: rule.enabled
+            },
+            {
+                repoId,
+                trigger,
+                labels: list(labels),
+                branches: list(branches),
+                instructions,
+                enabled
+            }
+        );
 
     const save = () => {
         startTransition(() => {
@@ -320,7 +342,7 @@ function RuleDialog({
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={!repoId || pending}>
+                    <Button onClick={save} disabled={!repoId || pending || unchanged}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>

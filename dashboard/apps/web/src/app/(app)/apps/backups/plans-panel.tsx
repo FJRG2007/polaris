@@ -33,7 +33,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 
 export function PlansPanel({
@@ -215,6 +216,22 @@ function PlanDialog({
         problems.push(t("plans.problems.limit"));
     }
 
+    // An edit put back to how the plan was saves nothing; which destinations, in no order.
+    const unchanged =
+        plan !== null &&
+        !isDirty(
+            {
+                name: plan.name,
+                every: plan.every,
+                keepLast: plan.keepLast,
+                keepDays: plan.keepDays,
+                maxGb: toGigabytes(plan.maxBytes),
+                notify: plan.notifyOnFailure,
+                chosen: new Set(plan.destinationIds)
+            },
+            { name, every, keepLast, keepDays, maxGb, notify, chosen: new Set(chosen) }
+        );
+
     async function onSave() {
         setPending(true);
         setError(null);
@@ -347,7 +364,10 @@ function PlanDialog({
                         <DialogClose asChild>
                             <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                         </DialogClose>
-                        <Button onClick={() => void onSave()} disabled={pending || problems.length > 0}>
+                        <Button
+                            onClick={() => void onSave()}
+                            disabled={pending || problems.length > 0 || unchanged}
+                        >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                             {plan ? t("plans.saveChanges") : t("plans.create")}
                         </Button>

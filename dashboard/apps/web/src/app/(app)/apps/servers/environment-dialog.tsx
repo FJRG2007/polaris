@@ -10,7 +10,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import type { ServerEnvironment } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    isDirty
+} from "@polaris/ui";
 import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -173,7 +182,15 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                         placeholder="apps.example.com" // i18n-ignore example domain
                         autoComplete="off"
                     />
-                    <Button size="sm" variant="secondary" onClick={save} disabled={saving || value === current}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={save}
+                        disabled={
+                            saving ||
+                            !isDirty(current, value, (domain) => domain.trim().toLowerCase())
+                        }
+                    >
                         {saving ? tcommon("actions.saving") : tcommon("actions.save")}
                     </Button>
                 </div>

@@ -44,7 +44,8 @@ import {
     Input,
     ScrollRow,
     SegmentedControl,
-    Skeleton
+    Skeleton,
+    sameValue
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -420,7 +421,7 @@ function ProjectSettings({
                 <span className="text-xs text-muted-foreground">{t("settings.days")}</span>
                 <Button
                     size="sm"
-                    disabled={saving || days === String(project.retentionDays)}
+                    disabled={saving || sameValue(days, project.retentionDays)}
                     onClick={async () => {
                         setSaving(true);
                         await runAction(

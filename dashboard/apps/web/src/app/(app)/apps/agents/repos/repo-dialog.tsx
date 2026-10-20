@@ -14,7 +14,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    isDirty
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { agentWord } from "@/lib/agents/words";
@@ -62,6 +63,22 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             setPolicy(result.policy ?? null);
         })();
     }, [repo.repoFullName, repo.isPrivate]);
+
+    // Settings put back to how they were save nothing.
+    const unchanged = !isDirty(
+        {
+            execution: repo.execution,
+            poolId: repo.poolId,
+            model: repo.model,
+            effort: repo.effort,
+            push: repo.push,
+            shell: repo.shell,
+            pullRequests: repo.pullRequests,
+            issues: repo.issues,
+            gate: repo.gate
+        },
+        { execution, poolId, model, effort, push, shell, pullRequests, issues, gate }
+    );
 
     const save = () => {
         startTransition(() => {
@@ -169,7 +186,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={pending}>
+                    <Button onClick={save} disabled={pending || unchanged}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>

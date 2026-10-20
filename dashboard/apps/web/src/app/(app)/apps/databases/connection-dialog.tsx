@@ -85,7 +85,8 @@ import {
     Skeleton,
     Switch,
     Textarea,
-    cn
+    cn,
+    isDirty
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
@@ -296,6 +297,10 @@ export function ConnectionDialog({
             ssh
         ]
     );
+
+    // The connection as it was opened: an edit that ends where it started saves nothing.
+    const loaded = useRef(draft).current;
+    const unchanged = connection !== null && !isDirty(loaded, draft);
 
     // The same schema the action parses. A field with nothing in it yet is
     // incomplete rather than wrong, so its message is held back until something
@@ -1075,7 +1080,7 @@ export function ConnectionDialog({
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={() => void save()} disabled={!complete || saving}>
+                    <Button onClick={() => void save()} disabled={!complete || saving || unchanged}>
                         {saving && <Loader2 className="size-4 animate-spin" />}
                         <Plug className="size-4" />
                         {connection ? tcommon("actions.save") : t("dialog.add")}

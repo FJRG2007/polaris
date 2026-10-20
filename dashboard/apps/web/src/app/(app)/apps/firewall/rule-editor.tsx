@@ -19,7 +19,7 @@ import * as core from "@polaris/core";
 import { TriangleAlert } from "lucide-react";
 import { PageHeader, Section } from "./page-parts";
 import { ConditionBuilder } from "./condition-builder";
-import { Button, Checkbox, Input, Select } from "@polaris/ui";
+import { Button, Checkbox, Input, Select, isDirty } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -110,6 +110,10 @@ export function RuleEditor({
     const [position, setPosition] = useState<RulePosition>(() => startingPosition(index));
     const blocked = blockingReason(rule, t);
     const creating = index === null;
+    // An existing rule edited back to how it was, in the same place, saves nothing.
+    const unchanged =
+        !creating &&
+        !isDirty({ rule: initial, position: startingPosition(index) }, { rule, position });
     const skip = rule.skip ?? [];
 
     return (
@@ -255,7 +259,7 @@ export function RuleEditor({
                 </Button>
                 <Button
                     type="button"
-                    disabled={blocked !== null}
+                    disabled={blocked !== null || unchanged}
                     title={blocked ?? undefined}
                     onClick={() => onSave({ ...rule, name: rule.name.trim() }, position)}
                 >
