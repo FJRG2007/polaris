@@ -107,4 +107,31 @@ describe("opening a stored chat", () => {
         fireEvent.click(await screen.findByText("Old chat"));
         expect(await screen.findByText("What was said before")).toBeTruthy();
     });
+
+    it("opens nothing when the remembered chat answers with something else", async () => {
+        // A chat remembered from before a reload, whose address answers with no chat.
+        const stored = new Map([["polar.thread", "t-gone"]]);
+        vi.stubGlobal("localStorage", {
+            getItem: (key: string) => stored.get(key) ?? null,
+            setItem: (key: string, value: string) => void stored.set(key, value),
+            removeItem: (key: string) => void stored.delete(key),
+            clear: () => stored.clear()
+        });
+        const failures: unknown[] = [];
+        const record = (reason: unknown) => failures.push(reason);
+        process.on("unhandledRejection", record);
+        try {
+            render(<PolarChat />, { wrapper: MessagesWrapper });
+            await waitFor(() =>
+                expect(
+                    vi.mocked(fetch).mock.calls.some(([url]) => url === "/api/polar/threads/t-gone")
+                ).toBe(true)
+            );
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(failures).toEqual([]);
+            expect(screen.queryByText("What was said before")).toBeNull();
+        } finally {
+            process.off("unhandledRejection", record);
+        }
+    });
 });

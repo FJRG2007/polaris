@@ -543,6 +543,12 @@ describe("Polar on the web", () => {
         expect(names.filter((name) => /web|page/.test(name))).toEqual([]);
     });
 
+    it("does not offer a tool the person switched off in Polar's settings", async () => {
+        const names = await offered(body({ off: ["read_tasks"] }));
+        expect(names).not.toContain("read_tasks");
+        expect(names).toContain("delete_task");
+    });
+
     it("still reads an older turn that searched, whatever this turn may use", async () => {
         state.web = false;
         const response = await post(

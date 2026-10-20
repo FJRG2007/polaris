@@ -378,7 +378,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                 </button>
                 <Button
                     size="icon"
-                    variant="danger"
+                    variant="hangUp"
                     aria-label={t("callSession.leaveTheCall")}
                     onClick={leave}
                 >

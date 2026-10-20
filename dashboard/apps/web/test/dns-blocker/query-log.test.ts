@@ -121,6 +121,21 @@ describe("query log", () => {
         expect(stats.clientSeries[0]?.counts[bar]).toBe(2);
     });
 
+    it("leaves out Polaris's own check that blocking is on, in the log and every count", () => {
+        const check = line("172.22.0.1", "blocking-check.polaris.invalid", "BLOCKED", {
+            reason: "BLOCKED (polaris)"
+        });
+        expect(parseQueryLine(check)).toBeNull();
+        const log = reader();
+        log.add(check);
+        log.add(line("10.0.0.2", "ads.example", "BLOCKED", { reason: "BLOCKED (ads)" }));
+        const stats = log.stats();
+        expect(stats).toMatchObject({ queries: 1, blocked: 1 });
+        expect(stats.topBlockedClients).toEqual([{ name: "10.0.0.2", count: 1 }]);
+        expect(stats.topBlocked).toEqual([{ name: "ads.example", count: 1 }]);
+        expect(log.page(0).rows.map((row) => row.domain)).toEqual(["ads.example"]);
+    });
+
     it("pages the matching rows newest first and says when there is an older page", () => {
         const log = reader({ outcome: "blocked" });
         for (let at = 0; at < QUERY_LOG_ROWS + 5; at += 1) {

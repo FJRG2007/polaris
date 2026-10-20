@@ -52,6 +52,15 @@ function post() {
     sendFrame(STREAM, { kind: "posted", seq: delivered, channels: [CHANNEL_ID] });
 }
 
+/** What a chat screen reads through routes (`chat-polls.ts`, the soundboard picker). */
+export function chatApi(ctx: SceneContext) {
+    return {
+        "GET /api/chat/voice-presence": () => ({ inRoom: voicePresence() }),
+        "GET /api/chat/channels/:id/live-call": () => ({ live: null }),
+        "GET /api/chat/meetings/:id/soundboard": () => ({ board: callSoundboard(ctx) })
+    };
+}
+
 /** Every action a chat screen asks, answered for the conversation `channelId`. */
 export function chatActions(ctx: SceneContext, channelId: string) {
     const channels = chatChannels(ctx);
@@ -66,8 +75,6 @@ export function chatActions(ctx: SceneContext, channelId: string) {
         listChannelsAction: () => ({ channels }),
         chatRulesAction: () => ({ rules: {} }),
         callsUnavailableAction: () => null,
-        callSoundboardAction: () => ({ board: callSoundboard(ctx) }),
-        voicePresenceAction: () => ({ inRoom: voicePresence() }),
         readChannelAction: () => ({
             page: { messages: conversation(ctx, channelId), olderThan: null },
             channel: channels.find((one) => one.id === channelId)
@@ -84,7 +91,6 @@ export function chatActions(ctx: SceneContext, channelId: string) {
         markReadAction: () => ({}),
         receiptsAction: () => ({ receipts: {} }),
         listScheduledAction: () => ({ scheduled: [] }),
-        liveCallAction: () => null,
         pinsAction: () => ({ pins: [] }),
         conversationsElsewhereAction: () => ({ chats: [] }),
         listMembersAction: () => ({
@@ -150,6 +156,7 @@ export const chat = defineScene({
     path: `/chat/c/${CHANNEL_ID}`,
     params: { channelId: CHANNEL_ID },
     actions: (ctx) => chatActions(ctx, CHANNEL_ID),
+    api: chatApi,
     render: () => <ChatScreen channelId={CHANNEL_ID} />,
     animation: {
         frames: PLAY.length,

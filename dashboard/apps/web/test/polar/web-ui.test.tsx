@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * Polar on the web, on screen: the composer's switch appears only where the
- * administrator allows the web, each step says what it searched or read, and
+ * Polar on the web, on screen: its switch is in Polar's settings, beside the
+ * other tools, and can be turned on only where the administrator allows it; each step says what it searched or read, and
  * an answer lists its sources and cites them by number.
  */
 
@@ -14,6 +14,9 @@ const chat = {
     messages: [] as Array<{ id: string; role: string; parts: Part[]; metadata?: unknown }>
 };
 let webAllowed = true;
+let tools: Record<string, unknown> = {};
+/** The panel's own storage; not every test environment has one. */
+const kept = new Map<string, string>();
 
 vi.mock("@ai-sdk/react", () => ({
     useChat: () => ({
@@ -35,17 +38,19 @@ vi.mock("next/navigation", () => ({
 beforeEach(() => {
     chat.messages = [];
     webAllowed = true;
-    try {
-        window.sessionStorage.clear();
-        window.localStorage.clear();
-    } catch {
-        // No storage in this environment.
-    }
+    tools = {};
+    kept.clear();
+    vi.stubGlobal("localStorage", {
+        getItem: (key: string) => kept.get(key) ?? null,
+        setItem: (key: string, value: string) => void kept.set(key, value),
+        removeItem: (key: string) => void kept.delete(key),
+        clear: () => kept.clear()
+    });
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) =>
             url === "/api/polar/models"
-                ? Response.json({ providers: [], tools: {}, isAdmin: false, web: webAllowed })
+                ? Response.json({ providers: [], tools, isAdmin: false, web: webAllowed })
                 : Response.json({})
         )
     );
@@ -86,29 +91,40 @@ const read: Part = {
 };
 
 describe("Polar on the web", () => {
-    it("shows the composer's web switch where the web is allowed, and remembers it off", async () => {
+    it("keeps web search out of the composer, as a switch in Polar's settings", async () => {
         mount();
-        const toggle = await screen.findByRole("button", { name: "Search the web" });
-        expect(toggle.getAttribute("aria-pressed")).toBe("true");
+        await screen.findByRole("textbox");
+        expect(screen.queryByRole("button", { name: "Search the web" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        const toggle = await screen.findByRole("switch", { name: "Search the web" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
         fireEvent.click(toggle);
-        expect(toggle.getAttribute("aria-pressed")).toBe("false");
-        // Remembered where this environment has storage at all.
-        let stored: string | null = "off";
-        try {
-            stored = window.localStorage.getItem("polar.web");
-        } catch {
-            // No storage here.
-        }
-        expect(stored).toBe("off");
+        expect(toggle.getAttribute("aria-checked")).toBe("false");
+        expect(kept.get("polar.web")).toBe("off");
     });
 
-    it("has no web switch where an administrator turned the web off", async () => {
+    it("says the web is off, and cannot be switched on, where an administrator turned it off", async () => {
         webAllowed = false;
         mount();
         await screen.findByRole("textbox");
         // Give the models answer its turn to land.
         await new Promise((done) => setTimeout(done, 0));
-        expect(screen.queryByRole("button", { name: "Search the web" })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        const toggle = await screen.findByRole("switch", { name: "Search the web" });
+        expect((toggle as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByText("Your administrator has turned web search off.")).toBeTruthy();
+    });
+
+    it("lists Polar's tools with a switch each, and remembers the ones switched off", async () => {
+        tools = { read_tasks: { title: "Read tasks", writes: false, destructive: false } };
+        mount();
+        await screen.findByRole("textbox");
+        await new Promise((done) => setTimeout(done, 0));
+        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        const toggle = await screen.findByRole("switch", { name: "Read tasks" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(toggle);
+        expect(kept.get("polar.toolsOff")).toBe(JSON.stringify(["read_tasks"]));
     });
 
     it("names what each step searched for and which site it read", async () => {

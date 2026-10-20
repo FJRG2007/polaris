@@ -10,6 +10,7 @@ export const soundboard = defineScene({
     path: inCall.path,
     params: inCall.params,
     actions: inCall.actions,
+    api: inCall.api,
     render: inCall.render,
     prepare: (ctx) => press(label(ctx.locale, "chat.soundboard.button"))
 });

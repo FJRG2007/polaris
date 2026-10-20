@@ -10,6 +10,14 @@
 
 import { z } from "zod";
 
+/**
+ * A name that is always blocked, so Polaris can ask the blocker for it and tell
+ * from the answer that blocking is on. Under `.invalid`, which no resolver on
+ * the internet will ever answer (RFC 6761), so nothing real is ever caught.
+ * The question is Polaris's own, so the query log and its counts leave it out.
+ */
+export const DNS_CHECK_NAME = "blocking-check.polaris.invalid";
+
 /** The app that puts the Ad blocker screen here. Runs nothing itself. */
 export const DNS_BLOCKER_APP = "dns-blocker";
 /** The DNS server it starts when blocking is turned on. */

@@ -32,7 +32,10 @@ const buttonVariants = cva(
                 outline:
                     "border border-border bg-transparent text-foreground hover:border-border-strong hover:bg-card-hover active:bg-muted",
                 ghost: "text-muted-foreground hover:bg-card-hover hover:text-foreground active:bg-muted",
-                danger: "border border-white/10 bg-danger text-danger-foreground hover:bg-danger/90 active:bg-danger/80"
+                danger: "border border-white/10 bg-danger text-danger-foreground hover:bg-danger/90 active:bg-danger/80",
+                // Ending a call: plain red, nothing around it, the one control
+                // in a call bar that has to be found without looking.
+                hangUp: "border-0 bg-danger text-danger-foreground hover:bg-danger/90 active:bg-danger/80"
             },
             size: {
                 xs: "h-6 gap-1 rounded px-1.5 text-xs [&_svg]:size-3.5",

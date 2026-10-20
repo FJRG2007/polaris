@@ -16,6 +16,7 @@ import { getURLFromRedirectError } from "next/dist/client/components/redirect";
 import { loadedBundle } from "@/lib/app-bundles/loader";
 import { runAction } from "@/lib/app-bundles/action-context";
 import { fromWire, toWire } from "@/lib/app-bundles/wire";
+import { sameOrigin } from "@/lib/same-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,18 +33,6 @@ const Call = z.object({
 
 function refuse(status: number, error: string) {
     return NextResponse.json({ error }, { status });
-}
-
-/** The same check Next makes before running one of its own actions. */
-function sameOrigin(request: NextRequest): boolean {
-    const origin = request.headers.get("origin");
-    if (!origin) return false;
-    const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-    try {
-        return new URL(origin).host === host;
-    } catch {
-        return false;
-    }
 }
 
 export async function POST(request: NextRequest) {

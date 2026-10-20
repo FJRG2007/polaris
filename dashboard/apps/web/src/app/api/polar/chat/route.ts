@@ -87,7 +87,9 @@ const bodySchema = z.object({
      *  model it was on, so the next message goes back to it. */
     remember: z.boolean().default(true),
     /** Whether the person left web search on for this turn. */
-    web: z.boolean().default(true)
+    web: z.boolean().default(true),
+    /** Polar's tools the person switched off in its settings: not offered. */
+    off: z.array(z.string().max(200)).max(500).default([])
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -213,8 +215,9 @@ export async function POST(request: Request): Promise<Response> {
     // for a turn; either one off and the tools are simply not offered.
     const web = access.web && body.data.web;
     const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
+    const off = new Set(body.data.off);
     const tools = {
-        ...toolset.tools,
+        ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
         ...webTools
     };

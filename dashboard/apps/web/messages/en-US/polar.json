@@ -319,7 +319,7 @@
     "settings": {
         "open": "Polar settings",
         "title": "Polar settings",
-        "intro": "What Polar remembers, what your chats show, and what you keep.",
+        "intro": "What Polar remembers, the tools it may use, what your chats show, and what you keep.",
         "memory": {
             "title": "Memory",
             "intro": "Facts Polar keeps in mind across chats. Ask it to remember or forget something, or edit them here.",
@@ -343,6 +343,11 @@
                 "rate_limited": "Too many changes. Wait a moment.",
                 "failed": "Couldn't save the change. Try again."
             }
+        },
+        "tools": {
+            "title": "Polar's tools",
+            "intro": "What Polar may use in a chat. One switched off is never offered to it.",
+            "webOff": "Your administrator has turned web search off."
         },
         "data": {
             "title": "Your chats",

@@ -21,6 +21,7 @@
 
 import Link from "next/link";
 import { runAction } from "@/lib/run-action";
+import { joinMeeting } from "@/app/(app)/chat/call-requests";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useAppUrl } from "@/components/app-url";
 import { copyText } from "@/app/(app)/chat/links";
@@ -67,7 +68,6 @@ import {
 import {
     endMeetingAction,
     inviteToMeetingAction,
-    joinMeetingAction,
     listMeetingsAction,
     removeFromMeetingAction,
     setMeetingOptionsAction,
@@ -128,7 +128,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
 
     const join = useCallback(async () => {
         setJoining(true);
-        const result = await runAction(() => joinMeetingAction(meetingId), setError);
+        const result = await runAction(() => joinMeeting(meetingId), setError);
         setJoining(false);
         if (!result || result.error) return;
         if (result.admission === "waiting") {

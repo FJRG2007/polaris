@@ -175,7 +175,7 @@ describe("a call running in a group somebody is only reading", () => {
         expect(within(panel).getByLabelText("Microphone off")).toBeTruthy();
 
         fireEvent.click(within(panel).getByRole("button", { name: "Join" }));
-        expect(state.started).toEqual(["c1"]);
+        await vi.waitFor(() => expect(state.started).toEqual(["c1"]));
     });
 
     it("says who is sharing a screen, without a way to watch it from outside", async () => {

@@ -27,7 +27,8 @@ import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
-import { DNS_CHECK_NAME, encodeBlockyConfig } from "./render";
+import { encodeBlockyConfig } from "./render";
+import { DNS_CHECK_NAME } from "./settings";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -79,13 +80,7 @@ export class DnsBlockerRefusal extends Error {
  * - `noAddress`: this machine has no address on the network Polaris knows of.
  */
 export type DnsBlockerState =
-    | "off"
-    | "portTaken"
-    | "starting"
-    | "portHeld"
-    | "conflict"
-    | "blocking"
-    | "noAddress";
+    "off" | "portTaken" | "starting" | "portHeld" | "conflict" | "blocking" | "noAddress";
 
 export interface DnsBlockerStatus {
     readonly state: DnsBlockerState;

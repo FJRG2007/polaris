@@ -556,6 +556,65 @@ describe("the queue", () => {
     });
 });
 
+describe("the open conversation after a reload", () => {
+    // Not every test environment has storage; the panel's own is a plain map here.
+    beforeEach(() => {
+        const kept = new Map<string, string>();
+        vi.stubGlobal("localStorage", {
+            getItem: (key: string) => kept.get(key) ?? null,
+            setItem: (key: string, value: string) => void kept.set(key, value),
+            removeItem: (key: string) => void kept.delete(key),
+            clear: () => kept.clear()
+        });
+    });
+
+    it("opens the conversation that was open before", async () => {
+        storedThread = {
+            id: "t-old",
+            messages: [
+                { id: "u1", parentId: null, role: "user", parts: [{ type: "text", text: "Hi" }] }
+            ],
+            queue: [{ id: "q1", text: "still here after the reload" }],
+            choice: null
+        };
+        window.localStorage.setItem("polar.thread", "t-old");
+        chat.status = "streaming";
+        mount();
+        await waitFor(() =>
+            expect((screen.getByLabelText("Queued message") as HTMLInputElement).value).toBe(
+                "still here after the reload"
+            )
+        );
+    });
+
+    it("remembers a conversation once it has messages, and forgets it for a new one", async () => {
+        chat.messages = [{ id: "u1", role: "user", parts: [{ type: "text", text: "Hi" }] }];
+        mount();
+        await ready();
+        const remembered = window.localStorage.getItem("polar.thread");
+        expect(remembered).toBeTruthy();
+        // A new conversation starts empty, as useChat makes one per id.
+        chat.messages = [];
+        fireEvent.click(screen.getByLabelText("New chat"));
+        await waitFor(() => expect(window.localStorage.getItem("polar.thread")).toBe(""));
+    });
+
+    it("forgets a remembered conversation that is gone", async () => {
+        window.localStorage.setItem("polar.thread", "t-gone");
+        const answer = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation()!;
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string, init?: RequestInit) =>
+                url === "/api/polar/threads/t-gone"
+                    ? Response.json({ error: "not_found" }, { status: 404 })
+                    : answer(url, init)
+            )
+        );
+        mount();
+        await waitFor(() => expect(window.localStorage.getItem("polar.thread")).toBe(""));
+    });
+});
+
 describe("matching the / list", () => {
     const row = (shortcut: string) => ({
         id: shortcut,

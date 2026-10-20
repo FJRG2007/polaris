@@ -71,7 +71,19 @@
         "applied": "{ok, plural, one {# change made} other {# changes made}}",
         "someFailed": "{failed, plural, one {# change was not made} other {# changes were not made}}: {detail}",
         "cannotOwner": "Polaris publishes these for you once this domain has a Cloudflare token (under its certificate).",
-        "cannotAdmin": "Polaris publishes these for you when the Cloudflare account connected under Integrations holds this zone."
+        "cannotAdmin": "Polaris publishes these for you when the Cloudflare account connected under Integrations holds this zone.",
+        "noneButPolicy": "Nothing else to change. The DMARC policy above is the one fix left.",
+        "advice": {
+            "title": "Recommended",
+            "use": "Use recommended",
+            "option": "{label} (recommended)",
+            "tightenQuarantine": "Move to Quarantine. Every sender in the last 30 days of reports passes, so mail that still fails is forged and goes to spam. Move to Reject once a few weeks pass with nothing legitimate in spam.",
+            "tightenReject": "Move to Reject. Every sender in the last 30 days of reports passes, so mail that still fails is forged and is refused.",
+            "fixSenders": "Keep it for now. {count, plural, one {# service sends as {domain} and fails} other {# services send as {domain} and fail}}: add them to SPF or have them sign with DKIM (they show as Not set up in the senders list), then tighten.",
+            "waitReports": "Keep it for now. Receivers send their first reports within a day; once they show every sender passing, the next step is recommended here.",
+            "readElsewhere": "Keep it until you have checked the reports at {hosts}. Once every sender there passes, choose {to, select, quarantine {Quarantine} other {Reject}}.",
+            "noReports": "Keep it for now. Nobody receives reports for {domain}, so there is no way to tell whether every sender passes. Add a report address (rua) to its DMARC record first."
+        }
     },
     "dedicated": {
         "label": "Keep it fixed automatically",

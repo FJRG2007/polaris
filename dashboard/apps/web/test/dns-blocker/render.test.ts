@@ -32,7 +32,7 @@ function servers(config: Record<string, unknown>): string[] {
 describe("blockyConfig", () => {
     it("always blocks the check name in the polaris group, even with nothing else on", () => {
         const config = render.blockyConfig(settings({ sources: [] }));
-        expect(blocking(config).denylists).toEqual({ polaris: [`${render.DNS_CHECK_NAME}\n`] });
+        expect(blocking(config).denylists).toEqual({ polaris: [`${dns.DNS_CHECK_NAME}\n`] });
         expect(blocking(config).clientGroupsBlock.default).toEqual(["polaris"]);
     });
 
@@ -49,7 +49,7 @@ describe("blockyConfig", () => {
         expect(denylists.ads).toEqual([url("hagezi-pro")]);
         expect(denylists.malware).toEqual([url("hagezi-tif")]);
         expect(denylists.social).toEqual(["https://lists.example.test/social.txt"]);
-        expect(denylists.polaris).toEqual([`${render.DNS_CHECK_NAME}\nads.example.test\n`]);
+        expect(denylists.polaris).toEqual([`${dns.DNS_CHECK_NAME}\nads.example.test\n`]);
         expect(clientGroupsBlock.default).toEqual(["ads", "malware", "social", "polaris"]);
     });
 

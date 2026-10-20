@@ -6,7 +6,7 @@
 
 import { Chrome } from "../runtime/chrome";
 import { defineScene } from "../runtime/scene";
-import { ChatScreen, chatActions } from "./chat";
+import { ChatScreen, chatActions, chatApi } from "./chat";
 import { label, pressMatching, scrollTo } from "../runtime/interact";
 import { ChannelSettings } from "@/app/(app)/chat/channel-settings";
 import { ChatRulesView } from "@/app/(app)/admin/chat/chat-rules-view";
@@ -20,6 +20,7 @@ export const chatThread = defineScene({
     path: `/chat/c/${CHANNEL_ID}`,
     params: { channelId: CHANNEL_ID },
     actions: (ctx) => chatActions(ctx, CHANNEL_ID),
+    api: chatApi,
     render: () => <ChatScreen channelId={CHANNEL_ID} />,
     // The replies under Lena's screens, opened beside the channel.
     prepare: () => pressMatching(/^3\s/)
@@ -30,6 +31,7 @@ export const chatMedia = defineScene({
     path: `/chat/c/${DESIGN_ID}`,
     params: { channelId: DESIGN_ID },
     actions: (ctx) => chatActions(ctx, DESIGN_ID),
+    api: chatApi,
     render: () => <ChatScreen channelId={DESIGN_ID} />
 });
 
@@ -41,6 +43,7 @@ export const chatPoll = defineScene({
         ...chatActions(ctx, GENERAL_ID),
         listScheduledAction: () => ({ scheduled: generalScheduled(ctx) })
     }),
+    api: chatApi,
     render: () => <ChatScreen channelId={GENERAL_ID} />
 });
 
@@ -49,6 +52,7 @@ export const chatDirect = defineScene({
     path: `/chat/c/${ANA_DM_ID}`,
     params: { channelId: ANA_DM_ID },
     actions: (ctx) => chatActions(ctx, ANA_DM_ID),
+    api: chatApi,
     render: () => <ChatScreen channelId={ANA_DM_ID} />
 });
 
@@ -57,6 +61,7 @@ export const chatChannelSettings = defineScene({
     path: `/chat/c/${CHANNEL_ID}/settings`,
     params: { channelId: CHANNEL_ID },
     actions: (ctx) => chatActions(ctx, CHANNEL_ID),
+    api: chatApi,
     render: () => (
         <ChatScreen channelId={CHANNEL_ID}>
             <ChannelSettings channelId={CHANNEL_ID} />

@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { normalizeDnsRule } from "./settings";
+import { DNS_CHECK_NAME, normalizeDnsRule } from "./settings";
 
 /** Where the engine writes its query log inside the container. */
 export const QUERY_LOG_DIR = "/logs";
@@ -187,6 +187,9 @@ export function parseQueryLine(line: string): QueryRow | null {
     if (cells.length < 10) return null;
     const [time, client, names, duration, reason, question, , , responseType, type] = cells;
     if (!time || !client || !question) return null;
+    const domain = question.replace(/\.$/, "").toLowerCase();
+    // Polaris asking whether blocking is on: not a lookup anybody made.
+    if (domain === DNS_CHECK_NAME) return null;
     const name = (names ?? "").split(";")[0]?.trim().replace(/\.$/, "") ?? "";
     const response = responseType ?? "";
     const why = reason ?? "";
@@ -195,7 +198,7 @@ export function parseQueryLine(line: string): QueryRow | null {
         at: timeOf(time),
         client,
         clientName: name && name !== client ? name : "",
-        domain: question.replace(/\.$/, "").toLowerCase(),
+        domain,
         type: type ?? "",
         // REBIND is the engine refusing a public name that answers with a
         // private address: a block too, for the reader.

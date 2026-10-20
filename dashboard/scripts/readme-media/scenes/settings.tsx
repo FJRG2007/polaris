@@ -4,6 +4,7 @@ import { PageHeader } from "@polaris/ui";
 import { Chrome } from "../runtime/chrome";
 import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
+import { toWire } from "@/lib/app-bundles/wire";
 import { TEAM, VIEWER } from "../fixtures/people";
 import { SecurityView } from "@/app/(app)/account/security/security-view";
 import { SettingsView } from "@/app/(app)/admin/settings/settings-view";
@@ -26,8 +27,8 @@ import {
 export const settings = defineScene({
     id: "settings",
     path: "/admin/settings",
-    actions: (ctx) => ({ checkUpdatesAction: () => updateStatus(ctx) }),
     api: (ctx) => ({
+        "GET /api/admin/settings/update-status": () => ({ value: toWire(updateStatus(ctx)) }),
         "GET /api/admin/settings/overview": () => settingsOverview(ctx),
         "GET /api/updates/logs": () => quietUpdateLog(ctx)
     }),

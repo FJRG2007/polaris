@@ -1408,23 +1408,20 @@ export function CallRoom({
                     )}
                 </div>
 
-                {/* In a cluster of its own, so it has the same frame, padding
-                    and height as the groups beside it rather than a bare
-                    button sitting lower and narrower at the end of the bar. */}
-                <div className={CLUSTER}>
-                    <Button
-                        size="icon"
-                        variant="danger"
-                        aria-label={t("callRoom.leaveTheCall")}
-                        title={t("callRoom.leaveTheCall")}
-                        onClick={() => {
-                            playCallSound("hangUp");
-                            onLeave();
-                        }}
-                    >
-                        <PhoneOff className="size-4" />
-                    </Button>
-                </div>
+                {/* Red and nothing else, as tall as the groups beside it (their
+                    button, padding and frame) so it does not sit lower than them. */}
+                <Button
+                    variant="hangUp"
+                    className="h-[2.625rem] w-[3.25rem] rounded-xl"
+                    aria-label={t("callRoom.leaveTheCall")}
+                    title={t("callRoom.leaveTheCall")}
+                    onClick={() => {
+                        playCallSound("hangUp");
+                        onLeave();
+                    }}
+                >
+                    <PhoneOff className="size-4" />
+                </Button>
             </div>
 
             {viewerId && (mayInvite || canShare) && (
