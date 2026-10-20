@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
+import { polarConnectorTools } from "@/lib/polar/connectors/tools";
 import { polarModelOptions } from "@/lib/polar/models";
 import { polarVoiceAvailability } from "@/lib/polar/voice";
 
@@ -17,16 +18,18 @@ export async function GET(): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const access = await polarAccessFor(user.id);
-    const [providers, toolset, voice] = await Promise.all([
+    const [providers, toolset, connectorSet, voice] = await Promise.all([
         polarModelOptions(user.id, access, { waitForWindows: true }),
         polarTools(user),
+        polarConnectorTools(user, access),
         polarVoiceAvailability(user.id, access)
     ]);
     // Whether the deployment's keys are this person's to spend, so a picker with
     // nothing in it can say their own key is the way in rather than "ask".
     return NextResponse.json({
         providers,
-        tools: toolset.described,
+        tools: { ...toolset.described, ...connectorSet.described },
+        connectors: access.connectors,
         isAdmin: user.isAdmin,
         voice,
         spendsDeployment: access.spend,

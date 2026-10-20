@@ -65,6 +65,9 @@ vi.mock("ai", () => ({
 }));
 vi.mock("@/lib/polar/models", () => ({ polarModelOptions: async () => [] }));
 vi.mock("@/lib/polar/tools", () => ({ polarTools: async () => ({ described: {} }) }));
+vi.mock("@/lib/polar/connectors/tools", () => ({
+    polarConnectorTools: async () => ({ tools: {}, approval: {}, described: {} })
+}));
 
 const transcribeRoute = await import("@/app/api/polar/transcribe/route");
 const speakRoute = await import("@/app/api/polar/speak/route");

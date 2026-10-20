@@ -30,6 +30,7 @@ import {
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
+import { connectorStandIns, polarConnectorTools } from "@/lib/polar/connectors/tools";
 import {
     FIND_TOOLS,
     READ_CURRENT_VIEW,
@@ -105,7 +106,9 @@ const bodySchema = z.object({
     /** Polar's tools the person switched off in its settings: not offered. */
     off: z.array(z.string().max(200)).max(500).default([]),
     /** An answer asked again from its row with more detail or fewer words. */
-    refine: z.enum(POLAR_REFINES).nullable().default(null)
+    refine: z.enum(POLAR_REFINES).nullable().default(null),
+    /** Whether the person left their connectors on for this turn. */
+    connectors: z.boolean().default(true)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -178,7 +181,11 @@ export async function POST(request: Request): Promise<Response> {
     const body = bodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
 
-    const toolset = await polarTools(user);
+    const access = await polarAccessFor(user.id);
+    const [toolset, connectorSet] = await Promise.all([
+        polarTools(user),
+        polarConnectorTools(user, access)
+    ]);
     // Tools the person switched off in Polar's settings: never offered, and
     // never turned up by find_tools either.
     const off = new Set(body.data.off);
@@ -199,7 +206,9 @@ export async function POST(request: Request): Promise<Response> {
             ...screenTools,
             ...memoryTools,
             ...NATIVE_SEARCH_STAND_INS,
-            ...polarWebTools("", "")
+            ...polarWebTools("", ""),
+            ...connectorSet.tools,
+            ...connectorStandIns(body.data.messages, connectorSet.tools)
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
@@ -220,7 +229,6 @@ export async function POST(request: Request): Promise<Response> {
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
     let choice: ModelChoice = body.data.choice;
-    const access = await polarAccessFor(user.id);
     const signals = turnSignals(messages);
     let resolved = await resolvePolarModel(user.id, choice, signals, access);
     let fellBackFrom: string | null = null;
@@ -258,7 +266,12 @@ export async function POST(request: Request): Promise<Response> {
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
-        ...webTools
+        ...webTools,
+        ...(body.data.connectors
+            ? Object.fromEntries(
+                  Object.entries(connectorSet.tools).filter(([name]) => !off.has(name))
+              )
+            : {})
     };
     // What the model is sent: the core and the current app's tools, and any
     // this conversation already reached for. Every one stays registered, so an
@@ -267,7 +280,11 @@ export async function POST(request: Request): Promise<Response> {
         READ_CURRENT_VIEW,
         FIND_TOOLS,
         ...Object.keys(remembers ? memoryTools : {}),
-        ...Object.keys(webTools)
+        ...Object.keys(webTools),
+        // A connector is one the person added on purpose: its tools are always sent.
+        ...(body.data.connectors
+            ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
+            : [])
     ];
     const used = usedInMessages(messages as never);
     const activeFor = (found: ReadonlySet<string>) =>
@@ -348,6 +365,7 @@ export async function POST(request: Request): Promise<Response> {
         },
         toolApproval: {
             ...toolset.approval,
+            ...(body.data.connectors ? connectorSet.approval : {}),
             ...(remembers ? MEMORY_APPROVAL : {}),
             ...(web ? WEB_APPROVAL : {})
         },
