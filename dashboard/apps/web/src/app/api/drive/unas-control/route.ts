@@ -22,15 +22,25 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const connectionId = new URL(request.url).searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
 
     try {
         const target = await getUnasTarget(connectionId, user.id);
-        const [fan, tasks] = await Promise.allSettled([readFanProfile(target), listBackupTasks(target)]);
+        const [fan, tasks] = await Promise.allSettled([
+            readFanProfile(target),
+            listBackupTasks(target)
+        ]);
         if (fan.status === "rejected" && tasks.status === "rejected") throw fan.reason;
         const now = new Date();
         return Response.json({
@@ -45,7 +55,8 @@ export async function GET(request: Request): Promise<Response> {
                     : null
         });
     } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "Unable to reach the UNAS console";
+        const message =
+            caught instanceof Error ? caught.message : "Unable to reach the UNAS console";
         return Response.json({ error: message }, { status: 502 });
     }
 }
