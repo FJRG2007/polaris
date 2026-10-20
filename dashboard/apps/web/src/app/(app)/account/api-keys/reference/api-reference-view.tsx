@@ -12,6 +12,7 @@ import { curlCommand } from "@/lib/api-docs/curl";
 import { ArrowLeft, Download } from "lucide-react";
 import { Badge, Button, CopyButton, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { CodeView, JsonView } from "@/components/json-view";
 
 export interface ReferenceEntry {
     id: string;
@@ -40,9 +41,6 @@ const METHOD_TONE: Record<string, string> = {
     PUT: "text-amber-600 dark:text-amber-400",
     DELETE: "text-danger"
 };
-
-const CODE =
-    "overflow-x-auto overscroll-x-contain rounded-md bg-muted/60 p-3 font-mono text-xs leading-relaxed";
 
 export function ApiReferenceView({
     entries,
@@ -90,7 +88,13 @@ export function ApiReferenceView({
                 <h2 className="text-sm font-semibold">{t("apiKeys.reference.auth")}</h2>
                 <p className="text-sm text-muted-foreground">{t("apiKeys.reference.authBody")}</p>
                 <div className="flex items-start gap-2">
-                    <pre className={cn(CODE, "min-w-0 flex-1")}>{header}</pre>
+                    <CodeView
+                        value={header}
+                        language="http"
+                        copyable={false}
+                        label={t("apiKeys.reference.auth")}
+                        className="min-w-0 flex-1"
+                    />
                     <CopyButton value={header} />
                 </div>
             </section>
@@ -214,9 +218,7 @@ function Operation({
                     <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
                         {t("apiKeys.reference.body")}
                     </summary>
-                    <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto overscroll-y-contain")}>
-                        {entry.body}
-                    </pre>
+                    <JsonView value={entry.body} className="mt-1 max-h-80" />
                 </details>
             ) : entry.binaryType ? (
                 <p className="text-xs text-muted-foreground">
@@ -243,14 +245,7 @@ function Operation({
                                     </span>
                                 ) : null}
                             </summary>
-                            <pre
-                                className={cn(
-                                    CODE,
-                                    "mt-1 max-h-80 overflow-y-auto overscroll-y-contain"
-                                )}
-                            >
-                                {response.schema}
-                            </pre>
+                            <JsonView value={response.schema} className="mt-1 max-h-80" />
                         </details>
                     ) : (
                         <p key={response.status} className="text-xs">
@@ -266,7 +261,13 @@ function Operation({
                     {t("apiKeys.reference.example")}
                 </h4>
                 <div className="flex items-start gap-2">
-                    <pre className={cn(CODE, "min-w-0 flex-1")}>{example}</pre>
+                    <CodeView
+                        value={example}
+                        language="bash"
+                        copyable={false}
+                        label={t("apiKeys.reference.example")}
+                        className="min-w-0 flex-1"
+                    />
                     <CopyButton value={example} />
                 </div>
             </div>

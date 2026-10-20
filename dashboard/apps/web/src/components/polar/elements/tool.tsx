@@ -8,7 +8,8 @@
  * packages/elements/src/tool.tsx at ca8be60), Apache-2.0 - see the LICENSE
  * beside this file. Changed: Tailwind 3 and Polaris status tokens instead of
  * fixed colours, a plain disclosure instead of the Radix collapsible, state
- * words from the catalogue, and no code highlighter for the input.
+ * words from the catalogue, and the input painted by Polaris's own JSON
+ * highlighter rather than the one AI Elements ships.
  */
 
 import { cn } from "@polaris/ui";
@@ -16,6 +17,7 @@ import { useId, useState, type ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import type { OrbState } from "@/components/polar/motion/orb-engine/presets";
+import { JsonView } from "@/components/json-view";
 import { CheckCircle2, ChevronDown, Circle, Clock, Wrench, XCircle } from "lucide-react";
 
 export const TOOL_STATES = [
@@ -111,9 +113,7 @@ export function ToolInput({ input }: { input: unknown }) {
             <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
                 {t("elements.parameters")}
             </p>
-            <pre className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px] text-muted-foreground">
-                {jsonOf(input)}
-            </pre>
+            <JsonView value={jsonOf(input)} className="max-h-40" label={t("elements.parameters")} />
         </div>
     );
 }
@@ -121,25 +121,36 @@ export function ToolInput({ input }: { input: unknown }) {
 export function ToolOutput({ output, errorText }: { output: unknown; errorText?: string }) {
     const t = useTranslations("polar");
     if (output === undefined && !errorText) return null;
-    // Polar's tools answer `{ ok, text }`: the text is what a person reads.
-    const text =
+    // Polar's tools answer `{ ok, text }`: the text is what a person reads,
+    // and stays prose. Anything else is data, painted as the JSON it is.
+    const prose =
         errorText ??
         (output && typeof output === "object" && "text" in output && typeof output.text === "string"
             ? output.text
-            : jsonOf(output));
+            : null);
     return (
         <div className="space-y-1">
             <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
                 {errorText ? t("elements.error") : t("elements.result")}
             </p>
-            <pre
-                className={cn(
-                    "max-h-56 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded p-2 font-mono text-[11px]",
-                    errorText ? "bg-danger-soft text-danger-ink" : "bg-muted text-muted-foreground"
-                )}
-            >
-                {text}
-            </pre>
+            {prose === null ? (
+                <JsonView
+                    value={jsonOf(output)}
+                    className="max-h-56"
+                    label={t("elements.result")}
+                />
+            ) : (
+                <pre
+                    className={cn(
+                        "max-h-56 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded p-2 font-mono text-[11px]",
+                        errorText
+                            ? "bg-danger-soft text-danger-ink"
+                            : "bg-muted text-muted-foreground"
+                    )}
+                >
+                    {prose}
+                </pre>
+            )}
         </div>
     );
 }

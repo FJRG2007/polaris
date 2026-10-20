@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { CodeSurface } from "@/components/code-surface";
 import { Pencil } from "lucide-react";
 import { Button, cn } from "@polaris/ui";
 import { EditorActions } from "./editor-actions";
@@ -193,7 +194,7 @@ export function MarkdownView({
                 ) : mode === "raw" ? (
                     // Sideways only, like the plain-text view: the box around
                     // it scrolls down - see `PlainTextEditor`.
-                    <pre className="overflow-x-auto p-4 text-xs leading-relaxed">{file.text}</pre>
+                    <CodeSurface code={file.text} language="markdown" ariaLabel={target.name} />
                 ) : (
                     <MarkdownContent html={html} className={MARKDOWN_PROSE} />
                 )}

@@ -24,6 +24,7 @@ import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enr
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
+import { CodeView } from "@/components/json-view";
 
 type Field = "name" | "username" | "email" | "password";
 
@@ -119,10 +120,13 @@ export function SetupForm({
                     </CardHeader>
                     <CardBody>
                         <p className="text-sm text-muted-foreground">{t("setup.linkHint")}</p>
-                        <pre className="mt-2 rounded-md border border-border bg-muted/40 p-2 text-sm">
-                            {/* i18n-ignore - a command, typed as it is */}
-                            polaris setup
-                        </pre>
+                        <CodeView
+                            // i18n-ignore - a command, typed as it is
+                            value="polaris setup"
+                            language="bash"
+                            label={t("setup.title")}
+                            className="mt-2"
+                        />
                         {tokenConfigured ? null : (
                             <p className="mt-3 text-xs text-warning">{t("setup.noToken")}</p>
                         )}

@@ -48,9 +48,18 @@ export function isValidJson(value: string): boolean {
 }
 
 /** The painted layer. Falls back to plain text until the grammar has loaded. */
-function Painted({ code, className }: { code: string; className?: string }) {
-    const highlight = useHighlighter("json");
-    const painted = highlight ? highlight(code, "json") : null;
+function Painted({
+    code,
+    className,
+    language = "json"
+}: {
+    code: string;
+    className?: string;
+    /** A highlight.js token: an extension or a Markdown fence tag. */
+    language?: string;
+}) {
+    const highlight = useHighlighter(language);
+    const painted = highlight ? highlight(code, language) : null;
 
     // The trailing newline gives the last line a box of its own, so the caret at
     // the end of the document stays visible while editing.
@@ -62,6 +71,45 @@ function Painted({ code, className }: { code: string; className?: string }) {
                 <code dangerouslySetInnerHTML={{ __html: `${painted}\n` }} />
             )}
         </pre>
+    );
+}
+
+/**
+ * Code nobody may change, in any grammar the highlighter knows - a curl
+ * command, an HTTP header, a config file - painted the way `JsonView` paints
+ * JSON. Not for logs or prose: those have no grammar and stay plain text.
+ */
+export function CodeView({
+    value,
+    language,
+    className,
+    copyable = true,
+    label
+}: {
+    value: string;
+    /** A highlight.js token: `bash`, `http`, `yaml`, a file's extension. */
+    language: string;
+    className?: string;
+    copyable?: boolean;
+    /** What the copy button copies, for its name. */
+    label: string;
+}) {
+    return (
+        <div
+            className={cn(
+                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
+                className
+            )}
+        >
+            {copyable ? (
+                <CopyButton
+                    value={value}
+                    label={label}
+                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                />
+            ) : null}
+            <Painted code={value} language={language} />
+        </div>
     );
 }
 

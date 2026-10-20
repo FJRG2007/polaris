@@ -32,6 +32,7 @@ import { dataText } from "@/lib/data/words";
 import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
+import { JsonView, isValidJson } from "@/components/json-view";
 import { spreadsheetSafe } from "@/lib/data/spreadsheet";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -1351,9 +1352,15 @@ function KeyPanel({ value, onClose }: { value: KeyValueView; onClose: () => void
                     </Button>
                 </div>
                 {value.value !== null ? (
-                    <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
-                        {value.value}
-                    </pre>
+                    // A value that is JSON (an object or a list) is painted as
+                    // JSON; a plain string or counter stays as it is stored.
+                    /^\s*[[{]/.test(value.value) && isValidJson(value.value) ? (
+                        <JsonView value={value.value} label={value.key} className="max-h-64" />
+                    ) : (
+                        <pre className="max-h-64 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-xs">
+                            {value.value}
+                        </pre>
+                    )
                 ) : value.entries ? (
                     <div className="max-h-64 overflow-auto overscroll-contain rounded border border-border">
                         <table className="w-full text-xs">
