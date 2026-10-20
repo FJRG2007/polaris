@@ -476,6 +476,11 @@ export function PolarChat({
     const pathname = usePathname();
     const state = useContext(PolarContext);
     const [threadId, setThreadId] = useState(newId);
+    // What a chat opens with. `useChat` makes a new chat for every id, so the
+    // messages of a thread being opened go in with its id: set on the chat it
+    // had before, they would land on the one being replaced, and the thread
+    // opened empty until a second click found its id already in place.
+    const [opening, setOpening] = useState<UIMessage[]>([]);
     const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
     const [tools, setTools] = useState<Record<string, ToolDescription>>({});
     const [isAdmin, setIsAdmin] = useState(false);
@@ -556,6 +561,7 @@ export function PolarChat({
     );
     const chat = useChat({
         id: threadId,
+        messages: opening,
         transport,
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses
     });
@@ -725,9 +731,12 @@ export function PolarChat({
         setTemporary(false);
         const roots = thread.messages.filter((message) => message.parentId === null);
         const newestRoot = roots.at(-1);
+        const shown = newestRoot ? pathThrough(next, [], 0, newestRoot.id) : [];
+        setOpening(shown);
         setThreadId(thread.id);
         setNewProject(thread.projectId);
-        chat.setMessages(newestRoot ? pathThrough(next, [], 0, newestRoot.id) : []);
+        // The thread already open: the same chat, so its messages are set on it.
+        if (thread.id === threadId) chat.setMessages(shown);
         setQueue(thread.queue);
         if (thread.choice) setChoice(thread.choice);
         setShowHistory(fullPage);
@@ -760,8 +769,8 @@ export function PolarChat({
         setNewProject(projectId);
         if (projectId) sidebar.openProject(projectId);
         tree.current = new Map();
+        setOpening([]);
         setThreadId(newId());
-        chat.setMessages([]);
         setQueue([]);
         setInput("");
         setQuote(null);
