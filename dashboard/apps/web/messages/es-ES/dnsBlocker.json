@@ -312,5 +312,14 @@
         "server": "Servidor",
         "add": "Reenviar",
         "remove": "Dejar de reenviar"
+    },
+    "safe": {
+        "title": "Búsqueda segura",
+        "intro": "Para todos los equipos de la red. El navegador no puede quitarla.",
+        "search": "Filtrar resultados explícitos en Google y Bing",
+        "youtube": "Modo restringido de YouTube",
+        "youtubeOff": "No",
+        "youtubeModerate": "Moderado",
+        "youtubeStrict": "Estricto"
     }
 }

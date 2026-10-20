@@ -382,6 +382,10 @@ export const dnsSettingsSchema = z.object({
     logDays: z.number().int().min(1).max(DNS_LIMITS.logDays),
     /** Domains sent to another server instead of the resolvers above. */
     forwards: z.array(dnsForwardSchema).max(DNS_LIMITS.forwards),
+    /** Google and Bing answer with explicit results filtered, for every device. */
+    safeSearch: z.boolean(),
+    /** YouTube's restricted mode for every device, or "off". */
+    youtube: z.enum(["off", "moderate", "strict"]),
     /** Devices named by hand, which win over a name the router reports. */
     devices: z.array(dnsDeviceSchema).max(DNS_LIMITS.devices),
     /** The router asked for device names (reverse lookups), or "" for none. */
@@ -413,6 +417,8 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     logDays: 7,
     devices: [],
     forwards: [],
+    safeSearch: false,
+    youtube: "off",
     namesFrom: ""
 };
 
@@ -450,6 +456,8 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         logDays: field("logDays"),
         devices: field("devices"),
         forwards: field("forwards"),
+        safeSearch: field("safeSearch"),
+        youtube: field("youtube"),
         namesFrom: field("namesFrom")
     };
 }

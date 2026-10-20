@@ -312,5 +312,14 @@
         "server": "Its server",
         "add": "Forward",
         "remove": "Stop forwarding"
+    },
+    "safe": {
+        "title": "Safe search filters",
+        "intro": "For every device on the network. A browser setting cannot turn it off.",
+        "search": "Filter explicit results on Google and Bing",
+        "youtube": "YouTube restricted mode",
+        "youtubeOff": "Off",
+        "youtubeModerate": "Moderate",
+        "youtubeStrict": "Strict"
     }
 }

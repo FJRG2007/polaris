@@ -111,6 +111,8 @@ export function DnsBlockerView({
     const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
     const [devices, setDevices] = useState(initial.devices);
     const [forwards, setForwards] = useState(initial.forwards);
+    const [safeSearch, setSafeSearch] = useState(initial.safeSearch);
+    const [youtube, setYoutube] = useState(initial.youtube);
     const [forwardDomain, setForwardDomain] = useState("");
     const [forwardServer, setForwardServer] = useState("");
     const [deviceName, setDeviceName] = useState("");
@@ -194,6 +196,8 @@ export function DnsBlockerView({
             logDays: days,
             devices,
             forwards,
+            safeSearch,
+            youtube,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -210,6 +214,8 @@ export function DnsBlockerView({
             days,
             devices,
             forwards,
+            safeSearch,
+            youtube,
             namesFrom
         ]
     );
@@ -764,6 +770,33 @@ export function DnsBlockerView({
                             <Plus />
                             {t("aliases.add")}
                         </Button>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("safe.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("safe.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+                    <label className="flex items-center gap-2 text-sm">
+                        <Switch checked={safeSearch} onChange={setSafeSearch} />
+                        <span>{t("safe.search")}</span>
+                    </label>
+                    <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2">
+                        <span aria-hidden>{t("safe.youtube")}</span>
+                        <Select
+                            className="w-full sm:w-48"
+                            value={youtube}
+                            aria-label={t("safe.youtube")}
+                            onValueChange={(value) => setYoutube(value as typeof youtube)}
+                            options={[
+                                { value: "off", label: t("safe.youtubeOff") },
+                                { value: "moderate", label: t("safe.youtubeModerate") },
+                                { value: "strict", label: t("safe.youtubeStrict") }
+                            ]}
+                        />
                     </div>
                 </CardBody>
             </Card>

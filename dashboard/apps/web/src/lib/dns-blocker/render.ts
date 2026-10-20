@@ -11,6 +11,7 @@
  */
 
 import { QUERY_LOG_DIR } from "./query-log";
+import { safeSearchAliases } from "./safe-search";
 import {
     DNS_CATEGORIES,
     DNS_LIST_SOURCES,
@@ -89,6 +90,12 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
 
     const { servers, bootstrap } = upstreamsOf(settings);
     const aliased = new Set(settings.aliases.map((alias) => alias.name));
+    const recorded = new Set(settings.records.map((record) => record.name));
+    // A name the operator answers themselves keeps their answer.
+    const safe = safeSearchAliases(settings).filter(
+        (alias) => !aliased.has(alias.name) && !recorded.has(alias.name)
+    );
+    const zoned = [...settings.aliases, ...safe];
     const mapping = new Map<string, string[]>();
     for (const record of settings.records) {
         // The engine lets a zone entry replace a mapped one of the same name,
@@ -124,7 +131,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                 maxErrorsPerSource: -1
             }
         },
-        ...(mapping.size > 0 || settings.aliases.length > 0
+        ...(mapping.size > 0 || zoned.length > 0
             ? {
                   customDNS: {
                       customTTL: "5m",
@@ -140,7 +147,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                           : {}),
                       // Aliases (CNAME) can only be written as a zone file; every
                       // name is absolute, so no origin is needed.
-                      ...(settings.aliases.length > 0 ? { zone: aliasZone(settings) } : {})
+                      ...(zoned.length > 0 ? { zone: zoneOf(zoned) } : {})
                   }
               }
             : {}),
@@ -188,7 +195,11 @@ function clientLookupOf(settings: DnsSettings): Record<string, unknown> {
 
 /** The aliases as zone-file lines, one CNAME each. Exported for tests. */
 export function aliasZone(settings: DnsSettings): string {
-    return inline(settings.aliases.map((alias) => `${alias.name}. 300 IN CNAME ${alias.target}.`));
+    return zoneOf(settings.aliases);
+}
+
+function zoneOf(aliases: readonly { name: string; target: string }[]): string {
+    return inline(aliases.map((alias) => `${alias.name}. 300 IN CNAME ${alias.target}.`));
 }
 
 /** The configuration file's text. */

@@ -243,3 +243,53 @@ describe("local domains", () => {
         );
     });
 });
+
+describe("safe search", () => {
+    const zoneOf = (patch: Partial<dns.DnsSettings>) =>
+        (render.blockyConfig(settings(patch)).customDNS as { zone?: string } | undefined)?.zone ??
+        "";
+
+    it("answers every Google domain and Bing with their locked hosts", () => {
+        const zone = zoneOf({ safeSearch: true });
+        expect(zone).toContain("www.google.com. 300 IN CNAME forcesafesearch.google.com.\n");
+        expect(zone).toContain("www.google.es. 300 IN CNAME forcesafesearch.google.com.\n");
+        expect(zone).toContain("www.bing.com. 300 IN CNAME strict.bing.com.\n");
+        expect(zone).not.toContain("youtube");
+    });
+
+    it("restricts only the YouTube hosts Google names", () => {
+        const zone = zoneOf({ youtube: "moderate" });
+        expect(zone.trim().split("\n")).toEqual([
+            "www.youtube.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "m.youtube.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "youtubei.googleapis.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "youtube.googleapis.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "www.youtube-nocookie.com. 300 IN CNAME restrictmoderate.youtube.com."
+        ]);
+        expect(zoneOf({ youtube: "strict" })).toContain("IN CNAME restrict.youtube.com.");
+    });
+
+    it("leaves a name the operator answers themselves alone", () => {
+        const zone = zoneOf({
+            safeSearch: true,
+            records: [{ name: "www.google.com", address: "10.0.0.5" }],
+            aliases: [{ name: "www.bing.com", target: "nas.home" }]
+        });
+        expect(zone).not.toContain("www.google.com. 300 IN CNAME forcesafesearch");
+        expect(zone).toContain("www.bing.com. 300 IN CNAME nas.home.\n");
+        expect(zone).not.toContain("www.bing.com. 300 IN CNAME strict.bing.com.");
+    });
+
+    it("is off for a fresh install and for an older stored row", () => {
+        expect(render.blockyConfig(settings()).customDNS).toBeUndefined();
+        expect(dns.readDnsSettings({ youtube: "nonsense" })).toMatchObject({
+            safeSearch: false,
+            youtube: "off"
+        });
+    });
+
+    it("still fits the one environment value with everything on", () => {
+        const encoded = render.encodeBlockyConfig(settings({ safeSearch: true, youtube: "strict" }));
+        expect(encoded.length).toBeLessThan(ENV_VALUE_MAX);
+    });
+});
