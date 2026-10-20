@@ -33,7 +33,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 /** Only one provider exists today; the catalogue keeps the form data-driven. */
@@ -142,6 +143,10 @@ function SmsSenderDialog({
     }));
     const [secret, setSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { name, settings, secret };
+    // What the sender held when the dialog opened: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = sender !== null && !isDirty(loaded, values);
 
     function submit() {
         setError(null);
@@ -212,7 +217,7 @@ function SmsSenderDialog({
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button onClick={submit} disabled={pending}>
+                        <Button onClick={submit} disabled={pending || unchanged}>
                             {tc("actions.save")}
                         </Button>
                     </div>
