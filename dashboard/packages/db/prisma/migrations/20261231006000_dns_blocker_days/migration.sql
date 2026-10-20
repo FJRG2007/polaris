@@ -1,6 +1,6 @@
 -- The ad blocker's long-term statistics: one row per finished UTC day, rolled
 -- up from the DNS server's own log before it is deleted. Additive.
-CREATE TABLE "DnsBlockerDay" (
+CREATE TABLE IF NOT EXISTS "DnsBlockerDay" (
     "day" DATE NOT NULL,
     "queries" INTEGER NOT NULL,
     "blocked" INTEGER NOT NULL,

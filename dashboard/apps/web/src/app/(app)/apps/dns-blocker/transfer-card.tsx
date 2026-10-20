@@ -6,20 +6,22 @@
  * nothing is applied until Save.
  */
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Download, Upload } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useDnsBlocker } from "./dns-blocker-context";
 import * as transfer from "@/lib/dns-blocker/transfer";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 
 export function DnsTransferCard() {
     const t = useTranslations("dnsBlocker");
     const { saved, dirty, loadForm } = useDnsBlocker();
-    const picker = useRef<HTMLInputElement>(null);
+    const [chooseFiles, chooser] = useChooseFiles();
     const [preview, setPreview] = useState<transfer.DnsImport | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
+    const [failed, setFailed] = useState<string | null>(null);
 
     const field = (key: string) => {
         const label = `transfer.fields.${key}` as NamespaceKey<"dnsBlocker">;
@@ -70,24 +72,23 @@ export function DnsTransferCard() {
                         <Download className="size-4 shrink-0" />
                         {t("transfer.export")}
                     </Button>
-                    <Button variant="outline" onClick={() => picker.current?.click()}>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setFailed(null);
+                            void chooseFiles({
+                                accept: "application/json,.json",
+                                onFailed: setFailed
+                            }).then(([file]) => read(file));
+                        }}
+                    >
                         <Upload className="size-4 shrink-0" />
                         {t("transfer.import")}
                     </Button>
-                    <input
-                        ref={picker}
-                        type="file"
-                        accept="application/json,.json"
-                        className="hidden"
-                        aria-hidden
-                        tabIndex={-1}
-                        onChange={(event) => {
-                            read(event.target.files?.[0]);
-                            event.target.value = "";
-                        }}
-                    />
+                    {chooser}
                 </div>
                 {notice ? <p className="text-sm text-success-ink">{notice}</p> : null}
+                {failed ? <p className="text-sm text-danger-ink">{failed}</p> : null}
                 {preview && !preview.ok ? (
                     <p className="text-sm text-danger-ink">
                         {preview.error === "invalid"

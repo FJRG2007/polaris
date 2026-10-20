@@ -93,7 +93,7 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                     </p>
                 ) : null}
                 {devices && devices.length > 0 ? (
-                    <div className="max-h-[28rem] overflow-auto">
+                    <div className="max-h-[28rem] overflow-auto overscroll-contain">
                         <table className="w-full min-w-[40rem] text-sm">
                             <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                                 <tr>

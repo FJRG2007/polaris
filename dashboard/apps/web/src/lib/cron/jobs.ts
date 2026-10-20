@@ -192,7 +192,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: 15 * MINUTE,
         // Leased: two runners would each redeploy the DNS server, and the
         // second restart would drop the answers the first had just resumed.
-        leaseMs: 10 * MINUTE,
+        leaseMs: 20 * MINUTE,
         run: () => reapplyAfterClockChange()
     },
     {
@@ -203,7 +203,7 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: HOUR,
         // Leased: a pass reads whole days of log from the DNS server, and two at
         // once would each read the same files (the row itself is written once).
-        leaseMs: 30 * MINUTE,
+        leaseMs: 2 * HOUR,
         run: () => rollUpHistory()
     },
     {
