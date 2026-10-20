@@ -14,6 +14,7 @@ import { QUERY_LOG_DIR } from "./query-log";
 import { safeSearchAliases } from "./safe-search";
 import {
     DNS_CATEGORIES,
+    DNS_CHECK_NAME,
     DNS_LIST_SOURCES,
     DNS_UPSTREAM_PRESETS,
     type DnsCategory,
@@ -22,13 +23,6 @@ import {
 
 /** The port the engine answers its HTTP API on, inside the container. */
 export const DNS_ENGINE_HTTP_PORT = 4000;
-
-/**
- * A name that is always blocked, so Polaris can ask the blocker for it and tell
- * from the answer that blocking is on. Under `.invalid`, which no resolver on
- * the internet will ever answer (RFC 6761), so nothing real is ever caught.
- */
-export const DNS_CHECK_NAME = "blocking-check.polaris.invalid";
 
 /** The group holding the operator's own blocked names. */
 const OWN_GROUP = "polaris";
