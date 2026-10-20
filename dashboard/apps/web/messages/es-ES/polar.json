@@ -1,4 +1,12 @@
 {
+    "notices": {
+        "answeredTitle": "Polar respondió: {title}",
+        "answeredBody": "El chat que dejaste ya tiene respuesta.",
+        "waitingTitle": "Polar te espera: {title}",
+        "waitingBody": "Un paso de este chat espera tu aprobación.",
+        "failedTitle": "Polar se paró: {title}",
+        "failedBody": "La respuesta acabó antes. Abre el chat para ver por qué."
+    },
     "toggle": {
         "title": "Pide a Polar ({keys})",
         "label": "Preguntar"
@@ -17,6 +25,9 @@
         "sleeping": "Polar, dormido"
     },
     "history": {
+        "running": "Respondiendo",
+        "waiting": "Espera tu aprobación",
+        "unread": "Respuesta nueva",
         "title": "Conversaciones",
         "empty": "Sin conversaciones aún.",
         "delete": "Eliminar",
@@ -139,7 +150,8 @@
         },
         "branchFailed": "No se pudo ramificar el chat. Vuelve a intentarlo.",
         "usageLimit": "Has usado {used} de los {amount} tokens por {period} que este Polaris te deja en su clave compartida. Añade tu clave o pide más a un admin.",
-        "fileUnreadable": "Este modelo no puede leer {name} y no se pudo sacar su texto. Elige un modelo que lea este tipo de archivo o adjúntalo como PDF o texto."
+        "fileUnreadable": "Este modelo no puede leer {name} y no se pudo sacar su texto. Elige un modelo que lea este tipo de archivo o adjúntalo como PDF o texto.",
+        "tooManyRuns": "Ya hay {max} chats tuyos respondiendo. Espera a que acabe uno o detén uno y vuelve a probar."
     },
     "queue": {
         "title": "Van después",

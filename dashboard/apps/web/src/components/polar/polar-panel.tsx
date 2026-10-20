@@ -86,6 +86,7 @@ import {
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
+import * as polarRuns from "@/components/polar/polar-runs";
 import * as polarShared from "@/lib/polar/shared";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
@@ -956,9 +957,16 @@ export function PolarChat({
         id: threadId,
         messages: opening,
         transport,
-        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+        // An answer keeps running after its chat is left; opening the chat
+        // again picks it up where it is (`chat/[id]/stream`).
+        resume: true
     });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const runMarks = polarRuns.usePolarRuns(showHistory, busy);
+    /** The stop button: leaving a chat never stops its answer, this does. */
+    const stopAnswer = () =>
+        Promise.all([chat.stop(), polarRuns.stopPolarAnswer(live.current.threadId)]);
     const online = usePolarOnline();
     const avatarState = avatarStateFor({ open: true, online, busy });
     // A failure the answer itself carries is drawn with it; the error alone is
@@ -967,7 +975,7 @@ export function PolarChat({
         chat.error && !polarFailure.messageFailure(chat.messages.at(-1)) ? chat.error : null;
     const stopTurn = () => {
         setStopped(chat.messages.at(-1)?.id ?? null);
-        void chat.stop();
+        void stopAnswer();
     };
     const waitingApproval = chat.messages
         .at(-1)
@@ -1332,6 +1340,7 @@ export function PolarChat({
     };
 
     const startNew = (projectId: string | null = null) => {
+        // Lets go of the answer on screen; it keeps running on the server.
         void chat.stop();
         discardTemporary();
         setNewProject(projectId);
@@ -1749,7 +1758,7 @@ export function PolarChat({
     /** What was said in voice mode, sent as the next message of this thread. */
     const sendSpoken = async (text: string) => {
         if (!live.current.choice) return;
-        if (chat.status === "submitted" || chat.status === "streaming") await chat.stop();
+        if (chat.status === "submitted" || chat.status === "streaming") await stopAnswer();
         turnChoice.current = null;
         setLastApproved(false);
         void chat.sendMessage(withScreen({ text }));
@@ -1942,6 +1951,7 @@ export function PolarChat({
         <PolarThreads
             sidebar={sidebar}
             activeId={chatMode ? threadId : ""}
+            runs={runMarks}
             onOpen={(id) => {
                 code.setMode("chat");
                 void openThread(id);

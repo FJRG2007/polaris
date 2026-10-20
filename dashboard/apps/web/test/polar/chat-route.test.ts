@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { MockLanguageModelV4 } from "ai/test";
 import { tool, type LanguageModelV4StreamPart, type UIMessage } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resetPolarRuns } from "@/lib/polar/runs";
 
 const USER = {
     id: "11111111-1111-4111-8111-111111111111",
@@ -29,6 +30,7 @@ const state = {
     parts: [] as LanguageModelV4StreamPart[],
     executed: [] as string[],
     saved: [] as unknown[],
+    asked: [] as unknown[],
     titled: [] as unknown[][],
     suggested: [] as unknown[][],
     suggestions: true,
@@ -88,8 +90,13 @@ vi.mock("@/lib/polar/threads", () => ({
         return state.owned ? { temporary: false } : null;
     },
     polarThreadInstructions: async () => null,
-    savePolarMessages: async (...args: unknown[]) => void state.saved.push(args)
+    // A question is kept as it is asked (`saved` holds only finished turns).
+    savePolarMessages: async (...args: unknown[]) => {
+        const list = args[2] as UIMessage[];
+        (list.at(-1)?.role === "user" ? state.asked : state.saved).push(args);
+    }
 }));
+vi.mock("@/lib/polar/run-notices", () => ({ noticePolarRunEnd: async () => undefined }));
 vi.mock("@/lib/polar/titles", () => ({
     startPolarTitle: (...args: unknown[]) => void state.titled.push(args)
 }));
@@ -258,6 +265,8 @@ beforeEach(() => {
     state.parts = says("Done.");
     state.executed = [];
     state.saved = [];
+    state.asked = [];
+    resetPolarRuns();
     state.titled = [];
     state.suggested = [];
     state.suggestions = true;
@@ -443,8 +452,13 @@ describe("what a request has to look like", () => {
         const answer = await post(body());
         const text = await answer.text();
         expect(text).toMatch(/"usage":\{"inputTokens":\d+,"outputTokens":\d+/);
-        await vi.waitFor(() => expect(state.recorded).toHaveLength(1));
-        expect(state.recorded[0]).toMatchObject({ payer: "own", threadId: THREAD });
+        // An earlier test's answer, never read, still finishes on its own and
+        // records too: this one is found by its id.
+        const id = /"type":"start"[^\n]*?"messageId":"([^"]+)"/.exec(text)?.[1];
+        const mine = () =>
+            state.recorded.filter((entry) => (entry as { messageId?: string }).messageId === id);
+        await vi.waitFor(() => expect(mine()).toHaveLength(1));
+        expect(mine()[0]).toMatchObject({ payer: "own", threadId: THREAD });
     });
 
     it("streams an answer and saves the turn", async () => {
@@ -745,5 +759,37 @@ describe("Polar on the web", () => {
         );
         expect(response.status).toBe(200);
         await response.text();
+    });
+});
+
+describe("answers that outlive their screen", () => {
+    it("finishes and saves an answer nobody read, and keeps the question first", async () => {
+        const answer = await post(body());
+        expect(answer.status).toBe(200);
+        // The screen went elsewhere: the body is never read.
+        expect(state.asked).toHaveLength(1);
+        await vi.waitFor(() => expect(state.saved).toHaveLength(1));
+        expect(savedTurn().at(-1)?.role).toBe("assistant");
+    });
+
+    it("refuses a second answer on a thread that is still answering", async () => {
+        const first = await post(body());
+        const second = await post(body());
+        expect(second.status).toBe(409);
+        await first.text();
+    });
+
+    it("replays the running answer to a chat opened again, and 204 once it is done", async () => {
+        const stream = await import("@/app/api/polar/chat/[id]/stream/route");
+        const params = { params: Promise.resolve({ id: THREAD }) };
+        const first = await post(body());
+        const replay = await stream.GET(new Request("https://polaris.test/x"), params);
+        expect(replay.status).toBe(200);
+        const [live, replayed] = await Promise.all([first.text(), replay.text()]);
+        expect(replayed).toContain("Done.");
+        expect(replayed).toContain(/"messageId":"([^"]+)"/.exec(live)?.[1]);
+        await vi.waitFor(async () =>
+            expect((await stream.GET(new Request("https://polaris.test/x"), params)).status).toBe(204)
+        );
     });
 });

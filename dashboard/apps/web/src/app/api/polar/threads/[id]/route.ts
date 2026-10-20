@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
+import { stopPolarRun } from "@/lib/polar/runs";
 import { queueSchema, threadTitleSchema } from "@/lib/polar/shared";
 import {
     changePolarThread,
@@ -69,6 +70,8 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Res
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
+    // An answer still running in a deleted chat has nowhere left to go.
+    stopPolarRun(user.id, id.data);
     return (await deletePolarThread(user.id, id.data))
         ? NextResponse.json({ ok: true })
         : NOT_FOUND();

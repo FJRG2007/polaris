@@ -68,9 +68,11 @@ export function PolarFailureNotice({
               })
             : stored?.code === "file_unreadable"
               ? t("errors.fileUnreadable", { name: stored.name })
-              : failure
-                ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
-                : t("errors.failed");
+              : stored?.code === "too_many_runs"
+                ? t("errors.tooManyRuns", { max: stored.max })
+                : failure
+                  ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
+                  : t("errors.failed");
     // A limit or a file is not fixed by asking again.
     const retry =
         stored?.code === "usage_limit" || stored?.code === "file_unreadable" ? undefined : onRetry;

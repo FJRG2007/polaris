@@ -453,6 +453,10 @@
             "label": "Actualizado automáticamente",
             "description": "Se ha ejecutado una actualización programada o automática, y cómo ha ido."
         },
+        "polarChatReady": {
+            "label": "Chat listo en segundo plano",
+            "description": "Un chat de Polar que dejaste terminó su respuesta o espera tu aprobación."
+        },
         "storageUnreachable": {
             "label": "El almacenamiento no responde",
             "description": "El almacenamiento de archivos dejó de responder, así que las subidas nuevas se guardan en este servidor. Solo llega a administradores."
@@ -550,6 +554,7 @@
         "network": "Red",
         "people": "Personas",
         "agents": "Agentes",
+        "polar": "Polar",
         "system": "Polaris"
     },
     "badges": {

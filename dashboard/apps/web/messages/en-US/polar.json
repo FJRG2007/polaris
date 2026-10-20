@@ -1,4 +1,12 @@
 {
+    "notices": {
+        "answeredTitle": "Polar answered: {title}",
+        "answeredBody": "The chat you left has its answer.",
+        "waitingTitle": "Polar is waiting: {title}",
+        "waitingBody": "A step in this chat needs your approval to go on.",
+        "failedTitle": "Polar stopped: {title}",
+        "failedBody": "The answer ended early. Open the chat to see why."
+    },
     "toggle": {
         "title": "Ask Polar ({keys})",
         "label": "Ask Polar"
@@ -17,6 +25,9 @@
         "sleeping": "Polar, asleep"
     },
     "history": {
+        "running": "Answering now",
+        "waiting": "Needs your approval",
+        "unread": "Unread answer",
         "title": "Conversations",
         "empty": "No conversations yet.",
         "delete": "Delete",
@@ -139,7 +150,8 @@
         },
         "branchFailed": "Could not branch this chat. Try again in a moment.",
         "usageLimit": "You have used {used} of the {amount} tokens this Polaris allows you on its shared key per {period}. Add your own key, or ask an administrator to raise the limit.",
-        "fileUnreadable": "{name} cannot be read by this model and no text could be taken from it. Pick a model that reads this kind of file, or attach it as PDF or text."
+        "fileUnreadable": "{name} cannot be read by this model and no text could be taken from it. Pick a model that reads this kind of file, or attach it as PDF or text.",
+        "tooManyRuns": "{max} of your chats are answering already. Wait for one to finish, or stop one, and try again."
     },
     "queue": {
         "title": "Sends next",

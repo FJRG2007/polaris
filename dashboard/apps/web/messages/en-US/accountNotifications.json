@@ -453,6 +453,10 @@
             "label": "Update installed on its own",
             "description": "A scheduled or automatic update ran, and how it went."
         },
+        "polarChatReady": {
+            "label": "Chat answered while away",
+            "description": "A Polar chat you left finished its answer, or is waiting for your approval."
+        },
         "storageUnreachable": {
             "label": "Upload storage is not reachable",
             "description": "The storage files are saved to stopped answering, so new uploads are kept on this server. Only reaches administrators."
@@ -550,6 +554,7 @@
         "network": "Network",
         "people": "People",
         "agents": "Agents",
+        "polar": "Polar",
         "system": "Polaris"
     },
     "badges": {

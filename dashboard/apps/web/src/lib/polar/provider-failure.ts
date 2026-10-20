@@ -103,7 +103,8 @@ export const storedFailureSchema = z.discriminatedUnion("code", [
         amount: z.number().nonnegative(),
         period: z.enum(["day", "week", "month"])
     }),
-    z.object({ code: z.literal("file_unreadable"), name: z.string().max(255) })
+    z.object({ code: z.literal("file_unreadable"), name: z.string().max(255) }),
+    z.object({ code: z.literal("too_many_runs"), max: z.number().int().min(1).max(100) })
 ]);
 export type StoredFailure = z.infer<typeof storedFailureSchema>;
 
