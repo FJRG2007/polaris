@@ -5,8 +5,10 @@
  */
 
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { Card, CardBody, Skeleton } from "@polaris/ui";
-import { requireUser } from "@/lib/session";
+import { homePathForUser, requireUser } from "@/lib/session";
+import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { listGrants } from "@/lib/polar/tool-grants";
@@ -33,6 +35,7 @@ async function GrantsSection({ userId }: { userId: string }) {
 
 export default async function PolarToolsPage() {
     const user = await requireUser();
+    if (!(await polarAccessFor(user.id)).use) redirect(await homePathForUser(user));
     const t = await getTranslations("account");
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">

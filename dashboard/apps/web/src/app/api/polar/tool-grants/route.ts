@@ -10,11 +10,11 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { callerMayUse } from "@/lib/mcp/protocol";
-import { polarCaller } from "@/lib/polar/tools";
+import { polarCaller as mcpCaller } from "@/lib/polar/tools";
 import { callTarget, grantScope, grantableTool, saveGrant } from "@/lib/polar/tool-grants";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ function refuse(code: string, status: number): NextResponse {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return refuse("view_as", 403);
     const limited = await rateLimit(`polar-grants:${user.id}`, 60, 60_000);
@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = bodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
 
-    const caller = await polarCaller(user);
+    const caller = await mcpCaller(user);
     const entry = await grantableTool(body.data.tool, (candidate) =>
         callerMayUse(candidate, caller)
     );
