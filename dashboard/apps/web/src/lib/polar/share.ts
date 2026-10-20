@@ -53,7 +53,11 @@ async function linkFor(token: string): Promise<string> {
     return `${await sharingBaseUrl()}/c/${token}`;
 }
 
-function tokenOf(share: { encryptedToken: Uint8Array; tokenNonce: Uint8Array; tokenKeyId: string }) {
+function tokenOf(share: {
+    encryptedToken: Uint8Array;
+    tokenNonce: Uint8Array;
+    tokenKeyId: string;
+}) {
     return decryptSecret(
         {
             ciphertext: Buffer.from(share.encryptedToken),
@@ -173,7 +177,12 @@ function filesOf(parts: unknown): SharedPolarFile[] {
     if (!Array.isArray(parts)) return [];
     return parts.flatMap((part) => {
         if (!part || typeof part !== "object") return [];
-        const file = part as { type?: unknown; url?: unknown; filename?: unknown; mediaType?: unknown };
+        const file = part as {
+            type?: unknown;
+            url?: unknown;
+            filename?: unknown;
+            mediaType?: unknown;
+        };
         if (file.type !== "file" || typeof file.url !== "string") return [];
         const id = polarAttachmentId(file.url);
         if (!id) return [];
@@ -211,9 +220,11 @@ export function newestPath<T extends Row>(rows: readonly T[]): T[] {
 }
 
 /** The words (and Polar's own files) of a thread up to a snapshot. */
-async function snapshotOf(
-    share: { threadId: string; sharedAt: Date; thread: { title: string } }
-): Promise<SharedPolarThread> {
+async function snapshotOf(share: {
+    threadId: string;
+    sharedAt: Date;
+    thread: { title: string };
+}): Promise<SharedPolarThread> {
     const rows = await prisma.polarMessage.findMany({
         where: { threadId: share.threadId, createdAt: { lte: share.sharedAt } },
         select: { id: true, parentId: true, role: true, parts: true },

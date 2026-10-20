@@ -49,7 +49,10 @@ async function findPeople(query: string) {
         () => null
     );
     if (!response?.ok) return { results: [] };
-    return (await response.json()) as { results?: { id: string; name: string }[]; withheld?: number };
+    return (await response.json()) as {
+        results?: { id: string; name: string }[];
+        withheld?: number;
+    };
 }
 
 function IconAction({
@@ -209,7 +212,9 @@ export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClos
                                         onClick={() =>
                                             void copy(link.url).then((done) =>
                                                 done
-                                                    ? toast.show({ title: t("history.shareCopied") })
+                                                    ? toast.show({
+                                                          title: t("history.shareCopied")
+                                                      })
                                                     : null
                                             )
                                         }
@@ -411,7 +416,9 @@ export function SharedLinksDialog({
 
     const stop = async (share: OwnedPolarShare) => {
         const before = shares;
-        setShares((current) => current?.filter((entry) => entry.threadId !== share.threadId) ?? null);
+        setShares(
+            (current) => current?.filter((entry) => entry.threadId !== share.threadId) ?? null
+        );
         const response = await fetch(`/api/polar/threads/${share.threadId}/share?everyone=1`, {
             method: "DELETE"
         }).catch(() => null);
@@ -430,7 +437,9 @@ export function SharedLinksDialog({
                 </DialogHeader>
                 <div className="-mx-2 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {failed ? (
-                        <p className="px-2 py-1.5 text-sm text-danger">{t("sharing.linksFailed")}</p>
+                        <p className="px-2 py-1.5 text-sm text-danger">
+                            {t("sharing.linksFailed")}
+                        </p>
                     ) : shares === null ? (
                         <div className="space-y-2 p-2">
                             {[0, 1, 2].map((key) => (

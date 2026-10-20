@@ -39,7 +39,11 @@ async function headersFor(path: string): Promise<Record<string, string>> {
     const rules = (await nextConfig.headers?.()) ?? [];
     const out: Record<string, string> = {};
     for (const rule of rules) {
-        const matcher = pathToRegexp(rule.source, [], { strict: true, sensitive: false, delimiter: "/" });
+        const matcher = pathToRegexp(rule.source, [], {
+            strict: true,
+            sensitive: false,
+            delimiter: "/"
+        });
         if (!matcher.test(path)) continue;
         for (const header of rule.headers) out[header.key] = header.value;
     }
@@ -89,7 +93,11 @@ describe("search engines", () => {
         const missing: string[] = [];
         for (const address of addresses) {
             const robotsTag = (await headersFor(address))["X-Robots-Tag"] ?? "";
-            if (!/noindex/.test(robotsTag) || !/nofollow/.test(robotsTag) || !/noarchive/.test(robotsTag))
+            if (
+                !/noindex/.test(robotsTag) ||
+                !/nofollow/.test(robotsTag) ||
+                !/noarchive/.test(robotsTag)
+            )
                 missing.push(address);
         }
         expect(missing).toEqual([]);
@@ -114,11 +122,15 @@ describe("links out of a public page", () => {
             const headers = await headersFor(`/${prefix}/sample-token`);
             expect(headers["Referrer-Policy"], prefix).toBe("no-referrer");
         }
-        expect((await headersFor("/home"))["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+        expect((await headersFor("/home"))["Referrer-Policy"]).toBe(
+            "strict-origin-when-cross-origin"
+        );
     });
 
     it("leave the referrer to the header, which a page's meta referrer would override", () => {
-        const offenders = metadataFiles(APP).filter((file) => /\breferrer\s*:/.test(readFileSync(file, "utf8")));
+        const offenders = metadataFiles(APP).filter((file) =>
+            /\breferrer\s*:/.test(readFileSync(file, "utf8"))
+        );
         expect(offenders).toEqual([]);
     });
 

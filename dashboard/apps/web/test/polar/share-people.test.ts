@@ -31,7 +31,11 @@ const state = {
     failCopy: false
 };
 
-const SHARE = { threadId: THREAD, sharedAt: new Date(), thread: { title: "Disk", user: { name: "Ada", username: "ada" } } };
+const SHARE = {
+    threadId: THREAD,
+    sharedAt: new Date(),
+    thread: { title: "Disk", user: { name: "Ada", username: "ada" } }
+};
 const MESSAGES = [
     {
         id: "q",
@@ -39,7 +43,12 @@ const MESSAGES = [
         role: "user",
         parts: [
             { type: "text", text: "Look at this" },
-            { type: "file", url: `/api/polar/attachments/${FILE}`, filename: "disk.png", mediaType: "image/png" },
+            {
+                type: "file",
+                url: `/api/polar/attachments/${FILE}`,
+                filename: "disk.png",
+                mediaType: "image/png"
+            },
             { type: "file", url: "https://elsewhere.example/x.png", mediaType: "image/png" }
         ]
     },
@@ -56,7 +65,9 @@ vi.mock("@polaris/db", () => ({
         },
         polarThread: {
             findFirst: async ({ where }: { where: { userId: string; temporary?: boolean } }) =>
-                where.userId === OWNER && !(state.temporary && where.temporary === false) ? { title: "Disk" } : null,
+                where.userId === OWNER && !(state.temporary && where.temporary === false)
+                    ? { title: "Disk" }
+                    : null,
             count: async ({ where }: { where: { userId: string; temporary?: boolean } }) =>
                 where.userId === OWNER && !(state.temporary && where.temporary === false) ? 1 : 0,
             create: async () => ({ id: "new-thread" })
@@ -77,7 +88,13 @@ vi.mock("@polaris/db", () => ({
             createMany: async ({ data }: { data: Array<{ userId: string }> }) => {
                 state.created.push(...data);
             },
-            findMany: async () => state.created.map((row, index) => ({ id: `r${index}`, userId: row.userId, createdAt: new Date(), user: { name: "F", username: null } })),
+            findMany: async () =>
+                state.created.map((row, index) => ({
+                    id: `r${index}`,
+                    userId: row.userId,
+                    createdAt: new Date(),
+                    user: { name: "F", username: null }
+                })),
             findFirst: async ({ where }: { where: { id: string; userId: string } }) =>
                 state.recipient && state.recipient.userId === where.userId && where.id === ROW
                     ? { note: "see", share: SHARE }
@@ -102,16 +119,19 @@ vi.mock("@polaris/storage", () => ({
 }));
 vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://polaris.example" }));
 vi.mock("@/lib/privacy-service", () => ({
-    discoverableBy: async (_viewer: unknown, ids: string[]) => new Set(ids.filter((id) => state.visible.has(id)))
+    discoverableBy: async (_viewer: unknown, ids: string[]) =>
+        new Set(ids.filter((id) => state.visible.has(id)))
 }));
 vi.mock("@/lib/blocks", () => ({
-    blockedBetween: async (_id: string, ids: string[]) => new Set(ids.filter((id) => state.blocked.has(id)))
+    blockedBetween: async (_id: string, ids: string[]) =>
+        new Set(ids.filter((id) => state.blocked.has(id)))
 }));
 vi.mock("@/lib/polar/access", () => ({
     polarUsersAmong: async (ids: string[]) => new Set(ids.filter((id) => !state.barred.has(id)))
 }));
 vi.mock("@/lib/notification-service", () => ({
-    createNotification: async (input: { userId: string; href?: string }) => void state.notified.push(input)
+    createNotification: async (input: { userId: string; href?: string }) =>
+        void state.notified.push(input)
 }));
 vi.mock("@/lib/polar/attachments", () => ({
     readThreadAttachment: async (_thread: string, id: string) => {
@@ -140,7 +160,12 @@ beforeEach(() => {
 
 describe("sending a chat to people", () => {
     it("sends to somebody the search would find, and rings their bell", async () => {
-        const result = await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND], "see");
+        const result = await share.sendPolarShare(
+            { id: OWNER, name: "Ada" },
+            THREAD,
+            [FRIEND],
+            "see"
+        );
         expect(result.ok).toBe(true);
         expect(state.created.map((row) => row.userId)).toEqual([FRIEND]);
         expect(state.notified).toHaveLength(1);
@@ -149,30 +174,40 @@ describe("sending a chat to people", () => {
     });
 
     it("refuses somebody hidden from the search, or blocked, without sending to anyone", async () => {
-        expect(await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND, STRANGER], null)).toEqual({ ok: false, error: "unavailable" });
+        expect(
+            await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND, STRANGER], null)
+        ).toEqual({ ok: false, error: "unavailable" });
         state.visible.add(STRANGER);
         state.blocked.add(STRANGER);
-        expect((await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [STRANGER], null)).ok).toBe(false);
+        expect(
+            (await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [STRANGER], null)).ok
+        ).toBe(false);
         expect(state.created).toEqual([]);
         expect(state.notified).toEqual([]);
     });
 
     it("refuses somebody barred from Polar, who could not open it", async () => {
         state.barred.add(FRIEND);
-        expect(await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND], null)).toEqual({ ok: false, error: "unavailable" });
+        expect(
+            await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND], null)
+        ).toEqual({ ok: false, error: "unavailable" });
         expect(state.created).toEqual([]);
         expect(state.notified).toEqual([]);
     });
 
     it("never sends or links a temporary chat", async () => {
         state.temporary = true;
-        expect(await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND], null)).toEqual({ ok: false, error: "not_found" });
+        expect(
+            await share.sendPolarShare({ id: OWNER, name: "Ada" }, THREAD, [FRIEND], null)
+        ).toEqual({ ok: false, error: "not_found" });
         expect(await share.sharePolarThread(OWNER, THREAD)).toBeNull();
         expect(state.notified).toEqual([]);
     });
 
     it("answers a chat that is not the sender's as not found", async () => {
-        expect(await share.sendPolarShare({ id: FRIEND, name: "F" }, THREAD, [OWNER], null)).toEqual({ ok: false, error: "not_found" });
+        expect(
+            await share.sendPolarShare({ id: FRIEND, name: "F" }, THREAD, [OWNER], null)
+        ).toEqual({ ok: false, error: "not_found" });
     });
 });
 
@@ -182,7 +217,9 @@ describe("reading what was sent", () => {
         expect(await share.readReceivedPolarThread(STRANGER, ROW)).toBeNull();
         const thread = await share.readReceivedPolarThread(FRIEND, ROW);
         expect(thread?.from).toBe("Ada");
-        expect(thread?.messages[0]?.files).toEqual([{ id: FILE, name: "disk.png", mediaType: "image/png" }]);
+        expect(thread?.messages[0]?.files).toEqual([
+            { id: FILE, name: "disk.png", mediaType: "image/png" }
+        ]);
     });
 
     it("reads a file only when the snapshot shows it", async () => {

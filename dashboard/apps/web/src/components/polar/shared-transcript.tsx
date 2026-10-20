@@ -79,7 +79,6 @@ function Files({
                         className="flex min-w-0 max-w-[16rem] items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-sm text-foreground hover:bg-card-hover"
                     >
                         {PICTURES.has(file.mediaType) ? (
-                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                                 src={fileUrl(file.id)}
                                 alt=""

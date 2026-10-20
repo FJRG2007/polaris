@@ -63,7 +63,11 @@ import {
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectList, type PolarSidebar } from "@/components/polar/use-polar-sidebar";
 import * as polarShared from "@/lib/polar/shared";
-import { PolarShareDialog, SharedLinksDialog, SharedWithYou } from "@/components/polar/polar-sharing";
+import {
+    PolarShareDialog,
+    SharedLinksDialog,
+    SharedWithYou
+} from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 
 export type ThreadRow = PolarThreadRow;
