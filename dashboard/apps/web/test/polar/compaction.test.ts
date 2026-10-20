@@ -195,3 +195,60 @@ describe("context size", () => {
         expect(compaction.estimateTokens("abcd")).toBe(1);
     });
 });
+
+describe("automatic compaction before a turn", () => {
+    const turn = (used: number, enabled: boolean, compacted = true) => {
+        const order: string[] = [];
+        return {
+            order,
+            run: compaction.compactBeforeSending({
+                used,
+                draft: 10,
+                window: 1000,
+                enabled,
+                compact: async () => {
+                    order.push("compact");
+                    return compacted;
+                },
+                send: () => order.push("send")
+            })
+        };
+    };
+
+    it("compacts first, then sends, when the turn would cross the threshold", async () => {
+        const { order, run } = turn(800, true);
+        expect(await run).toBe(true);
+        expect(order).toEqual(["compact", "send"]);
+    });
+
+    it("only sends below the threshold, or with the setting off", async () => {
+        const below = turn(100, true);
+        expect(await below.run).toBe(false);
+        expect(below.order).toEqual(["send"]);
+        const off = turn(990, false);
+        expect(await off.run).toBe(false);
+        expect(off.order).toEqual(["send"]);
+    });
+
+    it("still sends when the compaction fails", async () => {
+        const { order, run } = turn(900, true, false);
+        expect(await run).toBe(false);
+        expect(order).toEqual(["compact", "send"]);
+    });
+
+    it("reads the last step's own count over the summed turn", () => {
+        const answer = (usage: Record<string, number>) => ({
+            role: "assistant",
+            parts: [],
+            metadata: { usage }
+        });
+        expect(
+            compaction.contextUsed([
+                answer({ inputTokens: 9000, outputTokens: 500, contextTokens: 3500 })
+            ])
+        ).toBe(3500);
+        expect(compaction.contextUsed([answer({ inputTokens: 900, outputTokens: 100 })])).toBe(
+            1000
+        );
+    });
+});

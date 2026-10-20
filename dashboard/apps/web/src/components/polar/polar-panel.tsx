@@ -94,12 +94,14 @@ import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
-import { CompactionDivider, ContextDialog } from "@/components/polar/polar-context";
-import { AnswerSpendLine, answerSpendOf } from "@/components/polar/polar-display";
+import { ContextBar, ContextDialog, CompactionDivider } from "@/components/polar/polar-context";
+import { AnswerSpendLine, answerSpendOf, usePolarDisplay } from "@/components/polar/polar-display";
 import {
     compactionOf,
     contextUsed,
+    estimateTokens,
     contextWindowOf,
+    compactBeforeSending,
     sendableMessages,
     summaryOf
 } from "@/lib/polar/compaction";
@@ -677,6 +679,7 @@ export function PolarChat({
     const [showUsage, setShowUsage] = useState(false);
     const [showContext, setShowContext] = useState(false);
     const [compacting, setCompacting] = useState(false);
+    const display = usePolarDisplay();
     /** The model one turn is sent on instead of the chosen one: a command's. */
     const turnChoice = useRef<ModelChoice | null>(null);
     const wide = useWide();
@@ -854,12 +857,13 @@ export function PolarChat({
 
     // The queue drains one message at a time once a turn has finished.
     useEffect(() => {
-        if (busy || waitingApproval || queue.length === 0 || chat.status === "error") return;
+        if (busy || compacting || waitingApproval || queue.length === 0 || chat.status === "error")
+            return;
         const [next, ...rest] = queue;
         saveQueue(rest);
         turnChoice.current = null;
-        if (next) void chat.sendMessage({ text: next.text });
-    }, [busy, waitingApproval, queue.length, chat.status]);
+        if (next) void sendWithRoom({ text: next.text });
+    }, [busy, compacting, waitingApproval, queue.length, chat.status]);
 
     /** A temporary chat that was written to is deleted as soon as it is left.
      *  `keepalive` lets the request finish while the tab closes; the hourly
@@ -1129,6 +1133,18 @@ export function PolarChat({
         return true;
     };
 
+    /** Sends a turn, compacting the chat first when this turn would bring it
+     *  near the model's window and the person has automatic compaction on. */
+    const sendWithRoom = (message: Parameters<typeof chat.sendMessage>[0]) =>
+        compactBeforeSending({
+            used: contextUsed(chat.messages),
+            draft: estimateTokens(message && "text" in message ? (message.text ?? "") : ""),
+            window: windowOf(providers, live.current.choice),
+            enabled: display.autoCompact,
+            compact: () => compact(null, true),
+            send: () => chat.sendMessage(message)
+        });
+
     /** Renames the open chat, shown in the list at once and put back if refused. */
     const renameChat = async (typed: string) => {
         const title = polarShared.threadTitleSchema.safeParse(typed);
@@ -1234,7 +1250,7 @@ export function PolarChat({
         }
         setLastApproved(false);
         turnChoice.current = ownChoice;
-        void chat.sendMessage(message);
+        void sendWithRoom(message);
     };
 
     /** What was said in voice mode, sent as the next message of this thread. */
@@ -1953,6 +1969,13 @@ export function PolarChat({
                             )}
                         >
                             {queueView}
+                            <ContextBar
+                                used={contextUsed(chat.messages)}
+                                draft={estimateTokens(input)}
+                                window={windowOf(providers, choice)}
+                                canCompact={canCompact}
+                                onCompact={() => void compact(null, false)}
+                            />
                             {composer}
                         </div>
                     </>
@@ -2028,9 +2051,9 @@ export function unreadableOf(error: Error | undefined): string | null {
     }
 }
 
-/** Whether the picker offers this model to the person now. */
-/** The window of the chosen model, from the catalogue; null for Automatic
- *  (the model is picked per turn) or a model with no known window. */
+/** The window of the chosen model: the provider's own figure when its API
+ *  reports one, else the catalogue's; null for Automatic (the model is picked
+ *  per turn) or a model with no known window. */
 export function windowOf(
     providers: ModelSelectorProvider[] | null,
     choice: ModelChoice | null
@@ -2039,12 +2062,16 @@ export function windowOf(
     const model = providers
         ?.find((entry) => entry.provider === choice.provider)
         ?.models.find((entry) => entry.model === choice.model) as
-        | { contextTokens?: unknown }
+        | { contextTokens?: unknown; providerContextTokens?: unknown }
         | undefined;
     return contextWindowOf({
+        provider:
+            typeof model?.providerContextTokens === "number" ? model.providerContextTokens : null,
         catalogue: typeof model?.contextTokens === "number" ? model.contextTokens : null
     });
 }
+
+/** Whether the picker offers this model to the person now. */
 
 function offered(providers: ModelSelectorProvider[] | null, choice: ModelChoice): boolean {
     return (providers ?? []).some((entry) =>

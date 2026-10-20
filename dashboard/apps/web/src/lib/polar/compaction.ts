@@ -269,7 +269,7 @@ export function contextWindowOf(sources: {
 }
 
 interface UsageMeta {
-    usage?: { inputTokens?: unknown; outputTokens?: unknown };
+    usage?: { inputTokens?: unknown; outputTokens?: unknown; contextTokens?: unknown };
 }
 
 /**
@@ -284,11 +284,19 @@ export function contextUsed(messages: readonly MessageLike[]): number {
         const message = messages[index];
         if (message?.role !== "assistant") continue;
         const usage = (message.metadata as UsageMeta | undefined)?.usage;
-        if (typeof usage?.inputTokens === "number" && typeof usage.outputTokens === "number") {
+        // The last step's own count when the answer carries it: a turn that
+        // used tools sums every step's input in `inputTokens`, which reads
+        // the same history several times over.
+        const read =
+            typeof usage?.contextTokens === "number"
+                ? usage.contextTokens
+                : typeof usage?.inputTokens === "number" && typeof usage.outputTokens === "number"
+                  ? usage.inputTokens + usage.outputTokens
+                  : null;
+        if (read !== null) {
             const later = messages.slice(index + 1);
             return (
-                usage.inputTokens +
-                usage.outputTokens +
+                read +
                 later.reduce((sum, entry) => sum + estimateTokens(textOfParts(entry.parts)), 0)
             );
         }
@@ -321,4 +329,25 @@ export function needsAutoCompact(
 ): boolean {
     if (!enabled || !window) return false;
     return used + draft >= window * AUTO_COMPACT_AT;
+}
+
+/**
+ * Sends a turn, compacting the chat first when this turn would cross the
+ * auto-compact threshold and the person has it on. A compaction that fails
+ * does not hold the turn back: it goes as it is, and the provider's own answer
+ * says if it no longer fits. True when the chat was compacted.
+ */
+export async function compactBeforeSending(turn: {
+    used: number;
+    draft: number;
+    window: number | null;
+    enabled: boolean;
+    compact: () => Promise<boolean>;
+    send: () => unknown;
+}): Promise<boolean> {
+    const compacted = needsAutoCompact(turn.used, turn.draft, turn.window, turn.enabled)
+        ? await turn.compact()
+        : false;
+    await turn.send();
+    return compacted;
 }

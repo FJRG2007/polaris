@@ -21,6 +21,7 @@ import {
 } from "@polaris/ui";
 import type { ThreadUsage } from "@/lib/polar/usage";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
+import { usePolarDisplay } from "@/components/polar/polar-display";
 import { contextFill, type ContextLevel } from "@/lib/polar/compaction";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -191,5 +192,74 @@ export function ContextDialog({
                 </div>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * The bar above the composer: the conversation as the provider last counted
+ * it plus the draft, against the model's window. It warns as the chat nears
+ * the window, and once the chat no longer fits - after a switch to a model
+ * with a smaller window, say - it says so and offers Compact. Nothing when the
+ * window is not known, or the person turned the bar off.
+ */
+export function ContextBar({
+    used,
+    draft,
+    window,
+    canCompact,
+    onCompact
+}: {
+    used: number;
+    draft: number;
+    window: number | null;
+    canCompact: boolean;
+    onCompact: () => void;
+}) {
+    const t = useTranslations("polar");
+    const locale = useLocale();
+    const display = usePolarDisplay();
+    const fill = contextFill(used + draft, window);
+    if (!display.showContextBar || !fill || !window) return null;
+    const share = Math.round(fill.share * 100);
+    const detail = t("contextBar.detail", {
+        used: formatTokens(used + draft, locale),
+        window: formatTokens(window, locale),
+        share,
+        draft: formatTokens(draft, locale)
+    });
+    return (
+        <div className="flex flex-col gap-1 pb-2" data-polar-context-bar>
+            <div className="flex min-w-0 items-center gap-2" title={detail}>
+                <div
+                    role="meter"
+                    aria-label={t("contextBar.label")}
+                    aria-valuetext={detail}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.min(100, share)}
+                    className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
+                >
+                    <div
+                        className={cn("h-full rounded-full", LEVEL_BAR[fill.level])}
+                        style={{ width: `${Math.min(100, fill.share * 100)}%` }}
+                    />
+                </div>
+                <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
+                    {t("contextBar.short", { share })}
+                </span>
+            </div>
+            {fill.level === "over" ? (
+                <div
+                    role="status"
+                    className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-danger-ink"
+                >
+                    <span className="min-w-0 flex-1">{t("contextBar.over")}</span>
+                    <Button size="xs" variant="outline" disabled={!canCompact} onClick={onCompact}>
+                        <Minimize2 />
+                        {t("compact.now")}
+                    </Button>
+                </div>
+            ) : null}
+        </div>
     );
 }

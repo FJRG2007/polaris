@@ -12,7 +12,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 
 const { MessagesWrapper } = await import("../setup/i18n");
 const display = await import("@/components/polar/polar-display");
-const { ChatSpend } = await import("@/components/polar/polar-context");
+const { ChatSpend, ContextBar } = await import("@/components/polar/polar-context");
 const { POLAR_DISPLAY_DEFAULTS } = await import("@/lib/polar/display");
 
 let saved: "ok" | "refused" = "ok";
@@ -171,5 +171,46 @@ describe("a chat's total", () => {
         );
         expect(document.querySelector("[data-polar-chat-spend]")).toBeNull();
         expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining("/usage"));
+    });
+});
+
+describe("the context bar", () => {
+    function bar(used: number, onCompact = vi.fn()) {
+        render(
+            <MessagesWrapper>
+                <ContextBar used={used} draft={40} window={1000} canCompact onCompact={onCompact} />
+            </MessagesWrapper>
+        );
+        return onCompact;
+    }
+
+    it("shows how full the context is, with the numbers on hover", () => {
+        bar(460);
+        const meter = screen.getByRole("meter");
+        expect(meter.getAttribute("aria-valuenow")).toBe("50");
+        expect(meter.getAttribute("aria-valuetext")).toContain("1,000");
+        expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("hides itself entirely when that switch is off", () => {
+        display.polarDisplayStore.set({ ...POLAR_DISPLAY_DEFAULTS, showContextBar: false });
+        bar(460);
+        expect(document.querySelector("[data-polar-context-bar]")).toBeNull();
+    });
+
+    it("says the chat no longer fits and offers Compact", () => {
+        const onCompact = bar(990);
+        expect(screen.getByRole("status")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button"));
+        expect(onCompact).toHaveBeenCalledOnce();
+    });
+
+    it("draws nothing for a model whose window is unknown", () => {
+        render(
+            <MessagesWrapper>
+                <ContextBar used={10} draft={0} window={null} canCompact onCompact={vi.fn()} />
+            </MessagesWrapper>
+        );
+        expect(document.querySelector("[data-polar-context-bar]")).toBeNull();
     });
 });

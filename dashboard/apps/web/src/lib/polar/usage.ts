@@ -35,6 +35,9 @@ export interface AnswerUsage {
     cachedTokens?: number;
     /** Output spent thinking, when the provider reports it. */
     reasoningTokens?: number;
+    /** What the turn's last step read and wrote: the conversation as the
+     *  next turn will send it, for the context bar. */
+    contextTokens?: number;
     /** Estimated from the catalogue's prices; null when it has none. */
     costUsd: number | null;
 }
@@ -78,6 +81,16 @@ export function answerUsage(
                 ? (inputTokens * costInput + outputTokens * costOutput) / PER_MILLION
                 : null
     };
+}
+
+/** The context a turn ends with, from its last step's counts, or nothing
+ *  when the provider reported none. */
+export function stepContext(
+    step: { inputTokens?: number | undefined; outputTokens?: number | undefined } | undefined
+): { contextTokens: number } | Record<string, never> {
+    const input = reported(step?.inputTokens);
+    if (input === undefined) return {};
+    return { contextTokens: input + (reported(step?.outputTokens) ?? 0) };
 }
 
 export async function recordPolarUsage(input: {

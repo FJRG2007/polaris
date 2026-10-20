@@ -32,6 +32,7 @@ import {
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
+import { providerWindows, WINDOW_PROVIDERS } from "@/lib/polar/provider-windows";
 import {
     polarAccessFor,
     polarCredentialFor,
@@ -72,6 +73,9 @@ export interface PolarModelOption {
     reasoning: boolean;
     attachment: boolean;
     contextTokens: number;
+    /** The window the provider's own API reports, when it reports one; it
+     *  wins over the catalogue's `contextTokens` (`provider-windows.ts`). */
+    providerContextTokens: number | null;
     /** Price per million input tokens, when the catalogue knows it. */
     costInput: number | null;
     /** Price per million output tokens, when the catalogue knows it. */
@@ -106,7 +110,10 @@ export async function polarModelOptions(
         const prefix = MODEL_PROVIDERS.find((provider) => provider.slug === slug)?.modelPrefix;
         if (prefix) prefixes.set(prefix, slug);
     }
-    const catalogue = prefixes.size > 0 ? await listCatalogModels([...prefixes.keys()]) : [];
+    const [catalogue, windows] = await Promise.all([
+        prefixes.size > 0 ? listCatalogModels([...prefixes.keys()]) : [],
+        windowsBySlug(userId, served, granted)
+    ]);
     const options: PolarProviderOption[] = [];
     for (const slug of served) {
         const payers: Payer[] = [sources.get(slug) ?? "own"];
@@ -120,17 +127,45 @@ export async function polarModelOptions(
         } else {
             models = catalogue
                 .filter((model) => prefixes.get(model.provider) === slug)
-                .map((model) => catalogueOption(slug, name, model));
+                .map((model) =>
+                    catalogueOption(
+                        slug,
+                        name,
+                        model,
+                        windows.get(slug)?.get(model.modelId) ?? null
+                    )
+                );
         }
         if (models.length > 0) options.push({ provider: slug, name, payers, models });
     }
     return options;
 }
 
+/** The windows each served provider's API reports, for the providers that
+ *  report any. A provider that cannot be asked reports none. */
+async function windowsBySlug(
+    userId: string,
+    served: readonly string[],
+    access: PolarAccess
+): Promise<Map<string, ReadonlyMap<string, number>>> {
+    const asked = served.filter((slug) => (WINDOW_PROVIDERS as readonly string[]).includes(slug));
+    return new Map(
+        await Promise.all(
+            asked.map(async (slug) => {
+                const credential = await polarCredentialFor(userId, slug, null, access).catch(
+                    () => null
+                );
+                return [slug, await providerWindows(credential)] as const;
+            })
+        )
+    );
+}
+
 function catalogueOption(
     slug: string,
     providerName: string,
-    model: CatalogModel
+    model: CatalogModel,
+    providerContextTokens: number | null
 ): PolarModelOption {
     return {
         provider: slug,
@@ -140,6 +175,7 @@ function catalogueOption(
         reasoning: model.reasoning,
         attachment: model.attachment,
         contextTokens: model.contextTokens,
+        providerContextTokens,
         costInput: model.costInput,
         costOutput: model.costOutput,
         inputs: model.inputModalities ?? [],
@@ -156,6 +192,7 @@ function gatewayOption(slug: string, providerName: string, model: string): Polar
         reasoning: false,
         attachment: false,
         contextTokens: 0,
+        providerContextTokens: null,
         costInput: null,
         costOutput: null,
         inputs: [],

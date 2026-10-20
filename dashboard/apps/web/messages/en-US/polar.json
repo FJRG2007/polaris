@@ -564,5 +564,11 @@
         "chatTotal": "{tokens} tokens in {answers, plural, one {# answer} other {# answers}}",
         "chatEmpty": "Nothing used in this chat yet.",
         "chatFailed": "This chat's usage couldn't be loaded."
+    },
+    "contextBar": {
+        "label": "Context used",
+        "detail": "{used} of {window} tokens ({share}%), {draft} of them in your message",
+        "short": "{share}% of context",
+        "over": "This chat no longer fits this model. Compact it before sending."
     }
 }

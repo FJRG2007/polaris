@@ -112,7 +112,11 @@ export function automaticCandidates(
     };
     if (signals.files > 0) keep((model) => model.attachment);
     const tokens = Math.ceil(signals.contextChars / CHARS_PER_TOKEN);
-    keep((model) => model.contextTokens === 0 || model.contextTokens > tokens);
+    keep((model) => {
+        // The provider's own window when it reports one, as the context bar reads it.
+        const window = model.providerContextTokens ?? model.contextTokens;
+        return window === 0 || window > tokens;
+    });
     const sorted = [...models].sort((a, b) => {
         if (route === "fast") {
             if (a.reasoning !== b.reasoning) return a.reasoning ? 1 : -1;
