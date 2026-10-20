@@ -11,6 +11,7 @@
  */
 
 import { QUERY_LOG_DIR } from "./query-log";
+import { engineSchedules } from "./schedules";
 import { safeSearchAliases } from "./safe-search";
 import {
     DNS_CATEGORIES,
@@ -50,8 +51,12 @@ function upstreamsOf(settings: DnsSettings): { servers: string[]; bootstrap: str
     return { servers: [...preset.servers], bootstrap: [...preset.bootstrap] };
 }
 
-/** The configuration as an object, before it is written out. Exported for tests. */
-export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
+/** The configuration as an object, before it is written out. Exported for tests.
+ *  `now` places the schedules: they are written in UTC with the zone's offset then. */
+export function blockyConfig(
+    settings: DnsSettings,
+    now: Date = new Date()
+): Record<string, unknown> {
     const enabled = new Set(settings.sources);
     const denylists: Record<string, string[]> = {};
     const add = (category: DnsCategory, entry: string) => {
@@ -81,6 +86,14 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     // has a deny list, covers them all.
     const allowlists =
         settings.allow.length > 0 ? { [OWN_GROUP]: [inline(settings.allow)] } : undefined;
+
+    // Never the operator's own group: it holds the name the status check asks for.
+    const scheduled = engineSchedules(
+        settings.schedules,
+        settings.timeZone,
+        new Set(Object.keys(denylists).filter((group) => group !== OWN_GROUP)),
+        now
+    );
 
     const { servers, bootstrap } = upstreamsOf(settings);
     const aliased = new Set(settings.aliases.map((alias) => alias.name));
@@ -114,6 +127,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
             denylists,
             ...(allowlists ? { allowlists } : {}),
             clientGroupsBlock,
+            ...(scheduled ?? {}),
             blockType: "zeroIp",
             blockTTL: "1m",
             loading: {
@@ -197,11 +211,11 @@ function zoneOf(aliases: readonly { name: string; target: string }[]): string {
 }
 
 /** The configuration file's text. */
-export function renderBlockyConfig(settings: DnsSettings): string {
-    return `${JSON.stringify(blockyConfig(settings), null, 1)}\n`;
+export function renderBlockyConfig(settings: DnsSettings, now?: Date): string {
+    return `${JSON.stringify(blockyConfig(settings, now), null, 1)}\n`;
 }
 
 /** The configuration as the one environment value the image reads. */
-export function encodeBlockyConfig(settings: DnsSettings): string {
-    return Buffer.from(renderBlockyConfig(settings), "utf8").toString("base64");
+export function encodeBlockyConfig(settings: DnsSettings, now?: Date): string {
+    return Buffer.from(renderBlockyConfig(settings, now), "utf8").toString("base64");
 }

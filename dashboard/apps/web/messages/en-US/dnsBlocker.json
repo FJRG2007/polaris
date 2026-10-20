@@ -12,7 +12,9 @@
     },
     "status": {
         "title": "Status",
-        "check": "Check again"
+        "check": "Check again",
+        "stale": "The DNS server runs older settings than these, from before a clock change or an update.",
+        "apply": "Apply now"
     },
     "states": {
         "off": {
@@ -139,7 +141,11 @@
         "invalidDeviceAddress": "Not an IP address, like 192.168.1.20.",
         "invalidDeviceName": "Letters, digits, dots and dashes; no spaces.",
         "invalidDomain": "Not a domain name.",
-        "invalidForwardServer": "Not a server address, like 192.168.1.1."
+        "invalidForwardServer": "Not a server address, like 192.168.1.1.",
+        "invalidTime": "Enter a time like 21:00.",
+        "timePair": "Set both times, or neither for the whole day.",
+        "sameTime": "The start and the end cannot be the same time.",
+        "invalidTimeZone": "Not a known time zone."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -322,5 +328,33 @@
         "youtubeOff": "Off",
         "youtubeModerate": "Moderate",
         "youtubeStrict": "Strict"
+    },
+    "schedules": {
+        "title": "Schedules",
+        "intro": "Lists that block only at set hours, for every device. Outside those hours they let everything through.",
+        "empty": "No schedules. Every list that is on blocks all day.",
+        "noLists": "Turn on a list above to schedule it.",
+        "lists": "Block",
+        "days": "On these days",
+        "whole": "Whole day",
+        "from": "From",
+        "to": "Until",
+        "zone": "Time zone",
+        "zoneSearch": "Search time zones",
+        "zoneEmpty": "No time zone matches.",
+        "everyDay": "Every day",
+        "allDay": "the whole day",
+        "notOn": "{name} (no list on)",
+        "add": "Add schedule",
+        "remove": "Remove schedule"
+    },
+    "weekdays": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
     }
 }

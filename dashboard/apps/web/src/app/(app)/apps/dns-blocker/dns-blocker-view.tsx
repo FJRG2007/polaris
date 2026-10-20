@@ -21,6 +21,7 @@ import {
     CardTitle,
     CopyButton,
     Input,
+    SearchableSelect,
     Select,
     Skeleton,
     Switch,
@@ -67,6 +68,28 @@ const STARTING_CHECKS = 15;
 
 /** States in which a DNS server of ours exists. */
 const ENGINE_STATES: readonly DnsBlockerState[] = ["blocking", "starting", "portHeld", "conflict"];
+
+/** Every zone this browser knows, with `current` kept even when it does not
+ *  list it (an older runtime without `supportedValuesOf`). */
+function timeZones(current: string): string[] {
+    const supported = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+    let zones: string[] = [];
+    try {
+        zones = supported ? supported("timeZone") : [];
+    } catch {
+        zones = [];
+    }
+    return zones.includes(current) ? zones : [current, ...zones];
+}
+
+/** The zone this browser is in, which a first schedule is written in. */
+function browserTimeZone(): string {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+        return "UTC";
+    }
+}
 
 /** Addresses, a range and a name pattern, as typed into a group. */
 const GROUP_CLIENTS_EXAMPLE = "192.168.1.20\n192.168.1.64/26\nkids-*"; // i18n-ignore example values
@@ -117,6 +140,17 @@ export function DnsBlockerView({
     const [forwardServer, setForwardServer] = useState("");
     const [deviceName, setDeviceName] = useState("");
     const [deviceAddress, setDeviceAddress] = useState("");
+    const [schedules, setSchedules] = useState(initial.schedules);
+    // Read after the first paint: the server does not know the reader's zone.
+    const [timeZone, setTimeZone] = useState(initial.timeZone || "UTC");
+    useEffect(() => {
+        if (!initial.timeZone) setTimeZone(browserTimeZone());
+    }, [initial.timeZone]);
+    const [scheduleLists, setScheduleLists] = useState<string[]>([]);
+    const [scheduleDays, setScheduleDays] = useState<dns.DnsWeekday[]>([]);
+    const [scheduleWhole, setScheduleWhole] = useState(false);
+    const [scheduleStart, setScheduleStart] = useState("21:00");
+    const [scheduleEnd, setScheduleEnd] = useState("07:00");
 
     /** A rule set from the query log: the lists as saved, without touching
      *  a list somebody is editing here. */
@@ -198,6 +232,9 @@ export function DnsBlockerView({
             forwards,
             safeSearch,
             youtube,
+            schedules,
+            // The zone is only worth storing with something written in it.
+            timeZone: schedules.length > 0 ? timeZone : saved.timeZone,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -216,6 +253,9 @@ export function DnsBlockerView({
             forwards,
             safeSearch,
             youtube,
+            schedules,
+            timeZone,
+            saved.timeZone,
             namesFrom
         ]
     );
@@ -255,6 +295,19 @@ export function DnsBlockerView({
         ? null
         : (newDevice.error.issues.find((issue) =>
               issue.path[0] === "name" ? deviceName.trim() !== "" : deviceAddress.trim() !== ""
+          )?.message ?? null);
+    const listed = dns.dnsListedCategories({ sources, customLists });
+    const newSchedule = dns.dnsScheduleSchema.safeParse({
+        lists: scheduleLists.filter((list) => (listed as string[]).includes(list)),
+        days: scheduleDays,
+        start: scheduleWhole ? "" : scheduleStart,
+        end: scheduleWhole ? "" : scheduleEnd
+    });
+    // Only the hours are said wrong; no list or no day yet is not finished.
+    const scheduleIssue = newSchedule.success
+        ? null
+        : (newSchedule.error.issues.find(
+              (issue) => issue.path[0] === "start" || issue.path[0] === "end"
           )?.message ?? null);
     const badGroupClients = rejected(groupClients, dns.normalizeDnsClient);
     const newGroup = dns.dnsClientGroupSchema.safeParse({
@@ -380,6 +433,17 @@ export function DnsBlockerView({
                             <Skeleton className="h-8 w-28" />
                         </div>
                     )}
+                    {status?.stale && state === "blocking" ? (
+                        <div className="flex flex-wrap items-center gap-2 rounded-md bg-warning-soft p-2">
+                            <p className="min-w-0 flex-1 text-sm text-warning-ink">
+                                {t("status.stale")}
+                            </p>
+                            <Button size="sm" onClick={() => switchTo(true)} disabled={switching}>
+                                {switching ? <Loader2 className="animate-spin" /> : null}
+                                {t("status.apply")}
+                            </Button>
+                        </div>
+                    ) : null}
                     {notice ? (
                         <p
                             role={notice.tone === "error" ? "alert" : "status"}
@@ -1065,6 +1129,192 @@ export function DnsBlockerView({
                             </Button>
                         </div>
                     </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("schedules.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("schedules.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {schedules.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("schedules.empty")}</p>
+                    ) : null}
+                    {schedules.map((schedule, index) => {
+                        const lists = schedule.lists.map((list) => {
+                            const name = (dns.DNS_CATEGORIES as readonly string[]).includes(list)
+                                ? t(`categories.${list as dns.DnsCategory}`)
+                                : list;
+                            return (listed as string[]).includes(list)
+                                ? name
+                                : t("schedules.notOn", { name });
+                        });
+                        const days =
+                            schedule.days.length === dns.DNS_WEEKDAYS.length
+                                ? t("schedules.everyDay")
+                                : schedule.days.map((day) => t(`weekdays.${day}`)).join(", ");
+                        const hours = schedule.start
+                            ? `${schedule.start} - ${schedule.end}`
+                            : t("schedules.allDay");
+                        return (
+                            <div
+                                key={`${schedule.lists.join(",")}-${index}`}
+                                className="flex min-w-0 items-start gap-2 rounded-md bg-muted p-2 text-sm"
+                            >
+                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                    <span className="truncate font-medium" title={lists.join(", ")}>
+                                        {lists.join(", ")}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {days}, {hours}
+                                    </span>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    aria-label={t("schedules.remove")}
+                                    title={t("schedules.remove")}
+                                    onClick={() =>
+                                        setSchedules((current) =>
+                                            current.filter((_, at) => at !== index)
+                                        )
+                                    }
+                                >
+                                    <Trash2 />
+                                </Button>
+                            </div>
+                        );
+                    })}
+                    {listed.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("schedules.noLists")}</p>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>{t("schedules.lists")}</span>
+                                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                                    {listed.map((category) => (
+                                        <label
+                                            key={category}
+                                            className="flex items-center gap-2 text-sm"
+                                        >
+                                            <Switch
+                                                checked={scheduleLists.includes(category)}
+                                                onChange={(on: boolean) =>
+                                                    setScheduleLists((current) =>
+                                                        on
+                                                            ? [...current, category]
+                                                            : current.filter(
+                                                                  (item) => item !== category
+                                                              )
+                                                    )
+                                                }
+                                            />
+                                            <span>{t(`categories.${category}`)}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>{t("schedules.days")}</span>
+                                <div className="flex flex-wrap gap-1">
+                                    {dns.DNS_WEEKDAYS.map((day) => {
+                                        const on = scheduleDays.includes(day);
+                                        return (
+                                            <Button
+                                                key={day}
+                                                size="sm"
+                                                variant={on ? "primary" : "outline"}
+                                                aria-pressed={on}
+                                                onClick={() =>
+                                                    setScheduleDays((current) =>
+                                                        on
+                                                            ? current.filter((item) => item !== day)
+                                                            : [...current, day]
+                                                    )
+                                                }
+                                            >
+                                                {t(`weekdays.${day}`)}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="flex items-center gap-2 self-center text-sm">
+                                    <Switch checked={scheduleWhole} onChange={setScheduleWhole} />
+                                    <span>{t("schedules.whole")}</span>
+                                </label>
+                                {!scheduleWhole ? (
+                                    <>
+                                        <label className="flex flex-col gap-1 text-sm">
+                                            <span>{t("schedules.from")}</span>
+                                            <Input
+                                                className="w-32"
+                                                type="time"
+                                                value={scheduleStart}
+                                                aria-invalid={Boolean(scheduleIssue)}
+                                                onChange={(event) =>
+                                                    setScheduleStart(event.target.value)
+                                                }
+                                            />
+                                        </label>
+                                        <label className="flex flex-col gap-1 text-sm">
+                                            <span>{t("schedules.to")}</span>
+                                            <Input
+                                                className="w-32"
+                                                type="time"
+                                                value={scheduleEnd}
+                                                aria-invalid={Boolean(scheduleIssue)}
+                                                onChange={(event) =>
+                                                    setScheduleEnd(event.target.value)
+                                                }
+                                            />
+                                        </label>
+                                    </>
+                                ) : null}
+                                <div className="flex min-w-0 flex-col gap-1 text-sm">
+                                    <span aria-hidden>{t("schedules.zone")}</span>
+                                    <SearchableSelect
+                                        className="w-full sm:w-64"
+                                        value={timeZone}
+                                        aria-label={t("schedules.zone")}
+                                        onValueChange={setTimeZone}
+                                        searchPlaceholder={t("schedules.zoneSearch")}
+                                        emptyText={t("schedules.zoneEmpty")}
+                                        options={timeZones(timeZone).map((zone) => ({
+                                            value: zone,
+                                            label: zone.replace(/_/g, " ")
+                                        }))}
+                                    />
+                                </div>
+                            </div>
+                            {scheduleIssue ? (
+                                <span className="text-xs text-danger-ink">
+                                    {t(`validation.${scheduleIssue as "timePair"}`)}
+                                </span>
+                            ) : null}
+                            <div>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={
+                                        !newSchedule.success ||
+                                        schedules.length >= dns.DNS_LIMITS.schedules
+                                    }
+                                    onClick={() => {
+                                        if (!newSchedule.success) return;
+                                        setSchedules((current) => [...current, newSchedule.data]);
+                                        setScheduleLists([]);
+                                        setScheduleDays([]);
+                                    }}
+                                >
+                                    <Plus />
+                                    {t("schedules.add")}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardBody>
             </Card>
 

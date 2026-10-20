@@ -9,7 +9,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import * as dns from "@/lib/dns-blocker/settings";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DnsBlockerState, DnsBlockerStatus } from "@/lib/dns-blocker/service";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 let answer: { error: string } | { status: DnsBlockerStatus };
 const turnOnDnsBlockerAction = vi.fn(async () => ({}));
@@ -58,7 +58,9 @@ function insights(logOff = false, domain = "example.com") {
 const { DnsBlockerView } = await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-view");
 
 function standing(state: DnsBlockerState): void {
-    answer = { status: { state, address: "192.168.1.5", settings: dns.DEFAULT_DNS_SETTINGS } };
+    answer = {
+        status: { state, address: "192.168.1.5", settings: dns.DEFAULT_DNS_SETTINGS, stale: false }
+    };
 }
 
 async function shown(): Promise<string[]> {
@@ -260,5 +262,63 @@ describe("DnsBlockerView device names", () => {
         fireEvent.click(add);
         expect(screen.getByText("ana-laptop")).toBeTruthy();
         expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false);
+    });
+});
+
+describe("DnsBlockerView schedules", () => {
+    it("offers only the categories that have a list on, and adds a valid schedule", async () => {
+        standing("off");
+        render(
+            <MessagesWrapper>
+                <DnsBlockerView
+                    initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: ["hagezi-pro", "hagezi-social"] }}
+                    brands={[]}
+                />
+            </MessagesWrapper>
+        );
+        await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
+        const section = within(screen.getByText("Schedules").closest("div")!.parentElement!);
+        expect(section.queryByRole("switch", { name: "Adult" })).toBeNull();
+        const add = section.getByRole("button", { name: "Add schedule" });
+        fireEvent.click(section.getByRole("switch", { name: "Social" }));
+        expect(add).toHaveProperty("disabled", true);
+        fireEvent.click(section.getByRole("button", { name: "Mon" }));
+        expect(add).toHaveProperty("disabled", false);
+        fireEvent.change(section.getByLabelText("Until"), { target: { value: "21:00" } });
+        expect(section.getByText("The start and the end cannot be the same time.")).toBeTruthy();
+        expect(add).toHaveProperty("disabled", true);
+        fireEvent.change(section.getByLabelText("Until"), { target: { value: "07:00" } });
+        fireEvent.click(add);
+        expect(section.getByText("Mon, 21:00 - 07:00")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false);
+    });
+
+    it("says to turn a list on when none is", async () => {
+        standing("off");
+        render(
+            <MessagesWrapper>
+                <DnsBlockerView initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: [] }} brands={[]} />
+            </MessagesWrapper>
+        );
+        expect(screen.getByText("Turn on a list above to schedule it.")).toBeTruthy();
+    });
+
+    it("offers to apply when the server runs older settings", async () => {
+        answer = {
+            status: {
+                state: "blocking",
+                address: "192.168.1.5",
+                settings: dns.DEFAULT_DNS_SETTINGS,
+                stale: true
+            }
+        };
+        dnsInsightsAction.mockImplementation(async () => insights());
+        render(
+            <MessagesWrapper>
+                <DnsBlockerView initial={dns.DEFAULT_DNS_SETTINGS} brands={[]} />
+            </MessagesWrapper>
+        );
+        fireEvent.click(await screen.findByRole("button", { name: "Apply now" }));
+        await waitFor(() => expect(turnOnDnsBlockerAction).toHaveBeenCalled());
     });
 });

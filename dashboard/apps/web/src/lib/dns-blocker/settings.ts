@@ -170,6 +170,7 @@ export const DNS_LIMITS = {
     devices: 200,
     forwards: 50,
     groupClients: 50,
+    schedules: 20,
     /** Days of lookups the engine keeps, which is as far back as the screen reads. */
     logDays: 30
 } as const;
@@ -337,6 +338,57 @@ export const dnsDeviceSchema = z.object({
         )
 });
 
+/** The engine's weekday names, Monday first as the screen lists them. */
+export const DNS_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+export type DnsWeekday = (typeof DNS_WEEKDAYS)[number];
+
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** A list group a schedule can switch: a category, or a service's own list. */
+const LIST_GROUP = /^[a-z0-9_-]{1,64}$/;
+
+/** Whether the runtime knows `zone` as an IANA time zone (`Europe/Madrid`). */
+export function isTimeZone(zone: string): boolean {
+    if (zone.length === 0 || zone.length > 64) return false;
+    try {
+        new Intl.DateTimeFormat("en-US", { timeZone: zone });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Hours in which some lists block, on some days, in the operator's own time.
+ * Outside them those lists let everything through. No start and end is the
+ * whole day; an end before the start runs past midnight into the next day.
+ */
+export const dnsScheduleSchema = z
+    .object({
+        lists: z
+            .array(
+                z
+                    .string()
+                    .refine((value) => LIST_GROUP.test(value) && value !== "default", "invalidList")
+            )
+            .min(1)
+            .max(40)
+            .transform((lists) => [...new Set(lists)]),
+        days: z
+            .array(z.enum(DNS_WEEKDAYS))
+            .min(1, "noDays")
+            .max(7)
+            .transform((days) => DNS_WEEKDAYS.filter((day) => days.includes(day))),
+        start: z.string().refine((value) => value === "" || TIME_OF_DAY.test(value), "invalidTime"),
+        end: z.string().refine((value) => value === "" || TIME_OF_DAY.test(value), "invalidTime")
+    })
+    .superRefine((schedule, ctx) => {
+        if ((schedule.start === "") !== (schedule.end === ""))
+            ctx.addIssue({ code: "custom", path: ["end"], message: "timePair" }); // i18n-ignore a key the screen says
+        else if (schedule.start !== "" && schedule.start === schedule.end)
+            ctx.addIssue({ code: "custom", path: ["end"], message: "sameTime" }); // i18n-ignore a key the screen says
+    });
+
 const clientSchema = z.string().transform((value, ctx) => {
     const client = normalizeDnsClient(value);
     if (!client) {
@@ -396,6 +448,13 @@ export const dnsSettingsSchema = z.object({
     youtube: z.enum(["off", "moderate", "strict"]),
     /** Devices named by hand, which win over a name the router reports. */
     devices: z.array(dnsDeviceSchema).max(DNS_LIMITS.devices),
+    /** When lists block, in `timeZone`. A list with no schedule always blocks. */
+    schedules: z.array(dnsScheduleSchema).max(DNS_LIMITS.schedules),
+    /** The zone schedules are written in, or "" before one was chosen (UTC). */
+    timeZone: z
+        .string()
+        .trim()
+        .refine((value) => value === "" || isTimeZone(value), "invalidTimeZone"),
     /** The router asked for device names (reverse lookups), or "" for none. */
     namesFrom: z
         .string()
@@ -410,6 +469,7 @@ export type DnsAlias = z.infer<typeof dnsAliasSchema>;
 export type DnsClientGroup = z.infer<typeof dnsClientGroupSchema>;
 export type DnsDevice = z.infer<typeof dnsDeviceSchema>;
 export type DnsForward = z.infer<typeof dnsForwardSchema>;
+export type DnsSchedule = z.infer<typeof dnsScheduleSchema>;
 
 export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     sources: DNS_LIST_SOURCES.filter((source) => source.recommended).map((source) => source.id),
@@ -427,8 +487,21 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     forwards: [],
     safeSearch: false,
     youtube: "off",
+    schedules: [],
+    timeZone: "",
     namesFrom: ""
 };
+
+/** The categories that have a list on, in category order: the only ones the
+ *  engine has a group for, so the only ones a schedule can switch. */
+export function dnsListedCategories(
+    settings: Pick<DnsSettings, "sources" | "customLists">
+): DnsCategory[] {
+    const on = new Set<DnsCategory>(settings.customLists.map((list) => list.category));
+    for (const source of DNS_LIST_SOURCES)
+        if (settings.sources.includes(source.id)) on.add(source.category);
+    return DNS_CATEGORIES.filter((category) => on.has(category));
+}
 
 /**
  * Settings read back from storage, whole whatever was stored.
@@ -466,6 +539,8 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         forwards: field("forwards"),
         safeSearch: field("safeSearch"),
         youtube: field("youtube"),
+        schedules: field("schedules"),
+        timeZone: field("timeZone"),
         namesFrom: field("namesFrom")
     };
 }

@@ -87,6 +87,10 @@ export interface DnsBlockerStatus {
     /** The address devices are told to use as their DNS server. */
     readonly address: string | null;
     readonly settings: DnsSettings;
+    /** The DNS server runs another configuration than these settings render to
+     *  now: saved while it could not take them, rendered differently by a newer
+     *  Polaris, or with schedules a daylight-saving change has since moved. */
+    readonly stale: boolean;
 }
 
 interface EngineRow {
@@ -129,10 +133,13 @@ export function encodedConfig(settings: DnsSettings): string {
 /** Whether the engine was last given the configuration the stored settings
  *  render to now. False for an engine deployed before a change to what is
  *  rendered, which keeps running the old one until it is applied again. */
-export async function engineConfigCurrent(engine: EngineRow): Promise<boolean> {
+export async function engineConfigCurrent(
+    engine: EngineRow,
+    known?: DnsSettings
+): Promise<boolean> {
     if (!engine.applicationId) return false;
     const [settings, stored] = await Promise.all([
-        readSettings(),
+        known ?? readSettings(),
         prisma.envVar.findFirst({
             where: { scopeType: "application", scopeId: engine.applicationId, key: DNS_CONFIG_ENV },
             select: { value: true }
@@ -179,16 +186,18 @@ export async function dnsBlockerStatus(): Promise<DnsBlockerStatus> {
         engineRow(),
         getHostLanIp().catch(() => null)
     ]);
-    const [answer, deployFailed] = await Promise.all([
+    const [answer, deployFailed, current] = await Promise.all([
         address
             ? probeDns(address, DNS_CHECK_NAME)
             : Promise.resolve<DnsProbeAnswer>({ kind: "silent" }),
-        engine ? lastDeployFailed(engine) : Promise.resolve(false)
+        engine ? lastDeployFailed(engine) : Promise.resolve(false),
+        engine?.applicationId ? engineConfigCurrent(engine, settings) : Promise.resolve(true)
     ]);
     return {
         state: stateOf({ address, engine: Boolean(engine), deployFailed, answer }),
         address,
-        settings
+        settings,
+        stale: !current
     };
 }
 

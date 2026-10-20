@@ -12,7 +12,9 @@
     },
     "status": {
         "title": "Estado",
-        "check": "Comprobar"
+        "check": "Comprobar",
+        "stale": "El servidor DNS usa ajustes anteriores a estos, de antes de un cambio de hora o una actualización.",
+        "apply": "Aplicar ya"
     },
     "states": {
         "off": {
@@ -139,7 +141,11 @@
         "invalidDeviceAddress": "No es una dirección IP, como 192.168.1.20.",
         "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios.",
         "invalidDomain": "No es un dominio.",
-        "invalidForwardServer": "No es un servidor, como 192.168.1.1."
+        "invalidForwardServer": "No es un servidor, como 192.168.1.1.",
+        "invalidTime": "Escribe una hora como 21:00.",
+        "timePair": "Pon las dos horas, o ninguna para todo el día.",
+        "sameTime": "El inicio y el final no pueden ser la misma hora.",
+        "invalidTimeZone": "No es una zona horaria conocida."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -322,5 +328,33 @@
         "youtubeOff": "No",
         "youtubeModerate": "Moderado",
         "youtubeStrict": "Estricto"
+    },
+    "schedules": {
+        "title": "Horarios",
+        "intro": "Listas que bloquean solo a ciertas horas, en todos los equipos. Fuera de esas horas dejan pasar todo.",
+        "empty": "Sin horarios. Cada lista activa bloquea todo el día.",
+        "noLists": "Activa una lista arriba para programarla.",
+        "lists": "Bloquear",
+        "days": "Estos días",
+        "whole": "Día entero",
+        "from": "Desde",
+        "to": "Hasta",
+        "zone": "Zona horaria",
+        "zoneSearch": "Buscar zona horaria",
+        "zoneEmpty": "Ninguna zona coincide.",
+        "everyDay": "Cada día",
+        "allDay": "todo el día",
+        "notOn": "{name} (sin lista activa)",
+        "add": "Añadir horario",
+        "remove": "Quitar horario"
+    },
+    "weekdays": {
+        "mon": "Lun",
+        "tue": "Mar",
+        "wed": "Mié",
+        "thu": "Jue",
+        "fri": "Vie",
+        "sat": "Sáb",
+        "sun": "Dom"
     }
 }
