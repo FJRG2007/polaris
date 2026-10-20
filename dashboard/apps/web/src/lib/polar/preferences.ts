@@ -18,7 +18,6 @@ import {
 
 export interface PolarPreferences extends PolarDisplay {
     memory: boolean;
-    suggestions: boolean;
     /** `provider/model`, or null for the fastest model a key is held for. */
     transcriptionModel: string | null;
     /** Null is Automatic. */
@@ -58,7 +57,6 @@ function preferencesOf(
 ): PolarPreferences {
     return {
         memory: typeof row?.memory === "boolean" ? row.memory : true,
-        suggestions: typeof row?.suggestions === "boolean" ? row.suggestions : true,
         transcriptionModel: transcriptionOf(row),
         helperModel: helperModelOf(row?.helperModel),
         ...displayOf(row)

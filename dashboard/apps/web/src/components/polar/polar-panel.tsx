@@ -36,6 +36,7 @@ import {
 } from "react";
 import {
     cn,
+    Button,
     Dialog,
     CopyIcon,
     useCopied,
@@ -79,6 +80,7 @@ import {
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import { PolarSettings, ToolSettings } from "@/components/polar/polar-settings";
+import { HelperSettings } from "@/components/polar/polar-helper-settings";
 import * as polarShared from "@/lib/polar/shared";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
@@ -993,6 +995,57 @@ export function PolarChat({
             })
             .catch(() => undefined);
     }, [settled, threadId]);
+    // The suggested next message (`lib/polar/suggestions.ts`): asked for once
+    // after an answer finishes in this tab, never for one only opened, and
+    // shown greyed in the empty composer until Tab takes it, Escape or typing
+    // dismisses it, or the next answer replaces it. Voice mode has none.
+    const [suggested, setSuggested] = useState<{
+        threadId: string;
+        answerId: string;
+        text: string;
+    } | null>(null);
+    const suggestionAsked = useRef(new Set<string>());
+    const answeredHere = useRef<string | null>(null);
+    useEffect(() => {
+        if (busy) answeredHere.current = threadId;
+    }, [busy, threadId]);
+    const newest = settled ? chat.messages.at(-1) : undefined;
+    const answerId = newest?.role === "assistant" ? newest.id : null;
+    useEffect(() => {
+        if (!display.suggestions || inCall || !answerId || chat.status === "error") return;
+        if (answeredHere.current !== threadId) return;
+        const key = `${threadId}:${answerId}`;
+        if (suggestionAsked.current.has(key)) return;
+        suggestionAsked.current.add(key);
+        const id = threadId;
+        fetch(`/api/polar/threads/${id}/suggestion?after=${encodeURIComponent(answerId)}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { suggestion?: unknown } | null) => {
+                const text = typeof data?.suggestion === "string" ? data.suggestion.trim() : "";
+                if (text) setSuggested({ threadId: id, answerId, text });
+            })
+            .catch(() => undefined);
+    }, [display.suggestions, inCall, answerId, threadId, chat.status]);
+    const ghost =
+        suggested &&
+        suggested.threadId === threadId &&
+        suggested.answerId === answerId &&
+        display.suggestions &&
+        !inCall &&
+        !input
+            ? suggested.text
+            : null;
+    const acceptSuggestion = (text: string) => {
+        setSuggested(null);
+        setInput(text);
+        // Into the box with the cursor at its end, ready to edit - never sent.
+        requestAnimationFrame(() => {
+            const box = textarea.current;
+            if (!box) return;
+            box.focus();
+            box.setSelectionRange(text.length, text.length);
+        });
+    };
     // Whether the page's sidebar was put away, remembered per browser.
     useEffect(() => setCollapsed(readStored(SIDEBAR_KEY) === "hidden"), []);
     const setSidebarHidden = (hidden: boolean) => {
@@ -1679,8 +1732,18 @@ export function PolarChat({
             ? slashActive
             : firstPickable(slashItems);
     const ids = fullPage
-        ? { input: "polar-input-page", slash: "polar-slash-page", attach: "polar-attach-page" }
-        : { input: "polar-input", slash: "polar-slash", attach: "polar-attach" };
+        ? {
+              input: "polar-input-page",
+              slash: "polar-slash-page",
+              attach: "polar-attach-page",
+              suggestion: "polar-suggestion-page"
+          }
+        : {
+              input: "polar-input",
+              slash: "polar-slash",
+              attach: "polar-attach",
+              suggestion: "polar-suggestion"
+          };
     const pickSlash = (index: number) => {
         const key = slashItems[index]?.key;
         if (!key) return;
@@ -1712,7 +1775,19 @@ export function PolarChat({
     // walk the commands that can run, Enter and Tab run the highlighted one,
     // Escape closes the list and leaves the text as it is.
     const onComposerKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-        if (!slashOpen || event.nativeEvent.isComposing) return;
+        if (event.nativeEvent.isComposing) return;
+        if (!slashOpen) {
+            if (!ghost) return;
+            if (event.key === "Tab" && !event.shiftKey) {
+                event.preventDefault();
+                acceptSuggestion(ghost);
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setSuggested(null);
+            }
+            return;
+        }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
             setSlashActive(
@@ -1896,13 +1971,36 @@ export function PolarChat({
                     <label htmlFor={ids.input} className="sr-only">
                         {t("composer.label")}
                     </label>
+                    {ghost ? (
+                        <>
+                            <span id={ids.suggestion} className="sr-only">
+                                {t("composer.suggestion.described", { text: ghost })}
+                            </span>
+                            {/* No Tab key on a touch screen: the suggestion is a tap. */}
+                            <div className="hidden min-w-0 px-3 pt-2 [@media(pointer:coarse)]:flex">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="max-w-full"
+                                    aria-label={t("composer.suggestion.use", { text: ghost })}
+                                    onClick={() => acceptSuggestion(ghost)}
+                                >
+                                    <span className="truncate" title={ghost}>
+                                        {ghost}
+                                    </span>
+                                </Button>
+                            </div>
+                        </>
+                    ) : null}
                     <PromptInputTextarea
                         ref={textarea}
                         id={ids.input}
                         value={input}
                         maxLength={20000}
                         disabled={noKeys}
-                        placeholder={t("composer.placeholder")}
+                        placeholder={ghost ?? t("composer.placeholder")}
+                        aria-describedby={ghost ? ids.suggestion : undefined}
                         aria-controls={slashOpen ? ids.slash : undefined}
                         aria-activedescendant={
                             slashOpen && slashHighlight >= 0
@@ -1910,7 +2008,10 @@ export function PolarChat({
                                 : undefined
                         }
                         onKeyDown={onComposerKey}
-                        onChange={(event) => setInput(event.target.value)}
+                        onChange={(event) => {
+                            if (event.target.value) setSuggested(null);
+                            setInput(event.target.value);
+                        }}
                         onSubmitKey={submit}
                         onPaste={(event) => {
                             const pasted = pastedFiles(event.clipboardData);
@@ -2121,6 +2222,7 @@ export function PolarChat({
                                 setToolsOff(next);
                             }}
                         />
+                        <HelperSettings providers={providers} />
                     </PolarSettings>
                     {fullPage ? (
                         !wide || collapsed ? (

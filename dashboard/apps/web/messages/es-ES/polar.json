@@ -187,7 +187,11 @@
     },
     "composer": {
         "label": "Escribe a Polar",
-        "placeholder": "Pregunta a Polar o escribe / para comandos"
+        "placeholder": "Pregunta a Polar o escribe / para comandos",
+        "suggestion": {
+            "described": "Sugerencia: {text}. Pulsa Tab para usarla.",
+            "use": "Usar sugerencia: {text}"
+        }
     },
     "picker": {
         "automatic": "Automático",
@@ -383,6 +387,16 @@
             "showContextBar": "Barra de contexto",
             "autoCompact": "Compactar automáticamente",
             "autoCompactHint": "Cerca del límite del modelo, se resumen los mensajes antiguos antes de enviar.",
+            "failed": "No se pudo guardar el ajuste. Prueba otra vez."
+        },
+        "helper": {
+            "title": "Extras",
+            "intro": "Tareas pequeñas de tus chats, con su propio modelo.",
+            "suggestions": "Sugerir el siguiente mensaje",
+            "suggestionsHint": "Tras cada respuesta, pulsa Tab para usar la sugerencia gris.",
+            "model": "Modelo de títulos y sugerencias",
+            "modelHint": "Automático usa tu modelo más rápido.",
+            "unavailable": "Ese modelo no está disponible, así que se usa Automático.",
             "failed": "No se pudo guardar el ajuste. Prueba otra vez."
         }
     },

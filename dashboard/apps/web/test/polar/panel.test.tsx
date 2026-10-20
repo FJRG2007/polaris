@@ -60,6 +60,8 @@ let providers: unknown[] = PROVIDERS;
 const patches: unknown[] = [];
 let storedThread: unknown = null;
 let ownCommands: unknown[] = [];
+let suggestionReply: string | null = null;
+const suggestionAsks: string[] = [];
 
 beforeEach(() => {
     chat.status = "ready";
@@ -70,6 +72,8 @@ beforeEach(() => {
     patches.length = 0;
     storedThread = null;
     ownCommands = [];
+    suggestionReply = null;
+    suggestionAsks.length = 0;
     try {
         window.localStorage.clear();
         window.sessionStorage.clear();
@@ -93,6 +97,10 @@ beforeEach(() => {
                 return Response.json({ ok: true });
             }
             if (url === "/api/polar/threads/t-old") return Response.json({ thread: storedThread });
+            if (url.includes("/suggestion?after=")) {
+                suggestionAsks.push(url);
+                return Response.json({ suggestion: suggestionReply });
+            }
             return Response.json({});
         })
     );
@@ -105,6 +113,7 @@ afterEach(() => {
 
 const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } =
     await import("@/components/polar/polar-panel");
+const { polarDisplayStore } = await import("@/components/polar/polar-display");
 
 function mount() {
     const view = render(<PolarChat />, { wrapper: MessagesWrapper });
@@ -657,5 +666,78 @@ describe("matching the / list", () => {
         expect(ownCommandIn("/tldr", [row("tldr")])?.rest).toBe("");
         expect(ownCommandIn("/other x", [row("tldr")])).toBeNull();
         expect(ownCommandIn("tldr x", [row("tldr")])).toBeNull();
+    });
+});
+
+describe("suggested next message", () => {
+    /** An answer that finishes in this tab, the way useChat reports it. */
+    function answer(view: ReturnType<typeof mount>) {
+        chat.status = "streaming";
+        chat.messages = [{ id: "u1", role: "user", parts: [{ type: "text", text: "Deploy?" }] }];
+        act(() => view.again());
+        chat.status = "ready";
+        chat.messages = [
+            ...chat.messages,
+            { id: "a1", role: "assistant", parts: [{ type: "text", text: "Open Deploy." }] }
+        ];
+        act(() => view.again());
+    }
+
+    const box = () => document.getElementById("polar-input") as HTMLTextAreaElement;
+
+    it("shows it greyed in the empty composer, and Tab puts it in the box unsent", async () => {
+        suggestionReply = "Add a custom domain";
+        const view = mount();
+        answer(view);
+        await waitFor(() => expect(box().placeholder).toBe("Add a custom domain"));
+        expect(suggestionAsks[0]).toContain("after=a1");
+        expect(box().getAttribute("aria-describedby")).toBe("polar-suggestion");
+        expect(document.getElementById("polar-suggestion")?.textContent).toContain("Tab");
+        fireEvent.keyDown(box(), { key: "Enter" });
+        expect(chat.sent).toHaveLength(0);
+        fireEvent.keyDown(box(), { key: "Tab" });
+        await waitFor(() => expect(box().value).toBe("Add a custom domain"));
+        expect(chat.sent).toHaveLength(0);
+    });
+
+    it("goes away on Escape and on typing", async () => {
+        suggestionReply = "Add a custom domain";
+        const view = mount();
+        answer(view);
+        await waitFor(() => expect(box().placeholder).toBe("Add a custom domain"));
+        fireEvent.keyDown(box(), { key: "Escape" });
+        await waitFor(() => expect(box().placeholder).not.toBe("Add a custom domain"));
+        expect(box().getAttribute("aria-describedby")).toBeNull();
+
+        cleanup();
+        const again = mount();
+        answer(again);
+        await waitFor(() => expect(box().placeholder).toBe("Add a custom domain"));
+        fireEvent.change(box(), { target: { value: "W" } });
+        fireEvent.change(box(), { target: { value: "" } });
+        expect(box().placeholder).not.toBe("Add a custom domain");
+    });
+
+    it("is never asked for an answer only opened, nor when switched off", async () => {
+        chat.messages = [
+            { id: "u1", role: "user", parts: [{ type: "text", text: "Deploy?" }] },
+            { id: "a1", role: "assistant", parts: [{ type: "text", text: "Open Deploy." }] }
+        ];
+        mount();
+        await act(async () => undefined);
+        expect(suggestionAsks).toHaveLength(0);
+        cleanup();
+
+        const before = polarDisplayStore.get();
+        act(() => polarDisplayStore.set({ ...before, suggestions: false }));
+        try {
+            suggestionReply = "Add a custom domain";
+            const view = mount();
+            answer(view);
+            await act(async () => undefined);
+            expect(suggestionAsks).toHaveLength(0);
+        } finally {
+            act(() => polarDisplayStore.set(before));
+        }
     });
 });

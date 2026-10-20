@@ -187,7 +187,11 @@
     },
     "composer": {
         "label": "Message Polar",
-        "placeholder": "Ask Polar, or type / for commands"
+        "placeholder": "Ask Polar, or type / for commands",
+        "suggestion": {
+            "described": "Suggestion: {text}. Press Tab to use it.",
+            "use": "Use suggestion: {text}"
+        }
     },
     "picker": {
         "automatic": "Automatic",
@@ -383,6 +387,16 @@
             "showContextBar": "Context usage bar",
             "autoCompact": "Compact automatically",
             "autoCompactHint": "Near the model's limit, older messages are summarized before sending.",
+            "failed": "Couldn't save that setting. Try again."
+        },
+        "helper": {
+            "title": "Extras",
+            "intro": "Small jobs around your chats, on a model of their own.",
+            "suggestions": "Suggest a next message",
+            "suggestionsHint": "After each answer, press Tab to use the greyed suggestion.",
+            "model": "Model for titles and suggestions",
+            "modelHint": "Automatic uses the fastest model you have.",
+            "unavailable": "That model is not available now, so Automatic is used.",
             "failed": "Couldn't save that setting. Try again."
         }
     },
