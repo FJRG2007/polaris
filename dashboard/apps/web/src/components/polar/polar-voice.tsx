@@ -101,7 +101,11 @@ export async function transcribeAudio(
 
 /** What a voice button says when it is pressed but cannot work. */
 export type VoiceNotice =
-    "unavailable" | "micDenied" | "cannotRecord" | Exclude<TranscribeError, "no_voice_provider">;
+    | "unavailable"
+    | "micDenied"
+    | "cannotRecord"
+    | "modelNotSaved"
+    | Exclude<TranscribeError, "no_voice_provider">;
 
 /**
  * The microphone in the composer. Unavailable stays visible and focusable, and
@@ -318,7 +322,7 @@ export function DictationMenu({
                             </span>
                         )}
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="max-h-80 w-64 overflow-y-auto">
+                    <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto">
                         {groups.map((group) => (
                             <div key={group.provider} role="group" aria-label={group.name}>
                                 <DropdownMenuLabel>{group.name}</DropdownMenuLabel>

@@ -293,6 +293,7 @@
         "unavailable": "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI.",
         "micDenied": "Polar can't use your microphone. Allow it for this site in your browser, then try again.",
         "cannotRecord": "This browser can't record audio.",
+        "modelNotSaved": "Your model choice wasn't saved. Try again.",
         "errors": {
             "no_voice_provider": "Polar can't hear you without a speech-to-text key, like Groq or OpenAI.",
             "transcribe_failed": "That didn't come through. Try again.",

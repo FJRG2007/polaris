@@ -23,7 +23,7 @@ export interface SpeechProviderSeed {
     keyUrl: string;
 }
 
-// i18n-ignore (marked per line below): names are the providers' own; the card's words come from `integrationWords`.
+// i18n-ignore (marked per line below): names are the providers' own; the summaries, description and link label are the registry's record, never on screen - the Models keys dialog shows only the name and its own translated words.
 export const SPEECH_PROVIDER_SEEDS: readonly SpeechProviderSeed[] = [
     {
         slug: "elevenlabs",
@@ -84,6 +84,5 @@ export const SEEDED_SPEECH_INTEGRATIONS: readonly IntegrationCatalogEntry[] = SP
     description: `Connects your ${seed.name} account so Polar can turn what you say into text. The key is held here and never copied into your repositories. Usage is billed by ${seed.name} directly.`, // i18n-ignore
     docsUrl: seed.docsUrl,
     setupLinks: [{ label: "Create an API key", url: seed.keyUrl }], // i18n-ignore
-    requiresApiKey: true,
-    apiKeyLabel: "API key" // i18n-ignore
+    requiresApiKey: true
 }));

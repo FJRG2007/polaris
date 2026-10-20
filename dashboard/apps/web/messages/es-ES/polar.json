@@ -293,6 +293,7 @@
         "unavailable": "Hablar con Polar requiere una clave de voz, como Groq u OpenAI.",
         "micDenied": "Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.",
         "cannotRecord": "Este navegador no puede grabar audio.",
+        "modelNotSaved": "No se ha guardado el modelo. Vuelve a probar.",
         "errors": {
             "no_voice_provider": "Polar no puede oírte sin una clave de voz, como Groq u OpenAI.",
             "transcribe_failed": "No se ha entendido. Vuelve a probar.",
@@ -300,7 +301,7 @@
             "too_large": "La grabación es demasiado larga.",
             "speak_failed": "Polar no ha podido leer esta respuesta. Está en pantalla.",
             "no_speech_provider": "Polar no puede hablar sin una clave de OpenAI o Google AI. Sus respuestas siguen en pantalla.",
-            "usage_limit": "Llegaste al límite de la clave compartida. Usa una tuya."
+            "usage_limit": "Has llegado al límite de la clave compartida. Usa una tuya."
         },
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",

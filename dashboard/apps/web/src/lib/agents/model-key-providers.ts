@@ -58,7 +58,8 @@ export interface ProviderRow {
     name: string;
     /** Extra words somebody might type instead of the name. */
     aliases: string[];
-    apiKeyLabel: string;
+    /** The provider's own name for its key; null is the dialog's "API key". */
+    apiKeyLabel: string | null;
     apiKeyHelp: string | null;
     createUrl: string | null;
     /** The gateway is not a provider: it needs an endpoint and a model as well as
@@ -77,7 +78,7 @@ export function modelProviderRows(): ProviderRow[] {
         slug: entry.slug,
         name: entry.name,
         aliases: PROVIDER_ALIASES[entry.slug] ?? [],
-        apiKeyLabel: entry.apiKeyLabel ?? "API key",
+        apiKeyLabel: entry.apiKeyLabel ?? null,
         apiKeyHelp: entry.apiKeyHelp ?? null,
         createUrl: entry.setupLinks?.[0]?.url ?? null,
         isGateway: entry.slug === GATEWAY_SLUG,

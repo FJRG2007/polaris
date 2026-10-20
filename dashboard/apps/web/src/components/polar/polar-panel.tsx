@@ -662,7 +662,7 @@ export function PolarChat({
                 setVoice((current) =>
                     current.transcriber === id ? { ...current, transcriber: before } : current
                 );
-                setVoiceNotice("transcribe_failed");
+                setVoiceNotice("modelNotSaved");
             });
     }, []);
     const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
@@ -1702,7 +1702,9 @@ export function PolarChat({
                             >
                                 {voiceNotice === "unavailable"
                                     ? t("voice.unavailable")
-                                    : voiceNotice === "micDenied" || voiceNotice === "cannotRecord"
+                                    : voiceNotice === "micDenied" ||
+                                      voiceNotice === "cannotRecord" ||
+                                      voiceNotice === "modelNotSaved"
                                       ? t(`voice.${voiceNotice}`)
                                       : t(`voice.errors.${voiceNotice}`)}
                             </span>

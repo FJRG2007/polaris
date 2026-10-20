@@ -729,7 +729,6 @@ export const SEEDED_MODEL_INTEGRATIONS: readonly IntegrationCatalogEntry[] = MOD
     docsUrl: seed.docsUrl,
     setupLinks: seed.keyUrl ? [{ label: "Create an API key", url: seed.keyUrl }] : undefined, // i18n-ignore
     requiresApiKey: true,
-    apiKeyLabel: "API key",
     defaultModel: seed.defaultModel,
     freeTier: seed.free
 }));

@@ -13,8 +13,9 @@
  * The ceilings are the administrator's existing agent usage rules
  * (`agent-usage-limits.ts`): a "tokens" rule on everyone, a person, a role or a
  * group also bounds what that person spends through Polar on the key this
- * Polaris shares. A person's own key is their own money and is never capped
- * here. Repository and GitHub-organisation rules are about agent runs and do
+ * Polaris shares. A transcription counts toward the same ceiling at
+ * `AUDIO_TOKENS_PER_SECOND` per second of audio. A person's own key is their
+ * own money and is never capped here. Repository and GitHub-organisation rules are about agent runs and do
  * not apply to a chat.
  *
  * Server-only.
@@ -277,6 +278,13 @@ export async function sharedKeySpend(now = new Date()): Promise<SharedKeySpend> 
     };
 }
 
+/**
+ * What one second of a transcription weighs against a token ceiling: Gemini's
+ * own audio rate (ai.google.dev/gemini-api/docs/audio, "each second of audio as
+ * 32 tokens"), so dictation on the shared key moves the same budget a chat does.
+ */
+export const AUDIO_TOKENS_PER_SECOND = 32;
+
 /** The subjects a chat answers to: the person and what they belong to. */
 const CHAT_SUBJECTS: readonly LimitSubject[] = ["everyone", "user", "role", "group"];
 
@@ -288,7 +296,8 @@ export interface PolarLimitHit {
 }
 
 /**
- * The first token ceiling this person has reached on the shared key, or null
+ * The first token ceiling this person has reached on the shared key, counting
+ * transcriptions by their length, or null
  * when they may go on. Reads one table and stops when no rule is about tokens,
  * which is the common case. Windows roll, as the agent rules' do.
  */
@@ -310,9 +319,12 @@ export async function polarLimitReached(
                 payer: "instance",
                 createdAt: { gte: since(period, now) }
             },
-            _sum: { inputTokens: true, outputTokens: true }
+            _sum: { inputTokens: true, outputTokens: true, audioSeconds: true }
         });
-        const used = (spent._sum.inputTokens ?? 0) + (spent._sum.outputTokens ?? 0);
+        const used =
+            (spent._sum.inputTokens ?? 0) +
+            (spent._sum.outputTokens ?? 0) +
+            (spent._sum.audioSeconds ?? 0) * AUDIO_TOKENS_PER_SECOND;
         if (used >= rule.amount) return { used, amount: rule.amount, period };
     }
     return null;
