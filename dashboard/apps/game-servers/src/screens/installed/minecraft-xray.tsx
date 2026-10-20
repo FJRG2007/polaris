@@ -22,7 +22,18 @@ import { hostUi } from "@polaris/app-host/client";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { useEffect, useMemo, useRef, useState, useTransition, type ComponentProps } from "react";
-import { Badge, Button, Card, CardBody, Input, Select, Skeleton, Switch, cn } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Input,
+    Select,
+    Skeleton,
+    Switch,
+    cn,
+    isDirty
+} from "@polaris/ui";
 import {
     BAN_HITS_MIN,
     CONFIRM_HITS,
@@ -225,7 +236,7 @@ export function MinecraftXray({
             ? t(message.slice("minecraft:".length) as GameKey<"minecraft">)
             : (message ?? t("xray.checkSettings"));
     }, [draft, t]);
-    const dirty = view !== null && JSON.stringify(draft) !== JSON.stringify(view.settings);
+    const dirty = view !== null && isDirty(view.settings, draft);
 
     const { suspects, incidents } = useMemo(
         () =>

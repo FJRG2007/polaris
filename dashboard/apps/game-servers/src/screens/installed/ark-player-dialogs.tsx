@@ -44,7 +44,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -109,6 +110,22 @@ export function ArkPlayerDialog({
 
     const trimmed = steamId.trim();
     const invalid = trimmed.length > 0 && !isSteamId(trimmed);
+    // The row as it would be saved, against the row as it was opened: an id, a
+    // name or an account put back as it was saves nothing.
+    const unchanged =
+        player !== null &&
+        !isDirty(
+            {
+                steamId: player.steamId,
+                label: player.label !== player.steamId ? player.label : "",
+                userId: player.userId ?? null
+            },
+            {
+                steamId: trimmed,
+                label: label.trim(),
+                userId: account && follow ? account.userId : null
+            }
+        );
 
     /** Fill both fields in from a Polaris account, so the id is never retyped by
      *  hand from a chat message. */
@@ -143,6 +160,7 @@ export function ArkPlayerDialog({
             }
             confirmLabel={editing ? t("playerDialogs.save") : t("playerDialogs.addPlayer")}
             ready={isSteamId(trimmed)}
+            unchanged={unchanged}
             pending={pending}
             error={error}
             onClose={onClose}

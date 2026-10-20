@@ -19,7 +19,17 @@ import { hostUi } from "@polaris/app-host/client";
 import { useGameText, useSchemaText } from "../game-text";
 import { useEffect, useState, useTransition } from "react";
 import { Download, ExternalLink, Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Skeleton,
+    isDirty
+} from "@polaris/ui";
 import {
     readSpigotPluginsAction,
     saveSpigotPluginsAction,
@@ -59,7 +69,9 @@ export function SpigotPluginsCard({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const changed = ids.join(",") !== saved.join(",");
+    // The server downloads every plugin on the list, in no particular order, so
+    // one taken off and put back is the same list.
+    const changed = isDirty(new Set(saved), new Set(ids));
 
     // What the search shows before anything is typed: the popular free ones,
     // which is a better empty state than a box and an instruction.

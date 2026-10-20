@@ -15,7 +15,17 @@ import type { GameKey } from "../../../messages";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { WholeNumberInput } from "../../components/whole-number-input";
-import { Badge, Button, Card, CardBody, Checkbox, Skeleton, Switch, Textarea } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    Skeleton,
+    Switch,
+    Textarea,
+    isDirty
+} from "@polaris/ui";
 import {
     BLOCK_REASONS,
     chatModerationSchema,
@@ -112,10 +122,7 @@ export function ChatModerationSection({
         });
     }, [draft]);
     const saved = state?.rules ?? null;
-    const dirty =
-        candidate?.success === true &&
-        saved !== null &&
-        JSON.stringify(candidate.data) !== JSON.stringify(saved);
+    const dirty = candidate?.success === true && saved !== null && isDirty(saved, candidate.data);
     const invalid = candidate !== null && !candidate.success;
 
     const change = (patch: Partial<ChatModeration>) => {

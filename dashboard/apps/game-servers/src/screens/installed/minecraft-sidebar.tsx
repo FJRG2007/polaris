@@ -52,6 +52,7 @@ import {
     Switch,
     allChosen,
     cn,
+    isDirty,
     useRangeSelection
 } from "@polaris/ui";
 import * as side from "../../lib/minecraft/sidebar";
@@ -176,7 +177,7 @@ export function MinecraftSidebar({
     const invalid = side.hasSidebarProblems(draft, known);
     // Only a change is worth a save: the same panel saved again is a round trip
     // that changes nothing on anybody's screen.
-    const dirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.sidebar);
+    const dirty = state !== null && isDirty(state.sidebar, draft);
     const inserts = useMemo(() => insertsFor(t, "java", "server"), [t]);
     /** Changing the panel waits for the server's answer, as the form did when
      *  it was only drawn after it. */
@@ -551,6 +552,15 @@ function RotatingDialog({
     );
     const selection = useRangeSelection(everyId, rotating.ids, setIds);
     const editing = rotating.at !== null;
+    // The pair as it was opened: chosen again in the same order, for as long,
+    // is nothing to save.
+    const [opened] = useState(rotating);
+    const unchanged =
+        editing &&
+        !isDirty(
+            { ids: opened.ids, every: opened.every },
+            { ids: rotating.ids, every: rotating.every }
+        );
     const chosen = rotating.ids.flatMap(
         (id) => SIDEBAR_BLOCKS.find((block) => block.id === id) ?? []
     );
@@ -651,7 +661,8 @@ function RotatingDialog({
                         {t("sidebar.cancel")}
                     </Button>
                     <Button
-                        disabled={chosen.length < 2 || (!editing && !room)}
+                        disabled={chosen.length < 2 || (!editing && !room) || unchanged}
+                        title={unchanged ? t("settings.nothingToSave") : undefined}
                         onClick={() => onDone(chosen)}
                     >
                         {editing ? t("sidebar.save") : t("sidebar.add")}

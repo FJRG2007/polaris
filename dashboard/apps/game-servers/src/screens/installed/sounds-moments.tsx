@@ -14,7 +14,7 @@ import { Plus, Play, Square, Trash2 } from "lucide-react";
 import { saveSoundSettingsAction } from "./sounds-actions";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { SoundEntry } from "../../lib/minecraft/sounds-service";
-import { Button, Card, CardBody, Input, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Switch, isDirty } from "@polaris/ui";
 import * as rules from "../../lib/minecraft/sounds";
 
 type Moment = rules.Moment;
@@ -103,7 +103,7 @@ export function SoundSettingsEditor({
                 .map((entry) => ({ value: entry.key, label: entry.name })),
         [sounds]
     );
-    const dirty = !same(draft, settings);
+    const dirty = isDirty(settings, draft);
     const badPlayers = draft.players.some((one) => !PLAYER.test(one.player.trim()));
     const repeated = new Set<string>();
     const duplicate = draft.players.some((one) => {

@@ -23,7 +23,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import type { GameKey } from "../../../messages";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { saveGameScheduleAction, setWakeOnJoinAction } from "./minecraft-actions";
-import { Button, Card, CardBody, Input, Select, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Switch, isDirty } from "@polaris/ui";
 import { CalendarClock, Loader2, Moon, Plus, Power, Trash2 } from "lucide-react";
 import {
     describeSchedule,
@@ -97,7 +97,7 @@ export function MinecraftSchedule({
 
     // A form is dirty when its values differ from the ones it loaded, not when
     // somebody has touched it: a window opened and closed again is no change.
-    const changed = useMemo(() => JSON.stringify(schedule) !== JSON.stringify(saved), [schedule, saved]);
+    const changed = useMemo(() => isDirty(saved, schedule), [schedule, saved]);
     const summary = useMemo(() => describeSchedule(schedule, new Date()), [schedule]);
     // Whether anything in this schedule actually waits for the server to empty.
     const sleeps = useMemo(

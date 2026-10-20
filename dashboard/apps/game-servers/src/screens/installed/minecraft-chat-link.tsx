@@ -11,7 +11,7 @@
 import { Loader2, MessagesSquare } from "lucide-react";
 import type { GameKey } from "../../../messages";
 import { useGameText } from "../game-text";
-import { Button, Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Skeleton, Switch, isDirty } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     CHAT_COMMANDS,
@@ -137,8 +137,7 @@ export function MinecraftChatLink({ installedAppId }: { installedAppId: string }
 
     const link = linkOf(draft);
     // Only a change is worth a save, and the same link saved again is not one.
-    const dirty =
-        state !== null && link !== undefined && JSON.stringify(link) !== JSON.stringify(state.link);
+    const dirty = state !== null && link !== undefined && isDirty(state.link, link);
     const text = linkedChannels(link ?? null).text;
 
     const change = (patch: Partial<Draft>) => {
