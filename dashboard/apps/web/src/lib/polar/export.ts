@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import { getTranslations } from "@/lib/i18n/request";
+import { compactionOf } from "@/lib/polar/compaction";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 
 /** Most messages one exported chat carries; the newest ones. */
@@ -50,6 +51,7 @@ export interface ExportNames {
     file: (name: string) => string;
     used: (name: string) => string;
     truncated: string;
+    compacted: (auto: boolean) => string;
 }
 
 export async function exportNames(): Promise<ExportNames> {
@@ -61,7 +63,8 @@ export async function exportNames(): Promise<ExportNames> {
         attachment: t("export.attachment"),
         file: (name) => t("export.file", { name }),
         used: (name) => t("export.used", { name }),
-        truncated: t("export.truncated", { most: EXPORT_MESSAGES_MOST })
+        truncated: t("export.truncated", { most: EXPORT_MESSAGES_MOST }),
+        compacted: (auto) => t(auto ? "compact.dividerAuto" : "compact.divider")
     };
 }
 
@@ -117,6 +120,11 @@ export function threadMarkdown(thread: ExportThread, names: ExportNames): string
     ];
     if (thread.truncated) blocks.push(`> ${names.truncated}`);
     for (const message of newestPath(thread.messages)) {
+        const compaction = compactionOf({ role: message.role, metadata: message.metadata });
+        if (compaction) {
+            blocks.push("---", `_${names.compacted(compaction.auto)}_`);
+            continue;
+        }
         const body = partsMarkdown(message.parts, names);
         if (!body) continue;
         blocks.push(`## ${message.role === "user" ? names.user : names.assistant}`, body);

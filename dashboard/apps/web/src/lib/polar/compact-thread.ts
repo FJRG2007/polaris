@@ -11,7 +11,13 @@ import { prisma, type Prisma } from "@polaris/db";
 import { turnSignals } from "@/lib/polar/automatic";
 import { getPolarThread } from "@/lib/polar/threads";
 import type { ModelChoice } from "@/lib/polar/shared";
-import { answerUsage, recordPolarUsage, type AnswerUsage } from "@/lib/polar/usage";
+import {
+    answerUsage,
+    recordPolarUsage,
+    polarLimitReached,
+    type AnswerUsage,
+    type PolarLimitHit
+} from "@/lib/polar/usage";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import { reasoningFor, resolvePolarModel, type ModelRefusal } from "@/lib/polar/models";
 import {
@@ -38,7 +44,7 @@ export async function compactPolarThread(input: {
     choice: ModelChoice;
     instructions: string | null;
     auto: boolean;
-}): Promise<{ message: UIMessage } | CompactRefusal> {
+}): Promise<{ message: UIMessage } | { limit: PolarLimitHit } | CompactRefusal> {
     const thread = await getPolarThread(input.userId, input.threadId);
     if (!thread) return "not_found";
     const path = pathTo(thread.messages, input.leafId);
@@ -50,6 +56,11 @@ export async function compactPolarThread(input: {
 
     const resolved = await resolvePolarModel(input.userId, input.choice, turnSignals(since));
     if (typeof resolved === "string") return resolved;
+    // A summary spends tokens like a turn, so the shared key's ceilings hold.
+    if (resolved.credential.source === "instance") {
+        const hit = await polarLimitReached(input.userId);
+        if (hit) return { limit: hit };
+    }
 
     let text: string;
     let spent: AnswerUsage;

@@ -10,7 +10,6 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { polarLimitReached } from "@/lib/polar/usage";
 import { modelChoiceSchema } from "@/lib/polar/shared";
 import { compactPolarThread } from "@/lib/polar/compact-thread";
 import { POLAR_COMPACT_INSTRUCTIONS_MAX } from "@/lib/polar/compaction";
@@ -55,11 +54,6 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     if (!body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     const limited = await rateLimit(`polar-compact:${user.id}`, 10, 60_000);
     if (!limited.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-    // A summary spends tokens like a turn, so the shared key's ceilings hold.
-    if (body.data.choice.payer !== "own") {
-        const hit = await polarLimitReached(user.id);
-        if (hit) return NextResponse.json({ error: "usage_limit", ...hit }, { status: 429 });
-    }
     const result = await compactPolarThread({
         userId: user.id,
         threadId: id.data,
@@ -70,6 +64,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     });
     if (typeof result === "string") {
         return NextResponse.json({ error: result }, { status: STATUS[result] ?? 400 });
+    }
+    if ("limit" in result) {
+        return NextResponse.json({ error: "usage_limit", ...result.limit }, { status: 429 });
     }
     return NextResponse.json(result);
 }

@@ -172,4 +172,26 @@ describe("a shared link", () => {
         ]);
         expect(JSON.stringify(shared)).not.toContain("/srv/private");
     });
+
+    it("leaves a compaction summary out of a shared chat", async () => {
+        state.share = { sharedAt: new Date(), threadId: ID, thread: { title: "Disk" } };
+        state.messages = [
+            { id: "q", parentId: null, role: "user", parts: [{ type: "text", text: "How full?" }] },
+            {
+                id: "c",
+                parentId: "q",
+                role: "assistant",
+                parts: [{ type: "text", text: "Summary so far" }],
+                metadata: { compaction: { auto: false, keep: 0, at: "2026-01-01T00:00:00.000Z" } }
+            },
+            {
+                id: "a",
+                parentId: "c",
+                role: "assistant",
+                parts: [{ type: "text", text: "Half full." }]
+            }
+        ];
+        const shared = await readSharedPolarThread(TOKEN);
+        expect(shared?.messages.map((message) => message.id)).toEqual(["q", "a"]);
+    });
 });

@@ -57,7 +57,7 @@ describe("asking the provider", () => {
     it("asks Anthropic once per key, with its headers, and remembers the answer", async () => {
         answer = () => json({ data: [{ id: "claude-a", max_input_tokens: 200_000 }] });
         const key = { provider: "anthropic", secret: "sk-test" };
-        expect((await windows.providerWindows(key)).get("claude-a")).toBe(200_000);
+        expect((await windows.providerWindows(key, { wait: true })).get("claude-a")).toBe(200_000);
         expect((await windows.providerWindows(key)).get("claude-a")).toBe(200_000);
         expect(calls).toHaveLength(1);
         expect(calls[0]?.url).toContain("https://api.anthropic.com/v1/models");
@@ -75,7 +75,10 @@ describe("asking the provider", () => {
                       models: [{ name: "models/a", inputTokenLimit: 1 }],
                       nextPageToken: "next"
                   });
-        const found = await windows.providerWindows({ provider: "google-ai", secret: "g-key" });
+        const found = await windows.providerWindows(
+            { provider: "google-ai", secret: "g-key" },
+            { wait: true }
+        );
         expect([...found]).toEqual([
             ["a", 1],
             ["b", 2]
@@ -93,9 +96,35 @@ describe("asking the provider", () => {
     it("answers nothing when the provider fails, and does not ask again at once", async () => {
         answer = () => new Response("{}", { status: 503 });
         const key = { provider: "anthropic", secret: "down" };
-        expect((await windows.providerWindows(key)).size).toBe(0);
-        expect((await windows.providerWindows(key)).size).toBe(0);
+        expect((await windows.providerWindows(key, { wait: true })).size).toBe(0);
+        expect((await windows.providerWindows(key, { wait: true })).size).toBe(0);
         expect(calls).toHaveLength(1);
+    });
+
+    it("never waits on a chat turn: nothing known answers empty and reads it once", async () => {
+        answer = () => json({ data: [{ id: "claude-a", max_input_tokens: 200_000 }] });
+        const key = { provider: "anthropic", secret: "cold" };
+        expect((await windows.providerWindows(key)).size).toBe(0);
+        expect((await windows.providerWindows(key)).size).toBe(0);
+        await vi.waitFor(async () =>
+            expect((await windows.providerWindows(key)).get("claude-a")).toBe(200_000)
+        );
+        expect(calls).toHaveLength(1);
+    });
+
+    it("answers a list past its time at once and refreshes it in the background", async () => {
+        answer = () => json({ data: [{ id: "claude-a", max_input_tokens: 100 }] });
+        const key = { provider: "anthropic", secret: "stale" };
+        await windows.providerWindows(key, { wait: true });
+        answer = () => json({ data: [{ id: "claude-a", max_input_tokens: 200 }] });
+        const later = Date.now() + 7 * 60 * 60 * 1000;
+        expect(
+            (await windows.providerWindows(key, { wait: true, now: later })).get("claude-a")
+        ).toBe(100);
+        await vi.waitFor(async () =>
+            expect((await windows.providerWindows(key)).get("claude-a")).toBe(200)
+        );
+        expect(calls).toHaveLength(2);
     });
 });
 

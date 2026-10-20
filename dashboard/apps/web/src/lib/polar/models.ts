@@ -95,11 +95,14 @@ export interface PolarProviderOption {
 
 /**
  * The providers and models this person can use now: only providers with a
- * usable key, only models the catalogue carries for them.
+ * usable key, only models the catalogue carries for them. `waitForWindows`
+ * reads a provider's windows now when none are remembered yet (the picker);
+ * otherwise the remembered ones are used and refreshed in the background.
  */
 export async function polarModelOptions(
     userId: string,
-    access?: PolarAccess
+    access?: PolarAccess,
+    { waitForWindows = false }: { waitForWindows?: boolean } = {}
 ): Promise<PolarProviderOption[]> {
     const granted = access ?? (await polarAccessFor(userId));
     const sources = await polarKeySources(userId, granted);
@@ -112,7 +115,7 @@ export async function polarModelOptions(
     }
     const [catalogue, windows] = await Promise.all([
         prefixes.size > 0 ? listCatalogModels([...prefixes.keys()]) : [],
-        windowsBySlug(userId, served, granted)
+        windowsBySlug(userId, served, granted, waitForWindows)
     ]);
     const options: PolarProviderOption[] = [];
     for (const slug of served) {
@@ -146,7 +149,8 @@ export async function polarModelOptions(
 async function windowsBySlug(
     userId: string,
     served: readonly string[],
-    access: PolarAccess
+    access: PolarAccess,
+    wait: boolean
 ): Promise<Map<string, ReadonlyMap<string, number>>> {
     const asked = served.filter((slug) => (WINDOW_PROVIDERS as readonly string[]).includes(slug));
     return new Map(
@@ -155,7 +159,7 @@ async function windowsBySlug(
                 const credential = await polarCredentialFor(userId, slug, null, access).catch(
                     () => null
                 );
-                return [slug, await providerWindows(credential)] as const;
+                return [slug, await providerWindows(credential, { wait })] as const;
             })
         )
     );

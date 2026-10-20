@@ -114,10 +114,55 @@ const NAMES = {
     attachment: "adjunto",
     file: (name: string) => `Archivo: ${name}`,
     used: (name: string) => `Usó ${name}`,
-    truncated: "Recortado"
+    truncated: "Recortado",
+    compacted: (auto: boolean) => (auto ? "Compactada sola" : "Compactada")
 };
 
 describe("formats", () => {
+    it("writes a compaction marker as a divider, never as an answer", () => {
+        const at = new Date(0).toISOString();
+        const markdown = exporter.threadMarkdown(
+            {
+                id: ID,
+                title: "Long chat",
+                createdAt: at,
+                updatedAt: at,
+                truncated: false,
+                messages: [
+                    {
+                        id: "u",
+                        parentId: null,
+                        role: "user",
+                        parts: [{ type: "text", text: "Hi" }],
+                        metadata: null,
+                        createdAt: at
+                    },
+                    {
+                        id: "c",
+                        parentId: "u",
+                        role: "assistant",
+                        parts: [{ type: "text", text: "Summary of everything" }],
+                        metadata: { compaction: { auto: true, keep: 0, at } },
+                        createdAt: at
+                    },
+                    {
+                        id: "a",
+                        parentId: "c",
+                        role: "assistant",
+                        parts: [{ type: "text", text: "Next answer" }],
+                        metadata: null,
+                        createdAt: at
+                    }
+                ]
+            },
+            NAMES
+        );
+        expect(markdown).not.toContain("Summary of everything");
+        expect(markdown).toContain("---\n\n_Compactada sola_");
+        expect(markdown.match(/## Polar/g)).toHaveLength(1);
+        expect(markdown).toContain("Next answer");
+    });
+
     it("writes the newest path as Markdown, tools and files by name only", async () => {
         const thread = (await exporter.readExportThread("u1", ID))!;
         const markdown = exporter.threadMarkdown(thread, NAMES);

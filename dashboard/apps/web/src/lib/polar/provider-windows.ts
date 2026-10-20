@@ -39,6 +39,8 @@ const KEPT_MOST = 200;
 type Windows = ReadonlyMap<string, number>;
 
 const kept = new Map<string, { windows: Windows; until: number }>();
+/** Lists being read now, so one key is never asked twice at once. */
+const reading = new Map<string, Promise<Windows>>();
 
 function positive(value: unknown): number | null {
     return typeof value === "number" && Number.isFinite(value) && value > 0
@@ -101,27 +103,15 @@ async function listWindows(provider: string, secret: string): Promise<Windows> {
     return windows;
 }
 
-/**
- * The windows a provider reports for the models this key reaches; empty when
- * the provider reports none, or could not be asked. Never throws.
- */
-export async function providerWindows(
-    credential: Pick<ChatCredential, "provider" | "secret"> | null,
-    now = Date.now()
-): Promise<Windows> {
-    if (!credential?.secret) return new Map();
-    if (!(WINDOW_PROVIDERS as readonly string[]).includes(credential.provider)) return new Map();
-    const key = `${credential.provider}:${createHash("sha256").update(credential.secret).digest("hex")}`;
-    const hit = kept.get(key);
-    if (hit && hit.until > now) return hit.windows;
+async function refresh(key: string, provider: string, secret: string): Promise<Windows> {
     let windows: Windows;
     let until: number;
     try {
-        windows = await listWindows(credential.provider, credential.secret);
-        until = now + KEPT_MS;
+        windows = await listWindows(provider, secret);
+        until = Date.now() + KEPT_MS;
     } catch {
         windows = new Map();
-        until = now + FAILED_KEPT_MS;
+        until = Date.now() + FAILED_KEPT_MS;
     }
     kept.delete(key);
     if (kept.size >= KEPT_MOST) {
@@ -132,7 +122,38 @@ export async function providerWindows(
     return windows;
 }
 
+/**
+ * The windows a provider reports for the models this key reaches; empty when
+ * the provider reports none, or could not be asked. Never throws.
+ *
+ * A remembered list is answered at once, even past its time, while a fresh
+ * one is read in the background. With nothing remembered, `wait` reads it
+ * now; without it the answer is empty and the list arrives for the next call,
+ * so a chat turn never waits on a provider's model list.
+ */
+export async function providerWindows(
+    credential: Pick<ChatCredential, "provider" | "secret"> | null,
+    options: { wait?: boolean; now?: number } = {}
+): Promise<Windows> {
+    if (!credential?.secret) return new Map();
+    if (!(WINDOW_PROVIDERS as readonly string[]).includes(credential.provider)) return new Map();
+    const now = options.now ?? Date.now();
+    const key = `${credential.provider}:${createHash("sha256").update(credential.secret).digest("hex")}`;
+    const hit = kept.get(key);
+    if (hit && hit.until > now) return hit.windows;
+    let pending = reading.get(key);
+    if (!pending) {
+        pending = refresh(key, credential.provider, credential.secret).finally(() =>
+            reading.delete(key)
+        );
+        reading.set(key, pending);
+    }
+    if (hit) return hit.windows;
+    return options.wait ? pending : new Map();
+}
+
 /** Test seam: forget every remembered list. */
 export function forgetProviderWindows(): void {
     kept.clear();
+    reading.clear();
 }
