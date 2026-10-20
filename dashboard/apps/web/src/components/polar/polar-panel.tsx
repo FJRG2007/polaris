@@ -87,6 +87,7 @@ import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
 import * as polarRuns from "@/components/polar/polar-runs";
+import * as polarCompare from "@/components/polar/polar-compare";
 import * as polarShared from "@/lib/polar/shared";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
@@ -787,6 +788,8 @@ export function PolarChat({
     // The project a new chat is filed under when its first message is sent.
     const [newProject, setNewProject] = useState<string | null>(null);
     const [showHistory, setShowHistory] = useState(fullPage);
+    // One question asked of several models, laid out side by side.
+    const [comparison, setComparison] = polarCompare.useComparison();
     // A deleted conversation that is open is replaced by a new one.
     const removed = useRef<(id: string) => void>(() => undefined);
     const sidebar = usePolarSidebar({
@@ -1337,11 +1340,16 @@ export function PolarChat({
 
     removed.current = (id) => {
         if (id === threadId) startNew();
+        setComparison((current) => {
+            const columns = current?.columns.filter((column) => column.threadId !== id) ?? [];
+            return current && columns.length > 0 ? { ...current, columns } : null;
+        });
     };
 
     const startNew = (projectId: string | null = null) => {
         // Lets go of the answer on screen; it keeps running on the server.
         void chat.stop();
+        setComparison(null);
         discardTemporary();
         setNewProject(projectId);
         if (projectId) sidebar.openProject(projectId);
@@ -1953,6 +1961,7 @@ export function PolarChat({
             activeId={chatMode ? threadId : ""}
             runs={runMarks}
             onOpen={(id) => {
+                setComparison(null);
                 code.setMode("chat");
                 void openThread(id);
             }}
@@ -2113,13 +2122,35 @@ export function PolarChat({
                     ) : null
                 }
                 picker={
-                    <ModelSelector
-                        providers={providers ?? []}
-                        choice={choice}
-                        onChoice={setChoice}
-                        open={modelOpen}
-                        onOpenChange={setModelOpen}
-                    />
+                    <>
+                        <ModelSelector
+                            providers={providers ?? []}
+                            choice={choice}
+                            onChoice={setChoice}
+                            open={modelOpen}
+                            onOpenChange={setModelOpen}
+                        />
+                        {welcome && !temporary ? (
+                            <polarCompare.AskSeveral
+                                providers={providers ?? []}
+                                choice={choice}
+                                question={input}
+                                hasFiles={files.length > 0}
+                                onStart={(choices) => {
+                                    writeStored(threadKey, "");
+                                    setComparison({
+                                        question: input.trim(),
+                                        columns: choices.map((one) => ({
+                                            threadId: newId(),
+                                            choice: one,
+                                            sent: false
+                                        }))
+                                    });
+                                    setInput("");
+                                }}
+                            />
+                        ) : null}
+                    </>
                 }
                 attachId={ids.attach}
                 attach={{
@@ -2380,7 +2411,30 @@ export function PolarChat({
                     className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !chatMode && "hidden")}
                     inert={chatMode ? undefined : true}
                 >
-                    {welcome ? (
+                    {comparison ? (
+                        <polarCompare.PolarCompare
+                            comparison={comparison}
+                            onChange={setComparison}
+                            providers={providers ?? []}
+                            isAdmin={isAdmin}
+                            settings={{ web, toolNames: Object.keys(tools) }}
+                            onClose={() => setComparison(null)}
+                            onContinue={(id) => {
+                                setComparison(null);
+                                void openThread(id);
+                            }}
+                            onSettled={(id) => {
+                                sidebar.refresh(true);
+                                fetch(`/api/polar/threads/${id}/title`)
+                                    .then((response) => (response.ok ? response.json() : null))
+                                    .then((data: { title?: unknown } | null) => {
+                                        if (typeof data?.title === "string")
+                                            sidebar.retitle(id, data.title);
+                                    })
+                                    .catch(() => undefined);
+                            }}
+                        />
+                    ) : welcome ? (
                         <PolarWelcome
                             avatar={<PolarAvatar state={avatarState} size={64} />}
                             title={temporary ? t("temporary.title") : t("welcome")}

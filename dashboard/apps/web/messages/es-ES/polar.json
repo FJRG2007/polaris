@@ -745,5 +745,24 @@
         "noAgentMatch": "Ningún agente",
         "noFiles": "Una sesión de agente aún no admite adjuntos",
         "noVoice": "La voz va al chat de Polar, no a un agente"
+    },
+    "compare": {
+        "open": "Preguntar a varios",
+        "title": "Preguntar a varios modelos",
+        "intro": "Cada modelo responde en su propio chat, uno al lado del otro. Las herramientas de Polaris quedan apagadas para no hacer nada dos veces.",
+        "add": "Añadir modelo",
+        "remove": "Quitar este modelo",
+        "cancel": "Cancelar",
+        "send": "Enviar a todos",
+        "needText": "Escribe primero la pregunta.",
+        "noFiles": "Los archivos van a un solo modelo. Quítalos para preguntar a varios.",
+        "sameModel": "Elige un modelo distinto en cada uno.",
+        "noRoom": "Solo {room} chats más pueden responder ahora ({max} a la vez). Espera a que termine uno, detén uno o pregunta a menos modelos.",
+        "close": "Cerrar comparación",
+        "answers": "Respuestas",
+        "resize": "Ajustar columnas",
+        "answering": "Respondiendo",
+        "approval": "Esta respuesta espera tu aprobación. Sigue con este chat para responderla.",
+        "continue": "Seguir con esta"
     }
 }
