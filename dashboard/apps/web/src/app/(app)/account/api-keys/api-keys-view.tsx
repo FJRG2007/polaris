@@ -43,7 +43,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ApiKeyView } from "@polaris/auth";
-import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
+import { deleteApiKeyAction, revokeApiKeyAction, toggleApiKeyAction } from "./actions";
 import { Ban, BarChart3, BookOpen, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { API_KEY_ENVIRONMENTS, describeDevice, type ApiKeyEnvironment } from "@polaris/core";
 import * as list from "./api-keys-filter";
@@ -57,6 +57,7 @@ import {
     DropdownMenuTrigger,
     Input,
     Select,
+    Switch,
     cn
 } from "@polaris/ui";
 
@@ -106,8 +107,17 @@ function environmentLabel(environment: string, t: Translate): string {
     return key ? t(key) : environment;
 }
 
-export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
+export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
     const router = useRouter();
+    // The rows as this screen last drew them, so a switch flips at once and is
+    // put back when the server refuses. Replaced whenever the server sends new
+    // ones.
+    const [keys, setKeys] = useState(served);
+    const [from, setFrom] = useState(served);
+    if (from !== served) {
+        setFrom(served);
+        setKeys(served);
+    }
     const format = useDisplayFormat();
     const t = useTranslations("account");
     const [confirm, confirmElement] = useConfirm();
@@ -133,6 +143,24 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
         const result = await revokeApiKeyAction(key.id);
         if (result.error) setError(result.error);
         else router.refresh();
+    }
+
+    async function toggle(key: ApiKeyView, enabled: boolean) {
+        const previous = keys;
+        setKeys(keys.map((row) => (row.id === key.id ? { ...row, enabled } : row)));
+        setError(null);
+        let result: { error?: string };
+        try {
+            result = await toggleApiKeyAction({ id: key.id, enabled });
+        } catch {
+            result = { error: t("apiKeys.list.toggleFailed") };
+        }
+        if (result.error) {
+            setKeys(previous);
+            setError(result.error);
+            return;
+        }
+        router.refresh();
     }
 
     async function remove(key: ApiKeyView) {
@@ -309,6 +337,7 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                                     entry={key}
                                     date={(iso) => format.date(iso)}
                                     onRevoke={() => void revoke(key)}
+                                    onToggle={(enabled) => void toggle(key, enabled)}
                                     onDelete={() => void remove(key)}
                                 />
                             ))}
@@ -345,11 +374,13 @@ function KeyRow({
     entry,
     date,
     onRevoke,
+    onToggle,
     onDelete
 }: {
     entry: ApiKeyView;
     date: (iso: string) => string;
     onRevoke: () => void;
+    onToggle: (enabled: boolean) => void;
     onDelete: () => void;
 }) {
     const t = useTranslations("account");
@@ -389,7 +420,11 @@ function KeyRow({
                         <Badge variant="danger">{t("apiKeys.list.revoked")}</Badge>
                     ) : state === "expired" ? (
                         <Badge variant="neutral">{t("apiKeys.list.expiry.expired")}</Badge>
-                    ) : null}
+                    ) : entry.enabled ? null : (
+                        <Badge variant="warning" title={t("apiKeys.list.offHint")}>
+                            {t("apiKeys.list.off")}
+                        </Badge>
+                    )}
                 </span>
                 {entry.description ? (
                     <p className="truncate text-xs" title={entry.description}>
@@ -471,6 +506,17 @@ function KeyRow({
             </td>
             <td className="px-3 py-2 align-top">
                 <span className="flex items-center justify-end gap-0.5">
+                    {/* Gone for a revoked key: that one is over, and a switch
+                        would promise it could come back. */}
+                    {state === "revoked" ? null : (
+                        <span className="mr-1 inline-flex" title={t("apiKeys.list.offHint")}>
+                            <Switch
+                                checked={entry.enabled}
+                                onChange={onToggle}
+                                aria-label={t("apiKeys.list.toggleNamed", { name: entry.name })}
+                            />
+                        </span>
+                    )}
                     <Button size="icon" variant="ghost" asChild>
                         <Link
                             href={`${href}/usage`}

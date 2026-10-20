@@ -27,6 +27,7 @@ import {
     editKey,
     removeKey,
     reorderKeys,
+    toggleKey,
     type KeyActionResult,
     type KeyScope
 } from "@/lib/agents/model-key-actions";
@@ -51,6 +52,10 @@ export async function deleteModelKeyAction(input: unknown): Promise<KeyActionRes
 
 export async function reorderModelKeysAction(input: unknown): Promise<KeyActionResult> {
     return reorderKeys(await scope(), input);
+}
+
+export async function toggleModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return toggleKey(await scope(), input);
 }
 
 // ---------------------------------------------------------------------------

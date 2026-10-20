@@ -217,6 +217,11 @@
                 "soon": "Caduca en {days} días",
                 "expired": "Caducada"
             },
+            "off": "Desactivada",
+            "offHint": "Una clave desactivada se rechaza como una revocada hasta que vuelvas a activarla.",
+            "toggleNamed": "Aceptar llamadas hechas con {name}",
+            "toggleGone": "Esa clave ya no existe o está revocada, así que no se puede cambiar.",
+            "toggleFailed": "No se pudo cambiar la clave. Inténtalo de nuevo.",
             "revokeTitle": "¿Revocar «{name}»?",
             "revokeDescription": "Todo lo que use esta clave deja de funcionar al momento.",
             "revoke": "Revocar",

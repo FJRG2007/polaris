@@ -56,6 +56,8 @@ export interface ApiKeyView {
     lastUsedIp: string | null;
     lastUsedUserAgent: string | null;
     revokedAt: string | null;
+    /** Off is refused like revoked, and can be switched back on. */
+    enabled: boolean;
     createdAt: string;
     /** The app whose settings minted this key, for one that came from there.
      *  Where it came from rather than what it may touch - a project token
@@ -238,6 +240,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         lastUsedIp: row.lastUsedIp,
         lastUsedUserAgent: row.lastUsedUserAgent,
         revokedAt: row.revokedAt?.toISOString() ?? null,
+        enabled: row.enabled,
         createdAt: row.createdAt.toISOString(),
         projectId: row.projectId,
         projectName: row.project?.name ?? null,
@@ -317,6 +320,23 @@ export async function revokeApiKey(userId: string, id: string): Promise<void> {
     });
 }
 
+/**
+ * Switch a key the caller owns off or back on. Off is refused by
+ * `verifyApiKey` exactly like a revoked key; unlike one, it can be switched
+ * back on. A revoked key stays revoked: false when there is no such live key.
+ */
+export async function setApiKeyEnabled(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<boolean> {
+    const result = await prisma.apiKey.updateMany({
+        where: { id, userId, revokedAt: null },
+        data: { enabled }
+    });
+    return result.count > 0;
+}
+
 /** Delete a key the caller owns, once they no longer want it listed. */
 export async function deleteApiKey(userId: string, id: string): Promise<void> {
     await prisma.apiKey.deleteMany({ where: { id, userId } });
@@ -324,7 +344,7 @@ export async function deleteApiKey(userId: string, id: string): Promise<void> {
 
 /**
  * Resolve a presented key to its owner and effective scopes, or null when it is
- * unknown, revoked, expired, or its owner is banned. The network rules come back
+ * unknown, revoked, switched off, expired, or its owner is banned. The network rules come back
  * unevaluated: the IP/geo decision needs the request context and the geolocation
  * cache, both of which live in the app, so the caller applies them.
  */
@@ -350,7 +370,8 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         }
     });
     if (!row || !tokenMatchesHash(presented, row.keyHash)) return null;
-    if (row.revokedAt || row.user.bannedAt) return null;
+    // Switched off by its owner reads exactly like revoked to whoever presents it.
+    if (row.revokedAt || row.enabled === false || row.user.bannedAt) return null;
     if (row.expiresAt && row.expiresAt.getTime() <= Date.now()) return null;
 
     // A key narrows, never grants: intersect its scopes with what the owner

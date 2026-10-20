@@ -28,6 +28,7 @@ import {
     deleteModelKeyAction,
     endAgentSigninAction,
     reorderModelKeysAction,
+    toggleModelKeyAction,
     updateModelKeyAction
 } from "./actions";
 
@@ -61,7 +62,8 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                     add: addModelKeyAction,
                     update: updateModelKeyAction,
                     remove: deleteModelKeyAction,
-                    reorder: reorderModelKeysAction
+                    reorder: reorderModelKeysAction,
+                    toggle: toggleModelKeyAction
                 }}
                 copy={{
                     title: t("aiKeys.keys.title"),
@@ -89,7 +91,8 @@ export async function AiKeysPanel({ userId }: { userId: string }) {
                     add: addModelKeyAction,
                     update: updateModelKeyAction,
                     remove: deleteModelKeyAction,
-                    reorder: reorderModelKeysAction
+                    reorder: reorderModelKeysAction,
+                    toggle: toggleModelKeyAction
                 }}
                 copy={{
                     title: t("aiKeys.accounts.title"),

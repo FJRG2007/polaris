@@ -11,7 +11,15 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { createApiKey, deleteApiKey, revokeApiKey, scopesAvailableTo, updateApiKey } from "@polaris/auth";
+import { z } from "zod";
+import {
+    createApiKey,
+    deleteApiKey,
+    revokeApiKey,
+    scopesAvailableTo,
+    setApiKeyEnabled,
+    updateApiKey
+} from "@polaris/auth";
 import { createApiKeySchema, updateApiKeySchema } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { requireUser } from "@/lib/session";
@@ -99,6 +107,34 @@ export async function deleteApiKeyAction(id: string): Promise<{ error?: string }
         action: "account.api-key.deleted",
         targetType: "apiKey",
         targetId: String(id)
+    });
+    revalidatePath("/account/api-keys");
+    return {};
+}
+
+const toggleApiKeySchema = z.object({ id: z.string().uuid(), enabled: z.boolean() });
+
+/**
+ * Switch a key off, or back on. Off is refused by the API exactly like a revoked
+ * key, without losing the key: switching it back on is all it takes. A revoked
+ * key cannot be switched back on, and says so.
+ */
+export async function toggleApiKeyAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = toggleApiKeySchema.safeParse(input);
+    const t = await getTranslations("account");
+    if (!parsed.success) return { error: t("apiKeys.list.toggleGone") };
+
+    if (!(await setApiKeyEnabled(user.id, parsed.data.id, parsed.data.enabled))) {
+        return { error: t("apiKeys.list.toggleGone") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: `account.api-key.${parsed.data.enabled ? "enabled" : "disabled"}`,
+        targetType: "apiKey",
+        targetId: parsed.data.id
     });
     revalidatePath("/account/api-keys");
     return {};
