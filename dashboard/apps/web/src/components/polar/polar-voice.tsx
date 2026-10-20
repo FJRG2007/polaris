@@ -648,7 +648,7 @@ export function VoiceCall(props: VoiceCallProps) {
                             {t("voice.interrupt")}
                         </Button>
                     ) : null}
-                    <Button type="button" variant="danger" onClick={end}>
+                    <Button type="button" variant="hangUp" onClick={end}>
                         <PhoneOff />
                         {t("voice.end")}
                     </Button>

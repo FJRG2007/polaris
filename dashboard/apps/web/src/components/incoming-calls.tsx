@@ -729,7 +729,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         </Button>
                         <Button
                             size="sm"
-                            variant="danger"
+                            variant="hangUp"
                             aria-label={t("calls.decline")}
                             title={t("calls.decline")}
                             onClick={() => {
