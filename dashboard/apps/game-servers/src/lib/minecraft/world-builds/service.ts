@@ -275,11 +275,16 @@ async function surveySite(
                 if (stray > 0) return { why: "occupied" };
             }
         }
-        // Its whole box nothing but air - lifted over the grass in its way - or
-        // it is not built on.
+        // Its whole box nothing but air - on the ground once the grass in its
+        // way is cleared, lifted over a flower - or it is not built on.
         for (let lift = 0; lift <= plan.LIFT_MAX; lift += 1) {
             const origin = plan.originFor(wanted, center, verdict.y + lift);
-            if (await allAir(server, plan.boxFor(wanted, origin)))
+            const box = plan.boxFor(wanted, origin);
+            if (await allAir(server, box))
+                return { origin, foundation: plan.foundationRuns(tops, origin.y) };
+            if (lift > 0) continue;
+            await server.sayAll(plan.clearWeeds(box));
+            if (await allAir(server, box))
                 return { origin, foundation: plan.foundationRuns(tops, origin.y) };
         }
         return { why: "not-air" };
@@ -430,6 +435,13 @@ export async function reconcileWorldBuilds(
                     origin,
                     batchKeyFor(server.installedAppId, wanted.id),
                     site.foundation
+                );
+                // The grass in the foundation's cells goes too, so the dirt
+                // fills them whole instead of round it.
+                await server.sayAll(
+                    site.foundation.flatMap(([x1, x2, z, y1, y2]) =>
+                        plan.clearWeeds({ x1, y1, z1: z, x2, y2, z2: z })
+                    )
                 );
                 await writePlaced(server.installedAppId, (list) => [
                     ...list.filter((one) => !same(one, fresh)),

@@ -526,10 +526,12 @@ describe("the catalog", () => {
 
 let ids = 0;
 
-/** What else a fake world holds: a block over the ground (`solid`), a tree
- *  on a column, something somebody left `dy` over a column's ground. */
+/** What else a fake world holds: a block over the ground (`solid`), short
+ *  grass a weed-clearing fill empties (`weeds`), a tree on a column, something
+ *  somebody left `dy` over a column's ground. */
 interface FakeWorld {
     solid?: (x: number, y: number, z: number) => boolean;
+    weeds?: (x: number, y: number, z: number) => boolean;
     tree?: (x: number, z: number) => boolean;
     stray?: (x: number, z: number, dy: number) => boolean;
 }
@@ -540,8 +542,11 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64, world
     const said: string[] = [];
     const sent: string[] = [];
     const columns: { x: number; z: number }[] = [];
+    const cleared = new Set<string>();
     const filled = (x: number, y: number, z: number) =>
-        y < heightAt(x, z) || (world.solid?.(x, y, z) ?? false);
+        y < heightAt(x, z) ||
+        (world.solid?.(x, y, z) ?? false) ||
+        ((world.weeds?.(x, y, z) ?? false) && !cleared.has(`${x},${y},${z}`));
     /** The markers a selector's volume takes in, all of them without one. */
     const selected = (command: string) => {
         const volume =
@@ -611,6 +616,8 @@ function fakeServer(heightAt: (x: number, z: number) => number = () => 64, world
                 if (top)
                     columns.push({ x: Math.floor(Number(top[1])), z: Math.floor(Number(top[2])) });
                 if (line.startsWith("kill @e[tag=")) columns.length = 0;
+                if (line.endsWith(" minecraft:air replace minecraft:short_grass"))
+                    for (const cell of cellsOf(line).cells) cleared.add(cell);
             }
             sent.push(...lines);
         }
@@ -863,10 +870,31 @@ describe("a site as players leave the world", () => {
         expect(plan.readPlaced(config)).toEqual([]);
     });
 
-    it("lifts a build over the grass in its way, which stays under the foundation", async () => {
+    it("stands on the ground and clears the short grass in its way", async () => {
         // Short grass on every column: the first layer over the ground is not air.
         const grass = (x: number, y: number, z: number) => y === 64;
-        const { server, sent } = fakeServer(() => 64, { solid: grass });
+        const { server, sent } = fakeServer(() => 64, { weeds: grass });
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        const [placed] = plan.readPlaced(config);
+        const { box } = placed!.arena;
+        expect(box.y1).toBe(64);
+        // Only the grass is emptied, and only in the build's own box.
+        const clears = sent.filter((line) => line.includes(" minecraft:air replace "));
+        expect(clears.length).toBeGreaterThan(0);
+        for (const line of clears) {
+            expect(plan.WEEDS.some((weed) => line.endsWith(` replace ${weed}`))).toBe(true);
+            for (const cell of cellsOf(line).cells) {
+                const [x, y, z] = cell.split(",").map(Number) as [number, number, number];
+                expect(x >= box.x1 && x <= box.x2 && z >= box.z1 && z <= box.z2).toBe(true);
+                expect(y >= box.y1 && y <= box.y2).toBe(true);
+            }
+        }
+    });
+
+    it("lifts a build over the flowers in its way, which stay under the foundation", async () => {
+        // A flower on every column: never replaced, so the build goes over it.
+        const flowers = (x: number, y: number, z: number) => y === 64;
+        const { server, sent } = fakeServer(() => 64, { solid: flowers });
         await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
         const [placed] = plan.readPlaced(config);
         expect(placed!.arena.box.y1).toBe(65);

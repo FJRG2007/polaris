@@ -15,11 +15,13 @@
  *   not a sample of them, so the foundation's cells are known one by one and
  *   none of them is ground: they sit above the heightmap's top in their
  *   column, where only air or what grows can be, and only the air is filled.
- * - Grass and flowers do not turn a site down; nothing that grows is replaced.
- *   A build over them is lifted a block or two instead, and the foundation
- *   goes in round them with `keep`, so taking it down leaves them as they
- *   were. Trees, water and lava still turn a site down: nothing is cut,
- *   drained or bridged.
+ * - Grass and flowers do not turn a site down. Short and tall grass and ferns
+ *   (`WEEDS`), which grow back on any grass block, are cleared out of the
+ *   build's box and its foundation so it stands on the ground; a flower or
+ *   anything else that grows is never replaced - a build over one is lifted a
+ *   block or two instead, and the foundation goes in round it with `keep`, so
+ *   taking it down leaves it as it was. Trees, water and lava still turn a
+ *   site down: nothing is cut, drained or bridged.
  * - Taking it down gives back exactly what was there - air - for every block it
  *   placed and nothing else: each cell it filled, top layer first, emptied only
  *   while it still holds what went there (or what that turned into by itself).
@@ -56,7 +58,29 @@ export function spreadAllowed(build: PolarisBuild): number {
     return Math.min(GROUND_SPREAD_MAX, Math.max(2, build.size.x, build.size.z));
 }
 
-/** How far a build is lifted over grass or flowers in its way, the tallest of
+/** What a build clears out of its way rather than stand over: grass and ferns,
+ *  which grow back on any grass block. Tall grass and large ferns are two
+ *  blocks; clearing the lower half takes the upper with it. */
+export const WEEDS = [
+    "minecraft:short_grass",
+    "minecraft:tall_grass",
+    "minecraft:fern",
+    "minecraft:large_fern"
+] as const;
+
+/** The commands that empty `box` of `WEEDS` and of nothing else. */
+export function clearWeeds(box: Box): string[] {
+    return arena
+        .slices(box)
+        .flatMap((piece) =>
+            WEEDS.map(
+                (weed) =>
+                    `${IN_OVERWORLD} fill ${piece.x1} ${piece.y1} ${piece.z1} ${piece.x2} ${piece.y2} ${piece.z2} minecraft:air replace ${weed}`
+            )
+        );
+}
+
+/** How far a build is lifted over flowers in its way, the tallest of
  *  which (a sunflower, tall grass) are two blocks. */
 export const LIFT_MAX = 2;
 
