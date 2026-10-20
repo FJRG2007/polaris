@@ -29,6 +29,14 @@ import { thresholdSource } from "./threshold-sources";
 import { compare, stepAlarm, worse } from "@/lib/alarm-state";
 import type { MetricReading } from "@/lib/watch/metric-reading";
 
+/**
+ * The lease (`withLease`, lib/cron/lease.ts) the threshold pass runs under: one
+ * process at a time, expiring on its own when the holder dies. Each row's due
+ * time is compare-and-swapped as well, so even a pass that outlived its lease
+ * reads a row once.
+ */
+export const THRESHOLD_LEASE = "automations.thresholds";
+
 /** How often a threshold is read: the sampling interval of what it reads. */
 export const THRESHOLD_POLL_MS = Number(process.env.POLARIS_THRESHOLD_POLL_MS) || 60_000;
 
