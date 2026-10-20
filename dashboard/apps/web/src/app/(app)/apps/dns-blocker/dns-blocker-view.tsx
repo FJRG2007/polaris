@@ -941,7 +941,9 @@ export function DnsBlockerView({
                         <Button
                             size="sm"
                             variant="outline"
-                            disabled={!newDevice.success || devices.length >= dns.DNS_LIMITS.devices}
+                            disabled={
+                                !newDevice.success || devices.length >= dns.DNS_LIMITS.devices
+                            }
                             onClick={() => {
                                 if (!newDevice.success) return;
                                 setDevices((current) => [...current, newDevice.data]);

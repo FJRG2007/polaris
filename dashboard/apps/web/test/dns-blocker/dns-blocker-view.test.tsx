@@ -210,8 +210,8 @@ describe("DnsBlockerView query log", () => {
         expect(blocked.className).not.toContain("truncate");
         const headers = [...document.querySelectorAll("th")].map((cell) => cell.textContent);
         expect(headers).not.toContain("Result");
-        const bars = [...document.querySelectorAll("[data-outcome]")].map(
-            (bar) => bar.getAttribute("data-outcome")
+        const bars = [...document.querySelectorAll("[data-outcome]")].map((bar) =>
+            bar.getAttribute("data-outcome")
         );
         expect(bars).toEqual(["blocked", "allowed"]);
         const time = document.querySelector("[data-outcome]")?.parentElement;
@@ -259,8 +259,6 @@ describe("DnsBlockerView device names", () => {
         expect(add).toHaveProperty("disabled", false);
         fireEvent.click(add);
         expect(screen.getByText("ana-laptop")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(
-            false
-        );
+        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false);
     });
 });

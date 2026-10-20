@@ -206,8 +206,9 @@ describe("device names", () => {
         expect(
             dns.dnsDeviceSchema.parse({ name: " Ana-Laptop ", address: " 192.168.1.20 " })
         ).toEqual({ name: "ana-laptop", address: "192.168.1.20" });
-        expect(dns.dnsDeviceSchema.safeParse({ name: "ana laptop", address: "192.168.1.20" })
-            .success).toBe(false);
+        expect(
+            dns.dnsDeviceSchema.safeParse({ name: "ana laptop", address: "192.168.1.20" }).success
+        ).toBe(false);
         expect(dns.dnsDeviceSchema.safeParse({ name: "tv", address: "not-an-ip" }).success).toBe(
             false
         );
@@ -232,15 +233,15 @@ describe("local domains", () => {
     });
 
     it("normalizes the domain and refuses a server that is not one", () => {
-        expect(dns.dnsForwardSchema.parse({ domain: "Home.LAN.", server: " 192.168.1.1 " })).toEqual(
-            { domain: "home.lan", server: "192.168.1.1" }
-        );
-        expect(dns.dnsForwardSchema.safeParse({ domain: "home.lan", server: "router" }).success).toBe(
-            false
-        );
-        expect(dns.readDnsSettings({ forwards: [{ domain: "x y", server: "1.1.1.1" }] }).forwards).toEqual(
-            []
-        );
+        expect(
+            dns.dnsForwardSchema.parse({ domain: "Home.LAN.", server: " 192.168.1.1 " })
+        ).toEqual({ domain: "home.lan", server: "192.168.1.1" });
+        expect(
+            dns.dnsForwardSchema.safeParse({ domain: "home.lan", server: "router" }).success
+        ).toBe(false);
+        expect(
+            dns.readDnsSettings({ forwards: [{ domain: "x y", server: "1.1.1.1" }] }).forwards
+        ).toEqual([]);
     });
 });
 
@@ -289,7 +290,9 @@ describe("safe search", () => {
     });
 
     it("still fits the one environment value with everything on", () => {
-        const encoded = render.encodeBlockyConfig(settings({ safeSearch: true, youtube: "strict" }));
+        const encoded = render.encodeBlockyConfig(
+            settings({ safeSearch: true, youtube: "strict" })
+        );
         expect(encoded.length).toBeLessThan(ENV_VALUE_MAX);
     });
 });

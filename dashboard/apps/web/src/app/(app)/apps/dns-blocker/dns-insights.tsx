@@ -904,9 +904,7 @@ function QueryRows({
             <table className="w-full table-fixed text-sm">
                 <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
                     <tr>
-                        <th className="w-20 p-2 pl-3 font-medium sm:w-32">
-                            {t("insights.time")}
-                        </th>
+                        <th className="w-20 p-2 pl-3 font-medium sm:w-32">{t("insights.time")}</th>
                         <th className="p-2 font-medium">{t("insights.domain")}</th>
                         <th className="hidden w-14 p-2 font-medium sm:table-cell">
                             {t("insights.type")}
