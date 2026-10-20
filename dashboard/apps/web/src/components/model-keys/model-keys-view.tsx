@@ -46,6 +46,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Switch
 } from "@polaris/ui";
 
@@ -654,6 +655,19 @@ function KeyDialog({
         gatewayReady &&
         workspaceError === null &&
         expiryReady;
+    // A key that exists, put back as it is, has nothing to save. A typed secret
+    // is always a change: the stored one is never read back.
+    const unchanged =
+        existing !== null &&
+        secret.trim() === "" &&
+        !isDirty(
+            {
+                name: existing.name,
+                expiry: asDateValue(existing.expiresAt ?? null),
+                gateway: entry?.isGateway ? readGateway(existing) : null
+            },
+            { name, expiry, gateway: entry?.isGateway ? gateway : null }
+        );
 
     const submit = async () => {
         setBusy(true);
@@ -956,7 +970,10 @@ function KeyDialog({
                         <Button variant="ghost" onClick={onClose} disabled={busy}>
                             {tcommon("actions.cancel")}
                         </Button>
-                        <Button onClick={() => void submit()} disabled={busy || !ready}>
+                        <Button
+                            onClick={() => void submit()}
+                            disabled={busy || !ready || unchanged}
+                        >
                             {busy
                                 ? t("modelKeys.checking")
                                 : existing
