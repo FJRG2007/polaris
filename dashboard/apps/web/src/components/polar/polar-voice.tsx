@@ -338,7 +338,7 @@ export function DictationMenu({
                             </span>
                         )}
                     </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto">
+                    <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto overscroll-contain">
                         {groups.map((group) => (
                             <div key={group.provider} role="group" aria-label={group.name}>
                                 <DropdownMenuLabel>{group.name}</DropdownMenuLabel>
