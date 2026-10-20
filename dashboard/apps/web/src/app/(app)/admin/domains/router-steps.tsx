@@ -183,8 +183,9 @@ export function RouterSteps({
                 <div className="flex flex-col gap-3">
                     <ol className="ml-4 flex list-decimal flex-col gap-2">
                         <li>
-                            {t("domainsRouter.steps.openAdmin")}{" "}
-                            {adminUrl
+                            {guide.app ? t("domainsRouter.steps.openApp", { app: guide.app }) : null}
+                            {guide.app ? null : <>{t("domainsRouter.steps.openAdmin")} </>}
+                            {guide.app ? null : adminUrl
                                 ? t.rich(
                                       guide.admin === null
                                           ? "domainsRouter.steps.adminGateway"

@@ -31,6 +31,18 @@ export type RouterBrand =
     | "mikrotik"
     | "unifi"
     | "openwrt"
+    | "movistar"
+    | "livebox"
+    | "vodafone"
+    | "sagemcom"
+    | "nokia"
+    | "xiaomi"
+    | "linksys"
+    | "dlink"
+    | "mercusys"
+    | "tenda"
+    | "googlewifi"
+    | "eero"
     | "other";
 
 /**
@@ -116,6 +128,10 @@ export interface RouterBrandGuide {
     readonly dns: RouterDnsGuide | null;
     /** The name its admin page answers on, when it has one besides the gateway IP. */
     readonly admin: string | null;
+    /** The phone app that is the only way in, on a brand with no admin page at all.
+     *  Sending somebody to the gateway address of one of those is sending them to a
+     *  page that does not exist. */
+    readonly app: string | null;
     /** The factory sign-in, as far as one brand-wide answer exists. */
     readonly signIn: string;
     /** Where and how to give this server a fixed address. */
@@ -186,6 +202,7 @@ export interface RouterFormField {
  */
 const LOOK_FOR_IT: Omit<RouterBrandGuide, "id" | "label" | "topics" | "forwardSource" | "dns"> = {
     admin: null,
+    app: null,
     signIn: "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
     reserve: {
         kind: "form",
@@ -245,6 +262,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: null,
+        app: null,
         signIn: "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
         reserve: {
             kind: "form",
@@ -320,6 +338,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://192.168.100.1",
+        app: null,
         signIn: "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
         reserve: {
             kind: "form",
@@ -364,6 +383,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://tplinkwifi.net",
+        app: null,
         signIn: "The account you created on first setup. A router never set up asks for `admin` / `admin`.",
         reserve: {
             kind: "form",
@@ -409,6 +429,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://router.asus.com",
+        app: null,
         signIn: "The account you created on first setup, or `admin` / `admin` on one never set up.",
         reserve: {
             kind: "form",
@@ -462,6 +483,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://fritz.box",
+        app: null,
         signIn: "The FRITZ!Box password on the label or on the card that came with it. There is no user name.",
         reserve: {
             kind: "device",
@@ -503,6 +525,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://routerlogin.net",
+        app: null,
         signIn: "`admin` with the password you set. A router never set up uses `admin` / `password`.",
         reserve: {
             kind: "form",
@@ -549,6 +572,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             conflict: null
         },
         admin: "http://192.168.88.1",
+        app: null,
         signIn: "`admin`, with no password on a router still at defaults.",
         reserve: {
             kind: "device",
@@ -573,8 +597,14 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // Ad Blocking: https://help.ui.com/hc/en-us/articles/9794438523799 - with it on,
         // clients set to another DNS server are redirected to the gateway's own. Its
         // switch lives in Content Filter: https://help.ui.com/hc/en-us/articles/12568927589143.
-        topics: ["dns"],
-        forwardSource: null,
+        // Forwarding: the help.ui.com article below names Settings > Policy Engine > Port
+        // Forwarding on Network 9.4 (Policy Table > Create New Policy on 9.3); earlier
+        // versions keep it under Settings > Routing (wundertech.net/how-to-port-forward-on-unifi-devices),
+        // and it warns a rule does nothing behind another NAT. Fixed IP: the client's own
+        // settings, which need a UniFi gateway
+        // (unihosted.com/blog/how-to-reserve-an-ip-address-on-a-unifi-controller).
+        topics: ["forward", "dns"],
+        forwardSource: "https://help.ui.com/hc/en-us/articles/235723207",
         dns: {
             mode: "direct",
             lan: {
@@ -595,15 +625,29 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
                 source: "https://help.ui.com/hc/en-us/articles/12568927589143"
             }
         },
-        ...LOOK_FOR_IT
+        ...LOOK_FOR_IT,
+        reserve: {
+            kind: "device",
+            path: "UniFi Network > Client Devices",
+            action: 'open its settings and turn on "Fixed IP Address", keeping the address it has now'
+        },
+        forwardPath:
+            "UniFi Network > Settings > Policy Engine > Port Forwarding (Settings > Routing > Port Forwarding before Network 9.4)",
+        forwardEnable: null,
+        caution:
+            "A rule does nothing while the gateway's own WAN address is a private one (10.x, 192.168.x or 100.64.x): another router or the provider's CGNAT sits in front of it, and that is where the ports have to be opened."
     },
     {
         id: "openwrt",
         // i18n-ignore a brand's name
         label: "OpenWrt",
         // DNS: https://openwrt.org/docs/guide-user/base-system/dhcp_configuration ("Providing custom DNS with DHCP").
-        topics: ["dns"],
-        forwardSource: null,
+        // Forwarding: Network > Firewall per the firewall page below; the Port Forwards tab
+        // and its fields as LuCI's own guide words them (mirrored at
+        // gogs.librecmc.org/libreCMC/libreCMC/wiki/Port_Forwards). Static leases: the
+        // "Static leases" section of the DHCP page above.
+        topics: ["forward", "dns"],
+        forwardSource: "https://openwrt.org/docs/guide-user/firewall/firewall_configuration",
         dns: {
             mode: "direct",
             lan: {
@@ -624,7 +668,364 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             },
             conflict: null
         },
-        ...LOOK_FOR_IT
+        ...LOOK_FOR_IT,
+        reserve: {
+            kind: "form",
+            path: "Network > DHCP and DNS > Static Leases",
+            add: "Add",
+            fields: [
+                // i18n-ignore the router's own label, quoted as its page shows it
+                { label: "Hostname", value: "name" },
+                // i18n-ignore the router's own label, quoted as its page shows it
+                { label: "MAC address", value: "mac" },
+                // i18n-ignore the router's own label, quoted as its page shows it
+                { label: "IPv4 address", value: "ip" }
+            ],
+            save: "Save & Apply"
+        },
+        forwardPath: "Network > Firewall > Port Forwards > Add",
+        forwardFields: [
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Name", value: "name" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Protocol", value: "protocol" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "External port", value: "port" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Internal IP address", value: "ip" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Internal port", value: "port" }
+        ],
+        forwardSave: "Save & Apply",
+        combinedProtocol: "TCP+UDP",
+        forwardEnable: null,
+        remotePath: null,
+        caution: "Leave External zone on wan and Internal zone on lan."
+    },
+    {
+        id: "movistar",
+        // i18n-ignore the provider's name, which is what the box is known by
+        label: "Movistar / O2",
+        // The Askey and Mitrastar HGU that Movistar and O2 both ship. Forwarding: Movistar's
+        // own knowledge base (the Puertos section of 192.168.1.1, or the Smart WiFi app);
+        // that portal is Spanish only, so its labels are quoted in Spanish. Sign-in: the
+        // sticker underneath, not the WiFi key (Movistar's blog,
+        // comunidad.movistar.es/t5/Blog-Movisfera/.../ba-p/2297521). Fixed IP: the
+        // advanced menu's Static IP Lease List (bandaancha.eu/foros
+        // /como-abrir-puertos-hgu-movistar-o2-1746287). No DNS topic: the portal has no
+        // DNS field, and a change made in the advanced menu reverts on restart
+        // (bandaancha.eu/foros/cambiar-dns-routers-movistar-1760943).
+        topics: ["forward"],
+        forwardSource:
+            "https://comunidad.movistar.es/kb/Router/c%C3%B3mo-abrir-los-puertos-de-tu-router-movistar/3613957",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://192.168.1.1",
+        signIn: "The password on the sticker underneath the router, which is not the WiFi key.",
+        reserve: {
+            kind: "form",
+            path: "the advanced settings (Configuración avanzada) > Advanced Setup > LAN > Static IP Lease List",
+            add: "Add Entries",
+            fields: [
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "MAC address", value: "mac" },
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "IP address", value: "ip" }
+            ],
+            save: "the save button at the bottom of the page"
+        },
+        forwardPath: "Puertos",
+        forwardSave: "Añadir",
+        forwardEnable: null,
+        caution:
+            "The portal is only in Spanish. If Puertos is missing on a newer unit, the Smart WiFi app opens ports too. A firmware update from Movistar can undo changes made in the advanced menu, so check the rules again if the ports close."
+    },
+    {
+        id: "livebox",
+        // i18n-ignore the provider's name, which is what the box is known by
+        label: "Orange / Jazztel Livebox",
+        // Livebox Fibra (Arcadyan) and Livebox 6 (Sagemcom), Spanish-only firmware. Path,
+        // sign-in and the add button: comparaiso.es/gestiones/router/orange and
+        // bandaancha.eu/foros/ayuda-abrir-puertos-livebox-fibra-me-1726507 (NAT/PAT). The
+        // firewall level and one-port-per-rule limits: bandaancha.eu/foros
+        // /livebox-fibra-no-abre-puertos-1731559 and /no-puedo-abrir-puertos-livebox-fibra-1741169.
+        // No DNS topic: the Livebox hands out itself and its DNS cannot be changed
+        // (bandaancha.eu/foros/cambiar-dns-router-livebox-1740478).
+        topics: ["forward"],
+        forwardSource: "https://bandaancha.eu/foros/ayuda-abrir-puertos-livebox-fibra-me-1726507",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://192.168.1.1",
+        signIn: "`admin`, with the password on the sticker on the back of the Livebox.",
+        forwardPath: "Configuración avanzada > Configuración de red > NAT/PAT",
+        forwardSave: "Añadir",
+        forwardEnable: null,
+        caution:
+            "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the ad blocker has to be set on each device instead."
+    },
+    {
+        id: "vodafone",
+        // i18n-ignore the provider's name, which is what the box is known by
+        label: "Vodafone (Sercomm)",
+        // Sercomm H500-s and H300s, Spanish firmware. Path, address and expert mode:
+        // roams.es/companias-telefonicas/vodafone/guias/internet-fibra/abrir-puertos-router/.
+        // Aplicar at the bottom, and the static DHCP entry on the expert LAN page:
+        // bandaancha.eu/foros/no-consigo-abrir-puertos-vodafone-h-500-1734056. No DNS
+        // topic: the DNS can only be set from firmware 3.6.13, as admin, and the steps
+        // are not documented (bandaancha.eu/foros/nuevo-firmware-3-6-13-h-500-s-1746695).
+        topics: ["forward"],
+        forwardSource:
+            "https://roams.es/companias-telefonicas/vodafone/guias/internet-fibra/abrir-puertos-router/",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://192.168.0.1",
+        signIn: "The user and password printed underneath the router.",
+        reserve: {
+            kind: "form",
+            path: "Configuración > LAN, with Modo Experto selected",
+            add: "the button that adds an entry",
+            fields: [
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "MAC address", value: "mac" },
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "IP address", value: "ip" }
+            ],
+            save: "Aplicar"
+        },
+        forwardPath: "Internet > Redirección de puertos > +, with Modo Experto selected",
+        forwardSave: "Aplicar",
+        forwardEnable: null,
+        caution:
+            "Switch the menu at the top from Modo Básico to Modo Experto, or the section is not there. Aplicar is at the bottom of the page: leaving without it drops the rule."
+    },
+    {
+        id: "sagemcom",
+        // i18n-ignore a brand's name
+        label: "Sagemcom",
+        // Every Sagemcom here is an ISP build, and the builds differ: Access Control >
+        // Port Forwarding on the F@st 3890 (source), Advanced Setup > NAT on the F@st
+        // 3864 (portforward.com/sagemcom/fast-3864v3hp/). A Livebox 6 is a Sagemcom too.
+        topics: ["forward"],
+        forwardSource: "https://portforward.com/sagemcom/fast-3890v3/",
+        dns: null,
+        ...LOOK_FOR_IT,
+        forwardPath: "Access Control > Port Forwarding (Advanced Setup > NAT on some provider builds)",
+        caution:
+            "Menus differ with each provider's firmware. An Orange or Jazztel Livebox 6 is a Sagemcom: pick Orange / Jazztel Livebox instead."
+    },
+    {
+        id: "nokia",
+        // i18n-ignore a brand's name
+        label: "Nokia (fibre ONT)",
+        // The G-240W family providers ship: Application > Port Forwarding, from a
+        // provider's full manual for the G-240W-C (INEA, source), matching
+        // portforward.com/nokia/g-240w-b/.
+        topics: ["forward"],
+        forwardSource:
+            "https://www.inea.pl/sites/default/files/2025-02/ONT%20NOKIA%20G-240W-C_instrukcja%20pelna%20%282018-07-03%29.pdf",
+        dns: null,
+        ...LOOK_FOR_IT,
+        forwardPath: "Application > Port Forwarding"
+    },
+    {
+        id: "xiaomi",
+        // i18n-ignore a brand's name
+        label: "Xiaomi",
+        // cfos.de/en/cfos-personal-net/port-forwarding/xiaomi-miwifi-mini.htm, the same on
+        // the Mi 3C (xiaomi-mi-3c.htm): Advanced > Port forwarding > Add rule, a range
+        // section for several ports, and a restart afterwards.
+        topics: ["forward"],
+        forwardSource: "https://cfos.de/en/cfos-personal-net/port-forwarding/xiaomi-miwifi-mini.htm",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://miwifi.com",
+        signIn: "The admin password chosen when the router was first set up.",
+        forwardPath: "Advanced > Port forwarding > Add rule",
+        forwardEnable:
+            "Restart the router from the menu under its name once the rules are listed - they take effect after the restart.",
+        caution: "A run of ports goes in the Range forwarding section, below the single-port one."
+    },
+    {
+        id: "linksys",
+        // i18n-ignore a brand's name
+        label: "Linksys",
+        // Linksys Smart Wi-Fi. "Both" in the Protocol list: the same Linksys article family
+        // (support.linksys.com/kb/article/3011/).
+        topics: ["forward"],
+        forwardSource: "https://support.linksys.com/kb/article/318",
+        dns: null,
+        ...LOOK_FOR_IT,
+        forwardPath:
+            "Router Settings > Security > Apps and Gaming > Single Port Forwarding > Add a new Single Port Forwarding",
+        forwardFields: [
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Application name", value: "name" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "External Port", value: "port" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Internal Port", value: "port" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Protocol", value: "protocol" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Device IP#", value: "ip" }
+        ],
+        forwardSave: "Save",
+        combinedProtocol: "Both",
+        forwardEnable:
+            'Tick "Enabled" on each rule, then press Apply - Save alone does not put it in force.'
+    },
+    {
+        id: "dlink",
+        // i18n-ignore a brand's name
+        label: "D-Link",
+        topics: ["forward"],
+        forwardSource:
+            "https://www.dlink.com/en/support/faq/routers/mydlink-routers/dir-868l/how-do-i-configure-port-forwarding-on-my-router",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://dlinkrouter.local",
+        signIn: "The Admin password you set. On a router never set up, leave it blank.",
+        forwardPath: "Features > Port Forwarding > Add Rule",
+        forwardSave: "Apply",
+        forwardEnable: null,
+        caution:
+            "The form has a TCP Port and a UDP Port box: put the port in the one matching the rule and leave the other empty. Leave Schedule on Always Enable."
+    },
+    {
+        id: "mercusys",
+        // i18n-ignore a brand's name
+        label: "Mercusys",
+        // Address reservation: https://www.mercusys.com/faq-1030/. Admin name: the DNS FAQ,
+        // https://www.mercusys.com/faq-768.
+        topics: ["forward"],
+        forwardSource: "https://www.mercusys.com/faq-902",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://mwlogin.net",
+        signIn: "The password you created on first setup.",
+        reserve: {
+            kind: "form",
+            path: "Advanced > Network > DHCP Server > Address Reservation",
+            add: "Add",
+            fields: [
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "MAC address", value: "mac" },
+                // i18n-ignore said in the reader's words by admin/domains/router-words.ts
+                { label: "IP address", value: "ip" }
+            ],
+            save: "Save"
+        },
+        forwardPath: "Advanced > NAT Forwarding > Port Forwarding > Add",
+        forwardFields: [
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Service Name", value: "name" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Device IP Address", value: "ip" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "External Port", value: "port" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Internal Port", value: "port" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Protocol", value: "protocol" }
+        ],
+        forwardSave: "Save",
+        forwardEnable: null
+    },
+    {
+        id: "tenda",
+        // i18n-ignore a brand's name
+        label: "Tenda",
+        // microcenter.com/tech_center/article/8323 (Virtual Server under Advanced Settings,
+        // Both, the Enable tick); address and default password from
+        // cfos.de/en/cfos-personal-net/port-forwarding/tenda-ac6-v1.htm.
+        topics: ["forward"],
+        forwardSource:
+            "https://www.microcenter.com/tech_center/article/8323/how-to-forward-or-open-a-port-on-a-tenda-router",
+        dns: null,
+        ...LOOK_FOR_IT,
+        admin: "http://192.168.0.1",
+        signIn: "The password you set, or `admin` on a router never set up.",
+        forwardPath: "Advanced Settings > Virtual Server",
+        combinedProtocol: "Both",
+        forwardEnable: 'Tick "Enable" on the rule, then press Apply or OK.'
+    },
+    {
+        id: "googlewifi",
+        // i18n-ignore a brand's name
+        label: "Google / Nest Wifi",
+        // App only. Forwarding: support.google.com/googlenest/answer/6274503 (Port
+        // management, TCP/UDP; cloud services: googlenestcommunity.com/t5/Nest-Wifi
+        // /Port-forwarding-issue/m-p/394872). Reservation: /answer/6274660. DNS:
+        // /answer/6274141 - the Wifi point is a DNS proxy, so devices keep asking it.
+        topics: ["forward", "dns"],
+        forwardSource: "https://support.google.com/googlenest/answer/6274503",
+        dns: {
+            mode: "relay",
+            lan: {
+                path: "Google Home app > Wi-Fi > Network settings > Advanced Networking > DNS",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Custom",
+                value: "address",
+                save: "Save",
+                source: "https://support.google.com/googlenest/answer/6274141"
+            },
+            ipv6: null,
+            conflict: null
+        },
+        ...LOOK_FOR_IT,
+        app: "Google Home",
+        signIn: "The Google account that owns the network, in the app.",
+        reserve: {
+            kind: "device",
+            path: "Google Home app > Wi-Fi > Settings > Advanced Networking > DHCP IP reservations",
+            action: "add a reservation for it, keeping the address it has now"
+        },
+        forwardPath: "Google Home app > Wi-Fi > Settings > Advanced Networking > Port management > Add",
+        forwardSave: "Save",
+        combinedProtocol: "TCP/UDP",
+        forwardEnable: null,
+        remotePath: null,
+        caution:
+            "There is no admin page: everything is in the app. If Port management is missing, turn on cloud services in the app's privacy settings."
+    },
+    {
+        id: "eero",
+        // i18n-ignore a brand's name
+        label: "eero",
+        // App only. Forwarding and reservations, one page: support.eero.com/hc/en-us/articles/207908443.
+        // DNS: support.eero.com/hc/articles/360059988432 - greyed out while eero Plus
+        // filters are on, and saving restarts the network. Relay: eero answers devices
+        // itself (Local DNS caching, support.eero.com/hc/en-us/articles/207613326).
+        topics: ["forward", "dns"],
+        forwardSource: "https://support.eero.com/hc/en-us/articles/207908443",
+        dns: {
+            mode: "relay",
+            lan: {
+                path: "eero app > Settings > Advanced networking > DNS",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Custom DNS",
+                value: "address",
+                save: "Save",
+                source: "https://support.eero.com/hc/articles/360059988432"
+            },
+            ipv6: null,
+            conflict: null
+        },
+        ...LOOK_FOR_IT,
+        app: "eero",
+        signIn: "The eero account that owns the network, in the app.",
+        reserve: {
+            kind: "device",
+            path: "eero app > Settings > Advanced networking > Reservations & port forwarding",
+            action: "reserve the address it has now"
+        },
+        forwardPath:
+            "eero app > Settings > Advanced networking > Reservations & port forwarding, on this server's reservation",
+        forwardSave: "Save",
+        forwardEnable: null,
+        remotePath: null,
+        caution:
+            "There is no admin page: everything is in the app. A port is opened on a reservation, so reserve this server's address first."
     },
     {
         id: "other",
@@ -657,7 +1058,21 @@ const SIGNATURES: readonly (readonly [RouterBrand, readonly string[]])[] = [
     ["asus", ["asus"]],
     ["fritzbox", ["fritz"]],
     ["netgear", ["netgear"]],
-    ["mikrotik", ["mikrotik", "routeros"]]
+    ["mikrotik", ["mikrotik", "routeros"]],
+    // The provider boxes before the makers they are built by: a Livebox names
+    // Arcadyan or Sagemcom, and is still best walked through as a Livebox.
+    ["movistar", ["movistar", "askey", "mitrastar"]],
+    ["livebox", ["livebox", "arcadyan"]],
+    ["vodafone", ["vodafone", "sercomm"]],
+    ["sagemcom", ["sagemcom"]],
+    ["nokia", ["nokia"]],
+    ["xiaomi", ["xiaomi", "miwifi"]],
+    ["linksys", ["linksys"]],
+    ["dlink", ["d-link", "dlink"]],
+    ["mercusys", ["mercusys"]],
+    ["tenda", ["tenda"]],
+    ["unifi", ["ubiquiti", "unifi"]],
+    ["openwrt", ["openwrt"]]
 ];
 
 /**

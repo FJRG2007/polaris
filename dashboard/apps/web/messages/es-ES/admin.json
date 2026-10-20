@@ -698,7 +698,8 @@
             "switchOn": "Activa {count, plural, one {la regla} other {cada regla}}.",
             "checkAgain": "Guarda y vuelve a hacer la comprobación de DNS: avisa en cuanto los puertos lleguen a Polaris.",
             "remote": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a <b>{path}</b> y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443.",
-            "remoteGeneric": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a los ajustes de administración remota y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443."
+            "remoteGeneric": "Solo si el router sigue respondiendo después: está reservando los puertos para su propia página de administración. Ve a los ajustes de administración remota y desactiva la administración desde internet (WAN), o muévela a un puerto como el 8443.",
+            "openApp": "Abre la app {app}: este router no tiene página de administración."
         },
         "brands": {
             "zte": {
@@ -757,6 +758,179 @@
                 "forwardPath": "Busca Port forwarding, Virtual server, NAT/PAT o Applications & Gaming: es el mismo formulario con cuatro nombres distintos.",
                 "forwardEnable": "Si la regla tiene un interruptor Enable o Status, actívalo: algunos firmwares guardan una regla nueva desactivada.",
                 "remotePath": "Busca Remote management, Web access from WAN o Remote administration."
+            },
+            "unifi": {
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "forwardPath": "UniFi Network > Settings > Policy Engine > Port Forwarding (Settings > Routing > Port Forwarding antes de Network 9.4)",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "Una regla no hace nada mientras la dirección WAN de la puerta de enlace sea privada (10.x, 192.168.x o 100.64.x): delante hay otro router o el CGNAT del operador, y es ahí donde hay que abrir los puertos.",
+                "reserve": {
+                    "action": "abre sus ajustes y activa \"Fixed IP Address\", manteniendo la dirección que tiene ahora"
+                }
+            },
+            "openwrt": {
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "caution": "Deja External zone en wan e Internal zone en lan.",
+                "reserve": {
+                    "fields": {
+                        "1": "Dirección MAC"
+                    }
+                }
+            },
+            "movistar": {
+                "signIn": "La contraseña de la pegatina de debajo del router, que no es la clave del WiFi.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "El portal solo está en español. Si en un equipo nuevo no aparece Puertos, la app Smart WiFi también abre puertos. Una actualización de Movistar puede deshacer lo cambiado en el menú avanzado: si los puertos se cierran, revisa las reglas.",
+                "reserve": {
+                    "path": "la configuración avanzada (Configuración avanzada) > Advanced Setup > LAN > Static IP Lease List",
+                    "save": "el botón de guardar al final de la página",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "livebox": {
+                "signIn": "`admin`, con la contraseña de la pegatina de la parte trasera del Livebox.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "La interfaz solo está en español. Los puertos reenviados siguen cerrados mientras el cortafuegos del Livebox esté en nivel medio o alto: ponlo en el más bajo. Acepta un puerto por regla, no rangos. Su servidor DNS no se puede cambiar, así que el bloqueador de anuncios hay que ponerlo en cada dispositivo.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "vodafone": {
+                "signIn": "El usuario y la contraseña impresos debajo del router.",
+                "forwardPath": "Internet > Redirección de puertos > +, con Modo Experto seleccionado",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "Cambia el menú de arriba de Modo Básico a Modo Experto, o la sección no aparece. Aplicar está al final de la página: si sales sin pulsarlo, la regla se pierde.",
+                "reserve": {
+                    "path": "Configuración > LAN, con Modo Experto seleccionado",
+                    "add": "el botón que añade una entrada",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "sagemcom": {
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "forwardPath": "Access Control > Port Forwarding (Advanced Setup > NAT en algunas versiones del operador)",
+                "forwardEnable": "Si la regla tiene un interruptor Enable o Status, actívalo: algunos firmwares guardan una regla nueva desactivada.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "Los menús cambian con el firmware de cada operador. Un Livebox 6 de Orange o Jazztel es un Sagemcom: elige Orange / Jazztel Livebox.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "nokia": {
+                "label": "Nokia (ONT de fibra)",
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "forwardEnable": "Si la regla tiene un interruptor Enable o Status, actívalo: algunos firmwares guardan una regla nueva desactivada.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "xiaomi": {
+                "signIn": "La contraseña de administración elegida al configurar el router por primera vez.",
+                "forwardEnable": "Reinicia el router desde el menú bajo su nombre cuando las reglas aparezcan en la lista: se aplican tras el reinicio.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "Varios puertos seguidos van en la sección Range forwarding, debajo de la de un solo puerto.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "linksys": {
+                "signIn": "El usuario y la contraseña de la etiqueta de debajo del router: en la mayoría de equipos no es la contraseña del WiFi. Si se cambió y se ha perdido, la única forma de volver a entrar es restablecerlo de fábrica.",
+                "forwardEnable": "Marca \"Enabled\" en cada regla y pulsa Apply: Save por sí solo no la pone en marcha.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "dlink": {
+                "signIn": "La contraseña de Admin que pusiste. En un router sin configurar, déjala en blanco.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "caution": "El formulario tiene una casilla TCP Port y otra UDP Port: pon el puerto en la que coincide con la regla y deja la otra vacía. Deja Schedule en Always Enable.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "mercusys": {
+                "signIn": "La contraseña que creaste en la primera configuración.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "reserve": {
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "tenda": {
+                "signIn": "La contraseña que pusiste, o `admin` en un router sin configurar.",
+                "forwardEnable": "Marca \"Enable\" en la regla y pulsa Apply u OK.",
+                "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
+                "reserve": {
+                    "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
+                    "add": "el botón que añade una entrada",
+                    "save": "Guardar",
+                    "fields": {
+                        "0": "Dirección MAC",
+                        "1": "Dirección IP"
+                    }
+                }
+            },
+            "googlewifi": {
+                "signIn": "La cuenta de Google propietaria de la red, en la app.",
+                "caution": "No hay página de administración: todo está en la app. Si no aparece Port management, activa los servicios en la nube en los ajustes de privacidad de la app.",
+                "reserve": {
+                    "action": "añade una reserva para él, manteniendo la dirección que tiene ahora"
+                }
+            },
+            "eero": {
+                "signIn": "La cuenta de eero propietaria de la red, en la app.",
+                "forwardPath": "eero app > Settings > Advanced networking > Reservations & port forwarding, en la reserva de este servidor",
+                "caution": "No hay página de administración: todo está en la app. Un puerto se abre sobre una reserva, así que reserva antes la dirección de este servidor.",
+                "reserve": {
+                    "action": "reserva la dirección que tiene ahora"
+                }
             }
         }
     },

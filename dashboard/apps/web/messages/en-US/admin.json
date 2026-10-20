@@ -698,7 +698,8 @@
             "switchOn": "Switch {count, plural, one {the rule} other {each rule}} on.",
             "checkAgain": "Save, then run the DNS check again - it reports the moment the ports reach Polaris.",
             "remote": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to <b>{path}</b> and turn off management from the internet (WAN), or move it to a port such as 8443.",
-            "remoteGeneric": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to the remote-management settings and turn off management from the internet (WAN), or move it to a port such as 8443."
+            "remoteGeneric": "Only if the router still answers after that: it is keeping the ports for its own admin page. Go to the remote-management settings and turn off management from the internet (WAN), or move it to a port such as 8443.",
+            "openApp": "Open the {app} app - this router has no admin page."
         },
         "brands": {
             "zte": {
@@ -757,6 +758,179 @@
                 "forwardPath": "Look for Port forwarding, Virtual server, NAT/PAT or Applications & Gaming - the same form under four different names.",
                 "forwardEnable": "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
                 "remotePath": "Look for Remote management, Web access from WAN or Remote administration."
+            },
+            "unifi": {
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "forwardPath": "UniFi Network > Settings > Policy Engine > Port Forwarding (Settings > Routing > Port Forwarding before Network 9.4)",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "A rule does nothing while the gateway's own WAN address is a private one (10.x, 192.168.x or 100.64.x): another router or the provider's CGNAT sits in front of it, and that is where the ports have to be opened.",
+                "reserve": {
+                    "action": "open its settings and turn on \"Fixed IP Address\", keeping the address it has now"
+                }
+            },
+            "openwrt": {
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "caution": "Leave External zone on wan and Internal zone on lan.",
+                "reserve": {
+                    "fields": {
+                        "1": "MAC address"
+                    }
+                }
+            },
+            "movistar": {
+                "signIn": "The password on the sticker underneath the router, which is not the WiFi key.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "The portal is only in Spanish. If Puertos is missing on a newer unit, the Smart WiFi app opens ports too. A firmware update from Movistar can undo changes made in the advanced menu, so check the rules again if the ports close.",
+                "reserve": {
+                    "path": "the advanced settings (Configuración avanzada) > Advanced Setup > LAN > Static IP Lease List",
+                    "save": "the save button at the bottom of the page",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "livebox": {
+                "signIn": "`admin`, with the password on the sticker on the back of the Livebox.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the ad blocker has to be set on each device instead.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "vodafone": {
+                "signIn": "The user and password printed underneath the router.",
+                "forwardPath": "Internet > Redirección de puertos > +, with Modo Experto selected",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "Switch the menu at the top from Modo Básico to Modo Experto, or the section is not there. Aplicar is at the bottom of the page: leaving without it drops the rule.",
+                "reserve": {
+                    "path": "Configuración > LAN, with Modo Experto selected",
+                    "add": "the button that adds an entry",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "sagemcom": {
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "forwardPath": "Access Control > Port Forwarding (Advanced Setup > NAT on some provider builds)",
+                "forwardEnable": "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "Menus differ with each provider's firmware. An Orange or Jazztel Livebox 6 is a Sagemcom: pick Orange / Jazztel Livebox instead.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "nokia": {
+                "label": "Nokia (fibre ONT)",
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "forwardEnable": "If the rule has an Enable or Status switch, turn it on - some firmware saves a new rule switched off.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "xiaomi": {
+                "signIn": "The admin password chosen when the router was first set up.",
+                "forwardEnable": "Restart the router from the menu under its name once the rules are listed - they take effect after the restart.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "A run of ports goes in the Range forwarding section, below the single-port one.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "linksys": {
+                "signIn": "The user and password on the label underneath the router - on most boxes this is not the WiFi password. If it was changed and is lost, a factory reset is the only way back in.",
+                "forwardEnable": "Tick \"Enabled\" on each rule, then press Apply - Save alone does not put it in force.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "dlink": {
+                "signIn": "The Admin password you set. On a router never set up, leave it blank.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "caution": "The form has a TCP Port and a UDP Port box: put the port in the one matching the rule and leave the other empty. Leave Schedule on Always Enable.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "mercusys": {
+                "signIn": "The password you created on first setup.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "reserve": {
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "tenda": {
+                "signIn": "The password you set, or `admin` on a router never set up.",
+                "forwardEnable": "Tick \"Enable\" on the rule, then press Apply or OK.",
+                "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
+                "reserve": {
+                    "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
+                    "add": "the button that adds an entry",
+                    "save": "Save",
+                    "fields": {
+                        "0": "MAC address",
+                        "1": "IP address"
+                    }
+                }
+            },
+            "googlewifi": {
+                "signIn": "The Google account that owns the network, in the app.",
+                "caution": "There is no admin page: everything is in the app. If Port management is missing, turn on cloud services in the app's privacy settings.",
+                "reserve": {
+                    "action": "add a reservation for it, keeping the address it has now"
+                }
+            },
+            "eero": {
+                "signIn": "The eero account that owns the network, in the app.",
+                "forwardPath": "eero app > Settings > Advanced networking > Reservations & port forwarding, on this server's reservation",
+                "caution": "There is no admin page: everything is in the app. A port is opened on a reservation, so reserve this server's address first.",
+                "reserve": {
+                    "action": "reserve the address it has now"
+                }
             }
         }
     },
