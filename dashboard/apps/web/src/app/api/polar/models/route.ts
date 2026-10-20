@@ -29,6 +29,7 @@ export async function GET(): Promise<Response> {
         tools: toolset.described,
         isAdmin: user.isAdmin,
         voice,
-        spendsDeployment: access.spend
+        spendsDeployment: access.spend,
+        web: access.web
     });
 }

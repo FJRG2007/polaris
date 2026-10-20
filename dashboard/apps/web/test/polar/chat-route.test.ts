@@ -35,12 +35,15 @@ const state = {
     signals: [] as unknown[],
     source: "own" as "own" | "instance",
     hit: null as null | { used: number; amount: number; period: string },
-    recorded: [] as unknown[]
+    recorded: [] as unknown[],
+    web: true,
+    models: [] as MockLanguageModelV4[]
 };
 
-vi.mock("@/lib/polar/access", async () =>
-    (await import("./fixtures/open-polar-access")).openPolarAccess()
-);
+vi.mock("@/lib/polar/access", async () => ({
+    ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
+    polarAccessFor: async () => ({ use: true, spend: true, web: state.web })
+}));
 vi.mock("@/lib/polar/usage", () => ({
     answerUsage: (usage?: { inputTokens?: number; outputTokens?: number }) => ({
         inputTokens: usage?.inputTokens ?? 0,
@@ -82,7 +85,7 @@ vi.mock("@/lib/polar/titles", () => ({
 /** The first step streams `state.parts`; any step after a tool ran just answers. */
 function model() {
     let step = 0;
-    return new MockLanguageModelV4({
+    const mock = new MockLanguageModelV4({
         doStream: async () => ({
             stream: new ReadableStream({
                 start(controller) {
@@ -93,6 +96,8 @@ function model() {
             })
         })
     });
+    state.models.push(mock);
+    return mock;
 }
 
 const OPTION = {
@@ -210,6 +215,8 @@ beforeEach(() => {
     state.resolveCalls = 0;
     state.ensured = [];
     state.signals = [];
+    state.web = true;
+    state.models = [];
 });
 
 describe("who may talk to Polar", () => {
@@ -361,5 +368,74 @@ describe("tools", () => {
         const text = await (await post(body())).text();
         expect(text).toContain("tool-approval-request");
         expect(state.executed).toEqual([]);
+    });
+});
+
+describe("Polar on the web", () => {
+    /** The tool names the model was offered on the first step of the turn. */
+    async function offered(payload: Record<string, unknown>): Promise<string[]> {
+        await (await post(payload)).text();
+        const call = state.models[0]?.doStreamCalls[0];
+        return (call?.tools ?? []).map((entry) => entry.name).sort();
+    }
+
+    it("offers the provider's own search and the page reader when the web is allowed", async () => {
+        const names = await offered(body());
+        expect(names).toContain("web_search");
+        expect(names).toContain("read_page");
+        const search = state.models[0]!.doStreamCalls[0]!.tools!.find(
+            (entry) => entry.name === "web_search"
+        );
+        expect(search?.type).toBe("provider");
+    });
+
+    it("offers no web tool once an administrator turns the web off", async () => {
+        state.web = false;
+        const names = await offered(body());
+        expect(names).not.toContain("web_search");
+        expect(names).not.toContain("read_page");
+        expect(names).not.toContain("search_web");
+        expect(names).toContain("read_tasks");
+    });
+
+    it("offers no web tool for a turn the person switched it off for", async () => {
+        const names = await offered(body({ web: false }));
+        expect(names.filter((name) => /web|page/.test(name))).toEqual([]);
+    });
+
+    it("still reads an older turn that searched, whatever this turn may use", async () => {
+        state.web = false;
+        const response = await post(
+            body({
+                messages: [
+                    { id: "u0", role: "user", parts: [{ type: "text", text: "Look it up" }] },
+                    {
+                        id: "a0",
+                        role: "assistant",
+                        parts: [
+                            {
+                                type: "tool-web_search",
+                                toolCallId: "s1",
+                                state: "output-available",
+                                providerExecuted: true,
+                                input: { query: "polaris" },
+                                output: []
+                            },
+                            {
+                                type: "tool-read_page",
+                                toolCallId: "r1",
+                                state: "output-available",
+                                input: { url: "https://example.com/" },
+                                output: { ok: true, url: "https://example.com/", title: "E" }
+                            },
+                            { type: "text", text: "Found it." }
+                        ]
+                    },
+                    { id: "u1", role: "user", parts: [{ type: "text", text: "Thanks" }] }
+                ]
+            })
+        );
+        expect(response.status).toBe(200);
+        await response.text();
     });
 });
