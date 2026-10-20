@@ -110,6 +110,28 @@
             "checkSettings": "Revisa los ajustes",
             "providerNotConnected": "Conecta {provider} en Integraciones antes de usar este modelo por defecto.",
             "poolGone": "Ese grupo de runners ya no existe."
+        },
+        "polarAccess": {
+            "use": {
+                "label": "Quién puede usar Polar",
+                "hint": "El resto no ve Polar en absoluto. Los administradores siempre pueden."
+            },
+            "spend": {
+                "label": "Quién gasta las claves del despliegue",
+                "hint": "El resto usa Polar solo con las claves que añade en Cuenta > Claves de proveedores de IA."
+            },
+            "who": {
+                "admins": "Administradores",
+                "chosen": "Personas elegidas",
+                "everyone": "Todos con sesión"
+            },
+            "people": "Personas",
+            "groups": "Grupos",
+            "noGroups": "Aún no hay grupos. Créalos en Grupos para elegir uno aquí.",
+            "findGroup": "Buscar un grupo",
+            "moreGroups": "Solo se listan los 200 primeros grupos. Busca para encontrar el resto.",
+            "noGroupFound": "Ningún grupo coincide con ese nombre.",
+            "guests": "Incluir cuentas de invitado"
         }
     },
     "billing": {
@@ -1333,7 +1355,7 @@
     "integrations": {
         "page": {
             "title": "Integraciones",
-            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Proveedores de IA</link>."
+            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Claves de IA</link>."
         },
         "grid": {
             "search": "Buscar integraciones",
@@ -1926,7 +1948,7 @@
         }
     },
     "integrationsModels": {
-        "title": "Modelos de IA",
+        "title": "Claves de IA",
         "intro": "Las cuentas propias de este despliegue con los proveedores de modelos. Una clave se entrega a una ejecución mediante una llamada autenticada y nunca se escribe en un repositorio, así que al sustituirla aquí el cambio se aplica en todas partes a la vez. Cada proveedor te factura directamente: Polaris no añade nada.",
         "keys": {
             "title": "Las claves de proveedor del despliegue",
@@ -2101,7 +2123,7 @@
                 "description": "Servicios de terceros (impresión de etiquetas, análisis de archivos)."
             },
             "integrationsModels": {
-                "title": "Modelos de IA",
+                "title": "Claves de IA",
                 "description": "Los proveedores de modelos que usan los agentes y las claves que guarda este despliegue."
             },
             "settings": {

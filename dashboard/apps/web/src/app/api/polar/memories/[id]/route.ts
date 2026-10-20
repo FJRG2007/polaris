@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { memoryTextSchema } from "@/lib/polar/shared";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { deletePolarMemory, editPolarMemory } from "@/lib/polar/memory";
@@ -20,7 +20,7 @@ type Params = { params: Promise<{ id: string }> };
 const NOT_FOUND = () => NextResponse.json({ error: "not_found" }, { status: 404 });
 
 export async function PATCH(request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
@@ -36,7 +36,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
 }
 
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);

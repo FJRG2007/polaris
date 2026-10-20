@@ -21,6 +21,8 @@ interface FakeKey {
     provider: string;
     config: string;
     expiresAt: Date | null;
+    /** Absent means on, which is every row stored before the switch existed. */
+    enabled?: boolean;
 }
 
 const state = {
@@ -43,11 +45,20 @@ vi.mock("@polaris/db", () => ({
             // honour, because which list a read is against is the question half
             // of these ask, and so is the expiry filter.
             findMany: vi.fn(
-                async ({ where }: { where?: { userId?: string | null; OR?: unknown[] } } = {}) =>
+                async ({
+                    where
+                }: {
+                    where?: { userId?: string | null; OR?: unknown[]; enabled?: boolean };
+                } = {}) =>
                     (where?.userId ? state.ownKeys : state.instanceKeys)
                         .filter(
                             (row) =>
                                 !where?.OR || row.expiresAt === null || row.expiresAt > new Date()
+                        )
+                        .filter(
+                            (row) =>
+                                where?.enabled === undefined ||
+                                (row.enabled ?? true) === where.enabled
                         )
                         .map((row) => ({
                             ...row,
@@ -385,6 +396,36 @@ describe("connectedProviders", () => {
         state.shared = false;
         instanceHas("groq", "gsk-theirs");
         expect(await connectedProviders()).toEqual(["groq"]);
+    });
+});
+
+describe("a switched-off key", () => {
+    it("is never handed to a run", async () => {
+        ownHas("k1", "openai", "sk-off");
+        state.ownKeys[0]!.enabled = false;
+        expect(await runSecretsFor("user-1")).toEqual({});
+    });
+
+    it("lets the next key of the provider serve instead", async () => {
+        ownHas("k1", "openai", "sk-off");
+        ownHas("k2", "openai", "sk-spare");
+        state.ownKeys[0]!.enabled = false;
+        expect((await runSecretsFor("user-1"))?.OPENAI_API_KEY).toBe("sk-spare");
+    });
+
+    it("is not spent by Polar, and the deployment no longer counts its provider", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        state.instanceKeys[0]!.enabled = false;
+        expect(await chatCredentialFor("user-1", "anthropic")).toBeNull();
+        expect(await connectedProviders()).toEqual([]);
+        expect((await keySourcesFor("user-1")).has("anthropic")).toBe(false);
+    });
+
+    it("keeps working when it was stored before the switch existed", async () => {
+        instanceHas("anthropic", "sk-theirs");
+        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({
+            secret: "sk-theirs"
+        });
     });
 });
 

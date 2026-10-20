@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { settledPolarTitle } from "@/lib/polar/titles";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ const idSchema = z.string().uuid();
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NextResponse.json({ error: "not_found" }, { status: 404 });

@@ -87,6 +87,8 @@ export interface ModelKeyView {
     /** When its owner said it stops working, or null for no end. */
     expiresAt: string | null;
     lastUsedAt: string | null;
+    /** Whether runs may spend it. Off keeps the row and hands it to nothing. */
+    enabled: boolean;
     updatedAt: string;
 }
 
@@ -100,6 +102,7 @@ const VIEW_SELECT = {
     config: true,
     expiresAt: true,
     lastUsedAt: true,
+    enabled: true,
     updatedAt: true
 } as const;
 
@@ -111,6 +114,7 @@ function toView(row: {
     config: string;
     expiresAt: Date | null;
     lastUsedAt: Date | null;
+    enabled: boolean;
     updatedAt: Date;
 }): ModelKeyView {
     return {
@@ -121,6 +125,7 @@ function toView(row: {
         config: parseConfig(row.config),
         expiresAt: row.expiresAt?.toISOString() ?? null,
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+        enabled: row.enabled,
         updatedAt: row.updatedAt.toISOString()
     };
 }
@@ -130,12 +135,15 @@ function toView(row: {
  *  the same on every screen. */
 const BY_PRIORITY = [{ priority: "asc" }, { createdAt: "asc" }] as const;
 
-/** A key that has not passed its end date. Written once because "usable" has to
- *  mean the same thing everywhere, and called rather than held because the
- *  moment it compares against is the moment of the read - a constant here would
- *  freeze "now" at the first import and keep handing out keys that expired
- *  while the process was up. */
-const unexpired = () => ({ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] });
+/** A key that is switched on and has not passed its end date. Written once
+ *  because "usable" has to mean the same thing everywhere, and called rather than
+ *  held because the moment it compares against is the moment of the read - a
+ *  constant here would freeze "now" at the first import and keep handing out
+ *  keys that expired while the process was up. */
+const spendable = () => ({
+    enabled: true,
+    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+});
 
 function parseConfig(json: string): Record<string, unknown> {
     try {
@@ -341,6 +349,20 @@ export async function updateModelKey(
 }
 
 /** Remove one. Scoped by owner, so an id from somewhere else deletes nothing. */
+/** Switch one of this owner's keys on or off. False when it holds no such key.
+ *  The row, its name and its place in the order are kept either way. */
+export async function setModelKeyEnabled(
+    owner: KeyOwner,
+    id: string,
+    enabled: boolean
+): Promise<boolean> {
+    const result = await prisma.userModelKey.updateMany({
+        where: { id, userId: owner },
+        data: { enabled }
+    });
+    return result.count > 0;
+}
+
 export async function deleteModelKey(owner: KeyOwner, id: string): Promise<boolean> {
     const result = await prisma.userModelKey.deleteMany({ where: { id, userId: owner } });
     return result.count > 0;
@@ -390,7 +412,7 @@ interface StoredKey {
  */
 async function storedKeys(owner: KeyOwner): Promise<StoredKey[]> {
     return prisma.userModelKey.findMany({
-        where: { userId: owner, ...unexpired() },
+        where: { userId: owner, ...spendable() },
         select: {
             id: true,
             provider: true,
@@ -471,11 +493,11 @@ export async function connectedProviders(): Promise<string[]> {
     return usableProviders(await activeKeys(INSTANCE));
 }
 
-/** Provider and config of an owner's unexpired keys, in their order. Enough to
+/** Provider and config of an owner's spendable keys, in their order. Enough to
  *  say which providers are covered without decrypting anything. */
 async function activeKeys(owner: KeyOwner): Promise<Array<{ provider: string; config: string }>> {
     return prisma.userModelKey.findMany({
-        where: { userId: owner, ...unexpired() },
+        where: { userId: owner, ...spendable() },
         select: { provider: true, config: true },
         orderBy: [...BY_PRIORITY]
     });
@@ -766,7 +788,7 @@ export async function signinOptionsFor(
                     {
                         OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
                     },
-                    unexpired()
+                    spendable()
                 ]
             },
             select: { id: true, userId: true, provider: true, name: true, config: true },
@@ -866,8 +888,13 @@ export async function secretForAccount(
         const shared = await instanceKeysAreShared();
         const row = await prisma.userModelKey.findFirst({
             where: {
-                id: accountId,
-                OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                AND: [
+                    { id: accountId },
+                    {
+                        OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                    },
+                    spendable()
+                ]
             },
             select: {
                 id: true,

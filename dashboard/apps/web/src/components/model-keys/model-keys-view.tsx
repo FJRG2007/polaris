@@ -45,7 +45,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    Switch
 } from "@polaris/ui";
 
 /** The four writes, as the screen that owns them exposes them. Each one is a
@@ -55,6 +56,8 @@ export interface ModelKeyActions {
     update: (input: unknown) => Promise<KeyActionResult>;
     remove: (input: unknown) => Promise<KeyActionResult>;
     reorder: (input: unknown) => Promise<KeyActionResult>;
+    /** Switching one on or off. Absent where the screen offers no switch. */
+    toggle?: (input: unknown) => Promise<KeyActionResult>;
 }
 
 /** The words that differ between the two owners. Everything else the table says
@@ -227,6 +230,26 @@ export function ModelKeysView({
         persistOrder(next);
     };
 
+    // Flipped at once and put back if the server refuses: the switch is the
+    // state, and one that waits for a round trip reads as broken.
+    const toggle = actions.toggle
+        ? async (key: ModelKeyView, enabled: boolean) => {
+              const previous = rows;
+              setRows(rows.map((row) => (row.id === key.id ? { ...row, enabled } : row)));
+              setError(null);
+              const result = await runAction(
+                  () => actions.toggle!({ id: key.id, enabled }),
+                  setError
+              );
+              if (!result || result.error) {
+                  setRows(previous);
+                  if (result?.error) setError(result.error);
+                  return;
+              }
+              router.refresh();
+          }
+        : null;
+
     const remove = async (key: ModelKeyView) => {
         const provider = byslug.get(key.provider);
         const ok = await confirm({
@@ -281,12 +304,19 @@ export function ModelKeysView({
                                 earlier. */}
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="w-10 px-2 py-2 font-medium" aria-label={t("modelKeys.order")} />
-                                    <th className="px-3 py-2 font-medium">{t("modelKeys.provider")}</th>
+                                    <th
+                                        className="w-10 px-2 py-2 font-medium"
+                                        aria-label={t("modelKeys.order")}
+                                    />
+                                    <th className="px-3 py-2 font-medium">
+                                        {t("modelKeys.provider")}
+                                    </th>
                                     {/* w-full max-w-0: the name is the column that gives, so
                                         a long one truncates instead of spilling the table
                                         sideways. */}
-                                    <th className="w-full max-w-0 px-3 py-2 font-medium">{t("modelKeys.name")}</th>
+                                    <th className="w-full max-w-0 px-3 py-2 font-medium">
+                                        {t("modelKeys.name")}
+                                    </th>
                                     <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
                                         {t("modelKeys.expires")}
                                     </th>
@@ -317,6 +347,11 @@ export function ModelKeysView({
                                             onMove={move}
                                             onEdit={() => setEditing(row)}
                                             onRemove={() => void remove(row)}
+                                            onToggle={
+                                                toggle
+                                                    ? (enabled) => void toggle(row, enabled)
+                                                    : null
+                                            }
                                         />
                                     ))
                                 )}
@@ -378,7 +413,8 @@ function KeyRow({
     total,
     onMove,
     onEdit,
-    onRemove
+    onRemove,
+    onToggle
 }: {
     row: ModelKeyView;
     provider: ProviderRow | null;
@@ -387,6 +423,7 @@ function KeyRow({
     onMove: (from: number, to: number) => void;
     onEdit: () => void;
     onRemove: () => void;
+    onToggle: ((enabled: boolean) => void) | null;
 }) {
     const t = useTranslations("components");
     const [over, setOver] = useState(false);
@@ -411,7 +448,7 @@ function KeyRow({
                 const from = Number(event.dataTransfer.getData("text/plain"));
                 if (Number.isInteger(from)) onMove(from, index);
             }}
-            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired ? "opacity-60" : ""}`}
+            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired || !row.enabled ? "opacity-60" : ""}`}
         >
             <td className="px-2 py-2">
                 <div className="flex items-center gap-1">
@@ -443,6 +480,7 @@ function KeyRow({
                             {standing.label}
                         </Badge>
                     ) : null}
+                    {row.enabled ? null : <Badge className="shrink-0">{t("modelKeys.off")}</Badge>}
                 </span>
             </td>
             <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
@@ -462,6 +500,18 @@ function KeyRow({
             </td>
             <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-1">
+                    {onToggle ? (
+                        <span
+                            className="mr-1 inline-flex"
+                            title={row.enabled ? t("modelKeys.turnOff") : t("modelKeys.turnOn")}
+                        >
+                            <Switch
+                                checked={row.enabled}
+                                onChange={onToggle}
+                                aria-label={t("modelKeys.useNamed", { name: row.name })}
+                            />
+                        </span>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -640,13 +690,13 @@ function KeyDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {existing
-                            ? t("modelKeys.editTitle", { thing: thing(action, t("modelKeys.providerKey")) })
+                            ? t("modelKeys.editTitle", {
+                                  thing: thing(action, t("modelKeys.providerKey"))
+                              })
                             : (action ?? t("modelKeys.addProviderKey"))}
                     </DialogTitle>
                     <DialogDescription>
-                        {existing
-                            ? t("modelKeys.editHint")
-                            : adding}
+                        {existing ? t("modelKeys.editHint") : adding}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -745,7 +795,9 @@ function KeyDialog({
                                     />
                                 </label>
                             </div>
-                            <p className="text-muted-foreground -mt-2 text-xs">{t("modelKeys.gatewayHint")}</p>
+                            <p className="text-muted-foreground -mt-2 text-xs">
+                                {t("modelKeys.gatewayHint")}
+                            </p>
                         </>
                     ) : null}
 
@@ -758,7 +810,9 @@ function KeyDialog({
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm">{t("modelKeys.canSignIn")}</p>
                                 <p className="text-muted-foreground text-xs">
-                                    {t("modelKeys.canSignInHint", { tool: signin.serves[0]?.label ?? t("modelKeys.theTool") })}
+                                    {t("modelKeys.canSignInHint", {
+                                        tool: signin.serves[0]?.label ?? t("modelKeys.theTool")
+                                    })}
                                 </p>
                             </div>
                             <Button size="sm" onClick={() => setSigningIn(true)} disabled={busy}>
@@ -799,7 +853,9 @@ function KeyDialog({
                             whether to go and make an account at all. */}
                         {entry?.freeTier && !existing ? (
                             <span className="text-success text-xs">
-                                {entry.freeTier.kind === "free" ? t("modelKeys.freeTier") : t("modelKeys.freeTrial")}{" "}
+                                {entry.freeTier.kind === "free"
+                                    ? t("modelKeys.freeTier")
+                                    : t("modelKeys.freeTrial")}{" "}
                                 {entry.freeTier.note}
                             </span>
                         ) : null}
@@ -814,7 +870,9 @@ function KeyDialog({
                             onChange={(event) => setExpiry(event.target.value)}
                         />
                         <span className="text-muted-foreground text-xs">
-                            {t("modelKeys.expiryHint", { provider: entry?.name ?? t("modelKeys.theProvider") })}
+                            {t("modelKeys.expiryHint", {
+                                provider: entry?.name ?? t("modelKeys.theProvider")
+                            })}
                         </span>
                         {expiry ? (
                             <button
@@ -828,7 +886,9 @@ function KeyDialog({
                     </label>
 
                     {existing ? null : (
-                        <p className="text-muted-foreground text-xs">{t("modelKeys.addedAtBottom")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("modelKeys.addedAtBottom")}
+                        </p>
                     )}
 
                     {error ? <p className="text-danger text-sm">{error}</p> : null}
@@ -848,7 +908,11 @@ function KeyDialog({
                             {tcommon("actions.cancel")}
                         </Button>
                         <Button onClick={() => void submit()} disabled={busy || !ready}>
-                            {busy ? t("modelKeys.checking") : existing ? t("modelKeys.save") : (action ?? t("modelKeys.addKey"))}
+                            {busy
+                                ? t("modelKeys.checking")
+                                : existing
+                                  ? t("modelKeys.save")
+                                  : (action ?? t("modelKeys.addKey"))}
                         </Button>
                     </div>
                 </div>

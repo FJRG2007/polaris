@@ -22,6 +22,9 @@ const state = {
     payers: [] as Array<string | null>
 };
 
+vi.mock("@/lib/polar/access", async () =>
+    (await import("./fixtures/open-polar-access")).openPolarAccess()
+);
 vi.mock("@/lib/api-session", () => ({
     apiUser: async () =>
         state.user

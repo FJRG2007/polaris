@@ -221,7 +221,12 @@ export function accessFor(user: SessionUser): AppAccessInput {
         // rather than in the app registry because that one is read in the
         // browser.
         alsoReaches: async (appId) =>
-            (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id)
+            (await import("@/lib/app-extensions/registry")).appReaches(appId, user.id),
+        // Polar's own audience, the same answer every Polar route checks.
+        closes: async (appId) =>
+            appId === "polar" &&
+            user.viewingAs?.mode !== "role" &&
+            !(await (await import("@/lib/polar/access")).polarAccessFor(user.id)).use
     };
 }
 

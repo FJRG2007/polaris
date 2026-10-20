@@ -19,7 +19,7 @@ import {
     streamText,
     type UIMessage
 } from "ai";
-import { apiUser } from "@/lib/api-session";
+import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
@@ -34,6 +34,11 @@ import {
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
+import {
+    classifyProviderFailure,
+    encodePolarFailure,
+    failureLogLine
+} from "@/lib/polar/provider-failure";
 import {
     fencePageContext,
     modelChoiceSchema,
@@ -74,7 +79,7 @@ function firstText(message: UIMessage | undefined): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     // An administrator looking through somebody else's eyes is not that person,
     // and Polar does things in its user's name.
@@ -108,14 +113,15 @@ export async function POST(request: Request): Promise<Response> {
     // A thread whose model has since been retired by its provider falls back to
     // the first model this person can use, and the answer says so.
     let choice: ModelChoice = body.data.choice;
-    let resolved = await resolvePolarModel(user.id, choice);
+    const access = await polarAccessFor(user.id);
+    let resolved = await resolvePolarModel(user.id, choice, access);
     let fellBackFrom: string | null = null;
     if (resolved === "unknown_model") {
-        const first = (await polarModelOptions(user.id))[0]?.models[0];
+        const first = (await polarModelOptions(user.id, access))[0]?.models[0];
         if (first) {
             fellBackFrom = choice.model;
             choice = { ...choice, provider: first.provider, model: first.model, payer: null };
-            resolved = await resolvePolarModel(user.id, choice);
+            resolved = await resolvePolarModel(user.id, choice, access);
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
@@ -194,6 +200,18 @@ export async function POST(request: Request): Promise<Response> {
                 reasoningFor("fast", resolved.option)
             );
         },
-        onError: () => "polar_failed"
+        // The provider's refusal is classified and named, never forwarded: its
+        // body is the provider's own words about the account it belongs to.
+        onError: (error) => {
+            const failure = classifyProviderFailure(error);
+            console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
+            return encodePolarFailure({
+                code: "provider",
+                kind: failure.kind,
+                provider: resolved.option.providerName,
+                slug: choice.provider,
+                payer: resolved.credential.source
+            });
+        }
     });
 }

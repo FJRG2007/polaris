@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { polarShareLink, revokePolarShare, sharePolarThread } from "@/lib/polar/share";
 
@@ -20,7 +20,7 @@ type Params = { params: Promise<{ id: string }> };
 const NOT_FOUND = () => NextResponse.json({ error: "not_found" }, { status: 404 });
 
 export async function GET(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
@@ -28,7 +28,7 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
 }
 
 export async function POST(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
@@ -40,7 +40,7 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
 }
 
 export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);

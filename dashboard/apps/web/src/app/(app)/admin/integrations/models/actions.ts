@@ -17,6 +17,7 @@ import {
     editKey,
     removeKey,
     reorderKeys,
+    toggleKey,
     type KeyActionResult,
     type KeyScope
 } from "@/lib/agents/model-key-actions";
@@ -24,7 +25,12 @@ import {
 /** The deployment's keys, written by whichever administrator is signed in. */
 async function scope(): Promise<KeyScope> {
     const admin = await requireAdmin();
-    return { owner: INSTANCE, actorId: admin.id, path: "/admin/integrations/models", audit: "instance" };
+    return {
+        owner: INSTANCE,
+        actorId: admin.id,
+        path: "/admin/integrations/models",
+        audit: "instance"
+    };
 }
 
 export async function addInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
@@ -41,4 +47,8 @@ export async function deleteInstanceModelKeyAction(input: unknown): Promise<KeyA
 
 export async function reorderInstanceModelKeysAction(input: unknown): Promise<KeyActionResult> {
     return reorderKeys(await scope(), input);
+}
+
+export async function toggleInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
+    return toggleKey(await scope(), input);
 }

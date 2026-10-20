@@ -13,6 +13,9 @@ const state = {
     instanceKey: false
 };
 
+vi.mock("@/lib/polar/access", async () =>
+    (await import("./fixtures/open-polar-access")).openPolarAccess()
+);
 vi.mock("@/lib/agents/model-keys", () => ({
     keySourcesFor: async () => {
         state.reads += 1;

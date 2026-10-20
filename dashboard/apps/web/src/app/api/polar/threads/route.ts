@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { THREAD_VIEWS } from "@/lib/polar/shared";
 import { listPolarThreads, polarSidebar } from "@/lib/polar/threads";
 
@@ -27,7 +27,7 @@ const querySchema = z
     .refine((query) => (query.view === "project") === (query.project !== undefined));
 
 export async function GET(request: Request): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const query = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
     if (!query.success) return NextResponse.json({ error: "invalid" }, { status: 400 });

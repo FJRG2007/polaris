@@ -15,6 +15,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { POLAR_TITLE_MAX } from "@/lib/polar/shared";
+import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import { generateText, type LanguageModel, type UIMessage } from "ai";
 
 /** Where a thread's title came from (`PolarThread.titleSource`). */
@@ -78,6 +79,11 @@ function textOf(message: UIMessage | undefined): string {
         .slice(0, EXCERPT_MAX);
 }
 
+/** Which provider a model belongs to, for a log line. */
+function providerOf(model: LanguageModel): string {
+    return typeof model === "string" ? model : model.provider;
+}
+
 /** Title generations still running in this process, so the browser can wait for one. */
 const running = new Map<string, Promise<void>>();
 
@@ -115,7 +121,11 @@ export async function titlePolarThread(
         title = sanitizeTitle(text);
         if (!title) console.warn("polar: the model gave no usable title", { threadId });
     } catch (error) {
-        console.error("polar: could not name the thread", error);
+        // One line, not a stack: a key that is out of credit fails every turn,
+        // and the reply already told the person why.
+        console.warn(
+            failureLogLine("naming a thread", providerOf(model), classifyProviderFailure(error))
+        );
     }
     await prisma.polarThread.updateMany({
         where: { id: threadId, userId, titleSource: "generating" },
@@ -133,7 +143,11 @@ export function startPolarTitle(
 ): void {
     if (running.has(threadId)) return;
     const job = titlePolarThread(userId, threadId, model, messages, reasoning)
-        .catch((error) => console.error("polar: could not name the thread", error))
+        .catch((error) =>
+            console.warn(
+                `polar: could not name the thread: ${error instanceof Error ? error.message : String(error)}`
+            )
+        )
         .finally(() => running.delete(threadId));
     running.set(threadId, job);
 }

@@ -437,6 +437,7 @@
         "web/src/app/(app)/admin/agents/catalog-card.tsx",
         "web/src/app/(app)/admin/agents/page.tsx",
         "web/src/app/(app)/admin/agents/platform-defaults-view.tsx",
+        "web/src/app/(app)/admin/agents/polar-access-card.tsx",
         "web/src/app/(app)/admin/agents/usage-limits-card.tsx",
         "web/src/app/(app)/admin/billing/actions.ts",
         "web/src/app/(app)/admin/billing/billing-view.tsx",

@@ -47,6 +47,7 @@ import { MessageToasts } from "@/components/message-toasts";
 import { TransfersView } from "@/components/transfers/transfers-view";
 import { CommandPalette } from "@/components/command-palette";
 import { PolarAside, PolarProvider, PolarToggle } from "@/components/polar/polar-panel";
+import { polarAccessFor } from "@/lib/polar/access";
 import { PresenceProvider } from "@/components/presence-store";
 import { ProfileStyleProvider } from "@/components/profile-style-store";
 import { listNotifications } from "@/lib/notification-service";
@@ -174,7 +175,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         mailUnread,
         adminWaiting,
         seasonsOn,
-        seasonal
+        seasonal,
+        polarAccess
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
         openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
@@ -202,7 +204,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         adminCount,
         // A decoration is never worth a failed page: off, rather than an error.
         seasonsAllowed().catch(() => false),
-        getSeasonalChoice(user.id).catch(() => SEASONAL_DEFAULTS)
+        getSeasonalChoice(user.id).catch(() => SEASONAL_DEFAULTS),
+        // The same check every Polar route makes, so the header follows it.
+        polarAccessFor(user.id)
     ]);
     const build = buildStamp();
     // What the apps this person reaches draw beside the bell - Calendar's
@@ -561,7 +565,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
     // every client component in it.
     return (
         <Messages namespaces={["nav", "chat", "shortcuts", "tours", "polar"]}>
-            <PolarProvider>{frame}</PolarProvider>
+            <PolarProvider allowed={polarAccess.use}>{frame}</PolarProvider>
         </Messages>
     );
 }

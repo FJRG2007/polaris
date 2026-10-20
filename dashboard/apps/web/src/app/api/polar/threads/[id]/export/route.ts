@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { apiUser } from "@/lib/api-session";
+import { polarCaller } from "@/lib/polar/access";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 import {
     exportFileName,
@@ -25,7 +25,7 @@ const formatSchema = z.enum(["markdown", "json"]).default("markdown");
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, { params }: Params): Promise<Response> {
-    const user = await apiUser();
+    const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const id = idSchema.safeParse((await params).id);
     const format = formatSchema.safeParse(

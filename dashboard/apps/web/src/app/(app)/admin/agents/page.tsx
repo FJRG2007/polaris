@@ -9,6 +9,8 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { UsageLimitsCard } from "./usage-limits-card";
 import { CatalogCard, KeySharingCard, SharedWorkspaceCard } from "./catalog-card";
+import { PolarAccessCard } from "./polar-access-card";
+import { readPolarPolicy } from "@/lib/polar/access";
 import { PlatformDefaultsView } from "./platform-defaults-view";
 import { catalogRefreshedAt } from "@/lib/agents/model-catalog";
 import { listUsageLimits } from "@/lib/agents/agent-usage-limits";
@@ -17,6 +19,9 @@ import { connectedProviders, instanceKeysAreShared } from "@/lib/agents/model-ke
 import { sharedWorkspaceAllowed } from "@/lib/agents/session-capacity";
 
 export const dynamic = "force-dynamic";
+
+/** How many groups the Polar card lists as chips before it asks for a search. */
+const GROUP_CHIPS = 200;
 
 export default async function AgentDefaultsAdminPage() {
     await requireAdmin();
@@ -29,6 +34,8 @@ export default async function AgentDefaultsAdminPage() {
         keysShared,
         limits,
         sharedMachine,
+        polarPolicy,
+        groups,
         t
     ] = await Promise.all([
         getPlatformAgentDefaults(),
@@ -45,6 +52,12 @@ export default async function AgentDefaultsAdminPage() {
         instanceKeysAreShared(),
         listUsageLimits(),
         sharedWorkspaceAllowed(),
+        readPolarPolicy(),
+        prisma.group.findMany({
+            select: { id: true, name: true },
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: GROUP_CHIPS + 1
+        }),
         getTranslations("admin")
     ]);
 
@@ -52,12 +65,26 @@ export default async function AgentDefaultsAdminPage() {
         // Narrow page: centre the column in the content area, header included, so
         // the form does not sit against the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("agents.page.title")}
-                description={t("agents.page.description")}
-            />
+            <PageHeader title={t("agents.page.title")} description={t("agents.page.description")} />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />
+                <PolarAccessCard
+                    policy={polarPolicy}
+                    groups={groups.slice(0, GROUP_CHIPS)}
+                    moreGroups={groups.length > GROUP_CHIPS}
+                    chosenGroups={await prisma.group.findMany({
+                        where: {
+                            id: { in: [...polarPolicy.use.groupIds, ...polarPolicy.spend.groupIds] }
+                        },
+                        select: { id: true, name: true }
+                    })}
+                    people={await prisma.user.findMany({
+                        where: {
+                            id: { in: [...polarPolicy.use.userIds, ...polarPolicy.spend.userIds] }
+                        },
+                        select: { id: true, name: true }
+                    })}
+                />
                 <SharedWorkspaceCard allowed={sharedMachine} />
                 <UsageLimitsCard limits={limits} />
                 <CatalogCard

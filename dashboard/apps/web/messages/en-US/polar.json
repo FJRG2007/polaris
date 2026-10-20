@@ -98,7 +98,8 @@
         "title": "Polar needs an AI provider key",
         "body": "Add a key from a provider such as Anthropic, OpenAI or Google, or ask an administrator to share this Polaris's keys.",
         "own": "Add your own key",
-        "admin": "Manage this Polaris's keys"
+        "admin": "Manage this Polaris's keys",
+        "ownOnly": "This Polaris's keys are not shared with you. To use Polar, add a key of your own from a provider such as Anthropic, OpenAI or Google."
     },
     "empty": "Ask about this page, or anything you can do in Polaris.",
     "status": {
@@ -106,7 +107,20 @@
     },
     "errors": {
         "failed": "Polar could not answer. Try again, or pick another model.",
-        "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one."
+        "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one.",
+        "provider": {
+            "key": "{provider} refused the key Polar used. It may be wrong, revoked or missing a permission.",
+            "credit": "{provider} says the account behind this key is out of credit. Add credit or a payment method in its billing settings.",
+            "rate": "{provider} is limiting how often this key can be used. Wait a minute and try again.",
+            "down": "{provider} is having trouble answering right now. Try again in a few minutes.",
+            "model": "{provider} no longer serves this model. Pick another one.",
+            "other": "{provider} could not answer. Try again, or pick another model.",
+            "askAdmin": "Ask your admin to check this Polaris's {provider} key.",
+            "openKey": "Open the key",
+            "ownKey": "Check your key",
+            "tryWith": "Try with {model}",
+            "retry": "Try again"
+        }
     },
     "queue": {
         "title": "Sends next",

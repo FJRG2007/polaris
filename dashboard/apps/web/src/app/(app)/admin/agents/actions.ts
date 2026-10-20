@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
+import { polarPolicySchema, savePolarPolicy } from "@/lib/polar/access";
 import { setSetting } from "@/lib/setting-store";
 import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
 import type { PickerModel } from "@/components/model-picker";
@@ -60,7 +61,8 @@ export async function platformModelChoices(): Promise<PickerModel[]> {
 export async function setInstanceKeySharingAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ shared: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
 
     await setInstanceKeysShared(parsed.data.shared);
     await recordAudit({
@@ -84,7 +86,8 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
 export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ allowed: z.boolean() }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
 
     await setSetting(SHARED_WORKSPACE_KEY, parsed.data.allowed ? "true" : "false");
     await recordAudit({
@@ -144,7 +147,8 @@ export async function saveUsageLimitAction(input: unknown): Promise<{ error?: st
 export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("admin"))("agents.errors.pickLimit") };
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickLimit") };
 
     await deleteUsageLimit(parsed.data.id);
     await recordAudit({
@@ -170,7 +174,10 @@ export async function refreshModelCatalogAction(): Promise<{
 }> {
     const admin = await requireAdmin();
     const result = await refreshModelCatalog();
-    if (!result.ok) return { error: result.error ?? (await getTranslations("admin"))("agents.errors.catalogUnread") };
+    if (!result.ok)
+        return {
+            error: result.error ?? (await getTranslations("admin"))("agents.errors.catalogUnread")
+        };
     await recordAudit({
         actorId: admin.id,
         action: "agents.catalog.refresh",
@@ -184,7 +191,11 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     const admin = await requireAdmin();
     const parsed = agentDefaultsSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("agents.errors.checkSettings") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("admin"))("agents.errors.checkSettings")
+        };
     }
 
     // Same refusal as the per-person tiers, and it matters more here: a model
@@ -214,4 +225,65 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     revalidatePath("/admin/agents");
     revalidatePath("/apps/agents/settings");
     return {};
+}
+
+/**
+ * Who may use Polar, and who may spend this deployment's keys in it.
+ *
+ * Saved whole: the card sends both audiences every time, so a half-saved policy
+ * is not a state anybody can reach.
+ */
+export async function setPolarAccessAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = polarPolicySchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
+
+    await savePolarPolicy(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "polar.access.update",
+        metadata: {
+            use: parsed.data.use.who,
+            spend: parsed.data.spend.who,
+            people: parsed.data.use.userIds.length + parsed.data.spend.userIds.length,
+            groups: parsed.data.use.groupIds.length + parsed.data.spend.groupIds.length
+        }
+    });
+    revalidatePath("/admin/agents");
+    return {};
+}
+
+/** People an administrator may name in a Polar audience. */
+export async function findPolarPeopleAction(
+    query: unknown
+): Promise<{ results: { id: string; name: string }[] }> {
+    await requireAdmin();
+    const term = z.string().trim().min(2).max(100).safeParse(query);
+    if (!term.success) return { results: [] };
+    const contains = { contains: term.data, mode: "insensitive" as const };
+    const found = await prisma.user.findMany({
+        where: { OR: [{ name: contains }, { email: contains }, { username: contains }] },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: 20
+    });
+    return { results: found };
+}
+
+/** Groups an administrator may name in a Polar audience, for a deployment with
+ *  more of them than the card lists. */
+export async function findPolarGroupsAction(
+    query: unknown
+): Promise<{ results: { id: string; name: string }[] }> {
+    await requireAdmin();
+    const term = z.string().trim().min(2).max(100).safeParse(query);
+    if (!term.success) return { results: [] };
+    const found = await prisma.group.findMany({
+        where: { name: { contains: term.data, mode: "insensitive" } },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: 20
+    });
+    return { results: found };
 }

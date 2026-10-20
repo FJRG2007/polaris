@@ -23,7 +23,13 @@ import { modelProviderName } from "@/lib/agents/model-key-providers";
 import type { Intelligence, ModelChoice, Payer } from "@/lib/polar/shared";
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
-import { chatCredentialFor, keySourcesFor, type ChatCredential } from "@/lib/agents/model-keys";
+import type { ChatCredential } from "@/lib/agents/model-keys";
+import {
+    polarAccessFor,
+    polarCredentialFor,
+    polarKeySources,
+    type PolarAccess
+} from "@/lib/polar/access";
 
 /**
  * Base URLs of the providers that speak the OpenAI chat API, taken from the
@@ -72,8 +78,12 @@ export interface PolarProviderOption {
  * The providers and models this person can use now: only providers with a
  * usable key, only models the catalogue carries for them.
  */
-export async function polarModelOptions(userId: string): Promise<PolarProviderOption[]> {
-    const sources = await keySourcesFor(userId);
+export async function polarModelOptions(
+    userId: string,
+    access?: PolarAccess
+): Promise<PolarProviderOption[]> {
+    const granted = access ?? (await polarAccessFor(userId));
+    const sources = await polarKeySources(userId, granted);
     const served = [...sources.keys()].filter(polarServesProvider);
     if (served.length === 0) return [];
     const prefixes = new Map<string, string>();
@@ -88,7 +98,7 @@ export async function polarModelOptions(userId: string): Promise<PolarProviderOp
         const name = modelProviderName(slug);
         let models: PolarModelOption[];
         if (slug === GATEWAY_SLUG) {
-            const credential = await chatCredentialFor(userId, slug);
+            const credential = await polarCredentialFor(userId, slug, null, granted);
             models = credential?.gatewayModel
                 ? [gatewayOption(slug, name, credential.gatewayModel)]
                 : [];
@@ -163,17 +173,19 @@ export interface ResolvedModel {
  */
 export async function resolvePolarModel(
     userId: string,
-    choice: ModelChoice
+    choice: ModelChoice,
+    access?: PolarAccess
 ): Promise<ResolvedModel | ModelRefusal> {
     if (choice.kind !== "language") return "unsupported_kind";
-    const provider = (await polarModelOptions(userId)).find(
+    const granted = access ?? (await polarAccessFor(userId));
+    const provider = (await polarModelOptions(userId, granted)).find(
         (entry) => entry.provider === choice.provider
     );
     if (!provider) return "no_key";
     if (choice.payer && !provider.payers.includes(choice.payer)) return "no_key";
     const option = provider.models.find((model) => model.model === choice.model);
     if (!option) return "unknown_model";
-    const credential = await chatCredentialFor(userId, choice.provider, choice.payer);
+    const credential = await polarCredentialFor(userId, choice.provider, choice.payer, granted);
     if (!credential) return "no_key";
     return { model: languageModel(credential, option.model), option, credential };
 }

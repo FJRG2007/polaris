@@ -19,11 +19,17 @@ import { getTranslations } from "@/lib/i18n/request";
 import { modelProviderRows } from "@/lib/agents/model-key-providers";
 import { signinProviderRows } from "@/lib/agents/agent-signins";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
-import { instanceKeysAreShared, INSTANCE, listAgentSignins, listProviderKeys } from "@/lib/agents/model-keys";
+import {
+    instanceKeysAreShared,
+    INSTANCE,
+    listAgentSignins,
+    listProviderKeys
+} from "@/lib/agents/model-keys";
 import {
     addInstanceModelKeyAction,
     deleteInstanceModelKeyAction,
     reorderInstanceModelKeysAction,
+    toggleInstanceModelKeyAction,
     updateInstanceModelKeyAction
 } from "./actions";
 
@@ -56,7 +62,8 @@ export default async function ModelProvidersPage() {
                     add: addInstanceModelKeyAction,
                     update: updateInstanceModelKeyAction,
                     remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction
+                    reorder: reorderInstanceModelKeysAction,
+                    toggle: toggleInstanceModelKeyAction
                 }}
                 copy={{
                     title: t("integrationsModels.keys.title"),
@@ -68,10 +75,16 @@ export default async function ModelProvidersPage() {
                     <SharingCard
                         title={t("integrationsModels.sharing.title")}
                         body={t.rich(
-                            shared ? "integrationsModels.sharing.shared" : "integrationsModels.sharing.private",
+                            shared
+                                ? "integrationsModels.sharing.shared"
+                                : "integrationsModels.sharing.private",
                             {
                                 link: (chunks) => (
-                                    <Link key="link" href="/admin/agents" className="text-primary hover:underline">
+                                    <Link
+                                        key="link"
+                                        href="/admin/agents"
+                                        className="text-primary hover:underline"
+                                    >
                                         {chunks}
                                     </Link>
                                 )
@@ -95,7 +108,8 @@ export default async function ModelProvidersPage() {
                     add: addInstanceModelKeyAction,
                     update: updateInstanceModelKeyAction,
                     remove: deleteInstanceModelKeyAction,
-                    reorder: reorderInstanceModelKeysAction
+                    reorder: reorderInstanceModelKeysAction,
+                    toggle: toggleInstanceModelKeyAction
                 }}
                 copy={{
                     title: t("integrationsModels.accounts.title"),
@@ -108,7 +122,11 @@ export default async function ModelProvidersPage() {
             <p className="text-muted-foreground text-sm">
                 {t.rich("integrationsModels.elsewhere", {
                     link: (chunks) => (
-                        <Link key="link" href="/admin/integrations" className="text-primary hover:underline">
+                        <Link
+                            key="link"
+                            href="/admin/integrations"
+                            className="text-primary hover:underline"
+                        >
                             {chunks}
                         </Link>
                     )
