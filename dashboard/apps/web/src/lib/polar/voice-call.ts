@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { PAYERS } from "@/lib/polar/shared";
 
 /** Largest recording the transcription route takes. Five minutes of Opus is a
  *  couple of megabytes; this leaves room for Safari's MP4. */
@@ -41,12 +42,15 @@ export const transcribeQuerySchema = z.object({
         .number()
         .int()
         .min(0)
-        .max(VOICE_MAX_SECONDS * 1000)
+        .max(VOICE_MAX_SECONDS * 1000),
+    /** Who pays, as picked for the chat; absent means the usual order. */
+    payer: z.enum(PAYERS).nullable().default(null)
 });
 
 /** The body of a speech request. */
 export const speakBodySchema = z.object({
-    text: z.string().trim().min(1).max(SPEAK_TEXT_MAX)
+    text: z.string().trim().min(1).max(SPEAK_TEXT_MAX),
+    payer: z.enum(PAYERS).nullable().default(null)
 });
 
 /** What this person can do with their voice, carried on `/api/polar/models`. */
@@ -137,7 +141,12 @@ export type CallPhase =
     | "approval";
 
 /** A failure the call shows, as a code the screen has words for. */
-export type CallError = "mic_denied" | "no_speech_provider" | "transcribe_failed" | "speak_failed";
+export type CallError =
+    | "mic_denied"
+    | "no_voice_provider"
+    | "no_speech_provider"
+    | "transcribe_failed"
+    | "speak_failed";
 
 export interface CallState {
     phase: CallPhase;
@@ -206,7 +215,8 @@ export function callReducer(state: CallState, event: CallEvent): CallState {
         }
         case "failed":
             // A missing voice still leaves the answer on screen.
-            return event.error === "speak_failed" || event.error === "no_speech_provider"
+            return (event.error === "speak_failed" || event.error === "no_speech_provider") &&
+                state.phase !== "transcribing"
                 ? { ...state, error: event.error }
                 : { ...state, phase: "listening", error: event.error };
         case "reply":

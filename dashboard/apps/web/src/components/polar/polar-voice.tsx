@@ -10,6 +10,7 @@
  * the recording goes - to `/api/polar/transcribe`, never into storage.
  */
 
+import type { Payer } from "@/lib/polar/shared";
 import type { ChatStatus, UIMessage } from "ai";
 import { micConstraints } from "@/app/(app)/chat/mic-cleanup";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -46,11 +47,14 @@ export type TranscribeError =
 export async function transcribeAudio(
     audio: Blob,
     durationMs: number,
+    payer: Payer | null = null,
     signal?: AbortSignal
 ): Promise<{ text: string } | { error: TranscribeError }> {
     const capped = Math.min(Math.max(0, Math.round(durationMs)), VOICE_MAX_SECONDS * 1000);
+    const query = new URLSearchParams({ durationMs: String(capped) });
+    if (payer) query.set("payer", payer);
     try {
-        const response = await fetch(`/api/polar/transcribe?durationMs=${capped}`, {
+        const response = await fetch(`/api/polar/transcribe?${query}`, {
             method: "POST",
             headers: { "Content-Type": audio.type || "audio/webm" },
             body: audio,
@@ -87,11 +91,14 @@ export type VoiceNotice =
 export function DictationButton({
     available,
     disabled,
+    payer = null,
     onText,
     onNotice
 }: {
     available: boolean;
     disabled?: boolean;
+    /** Who pays, as picked for the chat. */
+    payer?: Payer | null;
     onText: (text: string) => void;
     onNotice: (notice: VoiceNotice | null) => void;
 }) {
@@ -99,7 +106,7 @@ export function DictationButton({
     const [transcribing, setTranscribing] = useState(false);
     const recorder = useVoiceRecording((file, sound) => {
         setTranscribing(true);
-        void transcribeAudio(file, sound.durationMs).then((result) => {
+        void transcribeAudio(file, sound.durationMs, payer).then((result) => {
             setTranscribing(false);
             if ("text" in result) {
                 if (result.text) onText(result.text);
@@ -245,6 +252,8 @@ export interface VoiceCallProps {
     status: ChatStatus;
     /** Whether answers can be spoken; without it the call still shows them. */
     speech: boolean;
+    /** Who pays, as picked for the chat. */
+    payer?: Payer | null;
     tools: Record<string, { title: string; destructive: boolean }>;
     /** Send what was said as the next message of this thread. */
     onSend: (text: string) => void;
@@ -267,9 +276,11 @@ export function VoiceCall(props: VoiceCallProps) {
     const baseline = useRef<number | null>(null);
     const spokenUpTo = useRef(0);
     /** Sentences fetched ahead, in the order they are to be said. */
-    const queue = useRef<Array<Promise<Blob | null>>>([]);
+    const queue = useRef<Array<Promise<Blob | CallError>>>([]);
     const playing = useRef(false);
     const audio = useRef<HTMLAudioElement | null>(null);
+    /** Ends the sentence being played, which pausing alone never does. */
+    const played = useRef<(() => void) | null>(null);
     /** Bumped to cancel everything that is being said or fetched. */
     const generation = useRef(0);
     const fetches = useRef(new Set<AbortController>());
@@ -283,6 +294,8 @@ export function VoiceCall(props: VoiceCallProps) {
         fetches.current.clear();
         audio.current?.pause();
         audio.current = null;
+        played.current?.();
+        played.current = null;
         playing.current = false;
     }, []);
 
@@ -311,19 +324,23 @@ export function VoiceCall(props: VoiceCallProps) {
         while (queue.current.length > 0 && mine === generation.current) {
             const blob = await queue.current.shift()!;
             if (mine !== generation.current) return;
-            if (!blob) {
-                dispatch({ type: "failed", error: "speak_failed" });
+            if (typeof blob === "string") {
+                dispatch({ type: "failed", error: blob });
                 continue;
             }
             dispatch({ type: "speaking" });
             const url = URL.createObjectURL(blob);
             const player = new Audio(url);
             audio.current = player;
+            let stop: (() => void) | null = null;
             await new Promise<void>((resolve) => {
+                stop = resolve;
+                played.current = resolve;
                 player.onended = () => resolve();
                 player.onerror = () => resolve();
                 player.play().catch(() => resolve());
             });
+            if (played.current === stop) played.current = null;
             URL.revokeObjectURL(url);
         }
         if (mine !== generation.current) return;
@@ -336,14 +353,20 @@ export function VoiceCall(props: VoiceCallProps) {
         (sentence: string) => {
             const controller = new AbortController();
             fetches.current.add(controller);
-            const pending = fetch("/api/polar/speak", {
+            const pending: Promise<Blob | CallError> = fetch("/api/polar/speak", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: sentence }),
+                body: JSON.stringify({ text: sentence, payer: latest.current.payer ?? null }),
                 signal: controller.signal
             })
-                .then((response) => (response.ok ? response.blob() : null))
-                .catch(() => null)
+                .then((response): Promise<Blob | CallError> | CallError =>
+                    response.ok
+                        ? response.blob()
+                        : response.status === 409
+                          ? "no_speech_provider"
+                          : "speak_failed"
+                )
+                .catch((): CallError => "speak_failed")
                 .finally(() => fetches.current.delete(controller));
             queue.current.push(pending);
             void pump();
@@ -411,12 +434,16 @@ export function VoiceCall(props: VoiceCallProps) {
             media.onstop = () => {
                 if (!entry.keep || cancelled || chunks.length === 0) return;
                 const blob = new Blob(chunks, { type });
-                void transcribeAudio(blob, Date.now() - entry.began).then((result) => {
+                void transcribeAudio(
+                    blob,
+                    Date.now() - entry.began,
+                    latest.current.payer ?? null
+                ).then((result) => {
                     if (cancelled || live.current.ended) return;
                     if ("error" in result) {
                         const error: CallError =
                             result.error === "no_voice_provider"
-                                ? "no_speech_provider"
+                                ? "no_voice_provider"
                                 : "transcribe_failed";
                         dispatch({ type: "failed", error });
                         return;

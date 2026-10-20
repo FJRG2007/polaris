@@ -42,7 +42,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = speakBodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
 
-    const speaker = await polarSpeaker(user.id);
+    const speaker = await polarSpeaker(user.id, body.data.payer);
     if (!speaker) return refuse("no_voice_provider", 409);
     try {
         const result = await generateSpeech({

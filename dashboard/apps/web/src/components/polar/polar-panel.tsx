@@ -1169,6 +1169,7 @@ export function PolarChat({
                         <DictationButton
                             available={voice.dictation}
                             disabled={noKeys}
+                            payer={choice?.payer}
                             onNotice={setVoiceNotice}
                             onText={(text) => {
                                 setInput((current) =>
@@ -1210,6 +1211,7 @@ export function PolarChat({
                     messages={chat.messages}
                     status={chat.status}
                     speech={voice.speech}
+                    payer={choice?.payer}
                     tools={tools}
                     onSend={(text) => void sendSpoken(text)}
                     onStop={() => void chat.stop()}

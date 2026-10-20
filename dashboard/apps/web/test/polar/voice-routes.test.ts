@@ -18,7 +18,8 @@ const state = {
     provider: true,
     transcribed: [] as Array<{ audio: Uint8Array }>,
     spoken: [] as Array<{ text: string; voice: string; outputFormat: string }>,
-    fail: false
+    fail: false,
+    payers: [] as Array<string | null>
 };
 
 vi.mock("@/lib/api-session", () => ({
@@ -31,11 +32,16 @@ vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: !state.limited })
 }));
 vi.mock("@/lib/polar/voice", () => ({
-    polarTranscriber: async () => (state.provider ? { kind: "transcriber" } : null),
-    polarSpeaker: async () =>
-        state.provider
+    polarTranscriber: async (_userId: string, payer: string | null) => {
+        state.payers.push(payer);
+        return state.provider ? { kind: "transcriber" } : null;
+    },
+    polarSpeaker: async (_userId: string, payer: string | null) => {
+        state.payers.push(payer);
+        return state.provider
             ? { model: { kind: "speaker" }, voice: "alloy", format: "mp3", mediaType: "audio/mpeg" }
-            : null,
+            : null;
+    },
     polarVoiceAvailability: async () => ({ dictation: state.provider, speech: state.provider })
 }));
 vi.mock("ai", () => ({
@@ -88,6 +94,7 @@ beforeEach(() => {
     state.transcribed = [];
     state.spoken = [];
     state.fail = false;
+    state.payers = [];
 });
 
 describe("POST /api/polar/transcribe", () => {
@@ -96,6 +103,20 @@ describe("POST /api/polar/transcribe", () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ text: "hello polar" });
         expect(state.transcribed[0]?.audio).toEqual(new Uint8Array([26, 69, 223, 163]));
+        expect(state.payers).toEqual([null]);
+    });
+
+    it("spends the key of whoever was picked to pay, and refuses an unknown payer", async () => {
+        const query = "durationMs=1200&payer=instance";
+        expect((await transcribeRoute.POST(recording(undefined, undefined, query))).status).toBe(
+            200
+        );
+        expect(state.payers).toEqual(["instance"]);
+        const unknown = "durationMs=1200&payer=someone";
+        expect((await transcribeRoute.POST(recording(undefined, undefined, unknown))).status).toBe(
+            400
+        );
+        expect(state.payers).toEqual(["instance"]);
     });
 
     it("refuses anybody signed out, or viewing as somebody else", async () => {
@@ -158,6 +179,14 @@ describe("POST /api/polar/speak", () => {
             voice: "alloy",
             outputFormat: "mp3"
         });
+        expect(state.payers).toEqual([null]);
+    });
+
+    it("spends the key of whoever was picked to pay", async () => {
+        const response = await speakRoute.POST(sentence({ text: "Hi.", payer: "own" }));
+        expect(response.status).toBe(200);
+        expect(state.payers).toEqual(["own"]);
+        expect((await speakRoute.POST(sentence({ text: "Hi.", payer: "boss" }))).status).toBe(400);
     });
 
     it("refuses an empty, an unreadable and an over-long text", async () => {

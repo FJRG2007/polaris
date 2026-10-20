@@ -239,6 +239,7 @@
         "micDenied": "Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.",
         "cannotRecord": "Este navegador no puede grabar audio.",
         "errors": {
+            "no_voice_provider": "Polar no puede oírte sin una clave de OpenAI o Google AI.",
             "transcribe_failed": "No se ha entendido. Vuelve a probar.",
             "rate_limited": "Demasiados intentos. Espera un minuto.",
             "too_large": "La grabación es demasiado larga.",

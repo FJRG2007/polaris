@@ -239,6 +239,7 @@
         "micDenied": "Polar can't use your microphone. Allow it for this site in your browser, then try again.",
         "cannotRecord": "This browser can't record audio.",
         "errors": {
+            "no_voice_provider": "Polar can't hear you without an OpenAI or Google AI key.",
             "transcribe_failed": "That didn't come through. Try again.",
             "rate_limited": "Too many tries. Wait a minute.",
             "too_large": "That recording is too long.",

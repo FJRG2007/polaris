@@ -6,11 +6,12 @@
  * model ids its types list (`@ai-sdk/openai`, `@ai-sdk/google`): OpenAI first,
  * then Google. The keys are the ones every other call spends
  * (`model-keys.ts`): the person's own first, then the deployment's when it
- * shares them.
+ * shares them, or only the one the person picked to pay for the chat.
  *
  * Server-only.
  */
 
+import type { Payer } from "@/lib/polar/shared";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { SpeechModel, TranscriptionModel } from "ai";
@@ -46,15 +47,34 @@ const VOICE_PROVIDERS: readonly VoiceProvider[] = [
     }
 ];
 
-/** The first voice provider this person holds a key for. */
-async function voiceProviderFor(
-    userId: string
-): Promise<{ provider: VoiceProvider; credential: ChatCredential } | null> {
+type FoundVoice = { provider: VoiceProvider; credential: ChatCredential };
+
+/** A call asks for every sentence: the provider and key found for one are
+ *  reused for the next few seconds instead of read again from the key store. */
+const FOUND_TTL_MS = 30_000;
+const FOUND_MOST = 1000;
+const found = new Map<string, { at: number; value: FoundVoice }>();
+
+/** The first voice provider this person holds a key for, spending only the
+ *  payer's key when they picked who pays. */
+async function voiceProviderFor(userId: string, payer: Payer | null): Promise<FoundVoice | null> {
+    const key = `${userId}:${payer ?? ""}`;
+    const now = Date.now();
+    const cached = found.get(key);
+    if (cached && now - cached.at < FOUND_TTL_MS) return cached.value;
+    found.delete(key);
     const sources = await keySourcesFor(userId);
     for (const provider of VOICE_PROVIDERS) {
         if (!sources.has(provider.slug)) continue;
-        const credential = await chatCredentialFor(userId, provider.slug);
-        if (credential) return { provider, credential };
+        const credential = await chatCredentialFor(userId, provider.slug, payer);
+        if (!credential) continue;
+        const value = { provider, credential };
+        for (const [entry, { at }] of found) {
+            if (found.size < FOUND_MOST && now - at < FOUND_TTL_MS) break;
+            found.delete(entry);
+        }
+        found.set(key, { at: now, value });
+        return value;
     }
     return null;
 }
@@ -72,13 +92,16 @@ export async function polarVoiceAvailability(userId: string): Promise<VoiceAvail
 }
 
 /** The transcription model for this person, or null without a provider. */
-export async function polarTranscriber(userId: string): Promise<TranscriptionModel | null> {
-    const found = await voiceProviderFor(userId);
-    if (!found) return null;
-    const apiKey = found.credential.secret;
-    return found.provider.slug === "openai"
-        ? createOpenAI({ apiKey }).transcription(found.provider.transcription)
-        : createGoogle({ apiKey }).transcription(found.provider.transcription);
+export async function polarTranscriber(
+    userId: string,
+    payer: Payer | null = null
+): Promise<TranscriptionModel | null> {
+    const voice = await voiceProviderFor(userId, payer);
+    if (!voice) return null;
+    const apiKey = voice.credential.secret;
+    return voice.provider.slug === "openai"
+        ? createOpenAI({ apiKey }).transcription(voice.provider.transcription)
+        : createGoogle({ apiKey }).transcription(voice.provider.transcription);
 }
 
 export interface PolarSpeaker {
@@ -89,11 +112,14 @@ export interface PolarSpeaker {
 }
 
 /** The speech model for this person, or null without a provider. */
-export async function polarSpeaker(userId: string): Promise<PolarSpeaker | null> {
-    const found = await voiceProviderFor(userId);
-    if (!found) return null;
-    const apiKey = found.credential.secret;
-    const { provider } = found;
+export async function polarSpeaker(
+    userId: string,
+    payer: Payer | null = null
+): Promise<PolarSpeaker | null> {
+    const voice = await voiceProviderFor(userId, payer);
+    if (!voice) return null;
+    const apiKey = voice.credential.secret;
+    const { provider } = voice;
     const model =
         provider.slug === "openai"
             ? createOpenAI({ apiKey }).speech(provider.speech)

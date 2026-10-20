@@ -142,6 +142,33 @@ describe("the dictation button", () => {
             type: "audio/webm"
         });
     });
+
+    it("spends the key of whoever was picked to pay", async () => {
+        const fetch = vi.fn(
+            async () => new Response(JSON.stringify({ text: "hi" }), { status: 200 })
+        );
+        vi.stubGlobal("fetch", fetch);
+        const onText = vi.fn();
+        render(
+            <DictationButton
+                available
+                payer="instance"
+                onText={onText}
+                onNotice={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        act(() =>
+            recorder.onRecorded?.(
+                new File([new Uint8Array([1])], "voice.webm", { type: "audio/webm" }),
+                { durationMs: 900, waveform: "" }
+            )
+        );
+        await waitFor(() => expect(onText).toHaveBeenCalledWith("hi"));
+        expect(fetch.mock.calls[0]?.[0]).toBe(
+            "/api/polar/transcribe?durationMs=900&payer=instance"
+        );
+    });
 });
 
 describe("the voice mode button", () => {

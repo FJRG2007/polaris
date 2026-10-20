@@ -123,6 +123,16 @@ describe("the voice call", () => {
         });
     });
 
+    it("listens again when no key can hear you, instead of staying on transcribing", () => {
+        const heard = run([{ type: "speech-start" }, { type: "speech-end" }]);
+        expect(heard.phase).toBe("transcribing");
+        for (const error of ["no_voice_provider", "no_speech_provider", "speak_failed"] as const) {
+            const failed = callReducer(heard, { type: "failed", error });
+            expect(failed).toMatchObject({ phase: "listening", error });
+            expect(micOpen(failed)).toBe(true);
+        }
+    });
+
     it("ignores everything once ended", () => {
         const ended = run([{ type: "speech-start" }, { type: "end" }]);
         expect(ended.ended).toBe(true);

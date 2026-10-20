@@ -44,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!bytes) return refuse("too_large", 413);
     if (bytes.byteLength === 0) return refuse("invalid", 400);
 
-    const model = await polarTranscriber(user.id);
+    const model = await polarTranscriber(user.id, query.data.payer);
     if (!model) return refuse("no_voice_provider", 409);
     try {
         const result = await transcribe({ model, audio: bytes, abortSignal: request.signal });
