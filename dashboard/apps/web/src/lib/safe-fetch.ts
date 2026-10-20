@@ -341,7 +341,10 @@ export async function configuredRequest(
     const request = {
         ...(rest as Parameters<typeof guardedFetch>[1]),
         redirect: "manual" as const,
-        signal: AbortSignal.timeout(timeoutMs ?? 20_000),
+        // The caller's own signal still cancels it; the timeout bounds it either way.
+        signal: rest.signal
+            ? AbortSignal.any([rest.signal, AbortSignal.timeout(timeoutMs ?? 20_000)])
+            : AbortSignal.timeout(timeoutMs ?? 20_000),
         ...(options.allowPrivate ? {} : { dispatcher })
     };
     // undici's Response is the platform's in every way a caller reads it; the
