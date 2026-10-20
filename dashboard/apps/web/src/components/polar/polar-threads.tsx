@@ -372,7 +372,7 @@ function IconButton({
 
 /** A "shared with you" row: drawn like a chat's own row. */
 const SHARED_ROW =
-    "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "flex w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function NavRow({
     icon: Icon,
