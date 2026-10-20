@@ -1181,5 +1181,109 @@
             "load": "Load",
             "loadValue": "{avg}% avg, {max}% max"
         }
+    },
+    "nas": {
+        "heading": "NAS",
+        "back": "All NAS",
+        "none": "No NAS is connected. Add one in Drive.",
+        "openDrive": "Open in Drive",
+        "backups": "Backups app",
+        "share": "Share",
+        "unreachable": "The NAS did not answer. Check that it is on and reachable.",
+        "place": {
+            "label": "Place",
+            "none": "No place",
+            "failed": "The NAS could not be moved"
+        },
+        "tabs": {
+            "overview": "Overview",
+            "storage": "Storage",
+            "backups": "Backups"
+        },
+        "status": {
+            "model": "Model",
+            "firmware": "Firmware",
+            "uptime": "Uptime",
+            "cpuTemp": "CPU temp",
+            "memory": "Memory",
+            "usage": "Usage",
+            "health": "Health",
+            "healthy": "Healthy",
+            "atrisk": "At risk",
+            "protection": "Protection",
+            "unprotected": "Not protected"
+        },
+        "fan": {
+            "label": "Fan mode",
+            "quiet": "Quiet",
+            "balanced": "Balanced",
+            "cooling": "Cooling",
+            "unknown": "Not known",
+            "saved": "Fan mode set",
+            "failed": "The fan mode could not be changed"
+        },
+        "bays": {
+            "title": "Drives",
+            "bay": "Bay",
+            "drive": "Drive",
+            "status": "Status",
+            "temperature": "Temp",
+            "powerOn": "Power-on",
+            "size": "Size",
+            "pool": "Pool",
+            "serial": "Serial",
+            "noDrive": "No drive",
+            "optimal": "Optimal",
+            "notOptimal": "Needs attention",
+            "allDisks": "All disks",
+            "allDisksValue": "{count} drives, {min} to {max}, {hours} h on average",
+            "columns": "Columns",
+            "filterStatus": "Status",
+            "filterTemp": "Temperature",
+            "filterPool": "Pool",
+            "any": "Any",
+            "empty": "Empty bays",
+            "cool": "Under 40 C",
+            "warm": "40 to 50 C",
+            "hot": "Over 50 C",
+            "noMatch": "No bay matches these filters."
+        },
+        "chart": {
+            "temperature": "Disk temperature",
+            "bays": "Temperature per bay",
+            "usage": "Usage",
+            "cpu": "CPU",
+            "hottest": "Hottest disk",
+            "average": "Disk average",
+            "bay": "Bay {bay}",
+            "empty": "No readings yet. They are taken every five minutes.",
+            "noThroughput": "Disk throughput is not shown: the console does not report it to Polaris."
+        },
+        "ranges": {
+            "1h": "1 h",
+            "1d": "1 d",
+            "1w": "1 w",
+            "1m": "1 m"
+        },
+        "tasks": {
+            "title": "Backup tasks",
+            "none": "This NAS has no backup tasks.",
+            "unavailable": "The backup tasks could not be read.",
+            "run": "Run now",
+            "running": "Started",
+            "failed": "The task could not be started",
+            "lastRun": "Last run",
+            "nextRun": "Next run",
+            "never": "Never",
+            "ok": "Succeeded",
+            "error": "Failed",
+            "overdue": "Overdue",
+            "scheduleOff": "Schedule off"
+        },
+        "units": {
+            "celsius": "{value} C",
+            "hours": "{value} h",
+            "percent": "{value}%"
+        }
     }
 }

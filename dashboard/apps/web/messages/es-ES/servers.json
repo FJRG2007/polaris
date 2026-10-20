@@ -1181,5 +1181,109 @@
             "load": "Carga",
             "loadValue": "{avg}% media, {max}% máx."
         }
+    },
+    "nas": {
+        "heading": "NAS",
+        "back": "Todos",
+        "none": "No hay ningún NAS. Añade uno en Drive.",
+        "openDrive": "Abrir Drive",
+        "backups": "App Copias",
+        "share": "Prestar",
+        "unreachable": "El NAS no respondió. Comprueba que está encendido y accesible.",
+        "place": {
+            "label": "Lugar",
+            "none": "Sin lugar",
+            "failed": "No se pudo mover el NAS"
+        },
+        "tabs": {
+            "overview": "Resumen",
+            "storage": "Discos",
+            "backups": "Copias"
+        },
+        "status": {
+            "model": "Modelo",
+            "firmware": "Firmware",
+            "uptime": "Activo",
+            "cpuTemp": "Temp. CPU",
+            "memory": "Memoria",
+            "usage": "Uso",
+            "health": "Estado",
+            "healthy": "Correcto",
+            "atrisk": "En riesgo",
+            "protection": "Protección",
+            "unprotected": "Sin proteger"
+        },
+        "fan": {
+            "label": "Ventilador",
+            "quiet": "Silencio",
+            "balanced": "Equilibrado",
+            "cooling": "Refrigerar",
+            "unknown": "Sin datos",
+            "saved": "Modo aplicado",
+            "failed": "No se pudo cambiar el modo del ventilador"
+        },
+        "bays": {
+            "title": "Discos",
+            "bay": "Bahía",
+            "drive": "Disco",
+            "status": "Estado",
+            "temperature": "Temp.",
+            "powerOn": "Encendido",
+            "size": "Tamaño",
+            "pool": "Grupo",
+            "serial": "Serie",
+            "noDrive": "Sin disco",
+            "optimal": "Óptimo",
+            "notOptimal": "Revisar",
+            "allDisks": "Todos",
+            "allDisksValue": "{count} discos, de {min} a {max}, {hours} h de media",
+            "columns": "Columnas",
+            "filterStatus": "Estado",
+            "filterTemp": "Temperatura",
+            "filterPool": "Grupo",
+            "any": "Todos",
+            "empty": "Bahías vacías",
+            "cool": "Menos de 40 C",
+            "warm": "De 40 a 50 C",
+            "hot": "Más de 50 C",
+            "noMatch": "Ninguna bahía coincide con estos filtros."
+        },
+        "chart": {
+            "temperature": "Temp. de discos",
+            "bays": "Temp. por bahía",
+            "usage": "Uso",
+            "cpu": "CPU",
+            "hottest": "Más caliente",
+            "average": "Media discos",
+            "bay": "Bahía {bay}",
+            "empty": "Aún no hay lecturas. Se toman cada cinco minutos.",
+            "noThroughput": "No se muestra el tráfico de disco: la consola no se lo da a Polaris."
+        },
+        "ranges": {
+            "1h": "1 h",
+            "1d": "1 d",
+            "1w": "1 s",
+            "1m": "1 m"
+        },
+        "tasks": {
+            "title": "Copias",
+            "none": "Este NAS no tiene copias programadas.",
+            "unavailable": "No se pudieron leer las copias.",
+            "run": "Lanzar",
+            "running": "Iniciada",
+            "failed": "No se pudo iniciar la copia",
+            "lastRun": "Última",
+            "nextRun": "Próxima",
+            "never": "Nunca",
+            "ok": "Correcta",
+            "error": "Fallida",
+            "overdue": "Atrasada",
+            "scheduleOff": "Sin horario"
+        },
+        "units": {
+            "celsius": "{value} C",
+            "hours": "{value} h",
+            "percent": "{value} %"
+        }
     }
 }

@@ -12,18 +12,14 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import type { UnasMetrics } from "@/lib/unifi-unas";
+import { NAS_RANGES, NAS_RANGE_MS, type NasRange } from "./nas-view";
 
-export const NAS_RANGES = ["1h", "1d", "1w", "1m"] as const;
-export type NasRange = (typeof NAS_RANGES)[number];
+export { NAS_RANGES, NAS_RANGE_MS, type NasRange } from "./nas-view";
+
 export const nasRangeSchema = z.enum(NAS_RANGES);
 
 const HOUR_MS = 60 * 60 * 1000;
-export const NAS_RANGE_MS: Record<NasRange, number> = {
-    "1h": HOUR_MS,
-    "1d": 24 * HOUR_MS,
-    "1w": 7 * 24 * HOUR_MS,
-    "1m": 30 * 24 * HOUR_MS
-};
+
 /** One more than the widest range, so 1M never starts on a hole. */
 export const NAS_SAMPLE_RETENTION_DAYS = 31;
 /** The most points one series is drawn with. */

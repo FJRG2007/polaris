@@ -1159,6 +1159,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["ups", "sai", "battery", "power", "outage", "nut", "snmp", "shutdown"]
         },
         {
+            // A NAS connected in Drive, seen as the box in a place: its drives,
+            // temperatures, fans and backups. Its files stay in Drive.
+            label: "NAS", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/nas",
+            icon: HardDrive,
+            keywords: ["nas", "unas", "unifi", "disks", "drives", "raid", "backup", "fan"]
+        },
+        {
             label: "Automations", // i18n-ignore
             group: DEVICES_GROUP,
             href: "/places/devices/automations",
