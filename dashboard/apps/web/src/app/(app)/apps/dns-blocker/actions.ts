@@ -21,6 +21,7 @@ import { installApp } from "@/lib/apps/install-service";
 import { DNS_BLOCKER_APP, type DnsSettings } from "@/lib/dns-blocker/settings";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { networkDevices, type NetworkDevice } from "@/lib/dns-blocker/devices";
+import { dnsHistoryInputSchema, type DnsHistory } from "@/lib/dns-blocker/history";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -262,6 +263,17 @@ export async function dnsDevicesAction(
             blocker.readSettings()
         ]);
         return { devices: networkDevices(seen.devices, settings), logOff: seen.logOff };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** The finished days of a range, added up from the rows kept for the long term. */
+export async function dnsHistoryAction(input: unknown): Promise<Result<{ history: DnsHistory }>> {
+    await requireAdmin();
+    try {
+        const { range } = dnsHistoryInputSchema.parse(input);
+        return { history: await insights.dnsHistory(range) };
     } catch (error) {
         return failed(error);
     }

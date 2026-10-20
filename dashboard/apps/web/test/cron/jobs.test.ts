@@ -122,6 +122,8 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would each redeploy the ad blocker's DNS server after a
             // daylight-saving change.
             "dns-blocker-clock",
+            // Two passes would each read the same days of log from the DNS server.
+            "dns-blocker-history",
             // A cutover's steps each claim their phase first, so a second pass does
             // nothing; it would only ask the public resolvers twice.
             "dns-cutovers",

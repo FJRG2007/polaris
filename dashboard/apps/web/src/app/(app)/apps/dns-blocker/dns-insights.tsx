@@ -66,13 +66,13 @@ import {
     turnOnDnsBlockerAction
 } from "./actions";
 
-type Translate = ReturnType<typeof useTranslations<"dnsBlocker">>;
+export type Translate = ReturnType<typeof useTranslations<"dnsBlocker">>;
 
 /** Pause presets in seconds; 0 is until resumed. */
 const PAUSES = [10, 30, 300, 900, 3600, 0] as const;
 const LIVE_EVERY_MS = 3000;
-const ALLOWED_COLOR = "hsl(var(--primary))";
-const BLOCKED_COLOR = "hsl(var(--danger))";
+export const ALLOWED_COLOR = "hsl(var(--primary))";
+export const BLOCKED_COLOR = "hsl(var(--danger))";
 
 const EMPTY_FILTER: QueryFilter = {
     search: "",
@@ -129,13 +129,13 @@ function viaLabel(t: Translate, via: string): string {
     return via;
 }
 
-function listLabel(t: Translate, list: string): string {
+export function listLabel(t: Translate, list: string): string {
     if (list === "polaris") return t("insights.ownList");
     const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
     return t.has(key) ? t(key) : list;
 }
 
-function points(counts: readonly number[], timeline: QueryTimeline) {
+export function points(counts: readonly number[], timeline: QueryTimeline) {
     return counts.map((v, index) => ({
         t: timeline.from + index * timeline.bucketMs,
         v
@@ -767,7 +767,7 @@ export function Figure({
     );
 }
 
-function ChartBlock({
+export function ChartBlock({
     title,
     series,
     timeline,
@@ -820,7 +820,7 @@ function ChartBlock({
     );
 }
 
-function ShareList({
+export function ShareList({
     title,
     items,
     total,
@@ -887,7 +887,7 @@ function ShareList({
     );
 }
 
-function TopList({
+export function TopList({
     title,
     items,
     names,

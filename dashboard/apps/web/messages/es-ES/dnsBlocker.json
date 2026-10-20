@@ -270,10 +270,18 @@
         "removeService": "Dejar de bloquear {name}"
     },
     "history": {
-        "title": "Historial y nombres",
+        "title": "Historial de un año",
         "days": "Días de consultas guardados",
         "namesFrom": "Router con nombres de equipos",
-        "namesFromHint": "Su dirección. Así los dispositivos se muestran por nombre en vez de por dirección. Déjalo vacío para ver direcciones."
+        "namesFromHint": "Su dirección. Así los dispositivos se muestran por nombre en vez de por dirección. Déjalo vacío para ver direcciones.",
+        "intro": "Cada día terminado, guardado un año. Hoy está en la tarjeta de arriba.",
+        "empty": "Los días aparecen aquí cuando cada uno termina.",
+        "perDay": "Consultas por día",
+        "ranges": {
+            "30d": "30 días",
+            "90d": "90 días",
+            "365d": "1 año"
+        }
     },
     "routerGuide": {
         "brand": "Tu router",

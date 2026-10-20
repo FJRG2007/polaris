@@ -22,6 +22,23 @@ vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     turnOnDnsBlockerAction,
     dnsInsightsAction,
     dnsClientsAction: async () => ({ clients: [], logOff: false }),
+    dnsHistoryAction: async () => ({
+        history: {
+            days: 30,
+            queries: 0,
+            blocked: 0,
+            blockedPercent: 0,
+            timeline: { from: 0, bucketMs: 86_400_000, allowed: [], blocked: [] },
+            topPermitted: [],
+            topBlocked: [],
+            topClients: [],
+            topBlockedClients: [],
+            blockedBy: [],
+            clientNames: []
+        }
+    }),
+    dnsDevicesAction: async () => ({ devices: [], logOff: false }),
+    dnsLookupAction: async () => ({ error: "x" }),
     pauseDnsBlockingAction: async () => ({}),
     dnsListsAction: async () => ({ metrics: null }),
     dnsTailAction: async () => ({ rows: [] }),

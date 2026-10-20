@@ -9,9 +9,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const readFile = vi.fn();
 const runIn = vi.fn();
 const engineConfigCurrent = vi.fn(async () => true);
+const days = {
+    deleteMany: vi.fn(async () => ({ count: 0 })),
+    findMany: vi.fn(async (): Promise<{ day: Date }[]> => []),
+    createMany: vi.fn(async () => ({ count: 1 }))
+};
 
 vi.mock("@polaris/db", () => ({
-    prisma: { application: { findUnique: async () => ({ target: {} }) } }
+    prisma: {
+        application: { findUnique: async () => ({ target: {} }) },
+        dnsBlockerDay: days
+    }
 }));
 vi.mock("@/lib/dns-blocker/service", () => ({
     DnsBlockerRefusal: class DnsBlockerRefusal extends Error {
@@ -20,12 +28,15 @@ vi.mock("@/lib/dns-blocker/service", () => ({
         }
     },
     engineRow: async () => ({ id: "e", ownerId: "o", applicationId: "a", status: "running" }),
-    engineConfigCurrent
+    engineConfigCurrent,
+    readSettings: async () => ({ logDays: 2 })
 }));
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ({ readFile, runIn }) }));
 vi.mock("@/lib/container-files-service", () => ({ resolveContainerName: async () => "engine" }));
 
-const { dnsInsights, engineMetrics, tailQueries } = await import("@/lib/dns-blocker/insights");
+const { dnsInsights, engineMetrics, lookupName, rollUpHistory, tailQueries } = await import(
+    "@/lib/dns-blocker/insights"
+);
 const { queryFilterSchema } = await import("@/lib/dns-blocker/query-log");
 
 const LINE = [
@@ -163,5 +174,67 @@ describe("engineMetrics", () => {
     it("is null when the engine predates its metrics", async () => {
         runIn.mockResolvedValue({ code: 1, output: "wget: server returned error: HTTP/1.1 404" });
         expect(await engineMetrics()).toBeNull();
+    });
+});
+
+describe("rollUpHistory", () => {
+    const NOW = Date.parse("2026-10-18T05:00:00Z");
+    const line = (time: string, type: string) =>
+        [time, "10.0.0.2", "10.0.0.2", "3", "BLOCKED (ads)", "ads.com.", "0.0.0.0", "NOERROR", type, "A", "x"].join("	");
+
+    it("rolls up the finished days it has no row for, and prunes past a year", async () => {
+        days.findMany.mockResolvedValueOnce([{ day: new Date("2026-10-16T00:00:00Z") }]);
+        readFile.mockImplementation(async (_container: string, path: string) => {
+            if (path.includes("2026-10-17"))
+                return file(`${line("2026-10-17 03:10:00", "BLOCKED")}
+${line("2026-10-17 23:59:00", "RESOLVED")}
+`);
+            throw new Error("missing");
+        });
+        const result = await rollUpHistory(NOW);
+        // logDays 2 looks back three days: the 17th is read, the 16th is held,
+        // the 15th has no file.
+        expect(readFile.mock.calls.map((call) => call[1])).toEqual([
+            "/logs/2026-10-17_ALL.log",
+            "/logs/2026-10-15_ALL.log"
+        ]);
+        expect(result.added).toBe(1);
+        const [{ data, skipDuplicates }] = days.createMany.mock.calls.at(-1) as unknown as [
+            { data: Record<string, unknown>[]; skipDuplicates: boolean }
+        ];
+        expect(skipDuplicates).toBe(true);
+        expect(data[0]).toMatchObject({ queries: 2, blocked: 1, clients: 1 });
+        const hourly = data[0]?.hourly as [number, number][];
+        expect(hourly).toHaveLength(24);
+        expect(hourly[3]).toEqual([0, 1]);
+        expect(hourly[23]).toEqual([1, 0]);
+        expect(days.deleteMany).toHaveBeenCalledWith({
+            where: { day: { lt: new Date("2025-10-18T00:00:00Z") } }
+        });
+    });
+});
+
+describe("lookupName", () => {
+    it("asks the query API with the name as an argument, never a shell", async () => {
+        runIn.mockResolvedValueOnce({
+            code: 0,
+            output: JSON.stringify({
+                reason: "BLOCKED (ads)",
+                response: "A (0.0.0.0)",
+                responseType: "BLOCKED",
+                returnCode: "NOERROR"
+            })
+        });
+        const lookup = await lookupName("ads.example.com");
+        expect(lookup).toMatchObject({ outcome: "blocked", list: "ads" });
+        const args = runIn.mock.calls.at(-1)?.[1] as string[];
+        expect(args[0]).toBe("wget");
+        expect(args).not.toContain("sh");
+        expect(args).toContain(JSON.stringify({ query: "ads.example.com", type: "A" }));
+    });
+
+    it("says the engine is not answering for anything that is not its answer", async () => {
+        runIn.mockResolvedValueOnce({ code: 1, output: "wget: connection refused" });
+        await expect(lookupName("example.com")).rejects.toThrow("notAnswering");
     });
 });

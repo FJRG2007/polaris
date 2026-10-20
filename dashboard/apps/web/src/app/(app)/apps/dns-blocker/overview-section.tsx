@@ -20,6 +20,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DnsBlockerState } from "@/lib/dns-blocker/service";
 import { useDnsBlocker } from "./dns-blocker-context";
 import { DnsInsightsCard } from "./dns-insights";
+import { DnsHistoryCard } from "./history-card";
 import { RouterDnsGuide, type RouterBrandOption } from "./router-dns-guide";
 
 const STATE_TONE: Record<DnsBlockerState, "success" | "warning" | "danger" | "neutral"> = {
@@ -186,6 +187,7 @@ export function DnsOverviewSection({ brands }: { brands: RouterBrandOption[] }) 
                     refreshHours={saved.refreshHours}
                 />
             ) : null}
+            {state === "blocking" ? <DnsHistoryCard /> : null}
 
             {state !== "blocking" ? (
                 <Card>

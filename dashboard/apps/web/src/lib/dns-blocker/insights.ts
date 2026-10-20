@@ -9,9 +9,21 @@
  * published to the network.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import type { RuntimePorts } from "@polaris/deploy";
-import { DnsBlockerRefusal, engineConfigCurrent, engineRow } from "./service";
+import { DnsBlockerRefusal, engineConfigCurrent, engineRow, readSettings } from "./service";
+import {
+    DNS_HISTORY_BACKFILL_DAYS,
+    DNS_HISTORY_DAYS,
+    DNS_HISTORY_RANGES,
+    dayRow,
+    dayWindow,
+    finishedDays,
+    historyFrom,
+    utcDay,
+    type DnsHistory,
+    type DnsHistoryRange
+} from "./history";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { resolveContainerName } from "@/lib/container-files-service";
 import {
@@ -308,4 +320,80 @@ export async function dnsBlockerSummary(fresh = false): Promise<DnsBlockerSummar
         hourly: hourlyFrom(insights.stats),
         pause: insights.pause
     };
+}
+
+/**
+ * Fold every finished day the DNS server's log still holds, and Polaris has
+ * no row for, into one row a day, then drop the rows past the history kept.
+ * Run by the `dns-blocker-history` job; a day already rolled up costs one
+ * indexed read, and a day is read one file at a time.
+ */
+export async function rollUpHistory(now = Date.now()): Promise<{ added: number; pruned: number }> {
+    const { count: pruned } = await prisma.dnsBlockerDay.deleteMany({
+        where: { day: { lt: new Date(utcDay(now) - DNS_HISTORY_DAYS * 86_400_000) } }
+    });
+    let target: Engine;
+    try {
+        target = await engine();
+    } catch (error) {
+        if (error instanceof DnsBlockerRefusal) return { added: 0, pruned };
+        throw error;
+    }
+    const settings = await readSettings();
+    const days = finishedDays(now, Math.min(settings.logDays + 1, DNS_HISTORY_BACKFILL_DAYS));
+    const held = await prisma.dnsBlockerDay.findMany({
+        where: { day: { gte: new Date(days[days.length - 1] ?? now) } },
+        select: { day: true }
+    });
+    const done = new Set(held.map((row) => utcDay(row.day.getTime())));
+    const { page: _page, ...filter } = queryFilterSchema.parse({});
+    let added = 0;
+    for (const day of days) {
+        if (done.has(day)) continue;
+        const reader = new QueryLogReader(filter, dayWindow(day));
+        if (!(await readLog(target, queryLogPath(new Date(day)), reader))) continue;
+        const row = dayRow(day, reader.stats());
+        const { count } = await prisma.dnsBlockerDay.createMany({
+            data: [
+                {
+                    ...row,
+                    hourly: row.hourly as Prisma.InputJsonValue,
+                    topPermitted: row.topPermitted as Prisma.InputJsonValue,
+                    topBlocked: row.topBlocked as Prisma.InputJsonValue,
+                    topClients: row.topClients as Prisma.InputJsonValue,
+                    topBlockedClients: row.topBlockedClients as Prisma.InputJsonValue,
+                    blockedBy: row.blockedBy as Prisma.InputJsonValue
+                }
+            ],
+            // Two passes at once write the same day once.
+            skipDuplicates: true
+        });
+        added += count;
+    }
+    return { added, pruned };
+}
+
+/** The days of a range, added up, for the Overview's long-term card. */
+export async function dnsHistory(range: DnsHistoryRange, now = Date.now()): Promise<DnsHistory> {
+    const from = utcDay(now) - DNS_HISTORY_RANGES[range] * 86_400_000;
+    const rows = await prisma.dnsBlockerDay.findMany({
+        where: { day: { gte: new Date(from) } },
+        orderBy: { day: "asc" },
+        select: {
+            day: true,
+            queries: true,
+            blocked: true,
+            clients: true,
+            topPermitted: true,
+            topBlocked: true,
+            topClients: true,
+            topBlockedClients: true,
+            blockedBy: true
+        }
+    });
+    return historyFrom(
+        rows.map((row) => ({ ...row, hourly: [] })),
+        range,
+        now
+    );
 }

@@ -311,6 +311,7 @@
         "web/src/app/(app)/apps/dns-blocker/local-dns-section.tsx",
         "web/src/app/(app)/apps/dns-blocker/local-dns/page.tsx",
         "web/src/app/(app)/apps/dns-blocker/log-section.tsx",
+        "web/src/app/(app)/apps/dns-blocker/history-card.tsx",
         "web/src/app/(app)/apps/dns-blocker/lookup-card.tsx",
         "web/src/app/(app)/apps/dns-blocker/network-card.tsx",
         "web/src/app/(app)/apps/dns-blocker/log/page.tsx",

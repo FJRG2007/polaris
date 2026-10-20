@@ -270,10 +270,18 @@
         "removeService": "Stop blocking {name}"
     },
     "history": {
-        "title": "History and device names",
+        "title": "Long-term statistics",
         "days": "Days of lookups to keep",
         "namesFrom": "Router that knows device names",
-        "namesFromHint": "Its address. Devices then show by name instead of address. Leave empty to show addresses."
+        "namesFromHint": "Its address. Devices then show by name instead of address. Leave empty to show addresses.",
+        "intro": "Each finished day, kept for a year. Today is in the card above.",
+        "empty": "Days show up here once each one has ended.",
+        "perDay": "Lookups per day",
+        "ranges": {
+            "30d": "30 days",
+            "90d": "90 days",
+            "365d": "1 year"
+        }
     },
     "routerGuide": {
         "brand": "Your router",
