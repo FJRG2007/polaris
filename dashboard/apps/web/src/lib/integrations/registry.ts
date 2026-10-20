@@ -24,12 +24,7 @@ export type { FreeTier } from "@/lib/integrations/model-providers";
  * server at Steam.
  */
 export type IntegrationCategory =
-    | "Security"
-    | "OAuth apps"
-    | "Networking"
-    | "Games"
-    | "Chat"
-    | "Models";
+    "Security" | "OAuth apps" | "Networking" | "Games" | "Chat" | "Models";
 
 /** The order the screen shows them in, and the line under each heading. Security
  *  first because it is the one group that is about refusing things rather than

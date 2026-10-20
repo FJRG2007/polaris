@@ -27,7 +27,8 @@ const state = {
 };
 
 vi.mock("@/lib/polar/usage", () => ({
-    polarLimitReached: async () => (state.overLimit ? { used: 10, amount: 5, period: "day" } : null),
+    polarLimitReached: async () =>
+        state.overLimit ? { used: 10, amount: 5, period: "day" } : null,
     recordPolarUsage: async (input: Record<string, unknown>) => {
         state.recorded.push(input);
     }
@@ -153,7 +154,9 @@ describe("POST /api/polar/transcribe", () => {
 
     it("hears with the model picked in the menu, and refuses one that is not a pick", async () => {
         const picked = "durationMs=1200&model=groq/whisper-large-v3";
-        expect((await transcribeRoute.POST(recording(undefined, undefined, picked))).status).toBe(200);
+        expect((await transcribeRoute.POST(recording(undefined, undefined, picked))).status).toBe(
+            200
+        );
         expect(state.models).toEqual(["groq/whisper-large-v3"]);
         const bad = `durationMs=1200&model=${encodeURIComponent("groq/../etc passwd")}`;
         expect((await transcribeRoute.POST(recording(undefined, undefined, bad))).status).toBe(400);
@@ -164,7 +167,9 @@ describe("POST /api/polar/transcribe", () => {
     it("records each transcription's length, the provider's when it reports one", async () => {
         await transcribeRoute.POST(recording(undefined, undefined, "durationMs=1200"));
         state.duration = 4.2;
-        await transcribeRoute.POST(recording(undefined, undefined, "durationMs=1200&payer=instance"));
+        await transcribeRoute.POST(
+            recording(undefined, undefined, "durationMs=1200&payer=instance")
+        );
         expect(state.recorded).toEqual([
             expect.objectContaining({
                 provider: "groq",

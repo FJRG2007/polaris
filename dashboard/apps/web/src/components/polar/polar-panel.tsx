@@ -1703,8 +1703,8 @@ export function PolarChat({
                                 {voiceNotice === "unavailable"
                                     ? t("voice.unavailable")
                                     : voiceNotice === "micDenied" ||
-                                      voiceNotice === "cannotRecord" ||
-                                      voiceNotice === "modelNotSaved"
+                                        voiceNotice === "cannotRecord" ||
+                                        voiceNotice === "modelNotSaved"
                                       ? t(`voice.${voiceNotice}`)
                                       : t(`voice.errors.${voiceNotice}`)}
                             </span>

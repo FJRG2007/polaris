@@ -76,13 +76,14 @@ export const SPEECH_PROVIDER_SEEDS: readonly SpeechProviderSeed[] = [
 ];
 
 /** The speech providers as key-dialog entries, after the model providers. */
-export const SEEDED_SPEECH_INTEGRATIONS: readonly IntegrationCatalogEntry[] = SPEECH_PROVIDER_SEEDS.map((seed) => ({
-    slug: seed.slug,
-    name: seed.name,
-    category: "Models" as const,
-    summary: seed.summary,
-    description: `Connects your ${seed.name} account so Polar can turn what you say into text. The key is held here and never copied into your repositories. Usage is billed by ${seed.name} directly.`, // i18n-ignore
-    docsUrl: seed.docsUrl,
-    setupLinks: [{ label: "Create an API key", url: seed.keyUrl }], // i18n-ignore
-    requiresApiKey: true
-}));
+export const SEEDED_SPEECH_INTEGRATIONS: readonly IntegrationCatalogEntry[] =
+    SPEECH_PROVIDER_SEEDS.map((seed) => ({
+        slug: seed.slug,
+        name: seed.name,
+        category: "Models" as const,
+        summary: seed.summary,
+        description: `Connects your ${seed.name} account so Polar can turn what you say into text. The key is held here and never copied into your repositories. Usage is billed by ${seed.name} directly.`, // i18n-ignore
+        docsUrl: seed.docsUrl,
+        setupLinks: [{ label: "Create an API key", url: seed.keyUrl }], // i18n-ignore
+        requiresApiKey: true
+    }));

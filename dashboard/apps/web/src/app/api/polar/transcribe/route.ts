@@ -63,7 +63,8 @@ export async function POST(request: Request): Promise<Response> {
         });
         // The provider's own length when it reports one, the browser's otherwise.
         const seconds =
-            typeof result.durationInSeconds === "number" && Number.isFinite(result.durationInSeconds)
+            typeof result.durationInSeconds === "number" &&
+            Number.isFinite(result.durationInSeconds)
                 ? result.durationInSeconds
                 : query.data.durationMs / 1000;
         await recordPolarUsage({

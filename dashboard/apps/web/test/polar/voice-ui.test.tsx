@@ -20,8 +20,7 @@ const recorder = {
     stop: vi.fn(),
     cancel: vi.fn(),
     onRecorded: null as
-        | null
-        | ((file: File, sound: { durationMs: number; waveform: string }) => void)
+        null | ((file: File, sound: { durationMs: number; waveform: string }) => void)
 };
 let recordable = true;
 
@@ -37,9 +36,8 @@ vi.mock("@/app/(app)/chat/voice-recorder", () => ({
     }
 }));
 
-const { DictationButton, VoiceCall, VoiceModeButton } = await import(
-    "@/components/polar/polar-voice"
-);
+const { DictationButton, VoiceCall, VoiceModeButton } =
+    await import("@/components/polar/polar-voice");
 
 beforeEach(() => {
     recorder.recording = false;

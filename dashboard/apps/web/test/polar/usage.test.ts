@@ -145,7 +145,13 @@ describe("polarLimitReached", () => {
 
     it("counts transcribed audio toward the token ceiling", async () => {
         state.rules = [
-            { subjectType: "everyone", subjectId: "", metric: "tokens", period: "day", amount: 3200 }
+            {
+                subjectType: "everyone",
+                subjectId: "",
+                metric: "tokens",
+                period: "day",
+                amount: 3200
+            }
         ];
         state.audioSeconds = 100;
         expect(AUDIO_TOKENS_PER_SECOND).toBe(32);

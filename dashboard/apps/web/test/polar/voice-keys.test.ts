@@ -34,7 +34,8 @@ vi.mock("@/lib/agents/model-keys", () => ({
     },
     chatCredentialFor: async (_userId: string, provider: string, payer: string | null) => {
         state.asked.push({ provider, payer });
-        if (payer === "instance" && (!state.instanceKey || state.ownOnly.has(provider))) return null;
+        if (payer === "instance" && (!state.instanceKey || state.ownOnly.has(provider)))
+            return null;
         return { provider, source: payer ?? "own", secret: "sk-fixture", baseUrl: null };
     }
 }));

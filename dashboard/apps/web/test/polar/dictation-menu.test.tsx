@@ -72,7 +72,9 @@ describe("the dictation menu", () => {
         fireEvent.click(await screen.findByRole("menuitem", { name: /Model/ }));
         const groq = await screen.findByRole("group", { name: "Groq" });
         const openai = screen.getByRole("group", { name: "OpenAI" });
-        expect(groq.compareDocumentPosition(openai) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(
+            groq.compareDocumentPosition(openai) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
         const whisper = screen.getByRole("menuitem", { name: "Whisper" });
         expect(checked(whisper)).toBe(true);
         expect(checked(screen.getByRole("menuitem", { name: "Whisper Large v3 Turbo" }))).toBe(
@@ -106,7 +108,9 @@ describe("the dictation menu", () => {
         fireEvent.click(await screen.findByRole("menuitem", { name: /^Microphone$/ }));
         expect(await screen.findByRole("menuitem", { name: "Microphone 1" })).toBeTruthy();
         expect(checked(screen.getByRole("menuitem", { name: "System default" }))).toBe(true);
-        fireEvent.click(screen.getByRole("menuitem", { name: "Allow the microphone to see names" }));
+        fireEvent.click(
+            screen.getByRole("menuitem", { name: "Allow the microphone to see names" })
+        );
         await waitFor(() =>
             expect(screen.getByText("Blocked. Allow it in the browser.")).toBeTruthy()
         );

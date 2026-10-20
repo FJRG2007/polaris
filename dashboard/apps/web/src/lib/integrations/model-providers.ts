@@ -90,7 +90,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         keyUrl: "https://console.mistral.ai/api-keys",
         probe: "https://api.mistral.ai/v1/models",
         defaultModel: { label: "Mistral Medium", slug: "mistral/mistral-medium-2508" }, // i18n-ignore
-        free: { kind: "free", note: "An experiment tier that needs no card, rate limited rather than metered." }
+        free: {
+            kind: "free",
+            note: "An experiment tier that needs no card, rate limited rather than metered."
+        }
     },
     {
         slug: "zai",
@@ -124,7 +127,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         keyUrl: "https://dashboard.cohere.com/api-keys",
         probe: "https://api.cohere.com/v1/models",
         defaultModel: { label: "Command A (Cohere)", slug: "cohere/command-a-03-2025" }, // i18n-ignore
-        free: { kind: "trial", note: "A trial key with a monthly call allowance, for evaluating rather than running on." }
+        free: {
+            kind: "trial",
+            note: "A trial key with a monthly call allowance, for evaluating rather than running on."
+        }
     },
     {
         slug: "llama",
@@ -187,7 +193,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Its own models beside the open ones, on one key.",
         docsUrl: "https://docs.arcee.ai",
         probe: "https://api.arcee.ai/api/v1/models",
-        defaultModel: { label: "DeepSeek V4 Flash (Arcee)", slug: "arcee/deepseek/deepseek-v4-flash-latest" }, // i18n-ignore
+        defaultModel: {
+            label: "DeepSeek V4 Flash (Arcee)", // i18n-ignore
+            slug: "arcee/deepseek/deepseek-v4-flash-latest"
+        },
         free: { kind: "free", note: "A model kept free to use, with no card." }
     },
     {
@@ -405,7 +414,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://www.scaleway.com/en/docs/generative-apis/",
         keyUrl: "https://console.scaleway.com/iam/api-keys",
         probe: "https://api.scaleway.ai/v1/models",
-        defaultModel: { label: "Qwen3 235B (Scaleway)", slug: "scaleway/qwen3-235b-a22b-instruct-2507" }, // i18n-ignore
+        defaultModel: {
+            label: "Qwen3 235B (Scaleway)", // i18n-ignore
+            slug: "scaleway/qwen3-235b-a22b-instruct-2507"
+        },
         free: { kind: "trial", note: "A block of tokens for new accounts." }
     },
     {
@@ -493,7 +505,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "Open models with dedicated capacity behind them.",
         docsUrl: "https://docs.gmicloud.ai/inference-engine/api-reference/llm-api-reference",
         probe: "https://api.gmi-serving.com/v1/models",
-        defaultModel: { label: "DeepSeek V4 Pro (GMI)", slug: "gmicloud/deepseek-ai/DeepSeek-V4-Pro" } // i18n-ignore
+        defaultModel: {
+            label: "DeepSeek V4 Pro (GMI)", // i18n-ignore
+            slug: "gmicloud/deepseek-ai/DeepSeek-V4-Pro"
+        }
     },
     {
         slug: "io-net",
@@ -582,7 +597,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         summary: "An open-source router you can also host yourself.",
         docsUrl: "https://llmgateway.io/docs",
         keyUrl: "https://llmgateway.io/dashboard",
-        defaultModel: { label: "Grok 4.1 Fast (LLM Gateway)", slug: "llmgateway/grok-4-1-fast-reasoning" }, // i18n-ignore
+        defaultModel: {
+            label: "Grok 4.1 Fast (LLM Gateway)", // i18n-ignore
+            slug: "llmgateway/grok-4-1-fast-reasoning"
+        },
         free: { kind: "free", note: "A free tier on the hosted router." }
     },
     {
@@ -699,8 +717,10 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
 
 /** The sentence that says what kind of thing a provider is. */
 const KIND_SENTENCE: Record<ProviderKind, (name: string) => string> = {
-    lab: (name) => `Connects your ${name} account so agents can run on the models it trains and serves itself.`,
-    host: (name) => `Connects ${name}, which serves open models on its own hardware rather than training them.`,
+    lab: (name) =>
+        `Connects your ${name} account so agents can run on the models it trains and serves itself.`,
+    host: (name) =>
+        `Connects ${name}, which serves open models on its own hardware rather than training them.`,
     gateway: (name) =>
         `Routes agent runs through ${name}, which serves models from several providers behind one credential.`
 };
@@ -715,20 +735,23 @@ function describe(seed: ModelProviderSeed): string {
         seed.kind === "gateway"
             ? `Usage is billed by ${seed.name} directly.`
             : `Usage is billed by ${seed.name} directly, and Polaris adds nothing to that bill.`;
-    return [KIND_SENTENCE[seed.kind](seed.name), HANDLING, billing, seed.free?.note].filter(Boolean).join(" ");
+    return [KIND_SENTENCE[seed.kind](seed.name), HANDLING, billing, seed.free?.note]
+        .filter(Boolean)
+        .join(" ");
 }
 
 /** The tail as marketplace entries, for the registry to append to the nine it
  *  writes out by hand. */
-export const SEEDED_MODEL_INTEGRATIONS: readonly IntegrationCatalogEntry[] = MODEL_PROVIDER_SEEDS.map((seed) => ({
-    slug: seed.slug,
-    name: seed.name,
-    category: "Models" as const,
-    summary: seed.summary,
-    description: describe(seed),
-    docsUrl: seed.docsUrl,
-    setupLinks: seed.keyUrl ? [{ label: "Create an API key", url: seed.keyUrl }] : undefined, // i18n-ignore
-    requiresApiKey: true,
-    defaultModel: seed.defaultModel,
-    freeTier: seed.free
-}));
+export const SEEDED_MODEL_INTEGRATIONS: readonly IntegrationCatalogEntry[] =
+    MODEL_PROVIDER_SEEDS.map((seed) => ({
+        slug: seed.slug,
+        name: seed.name,
+        category: "Models" as const,
+        summary: seed.summary,
+        description: describe(seed),
+        docsUrl: seed.docsUrl,
+        setupLinks: seed.keyUrl ? [{ label: "Create an API key", url: seed.keyUrl }] : undefined, // i18n-ignore
+        requiresApiKey: true,
+        defaultModel: seed.defaultModel,
+        freeTier: seed.free
+    }));

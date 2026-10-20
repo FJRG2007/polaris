@@ -139,7 +139,10 @@ export async function polarVoiceAvailability(
 }
 
 /** The AI SDK transcription model for one catalogue entry. */
-export function transcriptionModelFor(option: TranscriptionOption, apiKey: string): TranscriptionModel {
+export function transcriptionModelFor(
+    option: TranscriptionOption,
+    apiKey: string
+): TranscriptionModel {
     switch (option.provider) {
         case "groq":
             return createGroq({ apiKey }).transcription(option.model);

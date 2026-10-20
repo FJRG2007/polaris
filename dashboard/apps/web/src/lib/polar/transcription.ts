@@ -128,7 +128,9 @@ export function transcriptionId(provider: string, model: string): string {
 }
 
 /** Every model a key is held for, grouped by provider in the catalogue's order. */
-export function transcriptionOptions(providers: { has(slug: string): boolean }): TranscriptionOption[] {
+export function transcriptionOptions(providers: {
+    has(slug: string): boolean;
+}): TranscriptionOption[] {
     return TRANSCRIPTION_PROVIDERS.filter((provider) => providers.has(provider.slug)).flatMap(
         (provider) =>
             provider.models.map((model) => ({

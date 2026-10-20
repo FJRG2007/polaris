@@ -136,14 +136,16 @@ export function DictationButton({
     const [transcribing, setTranscribing] = useState(false);
     const recorder = useVoiceRecording((file, sound) => {
         setTranscribing(true);
-        void transcribeAudio(file, sound.durationMs, payer, undefined, transcriber).then((result) => {
-            setTranscribing(false);
-            if ("text" in result) {
-                if (result.text) onText(result.text);
-            } else {
-                onNotice(result.error === "no_voice_provider" ? "unavailable" : result.error);
+        void transcribeAudio(file, sound.durationMs, payer, undefined, transcriber).then(
+            (result) => {
+                setTranscribing(false);
+                if ("text" in result) {
+                    if (result.text) onText(result.text);
+                } else {
+                    onNotice(result.error === "no_voice_provider" ? "unavailable" : result.error);
+                }
             }
-        });
+        );
     });
     const notice = useRef(onNotice);
     notice.current = onNotice;
@@ -240,7 +242,12 @@ export function DictationMenu({
     for (const option of transcribers) {
         const group = groups.find((entry) => entry.provider === option.provider);
         if (group) group.options.push(option);
-        else groups.push({ provider: option.provider, name: option.providerName, options: [option] });
+        else
+            groups.push({
+                provider: option.provider,
+                name: option.providerName,
+                options: [option]
+            });
     }
     const current = transcribers.find((option) => option.id === transcriber);
 
@@ -275,12 +282,21 @@ export function DictationMenu({
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                         <Mic />
-                        <span className="min-w-0 flex-1 truncate">{t("voice.menu.microphone")}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                            {t("voice.menu.microphone")}
+                        </span>
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-64">
                         <DropdownMenuItem onSelect={() => setMicDevice(null)}>
-                            <Check className={cn("size-3.5", chosen === null ? "opacity-100" : "opacity-0")} />
-                            <span className="min-w-0 truncate">{t("voice.menu.systemDefault")}</span>
+                            <Check
+                                className={cn(
+                                    "size-3.5",
+                                    chosen === null ? "opacity-100" : "opacity-0"
+                                )}
+                            />
+                            <span className="min-w-0 truncate">
+                                {t("voice.menu.systemDefault")}
+                            </span>
                         </DropdownMenuItem>
                         {devices.map((device) => (
                             <DropdownMenuItem key={device.id} onSelect={() => choose(device.id)}>
@@ -334,7 +350,9 @@ export function DictationMenu({
                                         <Check
                                             className={cn(
                                                 "size-3.5",
-                                                option.id === transcriber ? "opacity-100" : "opacity-0"
+                                                option.id === transcriber
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
                                             )}
                                         />
                                         <span className="min-w-0 truncate" title={option.label}>
