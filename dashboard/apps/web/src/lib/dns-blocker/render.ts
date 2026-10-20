@@ -18,6 +18,8 @@ import {
     DNS_CHECK_NAME,
     DNS_LIST_SOURCES,
     DNS_UPSTREAM_PRESETS,
+    dnsServiceList,
+    dnsServicesInUse,
     type DnsCategory,
     type DnsSettings
 } from "./settings";
@@ -65,9 +67,21 @@ export function blockyConfig(
     for (const source of DNS_LIST_SOURCES)
         if (enabled.has(source.id)) add(source.category, source.url);
     for (const list of settings.customLists) add(list.category, list.url);
+    // One list per service some device blocks, so a group or a schedule can
+    // name it; a service whose names were never downloaded has none.
+    for (const id of dnsServicesInUse(settings)) {
+        const names = settings.serviceDomains[id] ?? [];
+        if (names.length > 0) denylists[dnsServiceList(id)] = [inline(names)];
+    }
+    const servicesOf = (ids: readonly string[]) =>
+        ids.map(dnsServiceList).filter((list) => denylists[list]);
     denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
 
-    const groups = [...DNS_CATEGORIES.filter((category) => denylists[category]), OWN_GROUP];
+    const groups = [
+        ...DNS_CATEGORIES.filter((category) => denylists[category]),
+        ...servicesOf(settings.services),
+        OWN_GROUP
+    ];
     const clientGroupsBlock: Record<string, string[]> = { default: groups };
     // A device in a group blocks that group's categories (of the ones that
     // have a list) and the operator's own names, which hold the check name.
@@ -77,6 +91,7 @@ export function blockyConfig(
             ...DNS_CATEGORIES.filter(
                 (category) => denylists[category] && group.categories.includes(category)
             ),
+            ...servicesOf(group.services ?? []),
             OWN_GROUP
         ];
         for (const client of group.clients) clientGroupsBlock[client] ??= blocks;

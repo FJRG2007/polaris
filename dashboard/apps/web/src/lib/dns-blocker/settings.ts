@@ -123,6 +123,66 @@ export const DNS_LIST_SOURCES: readonly DnsListSource[] = [
     }
 ];
 
+/** How the blocked services are grouped on the screen. */
+export const DNS_SERVICE_GROUPS = ["social", "messaging", "video", "games", "other"] as const;
+export type DnsServiceGroup = (typeof DNS_SERVICE_GROUPS)[number];
+
+/** A service that can be blocked by name, each its own list in the engine. */
+export interface DnsService {
+    /** The service's id in the public registry its domains are read from. */
+    readonly id: string;
+    readonly name: string;
+    readonly group: DnsServiceGroup;
+}
+
+/**
+ * The services offered as switches. Only names and ids live here: the domains
+ * each one uses are downloaded from AdGuard's public services registry when the
+ * settings are saved (`services-registry.ts`), and stored with them. Every id
+ * was checked to be in that registry before it was written here.
+ */
+export const DNS_SERVICES: readonly DnsService[] = [
+    { id: "facebook", name: "Facebook", group: "social" },
+    { id: "instagram", name: "Instagram", group: "social" },
+    { id: "tiktok", name: "TikTok", group: "social" },
+    { id: "snapchat", name: "Snapchat", group: "social" },
+    { id: "twitter", name: "X (Twitter)", group: "social" },
+    { id: "reddit", name: "Reddit", group: "social" },
+    { id: "pinterest", name: "Pinterest", group: "social" },
+    { id: "linkedin", name: "LinkedIn", group: "social" },
+    { id: "tumblr", name: "Tumblr", group: "social" },
+    { id: "bluesky", name: "Bluesky", group: "social" },
+    { id: "whatsapp", name: "WhatsApp", group: "messaging" },
+    { id: "telegram", name: "Telegram", group: "messaging" },
+    { id: "discord", name: "Discord", group: "messaging" },
+    { id: "signal", name: "Signal", group: "messaging" },
+    { id: "youtube", name: "YouTube", group: "video" },
+    { id: "netflix", name: "Netflix", group: "video" },
+    { id: "twitch", name: "Twitch", group: "video" },
+    { id: "disneyplus", name: "Disney+", group: "video" },
+    { id: "hbomax", name: "HBO Max", group: "video" },
+    { id: "amazon_streaming", name: "Prime Video", group: "video" },
+    { id: "spotify", name: "Spotify", group: "video" },
+    { id: "roblox", name: "Roblox", group: "games" },
+    { id: "epic_games", name: "Epic Games (Fortnite)", group: "games" },
+    { id: "minecraft", name: "Minecraft", group: "games" },
+    { id: "steam", name: "Steam", group: "games" },
+    { id: "playstation", name: "PlayStation", group: "games" },
+    { id: "xboxlive", name: "Xbox Live", group: "games" },
+    { id: "nintendo", name: "Nintendo", group: "games" },
+    { id: "leagueoflegends", name: "League of Legends", group: "games" },
+    { id: "chatgpt", name: "ChatGPT", group: "other" },
+    { id: "tinder", name: "Tinder", group: "other" },
+    { id: "onlyfans", name: "OnlyFans", group: "other" }
+];
+
+const SERVICE_IDS: ReadonlySet<string> = new Set(DNS_SERVICES.map((service) => service.id));
+
+/** The engine's list group for a service. */
+export function dnsServiceList(id: string): string {
+    return `service-${id}`;
+}
+
 /** A resolver the blocker forwards allowed names to. */
 export interface DnsUpstreamPreset {
     readonly id: string;
@@ -171,6 +231,8 @@ export const DNS_LIMITS = {
     forwards: 50,
     groupClients: 50,
     schedules: 20,
+    /** Names one service may block; the largest in the registry has under 500. */
+    serviceDomains: 1000,
     /** Days of lookups the engine keeps, which is as far back as the screen reads. */
     logDays: 30
 } as const;
@@ -402,7 +464,14 @@ const clientSchema = z.string().transform((value, ctx) => {
 export const dnsClientGroupSchema = z.object({
     name: z.string().trim().min(1).max(40),
     clients: z.array(clientSchema).min(1).max(DNS_LIMITS.groupClients),
-    categories: z.array(z.enum(DNS_CATEGORIES)).max(DNS_CATEGORIES.length)
+    categories: z.array(z.enum(DNS_CATEGORIES)).max(DNS_CATEGORIES.length),
+    /** Services this group blocks besides its categories. Missing on a group
+     *  saved before services existed. */
+    services: z
+        .array(z.string().max(64))
+        .max(DNS_SERVICES.length)
+        .default([])
+        .transform((ids) => [...new Set(ids)].filter((id) => SERVICE_IDS.has(id)))
 });
 
 export const dnsCustomListSchema = z.object({
@@ -455,6 +524,14 @@ export const dnsSettingsSchema = z.object({
         .string()
         .trim()
         .refine((value) => value === "" || isTimeZone(value), "invalidTimeZone"),
+    /** Services blocked for every device, by id from `DNS_SERVICES`. */
+    services: z.array(z.string().max(64)).max(DNS_SERVICES.length),
+    /** The names each service blocks, downloaded when the settings were saved.
+     *  Written by the save path only, never taken from the screen. */
+    serviceDomains: z.record(
+        z.string().max(64),
+        z.array(z.string().max(256)).max(DNS_LIMITS.serviceDomains)
+    ),
     /** The router asked for device names (reverse lookups), or "" for none. */
     namesFrom: z
         .string()
@@ -489,6 +566,8 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     youtube: "off",
     schedules: [],
     timeZone: "",
+    services: [],
+    serviceDomains: {},
     namesFrom: ""
 };
 
@@ -501,6 +580,23 @@ export function dnsListedCategories(
     for (const source of DNS_LIST_SOURCES)
         if (settings.sources.includes(source.id)) on.add(source.category);
     return DNS_CATEGORIES.filter((category) => on.has(category));
+}
+
+/** Every service some device blocks: for everybody, or in a group. */
+export function dnsServicesInUse(
+    settings: Pick<DnsSettings, "services" | "clientGroups">
+): string[] {
+    const ids = new Set(settings.services);
+    for (const group of settings.clientGroups) for (const id of group.services ?? []) ids.add(id);
+    return DNS_SERVICES.map((service) => service.id).filter((id) => ids.has(id));
+}
+
+/** Every list a schedule can switch: the categories with a list on, then the
+ *  services in use. */
+export function dnsSchedulableLists(
+    settings: Pick<DnsSettings, "sources" | "customLists" | "services" | "clientGroups">
+): string[] {
+    return [...dnsListedCategories(settings), ...dnsServicesInUse(settings).map(dnsServiceList)];
 }
 
 /**
@@ -541,6 +637,18 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         youtube: field("youtube"),
         schedules: field("schedules"),
         timeZone: field("timeZone"),
+        services: field("services").filter((id) => SERVICE_IDS.has(id)),
+        serviceDomains: Object.fromEntries(
+            Object.entries(field("serviceDomains"))
+                .filter(([id]) => SERVICE_IDS.has(id))
+                .map(([id, names]) => [
+                    id,
+                    names.flatMap((name) => {
+                        const rule = normalizeDnsRule(name);
+                        return rule && !rule.startsWith("/") ? [rule] : [];
+                    })
+                ])
+        ),
         namesFrom: field("namesFrom")
     };
 }

@@ -29,6 +29,7 @@ import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
 import { encodeBlockyConfig } from "./render";
 import { DNS_CHECK_NAME } from "./settings";
+import { resolveServiceNames } from "./services-registry";
 import { installApp, uninstallApp } from "@/lib/apps/install-service";
 import { answerBlocks, probeDns, tcpListening, type DnsProbeAnswer } from "./probe";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
@@ -55,7 +56,9 @@ export type DnsRefusalCode =
     | "portBusy"
     | "notApplied"
     | "notRunning"
-    | "notAnswering";
+    | "notAnswering"
+    | "servicesOffline"
+    | "servicesMissing";
 
 export class DnsBlockerRefusal extends Error {
     constructor(readonly code: DnsRefusalCode) {
@@ -261,11 +264,27 @@ async function apply(
     }
 }
 
+/** The services' names for the settings, or the refusal that says why not. */
+async function serviceNamesOrRefuse(
+    settings: DnsSettings,
+    kept: Record<string, string[]>
+): Promise<Record<string, string[]>> {
+    const resolved = await resolveServiceNames(settings, kept);
+    if ("refusal" in resolved) throw new DnsBlockerRefusal(resolved.refusal);
+    return resolved.names;
+}
+
 /** Store new settings, and apply them at once when the blocker is on. Refused
  *  with `notApplied` when they were stored but the DNS server did not take them. */
 export async function saveSettings(input: unknown, actorId: string): Promise<DnsSettings> {
     const row = await requireApp();
-    const settings = readDnsSettings(dnsSettingsSchema.parse(input));
+    // The services' names are this path's to write, never the screen's.
+    const parsed = readDnsSettings({
+        ...dnsSettingsSchema.omit({ serviceDomains: true }).parse(input),
+        serviceDomains: {}
+    });
+    const kept = readDnsSettings(readInstallConfig(row.config)[CONFIG_KEY]).serviceDomains;
+    const settings = { ...parsed, serviceDomains: await serviceNamesOrRefuse(parsed, kept) };
     const encoded = encodedConfig(settings);
     await patchInstallConfig(row.id, { [CONFIG_KEY]: settings });
     const engine = await engineRow();

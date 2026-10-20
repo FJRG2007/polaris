@@ -322,3 +322,42 @@ describe("DnsBlockerView schedules", () => {
         await waitFor(() => expect(turnOnDnsBlockerAction).toHaveBeenCalled());
     });
 });
+
+describe("DnsBlockerView blocked services", () => {
+    it("turns a service on, and offers it to schedules once it is on", async () => {
+        standing("off");
+        render(
+            <MessagesWrapper>
+                <DnsBlockerView initial={{ ...dns.DEFAULT_DNS_SETTINGS, sources: [] }} brands={[]} />
+            </MessagesWrapper>
+        );
+        await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
+        expect(screen.getByText("Turn on a list above to schedule it.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("switch", { name: "YouTube" }));
+        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false);
+        const section = within(screen.getByText("Schedules").closest("div")!.parentElement!);
+        expect(section.getByRole("switch", { name: "YouTube" })).toBeTruthy();
+    });
+});
+
+describe("DnsBlockerView unchanged settings", () => {
+    it("keeps Save off for stored settings with services, schedules and groups", async () => {
+        standing("off");
+        const initial = dns.readDnsSettings({
+            sources: ["hagezi-social"],
+            services: ["youtube"],
+            serviceDomains: { youtube: ["*.youtube.com"] },
+            schedules: [{ lists: ["social"], days: ["mon"], start: "21:00", end: "07:00" }],
+            timeZone: "Europe/Madrid",
+            clientGroups: [{ name: "Kids", clients: ["10.0.0.9"], categories: [] }]
+        });
+        render(
+            <MessagesWrapper>
+                <DnsBlockerView initial={initial} brands={[]} />
+            </MessagesWrapper>
+        );
+        await waitFor(() => expect(document.querySelector("[aria-busy='true']")).toBeNull());
+        expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByText("Mon, 21:00 - 07:00")).toBeTruthy();
+    });
+});

@@ -157,7 +157,9 @@
         "invalid": "Some values are not valid. Fix the marked fields and save again.",
         "generic": "That did not work. Try again in a moment.",
         "notRunning": "The DNS server is not running. Turn blocking on first.",
-        "notAnswering": "The DNS server did not answer. Wait a moment and try again."
+        "notAnswering": "The DNS server did not answer. Wait a moment and try again.",
+        "servicesOffline": "Could not download the services' domains, so nothing was saved. Check this machine's internet connection and save again.",
+        "servicesMissing": "Some services are no longer in the public list, so nothing was saved. Turn them off and save again."
     },
     "insights": {
         "title": "Activity",
@@ -260,7 +262,9 @@
         "name": "Group name",
         "namePlaceholder": "Kids' tablets",
         "clients": "Devices: an address, a range or a name, one per line",
-        "add": "Add group"
+        "add": "Add group",
+        "addService": "Block a service too",
+        "removeService": "Stop blocking {name}"
     },
     "history": {
         "title": "History and device names",
@@ -356,5 +360,18 @@
         "fri": "Fri",
         "sat": "Sat",
         "sun": "Sun"
+    },
+    "services": {
+        "title": "Blocked services",
+        "intro": "Block an app or site by name for every device, or only for a device group. Its domains are downloaded from AdGuard's public list when you save.",
+        "search": "Search services",
+        "none": "No service matches.",
+        "groups": {
+            "social": "Social networks",
+            "messaging": "Messaging",
+            "video": "Video and music",
+            "games": "Games",
+            "other": "Other"
+        }
     }
 }

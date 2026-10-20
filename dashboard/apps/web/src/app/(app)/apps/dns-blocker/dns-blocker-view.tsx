@@ -10,7 +10,7 @@
  * off until the values differ from what was loaded.
  */
 
-import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
     Badge,
@@ -91,6 +91,11 @@ function browserTimeZone(): string {
     }
 }
 
+/** A service's name by id, or the id when it is no longer offered. */
+function serviceName(id: string): string {
+    return dns.DNS_SERVICES.find((service) => service.id === id)?.name ?? id;
+}
+
 /** Addresses, a range and a name pattern, as typed into a group. */
 const GROUP_CLIENTS_EXAMPLE = "192.168.1.20\n192.168.1.64/26\nkids-*"; // i18n-ignore example values
 
@@ -130,6 +135,8 @@ export function DnsBlockerView({
     const [groupName, setGroupName] = useState("");
     const [groupClients, setGroupClients] = useState("");
     const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
+    const [groupServices, setGroupServices] = useState<string[]>([]);
+    const [services, setServices] = useState<string[]>(initial.services);
     const [logDays, setLogDays] = useState(String(initial.logDays));
     const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
     const [devices, setDevices] = useState(initial.devices);
@@ -232,9 +239,14 @@ export function DnsBlockerView({
             forwards,
             safeSearch,
             youtube,
+            // In the order `readDnsSettings` returns, which is what `dirty`
+            // compares against.
             schedules,
             // The zone is only worth storing with something written in it.
             timeZone: schedules.length > 0 ? timeZone : saved.timeZone,
+            services,
+            // Written by the save path; carried so an unchanged form compares equal.
+            serviceDomains: saved.serviceDomains,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -254,6 +266,8 @@ export function DnsBlockerView({
             safeSearch,
             youtube,
             schedules,
+            services,
+            saved.serviceDomains,
             timeZone,
             saved.timeZone,
             namesFrom
@@ -296,9 +310,14 @@ export function DnsBlockerView({
         : (newDevice.error.issues.find((issue) =>
               issue.path[0] === "name" ? deviceName.trim() !== "" : deviceAddress.trim() !== ""
           )?.message ?? null);
-    const listed = dns.dnsListedCategories({ sources, customLists });
+    const listed = dns.dnsSchedulableLists({ sources, customLists, services, clientGroups });
+    /** What a list group is called on the screen: a category or a service. */
+    const listName = (list: string): string =>
+        (dns.DNS_CATEGORIES as readonly string[]).includes(list)
+            ? t(`categories.${list as dns.DnsCategory}`)
+            : serviceName(list.replace(/^service-/, ""));
     const newSchedule = dns.dnsScheduleSchema.safeParse({
-        lists: scheduleLists.filter((list) => (listed as string[]).includes(list)),
+        lists: scheduleLists.filter((list) => listed.includes(list)),
         days: scheduleDays,
         start: scheduleWhole ? "" : scheduleStart,
         end: scheduleWhole ? "" : scheduleEnd
@@ -313,7 +332,8 @@ export function DnsBlockerView({
     const newGroup = dns.dnsClientGroupSchema.safeParse({
         name: groupName,
         clients: lines(groupClients),
-        categories: groupCategories
+        categories: groupCategories,
+        services: groupServices
     });
 
     function save(): void {
@@ -867,6 +887,48 @@ export function DnsBlockerView({
 
             <Card>
                 <CardHeader>
+                    <CardTitle>{t("services.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("services.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-4">
+                    {dns.DNS_SERVICE_GROUPS.map((group) => (
+                        <div key={group} className="flex flex-col gap-2">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {t(`services.groups.${group}`)}
+                            </h4>
+                            <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {dns.DNS_SERVICES.filter((service) => service.group === group).map(
+                                    (service) => (
+                                        <label
+                                            key={service.id}
+                                            className="flex min-w-0 items-center gap-2 text-sm"
+                                        >
+                                            <Switch
+                                                checked={services.includes(service.id)}
+                                                onChange={(on: boolean) =>
+                                                    setServices((current) =>
+                                                        on
+                                                            ? [...current, service.id]
+                                                            : current.filter(
+                                                                  (id) => id !== service.id
+                                                              )
+                                                    )
+                                                }
+                                            />
+                                            <span className="truncate" title={service.name}>
+                                                {service.name}
+                                            </span>
+                                        </label>
+                                    )
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <CardTitle>{t("forwards.title")}</CardTitle>
                     <p className="text-xs text-muted-foreground">{t("forwards.intro")}</p>
                 </CardHeader>
@@ -1054,11 +1116,14 @@ export function DnsBlockerView({
                                     {group.clients.join(", ")}
                                 </span>
                                 <span className="truncate text-xs">
-                                    {group.categories.length === 0
+                                    {group.categories.length + group.services.length === 0
                                         ? t("groups.nothing")
-                                        : group.categories
-                                              .map((category) => t(`categories.${category}`))
-                                              .join(", ")}
+                                        : [
+                                              ...group.categories.map((category) =>
+                                                  t(`categories.${category}`)
+                                              ),
+                                              ...group.services.map(serviceName)
+                                          ].join(", ")}
                                 </span>
                             </div>
                             <Button
@@ -1108,6 +1173,43 @@ export function DnsBlockerView({
                                 </label>
                             ))}
                         </div>
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <SearchableSelect
+                                className="w-full sm:w-64"
+                                value=""
+                                placeholder={t("groups.addService")}
+                                aria-label={t("groups.addService")}
+                                searchPlaceholder={t("services.search")}
+                                emptyText={t("services.none")}
+                                onValueChange={(id) =>
+                                    setGroupServices((current) =>
+                                        current.includes(id) ? current : [...current, id]
+                                    )
+                                }
+                                options={dns.DNS_SERVICES.filter(
+                                    (service) => !groupServices.includes(service.id)
+                                ).map((service) => ({ value: service.id, label: service.name }))}
+                            />
+                            {groupServices.map((id) => (
+                                <Button
+                                    key={id}
+                                    size="xs"
+                                    variant="secondary"
+                                    aria-label={t("groups.removeService", {
+                                        name: serviceName(id)
+                                    })}
+                                    title={t("groups.removeService", { name: serviceName(id) })}
+                                    onClick={() =>
+                                        setGroupServices((current) =>
+                                            current.filter((item) => item !== id)
+                                        )
+                                    }
+                                >
+                                    {serviceName(id)}
+                                    <X />
+                                </Button>
+                            ))}
+                        </div>
                         <div>
                             <Button
                                 size="sm"
@@ -1122,6 +1224,7 @@ export function DnsBlockerView({
                                     setGroupName("");
                                     setGroupClients("");
                                     setGroupCategories([]);
+                                    setGroupServices([]);
                                 }}
                             >
                                 <Plus />
@@ -1142,14 +1245,11 @@ export function DnsBlockerView({
                         <p className="text-sm text-muted-foreground">{t("schedules.empty")}</p>
                     ) : null}
                     {schedules.map((schedule, index) => {
-                        const lists = schedule.lists.map((list) => {
-                            const name = (dns.DNS_CATEGORIES as readonly string[]).includes(list)
-                                ? t(`categories.${list as dns.DnsCategory}`)
-                                : list;
-                            return (listed as string[]).includes(list)
-                                ? name
-                                : t("schedules.notOn", { name });
-                        });
+                        const lists = schedule.lists.map((list) =>
+                            listed.includes(list)
+                                ? listName(list)
+                                : t("schedules.notOn", { name: listName(list) })
+                        );
                         const days =
                             schedule.days.length === dns.DNS_WEEKDAYS.length
                                 ? t("schedules.everyDay")
@@ -1193,24 +1293,24 @@ export function DnsBlockerView({
                             <div className="flex flex-col gap-1 text-sm">
                                 <span>{t("schedules.lists")}</span>
                                 <div className="flex flex-wrap gap-x-4 gap-y-2">
-                                    {listed.map((category) => (
+                                    {listed.map((list) => (
                                         <label
-                                            key={category}
+                                            key={list}
                                             className="flex items-center gap-2 text-sm"
                                         >
                                             <Switch
-                                                checked={scheduleLists.includes(category)}
+                                                checked={scheduleLists.includes(list)}
                                                 onChange={(on: boolean) =>
                                                     setScheduleLists((current) =>
                                                         on
-                                                            ? [...current, category]
+                                                            ? [...current, list]
                                                             : current.filter(
-                                                                  (item) => item !== category
+                                                                  (item) => item !== list
                                                               )
                                                     )
                                                 }
                                             />
-                                            <span>{t(`categories.${category}`)}</span>
+                                            <span>{listName(list)}</span>
                                         </label>
                                     ))}
                                 </div>

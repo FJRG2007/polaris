@@ -157,7 +157,9 @@
         "invalid": "Algunos valores no son válidos. Corrige los campos marcados y guarda de nuevo.",
         "generic": "No ha funcionado. Inténtalo de nuevo en un momento.",
         "notRunning": "El servidor DNS no está en marcha. Activa primero el bloqueo.",
-        "notAnswering": "El servidor DNS no ha respondido. Espera un momento y vuelve a intentarlo."
+        "notAnswering": "El servidor DNS no ha respondido. Espera un momento y vuelve a intentarlo.",
+        "servicesOffline": "No se pudieron descargar los dominios de los servicios y no se guardó nada. Revisa la conexión de esta máquina y guarda otra vez.",
+        "servicesMissing": "Algunos servicios ya no están en la lista pública y no se guardó nada. Desactívalos y guarda otra vez."
     },
     "insights": {
         "title": "Actividad",
@@ -260,7 +262,9 @@
         "name": "Nombre",
         "namePlaceholder": "Tablets niños",
         "clients": "Dispositivos: una dirección, un rango o un nombre, uno por línea",
-        "add": "Añadir grupo"
+        "add": "Añadir grupo",
+        "addService": "Bloquear un servicio",
+        "removeService": "Dejar de bloquear {name}"
     },
     "history": {
         "title": "Historial y nombres",
@@ -356,5 +360,18 @@
         "fri": "Vie",
         "sat": "Sáb",
         "sun": "Dom"
+    },
+    "services": {
+        "title": "Servicios bloqueados",
+        "intro": "Bloquea una app o web por nombre en todos los equipos, o solo en un grupo. Sus dominios se descargan de la lista pública de AdGuard al guardar.",
+        "search": "Buscar servicio",
+        "none": "Ningún servicio coincide.",
+        "groups": {
+            "social": "Redes sociales",
+            "messaging": "Mensajería",
+            "video": "Vídeo y música",
+            "games": "Juegos",
+            "other": "Otros"
+        }
     }
 }
