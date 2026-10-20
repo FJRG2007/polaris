@@ -39,6 +39,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    isDirty,
     useToast
 } from "@polaris/ui";
 
@@ -249,8 +250,10 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
     const unchanged =
         field !== null &&
         parsed.success &&
-        parsed.data.label === field.label &&
-        JSON.stringify(parsed.data.options) === JSON.stringify(field.options);
+        !isDirty(
+            { label: field.label, options: field.options },
+            { label: parsed.data.label, options: parsed.data.options }
+        );
     const renames = rows.flatMap((row) =>
         hasOptions(kind) && row.from !== null && row.text.trim() !== ""
             ? [{ from: row.from, to: normalizeLabel(row.text) }]
