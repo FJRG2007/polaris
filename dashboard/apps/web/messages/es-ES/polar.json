@@ -319,7 +319,7 @@
     "settings": {
         "open": "Ajustes de Polar",
         "title": "Ajustes de Polar",
-        "intro": "Lo que Polar recuerda y lo que guardas de tus chats.",
+        "intro": "Lo que Polar recuerda, lo que ves en tus chats y lo que guardas.",
         "memory": {
             "title": "Memoria",
             "intro": "Datos que Polar tiene presentes entre chats. Pídele recordar u olvidar algo, o edítalos aquí.",
@@ -348,6 +348,16 @@
             "title": "Tus chats",
             "intro": "Descarga todos los chats guardados en Markdown y JSON en un zip.",
             "exportAll": "Exportar todo"
+        },
+        "display": {
+            "title": "Vista del chat",
+            "intro": "Lo que muestran tus chats y cuándo compactan.",
+            "showTokens": "Tokens en las respuestas",
+            "showCost": "Coste estimado",
+            "showContextBar": "Barra de contexto",
+            "autoCompact": "Compactar automáticamente",
+            "autoCompactHint": "Cerca del límite del modelo, se resumen los mensajes antiguos antes de enviar.",
+            "failed": "No se pudo guardar el ajuste. Prueba otra vez."
         }
     },
     "temporary": {
@@ -430,7 +440,11 @@
             "day": "día",
             "week": "semana",
             "month": "30 días"
-        }
+        },
+        "breakdownInput": "Entrada: {count}",
+        "breakdownCached": "Entrada en caché: {count}",
+        "breakdownOutput": "Salida: {count}",
+        "breakdownReasoning": "Razonamiento: {count}"
     },
     "sharing": {
         "notice": "{name} compartió un chat de Polar contigo",
@@ -545,6 +559,10 @@
             "ok": "Queda espacio de sobra.",
             "warn": "Se está llenando. Compacta pronto.",
             "over": "No cabe en este modelo. Compacta o elige otro."
-        }
+        },
+        "chat": "Este chat",
+        "chatTotal": "{tokens} tokens en {answers, plural, one {# respuesta} other {# respuestas}}",
+        "chatEmpty": "Este chat aún no ha usado nada.",
+        "chatFailed": "No se pudo cargar el uso de este chat."
     }
 }

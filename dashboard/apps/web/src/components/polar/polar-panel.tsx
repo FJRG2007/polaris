@@ -92,9 +92,10 @@ import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
-import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import { UsageDialog } from "@/components/polar/polar-usage";
 import { CompactionDivider, ContextDialog } from "@/components/polar/polar-context";
+import { AnswerSpendLine, answerSpendOf } from "@/components/polar/polar-display";
 import {
     compactionOf,
     contextUsed,
@@ -102,7 +103,6 @@ import {
     sendableMessages,
     summaryOf
 } from "@/lib/polar/compaction";
-import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
 import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-avatar";
@@ -1963,6 +1963,7 @@ export function PolarChat({
                 <ContextDialog
                     used={contextUsed(chat.messages)}
                     window={windowOf(providers, choice)}
+                    threadId={temporary ? null : threadId}
                     canCompact={canCompact}
                     onCompact={() => {
                         setShowContext(false);
@@ -2136,17 +2137,9 @@ function MessageView({
         workedMs?: number;
         model?: string;
         automatic?: boolean;
-        usage?: { inputTokens?: unknown; outputTokens?: unknown; costUsd?: unknown };
+        usage?: unknown;
     };
-    const locale = useLocale();
-    const spent =
-        typeof meta.usage?.inputTokens === "number" && typeof meta.usage.outputTokens === "number"
-            ? {
-                  input: meta.usage.inputTokens,
-                  output: meta.usage.outputTokens,
-                  cost: typeof meta.usage.costUsd === "number" ? meta.usage.costUsd : null
-              }
-            : null;
+    const spent = answerSpendOf(meta.usage);
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) =>
@@ -2325,20 +2318,7 @@ function MessageView({
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {
                         model: meta.model
                     })}
-                    {spent ? (
-                        <span
-                            className="tabular-nums"
-                            title={t("usage.breakdown", {
-                                input: formatTokens(spent.input, locale),
-                                output: formatTokens(spent.output, locale)
-                            })}
-                        >
-                            {` - ${t("usage.answer", { tokens: formatTokens(spent.input + spent.output, locale) })}`}
-                            {spent.cost !== null
-                                ? ` - ${t("usage.cost", { cost: formatUsd(spent.cost, locale) })}`
-                                : null}
-                        </span>
-                    ) : null}
+                    {spent ? <AnswerSpendLine spent={spent} /> : null}
                 </p>
             ) : null}
             {!streaming ? (

@@ -73,14 +73,6 @@ export async function polarMemoryEnabled(userId: string): Promise<boolean> {
     return row?.memory ?? true;
 }
 
-export async function setPolarMemoryEnabled(userId: string, enabled: boolean): Promise<void> {
-    await prisma.polarPreference.upsert({
-        where: { userId },
-        create: { userId, memory: enabled },
-        update: { memory: enabled }
-    });
-}
-
 export async function listPolarMemories(userId: string): Promise<PolarMemoryView[]> {
     const rows = await prisma.polarMemory.findMany({
         where: { userId },

@@ -7,7 +7,7 @@
  * model's window when one is known.
  */
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ChevronDown, Minimize2 } from "lucide-react";
 import {
     cn,
@@ -16,9 +16,11 @@ import {
     DialogTitle,
     DialogHeader,
     DialogContent,
-    DialogDescription
+    DialogDescription,
+    Skeleton
 } from "@polaris/ui";
-import { formatTokens } from "@/lib/polar/usage-format";
+import type { ThreadUsage } from "@/lib/polar/usage";
+import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { contextFill, type ContextLevel } from "@/lib/polar/compaction";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -70,10 +72,58 @@ export function CompactionDivider({ summary, auto }: { summary: string; auto: bo
     );
 }
 
+/** What the whole chat has spent so far, from the saved answers. A chat that
+ *  was never saved (temporary, or not sent yet) has spent nothing. */
+export function ChatSpend({ threadId }: { threadId: string | null }) {
+    const t = useTranslations("polar");
+    const locale = useLocale();
+    const [state, setState] = useState<ThreadUsage | "empty" | "failed" | null>(
+        threadId ? null : "empty"
+    );
+    useEffect(() => {
+        if (!threadId) return setState("empty");
+        let live = true;
+        void fetch(`/api/polar/threads/${threadId}/usage`)
+            .then(async (response) => {
+                if (response.status === 404) return "empty" as const;
+                return response.ok ? ((await response.json()) as ThreadUsage) : ("failed" as const);
+            })
+            .catch(() => "failed" as const)
+            .then((next) => (live ? setState(next) : undefined));
+        return () => {
+            live = false;
+        };
+    }, [threadId]);
+    const usage = typeof state === "object" && state && state.answers > 0 ? state : null;
+    return (
+        <section className="flex flex-col gap-1">
+            <h3 className="text-sm font-medium text-foreground">{t("contextUsage.chat")}</h3>
+            {state === null ? (
+                <Skeleton className="h-5 w-48" />
+            ) : state === "failed" ? (
+                <p className="text-sm text-muted-foreground">{t("contextUsage.chatFailed")}</p>
+            ) : usage ? (
+                <p className="text-sm tabular-nums text-muted-foreground" data-polar-chat-spend>
+                    {t("contextUsage.chatTotal", {
+                        tokens: formatTokens(usage.inputTokens + usage.outputTokens, locale),
+                        answers: usage.answers
+                    })}
+                    {usage.answers > usage.unpriced
+                        ? ` - ${t("usage.cost", { cost: formatUsd(usage.costUsd, locale) })}`
+                        : null}
+                </p>
+            ) : (
+                <p className="text-sm text-muted-foreground">{t("contextUsage.chatEmpty")}</p>
+            )}
+        </section>
+    );
+}
+
 /** How full the context is, as numbers and a bar, with Compact at hand. */
 export function ContextDialog({
     used,
     window,
+    threadId,
     canCompact,
     onCompact,
     onMonth,
@@ -82,6 +132,8 @@ export function ContextDialog({
 }: {
     used: number;
     window: number | null;
+    /** The chat whose spend is shown; null when it is not saved. */
+    threadId: string | null;
     canCompact: boolean;
     onCompact: () => void;
     onMonth: () => void;
@@ -126,6 +178,7 @@ export function ContextDialog({
                         </p>
                     </div>
                 ) : null}
+                <ChatSpend threadId={threadId} />
                 {children}
                 <div className="flex flex-wrap justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={onMonth}>

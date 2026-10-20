@@ -24,6 +24,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { DisplaySettings } from "@/components/polar/polar-display";
 import { looksSecret, normalizeMemoryText, POLAR_MEMORY_MAX_CHARS } from "@/lib/polar/shared";
 
 export interface MemoryRow {
@@ -429,6 +430,7 @@ export function PolarSettings({
                 </DialogHeader>
                 <div className="flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain pr-1">
                     {open ? <MemorySettings /> : null}
+                    <DisplaySettings />
                     <DataSettings />
                     {children}
                 </div>

@@ -319,7 +319,7 @@
     "settings": {
         "open": "Polar settings",
         "title": "Polar settings",
-        "intro": "What Polar remembers and what you keep from your chats.",
+        "intro": "What Polar remembers, what your chats show, and what you keep.",
         "memory": {
             "title": "Memory",
             "intro": "Facts Polar keeps in mind across chats. Ask it to remember or forget something, or edit them here.",
@@ -348,6 +348,16 @@
             "title": "Your chats",
             "intro": "Download every saved chat as Markdown and JSON in one zip.",
             "exportAll": "Export all chats"
+        },
+        "display": {
+            "title": "Chat display",
+            "intro": "What your chats show, and when they compact.",
+            "showTokens": "Tokens under answers",
+            "showCost": "Estimated cost",
+            "showContextBar": "Context usage bar",
+            "autoCompact": "Compact automatically",
+            "autoCompactHint": "Near the model's limit, older messages are summarized before sending.",
+            "failed": "Couldn't save that setting. Try again."
         }
     },
     "temporary": {
@@ -430,7 +440,11 @@
             "day": "day",
             "week": "week",
             "month": "30 days"
-        }
+        },
+        "breakdownInput": "Input: {count}",
+        "breakdownCached": "Cached input: {count}",
+        "breakdownOutput": "Output: {count}",
+        "breakdownReasoning": "Reasoning: {count}"
     },
     "sharing": {
         "notice": "{name} shared a Polar chat with you",
@@ -545,6 +559,10 @@
             "ok": "Plenty of room left.",
             "warn": "Getting full. Compact soon to keep going.",
             "over": "Doesn't fit this model. Compact or pick a bigger one."
-        }
+        },
+        "chat": "This chat",
+        "chatTotal": "{tokens} tokens in {answers, plural, one {# answer} other {# answers}}",
+        "chatEmpty": "Nothing used in this chat yet.",
+        "chatFailed": "This chat's usage couldn't be loaded."
     }
 }

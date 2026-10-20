@@ -51,6 +51,38 @@ describe("answerUsage", () => {
         ).toEqual({ inputTokens: 1_000_000, outputTokens: 500_000, costUsd: 10.5 });
     });
 
+    it("keeps the cached and reasoning counts only when the provider reports them", () => {
+        const spent = answerUsage(
+            {
+                inputTokens: 1000,
+                outputTokens: 400,
+                inputTokenDetails: {
+                    noCacheTokens: 200,
+                    cacheReadTokens: 800,
+                    cacheWriteTokens: 0
+                },
+                outputTokenDetails: { textTokens: 100, reasoningTokens: 300 }
+            },
+            { costInput: null, costOutput: null }
+        );
+        expect(spent).toMatchObject({ cachedTokens: 800, reasoningTokens: 300 });
+        const plain = answerUsage(
+            {
+                inputTokens: 10,
+                outputTokens: 5,
+                inputTokenDetails: {
+                    noCacheTokens: undefined,
+                    cacheReadTokens: undefined,
+                    cacheWriteTokens: undefined
+                },
+                outputTokenDetails: { textTokens: undefined, reasoningTokens: undefined }
+            },
+            { costInput: null, costOutput: null }
+        );
+        expect(plain).not.toHaveProperty("cachedTokens");
+        expect(plain).not.toHaveProperty("reasoningTokens");
+    });
+
     it("gives no cost when a price is missing, and counts nothing as zero", () => {
         expect(
             answerUsage({ inputTokens: 10, outputTokens: 5 }, { costInput: 3, costOutput: null })
