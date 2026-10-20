@@ -103,9 +103,8 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } = await import(
-    "@/components/polar/polar-panel"
-);
+const { PolarAside, PolarChat, PolarProvider, ownCommandIn, slashMatches } =
+    await import("@/components/polar/polar-panel");
 
 function mount() {
     const view = render(<PolarChat />, { wrapper: MessagesWrapper });

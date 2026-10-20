@@ -412,8 +412,7 @@ const COMMAND_ICONS: Record<Command, SuggestionListItem["icon"]> = {
 
 /** One row of the "/" list: a command of Polar's, or one of the person's own. */
 export type SlashMatch =
-    | { kind: "builtin"; command: Command }
-    | { kind: "own"; row: polarShared.PolarCommandRow };
+    { kind: "builtin"; command: Command } | { kind: "own"; row: polarShared.PolarCommandRow };
 
 /** How well a shortcut answers what was typed after the "/": 0 when it starts
  *  with it, 1 when it holds it, 2 when it holds its letters in order; null when
@@ -444,12 +443,14 @@ export function slashMatches(
     if (!input.startsWith("/") || /\s/.test(input)) return [];
     const query = input.slice(1).toLowerCase();
     return [
-        ...ranked(COMMANDS, (command) => command, query).map(
-            (command): SlashMatch => ({ kind: "builtin", command })
-        ),
-        ...ranked(own, (row) => row.shortcut, query).map(
-            (row): SlashMatch => ({ kind: "own", row })
-        )
+        ...ranked(COMMANDS, (command) => command, query).map((command): SlashMatch => ({
+            kind: "builtin",
+            command
+        })),
+        ...ranked(own, (row) => row.shortcut, query).map((row): SlashMatch => ({
+            kind: "own",
+            row
+        }))
     ];
 }
 
@@ -1102,24 +1103,23 @@ export function PolarChat({
     const commandsFull = commands.commands.length >= polarShared.POLAR_COMMAND_MOST;
     const slashFound = slashMatches(input, commands.commands);
     const slashItems: SuggestionListItem[] = [
-        ...slashFound.map(
-            (match): SuggestionListItem =>
-                match.kind === "builtin"
-                    ? {
-                          key: match.command,
-                          label: `/${match.command}`,
-                          detail: LATER.has(match.command)
-                              ? t("slash.later")
-                              : t(`slash.${match.command}`),
-                          icon: COMMAND_ICONS[match.command],
-                          disabled: LATER.has(match.command)
-                      }
-                    : {
-                          key: `own:${match.row.id}`,
-                          label: `/${match.row.shortcut}`,
-                          detail: polarShared.firstLine(match.row.prompt),
-                          icon: Zap
-                      }
+        ...slashFound.map((match): SuggestionListItem =>
+            match.kind === "builtin"
+                ? {
+                      key: match.command,
+                      label: `/${match.command}`,
+                      detail: LATER.has(match.command)
+                          ? t("slash.later")
+                          : t(`slash.${match.command}`),
+                      icon: COMMAND_ICONS[match.command],
+                      disabled: LATER.has(match.command)
+                  }
+                : {
+                      key: `own:${match.row.id}`,
+                      label: `/${match.row.shortcut}`,
+                      detail: polarShared.firstLine(match.row.prompt),
+                      icon: Zap
+                  }
         ),
         ...(input.startsWith("/") && !/\s/.test(input)
             ? [
@@ -1673,7 +1673,9 @@ export function PolarChat({
                                             }
                                             onRegenerate={() => void chat.regenerate()}
                                             onBranch={
-                                                temporary ? undefined : () => void branchFrom(message.id)
+                                                temporary
+                                                    ? undefined
+                                                    : () => void branchFrom(message.id)
                                             }
                                         />
                                     );
@@ -1695,12 +1697,12 @@ export function PolarChat({
                                                       name: unreadableOf(chat.error)!
                                                   })
                                                 : limit
-                                                ? t("errors.usageLimit", {
-                                                      used: limit.used,
-                                                      amount: limit.amount,
-                                                      period: t(`usage.periods.${limit.period}`)
-                                                  })
-                                                : null}
+                                                  ? t("errors.usageLimit", {
+                                                        used: limit.used,
+                                                        amount: limit.amount,
+                                                        period: t(`usage.periods.${limit.period}`)
+                                                    })
+                                                  : null}
                                         </p>
                                     ) : (
                                         <PolarFailureNotice

@@ -166,7 +166,10 @@ export async function POST(request: Request): Promise<Response> {
     const unreadable: string[] = [];
     const sendable = await inlinePolarFiles(user.id, messages, resolved.option, unreadable);
     if (unreadable.length > 0) {
-        return NextResponse.json({ error: "file_unreadable", name: unreadable[0] }, { status: 422 });
+        return NextResponse.json(
+            { error: "file_unreadable", name: unreadable[0] },
+            { status: 422 }
+        );
     }
 
     const startedAt = Date.now();

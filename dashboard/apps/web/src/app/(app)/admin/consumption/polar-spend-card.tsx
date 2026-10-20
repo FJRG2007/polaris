@@ -65,7 +65,9 @@ export function PolarSpendCard() {
                                     <th className="py-1 pr-3 text-right">
                                         {t("consumption.polar.tokens")}
                                     </th>
-                                    <th className="py-1 text-right">{t("consumption.polar.cost")}</th>
+                                    <th className="py-1 text-right">
+                                        {t("consumption.polar.cost")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>

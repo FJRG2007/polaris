@@ -299,8 +299,9 @@ export function CommandsDialog({
             ? t("picker.automatic")
             : (providers
                   .flatMap((entry) => entry.models)
-                  .find((model) => model.provider === choice.provider && model.model === choice.model)
-                  ?.name ?? t("commands.modelGone"));
+                  .find(
+                      (model) => model.provider === choice.provider && model.model === choice.model
+                  )?.name ?? t("commands.modelGone"));
     return (
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="flex max-h-[min(36rem,85dvh)] max-w-lg flex-col gap-3">

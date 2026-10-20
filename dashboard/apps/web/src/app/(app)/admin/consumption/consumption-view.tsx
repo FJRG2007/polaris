@@ -170,7 +170,10 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                     <span className="text-sm font-medium">{consumption.machine.name}</span>
                     <span className="text-xs text-muted-foreground">
                         {total
-                            ? t("consumption.split.inContainers", { used: formatBytes(used), total: formatBytes(total) })
+                            ? t("consumption.split.inContainers", {
+                                  used: formatBytes(used),
+                                  total: formatBytes(total)
+                              })
                             : formatBytes(used)}
                         {consumption.machine.ncpu > 0
                             ? ` - ${t("consumption.split.cores", { count: consumption.machine.ncpu })}`
@@ -194,7 +197,10 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                                 key={group.id}
                                 className={cn("h-full", TONE[group.id])}
                                 style={{ width: `${Math.max(0.5, share)}%` }}
-                                title={t("consumption.split.segment", { label, size: formatBytes(group.memUsedBytes) })}
+                                title={t("consumption.split.segment", {
+                                    label,
+                                    size: formatBytes(group.memUsedBytes)
+                                })}
                             />
                         );
                     })}
@@ -219,7 +225,10 @@ export function ConsumptionSplit({ consumption }: { consumption: Consumption | n
                             </dd>
                             <dd className="text-xs text-foreground-subtle">
                                 {group.running < group.containers
-                                    ? t("consumption.running", { running: group.running, containers: group.containers })
+                                    ? t("consumption.running", {
+                                          running: group.running,
+                                          containers: group.containers
+                                      })
                                     : t("consumption.containers", { count: group.containers })}
                             </dd>
                         </div>
@@ -259,7 +268,8 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                         </span>
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">
-                        {formatBytes(group.memUsedBytes)} - {t("consumption.cpu", { percent: group.cpuPercent })}
+                        {formatBytes(group.memUsedBytes)} -{" "}
+                        {t("consumption.cpu", { percent: group.cpuPercent })}
                         {group.running < group.containers
                             ? ` - ${t("consumption.running", { running: group.running, containers: group.containers })}`
                             : ""}
@@ -267,16 +277,24 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                 </div>
 
                 {group.rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t(`consumption.empty.${group.id === "polaris" ? "other" : group.id}`)}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t(`consumption.empty.${group.id === "polaris" ? "other" : group.id}`)}
+                    </p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[34rem] text-sm">
                             <thead>
                                 <tr className="text-left">
-                                    <th className="w-full max-w-0 py-1 pr-3">{t("consumption.columns.name")}</th>
+                                    <th className="w-full max-w-0 py-1 pr-3">
+                                        {t("consumption.columns.name")}
+                                    </th>
                                     <th className="py-1 pr-3">{t("consumption.columns.owner")}</th>
-                                    <th className="py-1 pr-3 text-right">{t("consumption.columns.cpu")}</th>
-                                    <th className="py-1 text-right">{t("consumption.columns.memory")}</th>
+                                    <th className="py-1 pr-3 text-right">
+                                        {t("consumption.columns.cpu")}
+                                    </th>
+                                    <th className="py-1 text-right">
+                                        {t("consumption.columns.memory")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -285,7 +303,11 @@ export function ConsumptionGroupTable({ group }: { group: ConsumptionGroup }) {
                                         <Row
                                             row={row}
                                             open={opened.has(row.id)}
-                                            onToggle={row.parts.length > 0 ? () => toggle(row.id) : undefined}
+                                            onToggle={
+                                                row.parts.length > 0
+                                                    ? () => toggle(row.id)
+                                                    : undefined
+                                            }
                                         />
                                         {opened.has(row.id)
                                             ? row.parts.map((part) => (

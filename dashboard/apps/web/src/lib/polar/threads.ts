@@ -451,7 +451,13 @@ export async function branchPolarThread(
 ): Promise<PolarThreadRow | null> {
     const source = await prisma.polarThread.findFirst({
         where: { id: threadId, userId, temporary: false },
-        select: { title: true, titleSource: true, choice: true, projectId: true, branchRootId: true }
+        select: {
+            title: true,
+            titleSource: true,
+            choice: true,
+            projectId: true,
+            branchRootId: true
+        }
     });
     if (!source) return null;
     const rows = await prisma.polarMessage.findMany({
@@ -481,7 +487,8 @@ export async function branchPolarThread(
                 userId,
                 title: source.title,
                 // A title still being written belongs to the original thread.
-                titleSource: source.titleSource === "generating" ? "placeholder" : source.titleSource,
+                titleSource:
+                    source.titleSource === "generating" ? "placeholder" : source.titleSource,
                 projectId: source.projectId,
                 branchRootId: source.branchRootId ?? threadId,
                 ...(source.choice ? { choice: source.choice as Prisma.InputJsonValue } : {})

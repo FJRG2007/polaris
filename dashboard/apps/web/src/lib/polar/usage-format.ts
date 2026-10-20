@@ -8,9 +8,9 @@
  */
 
 export function formatTokens(count: number, locale: string): string {
-    return new Intl.NumberFormat(locale, { notation: count >= 100_000 ? "compact" : "standard" }).format(
-        count
-    );
+    return new Intl.NumberFormat(locale, {
+        notation: count >= 100_000 ? "compact" : "standard"
+    }).format(count);
 }
 
 export function formatUsd(amount: number, locale: string): string {

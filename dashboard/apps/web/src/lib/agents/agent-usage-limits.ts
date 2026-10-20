@@ -123,7 +123,8 @@ export async function checkUsageLimits(input: {
         const subject = rule.subjectType as LimitSubject;
         const applies =
             appliesToPerson(rule, input.ownerId, owner) ||
-            (subject === "repo" && rule.subjectId.toLowerCase() === input.repoFullName.toLowerCase()) ||
+            (subject === "repo" &&
+                rule.subjectId.toLowerCase() === input.repoFullName.toLowerCase()) ||
             (subject === "org" && rule.subjectId.toLowerCase() === org);
         if (!applies) continue;
 
@@ -136,7 +137,11 @@ export async function checkUsageLimits(input: {
                   ? { repo: { repoFullName: { startsWith: `${rule.subjectId}/` } } }
                   : { repo: { ownerId: input.ownerId } };
 
-        const used = await usageSince(scope, rule.metric as LimitMetric, since(rule.period as LimitPeriod));
+        const used = await usageSince(
+            scope,
+            rule.metric as LimitMetric,
+            since(rule.period as LimitPeriod)
+        );
         if (used < rule.amount) continue;
 
         return {
@@ -162,12 +167,17 @@ async function usageSince(
 ): Promise<number> {
     const where = { ...scope, createdAt: { gte: from } };
     if (metric === "runs") return await prisma.agentRun.count({ where });
-    const totals = await prisma.agentRun.aggregate({ where, _sum: { tokensIn: true, tokensOut: true } });
+    const totals = await prisma.agentRun.aggregate({
+        where,
+        _sum: { tokensIn: true, tokensOut: true }
+    });
     return (totals._sum.tokensIn ?? 0) + (totals._sum.tokensOut ?? 0);
 }
 
 /** Which roles and groups this person is in, for matching rules against. */
-export async function roleAndGroupIds(userId: string): Promise<{ roles: string[]; groups: string[] }> {
+export async function roleAndGroupIds(
+    userId: string
+): Promise<{ roles: string[]; groups: string[] }> {
     const [roles, groups] = await Promise.all([
         prisma.userRole.findMany({ where: { userId }, select: { roleId: true } }),
         prisma.groupMember.findMany({ where: { userId }, select: { groupId: true } })

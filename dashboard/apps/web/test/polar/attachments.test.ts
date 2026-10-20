@@ -320,7 +320,10 @@ describe("fileRoute", () => {
         expect(fileRoute("image/png", { inputs: [], attachment: true })).toBe("file");
         expect(fileRoute("application/pdf", { inputs: [], attachment: true })).toBe("text");
         expect(
-            fileRoute("application/vnd.openxmlformats-officedocument.wordprocessingml.document", pdfReader)
+            fileRoute(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                pdfReader
+            )
         ).toBe("text");
     });
 

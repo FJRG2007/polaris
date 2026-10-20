@@ -87,9 +87,12 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
                                         {row.model}
                                     </span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        {t(row.payer === "instance" ? "usage.shared" : "usage.own", {
-                                            answers: row.answers
-                                        })}
+                                        {t(
+                                            row.payer === "instance" ? "usage.shared" : "usage.own",
+                                            {
+                                                answers: row.answers
+                                            }
+                                        )}
                                     </span>
                                 </span>
                                 <span className="flex shrink-0 flex-col items-end text-xs tabular-nums">

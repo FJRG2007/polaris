@@ -85,7 +85,12 @@ const row = (id: string, parentId: string | null, role = "user"): Row => ({
 
 beforeEach(() => {
     // a -> b -> c, with b2 a second version of b that c does not follow.
-    state.rows = [row("a", null), row("b", "a", "assistant"), row("b2", "a", "assistant"), row("c", "b")];
+    state.rows = [
+        row("a", null),
+        row("b", "a", "assistant"),
+        row("b2", "a", "assistant"),
+        row("c", "b")
+    ];
     state.createdThread = null;
     state.createdMessages = [];
     state.temporary = false;
@@ -114,10 +119,9 @@ describe("branchPolarThread", () => {
 
     it("stops at the message branched from", async () => {
         await branchPolarThread(OWNER, THREAD, "b2");
-        expect(state.createdMessages.map((entry) => (entry.parts as { text: string }[])[0]!.text)).toEqual([
-            "a",
-            "b2"
-        ]);
+        expect(
+            state.createdMessages.map((entry) => (entry.parts as { text: string }[])[0]!.text)
+        ).toEqual(["a", "b2"]);
     });
 
     it("refuses another person's thread and a message not in it", async () => {

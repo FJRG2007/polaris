@@ -119,7 +119,10 @@ export async function polarMonthUsage(userId: string, now = new Date()): Promise
         })
     ]);
     const missing = new Map(
-        unpriced.map((row) => [`${row.provider}\u0000${row.model}\u0000${row.payer}`, row._count._all])
+        unpriced.map((row) => [
+            `${row.provider}\u0000${row.model}\u0000${row.payer}`,
+            row._count._all
+        ])
     );
     const models = rows
         .map((row) => ({
@@ -216,7 +219,10 @@ export interface PolarLimitHit {
  * when they may go on. Reads one table and stops when no rule is about tokens,
  * which is the common case. Windows roll, as the agent rules' do.
  */
-export async function polarLimitReached(userId: string, now = Date.now()): Promise<PolarLimitHit | null> {
+export async function polarLimitReached(
+    userId: string,
+    now = Date.now()
+): Promise<PolarLimitHit | null> {
     const rules = await prisma.agentUsageLimit.findMany({
         where: { metric: "tokens", subjectType: { in: [...CHAT_SUBJECTS] } }
     });

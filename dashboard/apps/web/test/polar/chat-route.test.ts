@@ -299,7 +299,12 @@ describe("what a request has to look like", () => {
         state.hit = { used: 120, amount: 100, period: "day" };
         const answer = await post(body());
         expect(answer.status).toBe(429);
-        expect(await answer.json()).toEqual({ error: "usage_limit", used: 120, amount: 100, period: "day" });
+        expect(await answer.json()).toEqual({
+            error: "usage_limit",
+            used: 120,
+            amount: 100,
+            period: "day"
+        });
     });
 
     it("never caps a person's own key", async () => {

@@ -218,8 +218,10 @@ async function documentText(mediaType: string, bytes: Uint8Array): Promise<strin
     }
     text = text.trim();
     if (!text) return null;
-    return text.length > TEXT_MAX_CHARS ? `${text.slice(0, TEXT_MAX_CHARS)}
-[...]` : text;
+    return text.length > TEXT_MAX_CHARS
+        ? `${text.slice(0, TEXT_MAX_CHARS)}
+[...]`
+        : text;
 }
 
 /** Everything the model may read: pictures only, as before this was known. */
