@@ -164,8 +164,12 @@ describe("the workflows dialog", () => {
         fireEvent.click(screen.getByRole("button", { name: "Remove condition" }));
         expect(screen.getByRole("button", { name: "Add condition" })).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+        // Put back as it was, it has nothing to save.
+        const save = () => screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+        expect(save().disabled).toBe(true);
+        fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Welcome back" } });
         await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Save" }));
+            fireEvent.click(save());
         });
         await waitFor(() => expect(state.saved).toHaveLength(1));
         expect(state.saved[0]).toMatchObject({

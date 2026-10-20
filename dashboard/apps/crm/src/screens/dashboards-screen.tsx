@@ -370,6 +370,7 @@ export function DashboardsScreen() {
             {editing && current ? (
                 <WidgetDialog
                     initial={editing}
+                    existing={current.widgets.some((one) => one.id === editing.id)}
                     choices={choices}
                     onClose={() => setEditing(null)}
                     onSave={(widget) => {

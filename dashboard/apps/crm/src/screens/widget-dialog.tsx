@@ -25,7 +25,8 @@ import {
     Input,
     SegmentedControl,
     Select,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 
 const ALL = "__all";
@@ -65,12 +66,15 @@ function Labeled({ label, children }: { label: string; children: React.ReactNode
 
 export function WidgetDialog({
     initial,
+    existing = false,
     choices,
     onSave,
     onClose
 }: {
     /** The widget changed; a new one when it is not on the dashboard yet. */
     initial: model.Widget;
+    /** Whether `initial` is already on the dashboard, so saving it as is changes nothing. */
+    existing?: boolean;
     choices: WidgetChoices;
     onSave: (widget: model.Widget) => void;
     onClose: () => void;
@@ -87,7 +91,10 @@ export function WidgetDialog({
     const split = draft.groupBy ? fieldOf(draft.object, draft.groupBy, custom) : undefined;
 
     const parsed = model.widgetSchema.safeParse(draft);
-    const ready = parsed.success && model.readWidget(parsed.data, custom) !== null;
+    const ready =
+        parsed.success &&
+        model.readWidget(parsed.data, custom) !== null &&
+        (!existing || isDirty(initial, draft));
 
     /** A change, with whatever no longer fits it put back to the first fit. */
     const change = (patch: Partial<model.Widget>) =>
