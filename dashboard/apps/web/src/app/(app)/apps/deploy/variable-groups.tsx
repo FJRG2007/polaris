@@ -466,7 +466,7 @@ export function LinkedGroupsPanel({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             align="end"
-                            className="max-h-72 overflow-y-auto overscroll-contain"
+                            className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
                         >
                             {view.linkable.map((one) => (
                                 <DropdownMenuItem

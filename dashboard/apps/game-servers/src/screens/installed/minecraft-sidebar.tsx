@@ -393,7 +393,7 @@ export function MinecraftSidebar({
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent
                                         align="start"
-                                        className="max-h-80 overflow-y-auto"
+                                        className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto"
                                     >
                                         {SIDEBAR_BLOCKS.map((block) => (
                                             <DropdownMenuItem

@@ -622,7 +622,7 @@ function ThreadItem({
                                     <FolderInput />
                                     {t("history.move")}
                                 </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent className="max-h-80 overflow-y-auto overscroll-contain">
+                                <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain">
                                     {actions.projects.map((project) => (
                                         <DropdownMenuItem
                                             key={project.id}

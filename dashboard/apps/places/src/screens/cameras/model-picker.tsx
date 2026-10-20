@@ -72,7 +72,7 @@ function PickerMenu({
                 {value}
                 <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]:rotate-180" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="max-h-80 w-[--radix-dropdown-menu-trigger-width] overflow-y-auto overscroll-contain">
+            <DropdownMenuContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-[--radix-dropdown-menu-trigger-width] overflow-y-auto overscroll-contain">
                 <MenuSearch value={query} onChange={onQuery} placeholder={placeholder} />
                 {children ? (
                     children

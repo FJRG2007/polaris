@@ -268,7 +268,7 @@ export function ProjectsGrid({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                                 align="end"
-                                className="max-h-72 overflow-y-auto overscroll-contain"
+                                className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
                             >
                                 <DropdownMenuItem onSelect={() => setTag(null)}>
                                     {t2("tags.all")}

@@ -597,7 +597,7 @@ function MoreEntries({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="start"
-                className="max-h-80 w-64 overflow-y-auto overscroll-contain"
+                className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto overscroll-contain"
             >
                 <DropdownMenuLabel>
                     {core.weekdayNames(locale, "long")[day.getDay()]} {format.date(day)}
