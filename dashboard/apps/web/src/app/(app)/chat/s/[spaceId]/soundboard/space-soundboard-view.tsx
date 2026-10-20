@@ -46,6 +46,7 @@ import {
     DialogTitle,
     Input,
     Select,
+    isDirty,
     Skeleton,
     Switch
 } from "@polaris/ui";
@@ -712,7 +713,15 @@ function SoundDialog({
                 ? t("errors.soundNameLong")
                 : t("errors.soundNameShort")
             : null;
-    const ready = parsedName.success && (!isNew || decoded !== null) && !saving;
+    // A sound edited back to what it already is has nothing to save.
+    const changed =
+        editing === "new" ||
+        (editing !== null &&
+            isDirty(
+                { name: editing.name, emoji: editing.emoji, volume: editing.volume },
+                { name, emoji, volume }
+            ));
+    const ready = parsedName.success && (!isNew || decoded !== null) && changed && !saving;
     const longer = decoded !== null && decoded.durationMs > rules.SOUND_MAX_MS;
 
     const save = async () => {

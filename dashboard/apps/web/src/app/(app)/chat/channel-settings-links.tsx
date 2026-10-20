@@ -24,7 +24,16 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatWebhookSecret, ChatWebhookView } from "@/lib/chat/webhooks";
 import { Check, Copy, Link2, Loader2, Pencil, RefreshCw, Trash2, Webhook, X } from "lucide-react";
-import { Button, cn, ConfirmDeleteDialog, EmptyState, Input, Select, Skeleton } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    ConfirmDeleteDialog,
+    EmptyState,
+    Input,
+    isDirty,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
 /** How long a copy button stays ticked. */
 const COPIED_MS = 1600;
@@ -317,6 +326,12 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
     const rename = async () => {
         if (!renaming) return;
         const name = renaming.name.trim();
+        // The name it already has: nothing to send.
+        const named = hooks?.find((hook) => hook.id === renaming.id);
+        if (named && !isDirty(named.name, name)) {
+            setRenaming(null);
+            return;
+        }
         const parsed = core.chatWebhookRenameSchema.safeParse({ webhookId: renaming.id, name });
         if (!parsed.success) {
             setError(t("errors.webhookName"));
@@ -405,7 +420,10 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                                         <Button
                                             type="submit"
                                             size="sm"
-                                            disabled={!renaming.name.trim()}
+                                            disabled={
+                                                !renaming.name.trim() ||
+                                                !isDirty(hook.name, renaming.name)
+                                            }
                                         >
                                             {t("channelSettings.save")}
                                         </Button>

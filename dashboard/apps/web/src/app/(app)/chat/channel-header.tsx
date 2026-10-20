@@ -72,7 +72,8 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 /** How the shared mute list draws itself inside a dropdown. */
@@ -596,6 +597,8 @@ export function ChannelHeader({
                         </Button>
                         <Button
                             size="sm"
+                            // The name it already has is nothing to save.
+                            disabled={!isDirty(channel.name, name)}
                             onClick={async () => {
                                 // Closed only once it worked. A dialog that closes
                                 // on a refusal takes the typed name with it and

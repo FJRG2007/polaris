@@ -121,6 +121,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
+    isDirty,
     Skeleton,
     useToast
 } from "@polaris/ui";
@@ -248,7 +249,9 @@ export function ChatSidebar() {
     const [duplicating, setDuplicating] = useState<ChatChannelView | null>(null);
     const [deleting, setDeleting] = useState<ChatChannelView | null>(null);
     const [deleteError, setDeleteError] = useState("");
-    const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+    const [renaming, setRenaming] = useState<{ id: string; name: string; was: string } | null>(
+        null
+    );
     // A move that has been asked for and is drawn already, ahead of the answer.
     // `stored` once the server has taken it: it is dropped when a list arrives
     // that carries it (or after a short wait, should another change mean none
@@ -766,7 +769,8 @@ export function ChatSidebar() {
                                                           onRename: () =>
                                                               setRenaming({
                                                                   id: category.id,
-                                                                  name: category.name
+                                                                  name: category.name,
+                                                                  was: category.name
                                                               }),
                                                           onDelete: async () => {
                                                               const result =
@@ -906,7 +910,9 @@ export function ChatSidebar() {
                         </Button>
                         <Button
                             size="sm"
-                            disabled={!renaming?.name.trim()}
+                            disabled={
+                                !renaming?.name.trim() || !isDirty(renaming.was, renaming.name)
+                            }
                             onClick={() => void rename()}
                         >
                             {tc("actions.save")}
@@ -963,6 +969,8 @@ export function ChatSidebar() {
 
     async function rename(): Promise<void> {
         if (!renaming?.name.trim()) return;
+        // The name it already has: nothing to send.
+        if (!isDirty(renaming.was, renaming.name)) return setRenaming(null);
         const result = await actions.renameCategoryAction({
             categoryId: renaming.id,
             name: renaming.name

@@ -67,7 +67,14 @@ import {
     Video,
     X
 } from "lucide-react";
-import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+    isDirty
+} from "@polaris/ui";
 import { SendButton } from "./send-button";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
 import {
@@ -635,6 +642,8 @@ export function Composer({
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
         if (disabled || tooLong || (!text && files.length === 0 && kept.length === 0)) return;
+        // An edit that puts back the words already there changes nothing.
+        if (editing && !isDirty(editing.body, text)) return onCancelEdit?.();
         const sending = files;
         const staying = kept;
         // The marks over both lists, in the order the server reads them: the
@@ -1278,7 +1287,11 @@ export function Composer({
                                 </Button>
                                 <Button
                                     size="xs"
-                                    disabled={tooLong || (blank && files.length === 0)}
+                                    disabled={
+                                        tooLong ||
+                                        (blank && files.length === 0) ||
+                                        !isDirty(editing.body, body)
+                                    }
                                     onClick={() => void submit(body)}
                                 >
                                     {t("composer.save")}
