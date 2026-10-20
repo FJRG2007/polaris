@@ -15214,7 +15214,7 @@ model PolarAnswerFeedback {
     updatedAt DateTime     @updatedAt
 
     @@unique([userId, messageId])
-    @@index([createdAt(sort: Desc)])
+    @@index([updatedAt(sort: Desc)])
 }
 
 // What one Polar answer spent: the provider's own token counts and, when the

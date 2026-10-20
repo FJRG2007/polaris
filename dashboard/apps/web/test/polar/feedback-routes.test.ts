@@ -77,7 +77,7 @@ vi.mock("@polaris/db", () => ({
                     ...mark,
                     id: "f1",
                     userId: OWNER,
-                    createdAt: new Date("2026-10-20T10:00:00Z"),
+                    updatedAt: new Date("2026-10-20T10:00:00Z"),
                     user: { name: "Ada", email: "ada@example.test" }
                 })),
             groupBy: async () => [

@@ -83,7 +83,7 @@ function IconAction({
 }
 
 /** One chat's link and the people it was sent to. `upTo` ends the snapshot at
- *  that answer; without it the snapshot is the whole chat. */
+ *  that answer; without it the link keeps the end point it already had. */
 export function PolarShareDialog({
     row,
     upTo,

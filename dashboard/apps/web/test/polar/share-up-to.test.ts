@@ -1,7 +1,8 @@
 /**
  * Sharing from an answer's row: the snapshot ends at that answer, on the path
  * that led to it (not the newest versions), a message from another chat is
- * ignored, and sharing the whole chat again clears the end point.
+ * ignored, updating the link without one keeps it, and sharing the whole chat
+ * clears it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,7 +12,7 @@ const THREAD = "11111111-1111-4111-8111-111111111111";
 
 const state = {
     share: null as null | { id: string; upToMessageId: string | null; sharedAt: Date },
-    writes: [] as Array<{ upToMessageId: string | null }>
+    writes: [] as Array<{ upToMessageId?: string | null }>
 };
 
 // q1 -> a1 (answered) and a2 (answered again, newer); a1 -> q2 -> a3.
@@ -54,17 +55,18 @@ vi.mock("@polaris/db", () => ({
                     sharedAt: state.share.sharedAt,
                     linkEnabled: true
                 },
-            create: async ({ data }: { data: { upToMessageId: string | null } }) => {
+            create: async ({ data }: { data: { upToMessageId?: string | null } }) => {
                 state.writes.push({ upToMessageId: data.upToMessageId });
                 state.share = {
                     id: "share",
-                    upToMessageId: data.upToMessageId,
+                    upToMessageId: data.upToMessageId ?? null,
                     sharedAt: new Date()
                 };
             },
-            update: async ({ data }: { data: { upToMessageId: string | null } }) => {
+            update: async ({ data }: { data: { upToMessageId?: string | null } }) => {
                 state.writes.push({ upToMessageId: data.upToMessageId });
-                state.share = { ...state.share!, upToMessageId: data.upToMessageId };
+                if ("upToMessageId" in data)
+                    state.share = { ...state.share!, upToMessageId: data.upToMessageId ?? null };
             }
         }
     }
@@ -122,9 +124,17 @@ describe("sharing up to an answer", () => {
         expect(state.writes).toEqual([{ upToMessageId: null }]);
     });
 
-    it("sharing the whole chat again clears the end point", async () => {
+    it("updating the link without an end point keeps the one it had", async () => {
         await share.sharePolarThread(OWNER, THREAD, "a1");
         await share.sharePolarThread(OWNER, THREAD);
+        expect(state.share?.upToMessageId).toBe("a1");
+        const read = await share.readSharedPolarThread("token-token-token-1");
+        expect(read?.messages.map((message) => message.id)).toEqual(["q1", "a1"]);
+    });
+
+    it("sharing the whole chat again clears the end point", async () => {
+        await share.sharePolarThread(OWNER, THREAD, "a1");
+        await share.sharePolarThread(OWNER, THREAD, null);
         expect(state.writes.at(-1)).toEqual({ upToMessageId: null });
         const read = await share.readSharedPolarThread("token-token-token-1");
         // The newest path: q1 then its newest answer, a2.

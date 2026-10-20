@@ -352,7 +352,7 @@ export function RegenerateMenu({
                                 <Bot />
                                 {t("actions.otherModel")}
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="max-h-80 max-w-72 overflow-y-auto">
+                            <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] max-w-72 overflow-y-auto">
                                 {providers.map((provider) =>
                                     provider.models.length > 0 ? (
                                         <div key={provider.provider}>

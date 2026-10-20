@@ -104,17 +104,27 @@ export async function polarShareLink(
  * The answer a snapshot ends at: `upTo` when it is one of this chat's own
  * messages, otherwise null, which shows the whole chat.
  */
-async function endOf(threadId: string, upTo: string | null | undefined): Promise<string | null> {
+async function endOf(threadId: string, upTo: string | null): Promise<string | null> {
     if (!upTo) return null;
     const found = await prisma.polarMessage.count({ where: { id: upTo, threadId } });
     return found ? upTo : null;
 }
 
+/** The end point to write: nothing when `upTo` was left out, so an existing
+ *  share keeps the one it had. */
+async function endAt(
+    threadId: string,
+    upTo: string | null | undefined
+): Promise<{ upToMessageId?: string | null }> {
+    return upTo === undefined ? {} : { upToMessageId: await endOf(threadId, upTo) };
+}
+
 /**
  * Shares the chat, or moves an existing link's snapshot to now. The address of
  * an existing link stays the same. `upTo` ends the snapshot at that answer
- * (shared from its own row); without it the snapshot is the whole chat. Null
- * when the chat is not this person's.
+ * (shared from its own row), null makes it the whole chat, and leaving it out
+ * keeps the end point the link already had. Null when the chat is not this
+ * person's.
  */
 export async function sharePolarThread(
     userId: string,
@@ -127,7 +137,7 @@ export async function sharePolarThread(
         where: { id: threadId, userId, temporary: false }
     });
     if (!owned) return null;
-    const upToMessageId = await endOf(threadId, upTo);
+    const end = await endAt(threadId, upTo);
     const existing = await prisma.polarThreadShare.findUnique({
         where: { threadId },
         select: { id: true }
@@ -135,11 +145,11 @@ export async function sharePolarThread(
     if (existing) {
         await prisma.polarThreadShare.update({
             where: { id: existing.id },
-            data: { sharedAt: new Date(), linkEnabled: true, upToMessageId }
+            data: { sharedAt: new Date(), linkEnabled: true, ...end }
         });
     } else {
         await prisma.polarThreadShare.create({
-            data: { threadId, upToMessageId, ...freshToken() }
+            data: { threadId, ...end, ...freshToken() }
         });
     }
     return polarShareLink(userId, threadId);
@@ -456,7 +466,7 @@ export async function sendPolarShare(
         ? (
               await prisma.polarThreadShare.update({
                   where: { id: existing.id },
-                  data: { sharedAt: new Date(), upToMessageId: await endOf(threadId, upTo) },
+                  data: { sharedAt: new Date(), ...(await endAt(threadId, upTo)) },
                   select: { id: true }
               })
           ).id
@@ -465,7 +475,7 @@ export async function sendPolarShare(
                   data: {
                       threadId,
                       linkEnabled: false,
-                      upToMessageId: await endOf(threadId, upTo),
+                      ...(await endAt(threadId, upTo)),
                       ...freshToken()
                   },
                   select: { id: true }

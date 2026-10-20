@@ -970,14 +970,14 @@ export function PolarChat({
         if (!live.current.choice) return;
         answerActions.stopReading();
         refine.current = options.refine ?? null;
-        if (options.model) {
-            turnChoice.current = {
-                ...live.current.choice,
-                provider: options.model.provider,
-                model: options.model.model,
-                payer: null
-            };
-        }
+        turnChoice.current = options.model
+            ? {
+                  ...live.current.choice,
+                  provider: options.model.provider,
+                  model: options.model.model,
+                  payer: null
+              }
+            : null;
         void chat.regenerate();
     };
 
@@ -1227,6 +1227,7 @@ export function PolarChat({
         // Read by the transport on this very send, before the state below has rendered.
         live.current = { ...live.current, choice: next };
         setChoice(next);
+        turnChoice.current = null;
         void chat.regenerate();
     };
 

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "PolarAnswerFeedback" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "PolarAnswerFeedback_userId_messageId_key" ON "PolarAnswerFeedback"("userId", "messageId");
-CREATE INDEX IF NOT EXISTS "PolarAnswerFeedback_createdAt_idx" ON "PolarAnswerFeedback"("createdAt" DESC);
+CREATE INDEX IF NOT EXISTS "PolarAnswerFeedback_updatedAt_idx" ON "PolarAnswerFeedback"("updatedAt" DESC);
 
 ALTER TABLE "PolarAnswerFeedback" DROP CONSTRAINT IF EXISTS "PolarAnswerFeedback_userId_fkey";
 ALTER TABLE "PolarAnswerFeedback" ADD CONSTRAINT "PolarAnswerFeedback_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

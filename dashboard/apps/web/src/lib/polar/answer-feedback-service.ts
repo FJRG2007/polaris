@@ -84,7 +84,7 @@ export async function polarFeedbackSummary(now = new Date()): Promise<PolarFeedb
     const [counts, recent] = await Promise.all([
         prisma.polarAnswerFeedback.groupBy({
             by: ["rating"],
-            where: { createdAt: { gte: since } },
+            where: { updatedAt: { gte: since } },
             _count: { _all: true }
         }),
         prisma.polarAnswerFeedback.findMany({
@@ -96,10 +96,10 @@ export async function polarFeedbackSummary(now = new Date()): Promise<PolarFeedb
                 note: true,
                 model: true,
                 userId: true,
-                createdAt: true,
+                updatedAt: true,
                 user: { select: { name: true, email: true } }
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: { updatedAt: "desc" },
             take: RECENT_MOST
         })
     ]);
@@ -108,15 +108,13 @@ export async function polarFeedbackSummary(now = new Date()): Promise<PolarFeedb
     return {
         good: count("good"),
         bad: count("bad"),
-        recent: recent.map(
-            (row): PolarFeedbackRow => ({
-                id: row.id,
-                ...markOf(row),
-                model: row.model,
-                userId: row.userId,
-                name: row.user.name || row.user.email,
-                at: row.createdAt.toISOString()
-            })
-        )
+        recent: recent.map((row): PolarFeedbackRow => ({
+            id: row.id,
+            ...markOf(row),
+            model: row.model,
+            userId: row.userId,
+            name: row.user.name || row.user.email,
+            at: row.updatedAt.toISOString()
+        }))
     };
 }

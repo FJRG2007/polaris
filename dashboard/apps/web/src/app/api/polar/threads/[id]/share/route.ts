@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
+import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { polarMessageIdSchema } from "@/lib/polar/answer-feedback";
 import { polarShareLink, revokePolarShare, sharePolarThread } from "@/lib/polar/share";
@@ -18,7 +19,9 @@ export const dynamic = "force-dynamic";
 
 const idSchema = z.string().uuid();
 
-/** No body (the whole chat) or the answer it ends at. */
+const BODY_MAX = 1024;
+
+/** No body (the end point the link had) or the answer it ends at (null for the whole chat). */
 const shareSchema = z.object({ upTo: polarMessageIdSchema.nullish() }).nullable();
 
 type Params = { params: Promise<{ id: string }> };
@@ -39,7 +42,9 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
-    const text = await request.text().catch(() => "");
+    const bytes = await readCappedBody(request, BODY_MAX).catch(() => new Uint8Array(0));
+    if (!bytes) return NextResponse.json({ error: "too_large" }, { status: 413 });
+    const text = new TextDecoder().decode(bytes);
     let raw: unknown = null;
     try {
         raw = text.trim() ? JSON.parse(text) : null;
@@ -50,7 +55,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     if (!body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     const limited = await rateLimit(`polar-share:${user.id}`, 20, 60_000);
     if (!limited.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-    const link = await sharePolarThread(user.id, id.data, body.data?.upTo ?? null);
+    const link = await sharePolarThread(user.id, id.data, body.data?.upTo);
     return link ? NextResponse.json({ link }) : NOT_FOUND();
 }
 

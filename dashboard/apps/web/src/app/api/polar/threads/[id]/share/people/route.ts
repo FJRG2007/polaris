@@ -19,7 +19,7 @@ const idSchema = z.string().uuid();
 const sendSchema = z.object({
     userIds: z.array(z.string().uuid()).min(1).max(share.POLAR_SHARE_SEND_MOST),
     note: z.string().trim().max(share.POLAR_SHARE_NOTE_MAX).nullish(),
-    /** The answer the snapshot ends at; absent sends the whole chat. */
+    /** The answer the snapshot ends at; null sends the whole chat, absent keeps the end point it had. */
     upTo: polarMessageIdSchema.nullish()
 });
 
@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
         id.data,
         body.data.userIds,
         body.data.note || null,
-        body.data.upTo ?? null
+        body.data.upTo
     );
     if (result.ok) return NextResponse.json({ sent: result.sent, people: result.recipients });
     if (result.error === "not_found") return NOT_FOUND();
