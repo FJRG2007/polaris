@@ -54,8 +54,9 @@ const bundles = [
     "status-pages"
 ]
     .flatMap((app) => routesUnder(join(WEB, "..", app, "src", "routes")))
-    // Public pages of a bundle (a booking link, a status page) have no Polar.
-    .filter((route) => !/^\/(cal|status)\//.test(route));
+    // Public pages of a bundle (a booking link, a status page, a lent door)
+    // have no Polar.
+    .filter((route) => !/^\/(cal|status|k)\//.test(route));
 
 describe("screen descriptor", () => {
     it("knows what every dynamic screen's id is", () => {
