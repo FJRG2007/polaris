@@ -344,6 +344,7 @@ final class SeasonalDecor implements Listener {
                 return true;
             });
             if (resend) resend(player, world, one, atX, atZ);
+            nearWebs(player, one, atX, atZ);
             budget -= decorateAround(player, world, one, atX, atZ, Math.min(budget, NEW_PER_PLAYER));
             if (budget <= 0 && !resend) break;
         }
@@ -368,6 +369,31 @@ final class SeasonalDecor implements Listener {
             }
         }
         return done;
+    }
+
+    /**
+     * Cobweb displays are real entities, so a player keeps them only for the chunks
+     * within RADIUS of where they stand: the rest are taken away and drawn again
+     * when the player comes back near, and one whose chunk was unloaded is drawn again.
+     */
+    private void nearWebs(Player player, Seen one, int atX, int atZ) {
+        for (Map.Entry<Long, List<Fake>> chunk : one.chunks.entrySet()) {
+            long key = chunk.getKey();
+            boolean near = Math.abs(chunkX(key) - atX) <= RADIUS && Math.abs(chunkZ(key) - atZ) <= RADIUS;
+            for (Fake fake : chunk.getValue()) {
+                if (!web(fake)) continue;
+                if (!near) {
+                    restore(player, one, fake);
+                    continue;
+                }
+                Location at = fake.at();
+                BlockDisplay display = one.webs.get(blockKey(at.getBlockX(), at.getBlockY(), at.getBlockZ()));
+                if (display != null && display.isValid()) continue;
+                World world = at.getWorld();
+                if (world == null || !world.isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) continue;
+                if (at.getBlock().getBlockData().equals(fake.real())) showWeb(player, one, fake);
+            }
+        }
     }
 
     private void resend(Player player, World world, Seen one, int atX, int atZ) {
