@@ -262,8 +262,13 @@ ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
  */
 function unmeasureKeptSubmenu(trigger: HTMLElement): void {
     if (trigger.dataset.state === "open") return;
-    const id = trigger.getAttribute("aria-controls");
-    const content = id ? trigger.ownerDocument.getElementById(id) : null;
+    // Found by the label it points back at: Radix only sets `aria-controls` on
+    // the trigger while its submenu is open, which is exactly when this skips.
+    const content = trigger.id
+        ? Array.from(
+              trigger.ownerDocument.querySelectorAll<HTMLElement>("[aria-labelledby]")
+          ).find((node) => node.getAttribute("aria-labelledby") === trigger.id)
+        : undefined;
     if (!content) return;
     Object.defineProperty(content, "getBoundingClientRect", {
         configurable: true,
