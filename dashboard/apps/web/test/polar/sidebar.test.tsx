@@ -218,7 +218,7 @@ describe("the row menu", () => {
         const names = within(menu)
             .getAllByRole("menuitem")
             .map((entry) => entry.textContent);
-        expect(names).toEqual(["Rename", "Pin", "Share", "Archive", "Delete", "Move to project"]);
+        expect(names).toEqual(["Rename", "Pin", "Share", "Export as Markdown", "Export as JSON", "Archive", "Delete", "Move to project"]);
     });
 
     it("archives a chat out of the list", async () => {

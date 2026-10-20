@@ -16,6 +16,8 @@
 
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
+    FileDown,
+    FileJson,
     Archive,
     ArchiveRestore,
     ChevronDown,
@@ -603,6 +605,18 @@ function ThreadItem({
                             <DropdownMenuItem onSelect={take(() => actions.onShare(row))}>
                                 <Share2 />
                                 {t("history.share")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <a href={`/api/polar/threads/${row.id}/export?format=markdown`} download>
+                                    <FileDown />
+                                    {t("export.markdown")}
+                                </a>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <a href={`/api/polar/threads/${row.id}/export?format=json`} download>
+                                    <FileJson />
+                                    {t("export.json")}
+                                </a>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => actions.onArchive(row)}>

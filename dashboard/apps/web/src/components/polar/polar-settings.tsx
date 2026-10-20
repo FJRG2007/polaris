@@ -7,10 +7,11 @@
  * the server refuses it.
  */
 
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Download, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
     Button,
+    buttonVariants,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -383,6 +384,25 @@ export function MemorySettings() {
     );
 }
 
+/** Everything the person has with Polar, as a download. */
+export function DataSettings() {
+    const t = useTranslations("polar");
+    return (
+        <Section title={t("settings.data.title")} description={t("settings.data.intro")}>
+            <div>
+                <a
+                    href="/api/polar/export"
+                    download
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                    <Download />
+                    {t("settings.data.exportAll")}
+                </a>
+            </div>
+        </Section>
+    );
+}
+
 /** The settings dialog. `sections` past memory are added by their features. */
 export function PolarSettings({
     open,
@@ -403,6 +423,7 @@ export function PolarSettings({
                 </DialogHeader>
                 <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
                     {open ? <MemorySettings /> : null}
+                    <DataSettings />
                     {children}
                 </div>
             </DialogContent>

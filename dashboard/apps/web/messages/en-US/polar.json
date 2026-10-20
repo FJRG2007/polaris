@@ -297,6 +297,11 @@
                 "rate_limited": "Too many changes. Wait a moment.",
                 "failed": "Couldn't save the change. Try again."
             }
+        },
+        "data": {
+            "title": "Your chats",
+            "intro": "Download every saved chat as Markdown and JSON in one zip.",
+            "exportAll": "Export all chats"
         }
     },
     "temporary": {
@@ -305,5 +310,10 @@
         "title": "Temporary chat",
         "body": "Not saved in your chats or used for memory. It's deleted when you leave it.",
         "banner": "Temporary chat: not in your history or memory, deleted when you leave it."
+    },
+    "export": {
+        "markdown": "Export as Markdown",
+        "json": "Export as JSON",
+        "you": "You"
     }
 }

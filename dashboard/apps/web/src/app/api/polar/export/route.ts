@@ -1,0 +1,32 @@
+/**
+ * GET /api/polar/export - every saved Polar chat of the signed-in person as one
+ * zip: a Markdown and a JSON file per chat. Temporary chats are not included.
+ * Streamed, one chat read at a time; a few per ten minutes per person.
+ */
+
+import { NextResponse } from "next/server";
+import { apiUser } from "@/lib/api-session";
+import { rateLimit } from "@/lib/rate-limit-service";
+import { getTranslations } from "@/lib/i18n/request";
+import { exportAllThreads } from "@/lib/polar/export";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export async function GET(): Promise<Response> {
+    const user = await apiUser();
+    if (user instanceof NextResponse) return user;
+    const limited = await rateLimit(`polar-export:${user.id}`, 5, 10 * 60_000);
+    if (!limited.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+    const t = await getTranslations("polar");
+    const stream = await exportAllThreads(user.id, { user: t("export.you"), assistant: "Polar" });
+    const day = new Date().toISOString().slice(0, 10);
+    return new Response(stream, {
+        headers: {
+            "Content-Type": "application/zip",
+            "Content-Disposition": `attachment; filename="polar-chats-${day}.zip"`,
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+        }
+    });
+}
