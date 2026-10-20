@@ -8,8 +8,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { serviceName } from "./fields";
-import { logHref } from "./dns-insights";
+import { listLabel, logHref } from "./dns-insights";
 import { Loader2, Search } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useDnsBlocker } from "./dns-blocker-context";
@@ -30,13 +29,6 @@ export function DnsLookupCard() {
     const parsed = lookupSchema.safeParse({ domain });
     // An empty field is not finished yet, not wrong.
     const invalid = domain.trim() !== "" && !parsed.success;
-
-    const listLabel = (list: string): string => {
-        if (list === "polaris") return t("insights.ownList");
-        if (list.startsWith("service-")) return serviceName(list.slice("service-".length));
-        const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
-        return t.has(key) ? t(key) : list;
-    };
 
     const ask = () => {
         if (!parsed.success || asking) return;
@@ -79,7 +71,7 @@ export function DnsLookupCard() {
     const answeredBy = !lookup
         ? ""
         : blocked
-          ? listLabel(lookup.list)
+          ? listLabel(t, lookup.list)
           : ["cache", "local", "other"].includes(lookup.via)
             ? t(`insights.via.${lookup.via}` as NamespaceKey<"dnsBlocker">)
             : lookup.via;

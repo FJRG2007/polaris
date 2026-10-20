@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as polls from "./dns-blocker-polls";
+import { serviceName } from "./fields";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import {
     Ban,
@@ -131,6 +132,7 @@ function viaLabel(t: Translate, via: string): string {
 
 export function listLabel(t: Translate, list: string): string {
     if (list === "polaris") return t("insights.ownList");
+    if (list.startsWith("service-")) return serviceName(list.slice("service-".length));
     const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
     return t.has(key) ? t(key) : list;
 }

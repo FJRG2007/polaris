@@ -36,6 +36,16 @@ describe("settings export and import", () => {
         });
     });
 
+    it("does not name what the form never holds as a change", () => {
+        const other = { serviceDomains: { youtube: ["youtube.com"] }, timeZone: "Europe/Madrid" };
+        expect(readImport(file(other), saved)).toMatchObject({ ok: true, changed: [] });
+        const scheduled = readImport(
+            file({ ...other, schedules: [{ lists: ["ads"], days: ["mon"], start: "", end: "" }] }),
+            saved
+        );
+        expect(scheduled.ok && scheduled.changed).toEqual(["schedules", "timeZone"]);
+    });
+
     it("ignores keys it does not know", () => {
         const result = readImport(file({ shell: "rm -rf /", logDays: 7 }), saved);
         expect(result.ok && result.changed).toEqual([]);

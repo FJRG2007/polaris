@@ -22,10 +22,11 @@ import {
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { RuleField, serviceName, timeZones } from "./fields";
+import { RuleField, timeZones } from "./fields";
 import { useDnsBlocker, useField } from "./dns-blocker-context";
 import { DnsSaveBar } from "./save-bar";
 import { DnsLookupCard } from "./lookup-card";
+import { listLabel } from "./dns-insights";
 
 export function DnsListsSection() {
     const t = useTranslations("dnsBlocker");
@@ -48,11 +49,6 @@ export function DnsListsSection() {
     const { badAllow, badDeny, tooMany } = checks;
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const listed = dns.dnsSchedulableLists({ sources, customLists, services, clientGroups });
-    /** What a list group is called on the screen: a category or a service. */
-    const listName = (list: string): string =>
-        (dns.DNS_CATEGORIES as readonly string[]).includes(list)
-            ? t(`categories.${list as dns.DnsCategory}`)
-            : serviceName(list.replace(/^service-/, ""));
     const newSchedule = dns.dnsScheduleSchema.safeParse({
         lists: scheduleLists.filter((list) => listed.includes(list)),
         days: scheduleDays,
@@ -266,8 +262,8 @@ export function DnsListsSection() {
                     {schedules.map((schedule, index) => {
                         const lists = schedule.lists.map((list) =>
                             listed.includes(list)
-                                ? listName(list)
-                                : t("schedules.notOn", { name: listName(list) })
+                                ? listLabel(t, list)
+                                : t("schedules.notOn", { name: listLabel(t, list) })
                         );
                         const days =
                             schedule.days.length === dns.DNS_WEEKDAYS.length
@@ -329,7 +325,7 @@ export function DnsListsSection() {
                                                     )
                                                 }
                                             />
-                                            <span>{listName(list)}</span>
+                                            <span>{listLabel(t, list)}</span>
                                         </label>
                                     ))}
                                 </div>

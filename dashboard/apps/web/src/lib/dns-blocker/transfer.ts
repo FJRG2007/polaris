@@ -87,7 +87,10 @@ export function readImport(text: string, current: DnsSettings): DnsImport {
     // The same pass a stored row gets: lists and services no longer offered drop.
     const settings = readDnsSettings(parsed.data);
     const changed = DNS_SETTING_KEYS.filter(
-        (key) => JSON.stringify(settings[key]) !== JSON.stringify(current[key])
+        (key) =>
+            key !== "serviceDomains" &&
+            (key !== "timeZone" || settings.schedules.length > 0) &&
+            JSON.stringify(settings[key]) !== JSON.stringify(current[key])
     );
     return { ok: true, settings, changed };
 }
