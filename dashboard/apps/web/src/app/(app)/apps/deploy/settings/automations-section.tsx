@@ -26,6 +26,7 @@ import type {
     DeployAutomationView
 } from "@/lib/deploy/automations";
 import * as rules from "@polaris/ui/automation-rules";
+import { CodeEditor } from "@/components/json-view";
 import {
     AddMenu,
     Field,
@@ -47,8 +48,7 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton,
-    Textarea
+    Skeleton
 } from "@polaris/ui";
 import {
     Clock,
@@ -1140,18 +1140,17 @@ export function AutomationEditor({
                                                         className="sm:col-span-2"
                                                     >
                                                         {(id, invalid) => (
-                                                            <Textarea
+                                                            <CodeEditor
                                                                 id={id}
-                                                                rows={3}
+                                                                language="bash"
                                                                 value={action.command}
-                                                                aria-invalid={invalid}
-                                                                className="font-mono text-xs"
+                                                                invalid={invalid}
                                                                 placeholder={t(
                                                                     "automations.commandPlaceholder"
                                                                 )}
-                                                                onChange={(event) =>
+                                                                onChange={(next) =>
                                                                     setAction(index, {
-                                                                        command: event.target.value
+                                                                        command: next
                                                                     })
                                                                 }
                                                             />

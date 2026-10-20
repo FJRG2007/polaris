@@ -210,3 +210,72 @@ export function JsonEditor({
         </div>
     );
 }
+
+/**
+ * A short editable block of code in any grammar - a shell command, a config
+ * file - painted as it is typed, the way `JsonEditor` paints JSON. The field's
+ * label, validation and error line stay the caller's: this is only the box, so
+ * it takes the `id`, `aria-invalid` and blur a plain textarea would.
+ */
+export function CodeEditor({
+    value,
+    onChange,
+    language,
+    id,
+    label,
+    invalid = false,
+    onBlur,
+    placeholder,
+    disabled = false,
+    className
+}: {
+    value: string;
+    onChange: (next: string) => void;
+    /** A highlight.js token, or null to leave the text unpainted. */
+    language: string | null;
+    /** For a `<label htmlFor>` the caller draws. */
+    id?: string;
+    /** Names the field when no label element points at it. */
+    label?: string;
+    invalid?: boolean;
+    onBlur?: () => void;
+    placeholder?: string;
+    disabled?: boolean;
+    className?: string;
+}) {
+    return (
+        <div
+            className={cn(
+                "overflow-auto overscroll-contain rounded-md border bg-surface",
+                invalid ? "border-danger" : "border-border",
+                className
+            )}
+        >
+            {/* The min height lives on the grid so a click under a short
+                command still lands in the textarea. */}
+            <div className="grid min-h-20 w-fit min-w-full">
+                {language ? (
+                    <Painted code={value} language={language} className="pointer-events-none" />
+                ) : (
+                    <pre className={cn(CODE_LAYER, "pointer-events-none")}>{`${value}\n`}</pre>
+                )}
+                <textarea
+                    id={id}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    onBlur={onBlur}
+                    wrap="off"
+                    spellCheck={false}
+                    disabled={disabled}
+                    placeholder={placeholder}
+                    aria-label={label}
+                    aria-invalid={invalid || undefined}
+                    className={cn(
+                        CODE_LAYER,
+                        "resize-none overflow-hidden border-0 bg-transparent text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
+                    )}
+                />
+            </div>
+        </div>
+    );
+}

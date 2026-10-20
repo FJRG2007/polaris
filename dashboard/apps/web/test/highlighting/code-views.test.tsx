@@ -8,7 +8,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("next/link", () => ({
     default: ({ children, href }: { children: unknown; href: string }) => (
@@ -17,7 +17,7 @@ vi.mock("next/link", () => ({
 }));
 
 const { MessagesWrapper } = await import("../setup/i18n");
-const { CodeView } = await import("@/components/json-view");
+const { CodeEditor, CodeView } = await import("@/components/json-view");
 const { ToolInput, ToolOutput } = await import("@/components/polar/elements/tool");
 const { ApiReferenceView } = await import(
     "@/app/(app)/account/api-keys/reference/api-reference-view"
@@ -34,11 +34,38 @@ describe("CodeView", () => {
     it("paints a shell command with the bash grammar", async () => {
         const { container } = render(
             <MessagesWrapper>
-                <CodeView value={'curl -H "Accept: x" https://x.test'} language="bash" label="cmd" />
+                <CodeView
+                    value={'curl -H "Accept: x" https://x.test'}
+                    language="bash"
+                    label="cmd"
+                />
             </MessagesWrapper>
         );
         await painted(container);
         expect(container.textContent).toContain("curl");
+    });
+});
+
+describe("CodeEditor", () => {
+    it("paints a command as it is typed and keeps the field's label and state", async () => {
+        const typed: string[] = [];
+        const { container } = render(
+            <MessagesWrapper>
+                <label htmlFor="cmd">Command</label>
+                <CodeEditor
+                    id="cmd"
+                    value="echo $HOME"
+                    language="bash"
+                    invalid
+                    onChange={(next) => typed.push(next)}
+                />
+            </MessagesWrapper>
+        );
+        await painted(container);
+        const field = screen.getByLabelText("Command");
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        fireEvent.change(field, { target: { value: "ls" } });
+        expect(typed).toEqual(["ls"]);
     });
 });
 
