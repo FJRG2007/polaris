@@ -158,6 +158,13 @@ describe("polarTools", () => {
         );
     });
 
+    it("never reads an empty-scope grant as covering a destructive call whose target is unknown", async () => {
+        held.add("tasks.manage");
+        grants.push({ tool: "tasks_delete", target: "" });
+        const toolset = await polarTools(USER);
+        expect(await (toolset.approval.tasks_delete as Approve)({})).toBe("user-approval");
+    });
+
     it("still refuses at run time an always-allowed tool whose permission is gone", async () => {
         held.add("tasks.manage");
         grants.push({ tool: "tasks_rename", target: "" });

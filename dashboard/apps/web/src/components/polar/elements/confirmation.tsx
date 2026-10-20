@@ -32,7 +32,7 @@ export interface ConfirmationApproval {
 /** What the server read a call as: the thing it acts on, and what a grant covers. */
 interface CallTarget {
     target: { name: string; action: string | null } | null;
-    scope: "target" | "tool";
+    scope: "target" | "tool" | "none";
 }
 
 /** Asks the server what a call acts on, or stores "Always allow" for it. */
@@ -210,7 +210,7 @@ export function Confirmation({
                     <Button type="button" variant="outline" size="sm" onClick={onReject}>
                         {t("approval.deny")}
                     </Button>
-                    {asking ? (
+                    {asking && read?.scope !== "none" ? (
                         <Button
                             type="button"
                             variant="outline"

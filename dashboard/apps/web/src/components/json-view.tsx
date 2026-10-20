@@ -126,24 +126,14 @@ export function JsonView({
     copyable?: boolean;
     label?: string;
 }) {
-    const code = prettyJson(value);
-
     return (
-        <div
-            className={cn(
-                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
-                className
-            )}
-        >
-            {copyable ? (
-                <CopyButton
-                    value={code}
-                    label={label}
-                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                />
-            ) : null}
-            <Painted code={code} />
-        </div>
+        <CodeView
+            value={prettyJson(value)}
+            language="json"
+            className={className}
+            copyable={copyable}
+            label={label}
+        />
     );
 }
 

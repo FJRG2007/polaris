@@ -46,12 +46,18 @@ export function perTarget(entry: Pick<McpTool<never>, "readOnly" | "destructive"
     return !entry.readOnly && (entry.destructive ?? true);
 }
 
-/** The target id a grant for this call is stored under. */
+/**
+ * The target id a grant for this call is stored under; "" for the whole tool.
+ * Null when the tool names its target but this call's could not be read: a
+ * grant then would cover every target, so there is none to give or match.
+ */
 export function grantScope(
-    entry: Pick<McpTool<never>, "readOnly" | "destructive">,
+    entry: Pick<McpTool<never>, "readOnly" | "destructive" | "target">,
     target: McpToolTarget | null
-): string {
-    return perTarget(entry) && target ? target.id : "";
+): string | null {
+    if (!perTarget(entry)) return "";
+    if (target) return target.id;
+    return entry.target ? null : "";
 }
 
 /** This person's grants, as keys, for the approval check of one turn. */
@@ -59,6 +65,7 @@ export async function grantKeys(userId: string): Promise<Set<string>> {
     const rows = await prisma.polarToolGrant.findMany({
         where: { ownerId: userId },
         select: { tool: true, target: true },
+        orderBy: { createdAt: "desc" },
         take: GRANT_LIMIT
     });
     return new Set(
@@ -69,10 +76,11 @@ export async function grantKeys(userId: string): Promise<Set<string>> {
 /** Whether a grant covers this call. */
 export function grantCovers(
     keys: ReadonlySet<string>,
-    entry: Pick<McpTool<never>, "name" | "readOnly" | "destructive">,
+    entry: Pick<McpTool<never>, "name" | "readOnly" | "destructive" | "target">,
     target: McpToolTarget | null
 ): boolean {
-    return keys.has(keyOf(entry.name, grantScope(entry, target)));
+    const scope = grantScope(entry, target);
+    return scope !== null && keys.has(keyOf(entry.name, scope));
 }
 
 /**
@@ -108,13 +116,28 @@ export async function grantableTool(name: string, mayUse: (entry: McpTool<never>
     return entry;
 }
 
-/** Stores a grant; allowing the same thing twice keeps the first. */
+/** Why a grant was not stored: no target to scope it to, or the list is full. */
+export type GrantRefusal = "target_unknown" | "limit";
+
+/**
+ * Stores a grant; allowing the same thing twice keeps the first. Refuses one
+ * past `GRANT_LIMIT`, so every grant stored is both honored and listed.
+ */
 export async function saveGrant(
     userId: string,
     entry: McpTool<never>,
     target: McpToolTarget | null
-): Promise<void> {
+): Promise<GrantRefusal | null> {
     const scope = grantScope(entry, target);
+    if (scope === null) return "target_unknown";
+    const key = { ownerId: userId, tool: entry.name, target: scope };
+    const existing = await prisma.polarToolGrant.findUnique({
+        where: { ownerId_tool_target: key },
+        select: { id: true }
+    });
+    if (existing) return null;
+    const held = await prisma.polarToolGrant.count({ where: { ownerId: userId } });
+    if (held >= GRANT_LIMIT) return "limit";
     await prisma.polarToolGrant.upsert({
         where: { ownerId_tool_target: { ownerId: userId, tool: entry.name, target: scope } },
         create: {
@@ -125,6 +148,7 @@ export async function saveGrant(
         },
         update: {}
     });
+    return null;
 }
 
 /** This person's grants, newest first, for the settings list. */

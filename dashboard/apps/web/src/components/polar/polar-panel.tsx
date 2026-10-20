@@ -2047,7 +2047,7 @@ function MessageView({
                                 }
                                 destructive={described?.destructive ?? name !== "polar_remember"}
                                 input={tool.input}
-                                tool={name}
+                                tool={described?.writes ? name : undefined}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
                                 onReject={() => tool.approval && onApprove(tool.approval.id, false)}
                             />

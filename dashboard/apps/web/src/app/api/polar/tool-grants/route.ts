@@ -63,10 +63,14 @@ export async function POST(request: Request): Promise<Response> {
     );
     if (!entry) return refuse("not_found", 404);
     const target = await callTarget(entry, body.data.input, caller);
-    if (body.data.allow) await saveGrant(user.id, entry, target);
+    if (body.data.allow) {
+        const refused = await saveGrant(user.id, entry, target);
+        if (refused) return refuse(refused, 409);
+    }
+    const scope = grantScope(entry, target);
     return NextResponse.json({
         target: target ? { name: target.name, action: target.action ?? null } : null,
-        scope: grantScope(entry, target) ? "target" : "tool",
+        scope: scope === null ? "none" : scope ? "target" : "tool",
         allowed: body.data.allow
     });
 }
