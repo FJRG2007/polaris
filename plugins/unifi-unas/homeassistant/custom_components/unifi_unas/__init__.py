@@ -48,6 +48,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
+    Platform.EVENT,
     Platform.SENSOR,
     Platform.SELECT,
     Platform.NUMBER,
@@ -346,6 +347,8 @@ class UNASDataUpdateCoordinator(DataUpdateCoordinator):
         self.sensor_add_entities = None
         self.button_add_entities = None
         self.switch_add_entities = None
+        self.binary_sensor_add_entities = None
+        self.console_seen: set = set()
 
         super().__init__(
             hass,
@@ -484,6 +487,9 @@ class UNASDataUpdateCoordinator(DataUpdateCoordinator):
             if self.switch_add_entities is not None:
                 from .switch import _discover_and_add_backup_switches
                 await _discover_and_add_backup_switches(self, self.switch_add_entities)
+
+            from .console import discover_console_entities
+            await discover_console_entities(self)
         except Exception as err:
             _LOGGER.error("Error during entity discovery: %s", err)
 

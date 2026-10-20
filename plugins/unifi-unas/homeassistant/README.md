@@ -29,16 +29,33 @@ Assistant devices and entities.
 - **Shares** - per-share usage, quota, storage pool, member count and details, snapshot and encryption status
 - **Network** - SMB connection count (with client details) and NFS mount count (with share details)
 - **Backup tasks** - status, progress, last run, next scheduled run, source/destination
+- **Uplink** - IP address, interface, link speed, download and upload rate
+- **All Disks** - disk count, bays, hottest and coolest disk, average power-on hours, disks not Optimal
+- **Scrub** (per array) - state, mismatches found, progress
+
+Every measurement keeps long-term statistics, so Home Assistant's history and
+statistics graphs give the console's 1H / 1D / 1W / 1M charts.
 
 ### Binary sensors
 
 - **Agent Installed** - whether the agent is deployed on the UNAS
 - **Monitor** - whether the agent service is running
 - **Fan Control** - whether fan control is active
+- **Online** - whether the NAS is reporting
+- **Time Machine** - on when a share is offered to Time Machine (attributes: shares, SMB address)
+- **Bay N Drive Present** / **Bay N Disk Problem** - one pair per physical bay; an empty bay reads "No Drive Detected" as off
+- **Storage Pool N No Data Protection** - on when the pool survives no disk failure
+- **Scrub Running** / **Scrub Found Errors** - per array
+- **Backup Last run failed** / **Backup Overdue** - per backup task
+
+### Events
+
+- **Sign-in** - fires `smb_session_started` with username, IP and share for every new SMB session
 
 ### Controls
 
 - **Fan Mode** (select) - UNAS Managed, Custom Curve, Target Temperature, or Set Speed
+- **Console Fan Profile** (select) - Quiet, Balanced or Cooling, the profile UniFi's own fan control follows in UNAS Managed mode
 - **Target Temperature** (number) - desired drive temperature for Target Temperature mode
 - **Temperature Metric** (select) - Max (hottest drive) or Average
 - **Response Speed** (select) - Relaxed, Balanced, or Aggressive
@@ -50,7 +67,23 @@ Assistant devices and entities.
 ### Switches and buttons
 
 - **Backup Schedule** (switch) - enable/disable each configured backup task
-- **Reinstall Agent**, **Reboot**, **Shutdown**, **Run backup** (buttons)
+- **Reinstall Agent**, **Reboot**, **Shutdown**, **Run backup**, **Run Scrub Now** (buttons)
+
+### Alert blueprints
+
+Import any of these from Settings -> Automations & Scenes -> Blueprints ->
+Import Blueprint, pasting the file's raw GitHub URL:
+
+| Blueprint | Fires when |
+|---|---|
+| [`nas_offline.yaml`](blueprints/automation/unifi_unas/nas_offline.yaml) | the NAS stops reporting for N minutes |
+| [`storage_problem.yaml`](blueprints/automation/unifi_unas/storage_problem.yaml) | a pool loses protection, a disk is not Optimal, a scrub finds errors, or a backup fails or is overdue |
+| [`disk_temperature.yaml`](blueprints/automation/unifi_unas/disk_temperature.yaml) | a disk stays above N C |
+| [`pool_usage.yaml`](blueprints/automation/unifi_unas/pool_usage.yaml) | a pool passes N% used |
+| [`unexpected_sign_in.yaml`](blueprints/automation/unifi_unas/unexpected_sign_in.yaml) | an SMB session opens as a user or from an address you did not list |
+
+Where each value comes from, and what the console shows that cannot be read,
+is in [`docs/data-sources.md`](../docs/data-sources.md).
 
 ## Supported devices
 

@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import UNASDataUpdateCoordinator
 from .const import CONF_DEVICE_MODEL, DOMAIN, get_device_info, get_mqtt_topics
+from .console import FanProfileSelect
 from .fan_mode import FanModeMixin
 
 DEFAULT_FAN_SPEED_50_PCT = 128
@@ -41,6 +42,7 @@ async def async_setup_entry(
         UNASFanModeSelect(coordinator, hass),
         UNASTempMetricSelect(coordinator, hass),
         UNASResponseSpeedSelect(coordinator, hass),
+        FanProfileSelect(coordinator),
     ])
 
 

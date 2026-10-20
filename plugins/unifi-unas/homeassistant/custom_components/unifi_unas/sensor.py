@@ -277,6 +277,9 @@ async def async_setup_entry(
 
     entities.append(UNASFanCurveVisualizationSensor(coordinator))
 
+    from .console import console_sensor_entities
+    entities.extend(console_sensor_entities(coordinator, UNASSensor))
+
     async_add_entities(entities)
 
     coordinator.sensor_add_entities = async_add_entities

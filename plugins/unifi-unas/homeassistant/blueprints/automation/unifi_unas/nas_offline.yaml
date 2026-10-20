@@ -1,0 +1,33 @@
+blueprint:
+  name: UniFi UNAS - NAS offline
+  description: Run actions when the NAS stops reporting for a while.
+  domain: automation
+  input:
+    online_sensor:
+      name: Online sensor
+      selector:
+        entity:
+          filter:
+            - integration: unifi_unas
+              domain: binary_sensor
+              device_class: connectivity
+    minutes:
+      name: Offline for (minutes)
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+    actions:
+      name: Actions
+      selector:
+        action: {}
+triggers:
+  - trigger: state
+    entity_id: !input online_sensor
+    to: "off"
+    for:
+      minutes: !input minutes
+actions: !input actions
+mode: single
