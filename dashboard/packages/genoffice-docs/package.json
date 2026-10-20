@@ -30,6 +30,11 @@
         "@polaris/genoffice-ui": "*",
         "@polaris/office-layout": "*",
         "@polaris/project-store": "*",
+        "@tiptap/core": "3.32.0",
+        "@tiptap/extensions": "3.32.0",
+        "@tiptap/pm": "3.32.0",
+        "@tiptap/react": "3.32.0",
+        "marked": "12.0.2",
         "react": "19.0.8",
         "react-dom": "19.0.8"
     },
