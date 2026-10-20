@@ -194,7 +194,16 @@ const importInput = z.object({
  * again. The graph is published as version 1 and armed.
  */
 export async function importLegacyAutomation(input: z.input<typeof importInput>): Promise<string> {
-    const given = importInput.parse(input);
+    return importAutomation(importInput.parse(input));
+}
+
+/**
+ * The import itself, for an app's rows and for core's own (Watch alarms, whose
+ * `origin` is null). Same once-only contract: keyed by `legacyRef`.
+ */
+export async function importAutomation(
+    given: Omit<z.output<typeof importInput>, "origin"> & { readonly origin: string | null }
+): Promise<string> {
     const existing = await prisma.automation.findUnique({
         where: { legacyRef: given.legacyRef },
         select: { id: true }

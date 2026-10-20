@@ -277,7 +277,9 @@ async function evaluateOne(
 }
 
 export async function evaluateAlarms(): Promise<void> {
-    const alarms = await prisma.alarm.findMany({ where: { enabled: true } });
+    // A carried alarm is its automation's now (`alarm-carry.ts`): evaluating it
+    // here too would announce the same crossing twice.
+    const alarms = await prisma.alarm.findMany({ where: { enabled: true, carriedToId: null } });
     if (alarms.length === 0) return;
     // One failed batch read falls back to each alarm reading what it names, so
     // it fails that alarm alone rather than the whole pass.

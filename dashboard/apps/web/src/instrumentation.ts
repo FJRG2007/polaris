@@ -233,6 +233,17 @@ export async function register(): Promise<void> {
     const { startZoneAddressSync } = await import("./lib/domain-address-sync");
     startZoneAddressSync();
 
+    // Carry Watch alarms into Automations, once each: an enabled alarm on a
+    // reading becomes a published automation and Watch stops evaluating it. After
+    // the predecessor so the two dashboards of an update do not both try; the
+    // unique legacyRef covers them if they do.
+    const { carryWatchAlarms } = await import("./lib/watch/alarm-carry");
+    void afterPredecessor()
+        .then(carryWatchAlarms)
+        .catch((error: unknown) =>
+            console.error("polaris: Watch alarms could not be carried to Automations:", error)
+        );
+
     // Domain health and Watch alarms used to start here, as two timers of their
     // own. They are scheduled jobs now - `domain-health` and `alarms` in
     // `lib/cron/jobs.ts` - because a timer takes no lease, and during an update

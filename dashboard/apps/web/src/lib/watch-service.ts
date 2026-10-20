@@ -22,6 +22,8 @@ export interface AlarmView {
     enabled: boolean;
     state: string;
     lastEvaluatedAt: string | null;
+    /** The automation it was carried into, when it was; Watch no longer evaluates it. */
+    carriedToId: string | null;
 }
 
 export interface AlarmEventView {
@@ -92,6 +94,7 @@ function toView(row: {
     enabled: boolean;
     state: string;
     lastEvaluatedAt: Date | null;
+    carriedToId: string | null;
 }): AlarmView {
     return {
         id: row.id,
@@ -104,7 +107,8 @@ function toView(row: {
         forPeriods: row.forPeriods,
         enabled: row.enabled,
         state: row.state,
-        lastEvaluatedAt: row.lastEvaluatedAt?.toISOString() ?? null
+        lastEvaluatedAt: row.lastEvaluatedAt?.toISOString() ?? null,
+        carriedToId: row.carriedToId
     };
 }
 

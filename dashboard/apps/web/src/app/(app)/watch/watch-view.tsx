@@ -122,8 +122,8 @@ export function WatchView({
                         {initialAlarms.map((alarm) => (
                             <Card key={alarm.id}>
                                 <CardBody className="flex items-center justify-between gap-3 py-3">
-                                    <div className="flex items-center gap-2">
-                                        <Activity className="size-4 text-muted-foreground" />
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <Activity className="size-4 shrink-0 text-muted-foreground" />
                                         <div className="min-w-0">
                                             <p className="truncate text-sm font-medium">{alarm.name}</p>
                                             <p className="truncate text-xs text-muted-foreground">
@@ -132,19 +132,36 @@ export function WatchView({
                                                     summary: describe(alarm)
                                                 })}
                                             </p>
+                                            {alarm.carriedToId && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t("alarms.carried")}{" "}
+                                                    <Link
+                                                        className="text-primary hover:underline"
+                                                        href={`/automations/${alarm.carriedToId}`}
+                                                    >
+                                                        {t("alarms.carriedOpen")}
+                                                    </Link>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge className={cn(stateTone(alarm.state))}>
-                                            {alarmStateWord(t, alarm.state)}
-                                        </Badge>
-                                        <Switch
-                                            checked={alarm.enabled}
-                                            onChange={(next) =>
-                                                void setAlarmEnabledAction(alarm.id, next).then(() => router.refresh())
-                                            }
-                                            aria-label={alarm.enabled ? t("alarms.disable") : t("alarms.enable")}
-                                        />
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {!alarm.carriedToId && (
+                                            <Badge className={cn(stateTone(alarm.state))}>
+                                                {alarmStateWord(t, alarm.state)}
+                                            </Badge>
+                                        )}
+                                        {!alarm.carriedToId && (
+                                            <Switch
+                                                checked={alarm.enabled}
+                                                onChange={(next) =>
+                                                    void setAlarmEnabledAction(alarm.id, next).then(() =>
+                                                        router.refresh()
+                                                    )
+                                                }
+                                                aria-label={alarm.enabled ? t("alarms.disable") : t("alarms.enable")}
+                                            />
+                                        )}
                                         <button
                                             type="button"
                                             aria-label={t("alarms.delete")}
