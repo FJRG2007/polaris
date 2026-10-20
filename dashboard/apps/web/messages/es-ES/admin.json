@@ -135,6 +135,19 @@
             "web": {
                 "label": "Polar en la web",
                 "hint": "Polar busca en la web y lee páginas públicas. Las búsquedas usan la clave del chat."
+            },
+            "connectors": {
+                "label": "Quién conecta servidores MCP",
+                "hint": "Cada persona añade sus servidores en Permisos de Polar. Sus herramientas solo funcionan para ella.",
+                "who": {
+                    "everyone": "Todos los de Polar",
+                    "admins": "Administradores",
+                    "off": "Nadie"
+                },
+                "hosts": "Hosts permitidos",
+                "hostsPlaceholder": "Cualquiera, p. ej. mcp.linear.app",
+                "hostsHint": "Separa con comas. Cada host permite los nombres bajo él. Vacío permite cualquier host público.",
+                "privateNetwork": "Permitir servidores de esta red"
             }
         }
     },

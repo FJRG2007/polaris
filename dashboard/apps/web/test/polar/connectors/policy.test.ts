@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as shared from "@/lib/polar/connectors/shared";
 import * as policy from "@/lib/polar/connectors/policy";
 
 const connector = { id: "0190a000-0000-7000-8000-000000000001", name: "Linear" };
@@ -29,11 +30,11 @@ describe("connector addresses", () => {
     });
 
     it("allows a host and the names under it, and everything with no list", () => {
-        expect(policy.hostAllowed("https://mcp.linear.app/mcp", [])).toBe(true);
-        expect(policy.hostAllowed("https://mcp.linear.app/mcp", ["linear.app"])).toBe(true);
-        expect(policy.hostAllowed("https://linear.app.evil.com", ["linear.app"])).toBe(false);
-        expect(policy.normalizeHostEntry(" *.Example.COM ")).toBe("example.com");
-        expect(policy.normalizeHostEntry("")).toBeNull();
+        expect(shared.hostAllowed("https://mcp.linear.app/mcp", [])).toBe(true);
+        expect(shared.hostAllowed("https://mcp.linear.app/mcp", ["linear.app"])).toBe(true);
+        expect(shared.hostAllowed("https://linear.app.evil.com", ["linear.app"])).toBe(false);
+        expect(shared.normalizeHostEntry(" *.Example.COM ")).toBe("example.com");
+        expect(shared.normalizeHostEntry("")).toBeNull();
     });
 });
 

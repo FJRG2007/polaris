@@ -14,7 +14,17 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { findPolarGroupsAction, findPolarPeopleAction, setPolarAccessAction } from "./actions";
 import { Card, CardBody, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import type { AudienceKind, PolarAudience, PolarPolicy } from "@/lib/polar/access";
+import {
+    CONNECTOR_AUDIENCES,
+    DEFAULT_CONNECTOR_POLICY,
+    normalizeHostEntry
+} from "@/lib/polar/connectors/shared";
+import type {
+    AudienceKind,
+    PolarAudience,
+    PolarConnectorPolicy,
+    PolarPolicy
+} from "@/lib/polar/access";
 
 type Part = "use" | "spend";
 type Group = { id: string; name: string };
@@ -47,6 +57,8 @@ export function PolarAccessCard({
         ...groups
     ]);
     const [groupQuery, setGroupQuery] = useState("");
+    const connectors = current.connectors ?? DEFAULT_CONNECTOR_POLICY;
+    const [hostsDraft, setHostsDraft] = useState(connectors.hosts.join(", "));
     const [foundGroups, setFoundGroups] = useState<readonly Group[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -90,6 +102,22 @@ export function PolarAccessCard({
     };
     const change = (part: Part, patch: Partial<PolarAudience>) =>
         save({ ...current, [part]: { ...current[part], ...patch } });
+
+    const changeConnectors = (patch: Partial<PolarConnectorPolicy>) =>
+        save({ ...current, connectors: { ...connectors, ...patch } });
+    /** The typed hosts, each normalized; an entry that is no host is dropped. */
+    const commitHosts = () => {
+        const hosts = [
+            ...new Set(
+                hostsDraft
+                    .split(/[\s,]+/)
+                    .map(normalizeHostEntry)
+                    .filter((host): host is string => Boolean(host))
+            )
+        ].slice(0, 100);
+        setHostsDraft(hosts.join(", "));
+        if (hosts.join(",") !== connectors.hosts.join(",")) changeConnectors({ hosts });
+    };
 
     const options = (["admins", "chosen", "everyone"] as const).map((value) => ({
         value,
@@ -234,6 +262,55 @@ export function PolarAccessCard({
                         disabled={pending}
                         aria-label={t("agents.polarAccess.web.label")}
                     />
+                </div>
+                <div className="space-y-2">
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">
+                            {t("agents.polarAccess.connectors.label")}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("agents.polarAccess.connectors.hint")}
+                        </p>
+                    </div>
+                    <SegmentedControl<PolarConnectorPolicy["who"]>
+                        size="sm"
+                        value={connectors.who}
+                        options={CONNECTOR_AUDIENCES.map((value) => ({
+                            value,
+                            label: t(`agents.polarAccess.connectors.who.${value}`)
+                        }))}
+                        aria-label={t("agents.polarAccess.connectors.label")}
+                        onValueChange={(who) => changeConnectors({ who })}
+                    />
+                    {connectors.who !== "off" ? (
+                        <>
+                            <Input
+                                value={hostsDraft}
+                                onChange={(event) => setHostsDraft(event.target.value)}
+                                onBlur={commitHosts}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") commitHosts();
+                                }}
+                                disabled={pending}
+                                placeholder={t("agents.polarAccess.connectors.hostsPlaceholder")}
+                                aria-label={t("agents.polarAccess.connectors.hosts")}
+                            />
+                            <p className="text-muted-foreground text-xs">
+                                {t("agents.polarAccess.connectors.hostsHint")}
+                            </p>
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="min-w-0 text-xs text-muted-foreground">
+                                    {t("agents.polarAccess.connectors.privateNetwork")}
+                                </p>
+                                <Switch
+                                    checked={connectors.privateNetwork}
+                                    onChange={(privateNetwork) => changeConnectors({ privateNetwork })}
+                                    disabled={pending}
+                                    aria-label={t("agents.polarAccess.connectors.privateNetwork")}
+                                />
+                            </div>
+                        </>
+                    ) : null}
                 </div>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>

@@ -97,7 +97,8 @@ describe("Polar access policy", () => {
         const policy = {
             use: audience({ who: "admins" }),
             spend: audience({ who: "everyone" }),
-            web: true
+            web: true,
+            connectors: DEFAULT_POLAR_POLICY.connectors
         };
         expect(decidePolarAccess(policy, member)).toMatchObject({ use: false, spend: false });
         expect(decidePolarAccess(policy, admin)).toMatchObject({ use: true, spend: true });
@@ -147,5 +148,16 @@ describe("Polar access policy", () => {
             expect(source, path).toContain("polarCaller()");
             expect(source, path).not.toMatch(/\bapiUser\(/);
         }
+    });
+
+    it("opens connectors to everybody who uses Polar until an administrator narrows them", () => {
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).connectors).toBe(true);
+        const saved = polarPolicySchema.parse({ use: { who: "everyone" }, spend: { who: "admins" } });
+        expect(saved.connectors).toEqual({ who: "everyone", hosts: [], privateNetwork: false });
+        const admins = { ...saved, connectors: { ...saved.connectors, who: "admins" as const } };
+        expect(decidePolarAccess(admins, member).connectors).toBe(false);
+        expect(decidePolarAccess(admins, admin).connectors).toBe(true);
+        const off = { ...saved, connectors: { ...saved.connectors, who: "off" as const } };
+        expect(decidePolarAccess(off, admin).connectors).toBe(false);
     });
 });

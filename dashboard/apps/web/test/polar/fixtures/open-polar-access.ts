@@ -9,7 +9,7 @@ export async function openPolarAccess() {
     return {
         // Read on the call, so a test that never reaches a route never loads a session.
         polarCaller: async () => (await import("@/lib/api-session")).apiUser(),
-        polarAccessFor: async () => ({ use: true, spend: true, web: true }),
+        polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true }),
         polarKeySources: (userId: string) => keys.keySourcesFor(userId),
         polarCredentialFor: (...args: Parameters<typeof keys.chatCredentialFor>) =>
             keys.chatCredentialFor(...args)

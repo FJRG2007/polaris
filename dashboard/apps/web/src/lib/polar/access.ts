@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import type { SessionUser } from "@/lib/session";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
 import {
     chatCredentialFor,
     instanceKeysAreShared,
@@ -43,12 +44,29 @@ const audienceSchema = z.object({
 });
 export type PolarAudience = z.infer<typeof audienceSchema>;
 
+/**
+ * Who may connect their own MCP servers to Polar, and where to. Open to
+ * everybody who uses Polar with no list by default, so an install that never
+ * saved it has connectors without anybody setting them up. A private address
+ * stays out of reach unless an administrator lets it in: a connector is a
+ * request from inside the deployment's network to an address somebody typed.
+ */
+const connectorPolicySchema = z.object({
+    who: z.enum(CONNECTOR_AUDIENCES).default("everyone"),
+    /** Hosts a connector may be on; empty allows any public host. */
+    hosts: z.array(z.string().trim().toLowerCase().min(1).max(253)).max(100).default([]),
+    /** Whether a connector may be on the deployment's own network. */
+    privateNetwork: z.boolean().default(false)
+});
+export type PolarConnectorPolicy = z.infer<typeof connectorPolicySchema>;
+
 export const polarPolicySchema = z.object({
     use: audienceSchema,
     spend: audienceSchema,
     /** Whether Polar may search and read the web. On unless an administrator
      *  turned it off, so a policy saved before this existed keeps it on. */
-    web: z.boolean().default(true)
+    web: z.boolean().default(true),
+    connectors: connectorPolicySchema.default(DEFAULT_CONNECTOR_POLICY)
 });
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
@@ -65,7 +83,8 @@ export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 export const DEFAULT_POLAR_POLICY: PolarPolicy = {
     use: { who: "everyone", userIds: [], groupIds: [], guests: false },
     spend: { who: "admins", userIds: [], groupIds: [], guests: false },
-    web: true
+    web: true,
+    connectors: DEFAULT_CONNECTOR_POLICY
 };
 
 /**
@@ -119,12 +138,22 @@ export interface PolarAccess {
     spend: boolean;
     /** Whether this account's turns may search and read the web. */
     web: boolean;
+    /** Whether this account may connect and use its own MCP servers. */
+    connectors: boolean;
 }
 
 /** One account's answer to both questions. Pure. */
 export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): PolarAccess {
     const use = audienceAdmits(policy.use, facts);
-    return { use, spend: use && audienceAdmits(policy.spend, facts), web: use && policy.web };
+    const connectors = policy.connectors ?? DEFAULT_CONNECTOR_POLICY;
+    return {
+        use,
+        spend: use && audienceAdmits(policy.spend, facts),
+        web: use && policy.web,
+        connectors:
+            use &&
+            (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin))
+    };
 }
 
 const FACTS_SELECT = {
@@ -163,7 +192,7 @@ export async function polarAccessFor(userId: string): Promise<PolarAccess> {
         return decidePolarAccess(policy, facts);
     } catch (error) {
         console.error("polar: could not read the access policy", error);
-        return { use: false, spend: false, web: false };
+        return { use: false, spend: false, web: false, connectors: false };
     }
 }
 

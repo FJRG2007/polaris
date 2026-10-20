@@ -14,7 +14,8 @@
  *   `readOnlyHint`, and one marked `destructiveHint` always asks.
  * - What a tool answers, as the model reads it: somebody else's text, capped
  *   and fenced, never an instruction (`fenceConnectorOutput`).
- * - Which addresses a deployment lets anybody connect (`hostAllowed`).
+ * - Which addresses a deployment lets anybody connect: `shared.ts`, which the
+ *   admin screen reads too.
  */
 
 import { z } from "zod";
@@ -331,31 +332,4 @@ export function fenceConnectorOutput(connector: string, text: string): string {
         clean,
         `</${FENCE}>`
     ].join("\n");
-}
-
-/** A host as an allowlist entry: lowercase, no scheme, port or path. */
-export function normalizeHostEntry(raw: string): string | null {
-    const trimmed = raw.trim().toLowerCase().replace(/^\*\./, "");
-    if (!trimmed) return null;
-    try {
-        const host = new URL(`https://${trimmed}`).hostname;
-        return host && !host.includes("/") ? host : null;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Whether the deployment lets anybody connect this address. An empty list
- * allows every host; an entry allows itself and every name under it.
- */
-export function hostAllowed(url: string, allowlist: readonly string[]): boolean {
-    if (allowlist.length === 0) return true;
-    let host: string;
-    try {
-        host = new URL(url).hostname.toLowerCase();
-    } catch {
-        return false;
-    }
-    return allowlist.some((entry) => host === entry || host.endsWith(`.${entry}`));
 }
