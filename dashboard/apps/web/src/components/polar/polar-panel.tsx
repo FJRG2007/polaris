@@ -80,6 +80,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
+import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
@@ -1098,184 +1099,186 @@ export function PolarChat({
                     className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm"
                 />
             ) : null}
-            <PromptInput
-                onSubmit={submit}
-                className={cn(dragging && "border-primary bg-primary/10")}
-                onDragOver={(event) => {
-                    if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
-                    event.preventDefault();
-                    setDragging(true);
-                }}
-                onDragLeave={(event) => {
-                    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            <BorderBeam active={chat.status === "streaming"}>
+                <PromptInput
+                    onSubmit={submit}
+                    className={cn(dragging && "border-primary bg-primary/10")}
+                    onDragOver={(event) => {
+                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                        event.preventDefault();
+                        setDragging(true);
+                    }}
+                    onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                            setDragging(false);
+                    }}
+                    onDrop={(event) => {
+                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                        event.preventDefault();
                         setDragging(false);
-                }}
-                onDrop={(event) => {
-                    if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
-                    event.preventDefault();
-                    setDragging(false);
-                    addFiles(Array.from(event.dataTransfer.files));
-                }}
-            >
-                <PromptInputHeader>
-                    {context ? (
-                        <Chip
-                            title={t("context.title")}
-                            label={context.record?.name ?? context.title ?? context.route}
-                            removeLabel={t("context.remove")}
-                            onRemove={() => setWithPage(false)}
-                        />
+                        addFiles(Array.from(event.dataTransfer.files));
+                    }}
+                >
+                    <PromptInputHeader>
+                        {context ? (
+                            <Chip
+                                title={t("context.title")}
+                                label={context.record?.name ?? context.title ?? context.route}
+                                removeLabel={t("context.remove")}
+                                onRemove={() => setWithPage(false)}
+                            />
+                        ) : null}
+                        {quote ? (
+                            <Chip
+                                label={`${t("reply.to")} "${quote}"`}
+                                removeLabel={t("reply.cancel")}
+                                onRemove={() => setQuote(null)}
+                            />
+                        ) : null}
+                        {editing ? (
+                            <Chip
+                                label={t("edit.editing")}
+                                removeLabel={t("edit.cancel")}
+                                onRemove={() => setEditing(null)}
+                            />
+                        ) : null}
+                    </PromptInputHeader>
+                    <AttachmentList
+                        files={files}
+                        className="mb-2 mt-1"
+                        onRemove={removeFile}
+                        onRetry={retryFile}
+                    />
+                    {fileError ? (
+                        <p role="alert" className="mb-1 text-xs text-danger-ink">
+                            {fileError}
+                        </p>
                     ) : null}
-                    {quote ? (
-                        <Chip
-                            label={`${t("reply.to")} "${quote}"`}
-                            removeLabel={t("reply.cancel")}
-                            onRemove={() => setQuote(null)}
-                        />
-                    ) : null}
-                    {editing ? (
-                        <Chip
-                            label={t("edit.editing")}
-                            removeLabel={t("edit.cancel")}
-                            onRemove={() => setEditing(null)}
-                        />
-                    ) : null}
-                </PromptInputHeader>
-                <AttachmentList
-                    files={files}
-                    className="mb-2 mt-1"
-                    onRemove={removeFile}
-                    onRetry={retryFile}
-                />
-                {fileError ? (
-                    <p role="alert" className="mb-1 text-xs text-danger-ink">
-                        {fileError}
-                    </p>
-                ) : null}
-                {voiceNotice ? (
-                    <div
-                        role="alert"
-                        className="mb-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-                    >
-                        <span
-                            className={
-                                voiceNotice === "unavailable"
-                                    ? "text-muted-foreground"
-                                    : "text-danger-ink"
-                            }
+                    {voiceNotice ? (
+                        <div
+                            role="alert"
+                            className="mb-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
                         >
-                            {voiceNotice === "unavailable"
-                                ? t("voice.unavailable")
-                                : voiceNotice === "micDenied" || voiceNotice === "cannotRecord"
-                                  ? t(`voice.${voiceNotice}`)
-                                  : t(`voice.errors.${voiceNotice}`)}
-                        </span>
-                        {voiceNotice === "unavailable" ? (
-                            <>
-                                <Link
-                                    href="/account/ai-keys"
-                                    className="text-primary hover:underline"
-                                >
-                                    {t("noKeys.own")}
-                                </Link>
-                                {isAdmin ? (
+                            <span
+                                className={
+                                    voiceNotice === "unavailable"
+                                        ? "text-muted-foreground"
+                                        : "text-danger-ink"
+                                }
+                            >
+                                {voiceNotice === "unavailable"
+                                    ? t("voice.unavailable")
+                                    : voiceNotice === "micDenied" || voiceNotice === "cannotRecord"
+                                      ? t(`voice.${voiceNotice}`)
+                                      : t(`voice.errors.${voiceNotice}`)}
+                            </span>
+                            {voiceNotice === "unavailable" ? (
+                                <>
                                     <Link
-                                        href="/admin/integrations/models"
+                                        href="/account/ai-keys"
                                         className="text-primary hover:underline"
                                     >
-                                        {t("noKeys.admin")}
+                                        {t("noKeys.own")}
                                     </Link>
-                                ) : null}
-                            </>
-                        ) : null}
-                        <button
-                            type="button"
-                            className="ml-auto text-muted-foreground hover:text-foreground"
-                            aria-label={t("voice.dismiss")}
-                            title={t("voice.dismiss")}
-                            onClick={() => setVoiceNotice(null)}
-                        >
-                            <X className="size-3.5" />
-                        </button>
-                    </div>
-                ) : null}
-                <label htmlFor={ids.input} className="sr-only">
-                    {t("composer.label")}
-                </label>
-                <PromptInputTextarea
-                    ref={textarea}
-                    id={ids.input}
-                    value={input}
-                    maxLength={20000}
-                    disabled={noKeys}
-                    placeholder={t("composer.placeholder")}
-                    aria-controls={slashOpen ? ids.slash : undefined}
-                    aria-activedescendant={
-                        slashOpen && slashHighlight >= 0
-                            ? suggestionOptionId(ids.slash, slashHighlight)
-                            : undefined
-                    }
-                    onKeyDown={onComposerKey}
-                    onChange={(event) => setInput(event.target.value)}
-                    onSubmitKey={submit}
-                    onPaste={(event) => {
-                        const pasted = pastedFiles(event.clipboardData);
-                        if (pasted.length > 0) {
-                            event.preventDefault();
-                            addFiles(pasted);
+                                    {isAdmin ? (
+                                        <Link
+                                            href="/admin/integrations/models"
+                                            className="text-primary hover:underline"
+                                        >
+                                            {t("noKeys.admin")}
+                                        </Link>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="ml-auto text-muted-foreground hover:text-foreground"
+                                aria-label={t("voice.dismiss")}
+                                title={t("voice.dismiss")}
+                                onClick={() => setVoiceNotice(null)}
+                            >
+                                <X className="size-3.5" />
+                            </button>
+                        </div>
+                    ) : null}
+                    <label htmlFor={ids.input} className="sr-only">
+                        {t("composer.label")}
+                    </label>
+                    <PromptInputTextarea
+                        ref={textarea}
+                        id={ids.input}
+                        value={input}
+                        maxLength={20000}
+                        disabled={noKeys}
+                        placeholder={t("composer.placeholder")}
+                        aria-controls={slashOpen ? ids.slash : undefined}
+                        aria-activedescendant={
+                            slashOpen && slashHighlight >= 0
+                                ? suggestionOptionId(ids.slash, slashHighlight)
+                                : undefined
                         }
-                    }}
-                />
-                <PromptInputFooter>
-                    <PromptInputTools>
-                        <span id={ids.attach} className="contents">
-                            <PromptInputAttach
-                                label={t("files.add")}
-                                accept={POLAR_ATTACHMENT_TYPES}
-                                disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
-                                onFiles={addFiles}
-                                onFailed={setFileError}
-                            />
-                        </span>
-                        <DictationButton
-                            available={voice.dictation}
-                            disabled={noKeys}
-                            payer={choice?.payer}
-                            onNotice={setVoiceNotice}
-                            onText={(text) => {
-                                setInput((current) =>
-                                    current.trim() ? `${current.trimEnd()} ${text}` : text
-                                );
-                                textarea.current?.focus();
-                            }}
-                        />
-                        <VoiceModeButton
-                            available={voice.dictation}
-                            disabled={noKeys || !choice}
-                            onNotice={setVoiceNotice}
-                            onOpen={() => setInCall(true)}
-                        />
-                        <ModelSelector
-                            providers={providers ?? []}
-                            choice={choice}
-                            onChoice={setChoice}
-                            open={modelOpen}
-                            onOpenChange={setModelOpen}
-                        />
-                    </PromptInputTools>
-                    <PromptInputSubmit
-                        busy={busy}
-                        disabled={
-                            (!input.trim() && files.length === 0) ||
-                            !choice ||
-                            files.some(stillStaging)
-                        }
-                        sendLabel={t("actions.send")}
-                        stopLabel={t("actions.stop")}
-                        onStop={() => void chat.stop()}
+                        onKeyDown={onComposerKey}
+                        onChange={(event) => setInput(event.target.value)}
+                        onSubmitKey={submit}
+                        onPaste={(event) => {
+                            const pasted = pastedFiles(event.clipboardData);
+                            if (pasted.length > 0) {
+                                event.preventDefault();
+                                addFiles(pasted);
+                            }
+                        }}
                     />
-                </PromptInputFooter>
-            </PromptInput>
+                    <PromptInputFooter>
+                        <PromptInputTools>
+                            <span id={ids.attach} className="contents">
+                                <PromptInputAttach
+                                    label={t("files.add")}
+                                    accept={POLAR_ATTACHMENT_TYPES}
+                                    disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
+                                    onFiles={addFiles}
+                                    onFailed={setFileError}
+                                />
+                            </span>
+                            <DictationButton
+                                available={voice.dictation}
+                                disabled={noKeys}
+                                payer={choice?.payer}
+                                onNotice={setVoiceNotice}
+                                onText={(text) => {
+                                    setInput((current) =>
+                                        current.trim() ? `${current.trimEnd()} ${text}` : text
+                                    );
+                                    textarea.current?.focus();
+                                }}
+                            />
+                            <VoiceModeButton
+                                available={voice.dictation}
+                                disabled={noKeys || !choice}
+                                onNotice={setVoiceNotice}
+                                onOpen={() => setInCall(true)}
+                            />
+                            <ModelSelector
+                                providers={providers ?? []}
+                                choice={choice}
+                                onChoice={setChoice}
+                                open={modelOpen}
+                                onOpenChange={setModelOpen}
+                            />
+                        </PromptInputTools>
+                        <PromptInputSubmit
+                            busy={busy}
+                            disabled={
+                                (!input.trim() && files.length === 0) ||
+                                !choice ||
+                                files.some(stillStaging)
+                            }
+                            sendLabel={t("actions.send")}
+                            stopLabel={t("actions.stop")}
+                            onStop={() => void chat.stop()}
+                        />
+                    </PromptInputFooter>
+                </PromptInput>
+            </BorderBeam>
             <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
             {inCall ? (
                 <VoiceCall
