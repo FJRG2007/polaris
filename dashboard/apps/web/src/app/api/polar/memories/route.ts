@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 const postSchema = z.object({ text: memoryTextSchema }).strict();
 
 /** Writes to the memory list, per person per minute. */
-export const MEMORY_WRITES_PER_MINUTE = 60;
+const MEMORY_WRITES_PER_MINUTE = 60;
 
 export async function GET(): Promise<Response> {
     const user = await apiUser();

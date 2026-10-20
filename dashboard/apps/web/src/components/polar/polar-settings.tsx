@@ -281,7 +281,7 @@ export function MemorySettings() {
                     {t("settings.memory.empty")}
                 </p>
             ) : (
-                <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                <ul className="flex max-h-72 flex-col divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                     {state.memories.map((row) => (
                         <li key={row.id} className="flex min-w-0 items-center gap-1 px-2 py-1.5">
                             {editing === row.id ? (
@@ -427,7 +427,7 @@ export function PolarSettings({
                     <DialogTitle>{t("settings.title")}</DialogTitle>
                     <DialogDescription>{t("settings.intro")}</DialogDescription>
                 </DialogHeader>
-                <div className="flex min-h-0 flex-col gap-6 overflow-y-auto pr-1">
+                <div className="flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain pr-1">
                     {open ? <MemorySettings /> : null}
                     <DataSettings />
                     {children}

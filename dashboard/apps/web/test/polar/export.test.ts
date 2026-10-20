@@ -213,7 +213,7 @@ describe("routes", () => {
 
     it("zips every saved chat and never a temporary one", async () => {
         state.rows = [{ id: ID, title: "Trip to Lisbon", updatedAt: at(5) }];
-        const response = await all.GET();
+        const response = await all.GET(new Request("http://x"));
         expect(response.headers.get("content-type")).toBe("application/zip");
         const bytes = new Uint8Array(await response.arrayBuffer());
         const text = new TextDecoder().decode(bytes);
@@ -226,7 +226,7 @@ describe("routes", () => {
         const row = (n: number) => ({ id: `t${n}`, title: `Chat ${n}`, updatedAt: at(5) });
         state.pages = [Array.from({ length: 200 }, (_, n) => row(n)), [row(200)]];
         const text = new TextDecoder().decode(
-            new Uint8Array(await (await all.GET()).arrayBuffer())
+            new Uint8Array(await (await all.GET(new Request("http://x"))).arrayBuffer())
         );
         expect(text).toContain("markdown/chat-200-t200.md");
         expect(state.listCalls).toHaveLength(2);

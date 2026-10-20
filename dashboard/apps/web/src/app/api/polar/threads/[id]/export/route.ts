@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import {
     exportFileName,
     exportNames,
@@ -39,6 +40,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const name = exportFileName(thread.title, thread.id, markdown ? "md" : "json");
     return new Response(body, {
         headers: {
+            ...downloadTicketHeaders(request),
             "Content-Type": markdown
                 ? "text/markdown; charset=utf-8"
                 : "application/json; charset=utf-8",
