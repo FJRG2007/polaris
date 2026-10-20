@@ -492,7 +492,8 @@
         "kind": "shared chat",
         "file": "Open {name}",
         "unnamedFile": "File",
-        "close": "Close"
+        "close": "Close",
+        "upToIntro": "Anyone with the link can read this conversation up to this answer. Later messages stay private, and updating the link keeps this end point."
     },
     "busyVerbs": {
         "pondering": "Pondering",

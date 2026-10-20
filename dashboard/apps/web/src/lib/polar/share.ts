@@ -101,12 +101,25 @@ export async function polarShareLink(
 }
 
 /**
+ * The answer a snapshot ends at: `upTo` when it is one of this chat's own
+ * messages, otherwise null, which shows the whole chat.
+ */
+async function endOf(threadId: string, upTo: string | null | undefined): Promise<string | null> {
+    if (!upTo) return null;
+    const found = await prisma.polarMessage.count({ where: { id: upTo, threadId } });
+    return found ? upTo : null;
+}
+
+/**
  * Shares the chat, or moves an existing link's snapshot to now. The address of
- * an existing link stays the same. Null when the chat is not this person's.
+ * an existing link stays the same. `upTo` ends the snapshot at that answer
+ * (shared from its own row); without it the snapshot is the whole chat. Null
+ * when the chat is not this person's.
  */
 export async function sharePolarThread(
     userId: string,
-    threadId: string
+    threadId: string,
+    upTo?: string | null
 ): Promise<PolarShareLink | null> {
     // A temporary chat is deleted when its tab leaves it; a link to it would
     // outlive the chat it promised, so it answers as one that does not exist.
@@ -114,6 +127,7 @@ export async function sharePolarThread(
         where: { id: threadId, userId, temporary: false }
     });
     if (!owned) return null;
+    const upToMessageId = await endOf(threadId, upTo);
     const existing = await prisma.polarThreadShare.findUnique({
         where: { threadId },
         select: { id: true }
@@ -121,10 +135,12 @@ export async function sharePolarThread(
     if (existing) {
         await prisma.polarThreadShare.update({
             where: { id: existing.id },
-            data: { sharedAt: new Date(), linkEnabled: true }
+            data: { sharedAt: new Date(), linkEnabled: true, upToMessageId }
         });
     } else {
-        await prisma.polarThreadShare.create({ data: { threadId, ...freshToken() } });
+        await prisma.polarThreadShare.create({
+            data: { threadId, upToMessageId, ...freshToken() }
+        });
     }
     return polarShareLink(userId, threadId);
 }
@@ -220,12 +236,34 @@ export function newestPath<T extends Row>(rows: readonly T[]): T[] {
     return path;
 }
 
-/** The words (and Polar's own files) of a thread up to a snapshot. */
-async function snapshotOf(share: {
+/**
+ * The conversation that led to one message: its first message, each answer
+ * and question in between, and the message itself - whichever versions it
+ * grew from, not the newest ones. Null when `id` is not among the rows.
+ */
+export function pathTo<T extends Row>(rows: readonly T[], id: string): T[] | null {
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const path: T[] = [];
+    const seen = new Set<string>();
+    let next = byId.get(id);
+    if (!next) return null;
+    while (next && !seen.has(next.id)) {
+        seen.add(next.id);
+        path.unshift(next);
+        next = next.parentId ? byId.get(next.parentId) : undefined;
+    }
+    return path;
+}
+
+type SnapshotShare = {
     threadId: string;
     sharedAt: Date;
+    upToMessageId?: string | null;
     thread: { title: string };
-}): Promise<SharedPolarThread> {
+};
+
+/** The words (and Polar's own files) of a thread up to a snapshot. */
+async function snapshotOf(share: SnapshotShare): Promise<SharedPolarThread> {
     const rows = await prisma.polarMessage.findMany({
         where: { threadId: share.threadId, createdAt: { lte: share.sharedAt } },
         select: { id: true, parentId: true, role: true, parts: true, metadata: true },
@@ -235,7 +273,9 @@ async function snapshotOf(share: {
     return {
         title: share.thread.title,
         sharedAt: share.sharedAt.toISOString(),
-        messages: newestPath(rows)
+        messages: (
+            (share.upToMessageId ? pathTo(rows, share.upToMessageId) : null) ?? newestPath(rows)
+        )
             .filter((row) => row.role === "user" || row.role === "assistant")
             .filter((row) => !compactionOf(row))
             .map((row) => ({
@@ -258,6 +298,7 @@ async function shareByToken(token: string) {
             sharedAt: true,
             threadId: true,
             linkEnabled: true,
+            upToMessageId: true,
             thread: { select: { title: true } }
         }
     });
@@ -284,11 +325,7 @@ const SNAPSHOT_FILES_MOST = 500;
  */
 const snapshotFiles = new Map<string, { at: number; ids: Promise<Set<string>> }>();
 
-function filesShownBy(share: {
-    threadId: string;
-    sharedAt: Date;
-    thread: { title: string };
-}): Promise<Set<string>> {
+function filesShownBy(share: SnapshotShare): Promise<Set<string>> {
     const key = `${share.threadId}:${share.sharedAt.getTime()}`;
     const now = Date.now();
     const hit = snapshotFiles.get(key);
@@ -311,10 +348,7 @@ function filesShownBy(share: {
 }
 
 /** A file the snapshot shows, read only because the snapshot shows it. */
-async function fileInSnapshot(
-    share: { threadId: string; sharedAt: Date; thread: { title: string } },
-    fileId: string
-): Promise<FileStream> {
+async function fileInSnapshot(share: SnapshotShare, fileId: string): Promise<FileStream> {
     const shown = (await filesShownBy(share)).has(fileId);
     return shown ? readThreadAttachment(share.threadId, fileId) : null;
 }
@@ -379,7 +413,8 @@ export async function sendPolarShare(
     sender: { id: string; name: string | null },
     threadId: string,
     userIds: readonly string[],
-    note: string | null
+    note: string | null,
+    upTo?: string | null
 ): Promise<SendPolarShareResult> {
     const thread = await prisma.polarThread.findFirst({
         // Temporary chats are never sent, for the same reason they have no link.
@@ -421,13 +456,18 @@ export async function sendPolarShare(
         ? (
               await prisma.polarThreadShare.update({
                   where: { id: existing.id },
-                  data: { sharedAt: new Date() },
+                  data: { sharedAt: new Date(), upToMessageId: await endOf(threadId, upTo) },
                   select: { id: true }
               })
           ).id
         : (
               await prisma.polarThreadShare.create({
-                  data: { threadId, linkEnabled: false, ...freshToken() },
+                  data: {
+                      threadId,
+                      linkEnabled: false,
+                      upToMessageId: await endOf(threadId, upTo),
+                      ...freshToken()
+                  },
                   select: { id: true }
               })
           ).id;
@@ -557,6 +597,7 @@ async function receivedShare(userId: string, recipientId: string) {
                 select: {
                     threadId: true,
                     sharedAt: true,
+                    upToMessageId: true,
                     thread: {
                         select: {
                             title: true,

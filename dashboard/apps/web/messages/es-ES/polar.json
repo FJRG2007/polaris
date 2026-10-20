@@ -492,7 +492,8 @@
         "kind": "compartido",
         "file": "Abrir {name}",
         "unnamedFile": "Archivo",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "upToIntro": "Quien tenga el enlace puede leer esta conversación hasta esta respuesta. Lo posterior sigue privado y al actualizar el enlace se mantiene este final."
     },
     "busyVerbs": {
         "pondering": "Rumiando",

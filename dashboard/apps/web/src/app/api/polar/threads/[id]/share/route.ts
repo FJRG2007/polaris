@@ -1,7 +1,8 @@
 /**
  * The read-only public link of one of the signed-in person's Polar chats.
  * GET reads it (`link: null` when it is not shared), POST makes it - or moves
- * an existing link's snapshot to now, keeping its address - and DELETE stops
+ * an existing link's snapshot to now, keeping its address; a body of
+ * `{ upTo }` ends the snapshot at that answer - and DELETE stops
  * serving it - `?everyone=1` also takes it back from every person it was sent
  * to. Another person's id answers as a thread that does not exist.
  */
@@ -10,11 +11,15 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { polarMessageIdSchema } from "@/lib/polar/answer-feedback";
 import { polarShareLink, revokePolarShare, sharePolarThread } from "@/lib/polar/share";
 
 export const dynamic = "force-dynamic";
 
 const idSchema = z.string().uuid();
+
+/** No body (the whole chat) or the answer it ends at. */
+const shareSchema = z.object({ upTo: polarMessageIdSchema.nullish() }).nullable();
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,15 +33,24 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
     return NextResponse.json({ link: await polarShareLink(user.id, id.data) });
 }
 
-export async function POST(_request: Request, { params }: Params): Promise<Response> {
+export async function POST(request: Request, { params }: Params): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
+    const text = await request.text().catch(() => "");
+    let raw: unknown = null;
+    try {
+        raw = text.trim() ? JSON.parse(text) : null;
+    } catch {
+        return NextResponse.json({ error: "invalid" }, { status: 400 });
+    }
+    const body = shareSchema.safeParse(raw);
+    if (!body.success) return NextResponse.json({ error: "invalid" }, { status: 400 });
     const limited = await rateLimit(`polar-share:${user.id}`, 20, 60_000);
     if (!limited.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-    const link = await sharePolarThread(user.id, id.data);
+    const link = await sharePolarThread(user.id, id.data, body.data?.upTo ?? null);
     return link ? NextResponse.json({ link }) : NOT_FOUND();
 }
 

@@ -6,7 +6,8 @@
  * taken back at any time.
  *
  * - `PolarShareDialog` - one chat's link (create, copy, update, delete) and the
- *   people it was sent to (send with a note, take back from one).
+ *   people it was sent to (send with a note, take back from one). Opened from
+ *   an answer's row, the snapshot it makes or updates ends at that answer.
  * - `SharedWithYou` - the sidebar section listing chats other people sent you.
  * - `SharedLinksDialog` - every chat you share, to open, copy or stop sharing.
  */
@@ -81,8 +82,17 @@ function IconAction({
     );
 }
 
-/** One chat's link and the people it was sent to. */
-export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClose: () => void }) {
+/** One chat's link and the people it was sent to. `upTo` ends the snapshot at
+ *  that answer; without it the snapshot is the whole chat. */
+export function PolarShareDialog({
+    row,
+    upTo,
+    onClose
+}: {
+    row: Pick<PolarThreadRow, "id">;
+    upTo?: string | null;
+    onClose: () => void;
+}) {
     const t = useTranslations("polar");
     const toast = useToast();
     const { copied, copy } = useCopied();
@@ -117,9 +127,15 @@ export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClos
 
     const change = async (method: "POST" | "DELETE") => {
         setWorking(true);
-        const response = await fetch(`/api/polar/threads/${row.id}/share`, { method }).catch(
-            () => null
-        );
+        const response = await fetch(`/api/polar/threads/${row.id}/share`, {
+            method,
+            ...(method === "POST" && upTo
+                ? {
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ upTo })
+                  }
+                : {})
+        }).catch(() => null);
         setWorking(false);
         if (!response?.ok) {
             toast.show({ title: t("history.shareFailed") });
@@ -141,7 +157,8 @@ export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClos
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
                 userIds: picked.map((person) => person.id),
-                note: note.trim() || null
+                note: note.trim() || null,
+                ...(upTo ? { upTo } : {})
             })
         }).catch(() => null);
         setWorking(false);
@@ -188,7 +205,9 @@ export function PolarShareDialog({ row, onClose }: { row: PolarThreadRow; onClos
             <DialogContent className="flex max-h-[min(40rem,90dvh)] max-w-lg flex-col gap-4">
                 <DialogHeader>
                     <DialogTitle>{t("history.shareTitle")}</DialogTitle>
-                    <DialogDescription>{t("history.shareIntro")}</DialogDescription>
+                    <DialogDescription>
+                        {t(upTo ? "sharing.upToIntro" : "history.shareIntro")}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="-mx-1 min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-1">
                     <section className="space-y-2">
