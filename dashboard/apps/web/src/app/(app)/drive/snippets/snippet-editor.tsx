@@ -26,7 +26,7 @@ import { CODE_LANGUAGES, languageForFile } from "@/lib/code-language";
 import { generateSealKey, seal, withSealKey } from "@/lib/browser-seal";
 import { MAX_SNIPPET_FILES, MAX_SNIPPET_TOTAL_CHARS } from "@polaris/core";
 import { createSnippetAction, updateSnippetAction } from "./snippet-actions";
-import { Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
+import { Button, Card, CardBody, Input, isDirty, Select, Textarea } from "@polaris/ui";
 
 export interface EditorFile {
     name: string;
@@ -89,6 +89,15 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     const [sealed, setSealed] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // An edit put back to the snippet as it is saves nothing. The files are
+    // compared exactly: whitespace inside code is part of the code.
+    const unchanged =
+        snippet !== undefined &&
+        !isDirty(
+            { title: snippet.title, description: snippet.description, files: snippet.files },
+            { title, description, files },
+            (value) => ({ ...value, files: JSON.stringify(value.files) })
+        );
     const [link, setLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
@@ -387,7 +396,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                 <Button asChild variant="secondary" type="button">
                     <Link href="/drive/snippets">{t("snippetEditor.cancel")}</Link>
                 </Button>
-                <Button type="submit" disabled={pending}>
+                <Button type="submit" disabled={pending || unchanged}>
                     {pending ? (
                         <Loader2 className="size-4 animate-spin" />
                     ) : (
