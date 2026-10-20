@@ -1292,23 +1292,23 @@ export function PolarChat({
                       group: t("slash.groups.control")
                   }
                 : match.kind === "builtin"
-                ? {
-                      key: match.command,
-                      label: `/${match.command}`,
-                      detail: LATER.has(match.command)
-                          ? t("slash.later")
-                          : t(`slash.${match.command}`),
-                      icon: COMMAND_ICONS[match.command],
-                      disabled: LATER.has(match.command),
-                      group: t("slash.groups.polar")
-                  }
-                : {
-                      key: `own:${match.row.id}`,
-                      label: `/${match.row.shortcut}`,
-                      detail: polarShared.firstLine(match.row.prompt),
-                      icon: Zap,
-                      group: t("slash.groups.own")
-                  }
+                  ? {
+                        key: match.command,
+                        label: `/${match.command}`,
+                        detail: LATER.has(match.command)
+                            ? t("slash.later")
+                            : t(`slash.${match.command}`),
+                        icon: COMMAND_ICONS[match.command],
+                        disabled: LATER.has(match.command),
+                        group: t("slash.groups.polar")
+                    }
+                  : {
+                        key: `own:${match.row.id}`,
+                        label: `/${match.row.shortcut}`,
+                        detail: polarShared.firstLine(match.row.prompt),
+                        icon: Zap,
+                        group: t("slash.groups.own")
+                    }
         ),
         ...(input.startsWith("/") && !/\s/.test(input)
             ? [
@@ -2062,8 +2062,7 @@ export function windowOf(
     const model = providers
         ?.find((entry) => entry.provider === choice.provider)
         ?.models.find((entry) => entry.model === choice.model) as
-        | { contextTokens?: unknown; providerContextTokens?: unknown }
-        | undefined;
+        { contextTokens?: unknown; providerContextTokens?: unknown } | undefined;
     return contextWindowOf({
         provider:
             typeof model?.providerContextTokens === "number" ? model.providerContextTokens : null,
