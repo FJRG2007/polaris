@@ -1692,8 +1692,12 @@ function MessageView({
                                 state={tool.state}
                                 approval={tool.approval}
                                 action={toolName(name)}
-                                affects={affectedBy(tool.input)}
-                                destructive={described?.destructive ?? true}
+                                affects={
+                                    name === "polar_remember"
+                                        ? affectedBy({ name: (tool.input as { text?: unknown } | undefined)?.text })
+                                        : affectedBy(tool.input)
+                                }
+                                destructive={described?.destructive ?? name !== "polar_remember"}
                                 input={tool.input}
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
                                 onReject={() => tool.approval && onApprove(tool.approval.id, false)}

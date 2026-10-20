@@ -3,7 +3,8 @@
  *
  * A memory is one short sentence the person can read, change and delete in
  * Polar's settings. The model writes them with `polar_remember` when asked to
- * ("remember that I prefer metric") and removes them with `polar_forget`; the
+ * ("remember that I prefer metric"), each save approved by the person in the
+ * chat, and removes them with `polar_forget`; the
  * saved ones reach every chat as a compact, fenced block of the system prompt.
  * A temporary chat neither reads nor writes them, and the per-person switch
  * turns both off without deleting anything (ChatGPT's "Reference saved
@@ -17,7 +18,7 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { tool, type ToolSet } from "ai";
+import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import {
     looksSecret,
     normalizeMemoryText,
@@ -168,21 +169,30 @@ export async function polarMemoryPrompt(userId: string): Promise<string> {
 /** Tool names the screen labels in its own words. */
 export const MEMORY_TOOL_NAMES = ["polar_remember", "polar_forget"] as const;
 
+const rememberInput = z.object({ text: z.string().min(1).max(POLAR_MEMORY_MAX_CHARS * 2) });
+const forgetInput = z.object({ id: z.string().uuid() });
+
 /**
- * The two memory tools for one chat. Neither waits for an approval - what they
- * touch is the person's own list, shown in settings, and the call is visible in
- * the answer's work line - but both refuse what the list would refuse.
+ * A save waits for the person's approval in the chat: what it writes reaches
+ * every later chat's prompt, and the words may come from a page, a mail or a
+ * tool's answer rather than from them. Forgetting only shrinks the list.
+ */
+export const MEMORY_APPROVAL: Record<string, "user-approval"> = { polar_remember: "user-approval" };
+
+/**
+ * The two memory tools for one chat. Both refuse what the list would refuse,
+ * and a save refuses while the person has memory switched off.
  */
 export function polarMemoryTools(userId: string, threadId: string): ToolSet {
     return {
         polar_remember: tool({
             description:
                 "Save one short fact about the person for future chats, only when they ask you to remember something or state a lasting preference. Never save passwords, keys, tokens, codes or other secrets.",
-            inputSchema: z.object({
-                text: z.string().min(1).max(POLAR_MEMORY_MAX_CHARS * 2)
-            }),
+            inputSchema: rememberInput as unknown as FlexibleSchema<z.infer<typeof rememberInput>>,
             async execute({ text }) {
-                const saved = await addPolarMemory(userId, text, threadId);
+                const saved = (await polarMemoryEnabled(userId))
+                    ? await addPolarMemory(userId, text, threadId)
+                    : "disabled";
                 if (typeof saved === "string") {
                     const reason: Record<MemoryRefusal, string> = {
                         empty: "Nothing to remember.",
@@ -198,7 +208,7 @@ export function polarMemoryTools(userId: string, threadId: string): ToolSet {
         }),
         polar_forget: tool({
             description: "Delete one saved memory by its id, when the person asks you to forget it.",
-            inputSchema: z.object({ id: z.string().uuid() }),
+            inputSchema: forgetInput as unknown as FlexibleSchema<z.infer<typeof forgetInput>>,
             async execute({ id }) {
                 return (await deletePolarMemory(userId, id))
                     ? { ok: true, text: "Forgotten." }

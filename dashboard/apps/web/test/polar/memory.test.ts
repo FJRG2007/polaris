@@ -135,6 +135,23 @@ describe("owner scope", () => {
         expect(result).toMatchObject({ ok: false });
         expect(state.calls.some((call) => call.op === "create")).toBe(false);
     });
+
+    it("the remember tool refuses while memory is off and saves while on", async () => {
+        const run = (text: string) =>
+            memory.polarMemoryTools("u1", ID).polar_remember!.execute!({ text } as never, {
+                toolCallId: "t",
+                messages: []
+            } as never);
+        state.preference = { memory: false };
+        expect(await run("likes tea")).toEqual({ ok: false, text: "Memory is off." });
+        expect(state.calls.some((call) => call.op === "create")).toBe(false);
+        state.preference = { memory: true };
+        expect(await run("likes tea")).toMatchObject({ ok: true, id: ID });
+    });
+
+    it("asks for approval before a save, never before a forget", () => {
+        expect(memory.MEMORY_APPROVAL).toEqual({ polar_remember: "user-approval" });
+    });
 });
 
 describe("routes", () => {

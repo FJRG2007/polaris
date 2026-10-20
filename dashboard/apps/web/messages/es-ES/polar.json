@@ -314,6 +314,11 @@
     "export": {
         "markdown": "Exportar en Markdown",
         "json": "Exportar en JSON",
-        "you": "Tú"
+        "you": "Tú",
+        "untitled": "Conversación",
+        "file": "Archivo: {name}",
+        "attachment": "adjunto",
+        "used": "Usó {name}",
+        "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat."
     }
 }

@@ -4,18 +4,21 @@
  * (every message and version, with its parent, parts and metadata). All of a
  * person's chats leave as one zip, streamed one chat at a time.
  *
- * Temporary chats are never in the zip. Every read names the owner.
+ * Temporary chats are never in the zip; every other one is, read a page of
+ * chats at a time. A chat longer than one export carries keeps its newest
+ * messages and says so in both files. Every read names the owner.
  *
  * Server-only.
  */
 
 import { prisma } from "@polaris/db";
+import { getTranslations } from "@/lib/i18n/request";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 
 /** Most messages one exported chat carries; the newest ones. */
 const EXPORT_MESSAGES_MOST = 5000;
-/** Most chats one zip carries, newest first. */
-const EXPORT_THREADS_MOST = 2000;
+/** Chats the zip reads per query. */
+const EXPORT_THREADS_PAGE = 200;
 
 export type ExportFormat = "markdown" | "json";
 
@@ -33,7 +36,33 @@ export interface ExportThread {
     title: string;
     createdAt: string;
     updatedAt: string;
+    /** Older messages were left out: the chat is longer than one export carries. */
+    truncated: boolean;
     messages: ExportMessage[];
+}
+
+/** The words a Markdown export is written in, in the reader's language. */
+export interface ExportNames {
+    user: string;
+    assistant: string;
+    untitled: string;
+    attachment: string;
+    file: (name: string) => string;
+    used: (name: string) => string;
+    truncated: string;
+}
+
+export async function exportNames(): Promise<ExportNames> {
+    const t = await getTranslations("polar");
+    return {
+        user: t("export.you"),
+        assistant: "Polar",
+        untitled: t("export.untitled"),
+        attachment: t("export.attachment"),
+        file: (name) => t("export.file", { name }),
+        used: (name) => t("export.used", { name }),
+        truncated: t("export.truncated", { most: EXPORT_MESSAGES_MOST })
+    };
 }
 
 /** The newest version of every turn, root to leaf: what the chat shows. */
@@ -62,7 +91,7 @@ type Part = { type?: unknown; text?: unknown; filename?: unknown; toolName?: unk
 
 /** One message's parts as Markdown: its words, the files it carried by name,
  *  and the tools it used by name. Tool inputs and outputs stay in the JSON. */
-function partsMarkdown(parts: readonly unknown[]): string {
+function partsMarkdown(parts: readonly unknown[], names: ExportNames): string {
     const lines: string[] = [];
     for (const raw of parts) {
         const part = (raw ?? {}) as Part;
@@ -70,19 +99,20 @@ function partsMarkdown(parts: readonly unknown[]): string {
         if (type === "text" && typeof part.text === "string" && part.text.trim()) {
             lines.push(part.text.trim());
         } else if (type === "file") {
-            lines.push(`> File: ${typeof part.filename === "string" ? part.filename : "attachment"}`);
+            lines.push(`> ${names.file(typeof part.filename === "string" ? part.filename : names.attachment)}`);
         } else if (type.startsWith("tool-") || type === "dynamic-tool") {
             const name = type === "dynamic-tool" ? String(part.toolName ?? "tool") : type.slice(5);
-            lines.push(`> Used ${name}`);
+            lines.push(`> ${names.used(name)}`);
         }
     }
     return lines.join("\n\n");
 }
 
-export function threadMarkdown(thread: ExportThread, names: { user: string; assistant: string }): string {
-    const blocks = [`# ${thread.title.replace(/\s+/g, " ").trim() || "Conversation"}`, `_${thread.createdAt}_`];
+export function threadMarkdown(thread: ExportThread, names: ExportNames): string {
+    const blocks = [`# ${thread.title.replace(/\s+/g, " ").trim() || names.untitled}`, `_${thread.createdAt}_`];
+    if (thread.truncated) blocks.push(`> ${names.truncated}`);
     for (const message of newestPath(thread.messages)) {
-        const body = partsMarkdown(message.parts);
+        const body = partsMarkdown(message.parts, names);
         if (!body) continue;
         blocks.push(`## ${message.role === "user" ? names.user : names.assistant}`, body);
     }
@@ -124,16 +154,19 @@ export async function readExportThread(userId: string, id: string): Promise<Expo
                     createdAt: true
                 },
                 orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                take: EXPORT_MESSAGES_MOST
+                take: EXPORT_MESSAGES_MOST + 1
             }
         }
     });
     if (!thread) return null;
+    const truncated = thread.messages.length > EXPORT_MESSAGES_MOST;
+    if (truncated) thread.messages.length = EXPORT_MESSAGES_MOST;
     return {
         id: thread.id,
         title: thread.title,
         createdAt: thread.createdAt.toISOString(),
         updatedAt: thread.updatedAt.toISOString(),
+        truncated,
         messages: thread.messages.reverse().map((message) => ({
             id: message.id,
             parentId: message.parentId,
@@ -155,22 +188,32 @@ function textStream(text: string): ReadableStream<Uint8Array> {
     });
 }
 
+/** Every saved chat of the person, a page at a time, newest first. Ordered by
+ *  creation so a chat touched while the zip is written is neither skipped nor
+ *  repeated. */
+async function* savedThreads(userId: string): AsyncGenerator<{ id: string; title: string; updatedAt: Date }> {
+    let cursor: string | null = null;
+    for (;;) {
+        const page: { id: string; title: string; updatedAt: Date }[] = await prisma.polarThread.findMany({
+            where: { userId, temporary: false },
+            select: { id: true, title: true, updatedAt: true },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: EXPORT_THREADS_PAGE,
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+        });
+        yield* page;
+        if (page.length < EXPORT_THREADS_PAGE) return;
+        cursor = page[page.length - 1]!.id;
+    }
+}
+
 /** Every saved chat of the person as a zip: a Markdown and a JSON file each.
  *  Each chat is read only when the archive reaches it. */
-export async function exportAllThreads(
-    userId: string,
-    names: { user: string; assistant: string }
-): Promise<ReadableStream<Uint8Array>> {
-    const rows = await prisma.polarThread.findMany({
-        where: { userId, temporary: false },
-        select: { id: true, title: true, updatedAt: true },
-        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-        take: EXPORT_THREADS_MOST
-    });
+export async function exportAllThreads(userId: string, names: ExportNames): Promise<ReadableStream<Uint8Array>> {
     async function* sources(): AsyncGenerator<ZipSource> {
         yield { name: "markdown/", kind: "dir", size: 0n };
         yield { name: "json/", kind: "dir", size: 0n };
-        for (const row of rows) {
+        for await (const row of savedThreads(userId)) {
             const thread = await readExportThread(userId, row.id);
             if (!thread) continue;
             const markdown = threadMarkdown(thread, names);

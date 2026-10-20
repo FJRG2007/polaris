@@ -13,7 +13,9 @@ const state = {
     anonymous: false,
     thread: null as unknown,
     listArgs: null as unknown,
-    rows: [] as { id: string; title: string; updatedAt: Date }[]
+    listCalls: [] as unknown[],
+    rows: [] as { id: string; title: string; updatedAt: Date }[],
+    pages: null as null | { id: string; title: string; updatedAt: Date }[][]
 };
 
 vi.mock("@/lib/api-session", () => ({
@@ -23,7 +25,10 @@ vi.mock("@/lib/api-session", () => ({
             : { id: "u1", name: "Ana", viewingAs: null }
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
-vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
+vi.mock("@/lib/i18n/request", () => ({
+    getTranslations: async () => (key: string, values?: Record<string, unknown>) =>
+        values ? `${key}(${Object.values(values).join(",")})` : key
+}));
 vi.mock("@polaris/db", () => ({
     prisma: {
         polarThread: {
@@ -31,7 +36,8 @@ vi.mock("@polaris/db", () => ({
                 args.where.userId === "u1" ? state.thread : null,
             findMany: async (args: unknown) => {
                 state.listArgs = args;
-                return state.rows;
+                state.listCalls.push(args);
+                return state.pages ? (state.pages.shift() ?? []) : state.rows;
             }
         }
     }
@@ -60,16 +66,62 @@ beforeEach(() => {
     state.anonymous = false;
     state.thread = stored();
     state.rows = [];
+    state.pages = null;
+    state.listCalls = [];
 });
+
+const NAMES = {
+    user: "Tú",
+    assistant: "Polar",
+    untitled: "Conversación",
+    attachment: "adjunto",
+    file: (name: string) => `Archivo: ${name}`,
+    used: (name: string) => `Usó ${name}`,
+    truncated: "Recortado"
+};
 
 describe("formats", () => {
     it("writes the newest path as Markdown, tools and files by name only", async () => {
         const thread = (await exporter.readExportThread("u1", ID))!;
-        const markdown = exporter.threadMarkdown(thread, { user: "You", assistant: "Polar" });
+        const markdown = exporter.threadMarkdown(thread, NAMES);
         expect(markdown).toContain("# Trip to Lisbon");
         expect(markdown).toContain("Edited question");
         expect(markdown).toContain("Second answer");
         expect(markdown).not.toContain("First answer");
+        expect(markdown).not.toMatch(/File:|Used |Recortado/);
+        const labelled = exporter.threadMarkdown(
+            {
+                ...thread,
+                title: " ",
+                messages: [
+                    { id: "x", parentId: null, role: "user", parts: [{ type: "file" }, { type: "tool-search" }], metadata: null, createdAt: "" }
+                ]
+            },
+            NAMES
+        );
+        expect(labelled).toContain("# Conversación");
+        expect(labelled).toContain("> Archivo: adjunto");
+        expect(labelled).toContain("> Usó search");
+    });
+
+    it("says when a chat is longer than one export carries", async () => {
+        const many = Array.from({ length: 5001 }, (_, n) => ({
+            id: `m${n}`,
+            parentId: n === 5000 ? null : `m${n + 1}`,
+            role: n % 2 ? "user" : "assistant",
+            parts: [{ type: "text", text: `t${n}` }],
+            metadata: null,
+            createdAt: at(0)
+        }));
+        state.thread = { ...stored(), messages: many };
+        const thread = (await exporter.readExportThread("u1", ID))!;
+        expect(thread.truncated).toBe(true);
+        expect(thread.messages).toHaveLength(5000);
+        expect(thread.messages.some((message) => message.id === "m5000")).toBe(false);
+        expect(exporter.threadMarkdown(thread, NAMES)).toContain("> Recortado");
+        expect(JSON.parse(exporter.threadJson(thread)).truncated).toBe(true);
+        state.thread = stored();
+        expect((await exporter.readExportThread("u1", ID))!.truncated).toBe(false);
     });
 
     it("keeps every version in JSON", async () => {
@@ -118,5 +170,14 @@ describe("routes", () => {
         expect(text).toContain("markdown/trip-to-lisbon-11111111.md");
         expect(text).toContain("json/trip-to-lisbon-11111111.json");
         expect(state.listArgs).toMatchObject({ where: { userId: "u1", temporary: false } });
+    });
+
+    it("pages through every saved chat instead of stopping at a limit", async () => {
+        const row = (n: number) => ({ id: `t${n}`, title: `Chat ${n}`, updatedAt: at(5) });
+        state.pages = [Array.from({ length: 200 }, (_, n) => row(n)), [row(200)]];
+        const text = new TextDecoder().decode(new Uint8Array(await (await all.GET()).arrayBuffer()));
+        expect(text).toContain("markdown/chat-200-t200.md");
+        expect(state.listCalls).toHaveLength(2);
+        expect(state.listCalls[1]).toMatchObject({ cursor: { id: "t199" }, skip: 1 });
     });
 });

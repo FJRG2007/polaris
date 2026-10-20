@@ -8,9 +8,9 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
-import { getTranslations } from "@/lib/i18n/request";
 import {
     exportFileName,
+    exportNames,
     readExportThread,
     threadJson,
     threadMarkdown
@@ -33,13 +33,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     const thread = await readExportThread(user.id, id.data);
     if (!thread) return NextResponse.json({ error: "not_found" }, { status: 404 });
     const markdown = format.data === "markdown";
-    let body: string;
-    if (markdown) {
-        const t = await getTranslations("polar");
-        body = threadMarkdown(thread, { user: t("export.you"), assistant: "Polar" });
-    } else {
-        body = threadJson(thread);
-    }
+    const body = markdown ? threadMarkdown(thread, await exportNames()) : threadJson(thread);
     const name = exportFileName(thread.title, thread.id, markdown ? "md" : "json");
     return new Response(body, {
         headers: {

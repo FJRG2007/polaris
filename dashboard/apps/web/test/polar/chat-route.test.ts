@@ -44,6 +44,7 @@ vi.mock("@/lib/polar/attachments", () => ({
     inlinePolarFiles: async (_user: string, messages: unknown) => messages
 }));
 vi.mock("@/lib/polar/memory", () => ({
+    MEMORY_APPROVAL: { polar_remember: "user-approval" },
     polarMemoryEnabled: async () => true,
     polarMemoryPrompt: async () => "",
     polarMemoryTools: () => ({})

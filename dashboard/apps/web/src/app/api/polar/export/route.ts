@@ -7,8 +7,7 @@
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { getTranslations } from "@/lib/i18n/request";
-import { exportAllThreads } from "@/lib/polar/export";
+import { exportAllThreads, exportNames } from "@/lib/polar/export";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,8 +17,7 @@ export async function GET(): Promise<Response> {
     if (user instanceof NextResponse) return user;
     const limited = await rateLimit(`polar-export:${user.id}`, 5, 10 * 60_000);
     if (!limited.ok) return NextResponse.json({ error: "rate_limited" }, { status: 429 });
-    const t = await getTranslations("polar");
-    const stream = await exportAllThreads(user.id, { user: t("export.you"), assistant: "Polar" });
+    const stream = await exportAllThreads(user.id, await exportNames());
     const day = new Date().toISOString().slice(0, 10);
     return new Response(stream, {
         headers: {

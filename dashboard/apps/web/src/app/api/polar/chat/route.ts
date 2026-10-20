@@ -25,7 +25,12 @@ import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
-import { polarMemoryEnabled, polarMemoryPrompt, polarMemoryTools } from "@/lib/polar/memory";
+import {
+    MEMORY_APPROVAL,
+    polarMemoryEnabled,
+    polarMemoryPrompt,
+    polarMemoryTools
+} from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
@@ -151,7 +156,7 @@ export async function POST(request: Request): Promise<Response> {
         ),
         messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
         tools,
-        toolApproval: toolset.approval,
+        toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
         stopWhen: isStepCount(STEP_MAX),
         reasoning: reasoningFor(choice.intelligence, resolved.option),
         abortSignal: request.signal
