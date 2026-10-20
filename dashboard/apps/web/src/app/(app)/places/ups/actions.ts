@@ -1,16 +1,19 @@
 "use server";
 
 /**
- * Adding, changing and driving a UPS. Platform admins only, the same gate as
- * the Servers app: every action asks for system.manage before it reads
- * anything. Reading a UPS is not here - a tab that keeps polling one does it
+ * Adding, changing and driving a UPS. Platform admins, the same gate as the
+ * Servers app: every action asks for system.manage before it reads anything -
+ * except driving one (a command, a variable, a self-test), which somebody it
+ * was lent to control may do too, spending one of their uses each time. Reading a UPS is not here - a tab that keeps polling one does it
  * through `/api/servers/ups`, which a deploy cannot leave pointing at an action
  * id that no longer exists.
  */
 
 import { z } from "zod";
 import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, requireUser, type SessionUser } from "@/lib/session";
+import { spendGrant, type LiveGrant } from "@/lib/access/grants";
+import { upsStanding } from "@/lib/ups/ups-access";
 import { recordAudit } from "@/lib/audit-service";
 import { hostSubject } from "@/lib/metrics-shared";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -36,6 +39,26 @@ function refused(error: unknown): { ok: false; error: string } {
 /** The machines this admin can name, as the metric subjects the UPS rows keep. */
 async function knownMachines(userId: string): Promise<Set<string>> {
     return new Set((await listServerRows(userId)).map((row) => hostSubject(row.id)));
+}
+
+/** Whoever may drive this UPS - its administrators, or a visitor lent control
+ *  of it - with the grant a visitor spends. Null for anybody else. */
+async function controlling(
+    id: string
+): Promise<{ user: SessionUser; upsId: string; grant: LiveGrant | null } | null> {
+    const user = await requireUser();
+    const upsId = idSchema.parse(id);
+    const standing = await upsStanding(user, upsId);
+    return standing?.control ? { user, upsId, grant: standing.grant } : null;
+}
+
+/** A visitor's use, counted after the UPS answered. Bookkeeping about an act
+ *  that already happened, so a failure is logged rather than raised. */
+async function countUse(grant: LiveGrant | null): Promise<void> {
+    if (!grant) return;
+    await spendGrant(grant).catch((caught: unknown) =>
+        console.error("polaris: a UPS use could not be counted:", caught)
+    );
 }
 
 async function parseConnection(
@@ -140,13 +163,15 @@ export async function runUpsCommandAction(
     id: string,
     command: string
 ): Promise<UpsActionResult<upsService.UpsCommandResult>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId, grant } = reached;
         const parsed = commandSchema.parse(command);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
         const outcome = await upsService.runUpsCommand(row, parsed);
+        await countUse(grant);
         await upsData.logAction({
             upsId,
             actorId: user.id,
@@ -159,7 +184,7 @@ export async function runUpsCommandAction(
             action: "ups.command",
             targetType: "ups",
             targetId: upsId,
-            metadata: { command: parsed, outcome }
+            metadata: { command: parsed, outcome, lent: Boolean(grant) }
         });
         return { ok: true, value: outcome };
     } catch (error) {
@@ -224,9 +249,10 @@ export async function acknowledgeUpsEventsAction(
     id: string,
     ids: unknown
 ): Promise<UpsActionResult<number>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId } = reached;
         const which = acknowledgeSchema.parse(ids);
         return { ok: true, value: await upsData.acknowledgeEvents(upsId, which, user.id) };
     } catch (error) {
@@ -238,13 +264,15 @@ export async function setUpsVarAction(
     id: string,
     raw: unknown
 ): Promise<UpsActionResult<{ outcome: upsService.UpsSetResult; error?: string }>> {
-    const user = await requirePermission("system.manage");
     try {
-        const upsId = idSchema.parse(id);
+        const reached = await controlling(id);
+        if (!reached) return { ok: false, error: "notFound" };
+        const { user, upsId, grant } = reached;
         const input = upsSettings.setVarSchema.parse(raw);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
         const result = await upsService.setUpsVar(row, input.name, input.value);
+        await countUse(grant);
         await upsData.logAction({
             upsId,
             actorId: user.id,
@@ -258,7 +286,7 @@ export async function setUpsVarAction(
             action: "ups.variable",
             targetType: "ups",
             targetId: upsId,
-            metadata: { name: input.name, outcome: result.outcome }
+            metadata: { name: input.name, outcome: result.outcome, lent: Boolean(grant) }
         });
         return { ok: true, value: result };
     } catch (error) {

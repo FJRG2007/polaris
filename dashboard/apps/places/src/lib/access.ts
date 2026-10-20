@@ -16,7 +16,7 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { redirect } from "next/navigation";
 import type { Permission } from "@polaris/core";
-import { placesReach, type PlacesReach } from "./sharing";
+import { placesReach, reachesNothing, type PlacesReach } from "./sharing";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 
@@ -109,7 +109,7 @@ export async function requireHomeShared(): Promise<{
 }> {
     const user = await requireUser();
     const reach = await placesReach(user);
-    if (!reach.everything && reach.cameras.size === 0 && reach.devices.size === 0) {
+    if (reachesNothing(reach)) {
         throw new HomeError("You do not have access to that");
     }
     return { user, install: await requireHomeInstall(), reach };
@@ -134,10 +134,13 @@ export async function requireHomeReach(): Promise<{
     reach: PlacesReach;
     canControl: boolean;
     canManage: boolean;
+    /** What a visitor may do with each device they were lent, for the screen to
+     *  draw those buttons and no others. Empty for a resident. */
+    lent: Record<string, readonly string[]>;
 }> {
     const user = await requireUser();
     const reach = await placesReach(user);
-    if (!reach.everything && reach.cameras.size === 0 && reach.devices.size === 0) {
+    if (reachesNothing(reach)) {
         redirect(`${await homePathForUser(user)}?denied=1`);
     }
     const install = await homeInstall();
@@ -151,5 +154,12 @@ export async function requireHomeReach(): Promise<{
               sessionCanAny(user, "home.manage")
           ])
         : [false, false];
-    return { user, install, reach, canControl, canManage };
+    return {
+        user,
+        install,
+        reach,
+        canControl,
+        canManage,
+        lent: Object.fromEntries(reach.deviceActions)
+    };
 }

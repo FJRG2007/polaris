@@ -7020,6 +7020,11 @@ model AccessGrant {
     maxUses     Int?
     uses        Int       @default(0)
     lastUsedAt  DateTime?
+    /// Which of the subject's actions it allows (GRANT_ACTIONS in core): open,
+    /// close, operate for a device; watch for a camera; watch, control for a UPS.
+    /// Empty is everything the capability reaches, which is what every grant
+    /// written before this column allowed.
+    actions     String[]  @default([])
 
     /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
     note        String  @default("")

@@ -4,10 +4,9 @@
  */
 
 import { z } from "zod";
-import { sessionCan } from "@/lib/session";
-import { apiUser } from "@/lib/api-session";
-import { readerWords } from "@/lib/i18n/reader-words";
 import * as upsService from "@/lib/ups/ups-service";
+import { upsReached } from "../guard";
+import { visitorView } from "@/lib/ups/ups-access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,22 +17,20 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ upsId: string }> }
 ): Promise<Response> {
-    const user = await apiUser();
-    if (user instanceof Response) return user;
-    const t = await readerWords("api");
-    if (!user.isAdmin && !(await sessionCan(user, "system.manage"))) {
-        return Response.json({ error: t("errors.forbidden") }, { status: 403 });
-    }
-    const id = z
-        .string()
-        .uuid()
-        .safeParse((await params).upsId);
-    const row = id.success ? await upsService.getUps(id.data) : null;
-    if (!row) return Response.json({ error: t("errors.notFound") }, { status: 404 });
+    // A visitor lent it to watch reads it too: its status and history are what
+    // they were lent.
+    const reached = await upsReached(params, "watch");
+    if (reached instanceof Response) return reached;
+    const { row, standing } = reached;
     const hours = hoursSchema.parse(new URL(request.url).searchParams.get("hours") ?? undefined);
     const [result, history] = await Promise.all([
         upsService.readUps(row, upsService.usbListing(), { writable: true }),
         upsService.upsHistory(row.id, hours)
     ]);
-    return Response.json({ ups: upsService.toView(row), result, history });
+    const view = upsService.toView(row);
+    return Response.json({
+        ups: standing.manage ? view : visitorView(view),
+        result,
+        history
+    });
 }

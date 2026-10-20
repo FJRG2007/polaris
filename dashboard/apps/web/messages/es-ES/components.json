@@ -561,6 +561,14 @@
         "switchAccounts": "Cambiar de cuenta"
     },
     "share": {
+        "actionsLabel": "Permite",
+        "actions": {
+            "open": "Abrir",
+            "close": "Cerrar",
+            "operate": "Accionar",
+            "watch": "Ver",
+            "control": "Controlar"
+        },
         "capabilities": {
             "guest": {
                 "label": "Invitado",

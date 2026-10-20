@@ -18,7 +18,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** Which instance permissions the caller holds. */
 let held = new Set<string>();
 /** What they were lent, by subject and id. */
-let lent: Record<string, { id: string; capability: string; counted: boolean }[]> = {};
+let lent: Record<
+    string,
+    { id: string; capability: string; counted: boolean; actions?: string[] }[]
+> = {};
+/** What a grant allows when a test does not say: everything its capability
+ *  reaches, as the grants library resolves an older row. */
+const ALL = { view: [], control: ["open", "close", "operate"] } as Record<string, string[]>;
+const resolved = (grants: (typeof lent)[string]) =>
+    grants.map((grant) => ({ ...grant, actions: grant.actions ?? ALL[grant.capability] ?? [] }));
 
 const spendGrant = vi.fn(async () => true);
 
@@ -28,7 +36,16 @@ vi.mock("@/lib/session", () => ({
 
 vi.mock("@/lib/access/grants", () => ({
     liveGrants: async (_userId: string, subject: string, subjectId: string) =>
-        lent[`${subject}:${subjectId}`] ?? [],
+        resolved(lent[`${subject}:${subjectId}`] ?? []),
+    grantedActions: async (_userId: string, subject: string) =>
+        new Map(
+            Object.entries(lent)
+                .filter(([key]) => key.startsWith(`${subject}:`))
+                .map(([key, grants]) => [
+                    key.split(":").slice(1).join(":"),
+                    resolved(grants).flatMap((grant) => grant.actions)
+                ])
+        ),
     grantedSubjects: async (_userId: string, subject: string) =>
         new Map(
             Object.entries(lent)
@@ -96,24 +113,64 @@ describe("seeing is not operating", () => {
         lent[key("place.device", "front-door")] = [
             { id: "g1", capability: "view", counted: false }
         ];
-        await expect(sharing.requireDeviceControl(VISITOR, "front-door")).rejects.toThrow();
+        await expect(
+            sharing.requireDeviceControl(VISITOR, "front-door", "unlock")
+        ).rejects.toThrow();
     });
 
     it("opens it for somebody who was lent operating it", async () => {
         lent[key("place.device", "front-door")] = [
             { id: "g1", capability: "control", counted: true }
         ];
-        const grant = await sharing.requireDeviceControl(VISITOR, "front-door");
+        const grant = await sharing.requireDeviceControl(VISITOR, "front-door", "unlock");
         expect(grant?.id).toBe("g1");
     });
 
     it("opens it for a resident, and hands back nothing to count", async () => {
         held.add("home.control");
-        expect(await sharing.requireDeviceControl(VISITOR, "front-door")).toBeNull();
+        expect(await sharing.requireDeviceControl(VISITOR, "front-door", "unlock")).toBeNull();
+    });
+
+    it("opens, and does not lock, with a key lent only to open it", async () => {
+        lent[key("place.device", "front-door")] = [
+            { id: "g1", capability: "control", counted: true, actions: ["open"] }
+        ];
+        expect((await sharing.requireDeviceControl(VISITOR, "front-door", "unlock"))?.id).toBe(
+            "g1"
+        );
+        expect((await sharing.requireDeviceControl(VISITOR, "front-door", "unlatch"))?.id).toBe(
+            "g1"
+        );
+        await expect(sharing.requireDeviceControl(VISITOR, "front-door", "lock")).rejects.toThrow();
+    });
+
+    it("locks, and does not open, with a key lent only to lock it", async () => {
+        lent[key("place.device", "front-door")] = [
+            { id: "g1", capability: "control", counted: true, actions: ["close"] }
+        ];
+        expect((await sharing.requireDeviceControl(VISITOR, "front-door", "lock"))?.id).toBe("g1");
+        await expect(
+            sharing.requireDeviceControl(VISITOR, "front-door", "unlock")
+        ).rejects.toThrow();
+        await expect(
+            sharing.requireDeviceControl(VISITOR, "front-door", "unlatch")
+        ).rejects.toThrow();
+    });
+
+    it("finds the grant that allows the act among several", async () => {
+        lent[key("place.device", "front-door")] = [
+            { id: "g1", capability: "control", counted: true, actions: ["close"] },
+            { id: "g2", capability: "control", counted: true, actions: ["open"] }
+        ];
+        expect((await sharing.requireDeviceControl(VISITOR, "front-door", "unlock"))?.id).toBe(
+            "g2"
+        );
     });
 
     it("refuses a door nobody lent them at all", async () => {
-        await expect(sharing.requireDeviceControl(VISITOR, "front-door")).rejects.toThrow();
+        await expect(
+            sharing.requireDeviceControl(VISITOR, "front-door", "unlock")
+        ).rejects.toThrow();
     });
 });
 
@@ -122,6 +179,7 @@ describe("what counts as a use", () => {
         await sharing.countDeviceUse({
             id: "g1",
             capability: "control",
+            actions: ["open"],
             until: null,
             counted: true
         });
@@ -139,7 +197,13 @@ describe("what counts as a use", () => {
         spendGrant.mockRejectedValueOnce(new Error("no such row"));
         const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
         await expect(
-            sharing.countDeviceUse({ id: "g1", capability: "control", until: null, counted: true })
+            sharing.countDeviceUse({
+                id: "g1",
+                capability: "control",
+                actions: ["open"],
+                until: null,
+                counted: true
+            })
         ).resolves.toBeUndefined();
         expect(quiet).toHaveBeenCalled();
         quiet.mockRestore();

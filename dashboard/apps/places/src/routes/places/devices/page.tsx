@@ -13,13 +13,14 @@ import { PlaceSwitcher } from "../../../screens/place-switcher";
 import { requireHomeReach } from "../../../lib/access";
 import { placesT } from "../../../lib/i18n";
 import { currentPlace } from "../../../lib/current-place";
+import { LentActionsProvider } from "../../../screens/devices/lent-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function DevicesPage() {
     const t = await placesT();
     // Somebody lent one door reaches this screen, and sees that door.
-    const { user, install, canControl, canManage } = await requireHomeReach();
+    const { user, install, canControl, canManage, lent } = await requireHomeReach();
     const place = await currentPlace(install.id);
 
     return (
@@ -35,13 +36,15 @@ export default async function DevicesPage() {
                     canManage={canManage}
                 />
             </div>
-            <DevicesView
-                places={place.places}
-                placeId={place.current.id}
-                cacheKey={`${user.id}:${place.current.id}`}
-                canControl={canControl}
-                canManage={canManage}
-            />
+            <LentActionsProvider lent={lent}>
+                <DevicesView
+                    places={place.places}
+                    placeId={place.current.id}
+                    cacheKey={`${user.id}:${place.current.id}`}
+                    canControl={canControl}
+                    canManage={canManage}
+                />
+            </LentActionsProvider>
         </div>
     );
 }

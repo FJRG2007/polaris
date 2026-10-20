@@ -932,6 +932,7 @@
             "cancel": "Cancel"
         },
         "edit": "Edit connection",
+        "share": "Share",
         "remove": "Remove",
         "removeKind": "UPS",
         "removeBody": "Its history and protected machines are forgotten. The UPS itself is not touched.",

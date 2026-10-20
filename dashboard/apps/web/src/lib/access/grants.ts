@@ -34,6 +34,9 @@ export interface GrantPrincipals {
 export interface LiveGrant {
     readonly id: string;
     readonly capability: string;
+    /** The actions it allows, resolved (`core.grantActions`): never empty for a
+     *  grant that allows something, whatever the row stored. */
+    readonly actions: readonly string[];
     /** When it stops applying, or null when nothing bounds it. What a screen
      *  says beside a door somebody has until eleven. */
     readonly until: Date | null;
@@ -45,8 +48,10 @@ export interface LiveGrant {
  *  facts wherever it is asked about. */
 const GRANT_FIELDS = {
     id: true,
+    subjectType: true,
     subjectId: true,
     capability: true,
+    actions: true,
     startsAt: true,
     endsAt: true,
     days: true,
@@ -59,8 +64,10 @@ const GRANT_FIELDS = {
 
 type GrantRow = {
     id: string;
+    subjectType: string;
     subjectId: string;
     capability: string;
+    actions: string[];
     startsAt: Date | null;
     endsAt: Date | null;
     days: number;
@@ -140,6 +147,13 @@ async function houseZone(rows: readonly GrantRow[]): Promise<string> {
     return (await getPlatformDisplayPreferences()).timeZone || "UTC";
 }
 
+/** What one row allows, in its subject's words. */
+function actionsOf(row: { subjectType: string; capability: string; actions: string[] }): string[] {
+    return core.isGrantSubject(row.subjectType)
+        ? core.grantActions(row.subjectType, row.capability, row.actions)
+        : [];
+}
+
 /** Whatever of these is in force, judged. */
 function live(rows: readonly GrantRow[], zone: string, now: Date): LiveGrant[] {
     const found: LiveGrant[] = [];
@@ -149,6 +163,7 @@ function live(rows: readonly GrantRow[], zone: string, now: Date): LiveGrant[] {
         found.push({
             id: row.id,
             capability: row.capability,
+            actions: actionsOf(row),
             until: verdict.until,
             counted: row.maxUses !== null
         });
@@ -381,6 +396,32 @@ export async function grantedSubjects(
 }
 
 /**
+ * What this account may do with each thing of one kind it was lent, right now:
+ * every action any of its live grants allows, joined. What a screen reads to
+ * draw a visitor the buttons they can use and none they cannot.
+ */
+export async function grantedActions(
+    userId: string,
+    subject: core.GrantSubject,
+    now = new Date()
+): Promise<Map<string, string[]>> {
+    const principals = await principalsOf(userId);
+    const rows = await prisma.accessGrant.findMany({
+        where: { subjectType: subject, ...addressedTo(principals) },
+        select: GRANT_FIELDS
+    });
+    const zone = await houseZone(rows);
+    const held = new Map<string, string[]>();
+    for (const grant of live(rows, zone, now)) {
+        const row = rows.find((one) => one.id === grant.id);
+        if (!row) continue;
+        const joined = new Set([...(held.get(row.subjectId) ?? []), ...grant.actions]);
+        held.set(row.subjectId, [...joined]);
+    }
+    return held;
+}
+
+/**
  * Whether this account reaches anything at all of these kinds, right now.
  *
  * The question navigation asks on every page, for everybody who does not hold
@@ -456,6 +497,8 @@ export interface GrantView {
     /** The organization it came out of, for a team or a role. */
     readonly orgName: string;
     readonly capability: string;
+    /** What it allows, resolved: see `LiveGrant.actions`. */
+    readonly actions: readonly string[];
     readonly standing: core.GrantStanding;
     readonly until: string | null;
     readonly schedule: {
@@ -505,6 +548,7 @@ export async function listSubjectGrants(
             principalName: who.name,
             orgName: who.orgName,
             capability: row.capability,
+            actions: actionsOf(row),
             standing: verdict.standing,
             until: verdict.until?.toISOString() ?? null,
             schedule: {
@@ -603,6 +647,13 @@ export async function writeGrant(
     if (!allowed.includes(input.capability)) {
         throw new GrantError("That is not something this can be shared as");
     }
+    // Only actions this subject has, and only ones the capability reaches: a
+    // list that names nothing usable would read back as "everything".
+    const actions = [...new Set(input.actions)];
+    const reachable = core.grantActions(subject, input.capability, []);
+    if (actions.some((action) => !reachable.includes(action))) {
+        throw new GrantError("That is not something this can be shared as");
+    }
     if (!(await principalExists(input.principalType, input.principalId, orgIds))) {
         throw new GrantError(
             input.principalType === "user"
@@ -622,6 +673,7 @@ export async function writeGrant(
             principalType: input.principalType,
             principalId: input.principalId,
             capability: input.capability,
+            actions,
             startsAt: input.startsAt ? new Date(input.startsAt) : null,
             endsAt: input.endsAt ? new Date(input.endsAt) : null,
             days: input.days,

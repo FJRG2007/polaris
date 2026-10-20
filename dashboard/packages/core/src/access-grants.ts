@@ -71,7 +71,8 @@ export const GRANT_SUBJECTS = [
     "note.space",
     "office.document",
     "place.device",
-    "place.camera"
+    "place.camera",
+    "place.ups"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -119,10 +120,79 @@ export const GRANT_CAPABILITIES = {
     "place.device": ["view", "control"],
     // Watching is all there is to give: nothing here points a camera or wipes
     // its footage on somebody else's behalf.
-    "place.camera": ["view"]
+    "place.camera": ["view"],
+    // A UPS: reading its status and history, or also sending it commands,
+    // writing its variables and running its self-test. The same split NUT
+    // itself draws - Home Assistant's NUT integration reads with no login and
+    // offers commands only to a NUT user with instant-command rights
+    // (https://www.home-assistant.io/integrations/nut).
+    "place.ups": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
+
+/**
+ * What a grant may be used FOR, per subject - the cut inside a capability.
+ *
+ * `control` over a door says the visitor may operate it; this says which way.
+ * Lock brands sell exactly this (a key that only opens, a code that only
+ * works some hours), and Home Assistant has no per-entity sharing at all - its
+ * users are administrators or not, and a hidden card is not a refused call
+ * (https://github.com/orgs/home-assistant/discussions/1171,
+ * https://developers.home-assistant.io/docs/auth_permissions) - so the
+ * vocabulary is ours:
+ *
+ * - a device: `open` (unlock, unlatch), `close` (lock) and `operate`
+ *   (everything a switch, a light or an air conditioner does);
+ * - a camera: `watch`;
+ * - a UPS: `watch` (status, history) and `control` (commands, variables, test).
+ *
+ * `watch` is what `view` reaches; every other action needs `control`.
+ */
+export const GRANT_ACTIONS = {
+    "chat.space": [],
+    "chat.channel": [],
+    "task.space": [],
+    "task.folder": [],
+    "note.space": [],
+    "office.document": [],
+    "place.device": ["open", "close", "operate"],
+    "place.camera": ["watch"],
+    "place.ups": ["watch", "control"]
+} as const satisfies Record<GrantSubject, readonly string[]>;
+
+/**
+ * The actions one grant really allows.
+ *
+ * An empty list is a row written before grants named their actions (or by a
+ * dashboard that had not been updated yet) and means everything the capability
+ * reaches - which is what it allowed when it was written. A listed action the
+ * capability does not reach is dropped rather than honoured: a `view` grant
+ * that somehow says `open` still opens nothing.
+ */
+export function grantActions(
+    subject: GrantSubject,
+    capability: string,
+    actions: readonly string[]
+): string[] {
+    const all = GRANT_ACTIONS[subject] as readonly string[];
+    const ladder = GRANT_CAPABILITIES[subject] as readonly string[];
+    const controls = ladder.includes("control") && atLeast(subject, capability, "control");
+    const reachable = all.filter((action) => action === "watch" || controls);
+    return actions.length === 0
+        ? reachable
+        : reachable.filter((action) => actions.includes(action));
+}
+
+/** Whether one grant allows one action. */
+export function allowsAction(
+    subject: GrantSubject,
+    capability: string,
+    actions: readonly string[],
+    wanted: string
+): boolean {
+    return grantActions(subject, capability, actions).includes(wanted);
+}
 
 /** Whether `held` is `wanted` or stronger, in that subject's own ladder. An
  *  unknown word is weaker than everything, which is the safe way to be wrong. */
@@ -388,6 +458,9 @@ export const accessGrantSchema = z
         // Zero would be a grant that is spent before it is written, which is a
         // way of saying "no" that looks like a way of saying "yes".
         maxUses: z.number().int().min(1).max(100_000).nullable().default(null),
+        // Which of the subject's actions it allows (GRANT_ACTIONS); empty is all
+        // of them. Checked against the subject where the subject is known.
+        actions: z.array(z.string().trim().min(1).max(32)).max(8).default([]),
         note: z.string().trim().max(200).default("")
     })
     // On the object because they are facts about the pair. Half an hour window

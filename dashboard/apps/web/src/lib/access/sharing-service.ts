@@ -75,6 +75,13 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             }
             return;
+        case "place.ups":
+            // A UPS shuts machines down: lending it is the standing of whoever
+            // runs those machines, the same permission its own screens ask.
+            if (!(await sessionCan(user, "system.manage"))) {
+                throw new GrantError("You cannot share that");
+            }
+            return;
     }
 }
 
@@ -226,7 +233,7 @@ function orgOf(row: { orgId: string | null } | null): string | null {
  * and a form nobody can answer is a form nobody fills in.
  */
 export function shareIsBounded(subject: core.GrantSubject): boolean {
-    return subject === "place.device" || subject === "place.camera";
+    return subject === "place.device" || subject === "place.camera" || subject === "place.ups";
 }
 
 /** What each capability is called and what it means, for the picker. Kept beside

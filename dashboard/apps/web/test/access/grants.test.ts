@@ -79,6 +79,7 @@ function grant(over: Record<string, unknown> = {}) {
         principalType: "user",
         principalId: "u1",
         capability: "control",
+        actions: [],
         startsAt: null,
         endsAt: null,
         days: EVERY_DAY,

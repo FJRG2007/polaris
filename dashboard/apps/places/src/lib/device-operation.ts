@@ -30,7 +30,7 @@ export async function operateDevice(
     action: DeviceAction,
     setting: DeviceCommand | undefined
 ): Promise<DeviceView> {
-    const lent = await requireDeviceControl(user, deviceId);
+    const lent = await requireDeviceControl(user, deviceId, action);
     let device: DeviceView;
     try {
         device = await devices.actOnDevice(installedAppId, deviceId, action, user.name, setting);

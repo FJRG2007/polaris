@@ -12,6 +12,7 @@ import { Check, CheckCheck } from "lucide-react";
 import * as upsEvents from "@/lib/ups/ups-events";
 import type { UpsEventsAnswer } from "../ups-words";
 import { acknowledgeUpsEventsAction } from "../actions";
+import { useUpsStanding } from "./ups-standing";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Checkbox, Select, Skeleton, useToast } from "@polaris/ui";
@@ -21,6 +22,9 @@ const DAYS = ["1", "7", "30", "90", "365"] as const;
 export function UpsEventsPanel({ upsId }: { upsId: string }) {
     const t = useTranslations("servers");
     const toast = useToast();
+    // Acknowledging is acting on the UPS: a visitor lent it to watch reads the
+    // log and is not offered the buttons.
+    const { control } = useUpsStanding();
     const [kinds, setKinds] = useState<upsEvents.UpsEventKind[]>([]);
     const [state, setState] = useState<"all" | "open" | "acknowledged">("all");
     const [days, setDays] = useState<(typeof DAYS)[number]>("30");
@@ -84,19 +88,21 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                     }))}
                     className="w-40"
                 />
-                <Button
-                    size="sm"
-                    variant="outline"
-                    aria-disabled={!open}
-                    onClick={() => {
-                        if (open) void acknowledge("all");
-                    }}
-                >
-                    <CheckCheck className="size-4 shrink-0" aria-hidden />
-                    {open === null
-                        ? t("ups.events.ackAll")
-                        : t("ups.events.ackAllCount", { count: open })}
-                </Button>
+                {control ? (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        aria-disabled={!open}
+                        onClick={() => {
+                            if (open) void acknowledge("all");
+                        }}
+                    >
+                        <CheckCheck className="size-4 shrink-0" aria-hidden />
+                        {open === null
+                            ? t("ups.events.ackAll")
+                            : t("ups.events.ackAllCount", { count: open })}
+                    </Button>
+                ) : null}
             </div>
             <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
                 <legend className="sr-only">{t("ups.events.kinds")}</legend>
@@ -152,7 +158,7 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                                             aria-label={t("ups.events.acknowledged")}
                                         />
                                     </span>
-                                ) : (
+                                ) : control ? (
                                     <Button
                                         size="icon"
                                         variant="ghost"
@@ -162,7 +168,7 @@ export function UpsEventsPanel({ upsId }: { upsId: string }) {
                                     >
                                         <Check className="size-4 shrink-0" aria-hidden />
                                     </Button>
-                                )}
+                                ) : null}
                             </li>
                         );
                     })}

@@ -170,6 +170,7 @@ const load = {
 export const serverHost = {
     accessGrants: {
         dropGrantsFor: later(load.accessGrants, "dropGrantsFor"),
+        grantedActions: later(load.accessGrants, "grantedActions"),
         grantedSubjects: later(load.accessGrants, "grantedSubjects"),
         liveGrants: later(load.accessGrants, "liveGrants"),
         reachesAnySubject: later(load.accessGrants, "reachesAnySubject"),

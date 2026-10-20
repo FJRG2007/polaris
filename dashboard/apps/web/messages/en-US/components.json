@@ -561,6 +561,14 @@
         "switchAccounts": "Switch accounts"
     },
     "share": {
+        "actionsLabel": "Allowed",
+        "actions": {
+            "open": "Open",
+            "close": "Lock",
+            "operate": "Switch",
+            "watch": "Watch",
+            "control": "Control"
+        },
         "capabilities": {
             "guest": {
                 "label": "Guest",

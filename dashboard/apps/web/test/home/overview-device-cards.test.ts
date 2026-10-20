@@ -23,6 +23,7 @@ vi.mock("@/lib/access/grants", () => ({
     liveGrants: async () => [],
     grantedSubjects: async (_userId: string, subject: string) =>
         new Map(subject === "place.device" ? Object.entries(lent) : []),
+    grantedActions: async () => new Map(),
     reachesAnySubject: async () => Object.keys(lent).length > 0,
     spendGrant: async () => true
 }));

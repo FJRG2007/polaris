@@ -33,6 +33,7 @@ import {
 import {
     Badge,
     Button,
+    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -109,6 +110,17 @@ export function ShareDialog({
     // and the cost of the default being too generous is somebody having more of
     // your house than you meant.
     const [capability, setCapability] = useState(capabilities[0] ?? "");
+    // Which of the subject's actions the grant allows (open, close, operate;
+    // watch, control). All of what the capability reaches until narrowed.
+    const reachable = core.grantActions(subject, capability, []);
+    const [actions, setActions] = useState<string[]>(reachable);
+    const pickCapability = (next: string): void => {
+        setCapability(next);
+        setActions(core.grantActions(subject, next, []));
+    };
+    // A grant that allows nothing is a "no" that looks like a "yes".
+    const noAction = reachable.length > 0 && !reachable.some((one) => actions.includes(one));
+    const actionLabel = (one: string) => t(`share.actions.${one}` as NamespaceKey<"components">);
     const [kind, setKind] = useState<core.GrantPrincipal>("user");
     const [principalId, setPrincipalId] = useState("");
     const [query, setQuery] = useState("");
@@ -168,12 +180,13 @@ export function ShareDialog({
     };
 
     const add = async (): Promise<void> => {
-        if (!principalId) return;
+        if (!principalId || noAction) return;
         setBusy(true);
         const answer = await shareAction(subject, subjectId, {
             principalType: kind,
             principalId,
             capability,
+            actions: reachable.filter((one) => actions.includes(one)),
             note,
             ...(limited
                 ? {
@@ -283,6 +296,12 @@ export function ShareDialog({
                                         </p>
                                         <p className="text-[12px] text-muted-foreground">
                                             {capabilityLabel(grant.capability)}
+                                            {grant.actions.length > 0 &&
+                                            grant.actions.length <
+                                                core.grantActions(subject, grant.capability, [])
+                                                    .length
+                                                ? ` (${grant.actions.map(actionLabel).join(", ")})`
+                                                : null}
                                             {describe(grant, weekOrder, t, dayNames) ? (
                                                 <> - {describe(grant, weekOrder, t, dayNames)}</>
                                             ) : null}
@@ -402,7 +421,7 @@ export function ShareDialog({
                             id="share-what"
                             aria-label={t("share.can")}
                             value={capability}
-                            onValueChange={setCapability}
+                            onValueChange={pickCapability}
                             options={capabilities.map((one) => ({
                                 value: one,
                                 label: capabilityLabel(one)
@@ -412,6 +431,34 @@ export function ShareDialog({
                             {capabilityHint(capability)}
                         </p>
                     </div>
+
+                    {reachable.length > 1 ? (
+                        <fieldset className="flex flex-col gap-1">
+                            <legend className="text-[12px] text-muted-foreground">
+                                {t("share.actionsLabel")}
+                            </legend>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {reachable.map((one) => (
+                                    <label
+                                        key={one}
+                                        className="flex items-center gap-2 text-[13px] text-foreground"
+                                    >
+                                        <Checkbox
+                                            checked={actions.includes(one)}
+                                            onChange={(event) =>
+                                                setActions((now) =>
+                                                    event.target.checked
+                                                        ? [...now, one]
+                                                        : now.filter((held) => held !== one)
+                                                )
+                                            }
+                                        />
+                                        {actionLabel(one)}
+                                    </label>
+                                ))}
+                            </div>
+                        </fieldset>
+                    ) : null}
 
                     {bounded ? (
                         <div className="flex flex-col gap-3">
@@ -535,8 +582,8 @@ export function ShareDialog({
 
                     <div className="flex justify-end">
                         <Button
-                            disabled={busy || !principalId}
-                            aria-disabled={busy || !principalId}
+                            disabled={busy || !principalId || noAction}
+                            aria-disabled={busy || !principalId || noAction}
                             onClick={() => void add()}
                         >
                             {busy ? (
