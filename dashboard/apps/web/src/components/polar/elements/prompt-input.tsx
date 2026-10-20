@@ -18,6 +18,9 @@ import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import {
     forwardRef,
+    useCallback,
+    useEffect,
+    useRef,
     type FormEvent,
     type HTMLAttributes,
     type TextareaHTMLAttributes
@@ -58,10 +61,30 @@ const MAX_ROWS_PX = 200;
 export const PromptInputTextarea = forwardRef<
     HTMLTextAreaElement,
     TextareaHTMLAttributes<HTMLTextAreaElement> & { onSubmitKey: () => void }
->(function PromptInputTextarea({ className, onSubmitKey, onKeyDown, onInput, ...props }, ref) {
+>(function PromptInputTextarea(
+    { className, onSubmitKey, onKeyDown, onInput, ...props },
+    forwarded
+) {
+    const own = useRef<HTMLTextAreaElement | null>(null);
+
+    /** Back to its resting height first: a box only fitted while typing keeps
+     *  the height of the message just sent once it is cleared. */
+    const fit = useCallback(() => {
+        const node = own.current;
+        if (!node) return;
+        node.style.height = "auto";
+        node.style.height = `${Math.min(node.scrollHeight, MAX_ROWS_PX)}px`;
+    }, []);
+
+    useEffect(fit, [fit, props.value]);
+
     return (
         <textarea
-            ref={ref}
+            ref={(node) => {
+                own.current = node;
+                if (typeof forwarded === "function") forwarded(node);
+                else if (forwarded) forwarded.current = node;
+            }}
             rows={2}
             onKeyDown={(event) => {
                 onKeyDown?.(event);
@@ -74,9 +97,7 @@ export const PromptInputTextarea = forwardRef<
                 }
             }}
             onInput={(event) => {
-                const node = event.currentTarget;
-                node.style.height = "auto";
-                node.style.height = `${Math.min(node.scrollHeight, MAX_ROWS_PX)}px`;
+                fit();
                 onInput?.(event);
             }}
             className={cn(
