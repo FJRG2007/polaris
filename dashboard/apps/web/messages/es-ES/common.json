@@ -67,5 +67,18 @@
         "refusedHere": "Ningún almacenamiento aceptó ese archivo.",
         "failed": "No se pudo guardar ese archivo. Inténtalo de nuevo.",
         "withDetail": "{sentence} ({detail})"
+    },
+    "selectionMenu": {
+        "copy": "Copiar",
+        "paste": "Pegar",
+        "selectAll": "Marcar todo",
+        "search": "Buscar",
+        "askPolar": "Preguntar a Polar",
+        "copySelection": "Copiar texto marcado",
+        "askPolarSelection": "Preguntar a Polar por lo marcado",
+        "copied": "Copiado al portapapeles",
+        "copyFailed": "Se bloqueó la copia. Usa el atajo de copiar del teclado.",
+        "pasteFailed": "El navegador no permitió pegar. Usa el atajo de pegar del teclado.",
+        "browserMenu": "Mayús+clic derecho abre el menú del navegador"
     }
 }

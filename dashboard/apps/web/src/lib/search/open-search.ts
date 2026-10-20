@@ -13,9 +13,26 @@ import { SEARCH_SCOPES, type SearchScope } from "@polaris/core";
 
 export const OPEN_SEARCH_EVENT = "polaris:open-search";
 
-/** Open the panel, on `scope` when one is given. */
-export function openSearch(scope: SearchScope | null = null): void {
-    window.dispatchEvent(new CustomEvent(OPEN_SEARCH_EVENT, { detail: { scope } }));
+/** Longest text a request may put in the field. */
+export const OPEN_SEARCH_QUERY_MAX = 200;
+
+/** Open the panel, on `scope` when one is given, with `query` already typed. */
+export function openSearch(scope: SearchScope | null = null, query?: string): void {
+    window.dispatchEvent(new CustomEvent(OPEN_SEARCH_EVENT, { detail: { scope, query } }));
+}
+
+/** The text an open request asked to search for, on one line and capped, or
+ *  null for none or for anything that is not text. */
+export function requestedQuery(event: Event): string | null {
+    const query = (event as CustomEvent<{ query?: unknown }>).detail?.query;
+    if (typeof query !== "string") return null;
+    const line = query
+        .replace(/[\u0000-\u001f\u007f]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, OPEN_SEARCH_QUERY_MAX)
+        .trim();
+    return line.length > 0 ? line : null;
 }
 
 /** The scope an open request asked for, or null for none or for anything that is

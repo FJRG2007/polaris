@@ -193,6 +193,13 @@ interface PolarState {
     setOpen: (open: boolean) => void;
     extra: ExtraContext | null;
     setExtra: (extra: ExtraContext | null) => void;
+    /** Text somebody asked Polar about from a menu, waiting for a chat to
+     *  quote it. Taken once, by whichever chat is on screen. */
+    asked: string | null;
+    /** Quotes `text` in the composer and opens the panel. Does nothing for an
+     *  account Polar is not for. */
+    ask: (text: string) => void;
+    takeAsked: () => void;
 }
 
 const PolarContext = createContext<PolarState | null>(null);
@@ -330,9 +337,20 @@ export function PolarProvider({
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
     }, [allowed]);
+    const [asked, setAsked] = useState<string | null>(null);
+    const ask = useCallback(
+        (text: string) => {
+            const quote = polarShared.selectionQuote(text);
+            if (!allowed || !quote) return;
+            setAsked(quote);
+            setOpen(true);
+        },
+        [allowed, setOpen]
+    );
+    const takeAsked = useCallback(() => setAsked(null), []);
     const value = useMemo(
-        () => ({ allowed, open, setOpen, extra, setExtra }),
-        [allowed, open, setOpen, extra]
+        () => ({ allowed, open, setOpen, extra, setExtra, asked, ask, takeAsked }),
+        [allowed, open, setOpen, extra, asked, ask, takeAsked]
     );
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
@@ -746,6 +764,14 @@ export function PolarChat({
     const wide = useWide();
     const tree = useRef<VersionTree>(new Map());
     const textarea = useRef<HTMLTextAreaElement>(null);
+    // Text asked about from a right-click menu: quoted here, once.
+    const asked = state?.asked ?? null;
+    useEffect(() => {
+        if (!asked) return;
+        setQuote(asked);
+        state?.takeAsked();
+        textarea.current?.focus();
+    }, [asked]);
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
@@ -1419,7 +1445,7 @@ export function PolarChat({
             own && (polarShared.isAutomatic(own.row.choice) || offered(providers, own.row.choice))
                 ? own.row.choice
                 : null;
-        const text = quote ? `> ${quote}\n\n${body}` : body;
+        const text = quote ? `${polarShared.quoteBlock(quote)}\n\n${body}` : body;
         const message = {
             text,
             files: ready.map((file) => ({
