@@ -21,9 +21,11 @@ export interface ProviderFailure {
 }
 
 /** Out of credit, whatever status the provider chose to say it with. */
-const CREDIT = /payment[_ ]required|insufficient[_ ](quota|funds|balance|credits?)|credit balance|billing|out of credits/i;
+const CREDIT =
+    /payment[_ ]required|insufficient[_ ](quota|funds|balance|credits?)|credit balance|billing|out of credits/i;
 /** The model asked for is not one the provider serves. */
-const MODEL = /model[_ ]not[_ ]found|no such model|unknown model|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
+const MODEL =
+    /model[_ ]not[_ ]found|no such model|unknown model|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
 
 interface CallErrorShape {
     statusCode?: unknown;

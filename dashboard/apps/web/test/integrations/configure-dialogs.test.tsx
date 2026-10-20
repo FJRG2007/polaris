@@ -28,7 +28,9 @@ vi.mock("../../src/app/(app)/admin/integrations/actions", () => ({}));
 // no mounted router in a static render.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined }) }));
 
-const { dialogFor, IntegrationsView } = await import("../../src/app/(app)/admin/integrations/integrations-view");
+const { dialogFor, IntegrationsView } = await import(
+    "../../src/app/(app)/admin/integrations/integrations-view"
+);
 
 /** A card as the page builds one: catalog entry, nothing configured yet. */
 function card(slug: string): IntegrationCard {
@@ -56,9 +58,9 @@ function card(slug: string): IntegrationCard {
 
 describe("the configure dialogs", () => {
     it("covers every integration the marketplace lists", () => {
-        const dead = SERVICE_INTEGRATIONS.filter((entry) => dialogFor(card(entry.slug)) === null).map(
-            (entry) => entry.slug
-        );
+        const dead = SERVICE_INTEGRATIONS.filter(
+            (entry) => dialogFor(card(entry.slug)) === null
+        ).map((entry) => entry.slug);
         expect(dead).toEqual([]);
     });
 
@@ -70,7 +72,9 @@ describe("the configure dialogs", () => {
 
     it("renders a way in for every card it is given", () => {
         const markup = renderToStaticMarkup(
-            withMessages(<IntegrationsView cards={SERVICE_INTEGRATIONS.map((entry) => card(entry.slug))} />)
+            withMessages(
+                <IntegrationsView cards={SERVICE_INTEGRATIONS.map((entry) => card(entry.slug))} />
+            )
         );
         for (const entry of SERVICE_INTEGRATIONS) expect(markup).toContain(entry.name);
         expect(markup.match(/Set up/g)?.length).toBe(SERVICE_INTEGRATIONS.length);
@@ -81,7 +85,9 @@ describe("the AI provider keys screen", () => {
     it("offers a key for every model provider in the catalog", () => {
         // Both screens that add a key read this one list, so a provider missing
         // here is a provider nobody can bring a key for.
-        expect(modelProviderRows().map((row) => row.slug)).toEqual(MODEL_INTEGRATIONS.map((entry) => entry.slug));
+        expect(modelProviderRows().map((row) => row.slug)).toEqual(
+            MODEL_INTEGRATIONS.map((entry) => entry.slug)
+        );
     });
 
     it("marks the gateway, and only the gateway", () => {

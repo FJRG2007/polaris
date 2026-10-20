@@ -24,8 +24,14 @@ function callError(statusCode: number, responseBody = ""): Error {
 
 describe("classifyProviderFailure", () => {
     it("reads Cerebras's 402 as out of credit", () => {
-        const body = JSON.stringify({ type: "payment_required_error", message: "Visit your billing tab" });
-        expect(classifyProviderFailure(callError(402, body))).toEqual({ kind: "credit", status: 402 });
+        const body = JSON.stringify({
+            type: "payment_required_error",
+            message: "Visit your billing tab"
+        });
+        expect(classifyProviderFailure(callError(402, body))).toEqual({
+            kind: "credit",
+            status: 402
+        });
     });
 
     it("reads a quota 429 as out of credit, not as a rate limit", () => {
@@ -34,7 +40,9 @@ describe("classifyProviderFailure", () => {
     });
 
     it("reads a low balance said with a 400 as out of credit", () => {
-        expect(classifyProviderFailure(callError(400, "Your credit balance is too low")).kind).toBe("credit");
+        expect(classifyProviderFailure(callError(400, "Your credit balance is too low")).kind).toBe(
+            "credit"
+        );
     });
 
     it("reads 401 and 403 as a key problem", () => {
@@ -52,21 +60,34 @@ describe("classifyProviderFailure", () => {
 
     it("reads a retired model as model not found", () => {
         expect(classifyProviderFailure(callError(404)).kind).toBe("model");
-        expect(classifyProviderFailure(callError(400, '{"code":"model_not_found"}')).kind).toBe("model");
+        expect(classifyProviderFailure(callError(400, '{"code":"model_not_found"}')).kind).toBe(
+            "model"
+        );
     });
 
     it("finds the status inside a retry that gave up", () => {
-        const retry = Object.assign(new Error("Failed after 3 attempts"), { lastError: callError(402) });
+        const retry = Object.assign(new Error("Failed after 3 attempts"), {
+            lastError: callError(402)
+        });
         expect(classifyProviderFailure(retry).kind).toBe("credit");
     });
 
     it("calls anything that is not a provider's answer other", () => {
-        expect(classifyProviderFailure(new Error("socket hang up"))).toEqual({ kind: "other", status: null });
+        expect(classifyProviderFailure(new Error("socket hang up"))).toEqual({
+            kind: "other",
+            status: null
+        });
         expect(classifyProviderFailure("nope")).toEqual({ kind: "other", status: null });
     });
 });
 
-const failure: PolarFailure = { code: "provider", kind: "credit", provider: "Cerebras", slug: "cerebras", payer: "instance" };
+const failure: PolarFailure = {
+    code: "provider",
+    kind: "credit",
+    provider: "Cerebras",
+    slug: "cerebras",
+    payer: "instance"
+};
 
 describe("the failure the stream carries", () => {
     it("round-trips, and carries nothing of the provider's body", () => {
@@ -89,13 +110,21 @@ describe("the failure the stream carries", () => {
 });
 
 const providers = [
-    { provider: "cerebras", name: "Cerebras", payers: [], models: [
-        { provider: "cerebras", model: "llama-a", name: "Llama A", reasoning: false },
-        { provider: "cerebras", model: "llama-b", name: "Llama B", reasoning: false }
-    ] },
-    { provider: "anthropic", name: "Anthropic", payers: [], models: [
-        { provider: "anthropic", model: "claude-x", name: "Claude X", reasoning: true }
-    ] }
+    {
+        provider: "cerebras",
+        name: "Cerebras",
+        payers: [],
+        models: [
+            { provider: "cerebras", model: "llama-a", name: "Llama A", reasoning: false },
+            { provider: "cerebras", model: "llama-b", name: "Llama B", reasoning: false }
+        ]
+    },
+    {
+        provider: "anthropic",
+        name: "Anthropic",
+        payers: [],
+        models: [{ provider: "anthropic", model: "claude-x", name: "Claude X", reasoning: true }]
+    }
 ] as never;
 
 describe("standIn", () => {

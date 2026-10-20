@@ -58,7 +58,9 @@ function conflict(caught: unknown): "name" | "secret" | null {
     if (typeof caught !== "object" || caught === null) return null;
     const error = caught as { code?: string; meta?: { target?: unknown } };
     if (error.code !== "P2002") return null;
-    const target = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : String(error.meta?.target ?? "");
+    const target = Array.isArray(error.meta?.target)
+        ? error.meta.target.join(",")
+        : String(error.meta?.target ?? "");
     return target.toLowerCase().includes("fingerprint") ? "secret" : "name";
 }
 
@@ -69,8 +71,14 @@ const SECRET_TAKEN = "That key was already added for this provider.";
 
 export async function addKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = createModelKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("refusals.aiKeys.checkKey") };
-    if (!isStorableProvider(parsed.data.provider)) return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await readerWords("api"))("refusals.aiKeys.checkKey")
+        };
+    if (!isStorableProvider(parsed.data.provider))
+        return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name)) return { error: NAME_TAKEN };
 
@@ -130,9 +138,15 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
 
 export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = updateModelKeySchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await readerWords("api"))("refusals.aiKeys.checkKey") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await readerWords("api"))("refusals.aiKeys.checkKey")
+        };
 
-    if (await ownerHasModelKeyName(scope.owner, parsed.data.name, parsed.data.id)) return { error: NAME_TAKEN };
+    if (await ownerHasModelKeyName(scope.owner, parsed.data.name, parsed.data.id))
+        return { error: NAME_TAKEN };
 
     // Only a key that was actually retyped is checked. A rename, or moving the
     // end date, should not fail because the provider is having a bad morning.
@@ -185,7 +199,8 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
 
-    if (!(await deleteModelKey(scope.owner, parsed.data.id))) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    if (!(await deleteModelKey(scope.owner, parsed.data.id)))
+        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
     await recordAudit({
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,
@@ -217,7 +232,8 @@ export async function toggleKey(scope: KeyScope, input: unknown): Promise<KeyAct
 /** The order to try them in, as the table now reads top to bottom. */
 export async function reorderKeys(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = reorderModelKeysSchema.safeParse(input);
-    if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.orderUnreadable") };
+    if (!parsed.success)
+        return { error: (await readerWords("api"))("refusals.aiKeys.orderUnreadable") };
 
     await reorderModelKeys(scope.owner, parsed.data.ids);
     revalidatePath(scope.path);

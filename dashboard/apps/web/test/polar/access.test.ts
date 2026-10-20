@@ -19,9 +19,22 @@ const GROUP = "00000000-0000-4000-8000-0000000000a1";
 const OTHER = "00000000-0000-4000-8000-0000000000a2";
 const PICKED = "00000000-0000-4000-8000-000000000001";
 
-const member: AccessFacts = { userId: "00000000-0000-4000-8000-000000000002", isAdmin: false, guest: false, groupIds: [] };
-const admin: AccessFacts = { ...member, userId: "00000000-0000-4000-8000-000000000003", isAdmin: true };
-const guest: AccessFacts = { ...member, userId: "00000000-0000-4000-8000-000000000004", guest: true };
+const member: AccessFacts = {
+    userId: "00000000-0000-4000-8000-000000000002",
+    isAdmin: false,
+    guest: false,
+    groupIds: []
+};
+const admin: AccessFacts = {
+    ...member,
+    userId: "00000000-0000-4000-8000-000000000003",
+    isAdmin: true
+};
+const guest: AccessFacts = {
+    ...member,
+    userId: "00000000-0000-4000-8000-000000000004",
+    guest: true
+};
 
 const audience = (patch: Partial<PolarAudience>): PolarAudience => ({
     who: "everyone",
@@ -33,21 +46,40 @@ const audience = (patch: Partial<PolarAudience>): PolarAudience => ({
 
 describe("Polar access policy", () => {
     it("defaults to Polar for everybody signed in but the deployment's keys for administrators only", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toEqual({ use: true, spend: false });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toEqual({
+            use: true,
+            spend: false
+        });
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toEqual({ use: true, spend: true });
     });
 
     it("carries the deployment's key sharing over to a policy that was never saved", () => {
         expect(unsavedPolarPolicy(false)).toEqual(DEFAULT_POLAR_POLICY);
-        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toEqual({ use: true, spend: true });
-        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toEqual({ use: false, spend: false });
+        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toEqual({
+            use: true,
+            spend: true
+        });
+        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toEqual({
+            use: false,
+            spend: false
+        });
     });
 
     it("keeps guests out unless the audience lets them in or names them", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest)).toEqual({ use: false, spend: false });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest)).toEqual({
+            use: false,
+            spend: false
+        });
         expect(audienceAdmits(audience({ guests: true }), guest)).toBe(true);
-        expect(audienceAdmits(audience({ who: "chosen", userIds: [guest.userId] }), guest)).toBe(true);
-        expect(audienceAdmits(audience({ who: "chosen", groupIds: [GROUP] }), { ...guest, groupIds: [GROUP] })).toBe(false);
+        expect(audienceAdmits(audience({ who: "chosen", userIds: [guest.userId] }), guest)).toBe(
+            true
+        );
+        expect(
+            audienceAdmits(audience({ who: "chosen", groupIds: [GROUP] }), {
+                ...guest,
+                groupIds: [GROUP]
+            })
+        ).toBe(false);
     });
 
     it("admits chosen people and members of chosen groups only", () => {
@@ -65,8 +97,16 @@ describe("Polar access policy", () => {
     });
 
     it("rejects a policy that is not one of the audiences", () => {
-        expect(polarPolicySchema.safeParse({ use: { who: "anyone" }, spend: { who: "admins" } }).success).toBe(false);
-        expect(polarPolicySchema.safeParse({ use: { who: "chosen", userIds: ["x"] }, spend: { who: "admins" } }).success).toBe(false);
+        expect(
+            polarPolicySchema.safeParse({ use: { who: "anyone" }, spend: { who: "admins" } })
+                .success
+        ).toBe(false);
+        expect(
+            polarPolicySchema.safeParse({
+                use: { who: "chosen", userIds: ["x"] },
+                spend: { who: "admins" }
+            }).success
+        ).toBe(false);
     });
 
     it("is asked by every Polar route instead of the plain session check", () => {

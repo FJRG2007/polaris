@@ -21,7 +21,9 @@ vi.mock("@/lib/api-session", () => ({
             ? NextResponse.json({ error: "unauthorized" }, { status: 401 })
             : { id: "u1", name: "Ana", viewingAs: null }
 }));
-vi.mock("@/lib/polar/access", async () => (await import("./fixtures/open-polar-access")).openPolarAccess());
+vi.mock("@/lib/polar/access", async () =>
+    (await import("./fixtures/open-polar-access")).openPolarAccess()
+);
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@polaris/db", () => {
     const record = (op: string) => async (args: unknown) => {

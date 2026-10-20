@@ -62,21 +62,35 @@ export function PolarFailureNotice({
             role="alert"
             className="flex flex-col gap-2 rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
         >
-            <p>{failure ? t(`errors.provider.${failure.kind}`, { provider: failure.provider }) : t("errors.failed")}</p>
+            <p>
+                {failure
+                    ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
+                    : t("errors.failed")}
+            </p>
             {failure && keyProblem && failure.payer === "instance" && !isAdmin ? (
                 <p>{t("errors.provider.askAdmin", { provider: failure.provider })}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {failure && keyProblem && (failure.payer === "own" || isAdmin) ? (
                     <Link
-                        href={failure.payer === "own" ? "/account/ai-keys" : "/admin/integrations/models"}
+                        href={
+                            failure.payer === "own"
+                                ? "/account/ai-keys"
+                                : "/admin/integrations/models"
+                        }
                         className="font-medium underline"
                     >
-                        {failure.payer === "own" ? t("errors.provider.ownKey") : t("errors.provider.openKey")}
+                        {failure.payer === "own"
+                            ? t("errors.provider.ownKey")
+                            : t("errors.provider.openKey")}
                     </Link>
                 ) : null}
                 {alternative ? (
-                    <button type="button" className="font-medium underline" onClick={() => onTryWith(alternative)}>
+                    <button
+                        type="button"
+                        className="font-medium underline"
+                        onClick={() => onTryWith(alternative)}
+                    >
                         {t("errors.provider.tryWith", { model: alternative.name })}
                     </button>
                 ) : null}

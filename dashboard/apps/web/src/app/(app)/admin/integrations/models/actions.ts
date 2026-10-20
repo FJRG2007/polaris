@@ -25,7 +25,12 @@ import {
 /** The deployment's keys, written by whichever administrator is signed in. */
 async function scope(): Promise<KeyScope> {
     const admin = await requireAdmin();
-    return { owner: INSTANCE, actorId: admin.id, path: "/admin/integrations/models", audit: "instance" };
+    return {
+        owner: INSTANCE,
+        actorId: admin.id,
+        path: "/admin/integrations/models",
+        audit: "instance"
+    };
 }
 
 export async function addInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {

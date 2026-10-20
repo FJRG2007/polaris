@@ -65,10 +65,7 @@ export default async function AgentDefaultsAdminPage() {
         // Narrow page: centre the column in the content area, header included, so
         // the form does not sit against the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("agents.page.title")}
-                description={t("agents.page.description")}
-            />
+            <PageHeader title={t("agents.page.title")} description={t("agents.page.description")} />
             <div className="space-y-4">
                 <KeySharingCard shared={keysShared} />
                 <PolarAccessCard
@@ -76,11 +73,15 @@ export default async function AgentDefaultsAdminPage() {
                     groups={groups.slice(0, GROUP_CHIPS)}
                     moreGroups={groups.length > GROUP_CHIPS}
                     chosenGroups={await prisma.group.findMany({
-                        where: { id: { in: [...polarPolicy.use.groupIds, ...polarPolicy.spend.groupIds] } },
+                        where: {
+                            id: { in: [...polarPolicy.use.groupIds, ...polarPolicy.spend.groupIds] }
+                        },
                         select: { id: true, name: true }
                     })}
                     people={await prisma.user.findMany({
-                        where: { id: { in: [...polarPolicy.use.userIds, ...polarPolicy.spend.userIds] } },
+                        where: {
+                            id: { in: [...polarPolicy.use.userIds, ...polarPolicy.spend.userIds] }
+                        },
                         select: { id: true, name: true }
                     })}
                 />

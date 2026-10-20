@@ -47,13 +47,19 @@ vi.mock("@polaris/db", () => ({
             findMany: vi.fn(
                 async ({
                     where
-                }: { where?: { userId?: string | null; OR?: unknown[]; enabled?: boolean } } = {}) =>
+                }: {
+                    where?: { userId?: string | null; OR?: unknown[]; enabled?: boolean };
+                } = {}) =>
                     (where?.userId ? state.ownKeys : state.instanceKeys)
                         .filter(
                             (row) =>
                                 !where?.OR || row.expiresAt === null || row.expiresAt > new Date()
                         )
-                        .filter((row) => where?.enabled === undefined || (row.enabled ?? true) === where.enabled)
+                        .filter(
+                            (row) =>
+                                where?.enabled === undefined ||
+                                (row.enabled ?? true) === where.enabled
+                        )
                         .map((row) => ({
                             ...row,
                             encryptedSecret: Buffer.from(row.id),
@@ -417,7 +423,9 @@ describe("a switched-off key", () => {
 
     it("keeps working when it was stored before the switch existed", async () => {
         instanceHas("anthropic", "sk-theirs");
-        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({ secret: "sk-theirs" });
+        expect(await chatCredentialFor("user-1", "anthropic")).toMatchObject({
+            secret: "sk-theirs"
+        });
     });
 });
 

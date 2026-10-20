@@ -45,7 +45,10 @@ describe("reachableAppIds", () => {
     });
 
     it("withholds an app its own policy closes to this person", async () => {
-        const closesPolar = { ...holding("drive.read"), closes: async (app: string) => app === "polar" };
+        const closesPolar = {
+            ...holding("drive.read"),
+            closes: async (app: string) => app === "polar"
+        };
         expect(await reachableAppIds(closesPolar)).toEqual(["overview", "drive"]);
     });
 

@@ -351,8 +351,15 @@ export async function updateModelKey(
 /** Remove one. Scoped by owner, so an id from somewhere else deletes nothing. */
 /** Switch one of this owner's keys on or off. False when it holds no such key.
  *  The row, its name and its place in the order are kept either way. */
-export async function setModelKeyEnabled(owner: KeyOwner, id: string, enabled: boolean): Promise<boolean> {
-    const result = await prisma.userModelKey.updateMany({ where: { id, userId: owner }, data: { enabled } });
+export async function setModelKeyEnabled(
+    owner: KeyOwner,
+    id: string,
+    enabled: boolean
+): Promise<boolean> {
+    const result = await prisma.userModelKey.updateMany({
+        where: { id, userId: owner },
+        data: { enabled }
+    });
     return result.count > 0;
 }
 
@@ -883,7 +890,9 @@ export async function secretForAccount(
             where: {
                 AND: [
                     { id: accountId },
-                    { OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])] },
+                    {
+                        OR: [...(userId ? [{ userId }] : []), ...(shared ? [{ userId: null }] : [])]
+                    },
                     spendable()
                 ]
             },

@@ -34,7 +34,11 @@ import {
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
-import { classifyProviderFailure, encodePolarFailure, failureLogLine } from "@/lib/polar/provider-failure";
+import {
+    classifyProviderFailure,
+    encodePolarFailure,
+    failureLogLine
+} from "@/lib/polar/provider-failure";
 import {
     fencePageContext,
     modelChoiceSchema,

@@ -19,7 +19,9 @@ const state = {
     messages: [] as unknown[]
 };
 
-vi.mock("@/lib/polar/access", async () => (await import("./fixtures/open-polar-access")).openPolarAccess());
+vi.mock("@/lib/polar/access", async () =>
+    (await import("./fixtures/open-polar-access")).openPolarAccess()
+);
 vi.mock("@/lib/api-session", () => ({
     apiUser: async () =>
         state.anonymous

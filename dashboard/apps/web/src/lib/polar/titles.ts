@@ -123,7 +123,9 @@ export async function titlePolarThread(
     } catch (error) {
         // One line, not a stack: a key that is out of credit fails every turn,
         // and the reply already told the person why.
-        console.warn(failureLogLine("naming a thread", providerOf(model), classifyProviderFailure(error)));
+        console.warn(
+            failureLogLine("naming a thread", providerOf(model), classifyProviderFailure(error))
+        );
     }
     await prisma.polarThread.updateMany({
         where: { id: threadId, userId, titleSource: "generating" },
@@ -142,7 +144,9 @@ export function startPolarTitle(
     if (running.has(threadId)) return;
     const job = titlePolarThread(userId, threadId, model, messages, reasoning)
         .catch((error) =>
-            console.warn(`polar: could not name the thread: ${error instanceof Error ? error.message : String(error)}`)
+            console.warn(
+                `polar: could not name the thread: ${error instanceof Error ? error.message : String(error)}`
+            )
         )
         .finally(() => running.delete(threadId));
     running.set(threadId, job);

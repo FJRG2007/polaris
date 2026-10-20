@@ -183,7 +183,8 @@ export async function polarCredentialFor(
     payer: KeySource | null = null,
     access?: PolarAccess
 ): Promise<ChatCredential | null> {
-    if ((access ?? (await polarAccessFor(userId))).spend) return chatCredentialFor(userId, provider, payer);
+    if ((access ?? (await polarAccessFor(userId))).spend)
+        return chatCredentialFor(userId, provider, payer);
     if (payer === "instance") return null;
     return chatCredentialFor(userId, provider, "own");
 }

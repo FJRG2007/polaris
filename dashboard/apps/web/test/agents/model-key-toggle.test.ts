@@ -29,7 +29,8 @@ vi.mock("@/lib/agents/model-keys", () => ({
     updateModelKey: vi.fn()
 }));
 vi.mock("@/lib/audit-service", () => ({
-    recordAudit: async (entry: { action: string; targetId?: string }) => void state.audits.push(entry)
+    recordAudit: async (entry: { action: string; targetId?: string }) =>
+        void state.audits.push(entry)
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/agents/provider-key-check", () => ({ checkProviderKey: vi.fn() }));
@@ -38,7 +39,12 @@ vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: strin
 const { toggleKey } = await import("@/lib/agents/model-key-actions");
 
 const ID = "0190a3c2-7a3e-7000-8000-000000000001";
-const scope = { owner: null, actorId: "admin-1", path: "/admin/integrations/models", audit: "instance" as const };
+const scope = {
+    owner: null,
+    actorId: "admin-1",
+    path: "/admin/integrations/models",
+    audit: "instance" as const
+};
 
 beforeEach(() => {
     state.rows = new Map([[ID, { userId: null, enabled: true }]]);
@@ -49,7 +55,9 @@ describe("toggleKey", () => {
     it("switches a deployment key off and records who did it", async () => {
         expect(await toggleKey(scope, { id: ID, enabled: false })).toEqual({});
         expect(state.rows.get(ID)?.enabled).toBe(false);
-        expect(state.audits).toEqual([expect.objectContaining({ action: "instance.ai-key.disabled", targetId: ID })]);
+        expect(state.audits).toEqual([
+            expect.objectContaining({ action: "instance.ai-key.disabled", targetId: ID })
+        ]);
     });
 
     it("switches it back on", async () => {
@@ -61,11 +69,15 @@ describe("toggleKey", () => {
 
     it("refuses a key this owner does not hold, and records nothing", async () => {
         state.rows.set(ID, { userId: "someone", enabled: true });
-        expect(await toggleKey(scope, { id: ID, enabled: false })).toEqual({ error: "refusals.aiKeys.keyGone" });
+        expect(await toggleKey(scope, { id: ID, enabled: false })).toEqual({
+            error: "refusals.aiKeys.keyGone"
+        });
         expect(state.audits).toEqual([]);
     });
 
     it("refuses input that is not an id and a boolean", async () => {
-        expect(await toggleKey(scope, { id: ID, enabled: "no" })).toEqual({ error: "refusals.aiKeys.pickKey" });
+        expect(await toggleKey(scope, { id: ID, enabled: "no" })).toEqual({
+            error: "refusals.aiKeys.pickKey"
+        });
     });
 });

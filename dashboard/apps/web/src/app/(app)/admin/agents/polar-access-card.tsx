@@ -42,7 +42,10 @@ export function PolarAccessCard({
     const t = useTranslations("admin");
     const [current, setCurrent] = useState(policy);
     const [names, setNames] = useState<readonly PickedPerson[]>(people);
-    const [groupNames, setGroupNames] = useState<readonly Group[]>(() => [...chosenGroups, ...groups]);
+    const [groupNames, setGroupNames] = useState<readonly Group[]>(() => [
+        ...chosenGroups,
+        ...groups
+    ]);
     const [groupQuery, setGroupQuery] = useState("");
     const [foundGroups, setFoundGroups] = useState<readonly Group[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -128,7 +131,9 @@ export function PolarAccessCard({
                             search={(query) => findPolarPeopleAction(query)}
                             onChange={(next) => {
                                 setNames((known) => [
-                                    ...known.filter((person) => !next.some((entry) => entry.id === person.id)),
+                                    ...known.filter(
+                                        (person) => !next.some((entry) => entry.id === person.id)
+                                    ),
                                     ...next
                                 ]);
                                 change(part, { userIds: next.map((person) => person.id) });
@@ -150,7 +155,10 @@ export function PolarAccessCard({
                             </div>
                         ) : null}
                         {shownGroups.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5" aria-label={t("agents.polarAccess.groups")}>
+                            <div
+                                className="flex flex-wrap gap-1.5"
+                                aria-label={t("agents.polarAccess.groups")}
+                            >
                                 {shownGroups.map((group) => {
                                     const on = value.groupIds.includes(group.id);
                                     return (
@@ -162,7 +170,9 @@ export function PolarAccessCard({
                                             onClick={() =>
                                                 change(part, {
                                                     groupIds: on
-                                                        ? value.groupIds.filter((id) => id !== group.id)
+                                                        ? value.groupIds.filter(
+                                                              (id) => id !== group.id
+                                                          )
                                                         : [...value.groupIds, group.id]
                                                 })
                                             }
