@@ -2498,6 +2498,7 @@
         }
     },
     "overview": {
+        "upsTitle": "UPS units",
         "statusLabel": "Devices at a glance",
         "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
         "controlsLabel": "Quick controls",

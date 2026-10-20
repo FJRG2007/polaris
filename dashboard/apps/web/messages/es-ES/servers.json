@@ -762,6 +762,12 @@
         "description": "Sistemas de alimentación, su carga y las máquinas que protegen",
         "add": "Añadir SAI",
         "back": "Los SAI",
+        "place": {
+            "label": "Lugar",
+            "none": "Sin lugar",
+            "failed": "No se pudo mover el SAI"
+        },
+        "protectedBy": "Lo protege",
         "empty": {
             "title": "Sin SAI aún",
             "body": "Uno conectado por USB sale aquí solo. Añade uno de un servidor NUT o leído por SNMP."

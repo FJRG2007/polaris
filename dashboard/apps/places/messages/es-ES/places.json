@@ -2498,6 +2498,7 @@
         }
     },
     "overview": {
+        "upsTitle": "Equipos SAI",
         "statusLabel": "Estado de dispositivos",
         "statusHint": "Cómo están los dispositivos que elijas: temperaturas, calidad del aire, lecturas y baterías.",
         "controlsLabel": "Controles rápidos",

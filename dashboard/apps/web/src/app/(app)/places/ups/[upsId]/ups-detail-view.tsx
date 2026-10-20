@@ -28,6 +28,7 @@ import {
     MultiSeriesChart,
     PageHeader,
     SegmentedControl,
+    Select,
     Skeleton,
     Switch,
     useToast
@@ -44,7 +45,12 @@ import { UpsVariablesPanel } from "./ups-variables-panel";
 import * as upsSettings from "@/lib/ups/ups-settings";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { removeUpsAction, runUpsCommandAction, updateUpsShutdownAction } from "../actions";
+import {
+    removeUpsAction,
+    runUpsCommandAction,
+    setUpsPlaceAction,
+    updateUpsShutdownAction
+} from "../actions";
 import {
     minutesLeft,
     rounded,
@@ -71,11 +77,13 @@ type Tab = (typeof TABS)[number];
 export function UpsDetailView({
     initial,
     machines,
-    canOfferNetwork
+    canOfferNetwork,
+    places
 }: {
     initial: UpsView;
     machines: UpsMachine[];
     canOfferNetwork: boolean;
+    places: { id: string; name: string }[];
 }) {
     const t = useTranslations("servers");
     const router = useRouter();
@@ -96,6 +104,20 @@ export function UpsDetailView({
         select: (body) => body as UpsDetailAnswer
     });
     const ups = live.data?.ups ?? initial;
+    const toast = useToast();
+    // Optimistic: the picker shows the new place at once and goes back to the
+    // old one if the server refuses it.
+    const [placeId, setPlaceId] = useState<string | null>(initial.placeId);
+    async function movePlace(next: string | null) {
+        const before = placeId;
+        if (next === before) return;
+        setPlaceId(next);
+        const outcome = await setUpsPlaceAction(ups.id, next);
+        if (!outcome.ok) {
+            setPlaceId(before);
+            toast.show({ key: `ups:${ups.id}:place`, title: t("ups.place.failed") });
+        }
+    }
     const result = live.data?.result ?? null;
     const reading = result?.ok ? result.reading : null;
 
@@ -105,7 +127,7 @@ export function UpsDetailView({
             setRemoveError(t(`ups.errors.${outcome.error === "notFound" ? "notFound" : "failed"}`));
             return;
         }
-        router.push("/apps/servers/ups");
+        router.push("/places/ups");
     }
 
     function openTab(next: Tab) {
@@ -132,7 +154,7 @@ export function UpsDetailView({
     return (
         <>
             <Link
-                href="/apps/servers/ups"
+                href="/places/ups"
                 className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
                 <ArrowLeft className="size-4 shrink-0" aria-hidden />
@@ -142,7 +164,22 @@ export function UpsDetailView({
                 title={ups.name}
                 description={t(`ups.connection.${ups.connection}`)}
                 actions={
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                        {places.length > 0 ? (
+                            <Select
+                                aria-label={t("ups.place.label")}
+                                className="w-48"
+                                value={placeId ?? ""}
+                                onValueChange={(value) => void movePlace(value || null)}
+                                options={[
+                                    { value: "", label: t("ups.place.none") },
+                                    ...places.map((place) => ({
+                                        value: place.id,
+                                        label: place.name
+                                    }))
+                                ]}
+                            />
+                        ) : null}
                         <Button variant="outline" onClick={() => setEditing(true)}>
                             <Pencil className="size-4 shrink-0" aria-hidden />
                             {t("ups.edit")}

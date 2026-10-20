@@ -136,6 +136,11 @@ const nextConfig = {
         // that ever followed it, and this project has already lost one path that
         // way.
         { source: "/house", destination: "/places", permanent: false },
+        // The UPS screens moved from Servers into Places, where the other
+        // physical things are. Kept for good, and temporary for the reason
+        // above: a cached 308 cannot be taken back if the address moves again.
+        { source: "/apps/servers/ups", destination: "/places/ups", permanent: false },
+        { source: "/apps/servers/ups/:path*", destination: "/places/ups/:path*", permanent: false },
         { source: "/house/:path*", destination: "/places/:path*", permanent: false },
         // Management's screens were spread between /admin and the top level, so
         // the URL said nothing about which part of Polaris you were in. They are

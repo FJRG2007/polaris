@@ -762,6 +762,12 @@
         "description": "Battery backups, their charge and the machines they protect",
         "add": "Add a UPS",
         "back": "All UPSes",
+        "place": {
+            "label": "Place",
+            "none": "No place",
+            "failed": "The UPS could not be moved"
+        },
+        "protectedBy": "Protected by",
         "empty": {
             "title": "No UPS yet",
             "body": "One plugged in by USB shows up here by itself. Add one on a NUT server or read over SNMP."

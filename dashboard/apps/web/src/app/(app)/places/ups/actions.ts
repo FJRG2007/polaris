@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { listServerRows } from "../server-rows";
+import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { hostSubject } from "@/lib/metrics-shared";
@@ -333,6 +333,27 @@ export async function makeUpsReportAction(id: string): Promise<UpsActionResult<s
         );
         const name = `${upsData.fileStem(row.name)}-${schedule}-${period.from.toISOString().slice(0, 10)}.md`;
         return { ok: true, value: await upsData.saveToDrive(user.id, name, content) };
+    } catch (error) {
+        return refused(error);
+    }
+}
+
+/** Put a UPS in one of the places, or in none. */
+export async function setUpsPlaceAction(id: string, placeId: unknown): Promise<UpsActionResult> {
+    const user = await requirePermission("system.manage");
+    try {
+        const upsId = idSchema.parse(id);
+        const place = idSchema.nullable().parse(placeId ?? null);
+        if (!(await upsService.updateUpsPlace(upsId, place)))
+            return { ok: false, error: "notFound" };
+        await recordAudit({
+            actorId: user.id,
+            action: "ups.place",
+            targetType: "ups",
+            targetId: upsId,
+            metadata: { placeId: place }
+        });
+        return { ok: true, value: undefined };
     } catch (error) {
         return refused(error);
     }

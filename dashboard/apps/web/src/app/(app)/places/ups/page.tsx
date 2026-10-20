@@ -1,6 +1,6 @@
 import { requirePermission } from "@/lib/session";
 import { hostSubject } from "@/lib/metrics-shared";
-import { listServerRows } from "../server-rows";
+import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { UpsListView } from "./ups-list-view";
 
 export const dynamic = "force-dynamic";

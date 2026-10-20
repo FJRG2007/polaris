@@ -14917,12 +14917,18 @@ model Ups {
     reportLastAt            DateTime?
     // Offer this UPS to other machines' upsmon through its machine's daemon.
     netserverEnabled        Boolean     @default(false)
+    // The Places place this UPS stands in, or null for one nobody has placed.
+    // A bare uuid, per the Place/InstalledApp precedent: Places is an app that
+    // can be uninstalled, and a UPS must keep protecting its machines when it is.
+    placeId                 String?     @db.Uuid
     createdAt               DateTime    @default(now())
     updatedAt               DateTime    @updatedAt
     samples                 UpsSample[]
     events                  UpsEvent[]
     energy                  UpsEnergyHour[]
     actions                 UpsAction[]
+
+    @@index([placeId])
 }
 
 // Something a UPS did: a status flag that rose, a test, a lost link, a

@@ -8,7 +8,7 @@
 import * as nut from "@/lib/ups/nut-client";
 import * as events from "@/lib/ups/ups-events";
 import * as settings from "@/lib/ups/ups-settings";
-import * as words from "@/app/(app)/apps/servers/ups/ups-words";
+import * as words from "@/app/(app)/places/ups/ups-words";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createServer, type AddressInfo, type Server } from "node:net";
 

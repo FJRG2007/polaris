@@ -72,12 +72,15 @@ export interface UpsView {
     settings: upsSettings.UpsSettingsInput;
     variableMap: upsSettings.VariableMap;
     reportLastAt: string | null;
+    /** The Places place it stands in, or null. */
+    placeId: string | null;
 }
 
 export function toView(row: UpsRow): UpsView {
     return {
         id: row.id,
         name: row.name,
+        placeId: row.placeId,
         connection: row.connection as UpsView["connection"],
         machineId: row.machineId,
         deviceId: row.deviceId,
@@ -268,6 +271,44 @@ export async function updateUpsShutdown(
         }
     });
     return result.count > 0;
+}
+
+/**
+ * Put a UPS in a place, or take it out of one (null).
+ *
+ * The place is read from the table rather than through the Places app: a UPS
+ * is core (it shuts machines down) and must not depend on an app being loaded.
+ * Answers false for a UPS or a place that does not exist.
+ */
+export async function updateUpsPlace(id: string, placeId: string | null): Promise<boolean> {
+    if (
+        placeId &&
+        !(await prisma.place.findUnique({ where: { id: placeId }, select: { id: true } }))
+    )
+        return false;
+    const result = await prisma.ups.updateMany({ where: { id }, data: { placeId } });
+    return result.count > 0;
+}
+
+/** Every place a UPS can be put in, by name. Empty when Places is not installed. */
+export async function placeChoices(): Promise<{ id: string; name: string }[]> {
+    return prisma.place.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+        take: 200
+    });
+}
+
+/** The UPSes that shut this machine (a metric subject) down, for its own screen. */
+export async function upsProtecting(
+    machineSubject: string
+): Promise<{ id: string; name: string }[]> {
+    return prisma.ups.findMany({
+        where: { protectedMachineIds: { has: machineSubject } },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+        take: 20
+    });
 }
 
 export async function updateUpsSettings(
@@ -844,7 +885,7 @@ async function announce(
             ...((kind === "TEST" && outcome === "failed") || tone === "danger"
                 ? { level: "danger" as const }
                 : {}),
-            href: `/apps/servers/ups/${row.id}?tab=events`,
+            href: `/places/ups/${row.id}?tab=events`,
             metadata: { upsId: row.id, kind }
         }).catch((error: unknown) =>
             console.error("polaris: could not report a UPS event:", error)
@@ -876,7 +917,7 @@ async function reportPowerOffFailed(row: UpsRow, machineId: string): Promise<voi
         })),
         level: "danger",
         actionRequired: true,
-        href: `/apps/servers/ups/${row.id}`,
+        href: `/places/ups/${row.id}`,
         metadata: { upsId: row.id, machineId }
     }).catch((error: unknown) =>
         console.error("polaris: could not report a failed UPS shutdown:", error)

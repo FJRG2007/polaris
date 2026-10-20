@@ -809,14 +809,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"]
         },
         {
-            label: "UPS", // i18n-ignore
-            href: "/apps/servers/ups",
-            needs: "system.manage",
-            icon: BatteryCharging,
-            group: MACHINES_GROUP,
-            keywords: ["ups", "sai", "battery", "power", "outage", "nut", "snmp", "shutdown"]
-        },
-        {
             // Part of Servers on every Polaris (see `native-apps`); the same
             // permission its screen and every one of its actions asks.
             label: "Security scans", // i18n-ignore
@@ -1154,6 +1146,17 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "tuya",
                 "smart home"
             ]
+        },
+        {
+            // A UPS is a physical thing in a place, like a door (it was under
+            // Servers until 2026-10-20; the old address redirects here). The
+            // machines it protects link to it from their own page.
+            label: "UPS", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/ups",
+            needs: "system.manage",
+            icon: BatteryCharging,
+            keywords: ["ups", "sai", "battery", "power", "outage", "nut", "snmp", "shutdown"]
         },
         {
             label: "Automations", // i18n-ignore

@@ -8,7 +8,10 @@
  * has been asked anything.
  */
 
+import Link from "next/link";
 import { placesT } from "../../lib/i18n";
+import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { PageHeader } from "@polaris/ui";
 import { requireHomeReach } from "../../lib/access";
 import { currentPlace } from "../../lib/current-place";
@@ -20,8 +23,19 @@ export const dynamic = "force-dynamic";
 export default async function PlacePage() {
     const t = await placesT();
     // A visitor lent one door or one camera lands here too, and is shown that.
-    const { install, reach, canManage, canControl } = await requireHomeReach();
+    const { install, user, reach, canManage, canControl } = await requireHomeReach();
     const place = await currentPlace(install.id);
+    // The UPSes standing in this place. Their screens are core's (a UPS keeps
+    // shutting machines down with Places uninstalled), so they are only listed
+    // to whoever may open them, and read straight off the table.
+    const upses = (await host.session.sessionCan(user, "system.manage"))
+        ? await prisma.ups.findMany({
+              where: { placeId: place.current.id },
+              select: { id: true, name: true },
+              orderBy: { name: "asc" },
+              take: 50
+          })
+        : [];
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -43,6 +57,25 @@ export default async function PlacePage() {
                 canControl={canControl}
                 canManage={canManage}
             />
+            {upses.length > 0 ? (
+                <section aria-labelledby="place-ups" className="flex flex-col gap-2">
+                    <h2 id="place-ups" className="text-sm font-medium">
+                        {t("overview.upsTitle")}
+                    </h2>
+                    <ul className="flex flex-wrap gap-2">
+                        {upses.map((ups) => (
+                            <li key={ups.id} className="min-w-0">
+                                <Link
+                                    href={`/places/ups/${ups.id}`}
+                                    className="block truncate rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
+                                >
+                                    {ups.name}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
         </div>
     );
 }
