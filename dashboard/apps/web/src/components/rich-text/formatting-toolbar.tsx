@@ -468,7 +468,7 @@ export function FormattingToolbar({
                             <DropdownMenuSubTrigger>
                                 {t("editor.toolbar.size")}
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent className="max-h-72 overflow-y-auto overscroll-contain">
+                            <DropdownMenuSubContent className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain">
                                 {sizeOptions.map((one) => (
                                     <Picked
                                         key={one.value || "default"}

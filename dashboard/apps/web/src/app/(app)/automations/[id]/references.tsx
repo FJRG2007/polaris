@@ -86,7 +86,7 @@ function ReferenceMenu({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="end"
-                className="max-h-80 w-72 overflow-y-auto overscroll-contain"
+                className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-72 overflow-y-auto overscroll-contain"
             >
                 {groups.length === 0 ? (
                     <p className="px-2 py-1.5 text-xs text-muted-foreground">

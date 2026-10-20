@@ -221,6 +221,26 @@ notice pushes its bottom off a window that does not scroll.
   screen - `test/mail/page-height.test.ts` only holds `PAGE_BLEED`'s own
   string, not a screen's private formula.
 
+## A menu's own height still respects the screen
+
+`DropdownMenuContent`/`DropdownMenuSubContent`
+(`packages/ui/src/components/dropdown-menu.tsx`) already caps itself at
+`var(--radix-dropdown-menu-content-available-height)`, the room Radix measured
+beside its trigger. A caller that sets its own `max-h-72`/`max-h-80`/... on
+the menu replaces that cap instead of narrowing it - Tailwind's class merge
+keeps only the last `max-h-*` - so a menu opened low on the screen (Polar's
+model list from its composer, say) ran past the bottom edge with no way to
+scroll to its last options.
+
+- **A caller that wants a shorter menu takes the smaller of its height and
+  the measured one**, never a bare `max-h-*`:
+  `max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))]`.
+- `test/ui/menu-height-cap.test.ts` scans every `DropdownMenuContent`,
+  `DropdownMenuSubContent` and `ContextMenuContent` under `apps/` and
+  `packages/` for a `max-h-*` class that does not mention
+  `available-height`, and fails on the first one it finds - a new menu with
+  its own cap needs the `min(...)` form from the start.
+
 ## Minecraft events
 
 Before adding or changing a Game servers event

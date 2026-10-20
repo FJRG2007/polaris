@@ -842,7 +842,7 @@ export function GameConsole({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                             align="end"
-                            className="max-h-80 overflow-y-auto overscroll-contain"
+                            className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
                         >
                             <DropdownMenuLabel>{t("console.commandsYouHaveRun")}</DropdownMenuLabel>
                             <DropdownMenuSeparator />

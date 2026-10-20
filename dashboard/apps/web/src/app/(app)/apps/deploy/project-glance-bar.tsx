@@ -199,7 +199,7 @@ export function ProjectGlanceBar({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="start"
-                                    className="max-h-72 max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain"
+                                    className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain"
                                 >
                                     <DropdownMenuLabel>{t("glance.addresses")}</DropdownMenuLabel>
                                     {addresses.map((address) => (

@@ -135,7 +135,7 @@ export function ModelSelector({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="start"
-                className="max-h-96 w-72 overflow-y-auto overscroll-contain pt-2"
+                className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 overflow-y-auto overscroll-contain pt-2"
                 // Escape empties a search first and closes the menu only once
                 // there is nothing left to clear.
                 onEscapeKeyDown={(event) => {

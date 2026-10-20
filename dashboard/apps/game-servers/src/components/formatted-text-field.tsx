@@ -402,7 +402,10 @@ export function FormattedTextField({
                                     <Plus className="size-3.5" /> {t("textField.variable")}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+                            <DropdownMenuContent
+                                align="end"
+                                className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto"
+                            >
                                 {inserts.map((one) => (
                                     <DropdownMenuItem
                                         key={one.text}

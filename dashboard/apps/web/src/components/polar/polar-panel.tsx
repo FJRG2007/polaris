@@ -324,7 +324,7 @@ export function PolarAside() {
             />
             {/* Its own width from xl, so growing the panel uncovers it instead of
                 squeezing it. */}
-            <div className="flex min-h-0 flex-1 flex-col xl:w-[calc(var(--polar-width)-1px)] xl:flex-none">
+            <div className="flex min-h-0 flex-1 flex-col xl:w-[calc(var(--polar-width)-1px)]">
                 <PolarChat onClose={() => setOpen(false)} />
             </div>
         </aside>

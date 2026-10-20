@@ -100,7 +100,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const { PolarChat } = await import("@/components/polar/polar-panel");
+const { PolarAside, PolarChat, PolarProvider } = await import("@/components/polar/polar-panel");
 
 function mount() {
     const view = render(<PolarChat />, { wrapper: MessagesWrapper });
@@ -117,6 +117,23 @@ async function ready() {
     // The model list arrives before anything can be sent.
     await waitFor(() => expect(screen.getByText("Model One", { exact: false })).toBeTruthy());
 }
+
+describe("the side panel", () => {
+    it("lets the chat fill the panel's height, so the composer sits at the bottom", async () => {
+        render(
+            <PolarProvider>
+                <PolarAside />
+            </PolarProvider>,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.keyDown(window, { key: "j", ctrlKey: true });
+        const aside = await screen.findByRole("complementary");
+        const column = aside.lastElementChild as HTMLElement;
+        // The column sets its own width from xl; flex-none there would also stop it growing tall.
+        expect(column.className).toContain("flex-1");
+        expect(column.className).not.toMatch(/(^|\s)\S*:?flex-none(\s|$)/);
+    });
+});
 
 describe("an empty panel", () => {
     it("offers suggestions, shows the page it sees, and a composer", async () => {

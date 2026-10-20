@@ -292,7 +292,7 @@ export function ServerInsightsPanel({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                                 align="end"
-                                className="max-h-72 overflow-y-auto overscroll-y-contain"
+                                className="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-y-contain"
                             >
                                 <DropdownMenuItem onSelect={() => setFilter(null)}>
                                     {t("insights.anomalies.allServers")}

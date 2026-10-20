@@ -168,7 +168,7 @@ export function MenuButton({
             </DropdownMenuTrigger>
             <DropdownMenuContent
                 align="start"
-                className="max-h-[min(70vh,28rem)] overflow-y-auto overscroll-contain"
+                className="max-h-[min(70vh,28rem,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto overscroll-contain"
             >
                 {menu}
             </DropdownMenuContent>
