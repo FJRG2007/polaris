@@ -395,5 +395,20 @@
         "nxDomain": "No such name",
         "fqdnOnly": "Answer names without a dot as not found",
         "dnssec": "Check the DNSSEC signature of each answer"
+    },
+    "lookup": {
+        "title": "Is this name blocked?",
+        "intro": "Ask the blocker about one name, as a device with no group of its own would.",
+        "domain": "Name to check",
+        "ask": "Check",
+        "invalid": "Type one name, like ads.example.com, with no * or /.",
+        "blocked": "Blocked",
+        "allowed": "Allowed",
+        "byList": "Blocked by",
+        "answeredBy": "Answered by",
+        "answer": "Answer",
+        "allow": "Allow it",
+        "block": "Block it",
+        "inLog": "See the log"
     }
 }

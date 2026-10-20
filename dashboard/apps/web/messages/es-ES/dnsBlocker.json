@@ -395,5 +395,20 @@
         "nxDomain": "No existe",
         "fqdnOnly": "Dar por inexistentes los nombres sin punto",
         "dnssec": "Comprobar la firma DNSSEC de cada respuesta"
+    },
+    "lookup": {
+        "title": "¿Se bloquea este nombre?",
+        "intro": "Pregunta al bloqueador por un nombre, como un equipo sin grupo propio.",
+        "domain": "Nombre a mirar",
+        "ask": "Mirar",
+        "invalid": "Escribe un nombre, como ads.example.com, sin * ni /.",
+        "blocked": "Bloqueado",
+        "allowed": "Permitido",
+        "byList": "Bloqueado por",
+        "answeredBy": "Respondió",
+        "answer": "Respuesta",
+        "allow": "Permitir",
+        "block": "Bloquear",
+        "inLog": "Ver registro"
     }
 }

@@ -436,3 +436,60 @@ export const ruleFromLogSchema = z.object({
     }),
     list: z.enum(["allow", "deny"])
 });
+
+/** A name to ask the engine about: one plain host name, not a wildcard or a pattern. */
+export const lookupSchema = z.object({
+    domain: z.string().transform((value, ctx) => {
+        const rule = normalizeDnsRule(value);
+        if (!rule || rule.startsWith("/") || rule.startsWith("*.")) {
+            ctx.addIssue({ code: "custom", message: "invalidName" }); // i18n-ignore a key the screen says
+            return z.NEVER;
+        }
+        return rule;
+    })
+});
+
+/** What the engine's query API answers (`POST /api/query`, api.QueryResult). */
+const queryResultSchema = z.object({
+    reason: z.string(),
+    response: z.string(),
+    responseType: z.string(),
+    returnCode: z.string()
+});
+
+/** The engine's answer for one name, as the screen says it. */
+export interface DnsLookup {
+    readonly domain: string;
+    readonly outcome: QueryOutcome;
+    /** Who answered, as in the log: `blocked`, `cache`, `local`, an upstream, or `other`. */
+    readonly via: string;
+    /** The list that blocked it, when one did. */
+    readonly list: string;
+    /** The answer itself, e.g. `A (93.184.215.14)`. */
+    readonly response: string;
+    readonly returnCode: string;
+    readonly reason: string;
+}
+
+/** The query API's JSON read into a lookup, or null when it is not that shape. */
+export function parseLookup(domain: string, output: string): DnsLookup | null {
+    let json: unknown;
+    try {
+        json = JSON.parse(output);
+    } catch {
+        return null;
+    }
+    const parsed = queryResultSchema.safeParse(json);
+    if (!parsed.success) return null;
+    const { reason, response, responseType, returnCode } = parsed.data;
+    const blocked = responseType === "BLOCKED" || responseType === "REBIND";
+    return {
+        domain,
+        outcome: blocked ? "blocked" : "allowed",
+        via: viaOf(responseType, reason),
+        list: /^BLOCKED \((.+)\)$/.exec(reason)?.[1] ?? "",
+        response,
+        returnCode,
+        reason
+    };
+}

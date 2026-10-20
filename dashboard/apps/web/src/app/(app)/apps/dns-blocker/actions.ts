@@ -231,6 +231,19 @@ export async function ruleFromLogAction(
     }
 }
 
+/** Whether the blocker blocks one name right now, and by which list. */
+export async function dnsLookupAction(
+    input: unknown
+): Promise<Result<{ lookup: queryLog.DnsLookup }>> {
+    await requireAdmin();
+    try {
+        const { domain } = queryLog.lookupSchema.parse(input);
+        return { lookup: await insights.lookupName(domain) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
 /** Which addresses asked the blocker in the last 24 hours, for the check under the router
  *  steps. The same read of the log as the insights card's unfiltered view. */
 export async function dnsClientsAction(

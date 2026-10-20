@@ -25,6 +25,7 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { RuleField, serviceName, timeZones } from "./fields";
 import { useDnsBlocker, useField } from "./dns-blocker-context";
 import { DnsSaveBar } from "./save-bar";
+import { DnsLookupCard } from "./lookup-card";
 
 export function DnsListsSection() {
     const t = useTranslations("dnsBlocker");
@@ -43,7 +44,8 @@ export function DnsListsSection() {
     const [scheduleWhole, setScheduleWhole] = useState(false);
     const [scheduleStart, setScheduleStart] = useState("21:00");
     const [scheduleEnd, setScheduleEnd] = useState("07:00");
-    const { badAllow, badDeny, tooMany } = useDnsBlocker().checks;
+    const { checks, status } = useDnsBlocker();
+    const { badAllow, badDeny, tooMany } = checks;
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const listed = dns.dnsSchedulableLists({ sources, customLists, services, clientGroups });
     /** What a list group is called on the screen: a category or a service. */
@@ -66,6 +68,7 @@ export function DnsListsSection() {
 
     return (
         <div className="flex flex-col gap-4">
+            {status?.state === "blocking" ? <DnsLookupCard /> : null}
             <Card>
                 <CardHeader>
                     <CardTitle>{t("lists.title")}</CardTitle>

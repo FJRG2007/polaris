@@ -18,11 +18,13 @@ import {
     QueryLogReader,
     TAIL_BYTES,
     parseBlockingStatus,
+    parseLookup,
     parseEngineMetrics,
     parseTail,
     queryFilterSchema,
     queryLogPath,
     rangeWindow,
+    type DnsLookup,
     type EngineMetrics,
     type QueryFilter,
     type QueryPage,
@@ -196,6 +198,31 @@ export async function engineMetrics(): Promise<EngineMetrics | null> {
     ]);
     if (result.code !== 0 || !result.output.trim()) return null;
     return parseEngineMetrics(result.output);
+}
+
+/**
+ * Ask the engine for one name the way a device on the network would (the
+ * default group: no device of its own), and say whether it was blocked and by
+ * what. Through the query API on the container loopback, with the name passed
+ * as an argument and never through a shell.
+ */
+export async function lookupName(domain: string): Promise<DnsLookup> {
+    const target = await engine();
+    const result = await target.ports.runIn(target.container, [
+        "wget",
+        "-qO-",
+        "--header",
+        "Content-Type: application/json",
+        "--post-data",
+        JSON.stringify({ query: domain, type: "A" }),
+        `http://127.0.0.1:${DNS_ENGINE_HTTP_PORT}/api/query`
+    ]);
+    const lookup = result.code === 0 ? parseLookup(domain, result.output) : null;
+    if (!lookup) {
+        console.error("polaris: ad blocker lookup failed:", result.output);
+        throw new DnsBlockerRefusal("notAnswering");
+    }
+    return lookup;
 }
 
 /** Download every list again now, rather than at the next scheduled time. */
