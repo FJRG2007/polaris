@@ -30,7 +30,7 @@ import { UpsActionHistory } from "./ups-commands-panel";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setUpsVarAction, updateUpsVariableMapAction } from "../actions";
-import { useUpsStanding } from "./ups-standing";
+import { fencedCall, upsErrorKey, useUpsStanding } from "./ups-standing";
 
 export function UpsVariablesPanel({
     ups,
@@ -148,10 +148,12 @@ function EditVariableDialog({
     async function save() {
         setPending(true);
         setServerError(null);
-        const outcome = await setUpsVarAction(upsId, { name: rw.name, value });
+        const outcome = await fencedCall((where) =>
+            setUpsVarAction(upsId, { name: rw.name, value }, where)
+        );
         setPending(false);
         if (!outcome.ok) {
-            setServerError(t("ups.errors.failed"));
+            setServerError(t(`ups.errors.${upsErrorKey(outcome.error)}`));
             return;
         }
         if (outcome.value.outcome === "invalid") {

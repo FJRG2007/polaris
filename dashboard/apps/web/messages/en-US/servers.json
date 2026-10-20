@@ -947,6 +947,10 @@
             "unknownMachine": "That machine is not one of yours.",
             "shutdownIncomplete": "Pick at least one machine and one threshold.",
             "notFound": "This UPS was removed.",
+            "nearbyUnasked": "Allow your location: this only works near the UPS.",
+            "nearbyFar": "Only near the UPS, and you are not there.",
+            "nearbyVague": "Your location is not precise enough to tell.",
+            "nearbyUnplaced": "The UPS's place has no location, so this cannot check.",
             "failed": "That did not work. Try again.",
             "invalid": "Check the highlighted fields."
         },

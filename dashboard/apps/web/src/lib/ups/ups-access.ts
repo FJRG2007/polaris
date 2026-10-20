@@ -11,6 +11,7 @@
  * machines it shuts down and when. Those stay with whoever runs the machines.
  */
 
+import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { liveGrants, type LiveGrant } from "@/lib/access/grants";
@@ -58,4 +59,26 @@ export function visitorView(view: UpsView): UpsView {
         hasSecret: false,
         shutdown: { ...view.shutdown, protectedMachineIds: [] }
     };
+}
+
+/**
+ * Whether an act on a UPS is near enough, for a grant fenced to its place.
+ * Null when it may go ahead - no fence, or near; otherwise why not, for the
+ * screen to answer (`unasked`: ask the browser where it is and try again).
+ * The location is compared and dropped, never kept.
+ */
+export async function upsNearby(
+    grant: LiveGrant | null,
+    placeId: string | null,
+    where: core.ReportedLocation | null
+): Promise<Exclude<core.NearbyVerdict, "near"> | null> {
+    if (!grant?.nearbyMeters) return null;
+    const place = placeId
+        ? await prisma.place.findUnique({
+              where: { id: placeId },
+              select: { latitude: true, longitude: true }
+          })
+        : null;
+    const verdict = core.nearbyVerdict(place, where, grant.nearbyMeters);
+    return verdict === "near" ? null : verdict;
 }

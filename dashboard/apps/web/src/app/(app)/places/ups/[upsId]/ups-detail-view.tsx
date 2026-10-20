@@ -43,7 +43,12 @@ import { UpsCommandsPanel } from "./ups-commands-panel";
 import { UpsSettingsPanel } from "./ups-settings-panel";
 import { UpsVariablesPanel } from "./ups-variables-panel";
 import { ShareDialog } from "@/components/access/share-dialog";
-import { UpsStandingContext, type UpsReaderStanding } from "./ups-standing";
+import {
+    fencedCall,
+    upsErrorKey,
+    UpsStandingContext,
+    type UpsReaderStanding
+} from "./ups-standing";
 import * as upsSettings from "@/lib/ups/ups-settings";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -567,13 +572,13 @@ function UpsControls({ id, reading }: { id: string; reading: upsReading.UpsReadi
 
     async function run(command: upsReading.UpsCommand) {
         setBusy(command);
-        const outcome = await runUpsCommandAction(id, command);
+        const outcome = await fencedCall((where) => runUpsCommandAction(id, command, where));
         setBusy(null);
         toast.show({
             key: `ups:${id}:command`,
             title: outcome.ok
                 ? t(`ups.commandResult.${outcome.value}`)
-                : t(`ups.errors.${outcome.error === "notFound" ? "notFound" : "failed"}`)
+                : t(`ups.errors.${upsErrorKey(outcome.error)}`)
         });
     }
 

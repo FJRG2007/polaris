@@ -25,13 +25,16 @@ import {
     owningOrgIds,
     requireMayShare,
     shareCandidates,
+    subjectPlaceLocated,
     type GrantCandidate
 } from "@/lib/access/sharing-service";
+import { sharingBaseUrl } from "@/lib/domain-service";
 import {
     GrantError,
     listSubjectGrants,
     removeGrant,
     writeGrant,
+    writeGrantLink,
     type GrantView
 } from "@/lib/access/grants";
 
@@ -64,22 +67,29 @@ function subjectOf(value: unknown): core.GrantSubject {
  * every screen and already redraw themselves on the caller's own next move.
  */
 function settled(subject: core.GrantSubject): void {
-    if (subject === "place.device" || subject === "place.camera") revalidatePath("/places");
+    if (subject === "place.device" || subject === "place.camera" || subject === "place.ups")
+        revalidatePath("/places");
 }
 
 export async function listGrantsAction(
     subject: string,
     subjectId: string
-): Promise<{ grants?: GrantView[]; candidates?: GrantCandidate[]; error?: string }> {
+): Promise<{
+    grants?: GrantView[];
+    candidates?: GrantCandidate[];
+    located?: boolean | null;
+    error?: string;
+}> {
     try {
         const user = await requireUser();
         const kind = subjectOf(subject);
         await requireMayShare(user, kind, String(subjectId));
-        const [grants, candidates] = await Promise.all([
+        const [grants, candidates, located] = await Promise.all([
             listSubjectGrants(kind, String(subjectId)),
-            shareCandidates(user, kind, String(subjectId))
+            shareCandidates(user, kind, String(subjectId)),
+            subjectPlaceLocated(kind, String(subjectId))
         ]);
-        return { grants, candidates };
+        return { grants, candidates, located };
     } catch (caught) {
         return refusal(caught, "share.unreadable");
     }
@@ -132,6 +142,65 @@ export async function shareAction(
             parsed.data.principalType === "user" ? { userIds: [parsed.data.principalId] } : {}
         );
         return { grants: await listSubjectGrants(kind, String(subjectId)) };
+    } catch (caught) {
+        return refusal(caught, "share.notWritten");
+    }
+}
+
+/**
+ * Hand a door or a UPS out as a link, for somebody with no account.
+ *
+ * The same standing as sharing it with a person, the same bounds, and the link
+ * comes back once - only its hash is kept, so it cannot be shown again, only
+ * taken back and made anew. Built on the sharing domain, never the tab's host:
+ * the person it is sent to is not on this network.
+ */
+export async function shareLinkAction(
+    subject: string,
+    subjectId: string,
+    input: unknown
+): Promise<{ grants?: GrantView[]; link?: string; error?: string }> {
+    try {
+        const user = await requireUser();
+        const kind = subjectOf(subject);
+        if (!(core.GRANT_LINK_SUBJECTS as readonly string[]).includes(kind)) {
+            throw new GrantError("That cannot be shared as a link");
+        }
+        await requireMayShare(user, kind, String(subjectId));
+        const parsed = core.grantLinkSchema.safeParse(input);
+        if (!parsed.success) {
+            return {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await getTranslations("common"))("share.notWritten")
+            };
+        }
+        const { token } = await writeGrantLink(
+            kind as (typeof core.GRANT_LINK_SUBJECTS)[number],
+            String(subjectId),
+            parsed.data,
+            user.id
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "access.linked",
+            targetType: kind,
+            targetId: String(subjectId),
+            metadata: {
+                capability: parsed.data.capability,
+                actions: parsed.data.actions,
+                nearby: parsed.data.nearbyMeters !== null,
+                bounded: Boolean(
+                    parsed.data.endsAt || parsed.data.startMinute || parsed.data.maxUses
+                )
+            }
+        });
+        settled(kind);
+        const base = (await sharingBaseUrl()).replace(/\/+$/, "");
+        return {
+            grants: await listSubjectGrants(kind, String(subjectId)),
+            link: `${base}/k/${token}`
+        };
     } catch (caught) {
         return refusal(caught, "share.notWritten");
     }

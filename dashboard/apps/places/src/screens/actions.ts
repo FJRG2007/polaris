@@ -24,6 +24,7 @@ import * as events from "../lib/events";
 import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import type { Coordinate } from "@polaris/core";
+import { NearbyRefusal, reportedLocation, type NearbyRefused } from "../lib/nearby";
 import { normalizePlaceLocation, placeLocationSchema } from "../lib/place-kinds";
 import * as people from "../lib/people";
 import * as rooms from "../lib/rooms";
@@ -1228,8 +1229,9 @@ export async function syncDevicesAction(options: { probe?: boolean } = {}): Prom
 export async function operateDeviceAction(
     deviceId: string,
     action: DeviceAction,
-    command?: unknown
-): Promise<{ device?: DeviceView; error?: string }> {
+    command?: unknown,
+    where?: unknown
+): Promise<{ device?: DeviceView; error?: string; nearby?: NearbyRefused }> {
     const user = await requireUser();
     const install = await requireHomeInstall();
     // Both arrive from the browser, so neither is taken on trust: an action this
@@ -1240,16 +1242,25 @@ export async function operateDeviceAction(
     if (!known || (setting !== null && !setting.success)) {
         return { error: await say("refusals.deviceCannot") };
     }
-    const result = await guard(() =>
-        operateDevice(
-            user,
-            install.id,
-            String(deviceId),
-            action,
-            setting?.success ? setting.data : undefined
-        )
-    );
-    if (result.error) return { error: result.error };
+    // A grant fenced to the place says why it refused, so the screen can ask
+    // the browser where it is and try once more rather than only showing it.
+    let near: NearbyRefused | undefined;
+    const result = await guard(async () => {
+        try {
+            return await operateDevice(
+                user,
+                install.id,
+                String(deviceId),
+                action,
+                setting?.success ? setting.data : undefined,
+                reportedLocation(where)
+            );
+        } catch (caught) {
+            if (caught instanceof NearbyRefusal) near = caught.verdict;
+            throw caught;
+        }
+    });
+    if (result.error) return { error: result.error, ...(near ? { nearby: near } : {}) };
     return { device: result.value };
 }
 

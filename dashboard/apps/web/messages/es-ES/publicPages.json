@@ -284,5 +284,25 @@
         "you": "Tú",
         "assistant": "Polar",
         "busy": "Demasiadas peticiones. Espera un minuto y recarga la página."
+    },
+    "guestLink": {
+        "gone": "Este enlace no abre nada. Puede que lo hayan retirado.",
+        "standing": {
+            "waiting": "Este enlace aún no funciona. Vuelve a probar el día que empieza.",
+            "expired": "Este enlace ha caducado.",
+            "closed": "Este enlace no funciona a esta hora. Vuelve a probar más tarde.",
+            "spent": "Este enlace ya se ha usado todas las veces que permitía."
+        },
+        "until": "Funciona hasta el {when}.",
+        "nearby": "Solo funciona a menos de {meters} m del lugar. El navegador te pedirá la ubicación al pulsar.",
+        "errors": {
+            "closed": "Este enlace no abre nada ahora mismo.",
+            "notThat": "Este enlace no permite eso.",
+            "tooMany": "Demasiadas pulsaciones. Espera un minuto y vuelve a probar.",
+            "nearbyUnasked": "Solo funciona cerca del lugar. Permite tu ubicación para seguir.",
+            "nearbyFar": "Solo funciona cerca del lugar, y no estás allí.",
+            "nearbyVague": "Tu ubicación no es lo bastante precisa.",
+            "nearbyUnplaced": "El lugar aún no tiene ubicación, no se puede comprobar."
+        }
     }
 }

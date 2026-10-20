@@ -284,5 +284,25 @@
         "you": "You",
         "assistant": "Polar",
         "busy": "Too many requests. Wait a minute and reload the page."
+    },
+    "guestLink": {
+        "gone": "This link does not open anything. It may have been taken back.",
+        "standing": {
+            "waiting": "This link does not work yet. Try again on the day it starts.",
+            "expired": "This link has run out.",
+            "closed": "This link does not work at this hour. Try again later.",
+            "spent": "This link has been used as many times as it allowed."
+        },
+        "until": "Works until {when}.",
+        "nearby": "Only works within {meters} m of the place. Your browser will ask for your location when you press.",
+        "errors": {
+            "closed": "This link does not open anything right now.",
+            "notThat": "This link does not allow that.",
+            "tooMany": "Too many presses. Wait a minute and try again.",
+            "nearbyUnasked": "This only works near the place. Allow your location to go on.",
+            "nearbyFar": "This only works near the place, and you are not there.",
+            "nearbyVague": "Your location is not precise enough to tell.",
+            "nearbyUnplaced": "The place has no location yet, so this cannot check."
+        }
     }
 }

@@ -23,12 +23,23 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { GrantCandidate } from "@/lib/access/sharing-service";
-import { CalendarClock, Loader2, Search, Trash2, UserRound, Users } from "lucide-react";
+import {
+    CalendarClock,
+    Copy,
+    Link2,
+    Loader2,
+    MapPin,
+    Search,
+    Trash2,
+    UserRound,
+    Users
+} from "lucide-react";
 import {
     findSharePeopleAction,
     listGrantsAction,
     revokeShareAction,
-    shareAction
+    shareAction,
+    shareLinkAction
 } from "@/app/(app)/access-actions";
 import {
     Badge,
@@ -132,6 +143,15 @@ export function ShareDialog({
     const [days, setDays] = useState(core.EVERY_DAY);
     const [hours, setHours] = useState({ from: "", to: "" });
     const [maxUses, setMaxUses] = useState("");
+    // Only near the place, and how near. Offered where an act happens at a
+    // place - a door, a UPS - and nowhere else.
+    const fenceable = subject === "place.device" || subject === "place.ups";
+    const linkable = (core.GRANT_LINK_SUBJECTS as readonly string[]).includes(subject);
+    const [nearby, setNearby] = useState(false);
+    const [nearbyMeters, setNearbyMeters] = useState("100");
+    const [located, setLocated] = useState<boolean | null>(null);
+    /** A link just made: shown once, since only its hash is kept. */
+    const [madeLink, setMadeLink] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         const answer = await listGrantsAction(subject, subjectId);
@@ -142,11 +162,13 @@ export function ShareDialog({
         }
         setGrants(answer.grants ?? []);
         setCandidates(answer.candidates ?? []);
+        setLocated(answer.located ?? null);
     }, [subject, subjectId, toast]);
 
     useEffect(() => {
         if (!open) return;
         setGrants(null);
+        setMadeLink(null);
         void load();
     }, [open, load]);
 
@@ -177,31 +199,73 @@ export function ShareDialog({
         setDays(core.EVERY_DAY);
         setHours({ from: "", to: "" });
         setMaxUses("");
+        setNearby(false);
+        setNearbyMeters("100");
     };
 
+    /** What bounds the grant, the same for a person and for a link. */
+    const bounds = () => ({
+        capability,
+        actions: reachable.filter((one) => actions.includes(one)),
+        note,
+        nearbyMeters: fenceable && nearby ? Number(nearbyMeters) : null,
+        ...(limited
+            ? {
+                  // The picked day, in the reader's own zone, and the last
+                  // one lent whole: sent as a bare date these are both
+                  // midnight UTC, which begins a grant early and ends it a
+                  // day short.
+                  startsAt: core.dayBegins(startsAt)?.toISOString(),
+                  endsAt: core.dayEnds(endsAt)?.toISOString(),
+                  days,
+                  startMinute: core.clockMinute(hours.from),
+                  endMinute: core.clockMinute(hours.to),
+                  maxUses: maxUses ? Number(maxUses) : null
+              }
+            : {})
+    });
+    const metres = Number(nearbyMeters);
+    const badFence =
+        fenceable &&
+        nearby &&
+        (!Number.isInteger(metres) || metres < core.NEARBY_MIN_M || metres > core.NEARBY_MAX_M);
+
+    const makeLink = async (): Promise<void> => {
+        if (noAction || badFence) return;
+        setBusy(true);
+        const answer = await shareLinkAction(subject, subjectId, bounds());
+        setBusy(false);
+        if (answer.error || !answer.link) {
+            toast.show({ title: answer.error ?? t("share.needAction") });
+            return;
+        }
+        setGrants(answer.grants ?? []);
+        setMadeLink(answer.link);
+        reset();
+    };
+
+    const copyLink = async (): Promise<void> => {
+        if (!madeLink) return;
+        try {
+            await navigator.clipboard.writeText(madeLink);
+            toast.show({ title: t("share.copied") });
+        } catch {
+            // A browser that refuses the clipboard still shows the link,
+            // selected, for copying by hand.
+        }
+    };
+
+    /** Who a grant is to, in words: a link has nobody, so it is called one. */
+    const who = (grant: GrantView): string =>
+        grant.principalType === "link" ? t("share.linkName") : grant.principalName;
+
     const add = async (): Promise<void> => {
-        if (!principalId || noAction) return;
+        if (!principalId || noAction || badFence) return;
         setBusy(true);
         const answer = await shareAction(subject, subjectId, {
             principalType: kind,
             principalId,
-            capability,
-            actions: reachable.filter((one) => actions.includes(one)),
-            note,
-            ...(limited
-                ? {
-                      // The picked day, in the reader's own zone, and the last
-                      // one lent whole: sent as a bare date these are both
-                      // midnight UTC, which begins a grant early and ends it a
-                      // day short.
-                      startsAt: core.dayBegins(startsAt)?.toISOString(),
-                      endsAt: core.dayEnds(endsAt)?.toISOString(),
-                      days,
-                      startMinute: core.clockMinute(hours.from),
-                      endMinute: core.clockMinute(hours.to),
-                      maxUses: maxUses ? Number(maxUses) : null
-                  }
-                : {})
+            ...bounds()
         });
         setBusy(false);
         if (answer.error) {
@@ -223,8 +287,8 @@ export function ShareDialog({
      */
     const revoke = async (grant: GrantView): Promise<void> => {
         const sure = await confirm({
-            title: t("share.stopTitle", { name: grant.principalName }),
-            description: t("share.stopBody", { who: grant.principalName, what: name }),
+            title: t("share.stopTitle", { name: who(grant) }),
+            description: t("share.stopBody", { who: who(grant), what: name }),
             confirmLabel: t("share.stop"),
             danger: true
         });
@@ -274,7 +338,9 @@ export function ShareDialog({
                                     className="flex items-start gap-2 rounded-lg border border-border px-3 py-2"
                                 >
                                     <span className="mt-0.5 text-foreground-subtle">
-                                        {grant.principalType === "user" ? (
+                                        {grant.principalType === "link" ? (
+                                            <Link2 className="size-4 shrink-0" aria-hidden />
+                                        ) : grant.principalType === "user" ? (
                                             <UserRound className="size-4 shrink-0" aria-hidden />
                                         ) : (
                                             <Users className="size-4 shrink-0" aria-hidden />
@@ -283,7 +349,7 @@ export function ShareDialog({
                                     <div className="min-w-0 flex-1">
                                         <p className="flex flex-wrap items-center gap-2 text-[13px] text-foreground">
                                             <span className="truncate font-medium">
-                                                {grant.principalName}
+                                                {who(grant)}
                                             </span>
                                             {grant.orgName ? (
                                                 <span className="text-foreground-subtle">
@@ -315,8 +381,8 @@ export function ShareDialog({
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        aria-label={t("share.stopNamed", { name: grant.principalName })}
-                                        title={t("share.stopNamed", { name: grant.principalName })}
+                                        aria-label={t("share.stopNamed", { name: who(grant) })}
+                                        title={t("share.stopNamed", { name: who(grant) })}
                                         onClick={() => void revoke(grant)}
                                     >
                                         <Trash2 className="size-4 shrink-0" aria-hidden />
@@ -571,6 +637,52 @@ export function ShareDialog({
                         </div>
                     ) : null}
 
+                    {fenceable ? (
+                        <div className="flex flex-col gap-2">
+                            <label className="flex items-center justify-between gap-2 text-[13px] text-foreground">
+                                <span className="flex items-center gap-2">
+                                    <MapPin
+                                        className="size-4 shrink-0 text-foreground-subtle"
+                                        aria-hidden
+                                    />
+                                    {t("share.nearbyLabel")}
+                                </span>
+                                <Switch
+                                    checked={nearby}
+                                    onChange={setNearby}
+                                    aria-label={t("share.nearbyLabel")}
+                                />
+                            </label>
+                            {nearby ? (
+                                <>
+                                    <Field label={t("share.nearbyMeters")} htmlFor="share-nearby">
+                                        <Input
+                                            id="share-nearby"
+                                            type="number"
+                                            min={core.NEARBY_MIN_M}
+                                            max={core.NEARBY_MAX_M}
+                                            step={25}
+                                            inputMode="numeric"
+                                            value={nearbyMeters}
+                                            aria-invalid={badFence || undefined}
+                                            onChange={(event) =>
+                                                setNearbyMeters(event.target.value)
+                                            }
+                                        />
+                                    </Field>
+                                    <p className="text-[12px] text-foreground-subtle">
+                                        {t("share.nearbyHint")}
+                                    </p>
+                                    {located === false ? (
+                                        <p role="alert" className="text-[12px] text-danger-ink">
+                                            {t("share.nearbyNoPlace")}
+                                        </p>
+                                    ) : null}
+                                </>
+                            ) : null}
+                        </div>
+                    ) : null}
+
                     <Field label={t("share.note")} htmlFor="share-note">
                         <Input
                             id="share-note"
@@ -582,8 +694,8 @@ export function ShareDialog({
 
                     <div className="flex justify-end">
                         <Button
-                            disabled={busy || !principalId || noAction}
-                            aria-disabled={busy || !principalId || noAction}
+                            disabled={busy || !principalId || noAction || badFence}
+                            aria-disabled={busy || !principalId || noAction || badFence}
                             onClick={() => void add()}
                         >
                             {busy ? (
@@ -592,6 +704,53 @@ export function ShareDialog({
                             {t("share.share")}
                         </Button>
                     </div>
+
+                    {linkable ? (
+                        <div className="flex flex-col gap-2 border-t border-border pt-3">
+                            <p className="text-[13px] font-medium text-foreground">
+                                {t("share.linkTitle")}
+                            </p>
+                            <p className="text-[12px] text-foreground-subtle">
+                                {t("share.linkHint")}
+                            </p>
+                            {madeLink ? (
+                                <div className="flex min-w-0 flex-col gap-2">
+                                    <p className="text-[12px] text-muted-foreground">
+                                        {t("share.linkMade")}
+                                    </p>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <Input
+                                            readOnly
+                                            value={madeLink}
+                                            aria-label={t("share.linkName")}
+                                            onFocus={(event) => event.target.select()}
+                                            className="min-w-0 flex-1"
+                                        />
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            aria-label={t("share.copyLink")}
+                                            title={t("share.copyLink")}
+                                            onClick={() => void copyLink()}
+                                        >
+                                            <Copy className="size-4 shrink-0" aria-hidden />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : null}
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="outline"
+                                    disabled={busy || noAction || badFence}
+                                    aria-disabled={busy || noAction || badFence}
+                                    onClick={() => void makeLink()}
+                                >
+                                    <Link2 className="size-4 shrink-0" aria-hidden />
+                                    {t("share.makeLink")}
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
                 </section>
                 {extra}
                 {confirmDialog}

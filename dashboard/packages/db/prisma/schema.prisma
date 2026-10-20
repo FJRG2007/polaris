@@ -7025,6 +7025,10 @@ model AccessGrant {
     /// Empty is everything the capability reaches, which is what every grant
     /// written before this column allowed.
     actions     String[]  @default([])
+    /// Only near the place: the act is allowed when the browser says it is
+    /// within this many metres of where the subject stands. Null for anywhere.
+    /// The location itself is never stored - only whether it was near.
+    nearbyMeters Int?
 
     /// Why it exists, in the words of whoever wrote it ("Cleaner, Tuesdays").
     note        String  @default("")

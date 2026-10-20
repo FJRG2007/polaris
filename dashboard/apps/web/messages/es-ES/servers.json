@@ -947,6 +947,10 @@
             "unknownMachine": "Esa máquina no es tuya.",
             "shutdownIncomplete": "Elige al menos una máquina y un umbral.",
             "notFound": "Este SAI se quitó.",
+            "nearbyUnasked": "Permite tu ubicación: solo funciona cerca del SAI.",
+            "nearbyFar": "Solo cerca del SAI, y no estás allí.",
+            "nearbyVague": "Tu ubicación no es lo bastante precisa.",
+            "nearbyUnplaced": "El lugar del SAI no tiene ubicación, no se puede comprobar.",
             "failed": "No funcionó. Inténtalo de nuevo.",
             "invalid": "Revisa los campos marcados."
         },

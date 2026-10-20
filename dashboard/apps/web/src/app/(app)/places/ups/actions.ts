@@ -13,7 +13,8 @@ import { z } from "zod";
 import { listServerRows } from "@/app/(app)/apps/servers/server-rows";
 import { requirePermission, requireUser, type SessionUser } from "@/lib/session";
 import { spendGrant, type LiveGrant } from "@/lib/access/grants";
-import { upsStanding } from "@/lib/ups/ups-access";
+import * as core from "@polaris/core";
+import { upsNearby, upsStanding } from "@/lib/ups/ups-access";
 import { recordAudit } from "@/lib/audit-service";
 import { hostSubject } from "@/lib/metrics-shared";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -50,6 +51,19 @@ async function controlling(
     const upsId = idSchema.parse(id);
     const standing = await upsStanding(user, upsId);
     return standing?.control ? { user, upsId, grant: standing.grant } : null;
+}
+
+/** The error a fenced grant is refused with when the act is not near, or null
+ *  to go ahead. The location is compared here and goes no further. */
+async function fenced(
+    grant: LiveGrant | null,
+    placeId: string | null,
+    where: unknown
+): Promise<{ ok: false; error: string } | null> {
+    const parsed = core.reportedLocationSchema.safeParse(where);
+    const verdict = await upsNearby(grant, placeId, parsed.success ? parsed.data : null);
+    if (!verdict) return null;
+    return { ok: false, error: `nearby${verdict[0]!.toUpperCase()}${verdict.slice(1)}` };
 }
 
 /** A visitor's use, counted after the UPS answered. Bookkeeping about an act
@@ -161,7 +175,8 @@ export async function removeUpsAction(id: string): Promise<UpsActionResult> {
 
 export async function runUpsCommandAction(
     id: string,
-    command: string
+    command: string,
+    where?: unknown
 ): Promise<UpsActionResult<upsService.UpsCommandResult>> {
     try {
         const reached = await controlling(id);
@@ -170,6 +185,8 @@ export async function runUpsCommandAction(
         const parsed = commandSchema.parse(command);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
+        const refusedNear = await fenced(grant, row.placeId, where);
+        if (refusedNear) return refusedNear;
         const outcome = await upsService.runUpsCommand(row, parsed);
         await countUse(grant);
         await upsData.logAction({
@@ -262,7 +279,8 @@ export async function acknowledgeUpsEventsAction(
 
 export async function setUpsVarAction(
     id: string,
-    raw: unknown
+    raw: unknown,
+    where?: unknown
 ): Promise<UpsActionResult<{ outcome: upsService.UpsSetResult; error?: string }>> {
     try {
         const reached = await controlling(id);
@@ -271,6 +289,8 @@ export async function setUpsVarAction(
         const input = upsSettings.setVarSchema.parse(raw);
         const row = await upsService.getUps(upsId);
         if (!row) return { ok: false, error: "notFound" };
+        const refusedNear = await fenced(grant, row.placeId, where);
+        if (refusedNear) return refusedNear;
         const result = await upsService.setUpsVar(row, input.name, input.value);
         await countUse(grant);
         await upsData.logAction({

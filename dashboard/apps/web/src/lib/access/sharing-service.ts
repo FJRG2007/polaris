@@ -220,6 +220,37 @@ async function ownerOrgOf(subject: core.GrantSubject, subjectId: string): Promis
     }
 }
 
+/**
+ * Whether the place a door or a UPS stands in has a location to measure
+ * "only near the place" from - asked by the share dialog so it can say so
+ * before a fence is drawn that would refuse every press. Null where the
+ * question does not apply.
+ */
+export async function subjectPlaceLocated(
+    subject: core.GrantSubject,
+    subjectId: string
+): Promise<boolean | null> {
+    const placeId =
+        subject === "place.ups"
+            ? (await prisma.ups.findUnique({ where: { id: subjectId }, select: { placeId: true } }))
+                  ?.placeId
+            : subject === "place.device"
+              ? (
+                    await prisma.placeDevice.findUnique({
+                        where: { id: subjectId },
+                        select: { placeId: true }
+                    })
+                )?.placeId
+              : undefined;
+    if (placeId === undefined) return null;
+    if (!placeId) return false;
+    const place = await prisma.place.findUnique({
+        where: { id: placeId },
+        select: { latitude: true, longitude: true }
+    });
+    return Boolean(place && place.latitude !== null && place.longitude !== null);
+}
+
 function orgOf(row: { orgId: string | null } | null): string | null {
     return row?.orgId ?? null;
 }

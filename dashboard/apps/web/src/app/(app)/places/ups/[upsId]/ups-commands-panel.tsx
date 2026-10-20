@@ -22,6 +22,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { runUpsCommandAction } from "../actions";
+import { fencedCall, upsErrorKey } from "./ups-standing";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { commandLabelKey, isDangerousCommand, type UpsActionsAnswer } from "../ups-words";
@@ -35,14 +36,14 @@ export function useUpsCommand(upsId: string, onDone?: () => void) {
 
     async function run(command: string) {
         setBusy(true);
-        const outcome = await runUpsCommandAction(upsId, command);
+        const outcome = await fencedCall((where) => runUpsCommandAction(upsId, command, where));
         setBusy(false);
         setAsking(null);
         toast.show({
             key: `ups:${upsId}:command`,
             title: outcome.ok
                 ? t(`ups.commandResult.${outcome.value}`)
-                : t(`ups.errors.${outcome.error === "notFound" ? "notFound" : "failed"}`)
+                : t(`ups.errors.${upsErrorKey(outcome.error)}`)
         });
         onDone?.();
     }
