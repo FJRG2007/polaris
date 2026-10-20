@@ -10,11 +10,14 @@ export function stubCanvas(): { fills: () => number } {
     const ctx = new Proxy({} as Record<string | symbol, unknown>, {
         get(target, key) {
             if (key in target) return target[key];
-            return key === "fill"
-                ? () => {
-                      fills += 1;
-                  }
-                : () => undefined;
+            if (key === "fill")
+                return () => {
+                    fills += 1;
+                };
+            // A gradient that takes its stops and draws nothing.
+            if (key === "createLinearGradient" || key === "createRadialGradient")
+                return () => ({ addColorStop: () => undefined });
+            return () => undefined;
         },
         set(target, key, value) {
             target[key] = value;

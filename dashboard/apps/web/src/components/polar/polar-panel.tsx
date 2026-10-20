@@ -78,7 +78,9 @@ import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
-import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
+import { type PolarMood } from "@/components/polar/polar-mascot";
+import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
+import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-avatar";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
@@ -284,6 +286,7 @@ export function PolarProvider({
 export function PolarToggle() {
     const t = useTranslations("polar");
     const { allowed, open, setOpen } = usePolar();
+    const online = usePolarOnline();
     const shortcut = useShortcutText();
     // Hidden rather than offered: the administrator keeps Polar to some people,
     // and a button that only ever answers "not for you" is noise in the header.
@@ -296,7 +299,7 @@ export function PolarToggle() {
             onClick={() => setOpen(!open)}
             className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground aria-pressed:bg-card-hover aria-pressed:text-foreground"
         >
-            <PolarMascot size={20} />
+            <PolarAvatar size={20} state={avatarStateFor({ open, online, busy: false })} />
             <span className="hidden lg:inline">{t("toggle.label")}</span>
             <kbd className="hidden rounded border border-border px-1 font-mono text-[10px] text-foreground-subtle xl:inline">
                 {shortcut("Mod+J")}
@@ -596,6 +599,8 @@ export function PolarChat({
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses
     });
     const busy = chat.status === "submitted" || chat.status === "streaming";
+    const online = usePolarOnline();
+    const avatarState = avatarStateFor({ open: true, online, busy });
     const waitingApproval = chat.messages
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
@@ -1359,7 +1364,7 @@ export function PolarChat({
                             {wide ? <PanelLeftOpen /> : <Menu />}
                         </MessageAction>
                     ) : null}
-                    <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
+                    <PolarAvatar state={avatarState} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
                     <span className="flex-1" />
                     <MessageAction
@@ -1413,7 +1418,7 @@ export function PolarChat({
                     <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-contain px-4 py-6">
                         <div className="flex w-full max-w-3xl flex-col gap-4">
                             <div className="flex flex-col items-center gap-3 text-center">
-                                <PolarMascot mood={mood} size={64} />
+                                <PolarAvatar state={avatarState} size={64} />
                                 <h1 className="text-xl font-semibold text-foreground">
                                     {temporary ? t("temporary.title") : t("welcome")}
                                 </h1>
@@ -1467,7 +1472,7 @@ export function PolarChat({
                                     </div>
                                 ) : chat.messages.length === 0 ? (
                                     <ConversationEmptyState
-                                        icon={<PolarMascot mood="idle" size={64} />}
+                                        icon={<PolarAvatar state={avatarState} size={64} />}
                                         description={t("empty")}
                                     >
                                         {suggestions}

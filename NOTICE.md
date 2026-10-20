@@ -57,7 +57,8 @@ keep their own licenses and notices, recorded next to the code they cover (for
 example `dashboard/packages/agent-runtime/LICENSE`).
 
 Polar's motion - the thinking orbs, the voice glow, the composer's border beam
-and the technique behind Polar's animated avatar - is ported from
+and Polar's animated avatar (its rig, renderer and pointer tracking, from the
+`bot-avatars` package, drawn with Polar's own mark) - is ported from
 [Libraries.dev](https://github.com/Jakubantalik/Libraries.dev), Copyright (c)
 2026 Jakub Antalik, under the MIT License; the full notice is in
 `dashboard/apps/web/src/components/polar/motion/LICENSE`.

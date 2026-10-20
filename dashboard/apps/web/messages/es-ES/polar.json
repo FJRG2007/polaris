@@ -11,6 +11,11 @@
         "done": "Polar, hecho",
         "trouble": "Polar, algo falló"
     },
+    "avatar": {
+        "idle": "Polar, mirando alrededor",
+        "working": "Polar, trabajando",
+        "sleeping": "Polar, dormido"
+    },
     "history": {
         "title": "Conversaciones",
         "empty": "Sin conversaciones aún.",
