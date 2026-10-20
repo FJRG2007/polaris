@@ -620,6 +620,10 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
                     diskTotalBytes: bigBytes(metrics.totalBytes)
                 });
                 await watchUnasAlerts({ id: conn.id, ownerId: conn.ownerId }, metrics);
+                // Its Places charts and Automation events. Loaded on demand: it
+                // pulls in the automation outbox, which no other storage needs.
+                const { watchNas } = await import("./nas/nas-watch");
+                await watchNas(conn.id, metrics, ts);
                 continue;
             }
             const driver = await getDriverForConnection(conn.id);
@@ -640,6 +644,10 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
             }
         } catch {
             // Device unreachable or bad credentials - skip it this tick.
+            if (conn.kind === "unifi-unas") {
+                const { watchNas } = await import("./nas/nas-watch");
+                await watchNas(conn.id, null, ts);
+            }
         }
     }
     return rows;

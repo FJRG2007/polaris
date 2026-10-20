@@ -107,6 +107,8 @@ export function backupOverdue(
 }
 
 export type UnasAlertKind =
+    /** Raised by the watcher when the console does not answer, not by unasAlerts. */
+    | "offline"
     | "pool-unprotected"
     | "pool-usage"
     | "disk-unhealthy"
