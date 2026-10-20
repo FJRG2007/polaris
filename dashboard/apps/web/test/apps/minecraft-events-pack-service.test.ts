@@ -27,9 +27,8 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
     }
 }));
 
-const service = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack-service"
-);
+const service =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack-service");
 
 function serverOf() {
     const said: string[] = [];

@@ -44,8 +44,15 @@ vi.mock("@polaris/app-host", () => ({
         },
         chatCalls: {
             voicePresence: async (channels: string[]) =>
-                new Map(channels.map((id) => [id, fake.inCall.map((name, at) => ({ id: `p${at}`, name }))])),
-            subscribeMeetingEvents: async (listener: (event: { meetingId: string; kind: string }) => void) => {
+                new Map(
+                    channels.map((id) => [
+                        id,
+                        fake.inCall.map((name, at) => ({ id: `p${at}`, name }))
+                    ])
+                ),
+            subscribeMeetingEvents: async (
+                listener: (event: { meetingId: string; kind: string }) => void
+            ) => {
                 fake.listener = listener;
                 return () => undefined;
             }

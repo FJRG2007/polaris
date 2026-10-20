@@ -108,7 +108,7 @@ export async function inTrips<R>(
     send: (trip: string[]) => Promise<R>
 ): Promise<R[]> {
     const out: R[] = [];
-    for (let from = 0; from < lines.length; ) {
+    for (let from = 0; from < lines.length;) {
         const trip = pacing.take(lines.slice(from), fillVolume);
         out.push(await pacing.timed(() => send(trip)));
         from += trip.length;

@@ -27,9 +27,8 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { reconcileWorldBuilds } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/world-builds/service"
-);
+const { reconcileWorldBuilds } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/service");
 
 /** A 3 x 2 x 2 build: a stone floor with one lantern on it. */
 function tinyBuild(season: "winter" | "halloween" = "winter"): format.PolarisBuild {
@@ -412,12 +411,10 @@ describe("taking it down", () => {
 
 describe("the catalog", () => {
     it("ships a build for every season, each small enough to site near a home", async () => {
-        const { WORLD_BUILDS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
-        );
-        const { DECORATIONS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/seasonal"
-        );
+        const { WORLD_BUILDS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog");
+        const { DECORATIONS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/seasonal");
         for (const season of DECORATIONS)
             expect(WORLD_BUILDS.some((one) => one.season === season)).toBe(true);
         for (const build of WORLD_BUILDS) {
@@ -435,9 +432,8 @@ describe("the catalog", () => {
     });
 
     it("pastes only blocks that stay put: no fluids, containers, entities or decaying leaves", async () => {
-        const { WORLD_BUILDS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
-        );
+        const { WORLD_BUILDS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog");
         // Every block here sits still once pasted: nothing flows, falls, decays,
         // holds loot or spawns anything (no water, lava, sand, chests, spawners,
         // skulls or iron blocks for a golem). A cauldron fills with rain, which
@@ -1115,9 +1111,8 @@ describe("the search for a site", () => {
         const first = bedServer({ x: 0, z: 0 });
         await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
         vi.resetModules();
-        const fresh = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/service"
-        );
+        const fresh =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/service");
         logged = [];
         const again = bedServer({ x: 0, z: 0 });
         again.server.installedAppId = first.server.installedAppId;
