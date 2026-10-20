@@ -35,6 +35,8 @@ model User {
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
     polarAttachments  PolarAttachment[]
+    polarMemories     PolarMemory[]
+    polarPreference   PolarPreference?
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
     automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
@@ -15024,6 +15026,32 @@ model PolarProject {
     threads      PolarThread[]
 
     @@index([ownerId, updatedAt(sort: Desc)])
+}
+
+// One thing Polar remembers about its person across chats: a short sentence the
+// person can read, change and delete in Polar's settings. Written by the
+// `polar_remember` tool or by hand; never carries a secret (refused on write).
+// `threadId` is the chat it was learnt in, kept only as a pointer.
+model PolarMemory {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    text      String
+    threadId  String?  @db.Uuid
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([userId, updatedAt(sort: Desc)])
+}
+
+// Polar's per-person settings. No row reads as the defaults, so nobody needs
+// one written for them.
+model PolarPreference {
+    userId    String   @id @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // Whether Polar reads and writes memories at all. Off keeps what is saved.
+    memory    Boolean  @default(true)
+    updatedAt DateTime @updatedAt
 }
 
 // A read-only public link to a Polar chat. The raw token lives in the URL only;

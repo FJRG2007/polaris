@@ -46,6 +46,7 @@ import {
     FileText,
     History,
     Maximize2,
+    Settings2,
     Menu,
     PanelLeftClose,
     PanelLeftOpen,
@@ -60,6 +61,7 @@ import {
     X
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
+import { PolarSettings } from "@/components/polar/polar-settings";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
 import {
     firstPickable,
@@ -505,6 +507,7 @@ export function PolarChat({
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [modelOpen, setModelOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const wide = useWide();
@@ -1289,6 +1292,10 @@ export function PolarChat({
                     <PolarMascot mood={mood} size={24} label={t(`mood.${mood}`)} />
                     <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
                     <span className="flex-1" />
+                    <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
+                        <Settings2 />
+                    </MessageAction>
+                    <PolarSettings open={settingsOpen} onOpenChange={setSettingsOpen} />
                     {fullPage ? (
                         !wide || collapsed ? (
                             <MessageAction label={t("actions.new")} onClick={() => startNew()}>
@@ -1514,7 +1521,13 @@ function MessageView({
     };
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
-    const toolName = (name: string) => tools[name]?.title ?? name;
+    const toolName = (name: string) =>
+        tools[name]?.title ??
+        (name === "polar_remember"
+            ? t("memory.remember")
+            : name === "polar_forget"
+              ? t("memory.forget")
+              : name);
     const { copied, copy } = useCopied();
     const toolOf = (part: UIMessage["parts"][number]) => {
         if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") return null;

@@ -265,5 +265,38 @@
         "polar": "Polar",
         "captions": "Live captions",
         "dismiss": "Dismiss"
+    },
+    "memory": {
+        "remember": "Remember",
+        "forget": "Forget"
+    },
+    "settings": {
+        "open": "Polar settings",
+        "title": "Polar settings",
+        "intro": "What Polar remembers and what you keep from your chats.",
+        "memory": {
+            "title": "Memory",
+            "intro": "Facts Polar keeps in mind across chats. Ask it to remember or forget something, or edit them here.",
+            "toggle": "Use and save memories",
+            "off": "Memory is off. Polar won't read or save memories; the saved ones stay here.",
+            "empty": "Nothing saved yet.",
+            "add": "Add memory",
+            "edit": "Edit memory",
+            "delete": "Delete memory",
+            "save": "Save",
+            "cancel": "Cancel",
+            "placeholder": "Something Polar should know",
+            "clear": "Delete all",
+            "kind": "memories",
+            "clearTitle": "Delete all memories?",
+            "clearQuestion": "Polar will forget everything saved here. Your chats stay.",
+            "errors": {
+                "too_long": "Keep it under {most} characters.",
+                "secret": "Looks like a password or key. Polar never saves those.",
+                "full": "Memory is full. Delete some first.",
+                "rate_limited": "Too many changes. Wait a moment.",
+                "failed": "Couldn't save the change. Try again."
+            }
+        }
     }
 }

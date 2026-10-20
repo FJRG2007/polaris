@@ -43,6 +43,11 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !stat
 vi.mock("@/lib/polar/attachments", () => ({
     inlinePolarFiles: async (_user: string, messages: unknown) => messages
 }));
+vi.mock("@/lib/polar/memory", () => ({
+    polarMemoryEnabled: async () => true,
+    polarMemoryPrompt: async () => "",
+    polarMemoryTools: () => ({})
+}));
 vi.mock("@/lib/polar/threads", () => ({
     ensurePolarThread: async () => state.owned,
     polarThreadInstructions: async () => null,

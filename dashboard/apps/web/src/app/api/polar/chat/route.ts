@@ -25,6 +25,7 @@ import { polarSystemPrompt } from "@/lib/polar/prompt";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
+import { polarMemoryEnabled, polarMemoryPrompt, polarMemoryTools } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
@@ -87,9 +88,12 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const toolset = await polarTools(user);
+    // Known to the check even while memory is off, so an older turn that used
+    // them still reads as valid.
+    const memoryTools = polarMemoryTools(user.id, body.data.threadId);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
-        tools: toolset.tools as never
+        tools: { ...toolset.tools, ...memoryTools } as never
     });
     if (!checked.success) return refuse("invalid", 400);
     const messages = checked.data as UIMessage[];
@@ -117,7 +121,14 @@ export async function POST(request: Request): Promise<Response> {
         body.data.projectId
     );
     if (!owned) return refuse("not_found", 404);
-    const instructions = await polarThreadInstructions(user.id, body.data.threadId);
+    const [instructions, remembers] = await Promise.all([
+        polarThreadInstructions(user.id, body.data.threadId),
+        polarMemoryEnabled(user.id)
+    ]);
+    const memories = remembers ? await polarMemoryPrompt(user.id) : "";
+    const tools = remembers
+        ? { ...toolset.tools, ...memoryTools }
+        : toolset.tools;
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"
@@ -127,9 +138,14 @@ export async function POST(request: Request): Promise<Response> {
     const startedAt = Date.now();
     const result = streamText({
         model: resolved.model,
-        system: polarSystemPrompt(user.name, fencePageContext(body.data.context), instructions),
+        system: polarSystemPrompt(
+            user.name,
+            fencePageContext(body.data.context),
+            instructions,
+            memories
+        ),
         messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
-        tools: toolset.tools,
+        tools,
         toolApproval: toolset.approval,
         stopWhen: isStepCount(STEP_MAX),
         reasoning: reasoningFor(choice.intelligence, resolved.option),
