@@ -813,7 +813,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardSource: "https://portforward.com/sagemcom/fast-3890v3/",
         dns: null,
         ...LOOK_FOR_IT,
-        forwardPath: "Access Control > Port Forwarding (Advanced Setup > NAT on some provider builds)",
+        forwardPath:
+            "Access Control > Port Forwarding (Advanced Setup > NAT on some provider builds)",
         caution:
             "Menus differ with each provider's firmware. An Orange or Jazztel Livebox 6 is a Sagemcom: pick Orange / Jazztel Livebox instead."
     },
@@ -839,7 +840,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // the Mi 3C (xiaomi-mi-3c.htm): Advanced > Port forwarding > Add rule, a range
         // section for several ports, and a restart afterwards.
         topics: ["forward"],
-        forwardSource: "https://cfos.de/en/cfos-personal-net/port-forwarding/xiaomi-miwifi-mini.htm",
+        forwardSource:
+            "https://cfos.de/en/cfos-personal-net/port-forwarding/xiaomi-miwifi-mini.htm",
         dns: null,
         ...LOOK_FOR_IT,
         admin: "http://miwifi.com",
@@ -994,7 +996,8 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
             path: "Google Home app > Wi-Fi > Settings > Advanced Networking > DHCP IP reservations",
             action: "add a reservation for it, keeping the address it has now"
         },
-        forwardPath: "Google Home app > Wi-Fi > Settings > Advanced Networking > Port management > Add",
+        forwardPath:
+            "Google Home app > Wi-Fi > Settings > Advanced Networking > Port management > Add",
         forwardSave: "Save",
         combinedProtocol: "TCP/UDP",
         forwardEnable: null,

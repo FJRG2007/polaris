@@ -187,30 +187,34 @@ export function RouterSteps({
                 <div className="flex flex-col gap-3">
                     <ol className="ml-4 flex list-decimal flex-col gap-2">
                         <li>
-                            {guide.app ? t("domainsRouter.steps.openApp", { app: guide.app }) : null}
+                            {guide.app
+                                ? t("domainsRouter.steps.openApp", { app: guide.app })
+                                : null}
                             {guide.app ? null : <>{t("domainsRouter.steps.openAdmin")} </>}
-                            {guide.app ? null : adminUrl
-                                ? t.rich(
-                                      guide.admin === null
-                                          ? "domainsRouter.steps.adminGateway"
-                                          : "domainsRouter.steps.adminKnown",
-                                      {
-                                          brand: guide.label,
-                                          url: adminUrl,
-                                          link: (chunks) => (
-                                              <a
-                                                  key="link"
-                                                  href={adminUrl}
-                                                  target="_blank"
-                                                  rel="noreferrer noopener"
-                                                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                                              >
-                                                  {chunks} <ExternalLink className="size-3" />
-                                              </a>
-                                          )
-                                      }
-                                  )
-                                : t("domainsRouter.steps.adminUnknown")}
+                            {guide.app
+                                ? null
+                                : adminUrl
+                                  ? t.rich(
+                                        guide.admin === null
+                                            ? "domainsRouter.steps.adminGateway"
+                                            : "domainsRouter.steps.adminKnown",
+                                        {
+                                            brand: guide.label,
+                                            url: adminUrl,
+                                            link: (chunks) => (
+                                                <a
+                                                    key="link"
+                                                    href={adminUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                                >
+                                                    {chunks} <ExternalLink className="size-3" />
+                                                </a>
+                                            )
+                                        }
+                                    )
+                                  : t("domainsRouter.steps.adminUnknown")}
                         </li>
                         <li>
                             {t("domainsRouter.steps.signIn")} {guide.signIn}
