@@ -79,6 +79,8 @@ import { useExitPresence } from "@/lib/use-exit-presence";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/elements/tool";
 import { PolarMascot, type PolarMood } from "@/components/polar/polar-mascot";
+import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
+import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
@@ -1500,7 +1502,7 @@ export function PolarChat({
                                 })}
                                 {chat.status === "submitted" ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <PolarMascot mood="thinking" size={18} />
+                                        <ThinkingOrb state="breathing" size={20} />
                                         <Shimmer>{t("status.thinking")}</Shimmer>
                                     </div>
                                 ) : null}
@@ -1671,7 +1673,13 @@ function MessageView({
         if (!found) return null;
         const { tool, name } = found;
         return (
-            <Tool key={index} title={toolName(name)} state={tool.state} defaultOpen={opened}>
+            <Tool
+                key={index}
+                title={toolName(name)}
+                state={tool.state}
+                orb={orbForTool(part)}
+                defaultOpen={opened}
+            >
                 <ToolInput input={tool.input} />
                 <ToolOutput output={tool.output} errorText={tool.errorText} />
             </Tool>
@@ -1700,6 +1708,10 @@ function MessageView({
                             messageId={message.id}
                             streaming={streaming && !answering}
                             current={current}
+                            orb={
+                                orbForActivity({ status: "streaming", parts: message.parts }) ??
+                                "solving"
+                            }
                             tools={toolParts.length}
                             failed={failed}
                             seconds={

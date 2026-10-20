@@ -14,6 +14,8 @@ import { cn } from "@polaris/ui";
 import { useId, useState, type ReactNode } from "react";
 import { ChevronDown, Layers, XCircle } from "lucide-react";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
+import type { OrbState } from "@/components/polar/motion/orb-engine/presets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const OPEN_KEY = "polar.work.";
@@ -39,6 +41,7 @@ export function Work({
     messageId,
     streaming,
     current,
+    orb = "solving",
     tools,
     failed,
     seconds,
@@ -50,6 +53,8 @@ export function Work({
     streaming: boolean;
     /** The step running now, already in words; null while it thinks. */
     current: string | null;
+    /** The orb shown beside the line while the turn runs. */
+    orb?: OrbState;
     tools: number;
     failed: number;
     /** How long the turn worked, when the server measured it. */
@@ -81,7 +86,11 @@ export function Work({
                 onClick={toggle}
                 className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded px-1 py-0.5 hover:text-foreground"
             >
-                <Layers className="h-3.5 w-3.5 shrink-0" />
+                {streaming ? (
+                    <ThinkingOrb state={orb} size={20} />
+                ) : (
+                    <Layers className="h-3.5 w-3.5 shrink-0" />
+                )}
                 {streaming ? (
                     <Shimmer className="min-w-0 truncate">
                         {current ? t("work.running", { step: current }) : t("elements.thinking")}

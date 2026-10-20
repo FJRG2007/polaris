@@ -334,5 +334,16 @@
         "attachment": "attachment",
         "used": "Used {name}",
         "truncated": "Only the newest {most} messages of this chat are included."
+    },
+    "orb": {
+        "working": "Working",
+        "searching": "Searching",
+        "solving": "Reasoning",
+        "listening": "Listening",
+        "connecting": "Connecting",
+        "weaving": "Running several tools",
+        "composing": "Writing the answer",
+        "breathing": "Thinking",
+        "shaping": "Reading files"
     }
 }
