@@ -14,12 +14,20 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.entity.Display;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -32,6 +40,7 @@ import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -39,6 +48,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import polaris.minecraft.mixin.BlockDisplayInvoker;
 
 /**
  * The season Polaris says it is, drawn on each player's screen and nowhere else.
@@ -52,8 +62,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * world: nothing reaches a region file, and a chunk the game loads again shows
  * the world as it is. Pumpkins take the place of a grass block in the ground (the
  * same full block underfoot, so nobody walks into one); cobwebs hang under the
- * leaves of a natural tree, at least three blocks clear of the ground, and a
- * player's game loses one before they can reach it ({@link #websNear}); in winter
+ * leaves of a natural tree, at least three blocks clear of the ground, drawn as a
+ * block display only that player's game has ({@link #show}). A web block slowed
+ * whoever passed through it on their screen while the server, which holds air
+ * there, did not, so it had to vanish before they reached it; a display has
+ * nothing to walk into and stays in sight up close. In winter
  * a thin layer of snow, which nothing collides with, lies on some grass and snow
  * falls around a player standing under the open sky. Only on ground whose every
  * neighbour is natural - a block anybody placed nearby, a path, a fence, keeps
@@ -75,11 +88,12 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * where the decoration stood in air, and the next time the chunk was decided
  * the decoration stood there again. A pumpkin takes as long to dig as a real
  * one and drops itself ({@link #onHit}); anything else comes down on the first
- * hit.
+ * hit. Pick block on one gives the decoration, not the real block under it
+ * ({@link #pick}).
  *
  * Server thread only: the commands and the tick both run there.
  */
-final class SeasonalDecor {
+public final class SeasonalDecor {
     enum Season {
         HALLOWEEN(0x5EA50171L), WINTER(0x5EA50172L);
 
@@ -116,24 +130,26 @@ final class SeasonalDecor {
     private static final int AVOID_PAD = 16;
     private static final int AVOID_KEPT = 64;
     private static final long MAX_HOLD_SECONDS = 24 * 60 * 60;
-    /** How near a cobweb a player comes before their game loses it, in blocks, and
-     *  how much further each block they moved in the last tick takes that. */
-    private static final double WEB_REACH = 6;
-    private static final double WEB_REACH_PER_SPEED = 12;
     /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
     private static final int PUMPKIN_CHUNKS = 45;
     private static final int TWO_PUMPKIN_CHUNKS = 30;
     /** Where the decorations players knocked down are kept, beside the world. */
     private static final String BROKEN_FILE = "polaris-season-broken.json";
 
-    /** One block a player's game was told is something else, and what it really was. */
-    private record Fake(BlockPos pos, BlockState real, BlockState shown) {}
+    /**
+     * One block a player's game was told is something else, and what it really
+     * was - or, for a cobweb, the display drawn there instead. The display is
+     * never added to the world: it only lends its id and its data to the packets.
+     */
+    private record Fake(BlockPos pos, BlockState real, BlockState shown, Display.BlockDisplay display) {
+        Fake(BlockPos pos, BlockState real, BlockState shown) {
+            this(pos, real, shown, null);
+        }
+    }
 
     private static final class Seen {
         ResourceKey<Level> dimension;
         final Map<Long, List<Fake>> chunks = new HashMap<>();
-        /** Where the player was on the last tick, for how fast they move. */
-        Vec3 last;
     }
 
     private static Season season;
@@ -267,7 +283,6 @@ final class SeasonalDecor {
                 return;
             }
             ticks++;
-            if (season == Season.HALLOWEEN) websNear(server);
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(server, true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(server, false);
             if (ticks % PASS_TICKS == 0) pass(server, ticks % RESEND_TICKS == 0);
@@ -308,9 +323,12 @@ final class SeasonalDecor {
             }
             if (level.dimension() != Level.OVERWORLD) continue;
             ChunkPos at = player.chunkPosition();
-            one.chunks.keySet().removeIf(key -> {
-                ChunkPos pos = new ChunkPos(key);
-                return Math.abs(pos.x - at.x) > FORGET || Math.abs(pos.z - at.z) > FORGET;
+            one.chunks.entrySet().removeIf(chunk -> {
+                ChunkPos pos = new ChunkPos(chunk.getKey());
+                if (Math.abs(pos.x - at.x) <= FORGET && Math.abs(pos.z - at.z) <= FORGET) return false;
+                // Their game let the blocks go with the chunk; a display it keeps until told.
+                for (Fake fake : chunk.getValue()) if (fake.display() != null) restore(player, fake);
+                return true;
             });
             if (resend) resend(player, level, one, at);
             budget -= decorateAround(player, level, one, at, Math.min(budget, NEW_PER_PLAYER));
@@ -530,50 +548,88 @@ final class SeasonalDecor {
         return state.is(Blocks.PUMPKIN) || state.is(Blocks.CARVED_PUMPKIN) || state.is(Blocks.JACK_O_LANTERN);
     }
 
+    /**
+     * Draw a decoration on one player's screen: a block update, or for a cobweb
+     * its display. A display their game already has is replaced by the same one,
+     * so this is safe to send again.
+     */
     private static void show(ServerPlayer player, Fake fake) {
-        player.connection.send(new ClientboundBlockUpdatePacket(fake.pos(), fake.shown()));
+        Display.BlockDisplay display = fake.display();
+        if (display == null) {
+            player.connection.send(new ClientboundBlockUpdatePacket(fake.pos(), fake.shown()));
+            return;
+        }
+        player.connection.send(new ClientboundAddEntityPacket(display, 0, fake.pos()));
+        List<SynchedEntityData.DataValue<?>> data = display.getEntityData().getNonDefaultValues();
+        if (data != null) player.connection.send(new ClientboundSetEntityDataPacket(display.getId(), data));
     }
 
-    /** The block as it really is now, which is what the player's game shows after. */
+    /** The block as it really is now, which is what the player's game shows after; a display is taken away. */
     private static void restore(ServerPlayer player, Fake fake) {
-        player.connection.send(new ClientboundBlockUpdatePacket(player.serverLevel(), fake.pos()));
+        if (fake.display() != null) player.connection.send(new ClientboundRemoveEntitiesPacket(fake.display().getId()));
+        else player.connection.send(new ClientboundBlockUpdatePacket(player.serverLevel(), fake.pos()));
+    }
+
+    /** A cobweb as a block display: nothing collides with it, so nobody is slowed by a web the server does not have. */
+    private static Display.BlockDisplay webDisplay(ServerLevel level) {
+        Display.BlockDisplay display = new Display.BlockDisplay(EntityType.BLOCK_DISPLAY, level);
+        ((BlockDisplayInvoker) display).polaris$setBlockState(Blocks.COBWEB.defaultBlockState());
+        return display;
     }
 
     /**
-     * Take a cobweb down for a player about to reach it, on every tick. A web
-     * slows whoever is in it, and their game would move them as slowed while the
-     * server, which holds air there, would not. The faster they go the earlier it
-     * goes; it stays down until the chunk is decided again.
+     * Pick block (middle click), from the packet's handler on the server thread:
+     * true when the player picked a decoration and it is answered here. The world
+     * holds the grass under a pumpkin, so left to the game the pick gave that. A
+     * cobweb is a display their game looks through, so its pick names the block
+     * behind it; a web on the line of sight nearer than that block is what they
+     * meant. Handed out as the game hands out a pick: selected where it already
+     * is in the inventory, and in creative put in the hotbar when it is not.
      */
-    private static void websNear(MinecraftServer server) {
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            Seen one = seen.get(player.getUUID());
-            if (one == null || one.dimension != player.serverLevel().dimension()) continue;
-            Vec3 center = player.getBoundingBox().getCenter();
-            double speed = one.last == null ? 0 : center.distanceTo(one.last);
-            one.last = center;
-            double reach = WEB_REACH + speed * WEB_REACH_PER_SPEED;
-            double reachSq = reach * reach;
-            ChunkPos at = player.chunkPosition();
-            int span = 1 + (int) Math.ceil(reach / 16);
-            for (int dx = -span; dx <= span; dx++) {
-                for (int dz = -span; dz <= span; dz++) {
-                    long key = ChunkPos.asLong(at.x + dx, at.z + dz);
-                    List<Fake> fakes = one.chunks.get(key);
-                    if (fakes == null || fakes.isEmpty()) continue;
-                    List<Fake> kept = null;
-                    for (int i = 0; i < fakes.size(); i++) {
-                        Fake fake = fakes.get(i);
-                        boolean near = fake.shown().is(Blocks.COBWEB)
-                                && center.distanceToSqr(Vec3.atCenterOf(fake.pos())) <= reachSq;
-                        if (near && kept == null) kept = new ArrayList<>(fakes.subList(0, i));
-                        if (near) restore(player, fake);
-                        else if (kept != null) kept.add(fake);
+    public static boolean pick(ServerPlayer player, BlockPos pos) {
+        if (season == null) return false;
+        Fake hit = shownAt(player, pos);
+        if (hit == null) hit = webInSight(player, pos);
+        if (hit == null || !player.canInteractWithBlock(hit.pos(), 1.0)) return false;
+        ItemStack item = new ItemStack(hit.shown().getBlock());
+        if (item.isEmpty() || !item.isItemEnabled(player.level().enabledFeatures())) return true;
+        Inventory inventory = player.getInventory();
+        int slot = inventory.findSlotMatchingItem(item);
+        if (slot != -1) {
+            if (Inventory.isHotbarSlot(slot)) inventory.selected = slot;
+            else inventory.pickSlot(slot);
+        } else if (player.hasInfiniteMaterials()) {
+            inventory.addAndPickItem(item);
+        }
+        player.connection.send(new ClientboundSetHeldSlotPacket(inventory.selected));
+        player.inventoryMenu.broadcastChanges();
+        return true;
+    }
+
+    /** The nearest cobweb a player is shown on their line of sight, before the block their game picked, or null. */
+    private static Fake webInSight(ServerPlayer player, BlockPos picked) {
+        Seen one = seen.get(player.getUUID());
+        if (one == null || one.dimension != player.serverLevel().dimension()) return null;
+        Vec3 eye = player.getEyePosition();
+        Vec3 end = eye.add(player.getViewVector(1).scale(player.blockInteractionRange() + 1));
+        double nearest = new AABB(picked).clip(eye, end).map(eye::distanceToSqr).orElse(Double.MAX_VALUE);
+        ChunkPos at = player.chunkPosition();
+        Fake web = null;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                List<Fake> fakes = one.chunks.get(ChunkPos.asLong(at.x + dx, at.z + dz));
+                if (fakes == null) continue;
+                for (Fake fake : fakes) {
+                    if (fake.display() == null) continue;
+                    double distance = new AABB(fake.pos()).clip(eye, end).map(eye::distanceToSqr).orElse(Double.MAX_VALUE);
+                    if (distance < nearest) {
+                        nearest = distance;
+                        web = fake;
                     }
-                    if (kept != null) one.chunks.put(key, kept);
                 }
             }
         }
+        return web;
     }
 
     private static void particles(MinecraftServer server, boolean snow) {
@@ -623,7 +679,7 @@ final class SeasonalDecor {
                 for (int tries = 0; tries < 6 && webs > 0; tries++) {
                     BlockPos web = webUnder(level, baseX + random.nextInt(16), baseZ + random.nextInt(16));
                     if (web == null) continue;
-                    fakes.add(new Fake(web, level.getBlockState(web), Blocks.COBWEB.defaultBlockState()));
+                    fakes.add(new Fake(web, level.getBlockState(web), Blocks.COBWEB.defaultBlockState(), webDisplay(level)));
                     webs--;
                 }
             }

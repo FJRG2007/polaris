@@ -42,6 +42,7 @@ public final class PolarisPlugin extends JavaPlugin {
         // The season Polaris says it is, on players' screens only; idle until told.
         seasonal = new SeasonalDecor(this);
         getServer().getPluginManager().registerEvents(seasonal, this);
+        seasonal.listenForPicks();
         getServer().getPluginManager().registerEvents(seasonal.mobs(), this);
         // Christmas and New Year's Eve on top of the winter; idle until told.
         winter = new SeasonalWinter(this, seasonal);

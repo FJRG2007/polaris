@@ -27,8 +27,10 @@ import org.bukkit.block.data.Snowable;
 import org.bukkit.block.data.type.Leaves;
 import org.bukkit.block.data.type.Snow;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -38,6 +40,8 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.BoundingBox;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 /**
@@ -50,11 +54,14 @@ import org.bukkit.util.Vector;
  * no dates of its own.
  *
  * Everything is a block change sent to one player ({@code sendBlockChange}),
- * never set in the world: nothing reaches a region file, and a chunk the game
- * loads again shows the world as it is. Pumpkins take the place of a grass block
+ * never set in the world - or, for a cobweb, a display entity hidden from
+ * everybody else and never saved: nothing reaches a region file, and a chunk the
+ * game loads again shows the world as it is. Pumpkins take the place of a grass block
  * in the ground (the same full block underfoot), cobwebs hang under the leaves of
- * a natural tree at least three blocks clear of the ground - and a player's game
- * loses one before they can reach it ({@link #websNear}) - and in winter a thin
+ * a natural tree at least three blocks clear of the ground - a block display only
+ * that player is shown ({@link #showWeb}), since a web block slowed them on their
+ * screen as they passed through it while the server, which holds air there, did
+ * not, so it had to vanish before they reached it - and in winter a thin
  * layer of snow, which nothing collides with, lies on some grass while snow falls
  * round a player under the open sky. Only on ground whose every neighbour is
  * natural, and only on leaves the game grew (a player's are persistent). While an
@@ -71,7 +78,8 @@ import org.bukkit.util.Vector;
  * rest of the season ({@link BrokenDecor}, kept beside the world): every hit on
  * it is called off, so the real block under it is neither broken nor dropped. A
  * pumpkin takes as long to dig as a real one and drops itself ({@link #onHit});
- * anything else comes down on the first hit.
+ * anything else comes down on the first hit. On Paper 1.21.4 and later, pick
+ * block on one gives the decoration, not the real block under it ({@link #pick}).
  *
  * Main thread only: the command and the timer both run there.
  */
@@ -106,10 +114,10 @@ final class SeasonalDecor implements Listener {
     private static final int SNOW_TICKS = 5;
     private static final int ASH_TICKS = 40;
     private static final long MAX_HOLD_SECONDS = 24 * 60 * 60;
-    /** How near a cobweb a player comes before their game loses it, in blocks, and
-     *  how much further each block they moved in the last tick takes that. */
-    private static final double WEB_REACH = 6;
-    private static final double WEB_REACH_PER_SPEED = 12;
+    /** How far a pick reaches, in blocks: past the game's own reach in creative. */
+    private static final double PICK_REACH = 6;
+    /** Where a pick can be answered (Paper 1.21.4 and later). */
+    private static final String PICK_EVENT = "io.papermc.paper.event.player.PlayerPickBlockEvent";
     /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
     private static final int PUMPKIN_CHUNKS = 45;
     private static final int TWO_PUMPKIN_CHUNKS = 30;
@@ -122,8 +130,9 @@ final class SeasonalDecor implements Listener {
     private static final class Seen {
         UUID world;
         final Map<Long, List<Fake>> chunks = new HashMap<>();
-        /** Where the player was on the last tick, for how fast they move. */
-        Vector last;
+        /** The cobwebs drawn for this player, by block: displays nobody else is shown,
+         *  never saved with the world. */
+        final Map<Long, BlockDisplay> webs = new HashMap<>();
     }
 
     private final Plugin plugin;
@@ -168,6 +177,22 @@ final class SeasonalDecor implements Listener {
 
     SeasonalDecor(Plugin plugin) {
         this.plugin = plugin;
+    }
+
+    /** Answer picks on decorations where the server has the event for it: Paper 1.21.4 and later. */
+    void listenForPicks() {
+        try {
+            Class.forName(PICK_EVENT, false, SeasonalDecor.class.getClassLoader());
+        } catch (ClassNotFoundException absent) {
+            return;
+        }
+        try {
+            Listener listener = (Listener) Class.forName("polaris.minecraft.SeasonalDecorPick")
+                    .getDeclaredConstructor(SeasonalDecor.class).newInstance(this);
+            Bukkit.getPluginManager().registerEvents(listener, plugin);
+        } catch (ReflectiveOperationException | LinkageError | ClassCastException failed) {
+            plugin.getLogger().warning("Polaris seasons: pick block on a decoration gives the block under it (" + failed + ").");
+        }
     }
 
     /** The season's mobs, which listen for spawns alongside this. */
@@ -269,7 +294,6 @@ final class SeasonalDecor implements Listener {
                 return;
             }
             ticks++;
-            if (season == Season.HALLOWEEN) websNear();
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(false);
             if (ticks % PASS_TICKS == 0) pass(ticks % RESEND_TICKS == 0);
@@ -283,6 +307,7 @@ final class SeasonalDecor implements Listener {
                 clear();
             } catch (RuntimeException ignored) {
                 season = null;
+                for (Seen one : seen.values()) removeWebs(one);
                 seen.clear();
                 digs.clear();
                 mobs.forget();
@@ -292,7 +317,8 @@ final class SeasonalDecor implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        seen.remove(event.getPlayer().getUniqueId());
+        Seen one = seen.remove(event.getPlayer().getUniqueId());
+        if (one != null) removeWebs(one);
         digs.remove(event.getPlayer().getUniqueId());
     }
 
@@ -304,15 +330,21 @@ final class SeasonalDecor implements Listener {
             // A game that changed world dropped every chunk it had.
             if (!world.getUID().equals(one.world)) {
                 one.chunks.clear();
+                removeWebs(one);
                 one.world = world.getUID();
             }
             if (world.getEnvironment() != World.Environment.NORMAL) continue;
             int atX = player.getLocation().getBlockX() >> 4;
             int atZ = player.getLocation().getBlockZ() >> 4;
             int forget = Math.min(FORGET, Bukkit.getViewDistance());
-            one.chunks.keySet().removeIf(key -> Math.abs(chunkX(key) - atX) > forget
-                    || Math.abs(chunkZ(key) - atZ) > forget);
+            one.chunks.entrySet().removeIf(chunk -> {
+                long key = chunk.getKey();
+                if (Math.abs(chunkX(key) - atX) <= forget && Math.abs(chunkZ(key) - atZ) <= forget) return false;
+                for (Fake fake : chunk.getValue()) if (web(fake)) restore(player, one, fake);
+                return true;
+            });
             if (resend) resend(player, world, one, atX, atZ);
+            nearWebs(player, one, atX, atZ);
             budget -= decorateAround(player, world, one, atX, atZ, Math.min(budget, NEW_PER_PLAYER));
             if (budget <= 0 && !resend) break;
         }
@@ -331,12 +363,37 @@ final class SeasonalDecor implements Listener {
                     List<Fake> fakes = decide(world, cx, cz, season);
                     fakes.removeIf(this::wasBroken);
                     one.chunks.put(key, fakes);
-                    for (Fake fake : fakes) player.sendBlockChange(fake.at(), fake.shown());
+                    for (Fake fake : fakes) show(player, one, fake);
                     done++;
                 }
             }
         }
         return done;
+    }
+
+    /**
+     * Cobweb displays are real entities, so a player keeps them only for the chunks
+     * within RADIUS of where they stand: the rest are taken away and drawn again
+     * when the player comes back near, and one whose chunk was unloaded is drawn again.
+     */
+    private void nearWebs(Player player, Seen one, int atX, int atZ) {
+        for (Map.Entry<Long, List<Fake>> chunk : one.chunks.entrySet()) {
+            long key = chunk.getKey();
+            boolean near = Math.abs(chunkX(key) - atX) <= RADIUS && Math.abs(chunkZ(key) - atZ) <= RADIUS;
+            for (Fake fake : chunk.getValue()) {
+                if (!web(fake)) continue;
+                if (!near) {
+                    restore(player, one, fake);
+                    continue;
+                }
+                Location at = fake.at();
+                BlockDisplay display = one.webs.get(blockKey(at.getBlockX(), at.getBlockY(), at.getBlockZ()));
+                if (display != null && display.isValid()) continue;
+                World world = at.getWorld();
+                if (world == null || !world.isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) continue;
+                if (at.getBlock().getBlockData().equals(fake.real())) showWeb(player, one, fake);
+            }
+        }
     }
 
     private void resend(Player player, World world, Seen one, int atX, int atZ) {
@@ -347,12 +404,11 @@ final class SeasonalDecor implements Listener {
             if (chunk.getValue().isEmpty() || !world.isChunkLoaded(cx, cz)) continue;
             List<Fake> kept = new ArrayList<>(chunk.getValue().size());
             for (Fake fake : chunk.getValue()) {
-                BlockData now = fake.at().getBlock().getBlockData();
-                if (now.equals(fake.real())) {
-                    player.sendBlockChange(fake.at(), fake.shown());
+                if (fake.at().getBlock().getBlockData().equals(fake.real())) {
+                    show(player, one, fake);
                     kept.add(fake);
                 } else {
-                    player.sendBlockChange(fake.at(), now);
+                    restore(player, one, fake);
                 }
             }
             chunk.setValue(kept);
@@ -412,7 +468,7 @@ final class SeasonalDecor implements Listener {
         if (fakes == null) return;
         List<Fake> kept = new ArrayList<>(fakes.size());
         for (Fake fake : fakes) {
-            if (same(fake.at(), x, y, z)) player.sendBlockChange(fake.at(), fake.at().getBlock().getBlockData());
+            if (same(fake.at(), x, y, z)) restore(player, one, fake);
             else kept.add(fake);
         }
         if (kept.size() != fakes.size()) one.chunks.put(key, kept);
@@ -561,49 +617,152 @@ final class SeasonalDecor implements Listener {
             Seen one = seen.get(player.getUniqueId());
             if (one == null || !player.getWorld().getUID().equals(one.world)) continue;
             for (List<Fake> fakes : one.chunks.values()) {
-                for (Fake fake : fakes) player.sendBlockChange(fake.at(), fake.at().getBlock().getBlockData());
+                for (Fake fake : fakes) if (!web(fake)) restore(player, one, fake);
             }
         }
+        for (Seen one : seen.values()) removeWebs(one);
         seen.clear();
         digs.clear();
     }
 
+    private static boolean web(Fake fake) {
+        return fake.shown().getMaterial() == Material.COBWEB;
+    }
+
+    /** Draw a decoration on one player's screen: a block change, or for a cobweb its display. */
+    private void show(Player player, Seen one, Fake fake) {
+        if (web(fake)) showWeb(player, one, fake);
+        else player.sendBlockChange(fake.at(), fake.shown());
+    }
+
+    /** The block as it really is now, which is what the player's game shows after; a cobweb's display is taken away. */
+    private static void restore(Player player, Seen one, Fake fake) {
+        Location at = fake.at();
+        if (!web(fake)) {
+            player.sendBlockChange(at, at.getBlock().getBlockData());
+            return;
+        }
+        BlockDisplay display = one.webs.remove(blockKey(at.getBlockX(), at.getBlockY(), at.getBlockZ()));
+        if (display != null) display.remove();
+    }
+
     /**
-     * Take a cobweb down for a player about to reach it, on every tick. A web
-     * slows whoever is in it, and their game would move them as slowed while the
-     * server, which holds air there, would not. The faster they go the earlier it
-     * goes; it stays down until the chunk is decided again.
+     * A cobweb as a block display shown to this player alone: nothing collides
+     * with it, so nobody is slowed by a web the server does not have, and it stays
+     * in sight up close. Bukkit has no entity that lives only on one player's
+     * screen, so it is a real one, hidden from everybody else and never saved
+     * with the world; one whose chunk was unloaded is gone, and is spawned again
+     * the next time it is shown.
      */
-    private void websNear() {
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            Seen one = seen.get(player.getUniqueId());
-            if (one == null || !player.getWorld().getUID().equals(one.world)) continue;
-            Vector center = player.getBoundingBox().getCenter();
-            double speed = one.last == null ? 0 : center.distance(one.last);
-            one.last = center;
-            double reach = WEB_REACH + speed * WEB_REACH_PER_SPEED;
-            double reachSq = reach * reach;
-            int atX = player.getLocation().getBlockX() >> 4;
-            int atZ = player.getLocation().getBlockZ() >> 4;
-            int span = 1 + (int) Math.ceil(reach / 16);
-            for (int dx = -span; dx <= span; dx++) {
-                for (int dz = -span; dz <= span; dz++) {
-                    long key = chunkKey(atX + dx, atZ + dz);
-                    List<Fake> fakes = one.chunks.get(key);
-                    if (fakes == null || fakes.isEmpty()) continue;
-                    List<Fake> kept = null;
-                    for (int i = 0; i < fakes.size(); i++) {
-                        Fake fake = fakes.get(i);
-                        boolean near = fake.shown().getMaterial() == Material.COBWEB
-                                && center.distanceSquared(fake.at().clone().add(0.5, 0.5, 0.5).toVector()) <= reachSq;
-                        if (near && kept == null) kept = new ArrayList<>(fakes.subList(0, i));
-                        if (near) player.sendBlockChange(fake.at(), fake.at().getBlock().getBlockData());
-                        else if (kept != null) kept.add(fake);
+    private void showWeb(Player player, Seen one, Fake fake) {
+        Location at = fake.at();
+        long key = blockKey(at.getBlockX(), at.getBlockY(), at.getBlockZ());
+        BlockDisplay display = one.webs.get(key);
+        if (display != null && display.isValid()) return;
+        World world = at.getWorld();
+        if (world == null || !world.isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) return;
+        display = world.spawn(at, BlockDisplay.class, spawned -> {
+            spawned.setVisibleByDefault(false);
+            spawned.setPersistent(false);
+            spawned.setBlock(fake.shown());
+        });
+        player.showEntity(plugin, display);
+        one.webs.put(key, display);
+    }
+
+    private static void removeWebs(Seen one) {
+        for (BlockDisplay display : one.webs.values()) display.remove();
+        one.webs.clear();
+    }
+
+    /**
+     * Pick block (middle click) on a block, from {@code SeasonalDecorPick}: true
+     * when the player picked a decoration and it is answered here. A cobweb is a
+     * display their game looks through, so its pick names the block behind it; a
+     * web on the line of sight nearer than that block is what they meant. Handed
+     * out as the game hands out a pick: selected where it already is in the
+     * inventory, and in creative put in the hotbar when it is not.
+     */
+    boolean pick(Player player, Block block) {
+        if (season == null) return false;
+        Fake hit = shownAt(player, block);
+        if (hit == null) hit = webInSight(player, block);
+        if (hit == null) return false;
+        Material kind = hit.shown().getMaterial();
+        if (!kind.isItem()) return true;
+        ItemStack item = new ItemStack(kind);
+        PlayerInventory inventory = player.getInventory();
+        int slot = -1;
+        for (int i = 0; i < 36 && slot == -1; i++) {
+            ItemStack there = inventory.getItem(i);
+            if (there != null && there.isSimilar(item)) slot = i;
+        }
+        if (slot >= 0 && slot < 9) {
+            inventory.setHeldItemSlot(slot);
+        } else if (slot >= 9) {
+            int hotbar = pickSlot(inventory);
+            ItemStack held = inventory.getItem(hotbar);
+            inventory.setItem(hotbar, inventory.getItem(slot));
+            inventory.setItem(slot, held);
+            inventory.setHeldItemSlot(hotbar);
+        } else if (player.getGameMode() == GameMode.CREATIVE) {
+            int hotbar = pickSlot(inventory);
+            ItemStack held = inventory.getItem(hotbar);
+            if (held != null && !held.getType().isAir()) {
+                int free = inventory.firstEmpty();
+                if (free != -1) inventory.setItem(free, held);
+            }
+            inventory.setItem(hotbar, item);
+            inventory.setHeldItemSlot(hotbar);
+        }
+        return true;
+    }
+
+    /** The hotbar slot a pick goes to, as the game chooses it: an empty one, else one not enchanted, from the selected one on. */
+    private static int pickSlot(PlayerInventory inventory) {
+        int selected = inventory.getHeldItemSlot();
+        for (int i = 0; i < 9; i++) {
+            ItemStack there = inventory.getItem((selected + i) % 9);
+            if (there == null || there.getType().isAir()) return (selected + i) % 9;
+        }
+        for (int i = 0; i < 9; i++) {
+            ItemStack there = inventory.getItem((selected + i) % 9);
+            if (there == null || there.getEnchantments().isEmpty()) return (selected + i) % 9;
+        }
+        return selected;
+    }
+
+    /** The nearest cobweb a player is shown on their line of sight, before the block their game picked, or null. */
+    private Fake webInSight(Player player, Block picked) {
+        Seen one = seen.get(player.getUniqueId());
+        if (one == null || one.webs.isEmpty() || !player.getWorld().getUID().equals(one.world)) return null;
+        Location eye = player.getEyeLocation();
+        Vector from = eye.toVector();
+        Vector direction = eye.getDirection();
+        double nearest = distance(BoundingBox.of(picked), from, direction);
+        int atX = eye.getBlockX() >> 4;
+        int atZ = eye.getBlockZ() >> 4;
+        Fake web = null;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                List<Fake> fakes = one.chunks.get(chunkKey(atX + dx, atZ + dz));
+                if (fakes == null) continue;
+                for (Fake fake : fakes) {
+                    if (!web(fake)) continue;
+                    double distance = distance(BoundingBox.of(fake.at().getBlock()), from, direction);
+                    if (distance < nearest) {
+                        nearest = distance;
+                        web = fake;
                     }
-                    if (kept != null) one.chunks.put(key, kept);
                 }
             }
         }
+        return web;
+    }
+
+    private static double distance(BoundingBox box, Vector from, Vector direction) {
+        RayTraceResult hit = box.rayTrace(from, direction, PICK_REACH);
+        return hit == null ? Double.MAX_VALUE : hit.getHitPosition().distanceSquared(from);
     }
 
     private void particles(boolean snow) {
