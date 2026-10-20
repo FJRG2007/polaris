@@ -97,7 +97,8 @@
         "reply": "Responder al mensaje",
         "copy": "Copiar mensaje",
         "regenerate": "Regenerar",
-        "copied": "Copiado"
+        "copied": "Copiado",
+        "branch": "Ramificar en chat nuevo"
     },
     "noKeys": {
         "title": "Polar necesita una clave de IA",
@@ -125,7 +126,8 @@
             "ownKey": "Revisar tu clave",
             "tryWith": "Probar con {model}",
             "retry": "Reintentar"
-        }
+        },
+        "branchFailed": "No se pudo ramificar el chat. Vuelve a intentarlo."
     },
     "queue": {
         "title": "Van después",

@@ -19,7 +19,7 @@
 
 import { extname } from "node:path";
 import type { UIMessage } from "ai";
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { chatTarget, removeStoredFiles } from "@/lib/chat/attachments";
 import { pipeThenDispose } from "@/lib/drive-stream";
 import { driverForTarget, LOCAL_TARGET, safeName, streamFile } from "@/lib/storage-target";
@@ -226,6 +226,35 @@ export function threadAttachments(userId: string, threadId: string): Promise<Pol
         where: { userId, threadId },
         select: { id: true, connectionId: true, path: true }
     });
+}
+
+/**
+ * The files of a thread about to go that no other chat of this person's still
+ * carries. One a branch still names moves to the branch instead, so deleting
+ * the original does not leave the branch with a broken file.
+ */
+export async function keepSharedAttachments(
+    userId: string,
+    threadId: string,
+    files: readonly PolarStoredFile[]
+): Promise<PolarStoredFile[]> {
+    if (files.length === 0) return [];
+    const carried = await prisma.$queryRaw<{ id: string; threadId: string }[]>(Prisma.sql`
+        SELECT DISTINCT ON (a.id) a.id, m."threadId"::text AS "threadId"
+        FROM unnest(${files.map((file) => file.id)}::text[]) AS a(id)
+        JOIN "PolarMessage" AS m ON m."parts"::text LIKE '%/api/polar/attachments/' || a.id || '%'
+        JOIN "PolarThread" AS t ON t."id" = m."threadId"
+        WHERE t."userId" = ${userId}::uuid AND m."threadId" <> ${threadId}::uuid
+        ORDER BY a.id, m."createdAt" ASC
+    `);
+    for (const row of carried) {
+        await prisma.polarAttachment.updateMany({
+            where: { id: row.id, userId },
+            data: { threadId: row.threadId }
+        });
+    }
+    const moved = new Set(carried.map((row) => row.id));
+    return files.filter((file) => !moved.has(file.id));
 }
 
 /** Rows first, bytes second: bytes without a row only cost disk. */

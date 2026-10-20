@@ -9,9 +9,11 @@
  * Server-only.
  */
 
+import { randomUUID } from "node:crypto";
 import type { UIMessage } from "ai";
 import { prisma, Prisma } from "@polaris/db";
 import {
+    keepSharedAttachments,
     discardPolarAttachments,
     linkPolarAttachments,
     threadAttachments
@@ -428,8 +430,81 @@ export async function setPolarQueue(
     return count > 0;
 }
 
+/** Most messages a branch copies: one path, however deep the tree is. */
+const BRANCH_MAX = 1000;
+
+/**
+ * A new conversation holding the path that ends at `messageId`: that message
+ * and every one it follows, back to the start, as ChatGPT's "Branch in new
+ * chat" does. The other versions along the way stay behind. The copies get new
+ * ids (an id names one place in one thread) and keep the order they were
+ * written in. Files are not copied: the branch names the same ones, and
+ * deleting either chat leaves them to the one still carrying them.
+ *
+ * Null when the thread, or the message in it, is not this person's.
+ */
+export async function branchPolarThread(
+    userId: string,
+    threadId: string,
+    messageId: string
+): Promise<PolarThreadRow | null> {
+    const source = await prisma.polarThread.findFirst({
+        where: { id: threadId, userId },
+        select: { title: true, titleSource: true, choice: true, projectId: true }
+    });
+    if (!source) return null;
+    const rows = await prisma.polarMessage.findMany({
+        where: { threadId },
+        select: { id: true, parentId: true, role: true, parts: true, metadata: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: BRANCH_MAX
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const path: typeof rows = [];
+    let current: string | null = messageId;
+    while (current && byId.has(current) && path.length < BRANCH_MAX) {
+        const row: (typeof rows)[number] = byId.get(current)!;
+        path.unshift(row);
+        byId.delete(current);
+        current = row.parentId;
+    }
+    if (path.length === 0) return null;
+    const id = randomUUID();
+    const ids = path.map(() => randomUUID());
+    // One millisecond apart, so the copies read back in the order of the path.
+    const start = Date.now() - path.length;
+    const thread = await prisma.$transaction(async (tx) => {
+        const created = await tx.polarThread.create({
+            data: {
+                id,
+                userId,
+                title: source.title,
+                // A title still being written belongs to the original thread.
+                titleSource: source.titleSource === "generating" ? "placeholder" : source.titleSource,
+                projectId: source.projectId,
+                ...(source.choice ? { choice: source.choice as Prisma.InputJsonValue } : {})
+            },
+            select: ROW_SELECT
+        });
+        await tx.polarMessage.createMany({
+            data: path.map((row, index) => ({
+                id: ids[index]!,
+                threadId: id,
+                parentId: index === 0 ? null : ids[index - 1]!,
+                role: row.role,
+                parts: row.parts as Prisma.InputJsonValue,
+                metadata: (row.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+                createdAt: new Date(start + index)
+            }))
+        });
+        return created;
+    });
+    return toRow(thread);
+}
+
 export async function deletePolarThread(userId: string, id: string): Promise<boolean> {
-    const files = await threadAttachments(userId, id);
+    // A file a branch still carries goes on with the branch.
+    const files = await keepSharedAttachments(userId, id, await threadAttachments(userId, id));
     const { count } = await prisma.polarThread.deleteMany({ where: { id, userId } });
     if (count > 0) await discardPolarAttachments(files);
     return count > 0;

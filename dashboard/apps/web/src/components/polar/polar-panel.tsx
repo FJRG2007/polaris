@@ -38,6 +38,7 @@ import {
     Dialog,
     CopyIcon,
     useCopied,
+    useToast,
     DialogTitle,
     DialogContent,
     useShortcutText
@@ -45,6 +46,7 @@ import {
 import {
     Cpu,
     FileText,
+    GitBranchPlus,
     History,
     Ghost,
     Maximize2,
@@ -618,6 +620,7 @@ export function PolarChat({
     const drawerButton = useRef<HTMLButtonElement>(null);
     const composerNext = useRef(false);
     const [, setTreeTick] = useState(0);
+    const toast = useToast();
 
     const context = useMemo(
         () =>
@@ -883,6 +886,25 @@ export function PolarChat({
         setDrawer(false);
         setShowHistory(fullPage);
         textarea.current?.focus();
+    };
+
+    /** Copies the path up to a message into a new conversation and opens it. */
+    const branchFrom = async (messageId: string) => {
+        const from = live.current.threadId;
+        const response = await fetch(`/api/polar/threads/${from}/branch`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ messageId })
+        }).catch(() => null);
+        const data = response?.ok
+            ? ((await response.json().catch(() => null)) as { thread?: { id: string } } | null)
+            : null;
+        if (!data?.thread) {
+            toast.show({ title: t("errors.branchFailed") });
+            return;
+        }
+        if (showHistory) sidebar.refresh(true);
+        await openThread(data.thread.id);
     };
 
     /** Uploads one staged file, drawing its progress, and leaves it ready or failed. */
@@ -1642,6 +1664,7 @@ export function PolarChat({
                                                 })
                                             }
                                             onRegenerate={() => void chat.regenerate()}
+                                            onBranch={() => void branchFrom(message.id)}
                                         />
                                     );
                                 })}
@@ -1779,7 +1802,8 @@ function MessageView({
     onEdit,
     onQuote,
     onSaveCommand,
-    onRegenerate
+    onRegenerate,
+    onBranch
 }: {
     message: UIMessage;
     tools: Record<string, ToolDescription>;
@@ -1792,6 +1816,7 @@ function MessageView({
     onQuote: () => void;
     onSaveCommand: () => void;
     onRegenerate: () => void;
+    onBranch: () => void;
 }) {
     const t = useTranslations("polar");
     const mine = message.role === "user";
@@ -1994,6 +2019,11 @@ function MessageView({
                     >
                         <CopyIcon copied={copied} />
                     </MessageAction>
+                    {!busy ? (
+                        <MessageAction label={t("actions.branch")} onClick={onBranch}>
+                            <GitBranchPlus />
+                        </MessageAction>
+                    ) : null}
                     {!mine && last ? (
                         <MessageAction label={t("actions.regenerate")} onClick={onRegenerate}>
                             <RotateCcw />

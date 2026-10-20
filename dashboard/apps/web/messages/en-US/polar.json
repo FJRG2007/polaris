@@ -97,7 +97,8 @@
         "reply": "Reply to message",
         "copy": "Copy message",
         "regenerate": "Answer again",
-        "copied": "Copied"
+        "copied": "Copied",
+        "branch": "Branch into new chat"
     },
     "noKeys": {
         "title": "Polar needs an AI provider key",
@@ -125,7 +126,8 @@
             "ownKey": "Check your key",
             "tryWith": "Try with {model}",
             "retry": "Try again"
-        }
+        },
+        "branchFailed": "Could not branch this chat. Try again in a moment."
     },
     "queue": {
         "title": "Sends next",
