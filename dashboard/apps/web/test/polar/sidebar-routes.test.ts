@@ -167,8 +167,8 @@ describe("a shared link", () => {
         const shared = await readSharedPolarThread(TOKEN);
         expect(shared?.title).toBe("Disk");
         expect(shared?.messages).toEqual([
-            { id: "q", role: "user", text: "How full?" },
-            { id: "a", role: "assistant", text: "Half full." }
+            { id: "q", role: "user", text: "How full?", files: [] },
+            { id: "a", role: "assistant", text: "Half full.", files: [] }
         ]);
         expect(JSON.stringify(shared)).not.toContain("/srv/private");
     });

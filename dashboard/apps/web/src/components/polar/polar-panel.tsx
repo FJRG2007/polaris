@@ -854,6 +854,15 @@ export function PolarChat({
         setShowHistory(fullPage);
         setDrawer(false);
     };
+    // A chat named in the page's address (a shared chat just continued) opens
+    // once, and the address goes back to plain /polar.
+    useEffect(() => {
+        if (!fullPage) return;
+        const named = new URLSearchParams(window.location.search).get("thread");
+        if (!named) return;
+        window.history.replaceState(null, "", window.location.pathname);
+        void openThread(named);
+    }, []);
 
     /** Empties the composer's files, letting go of their local previews. */
     const clearFiles = () => {

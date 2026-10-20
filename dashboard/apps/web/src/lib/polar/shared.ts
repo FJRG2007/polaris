@@ -422,3 +422,57 @@ export function firstLine(text: string, most = 80): string {
     const line = text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
     return line.length > most ? `${line.slice(0, most - 1).trimEnd()}…` : line;
 }
+
+// Shared Polar chats (`share.ts`), in the shapes the browser reads.
+
+export interface PolarShareLink {
+    url: string;
+    sharedAt: string;
+}
+
+export interface SharedPolarFile {
+    id: string;
+    name: string;
+    mediaType: string;
+}
+
+export interface SharedPolarMessage {
+    id: string;
+    role: "user" | "assistant";
+    text: string;
+    files: SharedPolarFile[];
+}
+
+export interface SharedPolarThread {
+    title: string;
+    sharedAt: string;
+    messages: SharedPolarMessage[];
+}
+
+export interface PolarShareRecipientView {
+    userId: string;
+    name: string;
+    sentAt: string;
+}
+
+export interface OwnedPolarShare {
+    threadId: string;
+    title: string;
+    sharedAt: string;
+    /** The public link, or null when the chat is only sent to people. */
+    url: string | null;
+    people: number;
+}
+
+export interface PolarSharedWithMe {
+    id: string;
+    title: string;
+    from: string;
+    note: string | null;
+    sharedAt: string;
+}
+
+export interface ReceivedPolarThread extends SharedPolarThread {
+    from: string;
+    note: string | null;
+}

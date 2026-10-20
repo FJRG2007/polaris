@@ -39,6 +39,7 @@ model User {
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
+    polarSharesIn     PolarShareRecipient[]
     automations       Automation[]       @relation("AutomationShelf")
     automationSecrets AutomationSecret[] @relation("AutomationSecretShelf")
     automationFolders AutomationFolder[] @relation("AutomationFolderShelf")
@@ -15106,6 +15107,27 @@ model PolarThreadShare {
     tokenKeyId     String
     sharedAt       DateTime    @default(now())
     createdAt      DateTime    @default(now())
+    // Whether the token answers on the public page. False when the snapshot is
+    // only sent to people: the row (and its snapshot time) exists for them, and
+    // nobody holding a link reads it. Rows older than this column were links.
+    linkEnabled    Boolean     @default(true)
+    recipients     PolarShareRecipient[]
+}
+
+// Somebody a Polar chat was sent to. They read the same snapshot as the link,
+// through the share, and only while this row exists: the owner removing them,
+// or the chat being deleted, takes it away.
+model PolarShareRecipient {
+    id        String           @id @default(uuid(7)) @db.Uuid
+    shareId   String           @db.Uuid
+    share     PolarThreadShare @relation(fields: [shareId], references: [id], onDelete: Cascade)
+    userId    String           @db.Uuid
+    user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    note      String?
+    createdAt DateTime         @default(now())
+
+    @@unique([shareId, userId])
+    @@index([userId, createdAt(sort: Desc)])
 }
 
 // One message of a thread, in the AI SDK's UI message shape. `parentId` is the

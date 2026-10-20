@@ -37,7 +37,7 @@ export default async function SharedPolarChatPage({
     if (!thread) notFound();
     return (
         <Messages namespaces={["publicPages", "polar", "chat"]}>
-            <SharedChat signedIn={signedIn} thread={thread} />
+            <SharedChat signedIn={signedIn} thread={thread} token={token} />
         </Messages>
     );
 }

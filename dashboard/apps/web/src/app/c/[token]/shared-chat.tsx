@@ -1,17 +1,24 @@
 "use client";
 
 /**
- * A shared Polar chat, read-only: the question on the right, the answer below
- * it, the way the chat itself lays them out.
+ * A shared Polar chat, read-only, for anyone holding the link. Its files are
+ * read through the link too, so they stop with it.
  */
 
-import { cn } from "@polaris/ui";
 import { PublicShell } from "@/components/public-shell";
-import type { SharedPolarThread } from "@/lib/polar/share";
+import type { SharedPolarThread } from "@/lib/polar/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { MessageResponse } from "@/components/polar/elements/message";
+import { SharedMessages } from "@/components/polar/shared-transcript";
 
-export function SharedChat({ thread, signedIn }: { thread: SharedPolarThread; signedIn: boolean }) {
+export function SharedChat({
+    thread,
+    token,
+    signedIn
+}: {
+    thread: SharedPolarThread;
+    token: string;
+    signedIn: boolean;
+}) {
     const t = useTranslations("publicPages");
     const date = new Date(thread.sharedAt).toLocaleDateString(undefined, { dateStyle: "medium" });
     return (
@@ -24,35 +31,10 @@ export function SharedChat({ thread, signedIn }: { thread: SharedPolarThread; si
                     {t("polarShare.sharedOn", { date })}
                 </p>
             </header>
-            {thread.messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("polarShare.empty")}</p>
-            ) : (
-                <ol className="flex min-w-0 flex-col gap-4">
-                    {thread.messages.map((message) => (
-                        <li
-                            key={message.id}
-                            className={cn(
-                                "min-w-0",
-                                message.role === "user" &&
-                                    "ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl bg-muted px-4 py-2.5 text-sm text-foreground"
-                            )}
-                        >
-                            <span className="sr-only">
-                                {t(
-                                    message.role === "user"
-                                        ? "polarShare.you"
-                                        : "polarShare.assistant"
-                                )}
-                            </span>
-                            {message.role === "user" ? (
-                                message.text
-                            ) : (
-                                <MessageResponse>{message.text}</MessageResponse>
-                            )}
-                        </li>
-                    ))}
-                </ol>
-            )}
+            <SharedMessages
+                messages={thread.messages}
+                fileUrl={(id) => `/c/${encodeURIComponent(token)}/files/${id}`}
+            />
             <p className="text-xs text-foreground-subtle">{t("polarShare.readOnly")}</p>
         </PublicShell>
     );
