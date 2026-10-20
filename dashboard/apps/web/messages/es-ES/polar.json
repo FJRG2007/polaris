@@ -11,6 +11,11 @@
         "done": "Polar, hecho",
         "trouble": "Polar, algo falló"
     },
+    "avatar": {
+        "idle": "Polar, mirando alrededor",
+        "working": "Polar, trabajando",
+        "sleeping": "Polar, dormido"
+    },
     "history": {
         "title": "Conversaciones",
         "empty": "Sin conversaciones aún.",
@@ -176,7 +181,6 @@
         "deep": "Intenso",
         "max": "Máximo"
     },
-    "footer": "Polar actúa con tu acceso y pregunta antes de cambiar nada.",
     "reasoning": "Razonamiento",
     "approval": {
         "run": "Ejecutar",
@@ -334,5 +338,16 @@
         "attachment": "adjunto",
         "used": "Usó {name}",
         "truncated": "Solo se incluyen los {most} mensajes más recientes de este chat."
+    },
+    "orb": {
+        "working": "Trabajando",
+        "searching": "Buscando",
+        "solving": "Razonando",
+        "listening": "Escuchando",
+        "connecting": "Conectando",
+        "weaving": "Varias herramientas",
+        "composing": "Escribiendo",
+        "breathing": "Pensando",
+        "shaping": "Leyendo archivos"
     }
 }

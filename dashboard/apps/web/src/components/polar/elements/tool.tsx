@@ -14,6 +14,8 @@
 import { cn } from "@polaris/ui";
 import { useId, useState, type ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
+import type { OrbState } from "@/components/polar/motion/orb-engine/presets";
 import { CheckCircle2, ChevronDown, Circle, Clock, Wrench, XCircle } from "lucide-react";
 
 export const TOOL_STATES = [
@@ -40,12 +42,15 @@ const ICONS: Record<ToolState, ReactNode> = {
 export function Tool({
     title,
     state,
+    orb,
     children,
     defaultOpen = false,
     className
 }: {
     title: string;
     state: ToolState;
+    /** While the call runs, the orb for what it does instead of a clock. */
+    orb?: OrbState;
     children?: ReactNode;
     defaultOpen?: boolean;
     className?: string;
@@ -67,7 +72,11 @@ export function Tool({
                     {title}
                 </span>
                 <span className="inline-flex shrink-0 items-center gap-1 text-muted-foreground">
-                    {ICONS[state]}
+                    {orb && (state === "input-streaming" || state === "input-available") ? (
+                        <ThinkingOrb state={orb} size={20} decorative />
+                    ) : (
+                        ICONS[state]
+                    )}
                     {t(`elements.toolState.${state}`)}
                 </span>
                 <ChevronDown
