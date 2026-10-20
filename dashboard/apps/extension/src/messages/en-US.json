@@ -287,5 +287,24 @@
         "removeTitle": "Remove {name}?",
         "removeSignsOut": "{count, plural, one {The account signed in on it here is signed out and this browser is disconnected from it.} other {The # accounts signed in on it here are signed out and this browser is disconnected from them.}}",
         "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."
+    },
+    "polar": {
+        "title": "Polar",
+        "open": "Open Polar beside the page",
+        "shortcut": "Shortcut: {keys}",
+        "noShortcut": "No shortcut set",
+        "change": "Change",
+        "pressKeys": "Press the new keys",
+        "shortcutRefused": "That shortcut cannot be used. Try another.",
+        "connectFirst": "Connect this browser to your Polaris from the toolbar button first.",
+        "offline": "Polaris is not answering right now.",
+        "retry": "Try again",
+        "askSite": "Let Polar read {site}?",
+        "askAny": "Let Polar read the pages you share?",
+        "allow": "Allow on this site",
+        "allowAny": "Allow",
+        "notNow": "Not now",
+        "reading": "Polar can read {site}",
+        "stop": "Stop"
     }
 }

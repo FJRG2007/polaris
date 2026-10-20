@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstName, initials, initialsInk, tintFor } from "@polaris/core/faces";
 import { describeServer, type ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
+import { PolarRow } from "./polar-row";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 
 /**
@@ -476,6 +477,7 @@ export function Home({
                         </svg>
                     </button>
                 </li>
+                <PolarRow />
             </ul>
         </main>
     );

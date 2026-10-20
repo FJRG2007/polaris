@@ -10,5 +10,9 @@
     "commandFillLogin": {
         "message": "Fill the login for this page",
         "description": "The keyboard shortcut's name in the browser's shortcuts screen."
+    },
+    "commandOpenPolar": {
+        "message": "Open Polar beside the page",
+        "description": "The Polar shortcut's name in the browser's shortcuts screen."
     }
 }

@@ -10,5 +10,9 @@
     "commandFillLogin": {
         "message": "Rellenar el acceso de esta página",
         "description": "The keyboard shortcut's name in the browser's shortcuts screen."
+    },
+    "commandOpenPolar": {
+        "message": "Abrir Polar junto a la página",
+        "description": "El nombre del atajo de Polar en la pantalla de atajos del navegador."
     }
 }

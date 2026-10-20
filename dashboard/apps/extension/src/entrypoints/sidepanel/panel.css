@@ -1,0 +1,62 @@
+/*
+ * The side panel: the popup's colours, the browser's full height, and the
+ * deployment's Polar filling everything under the one bar this draws itself.
+ */
+
+body.side {
+    width: auto;
+    height: 100vh;
+    background: hsl(var(--card));
+}
+
+.side-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-width: 0;
+}
+
+.side-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    border: 0;
+    background: hsl(var(--card));
+}
+
+/* The question about the page in front, and the line that says it is shared. */
+.side-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--surface));
+    font-size: 12px;
+    color: hsl(var(--muted-foreground));
+}
+
+.side-bar .grow {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.side-bar button:not(.ghost) {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.side-empty {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+}
