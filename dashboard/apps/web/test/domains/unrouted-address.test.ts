@@ -9,7 +9,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
-import { checkDomain, NO_REPAIR, nextRepairState } from "@/lib/watch/health-probe";
+import { checkDomain, NO_REPAIR, nextRepairState } from "@/lib/domain-health-probe";
 
 const TARGET = { hostname: "app.plr.example.com", https: true };
 

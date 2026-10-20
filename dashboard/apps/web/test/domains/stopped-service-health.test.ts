@@ -23,7 +23,7 @@ vi.mock("@/lib/notifications/domain-events", () => ({
     notifyDomainHealthChanges: async () => undefined
 }));
 
-const { checkDomain, probeAllDomains, STOPPED_HEALTH } = await import("@/lib/watch/health-probe");
+const { checkDomain, probeAllDomains, STOPPED_HEALTH } = await import("@/lib/domain-health-probe");
 
 beforeEach(() => {
     mocks.updateMany.mockReset().mockResolvedValue({ count: 1 });

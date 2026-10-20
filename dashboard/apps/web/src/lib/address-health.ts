@@ -28,7 +28,7 @@ import { DEFAULT_LOCALE, type Permission } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { publicHostname, syncDashboardRoute } from "@/lib/domain-edge";
-import { checkDomain } from "@/lib/watch/health-probe";
+import { checkDomain } from "@/lib/domain-health-probe";
 import { removeDashboardDomain } from "@/lib/domain-service";
 import { notifyOperators } from "@/lib/notifications/operators";
 import { reachableAddresses, type DeploymentAddress } from "@/lib/deployment-addresses";

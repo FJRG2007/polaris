@@ -72,7 +72,7 @@ function edge404(): Response {
 }
 
 async function pass(): Promise<void> {
-    const { probeAllDomains } = await import("@/lib/watch/health-probe");
+    const { probeAllDomains } = await import("@/lib/domain-health-probe");
     await probeAllDomains();
 }
 

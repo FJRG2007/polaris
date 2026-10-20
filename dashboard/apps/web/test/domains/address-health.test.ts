@@ -104,7 +104,7 @@ vi.mock("@/lib/notifications/dispatch", () => ({
     notify: (input: unknown) => notify(input as never)
 }));
 vi.mock("@/lib/deployment-addresses", () => ({ reachableAddresses: async () => addresses }));
-vi.mock("@/lib/watch/health-probe", () => ({
+vi.mock("@/lib/domain-health-probe", () => ({
     checkDomain: (target: { hostname: string }) => checkDomain(target)
 }));
 vi.mock("@/lib/polaris-tunnel-service", () => ({

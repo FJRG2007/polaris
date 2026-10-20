@@ -9,6 +9,12 @@
  * A sustained outage also raises an alert to whoever is answerable for the service.
  * Recording it was never enough on its own: nobody watches a status column, and the
  * page it is on is the one you open only after you already know something is wrong.
+ *
+ * This is edge infrastructure, not part of Watch or of any Automation: it runs as
+ * the core `domain-health` job (`lib/cron/jobs.ts`, leased) on every install, and
+ * it is what republishes the app routes when an address turns out to be unrouted.
+ * It must keep working with Watch unconfigured, retired, or never opened, so it
+ * imports nothing from either of them.
  */
 
 import { isIP } from "node:net";
