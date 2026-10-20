@@ -19,7 +19,7 @@
  *
  * The items come from a weighted pool (`POOLS`): a balanced mix, blocks only,
  * or chaos. They are handed out inside the server by the events data pack
- * (`FUNCTIONS`, `LOOT_TABLES`): every `interval` seconds each player still in
+ * (`FUNCTIONS`, `lootTables`): every `interval` seconds each player still in
  * rolls the pool's loot table once - one command for everybody, no round trip
  * per player. Where the pack is not on, the loop gives the same draws itself,
  * every player's in one batch (`dropLines`). Every item is marked as the kit,
@@ -237,19 +237,35 @@ export function lootTable(pool: Pool, marker: Marker): Record<string, unknown> {
 export const POOLS = ["balanced", "blocks", "chaos"] as const satisfies readonly Pool[];
 
 /**
- * The loot tables in the events pack, by their name under `polaris:pillars/`.
- * Two eras, because what marks an item changed: `set_nbt` up to 1.20.4,
+ * The loot tables in the events pack, by their name under `polaris:pillars/`,
+ * the way one era writes an item's data: `set_nbt` up to 1.20.4,
  * `set_custom_data` and `set_potion` from 1.20.5 (`set_potion` is 1.18+, so
- * the older tables write the potion into the item's data instead). A release
- * loads only the tables whose functions it knows; the rest are logged and
- * skipped.
+ * the older tables write the potion into the item's data instead). Both eras
+ * use the same names, and the pack puts each where only its own releases read
+ * it (`snowball-pack.packFiles`): a table in the wrong era's syntax is an error
+ * in the server's log at every start, and a function naming a table that did
+ * not load is refused whole from 1.20.5.
  */
-export const LOOT_TABLES: Readonly<Record<string, Record<string, unknown>>> = Object.fromEntries(
-    POOLS.flatMap((pool) => [
-        [`${pool}_components`, lootTable(pool, "components")],
-        [`${pool}_tag`, lootTable(pool, "tag")]
+export function lootTables(marker: Marker): Record<string, Record<string, unknown>> {
+    return Object.fromEntries(POOLS.map((pool) => [pool, lootTable(pool, marker)]));
+}
+
+/** What earlier versions of the pack wrote, one table and one roll function
+ *  per era, by their path inside the pack: each release loaded only one era's
+ *  tables and logged the other era's function as broken at every start, so
+ *  they are taken out of a world that still has them. */
+export const RETIRED_FILES: readonly string[] = [
+    ...["functions", "function"].flatMap((folder) =>
+        ["drop_components", "drop_tag"].map(
+            (name) => `data/polaris/${folder}/pillars/${name}.mcfunction`
+        )
+    ),
+    ...POOLS.flatMap((pool) => [
+        `data/polaris/loot_tables/pillars/${pool}_components.json`,
+        `data/polaris/loot_tables/pillars/${pool}_tag.json`,
+        `data/polaris/loot_table/pillars/${pool}_components.json`
     ])
-);
+];
 
 // ------------------------------------------------------------------ the pack
 
@@ -266,14 +282,12 @@ export const VOID_TAG = "pe_pi_void";
 
 const TARGET = `@a[tag=${IN_TAG},tag=!${OUT_TAG}]`;
 
-/** One era's rolls: each player still in rolls the pool's table once -
- *  `execute as`, so each rolls their own. */
-function rollLines(era: Marker): string[] {
-    return POOLS.map(
-        (pool, index) =>
-            `execute if score #pool ${OBJECTIVE} matches ${index} as ${TARGET} run loot give @s loot polaris:pillars/${pool}_${era}`
-    );
-}
+/** The rolls: each player still in rolls the pool's table once - `execute
+ *  as`, so each rolls their own. */
+const ROLL_LINES: readonly string[] = POOLS.map(
+    (pool, index) =>
+        `execute if score #pool ${OBJECTIVE} matches ${index} as ${TARGET} run loot give @s loot polaris:pillars/${pool}`
+);
 
 /** What everybody still standing sees and hears as an item lands: the pop of a
  *  pickup and a few green sparks round them. Played by the pack at each drop,
@@ -286,13 +300,8 @@ export const DROP_FEEDBACK: readonly string[] = [
 /**
  * The pack's part: with the switch on, a countdown of game ticks, and at zero
  * one roll of the pool for each player still in. Bounded by the players in
- * it, `MOST` at the most.
- *
- * Each era's rolls are a function of their own. From 1.20.5 a function is
- * refused whole when one of its lines names a loot table that is not loaded,
- * and only one era's tables load on any release (`LOOT_TABLES`); a function
- * named by another is looked up only when it runs, so the other era's file
- * failing to load costs nothing.
+ * it, `MOST` at the most. The tables the rolls name are the server's own era
+ * (`lootTables`), so the same lines serve every release.
  */
 export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     tick: [`execute if score #on ${OBJECTIVE} matches 1 run function polaris:pillars/run`],
@@ -302,12 +311,9 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     ],
     drop: [
         `scoreboard players operation #left ${OBJECTIVE} = #every ${OBJECTIVE}`,
-        `execute if score #era ${OBJECTIVE} matches 1 run function polaris:pillars/drop_components`,
-        `execute if score #era ${OBJECTIVE} matches 0 run function polaris:pillars/drop_tag`,
+        ...ROLL_LINES,
         ...DROP_FEEDBACK
-    ],
-    drop_components: rollLines("components"),
-    drop_tag: rollLines("tag")
+    ]
 };
 
 /** Game ticks between two drops. */
@@ -315,9 +321,9 @@ export function intervalTicks(seconds: number): number {
     return Math.max(20, Math.round(seconds * 20));
 }
 
-/** Switched on at "Go!": the interval, the pool, the era, the first drop at
- *  once, then the switch. */
-export function armLines(seconds: number, pool: Pool, marker: Marker): string[] {
+/** Switched on at "Go!": the interval, the pool, the first drop at once, then
+ *  the switch. */
+export function armLines(seconds: number, pool: Pool): string[] {
     const set = (name: string, value: number) =>
         `scoreboard players set #${name} ${OBJECTIVE} ${value}`;
     return [
@@ -326,7 +332,6 @@ export function armLines(seconds: number, pool: Pool, marker: Marker): string[] 
         set("every", intervalTicks(seconds)),
         set("left", 1),
         set("pool", POOLS.indexOf(pool)),
-        set("era", marker === "components" ? 1 : 0),
         set("on", 1)
     ];
 }

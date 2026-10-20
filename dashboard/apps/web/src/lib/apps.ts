@@ -1448,11 +1448,18 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["tokens", "webhook urls", "credentials", "passwords"]
         }
     ],
+    /**
+     * Polar draws no rail from here either: its page carries its own list of
+     * chats, projects and recents, exactly as Chat and Mail do, and a rail with
+     * one entry beside it was two sidebars for one screen. The entry is hidden
+     * and stays so the global search still finds the page by name.
+     */
     polar: [
         {
             label: "Conversations", // i18n-ignore
             href: "/polar",
             icon: MessagesSquare,
+            hidden: true,
             keywords: ["assistant", "ai", "ask", "chat", "history", "polar"]
         }
     ],

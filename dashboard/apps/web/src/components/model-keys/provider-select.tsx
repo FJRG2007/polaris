@@ -15,7 +15,7 @@
  */
 
 import { Badge, Button, Input } from "@polaris/ui";
-import { Check, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { IntegrationLogo } from "@/components/logos";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
@@ -63,7 +63,9 @@ export function ProviderSelect({
                 option.name,
                 option.slug,
                 ...option.aliases,
-                ...(option.freeTier ? [t(FREE_KEYS[option.freeTier.kind]), option.freeTier.kind] : [])
+                ...(option.freeTier
+                    ? [t(FREE_KEYS[option.freeTier.kind]), option.freeTier.kind]
+                    : [])
             ].some((term) => term.toLowerCase().includes(needle))
         );
     }, [options, query, t]);
@@ -87,6 +89,10 @@ export function ProviderSelect({
                 >
                     {chosen?.name ?? t("providerSelect.pick")}
                 </span>
+                <ChevronDown
+                    aria-hidden
+                    className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+                />
             </button>
 
             {/* bg-card, not bg-popover: there is no popover colour in the preset,

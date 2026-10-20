@@ -108,7 +108,7 @@ export async function inTrips<R>(
     send: (trip: string[]) => Promise<R>
 ): Promise<R[]> {
     const out: R[] = [];
-    for (let from = 0; from < lines.length; ) {
+    for (let from = 0; from < lines.length;) {
         const trip = pacing.take(lines.slice(from), fillVolume);
         out.push(await pacing.timed(() => send(trip)));
         from += trip.length;
@@ -140,15 +140,16 @@ export function teardownPacer(): Pacer {
 }
 
 /**
- * How much one trip of `coalescing` asks: the commands go into the trip's own
- * shell script, kept to the size a batch of lines is (`service.BATCH_MAX`).
- * What comes back is cut at 16 KiB (`say-each`); answers past the cut are
- * asked again together in the next trip, so a trip's worth of big bags costs
- * another trip, not one each.
+ * How much one trip of `coalescing` asks: the commands go into the console
+ * tool's input, one a line, kept to what one batch of `service.sayEach` takes
+ * once encoded (`service.BATCH_MAX`, base64 of these bytes), so a trip is one
+ * connection. What comes back is cut at 16 KiB (`say-each`); answers past the
+ * cut are asked again together in the next trip, so a trip's worth of big bags
+ * costs another trip, not one each.
  */
-const SCRIPT_PER_TRIP = 12_000;
-/** What `sayEachScript` adds around each command. */
-const SCRIPT_PER_COMMAND = 60;
+const SCRIPT_PER_TRIP = 8_000;
+/** The newline that ends each command's line. */
+const SCRIPT_PER_COMMAND = 1;
 
 /** How many turns of the promise queue a trip waits to gather questions. */
 const GATHER_HOPS = 32;

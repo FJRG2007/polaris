@@ -108,9 +108,6 @@
         "ownOnly": "Las claves de este Polaris no se comparten contigo. Para usar Polar, añade una clave tuya de un proveedor como Anthropic, OpenAI o Google."
     },
     "empty": "Pregunta por esta página o por lo que puedes hacer en Polaris.",
-    "status": {
-        "thinking": "Pensando"
-    },
     "errors": {
         "failed": "Polar no pudo responder. Reintenta o elige otro modelo.",
         "modelGone": "El modelo de esta conversación ya no se ofrece; Polar respondió con el primero que tienes disponible.",
@@ -217,7 +214,6 @@
         "previousVersion": "Versión anterior",
         "nextVersion": "Ver siguiente",
         "versionOf": "{current} de {total}",
-        "thinking": "Pensando",
         "thoughtFor": "Pensó {seconds} s",
         "parameters": "Parámetros",
         "result": "Resultado",
@@ -461,5 +457,42 @@
         "file": "Abrir {name}",
         "unnamedFile": "Archivo",
         "close": "Cerrar"
+    },
+    "busyVerbs": {
+        "pondering": "Rumiando",
+        "brewing": "Cocinando",
+        "mulling": "Meditando",
+        "rummaging": "Rebuscando",
+        "sniffing": "Olfateando",
+        "pawing": "Escarbando",
+        "fishing": "Pescando ideas",
+        "thawing": "Deshelando",
+        "honey": "Juntando miel",
+        "whittling": "Tallando",
+        "simmering": "Hirviendo",
+        "kneading": "Amasando",
+        "stirring": "Removiendo la olla",
+        "untangling": "Desenredando",
+        "puzzling": "Cavilando",
+        "tinkering": "Trasteando",
+        "noodling": "Maquinando",
+        "concocting": "Tramando",
+        "sketching": "Esbozando",
+        "weaving": "Tejiendo",
+        "stargazing": "Contemplando",
+        "northStar": "Siguiendo la Polar",
+        "charting": "Trazando rumbo",
+        "navigating": "Navegando por estrellas",
+        "whisking": "Batiendo",
+        "marinating": "Macerando",
+        "distilling": "Destilando",
+        "polishing": "Puliendo",
+        "connecting": "Uniendo los puntos",
+        "igloo": "Montando un iglú",
+        "mixing": "Mezclando",
+        "juggling": "Haciendo malabares",
+        "hatching": "Urdiendo un plan",
+        "unfolding": "Desplegando",
+        "snowballing": "Amasando nieve"
     }
 }

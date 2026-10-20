@@ -6,7 +6,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { BorderBeam, beamCss } from "@/components/polar/motion/border-beam";
 
 function motion(reduced: boolean) {
@@ -58,6 +58,32 @@ describe("the beam", () => {
         );
         expect(wrapper.hasAttribute("data-active")).toBe(false);
         expect(wrapper.hasAttribute("data-fading")).toBe(true);
+    });
+
+    it("goes out after its fade even when the fade never reports its end", () => {
+        motion(false);
+        vi.useFakeTimers();
+        try {
+            const view = render(
+                <BorderBeam active>
+                    <form />
+                </BorderBeam>
+            );
+            view.rerender(
+                <BorderBeam active={false}>
+                    <form />
+                </BorderBeam>
+            );
+            const wrapper = view.container.firstElementChild!;
+            expect(wrapper.hasAttribute("data-fading")).toBe(true);
+            act(() => {
+                vi.advanceTimersByTime(1000);
+            });
+            expect(wrapper.hasAttribute("data-fading")).toBe(false);
+            expect(view.container.querySelector("style")).toBeNull();
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it("draws nothing under reduced motion", () => {

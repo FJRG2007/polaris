@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { Check, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { AgentLogo } from "@/components/logos";
 import { Badge, Button, Input } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -133,6 +133,10 @@ export function AgentSelect({
                         {chosen.account}
                     </span>
                 ) : null}
+                <ChevronDown
+                    aria-hidden
+                    className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+                />
                 {chosen && chosen.mine === false ? (
                     <Badge variant="neutral" className="shrink-0">
                         {t("agentSelect.thisPolaris")}

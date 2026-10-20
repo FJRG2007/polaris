@@ -108,9 +108,6 @@
         "ownOnly": "This Polaris's keys are not shared with you. To use Polar, add a key of your own from a provider such as Anthropic, OpenAI or Google."
     },
     "empty": "Ask about this page, or anything you can do in Polaris.",
-    "status": {
-        "thinking": "Thinking"
-    },
     "errors": {
         "failed": "Polar could not answer. Try again, or pick another model.",
         "modelGone": "The model this conversation used is no longer offered, so Polar answered with your first available one.",
@@ -217,7 +214,6 @@
         "previousVersion": "Previous version",
         "nextVersion": "Next version",
         "versionOf": "{current} of {total}",
-        "thinking": "Thinking",
         "thoughtFor": "Thought for {seconds} s",
         "parameters": "Parameters",
         "result": "Result",
@@ -461,5 +457,42 @@
         "file": "Open {name}",
         "unnamedFile": "File",
         "close": "Close"
+    },
+    "busyVerbs": {
+        "pondering": "Pondering",
+        "brewing": "Brewing",
+        "mulling": "Mulling",
+        "rummaging": "Rummaging",
+        "sniffing": "Sniffing around",
+        "pawing": "Pawing through",
+        "fishing": "Fishing for ideas",
+        "thawing": "Thawing",
+        "honey": "Gathering honey",
+        "whittling": "Whittling",
+        "simmering": "Simmering",
+        "kneading": "Kneading",
+        "stirring": "Stirring the pot",
+        "untangling": "Untangling",
+        "puzzling": "Puzzling",
+        "tinkering": "Tinkering",
+        "noodling": "Noodling",
+        "concocting": "Concocting",
+        "sketching": "Sketching",
+        "weaving": "Weaving",
+        "stargazing": "Stargazing",
+        "northStar": "Following the North Star",
+        "charting": "Charting a course",
+        "navigating": "Navigating by the stars",
+        "whisking": "Whisking",
+        "marinating": "Marinating",
+        "distilling": "Distilling",
+        "polishing": "Polishing",
+        "connecting": "Connecting the dots",
+        "igloo": "Building an igloo",
+        "mixing": "Mixing",
+        "juggling": "Juggling ideas",
+        "hatching": "Hatching a plan",
+        "unfolding": "Unfolding",
+        "snowballing": "Snowballing"
     }
 }

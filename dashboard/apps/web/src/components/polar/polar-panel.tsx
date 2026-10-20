@@ -81,6 +81,7 @@ import {
     type SuggestionListItem
 } from "@/components/rich-text/suggestion-list";
 import { Shimmer } from "@/components/polar/elements/shimmer";
+import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { Work } from "@/components/polar/elements/work";
 import { Reasoning } from "@/components/polar/elements/reasoning";
 import { useExitPresence } from "@/lib/use-exit-presence";
@@ -293,15 +294,23 @@ export function PolarProvider({
     return <PolarContext.Provider value={value}>{children}</PolarContext.Provider>;
 }
 
+/** Whether this address is Polar's own page, where the side panel has no place:
+ *  the page is the same chat, full size. Exact, so `/polaris-...` is not it. */
+export function onPolarPage(pathname: string): boolean {
+    return pathname === "/polar" || pathname.startsWith("/polar/");
+}
+
 /** The header button. */
 export function PolarToggle() {
     const t = useTranslations("polar");
     const { allowed, open, setOpen } = usePolar();
     const online = usePolarOnline();
     const shortcut = useShortcutText();
+    const pathname = usePathname();
     // Hidden rather than offered: the administrator keeps Polar to some people,
     // and a button that only ever answers "not for you" is noise in the header.
-    if (!allowed) return null;
+    // On Polar's own page it would open a second copy of the chat on screen.
+    if (!allowed || onPolarPage(pathname)) return null;
     return (
         <button
             type="button"
@@ -352,7 +361,7 @@ function PolarAsideOpen() {
         window.addEventListener("pointerup", up);
     };
     // Kept on screen while it slides away; the page itself has no side panel.
-    const presence = useExitPresence(open && !pathname.startsWith("/polar"));
+    const presence = useExitPresence(open && !onPolarPage(pathname));
     if (!presence.mounted) return null;
     return (
         <aside
@@ -1472,7 +1481,9 @@ export function PolarChat({
     return (
         <div className="relative flex h-full min-h-0 min-w-0 flex-1">
             {sidebarShown ? (
-                <aside className="hidden w-64 shrink-0 flex-col border-r border-border md:flex">
+                // The app rail's own width and surface: on this page it is the
+                // only sidebar, so it reads as the one every other app has.
+                <aside className="hidden w-56 shrink-0 flex-col border-r border-border bg-surface md:flex">
                     {threadList({
                         label: t("history.hide"),
                         icon: PanelLeftClose,
@@ -1692,7 +1703,9 @@ export function PolarChat({
                                 {chat.status === "submitted" ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ThinkingOrb state="breathing" size={20} decorative />
-                                        <Shimmer>{t("status.thinking")}</Shimmer>
+                                        <Shimmer>
+                                            <BusyVerb />
+                                        </Shimmer>
                                     </div>
                                 ) : null}
                                 {chat.error ? (
@@ -1742,9 +1755,7 @@ export function PolarChat({
                         <div
                             className={cn(
                                 "shrink-0",
-                                fullPage
-                                    ? "mx-auto w-full max-w-3xl px-4 pb-3"
-                                    : "border-t border-border p-3"
+                                fullPage ? "mx-auto w-full max-w-3xl px-4 pb-3" : "p-3"
                             )}
                         >
                             {queueView}

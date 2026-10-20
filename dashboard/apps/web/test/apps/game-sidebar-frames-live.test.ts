@@ -111,8 +111,12 @@ describe("a panel that moves", () => {
         };
         live.startLiveDisplay("owner", "moving");
         await vi.advanceTimersByTimeAsync(2_100);
-        // The first draw writes the whole panel.
-        expect(fake.said.some((line) => line.includes("polaris.line.01"))).toBe(true);
+        // The first draw writes the whole panel, in one command to the container.
+        expect(fake.said).toEqual([]);
+        expect(fake.batches).toHaveLength(1);
+        expect(fake.batches[0]!.some((line) => line.includes("polaris.line.01"))).toBe(true);
+        expect(fake.batches[0]!.some((line) => line.includes("polaris.line.03"))).toBe(true);
+        fake.batches = [];
 
         // Past the next turn, and long enough for the shine to have moved.
         await vi.advanceTimersByTimeAsync(5_000);
@@ -142,6 +146,7 @@ describe("a panel that moves", () => {
         };
         live.startLiveDisplay("owner", "leased");
         await vi.advanceTimersByTimeAsync(2_100);
+        fake.batches = [];
         await vi.advanceTimersByTimeAsync(5_000);
         expect(fake.batches.length).toBeGreaterThan(3);
         expect(fake.opened).toBe(1);
@@ -158,6 +163,10 @@ describe("a panel that moves", () => {
         fake.sidebar = { enabled: true, title: "Polaris", lines: ["Online", "Still"] };
         live.startLiveDisplay("owner", "still");
         await vi.advanceTimersByTimeAsync(2_100);
+        // Drawn whole on the first tick, as one command.
+        expect(fake.batches).toHaveLength(1);
+        expect(fake.said).toEqual([]);
+        fake.batches = [];
         await vi.advanceTimersByTimeAsync(3_000);
         expect(fake.batches).toEqual([]);
     });

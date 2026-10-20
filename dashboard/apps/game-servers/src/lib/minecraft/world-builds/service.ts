@@ -103,11 +103,16 @@ async function loaded<T>(
     }
 }
 
+/** Where everybody in the overworld stands. */
+const STANDING = "execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos";
+
 /** Where players live in the overworld - where they stand only when nobody
  *  has a bed - in the same order every pass: what a build goes near. */
 async function homesOf(server: ServerContainer): Promise<{ x: number; z: number }[]> {
-    const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld] = await Promise.all(
-        commands.HOMES.map((line) => server.say([line]).catch(() => ""))
+    const [spawnX, spawnZ, respawn, spawnWorld, respawnWorld, where] = await commands.answersOf(
+        server,
+        [...commands.HOMES, STANDING],
+        (line) => server.say([line]).catch(() => "")
     );
     const beds = commands.readHomes(
         spawnX ?? "",
@@ -117,12 +122,7 @@ async function homesOf(server: ServerContainer): Promise<{ x: number; z: number 
         respawnWorld ?? ""
     );
     if (beds.length > 0) return plan.stableHomes(beds, []);
-    const standing = commands.readWhere(
-        await server
-            .say(["execute in minecraft:overworld as @a[distance=0..] run data get entity @s Pos"])
-            .catch(() => "")
-    );
-    return plan.stableHomes([], standing);
+    return plan.stableHomes([], commands.readWhere(where ?? ""));
 }
 
 /** The searches the config holds, but only for `season`'s builds. */
@@ -151,31 +151,48 @@ async function writeSearch(
     });
 }
 
-/** The markers every one of `linesFor`'s lines answers - each line names what
- *  is the world's, and a marker on anything else is in all of them - tried
- *  with the newest list of names first; Infinity when the server would not say. */
+/** For each of `groups`, the markers every one of its lines answers - each
+ *  line names what is the world's, and a marker on anything else is in all of
+ *  them - tried with the newest list of names first, every group's lines read
+ *  together; Infinity for a group the server would not say. */
 async function unnatural(
     server: ServerContainer,
-    linesFor: (names: commands.GroundNames) => string[]
-): Promise<number> {
+    groups: readonly ((names: commands.GroundNames) => string[])[]
+): Promise<number[]> {
+    const counts = groups.map(() => Number.POSITIVE_INFINITY);
+    let open = groups.map((_, index) => index);
     for (const names of commands.GROUND_NAMES) {
-        const answers: Set<string>[] = [];
-        let refused = false;
-        for (const line of linesFor(names)) {
-            const output = await server.say([line]);
-            if (commands.nameRefused(output)) {
-                refused = true;
-                break;
+        if (open.length === 0) break;
+        const asked = open.map((index) => groups[index]!(names));
+        const outputs = await commands.answersOf(server, asked.flat());
+        const refusedNow: number[] = [];
+        let at = 0;
+        for (const [position, index] of open.entries()) {
+            const lines = asked[position]!;
+            const answers: Set<string>[] = [];
+            let refused = false;
+            for (const output of outputs.slice(at, at + lines.length)) {
+                if (commands.nameRefused(output)) {
+                    refused = true;
+                    break;
+                }
+                const found = new Set(commands.samplesIn(output).map((one) => `${one.x},${one.z}`));
+                answers.push(found);
+                if (found.size === 0) break;
             }
-            const found = new Set(commands.samplesIn(output).map((one) => `${one.x},${one.z}`));
-            answers.push(found);
-            if (found.size === 0) break;
+            at += lines.length;
+            if (refused) {
+                refusedNow.push(index);
+                continue;
+            }
+            const [first, ...rest] = answers;
+            counts[index] = [...(first ?? [])].filter((one) =>
+                rest.every((set) => set.has(one))
+            ).length;
         }
-        if (refused) continue;
-        const [first, ...rest] = answers;
-        return [...(first ?? [])].filter((one) => rest.every((set) => set.has(one))).length;
+        open = refusedNow;
     }
-    return Number.POSITIVE_INFINITY;
+    return counts;
 }
 
 type SiteAnswer =
@@ -184,10 +201,8 @@ type SiteAnswer =
 
 /** Whether a box holds nothing but air. */
 async function allAir(server: ServerContainer, box: Box): Promise<boolean> {
-    for (const piece of arena.slices(box)) {
-        if (arena.readCount(await server.say([arena.solidCount(piece)])) !== 0) return false;
-    }
-    return true;
+    const counts = await commands.answersOf(server, arena.slices(box).map(arena.solidCount));
+    return counts.every((output) => arena.readCount(output) === 0);
 }
 
 /** The tops of `columns`, a marker summoned on each and read a strip at a
@@ -200,9 +215,12 @@ async function readTops(
     const strips = plan.stripsOf(columns);
     const inside = new Set(columns.map((one) => `${one.x},${one.z}`));
     const read = new Map<string, plan.Point>();
-    for (const strip of strips) {
-        const line = commands.readSamples(plan.stripTag(SAMPLE_TAG, strip));
-        for (const one of commands.samplesIn(await server.say([line]))) {
+    const outputs = await commands.answersOf(
+        server,
+        strips.map((strip) => commands.readSamples(plan.stripTag(SAMPLE_TAG, strip)))
+    );
+    for (const output of outputs) {
+        for (const one of commands.samplesIn(output)) {
             const key = `${one.x},${one.z}`;
             if (inside.has(key)) read.set(key, one);
         }
@@ -212,16 +230,21 @@ async function readTops(
 
 /** Whether a marker of any strip stands on a build, a tree, water or lava. */
 async function anyCovered(server: ServerContainer, strips: readonly Box[]): Promise<boolean> {
-    for (const strip of strips) {
-        const tag = plan.stripTag(SAMPLE_TAG, strip);
-        let covered = await unnatural(server, (names) => commands.builtUnderSamples(names, tag));
-        for (const block of [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"])
-            covered += commands.samplesIn(
-                await server.say([commands.samplesOn(block, tag)])
-            ).length;
-        if (covered > 0) return true;
-    }
-    return false;
+    const tags = strips.map((strip) => plan.stripTag(SAMPLE_TAG, strip));
+    const built = await unnatural(
+        server,
+        tags.map((tag) => (names: commands.GroundNames) => commands.builtUnderSamples(names, tag))
+    );
+    if (built.some((count) => count > 0)) return true;
+    const on = await commands.answersOf(
+        server,
+        tags.flatMap((tag) =>
+            [...commands.TREE_BLOCKS, "minecraft:water", "minecraft:lava"].map((block) =>
+                commands.samplesOn(block, tag)
+            )
+        )
+    );
+    return on.some((output) => commands.samplesIn(output).length > 0);
 }
 
 /**
@@ -255,6 +278,7 @@ async function surveySite(
         // Over the ground, only air or what grows there, in every cell the
         // foundation may fill: nobody's rail or torch goes under it.
         const highest = verdict.y + plan.LIFT_MAX - 1;
+        const strays: ((names: commands.GroundNames) => string[])[] = [];
         for (const strip of strips) {
             const low = Math.min(
                 ...tops
@@ -269,12 +293,11 @@ async function surveySite(
             );
             for (let dy = 0; low + dy <= highest; dy += 1) {
                 const tag = plan.stripTag(SAMPLE_TAG, strip, highest - dy);
-                const stray = await unnatural(server, (names) =>
-                    commands.strayAtSamples(names, dy, tag)
-                );
-                if (stray > 0) return { why: "occupied" };
+                strays.push((names) => commands.strayAtSamples(names, dy, tag));
             }
         }
+        if ((await unnatural(server, strays)).some((count) => count > 0))
+            return { why: "occupied" };
         // Its whole box nothing but air - on the ground once the grass in its
         // way is cleared, lifted over a flower - or it is not built on.
         const at = (lift: number) => {
@@ -311,9 +334,10 @@ async function findSite(
     server: ServerContainer,
     wanted: PolarisBuild,
     config: Readonly<Record<string, unknown>>,
-    season: readonly PolarisBuild[]
+    season: readonly PolarisBuild[],
+    homes: () => Promise<{ x: number; z: number }[]>
 ): Promise<{ origin: plan.Point; foundation: plan.FoundationRun[] } | null> {
-    const centers = plan.candidateCenters(await homesOf(server), wanted, Number.POSITIVE_INFINITY);
+    const centers = plan.candidateCenters(await homes(), wanted, Number.POSITIVE_INFINITY);
     if (centers.length === 0) return null;
     const list = plan.listDigest(centers);
     const stored = plan.readSiteSearches(config)[wanted.id];
@@ -426,6 +450,9 @@ export async function reconcileWorldBuilds(
                 [plan.SITE_SEARCH_KEY]: searchesOf(current, season)
             }));
         if (!decoration) return;
+        // Read once a pass, however many of the season's builds look for a site.
+        let homes: Promise<{ x: number; z: number }[]> | null = null;
+        const homesOnce = () => (homes ??= homesOf(server));
         for (const wanted of season) {
             const existing = placed.find(
                 (one) => one.id === wanted.id && one.season === decoration
@@ -433,7 +460,7 @@ export async function reconcileWorldBuilds(
             if (existing?.up) continue;
             let target = existing;
             if (!target) {
-                const site = await findSite(server, wanted, config, season);
+                const site = await findSite(server, wanted, config, season, homesOnce);
                 if (!site) continue;
                 const { origin } = site;
                 const fresh = plan.placedFor(

@@ -92,8 +92,7 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     if (run.marker) {
         for (const one of run.entrants) out.push(`gamemode survival ${one.name}`);
         // The drops handed out inside the server, where the pack is on.
-        if (await hitsService.ensure(ctx))
-            out.push(...pi.armLines(options.interval, options.pool, run.marker));
+        if (await hitsService.ensure(ctx)) out.push(...pi.armLines(options.interval, options.pool));
     }
     return out;
 }

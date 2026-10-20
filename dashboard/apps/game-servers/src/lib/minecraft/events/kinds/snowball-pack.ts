@@ -224,12 +224,20 @@ const ADVANCEMENTS: readonly (readonly [string, Readonly<Record<string, unknown>
     ["hit", hits.ADVANCEMENTS]
 ];
 
+/** Where the pillars' tables in item components go for 1.20.5 and 1.20.6, the
+ *  only releases that write items with them and still read `loot_tables`. */
+export const COMPONENTS_OVERLAY = "polaris_components";
+/** The data pack formats of those releases: 1.20.5 is 41, and 45 (a 1.21
+ *  snapshot) is where the folders were renamed. */
+const COMPONENTS_PLURAL_FORMATS = [41, 44] as const;
+
 /** The pack's files, by their path inside its folder. Both spellings of the
  *  function and advancement folders, because 1.21 renamed them (`functions` to
  *  `function`, `advancements` to `advancement`) and each release reads only
  *  its own; the format range covers 1.13 onwards. */
 export function packFiles(): ReadonlyMap<string, string> {
     const files = new Map<string, string>();
+    const [fromFormat, toFormat] = COMPONENTS_PLURAL_FORMATS;
     files.set(
         "pack.mcmeta",
         `${JSON.stringify({
@@ -239,6 +247,21 @@ export function packFiles(): ReadonlyMap<string, string> {
                 supported_formats: [4, 1000],
                 min_format: 4,
                 max_format: 1000
+            },
+            // An overlay is read from 1.20.2 and laid over the pack's own
+            // files, a file of the same path in it taking their place. Both
+            // spellings of its range: `formats` up to 1.21.8, which 1.21.9
+            // still asks for of a range below its own format 82, and
+            // `min_format`/`max_format` from 1.21.9.
+            overlays: {
+                entries: [
+                    {
+                        formats: [fromFormat, toFormat],
+                        min_format: fromFormat,
+                        max_format: toFormat,
+                        directory: COMPONENTS_OVERLAY
+                    }
+                ]
             }
         })}\n`
     );
@@ -254,16 +277,20 @@ export function packFiles(): ReadonlyMap<string, string> {
                     `data/polaris/${folder}/${game}/${name}.json`,
                     `${JSON.stringify(advancement)}\n`
                 );
-    // Pillars' drops (`pillars.ts`). 1.21 renamed `loot_tables` to
-    // `loot_table`, and every release that reads the new folder writes items
-    // with components, so only those tables go in it.
-    for (const folder of ["loot_tables", "loot_table"])
-        for (const [name, table] of Object.entries(pillars.LOOT_TABLES))
-            if (folder === "loot_tables" || name.endsWith("_components"))
-                files.set(
-                    `data/polaris/${folder}/pillars/${name}.json`,
-                    `${JSON.stringify(table)}\n`
-                );
+    // Pillars' drops (`pillars.ts`), one table per pool under the same name in
+    // every era, each era's only where its releases read it: a table in the
+    // other era's syntax is an error in the log at every start, and from
+    // 1.20.5 it takes the function that names it down too. Up to 1.20.4 the
+    // plural folder in NBT; 1.20.5 and 1.20.6 read the plural folder but write
+    // components, so the overlay puts those over it; from 1.21 the singular
+    // folder, read only by releases that write components.
+    const tables = (path: string, marker: "components" | "tag") => {
+        for (const [name, table] of Object.entries(pillars.lootTables(marker)))
+            files.set(`${path}/pillars/${name}.json`, `${JSON.stringify(table)}\n`);
+    };
+    tables("data/polaris/loot_tables", "tag");
+    tables(`${COMPONENTS_OVERLAY}/data/polaris/loot_tables`, "components");
+    tables("data/polaris/loot_table", "components");
     for (const folder of ["functions", "function"]) {
         files.set(`data/minecraft/tags/${folder}/tick.json`, tick);
         for (const [game, functions] of GAMES)
@@ -275,6 +302,11 @@ export function packFiles(): ReadonlyMap<string, string> {
     }
     return files;
 }
+
+/** Files earlier versions of the pack wrote and this one does not, by their
+ *  path inside its folder: taken out of a world that still has them, or each
+ *  release would go on loading them. */
+export const RETIRED_FILES: readonly string[] = pillars.RETIRED_FILES;
 
 /** Whether `datapack list enabled` names the pack. */
 export function packEnabled(said: string): boolean {

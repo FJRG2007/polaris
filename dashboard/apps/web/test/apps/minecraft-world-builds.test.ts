@@ -27,9 +27,8 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { reconcileWorldBuilds } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/world-builds/service"
-);
+const { reconcileWorldBuilds } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/service");
 
 /** A 3 x 2 x 2 build: a stone floor with one lantern on it. */
 function tinyBuild(season: "winter" | "halloween" = "winter"): format.PolarisBuild {
@@ -412,12 +411,10 @@ describe("taking it down", () => {
 
 describe("the catalog", () => {
     it("ships a build for every season, each small enough to site near a home", async () => {
-        const { WORLD_BUILDS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
-        );
-        const { DECORATIONS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/seasonal"
-        );
+        const { WORLD_BUILDS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog");
+        const { DECORATIONS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/seasonal");
         for (const season of DECORATIONS)
             expect(WORLD_BUILDS.some((one) => one.season === season)).toBe(true);
         for (const build of WORLD_BUILDS) {
@@ -435,9 +432,8 @@ describe("the catalog", () => {
     });
 
     it("pastes only blocks that stay put: no fluids, containers, entities or decaying leaves", async () => {
-        const { WORLD_BUILDS } = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog"
-        );
+        const { WORLD_BUILDS } =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/catalog");
         // Every block here sits still once pasted: nothing flows, falls, decays,
         // holds loot or spawns anything (no water, lava, sand, chests, spawners,
         // skulls or iron blocks for a golem). A cauldron fills with rain, which
@@ -1115,9 +1111,8 @@ describe("the search for a site", () => {
         const first = bedServer({ x: 0, z: 0 });
         await reconcileWorldBuilds(first.server, config, "winter", [tinyBuild()]);
         vi.resetModules();
-        const fresh = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/world-builds/service"
-        );
+        const fresh =
+            await import("@polaris-app/game-servers/src/lib/minecraft/world-builds/service");
         logged = [];
         const again = bedServer({ x: 0, z: 0 });
         again.server.installedAppId = first.server.installedAppId;
@@ -1215,5 +1210,90 @@ describe("the search for a site", () => {
         expect(searchOf()).toBeDefined();
         await reconcileWorldBuilds(server, config, null, [tinyBuild()]);
         expect(config[plan.SITE_SEARCH_KEY]).toEqual({});
+    });
+});
+
+describe("connections to the game in a pass", () => {
+    beforeEach(() => {
+        config = {};
+    });
+
+    /** The same fake, taking several reads in one connection the way `sayEach`
+     *  does, and counting connections: one per `say`, `sayAll` and `sayEach`. */
+    function counted(made: ReturnType<typeof fakeServer>) {
+        const plain = made.server as unknown as {
+            say: (argv: readonly string[]) => Promise<string>;
+            sayAll: (lines: readonly string[]) => Promise<void>;
+        };
+        const counts = { say: 0, sayAll: 0, sayEach: 0 };
+        const server = {
+            ...made.server,
+            say: async (argv: readonly string[]) => {
+                counts.say += 1;
+                return plain.say(argv);
+            },
+            sayAll: async (lines: readonly string[]) => {
+                counts.sayAll += 1;
+                return plain.sayAll(lines);
+            },
+            sayEach: async (commands: readonly (readonly string[])[]) => {
+                counts.sayEach += 1;
+                const answers: string[] = [];
+                for (const argv of commands) answers.push(await plain.say(argv));
+                return answers;
+            }
+        } as unknown as ServerContainer;
+        return { server, counts, said: made.said };
+    }
+
+    const total = (counts: { say: number; sayAll: number; sayEach: number }) =>
+        counts.say + counts.sayAll + counts.sayEach;
+
+    it("surveys a site in a handful of connections, with the verdict reading one at a time gave", async () => {
+        const world = { stray: (_x: number, _z: number, dy: number) => dy === 1 };
+        const before = fakeServer(() => 64, world);
+        await reconcileWorldBuilds(before.server, config, "winter", [tinyBuild()]);
+        const alone = before.said.length;
+        const verdict = {
+            searches: plan.readSiteSearches(config),
+            placed: plan.readPlaced(config)
+        };
+
+        config = {};
+        const after = counted(fakeServer(() => 64, world));
+        await reconcileWorldBuilds(after.server, config, "winter", [tinyBuild()]);
+        expect({
+            searches: plan.readSiteSearches(config),
+            placed: plan.readPlaced(config)
+        }).toEqual(verdict);
+        // One connection a read before; a few per site now.
+        expect(alone).toBeGreaterThan(30);
+        expect(total(after.counts)).toBeLessThan(alone / 2);
+    });
+
+    it("reads where the players live once a pass, however many builds look for a site", async () => {
+        const two = [tinyBuild(), { ...tinyBuild(), id: "test-build-2" }];
+        const { server, said } = counted(fakeServer(() => 64, { tree: () => true }));
+        await reconcileWorldBuilds(server, config, "winter", two);
+        expect(said.filter((line) => line.endsWith("@s SpawnX"))).toHaveLength(1);
+    });
+
+    it("puts the same build in the same place as reading one at a time did", async () => {
+        const alone = fakeServer();
+        await reconcileWorldBuilds(alone.server, config, "winter", [tinyBuild()]);
+        // The batch key is the install's own: everything else is the same.
+        const where = () =>
+            plan.readPlaced(config).map(({ arena: { box }, id, pasted, up }) => ({
+                box,
+                id,
+                pasted,
+                up
+            }));
+        const placed = where();
+        config = {};
+        const { server } = counted(fakeServer());
+        await reconcileWorldBuilds(server, config, "winter", [tinyBuild()]);
+        expect(where()).toEqual(placed);
+        expect(placed).toHaveLength(1);
     });
 });

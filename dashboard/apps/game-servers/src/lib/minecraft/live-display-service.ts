@@ -177,8 +177,10 @@ async function settingsOf(installedAppId: string): Promise<{
     };
 }
 
-/** Send lines to the game, stopping at the first it refuses. False when the
- *  server is not running and nothing was sent. */
+/** Send lines to the game over one connection - a whole panel drawn after a
+ *  restart is dozens of them - each sent alone, up to the first it
+ *  refuses, when the batch did not go. False when the server is not running
+ *  and nothing was sent. */
 async function say(
     ownerId: string,
     installedAppId: string,
@@ -187,7 +189,7 @@ async function say(
     if (lines.length === 0) return true;
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return false;
-        for (const line of lines) await server.say([line]);
+        await server.sayAll(lines);
         return true;
     });
 }
