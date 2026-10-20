@@ -118,24 +118,33 @@ export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): Pola
     return { use, spend: use && audienceAdmits(policy.spend, facts) };
 }
 
-async function factsFor(userId: string): Promise<AccessFacts> {
-    const row = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-            isAdmin: true,
-            roles: { select: { role: { select: { name: true } } } },
-            groups: { select: { groupId: true } }
-        }
-    });
-    if (!row) return { userId, isAdmin: false, guest: true, groupIds: [] };
+const FACTS_SELECT = {
+    id: true,
+    isAdmin: true,
+    roles: { select: { role: { select: { name: true } } } },
+    groups: { select: { groupId: true } }
+} as const;
+
+function factsOf(row: {
+    id: string;
+    isAdmin: boolean;
+    roles: { role: { name: string } }[];
+    groups: { groupId: string }[];
+}): AccessFacts {
     const roles = row.roles.map((entry) => entry.role.name);
     return {
-        userId,
+        userId: row.id,
         isAdmin: row.isAdmin,
         // No role but guest - or none at all - reaches no app, so it is a guest here.
         guest: !row.isAdmin && roles.every((name) => name === "guest"),
         groupIds: row.groups.map((entry) => entry.groupId)
     };
+}
+
+async function factsFor(userId: string): Promise<AccessFacts> {
+    const row = await prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT });
+    if (!row) return { userId, isAdmin: false, guest: true, groupIds: [] };
+    return factsOf(row);
 }
 
 /** This account's Polar access. A store that cannot be read answers no. */
@@ -146,6 +155,26 @@ export async function polarAccessFor(userId: string): Promise<PolarAccess> {
     } catch (error) {
         console.error("polar: could not read the access policy", error);
         return { use: false, spend: false };
+    }
+}
+
+/**
+ * The accounts among `userIds` that may use Polar, read with one policy and one
+ * query. A store that cannot be read answers nobody.
+ */
+export async function polarUsersAmong(userIds: readonly string[]): Promise<Set<string>> {
+    if (userIds.length === 0) return new Set();
+    try {
+        const [policy, rows] = await Promise.all([
+            readPolarPolicy(),
+            prisma.user.findMany({ where: { id: { in: [...userIds] } }, select: FACTS_SELECT })
+        ]);
+        return new Set(
+            rows.filter((row) => decidePolarAccess(policy, factsOf(row)).use).map((row) => row.id)
+        );
+    } catch (error) {
+        console.error("polar: could not read the access policy", error);
+        return new Set();
     }
 }
 

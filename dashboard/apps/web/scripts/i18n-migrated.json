@@ -2095,6 +2095,11 @@
         "web/src/app/api/polar/speak/route.ts",
         "web/src/app/api/polar/transcribe/route.ts",
         "web/src/app/c/[token]/page.tsx",
-        "web/src/app/c/[token]/shared-chat.tsx"
+        "web/src/app/c/[token]/shared-chat.tsx",
+        "web/src/components/polar/polar-sharing.tsx",
+        "web/src/components/polar/shared-transcript.tsx",
+        "web/src/app/(app)/polar/shared/[id]/page.tsx",
+        "web/src/app/(app)/polar/shared/[id]/received-chat.tsx",
+        "web/src/lib/polar/share.ts"
     ]
 }

@@ -20,7 +20,11 @@ async function headersFor(path: string): Promise<Record<string, string>> {
             )
         )
             continue;
-        for (const header of rule.headers) out[header.key] = header.value;
+        // Only the framing headers: the others (search engines, Referer) have
+        // their own test.
+        for (const header of rule.headers)
+            if (header.key === "Content-Security-Policy" || header.key === "X-Frame-Options")
+                out[header.key] = header.value;
     }
     return out;
 }

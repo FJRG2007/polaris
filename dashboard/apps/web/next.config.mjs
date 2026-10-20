@@ -40,6 +40,28 @@ const PLAYER_ORIGINS = [
     "https://player.kick.com"
 ];
 
+/**
+ * The top-level paths whose address is itself the credential: a shared chat,
+ * a Drive link, a drop point, a form, a published note, a vote... Their pages
+ * send no Referer at all, so following a link out of one never hands the token
+ * to the site at the other end. `test/seo/never-indexed.test.ts` holds every
+ * public route folder to this list.
+ */
+export const TOKEN_PATH_PREFIXES = [
+    "c",
+    "cal",
+    "forms",
+    "m",
+    "n",
+    "od",
+    "p",
+    "r",
+    "s",
+    "t",
+    "tr",
+    "vs"
+];
+
 /** The CLI protocol versions this server speaks, oldest-newest. Written out
  *  rather than imported for the same reason as the list above; a test holds
  *  it to the CLI's own `CLI_PROTOCOL`. */
@@ -209,6 +231,27 @@ const nextConfig = {
      * page cannot load an arbitrary site inside Polaris.
      */
     headers: async () => [
+        // Nothing Polaris serves belongs in a search engine: not a page, not a
+        // shared link, not a file, not an API answer. A header rather than only a
+        // robots.txt rule, because a URL robots.txt keeps a crawler away from can
+        // still be indexed from links pointing at it, and a crawler that may not
+        // fetch a page never reads its noindex
+        // (developers.google.com/search/docs/crawling-indexing/block-indexing).
+        // `X-Robots-Tag` reaches what a meta tag cannot: downloads, images, JSON.
+        // The Referrer-Policy keeps a page's path (and any token in it) from
+        // reaching another site; same-origin requests still get the full URL.
+        // "/" on its own as well: `/:path*` does not match the bare root.
+        ...["/", "/:path*"].map((source) => ({
+            source,
+            headers: [
+                { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+                { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }
+            ]
+        })),
+        ...TOKEN_PATH_PREFIXES.map((prefix) => ({
+            source: `/${prefix}/:path*`,
+            headers: [{ key: "Referrer-Policy", value: "no-referrer" }]
+        })),
         {
             source: FRAMEABLE_EXCEPT_EMBEDS,
             headers: [

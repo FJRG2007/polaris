@@ -126,6 +126,26 @@ export async function readPolarAttachment(
     return row ? openStored(row) : null;
 }
 
+/**
+ * A file of one thread, streamed, for a share that has already decided the
+ * reader may see it (`readSharedPolarFile`). Null when it is not that thread's.
+ */
+export async function readThreadAttachment(
+    threadId: string,
+    id: string
+): Promise<{
+    name: string;
+    mediaType: string;
+    size: number;
+    body: ReadableStream<Uint8Array>;
+} | null> {
+    const row = await prisma.polarAttachment.findFirst({
+        where: { id, threadId },
+        select: STORED_ROW
+    });
+    return row ? openStored(row) : null;
+}
+
 async function openStored(
     row: StoredRow
 ): Promise<{ name: string; mediaType: string; size: number; body: ReadableStream<Uint8Array> }> {

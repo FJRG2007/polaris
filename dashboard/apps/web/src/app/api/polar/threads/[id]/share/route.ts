@@ -2,7 +2,8 @@
  * The read-only public link of one of the signed-in person's Polar chats.
  * GET reads it (`link: null` when it is not shared), POST makes it - or moves
  * an existing link's snapshot to now, keeping its address - and DELETE stops
- * serving it. Another person's id answers as a thread that does not exist.
+ * serving it - `?everyone=1` also takes it back from every person it was sent
+ * to. Another person's id answers as a thread that does not exist.
  */
 
 import { z } from "zod";
@@ -39,13 +40,14 @@ export async function POST(_request: Request, { params }: Params): Promise<Respo
     return link ? NextResponse.json({ link }) : NOT_FOUND();
 }
 
-export async function DELETE(_request: Request, { params }: Params): Promise<Response> {
+export async function DELETE(request: Request, { params }: Params): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     if (user.viewingAs) return NextResponse.json({ error: "view_as" }, { status: 403 });
     const id = idSchema.safeParse((await params).id);
     if (!id.success) return NOT_FOUND();
-    return (await revokePolarShare(user.id, id.data))
+    const everyone = new URL(request.url).searchParams.get("everyone") === "1";
+    return (await revokePolarShare(user.id, id.data, everyone))
         ? NextResponse.json({ ok: true })
         : NOT_FOUND();
 }

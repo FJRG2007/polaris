@@ -27,6 +27,7 @@ import {
     FolderMinus,
     FolderOpen,
     FolderPlus,
+    Link2,
     MoreHorizontal,
     Pencil,
     Pin,
@@ -40,7 +41,6 @@ import {
     Button,
     cn,
     ConfirmDeleteDialog,
-    CopyIcon,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -58,13 +58,16 @@ import {
     Input,
     keepFocusOnClose,
     Textarea,
-    useCopied,
-    useDeferredFocus,
-    useToast
+    useDeferredFocus
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { projectList, type PolarSidebar } from "@/components/polar/use-polar-sidebar";
 import * as polarShared from "@/lib/polar/shared";
+import {
+    PolarShareDialog,
+    SharedLinksDialog,
+    SharedWithYou
+} from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 
 export type ThreadRow = PolarThreadRow;
@@ -119,6 +122,7 @@ export function PolarThreads({
     const [deleting, setDeleting] = useState<PolarThreadRow | null>(null);
     const [sharing, setSharing] = useState<PolarThreadRow | null>(null);
     const [searching, setSearching] = useState(false);
+    const [managingShares, setManagingShares] = useState(false);
     /** The project dialog: a new one (optionally for a chat to move into it),
      *  or an existing one to edit. */
     const [projectForm, setProjectForm] = useState<{
@@ -163,6 +167,9 @@ export function PolarThreads({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
                     {t("actions.new")}
+                </NavRow>
+                <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
+                    {t("sharing.links")}
                 </NavRow>
                 {rows === null ? (
                     <div className="space-y-2 p-2">
@@ -214,6 +221,7 @@ export function PolarThreads({
                                 </ProjectItem>
                             ))}
                         </Section>
+                        <SharedWithYou rowClass={SHARED_ROW} />
                         <div className="pt-3">
                             <button
                                 type="button"
@@ -275,7 +283,16 @@ export function PolarThreads({
                     }}
                 />
             ) : null}
-            {sharing ? <ShareDialog row={sharing} onClose={() => setSharing(null)} /> : null}
+            {sharing ? <PolarShareDialog row={sharing} onClose={() => setSharing(null)} /> : null}
+            {managingShares ? (
+                <SharedLinksDialog
+                    onClose={() => setManagingShares(false)}
+                    onOpen={(id) => {
+                        setManagingShares(false);
+                        onOpen(id);
+                    }}
+                />
+            ) : null}
             {projectForm ? (
                 <ProjectDialog
                     project={projectForm.project}
@@ -349,6 +366,10 @@ function IconButton({
         </Button>
     );
 }
+
+/** A "shared with you" row: drawn like a chat's own row. */
+const SHARED_ROW =
+    "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-card-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function NavRow({
     icon: Icon,
@@ -842,129 +863,6 @@ function SearchDialog({
                         {archived ? <Search className="size-4" /> : <Archive className="size-4" />}
                         {t(archived ? "history.search" : "history.archived")}
                     </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/** The chat's read-only public link: made, copied, updated to now, deleted. */
-function ShareDialog({ row, onClose }: { row: PolarThreadRow; onClose: () => void }) {
-    const t = useTranslations("polar");
-    const toast = useToast();
-    const { copied, copy } = useCopied();
-    const [link, setLink] = useState<{ url: string; sharedAt: string } | null | undefined>(
-        undefined
-    );
-    const [working, setWorking] = useState(false);
-
-    useEffect(() => {
-        let live = true;
-        fetch(`/api/polar/threads/${row.id}/share`)
-            .then((response) => (response.ok ? response.json() : Promise.reject()))
-            .then((data: { link: { url: string; sharedAt: string } | null }) => {
-                if (live) setLink(data.link);
-            })
-            .catch(() => {
-                if (live) setLink(null);
-            });
-        return () => {
-            live = false;
-        };
-    }, [row.id]);
-
-    const change = async (method: "POST" | "DELETE") => {
-        setWorking(true);
-        const response = await fetch(`/api/polar/threads/${row.id}/share`, { method }).catch(
-            () => null
-        );
-        setWorking(false);
-        if (!response?.ok) {
-            toast.show({ title: t("history.shareFailed") });
-            return;
-        }
-        if (method === "DELETE") {
-            setLink(null);
-            return;
-        }
-        const data = (await response.json()) as { link: { url: string; sharedAt: string } };
-        setLink(data.link);
-        if (await copy(data.link.url)) toast.show({ title: t("history.shareCopied") });
-    };
-
-    return (
-        <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>{t("history.shareTitle")}</DialogTitle>
-                    <DialogDescription>{t("history.shareIntro")}</DialogDescription>
-                </DialogHeader>
-                {link === undefined ? (
-                    <div className="h-9 rounded bg-muted motion-safe:animate-pulse" />
-                ) : link ? (
-                    <div className="space-y-1">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <Input
-                                readOnly
-                                value={link.url}
-                                aria-label={t("history.shareLink")}
-                                onFocus={(event) => event.currentTarget.select()}
-                                className="min-w-0 flex-1"
-                            />
-                            <IconButton
-                                label={t("history.shareCopy")}
-                                onClick={() =>
-                                    void copy(link.url).then((done) =>
-                                        done
-                                            ? toast.show({ title: t("history.shareCopied") })
-                                            : null
-                                    )
-                                }
-                            >
-                                <CopyIcon copied={copied} className="size-4" />
-                            </IconButton>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {t("history.shareUpdated", {
-                                date: new Date(link.sharedAt).toLocaleString(undefined, {
-                                    dateStyle: "medium",
-                                    timeStyle: "short"
-                                })
-                            })}
-                        </p>
-                    </div>
-                ) : null}
-                <DialogFooter>
-                    {link ? (
-                        <>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                disabled={working}
-                                onClick={() => void change("DELETE")}
-                                className="text-danger"
-                            >
-                                <Trash2 className="size-4" />
-                                {t("history.shareRevoke")}
-                            </Button>
-                            <Button
-                                type="button"
-                                disabled={working}
-                                onClick={() => void change("POST")}
-                            >
-                                {t("history.shareUpdate")}
-                            </Button>
-                        </>
-                    ) : (
-                        <Button
-                            type="button"
-                            disabled={working || link === undefined}
-                            onClick={() => void change("POST")}
-                        >
-                            <Share2 className="size-4" />
-                            {t("history.shareCreate")}
-                        </Button>
-                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
