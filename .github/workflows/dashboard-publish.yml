@@ -66,17 +66,20 @@ permissions:
   # Read by `changes`, to find the last run that published.
   actions: read
 
-# One publish at a time, and only the newest: a push to main cancels the run still
-# building an older commit, since every commit carries the ones before it and the
-# older image would only be replaced minutes later. Runs still never overlap, so an
-# older `tag` can never land after a newer one and move `latest` back. A run stopped
-# between the push and the tag leaves an untagged digest behind, which ghcr-prune.yml
-# removes; the next successful run measures its changes from the last one that
-# succeeded, so nothing the cancelled run carried is skipped.
+# One publish at a time, and the one already building is left to finish: a push to
+# main queues behind it, and a newer push replaces whatever is still waiting, so the
+# queue never holds more than the newest commit. Cancelling the running build instead
+# meant that with merges closer together than one build (~20 min) no image was ever
+# published - 20 of 30 runs on 2026-10-19/20 were cancelled and the deployment stayed
+# on an image hours old. Runs still never overlap, so an older `tag` can never land
+# after a newer one and move `latest` back. A run stopped between the push and the
+# tag leaves an untagged digest behind, which ghcr-prune.yml removes; the next
+# successful run measures its changes from the last one that succeeded, so nothing a
+# replaced run would have carried is skipped.
 concurrency:
   # A dry run has a queue of its own: it must never cancel a real publish.
   group: dashboard-publish${{ inputs.dry_run && '-dry-run' || '' }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # 'false' only for a manual run asked to be dry: every job and every step that
 # only reads still runs, exactly as a publish would, and nothing reaches the
