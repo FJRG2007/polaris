@@ -20,7 +20,7 @@ const sql = readFileSync(
 
 describe("the grant actions migration", () => {
     it("only adds: a column with a default, and no row or column removed", () => {
-        expect(sql).toMatch(/ADD COLUMN "actions" TEXT\[\] NOT NULL DEFAULT ARRAY\[\]::TEXT\[\]/);
+        expect(sql).toMatch(/ADD COLUMN (?:IF NOT EXISTS )?"actions" TEXT\[\] NOT NULL DEFAULT ARRAY\[\]::TEXT\[\]/);
         expect(sql).not.toMatch(/\bDROP\b|\bDELETE\b|\bTRUNCATE\b/i);
     });
 
