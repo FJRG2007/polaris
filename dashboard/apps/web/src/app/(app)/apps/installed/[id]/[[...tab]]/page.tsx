@@ -14,6 +14,7 @@
  * server that was never theirs.
  */
 
+import { PolarRecord } from "@/components/polar/polar-panel";
 import { findApp } from "@/lib/apps/catalog";
 import { notFound, redirect } from "next/navigation";
 import { requireUser, userHasManage } from "@/lib/session";
@@ -110,6 +111,7 @@ export default async function InstalledAppPage({
     ]);
     return (
         <Messages namespaces={["installed", "catalog", "marketplace"]}>
+            <PolarRecord kind="installed app" id={app.id} name={app.name} />
             <InstalledAppDashboard
                 app={app}
                 // The full list is the Settings screen's; a reader who may not

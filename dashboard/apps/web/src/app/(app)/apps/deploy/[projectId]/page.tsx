@@ -14,6 +14,7 @@ import { elsewhereByService, refreshStale } from "@/lib/deploy/external-services
 import { serviceAttention } from "@/lib/deploy/project-glance";
 import type { TunnelDomain } from "@/lib/deploy/tunnel-domains";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { PolarRecord } from "@/components/polar/polar-panel";
 import { listActiveTunnelDomains } from "@/lib/deploy/tunnel-domains";
 import {
     containerPortOf,
@@ -231,13 +232,16 @@ export default async function DeployProjectPage({
     // Both are only ever matched against this project's own ids, so an id that
     // belongs to nobody (or to another project) simply opens the default view.
     return (
-        <ProjectDetail
-            project={summary}
-            canManage={canManage}
-            capabilities={access.capabilities}
-            localReady={localReady}
-            activeEnvironmentId={pick(query.env)}
-            openService={pick(query.service)}
-        />
+        <>
+            <PolarRecord kind="deploy project" id={summary.id} name={summary.name} />
+            <ProjectDetail
+                project={summary}
+                canManage={canManage}
+                capabilities={access.capabilities}
+                localReady={localReady}
+                activeEnvironmentId={pick(query.env)}
+                openService={pick(query.service)}
+            />
+        </>
     );
 }

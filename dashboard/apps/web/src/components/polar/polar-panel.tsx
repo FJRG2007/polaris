@@ -161,8 +161,10 @@ import {
     POLAR_ATTACHMENT_TYPES,
     type ModelChoice,
     type PageContext,
-    type QueuedMessage
+    type QueuedMessage,
+    screenOf
 } from "@/lib/polar/shared";
+import { screenFor } from "@/lib/polar/screen";
 import { titleWithBadge } from "@/lib/favicon-style";
 import { NO_VOICE, type VoiceAvailability } from "@/lib/polar/voice-call";
 import { PolarShareDialog } from "@/components/polar/polar-sharing";
@@ -212,6 +214,12 @@ export function usePolarContext(extra: ExtraContext | null): void {
     }, [key]);
 }
 
+/** For a server-rendered screen: declares the record it shows, by name. */
+export function PolarRecord({ kind, id, name }: { kind: string; id: string; name?: string }) {
+    usePolarContext({ record: { kind, id, name } });
+    return null;
+}
+
 /** Route, title and the ids the URL names, everywhere. */
 export function pageContextFrom(
     pathname: string,
@@ -235,21 +243,27 @@ export function pageContextFrom(
     }
     // Cleaned here as the route cleans it, so a name made only of characters it
     // strips drops out of the context instead of refusing the whole message.
-    const recordId = extra?.record ? cleanContextText(extra.record.id) : "";
-    const recordKind = extra?.record ? cleanContextText(extra.record.kind) : "";
+    // The address says which app, section and record this is; a screen that
+    // knows more (the record's name, a selection) says so with usePolarContext.
+    const screen = screenFor(pathname);
+    const declared = extra?.record ?? screen.record;
+    const recordId = declared ? cleanContextText(declared.id) : "";
+    const recordKind = declared ? cleanContextText(declared.kind) : "";
     const selection = (extra?.selection ?? []).map(cleanContextText).filter(Boolean).slice(0, 20);
     return {
         route: pathname,
         // The tab's title carries what is waiting in front of it ("(1) Chat"),
         // which is the tab's business and not the page's name.
         title: cleanContextText(titleWithBadge(title, null)) || undefined,
+        app: screen.app ? cleanContextText(screen.app) || undefined : undefined,
+        section: screen.section ? cleanContextText(screen.section) || undefined : undefined,
         ids: Object.keys(ids).length ? ids : undefined,
         record:
             recordId && recordKind
                 ? {
                       kind: recordKind,
                       id: recordId,
-                      name: cleanContextText(extra?.record?.name ?? "") || undefined
+                      name: cleanContextText(declared?.name ?? "") || undefined
                   }
                 : undefined,
         selection: selection.length ? selection : undefined
@@ -1252,7 +1266,7 @@ export function PolarChat({
         }
         if (command === "tools" && choice && !busy) {
             turnChoice.current = null;
-            void chat.sendMessage({ text: t("slash.toolsPrompt") });
+            void chat.sendMessage(withScreen({ text: t("slash.toolsPrompt") }));
         }
     };
 
@@ -1288,6 +1302,17 @@ export function PolarChat({
 
     /** Sends a turn, compacting the chat first when this turn would bring it
      *  near the model's window and the person has automatic compaction on. */
+    /** The message with the screen it is asked on, which its bubble names. */
+    const withScreen = (message: Parameters<typeof chat.sendMessage>[0]) =>
+        message && "text" in message && live.current.context
+            ? {
+                  ...message,
+                  metadata: {
+                      ...((message.metadata as object | undefined) ?? {}),
+                      screen: live.current.context
+                  }
+              }
+            : message;
     const sendWithRoom = (message: Parameters<typeof chat.sendMessage>[0]) =>
         compactBeforeSending({
             used: contextUsed(chat.messages),
@@ -1295,7 +1320,7 @@ export function PolarChat({
             window: windowOf(providers, live.current.choice),
             enabled: display.autoCompact,
             compact: () => compact(null, true),
-            send: () => chat.sendMessage(message)
+            send: () => chat.sendMessage(withScreen(message))
         });
 
     /** Renames the open chat, shown in the list at once and put back if refused. */
@@ -1394,7 +1419,7 @@ export function PolarChat({
                 // The edited message stays in the tree as the earlier version.
                 turnChoice.current = ownChoice;
                 chat.setMessages(chat.messages.slice(0, index));
-                return void chat.sendMessage(message);
+                return void chat.sendMessage(withScreen(message));
             }
         }
         if (busy || waitingApproval) {
@@ -1412,7 +1437,7 @@ export function PolarChat({
         if (chat.status === "submitted" || chat.status === "streaming") await chat.stop();
         turnChoice.current = null;
         setLastApproved(false);
-        void chat.sendMessage({ text });
+        void chat.sendMessage(withScreen({ text }));
     };
 
     const streamingText =
@@ -2320,6 +2345,10 @@ function MessageView({
         usage?: unknown;
     };
     const spent = answerSpendOf(meta.usage);
+    const screen = mine ? screenOf(message.metadata) : null;
+    const askedOn = screen
+        ? (screen.record?.name ?? screen.section ?? screen.title ?? screen.route)
+        : null;
     const files = message.parts.filter((part) => part.type === "file");
     const streaming = busy && last;
     const toolName = (name: string) =>
@@ -2513,6 +2542,14 @@ function MessageView({
                         onPrevious={() => onVersion(-1)}
                         onNext={() => onVersion(1)}
                     />
+                    {askedOn ? (
+                        <span
+                            className="min-w-0 max-w-40 truncate text-xs text-muted-foreground"
+                            title={t("context.askedOn", { place: askedOn })}
+                        >
+                            {t("context.askedOn", { place: askedOn })}
+                        </span>
+                    ) : null}
                     {mine ? (
                         <>
                             <MessageAction label={t("actions.edit")} onClick={onEdit}>
