@@ -353,5 +353,38 @@
         "composing": "Writing the answer",
         "breathing": "Thinking",
         "shaping": "Reading files"
+    },
+    "commands": {
+        "new": "New command",
+        "newDetail": "Save a prompt you send often",
+        "manage": "Your commands",
+        "intro": "Type / and a shortcut to send its prompt. Anything you type after the shortcut is added below the prompt.",
+        "empty": "No commands yet. Add one for a prompt you send often.",
+        "editTitle": "Edit command",
+        "shortcut": "Shortcut",
+        "shortcutHint": "Lowercase letters, digits and hyphens, typed after /.",
+        "prompt": "Prompt",
+        "model": "Model for prompt",
+        "cancel": "Cancel",
+        "save": "Save",
+        "edit": "Edit /{shortcut}",
+        "delete": "Delete /{shortcut}",
+        "deleteTitle": "Delete this command?",
+        "deleteQuestion": "/{shortcut} leaves the / list. Messages already sent with it stay as they are.",
+        "deleteConfirm": "Delete",
+        "kind": "command",
+        "count": "{count} of {most}",
+        "saveAs": "Save as command",
+        "issues": {
+            "format": "Use lowercase letters, digits and hyphens, starting with a letter or digit.",
+            "long": "Keep it to {most} characters.",
+            "builtin": "Polar already has a command with this name.",
+            "taken": "You already have a command with this shortcut."
+        },
+        "errors": {
+            "too_many": "You can keep up to {most} commands. Delete one to add another.",
+            "unknown_model": "That model is no longer available to you. Pick another one or Automatic.",
+            "failed": "The command could not be saved. Try again."
+        }
     }
 }

@@ -34,6 +34,7 @@ datasource db {
 model User {
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
+    polarCommands     PolarCommand[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -15060,6 +15061,25 @@ model PolarPreference {
     // Whether Polar reads and writes memories at all. Off keeps what is saved.
     memory    Boolean  @default(true)
     updatedAt DateTime @updatedAt
+}
+
+// A "/" command somebody wrote for themselves: typing /shortcut sends the
+// prompt, with whatever follows the shortcut appended, on the model it names
+// for that one turn. One person's: every query names the owner.
+model PolarCommand {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // Lowercase letters, digits and hyphens, never a built-in command's name.
+    shortcut  String
+    prompt    String
+    // The model choice it runs on ({ provider, model, intelligence, payer }),
+    // "Automatic" included.
+    choice    Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, shortcut])
 }
 
 // A read-only public link to a Polar chat. The raw token lives in the URL only;

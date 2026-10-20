@@ -353,5 +353,38 @@
         "composing": "Escribiendo",
         "breathing": "Pensando",
         "shaping": "Leyendo archivos"
+    },
+    "commands": {
+        "new": "Nuevo comando",
+        "newDetail": "Guarda un prompt que usas a menudo",
+        "manage": "Tus comandos",
+        "intro": "Escribe / y un atajo para enviar su prompt. Lo que escribas tras el atajo se añade debajo del prompt.",
+        "empty": "Aún no hay comandos. Crea uno para un prompt que envíes a menudo.",
+        "editTitle": "Editar comando",
+        "shortcut": "Atajo",
+        "shortcutHint": "Minúsculas, dígitos y guiones, escritos tras /.",
+        "prompt": "Prompt",
+        "model": "Modelo del prompt",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "edit": "Editar /{shortcut}",
+        "delete": "Eliminar /{shortcut}",
+        "deleteTitle": "¿Eliminar este comando?",
+        "deleteQuestion": "/{shortcut} sale de la lista de /. Los mensajes ya enviados con él no cambian.",
+        "deleteConfirm": "Eliminar",
+        "kind": "comando",
+        "count": "{count} de {most}",
+        "saveAs": "Guardar comando",
+        "issues": {
+            "format": "Usa minúsculas, dígitos y guiones, empezando por una letra o un dígito.",
+            "long": "Máximo {most} caracteres.",
+            "builtin": "Polar ya tiene un comando con este nombre.",
+            "taken": "Ya tienes un comando con este atajo."
+        },
+        "errors": {
+            "too_many": "Puedes guardar hasta {most} comandos. Elimina uno para añadir otro.",
+            "unknown_model": "Ese modelo ya no está disponible para ti. Elige otro o Automático.",
+            "failed": "No se pudo guardar el comando. Inténtalo de nuevo."
+        }
     }
 }

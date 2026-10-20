@@ -246,9 +246,7 @@ export function ModelSelector({
                         ))}
                         {automatic ? null : (
                             <DropdownMenuItem disabled title={t("picker.signinReason")}>
-                                <span className="text-foreground-subtle">
-                                    {t("picker.signin")}
-                                </span>
+                                <span className="text-foreground-subtle">{t("picker.signin")}</span>
                             </DropdownMenuItem>
                         )}
                     </>

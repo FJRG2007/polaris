@@ -68,17 +68,11 @@ describe("turnSignals", () => {
             { role: "user", parts: [{ type: "text", text: "hello" }] },
             {
                 role: "assistant",
-                parts: [
-                    { type: "tool-read_tasks" },
-                    { type: "text", text: "done" }
-                ]
+                parts: [{ type: "tool-read_tasks" }, { type: "text", text: "done" }]
             },
             {
                 role: "user",
-                parts: [
-                    { type: "text", text: "and this" },
-                    { type: "file" }
-                ]
+                parts: [{ type: "text", text: "and this" }, { type: "file" }]
             }
         ]);
         expect(signals).toEqual({ files: 1, tools: true, contextChars: 17, lastChars: 8 });
