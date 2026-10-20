@@ -98,7 +98,16 @@
         "copy": "Copy message",
         "regenerate": "Answer again",
         "copied": "Copied",
-        "branch": "Branch into new chat"
+        "branch": "Branch into new chat",
+        "good": "Good answer",
+        "bad": "Bad answer",
+        "readAloud": "Read aloud",
+        "stopReading": "Stop reading",
+        "share": "Share up to here",
+        "tryAgain": "Try again",
+        "longer": "Add details",
+        "shorter": "More concise",
+        "otherModel": "Try another model"
     },
     "noKeys": {
         "title": "Polar needs an AI provider key",
@@ -586,6 +595,14 @@
             "slow": "Too slow",
             "unsafe": "Harmful or unsafe",
             "other": "Something else"
-        }
+        },
+        "title": "What went wrong?",
+        "intro": "Pick what applies. It helps whoever runs Polaris see where Polar falls short.",
+        "note": "Details",
+        "notePlaceholder": "Add details (optional)",
+        "send": "Send",
+        "skip": "Skip",
+        "thanks": "Thanks for telling us.",
+        "failed": "Couldn't save your rating. Try again."
     }
 }

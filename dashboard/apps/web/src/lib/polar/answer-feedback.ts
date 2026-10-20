@@ -44,6 +44,13 @@ export const polarFeedbackBodySchema = z
     }));
 export type PolarFeedbackBody = z.infer<typeof polarFeedbackBodySchema>;
 
+/** One person's mark on one answer, as the answer's row shows it. */
+export interface PolarMark {
+    rating: PolarRating;
+    reasons: PolarBadReason[];
+    note: string | null;
+}
+
 /** One mark as the administrator's list shows it. */
 export interface PolarFeedbackRow {
     id: string;

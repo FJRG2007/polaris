@@ -35,3 +35,19 @@ export function polarSystemPrompt(
         .filter(Boolean)
         .join("\n\n");
 }
+
+/** How an answer asked again from its row should change. */
+export const POLAR_REFINES = ["longer", "shorter"] as const;
+export type PolarRefine = (typeof POLAR_REFINES)[number];
+
+/** The line that asks the answer again with more detail or fewer words. The
+ *  person chose it from a menu; the words are never theirs. */
+export function refineLine(refine: PolarRefine | null): string {
+    if (refine === "longer") {
+        return "The person asked for this answer again with more detail: cover the same question more thoroughly, with explanations and examples where they help.";
+    }
+    if (refine === "shorter") {
+        return "The person asked for this answer again, more concise: keep only what matters, in as few words as stay clear.";
+    }
+    return "";
+}

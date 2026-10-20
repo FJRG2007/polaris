@@ -10,15 +10,9 @@ import type {
     PolarFeedbackBody,
     PolarFeedbackRow,
     PolarFeedbackSummary,
+    PolarMark,
     PolarRating
 } from "@/lib/polar/answer-feedback";
-
-/** One person's mark on one answer, as the answer's row shows it. */
-export interface PolarMark {
-    rating: PolarRating;
-    reasons: PolarBadReason[];
-    note: string | null;
-}
 
 /** Most marks one thread's read returns: more answers than a thread shows. */
 const THREAD_MARKS_MOST = 1000;

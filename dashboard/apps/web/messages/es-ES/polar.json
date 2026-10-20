@@ -98,7 +98,16 @@
         "copy": "Copiar mensaje",
         "regenerate": "Regenerar",
         "copied": "Copiado",
-        "branch": "Ramificar en chat nuevo"
+        "branch": "Ramificar en chat nuevo",
+        "good": "Me gusta",
+        "bad": "No me gusta",
+        "readAloud": "Leer en alto",
+        "stopReading": "Dejar de leer",
+        "share": "Compartir hasta aquí",
+        "tryAgain": "Reintentar",
+        "longer": "Más detalles",
+        "shorter": "Más concisa",
+        "otherModel": "Probar otro modelo"
     },
     "noKeys": {
         "title": "Polar necesita una clave de IA",
@@ -583,9 +592,17 @@
             "instructions": "Ignoró lo que pedí",
             "incomplete": "Incompleta",
             "style": "Tono o estilo malos",
-            "slow": "Demasiado lenta",
+            "slow": "Muy lenta",
             "unsafe": "Dañina o peligrosa",
             "other": "Otra cosa"
-        }
+        },
+        "title": "¿Qué falló?",
+        "intro": "Marca lo que aplique. Ayuda a quien gestiona Polaris a ver dónde falla Polar.",
+        "note": "Detalles",
+        "notePlaceholder": "Añade detalles (opcional)",
+        "send": "Enviar",
+        "skip": "Omitir",
+        "thanks": "Gracias por contárnoslo.",
+        "failed": "No se guardó tu valoración. Reinténtalo."
     }
 }
