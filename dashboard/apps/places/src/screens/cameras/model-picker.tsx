@@ -149,7 +149,9 @@ export function BrandPicker({
                         <span className="truncate">{brandName(value, t)}</span>
                     </span>
                 ) : (
-                    <span className="truncate text-foreground-subtle">{t("modelPicker.brandNone")}</span>
+                    <span className="truncate text-foreground-subtle">
+                        {t("modelPicker.brandNone")}
+                    </span>
                 )
             }
         >
