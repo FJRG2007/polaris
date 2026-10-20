@@ -21,6 +21,7 @@ import { graphProblems } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 import { AutomationAccessError } from "./access-error";
 import { checkChatWebhooks } from "./chat-webhooks";
+import { checkNoticeTargets } from "./notice-targets";
 
 export { AutomationAccessError };
 
@@ -358,6 +359,7 @@ export async function saveDraft(
     if (problems.some((problem) => problem.code !== "badConfig")) return problems;
     await checkSecrets(row, graph);
     await checkChatWebhooks(actor, graph, row.draft);
+    await checkNoticeTargets(actor, graph, row.draft);
     await prisma.automation.update({
         where: { id },
         data: { draft: graph as object, draftUpdatedAt: new Date() }
@@ -382,6 +384,7 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
     if (cycle) return [{ code: "callCycle", node: cycle.node }];
     await checkSecrets(row, parsed.data);
     await checkChatWebhooks(actor, parsed.data);
+    await checkNoticeTargets(actor, parsed.data);
     const last = await prisma.automationVersion.findFirst({
         where: { automationId: id },
         orderBy: { number: "desc" },

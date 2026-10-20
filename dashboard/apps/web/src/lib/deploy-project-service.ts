@@ -763,6 +763,35 @@ export async function testProjectWebhook(
 }
 
 /**
+ * Post one message to one project webhook, whatever events it subscribed to:
+ * the sender named this endpoint itself (an automation's notify step), so the
+ * deploy-event filter does not apply. Records the result on the row like any
+ * other send. Null when it went; otherwise a short reason code.
+ */
+export async function sendToProjectWebhook(
+    id: string,
+    message: { event: string; title: string; body: string | null; url: string | null }
+): Promise<"gone" | "failed" | null> {
+    const hook = await prisma.projectWebhook.findUnique({
+        where: { id },
+        select: { enabled: true }
+    });
+    if (!hook || !hook.enabled) return "gone";
+    const resolved = await webhookUrl(id);
+    if (!resolved) {
+        await recordWebhookResult(id, "The stored URL could not be read.");
+        return "gone";
+    }
+    const result = await sendWebhook(resolved.url, resolved.format, {
+        ...message,
+        level: "info",
+        at: new Date().toISOString()
+    });
+    await recordWebhookResult(id, result.error ?? null);
+    return result.error ? "failed" : null;
+}
+
+/**
  * Report a deploy to every endpoint on the project that asked for this event.
  * Never throws: it runs inside the deploy's own completion path, and a webhook
  * nobody maintains any more must not take a deploy's reporting down with it.

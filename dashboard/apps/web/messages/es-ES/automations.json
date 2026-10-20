@@ -743,7 +743,9 @@
             "bell": "Campana",
             "email": "Correo",
             "destination": "Destino",
-            "chat": "Chat"
+            "chat": "Chat",
+            "projectWebhook": "Webhook proyecto",
+            "messaging": "Mensajería"
         },
         "reasons": {
             "bellRead": "se guardó ya leído, porque su página estaba abierta",
@@ -759,7 +761,20 @@
             "webhookForbidden": "su dueño ya no lleva ese canal",
             "webhookLimited": "el webhook publicó mucho este minuto",
             "failed": "el envío falló"
-        }
+        },
+        "projectWebhooks": "Webhooks de mis proyectos",
+        "projectWebhooksNone": "Ningún proyecto tuyo tiene webhook aún.",
+        "projectWebhooksAdd": "Añadir uno",
+        "projectWebhookOption": "{name} ({project})",
+        "projectWebhookGone": "Un webhook elegido se borró o ya no es tuyo.",
+        "messaging": "Un canal de mensajería mío",
+        "messagingNone": "No tienes canales de mensajería conectados.",
+        "messagingAdd": "Conectar",
+        "messagingOption": "{name} ({platform})",
+        "messagingPick": "Elige el canal",
+        "messagingPeer": "A quién escribir en él",
+        "messagingIncomplete": "Elige un canal y a quién escribir.",
+        "messagingGone": "Ese canal se quitó o ya no es tuyo."
     },
     "appNodes": {
         "homeTime": "Lugares: a una hora",

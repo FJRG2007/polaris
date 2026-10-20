@@ -743,7 +743,9 @@
             "bell": "Bell",
             "email": "Email",
             "destination": "Destination",
-            "chat": "Chat"
+            "chat": "Chat",
+            "projectWebhook": "Project webhook",
+            "messaging": "Messaging"
         },
         "reasons": {
             "bellRead": "written already read, as its page was open",
@@ -759,7 +761,20 @@
             "webhookForbidden": "its owner no longer runs that channel",
             "webhookLimited": "the webhook posted too much this minute",
             "failed": "sending failed"
-        }
+        },
+        "projectWebhooks": "Webhooks of my Deploy projects",
+        "projectWebhooksNone": "None of your projects has a webhook yet.",
+        "projectWebhooksAdd": "Add one",
+        "projectWebhookOption": "{name} ({project})",
+        "projectWebhookGone": "A chosen webhook was deleted or is no longer yours.",
+        "messaging": "A messaging channel I connected",
+        "messagingNone": "You have no connected messaging channels.",
+        "messagingAdd": "Connect one",
+        "messagingOption": "{name} ({platform})",
+        "messagingPick": "Pick the channel",
+        "messagingPeer": "Who to message on it",
+        "messagingIncomplete": "Pick a channel and who to message.",
+        "messagingGone": "That channel was removed or is no longer yours."
     },
     "appNodes": {
         "homeTime": "Places: at a time",

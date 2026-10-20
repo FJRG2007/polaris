@@ -28,7 +28,13 @@ export interface AutomationNotice {
     readonly delivery?: core.NoticeDelivery;
 }
 
-export type NoticeChannel = "bell" | "email" | "destination" | "chat";
+export type NoticeChannel =
+    | "bell"
+    | "email"
+    | "destination"
+    | "chat"
+    | "projectWebhook"
+    | "messaging";
 
 export interface NoticeMiss {
     readonly channel: NoticeChannel;
@@ -117,6 +123,21 @@ export async function deliverAutomationNotice(notice: AutomationNotice): Promise
             else delivered.push("chat");
         });
     }
+    for (const webhookId of delivery.projectWebhooks ?? []) {
+        attempt("projectWebhook", async () => {
+            const reason = await postToProjectWebhook(notice, webhookId);
+            if (reason) missed.push({ channel: "projectWebhook", reason });
+            else delivered.push("projectWebhook");
+        });
+    }
+    if (delivery.messaging) {
+        const messaging = delivery.messaging;
+        attempt("messaging", async () => {
+            const reason = await sendToMessaging(notice, messaging);
+            if (reason) missed.push({ channel: "messaging", reason });
+            else delivered.push("messaging");
+        });
+    }
     await Promise.all(work);
 
     if (delivered.length === 0) throw new StepError("noticeNotDelivered", { sent: false, missed });
@@ -147,6 +168,52 @@ async function postToChat(
         return null;
     } catch (caught) {
         console.error("polaris: an automation notice could not post to chat:", caught);
+        return "messageRefused";
+    }
+}
+
+/** Post through a Deploy project's webhook, still the account's to use. Null when it went. */
+async function postToProjectWebhook(
+    notice: AutomationNotice,
+    webhookId: string
+): Promise<string | null> {
+    const targets = await import("./notice-targets");
+    if (!(await targets.mayUseProjectWebhook(notice.userId, webhookId))) {
+        const { prisma } = await import("@polaris/db");
+        const exists = await prisma.projectWebhook.findUnique({
+            where: { id: webhookId },
+            select: { id: true }
+        });
+        return exists ? "webhookForbidden" : "webhookGone";
+    }
+    const { sendToProjectWebhook } = await import("@/lib/deploy-project-service");
+    const reason = await sendToProjectWebhook(webhookId, {
+        event: notice.event,
+        title: notice.title,
+        body: notice.body,
+        url: null
+    });
+    return reason === "gone" ? "webhookGone" : reason;
+}
+
+/** Send through a messaging channel the account owns. Null when it went. */
+async function sendToMessaging(
+    notice: AutomationNotice,
+    messaging: { channelId: string; peerId: string }
+): Promise<string | null> {
+    const targets = await import("./notice-targets");
+    if (!(await targets.mayUseMessagingChannel(notice.userId, messaging.channelId)))
+        return "webhookGone";
+    const { bridgeSend } = await import("@/lib/messaging/bridge-client");
+    const text = (notice.body ? `${notice.title}\n${notice.body}` : notice.title).slice(
+        0,
+        core.AUTOMATION_LIMITS.textLength
+    );
+    try {
+        await bridgeSend(messaging.channelId, { peerId: messaging.peerId, text });
+        return null;
+    } catch (caught) {
+        console.error("polaris: an automation notice could not use a messaging channel:", caught);
         return "messageRefused";
     }
 }
