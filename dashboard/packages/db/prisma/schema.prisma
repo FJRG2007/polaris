@@ -14702,6 +14702,7 @@ model Automation {
     versions AutomationVersion[]
     triggers AutomationTrigger[]
     runs     AutomationRun[]
+    alarmEpisodes AutomationAlarmEpisode[]
 
     @@index([orgId, updatedAt])
     @@index([userId, updatedAt])
@@ -14743,6 +14744,35 @@ model AutomationTrigger {
     @@unique([automationId, nodeId])
     @@index([eventType, subjectKey])
     @@index([nextDueAt])
+}
+
+// One stretch a threshold trigger spent in alarm: when the reading crossed,
+// when it came back (null while it lasts), and the worst value seen. The
+// duration is worked out from the two times. Kept 90 days once resolved, and at
+// most 500 per automation (lib/automations/alarm-episodes.ts).
+model AutomationAlarmEpisode {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    automationId String    @db.Uuid
+    nodeId       String
+    // The trigger's reading (`host.cpu`, `ups.charge`, ...) and its subject.
+    source       String
+    subjectId    String    @db.Uuid
+    // gt | gte | lt | lte, and the value it was judged against.
+    comparator   String
+    threshold    Float
+    startedAt    DateTime
+    startValue   Float
+    // The highest value for "above", the lowest for "below".
+    peakValue    Float
+    resolvedAt   DateTime?
+    endValue     Float?
+    createdAt    DateTime  @default(now())
+
+    automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@unique([automationId, nodeId, startedAt])
+    @@index([automationId, startedAt])
+    @@index([startedAt])
 }
 
 // The outbox: an event something in Polaris said happened, kept until the engine

@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import { withLease } from "@/lib/cron/lease";
 import { fireDueSchedules } from "./triggers";
 import { evaluateThresholds, THRESHOLD_LEASE } from "./thresholds";
+import { pruneEpisodes, recordEpisode } from "./alarm-episodes";
 import { noteEngineBoot } from "./legacy-retirement";
 import { INTAKE_LEASE, processAutomationEvents } from "./outbox";
 import { advanceRun, resumeDueWaits, resumeEndedCalls, runnableRuns, stopClaiming } from "./engine";
@@ -39,7 +40,9 @@ export async function runAutomationsPass(): Promise<Record<string, number>> {
         const matched = await processAutomationEvents();
         return scheduled.length + matched.length;
     });
-    const crossed = await withLease(THRESHOLD_LEASE, 2 * 60_000, () => evaluateThresholds());
+    const crossed = await withLease(THRESHOLD_LEASE, 2 * 60_000, () =>
+        evaluateThresholds(100, recordEpisode)
+    );
     const resumed = [...(await resumeDueWaits()), ...(await resumeEndedCalls())];
     const runs = [...new Set([...resumed, ...(await runnableRuns(PARALLEL_RUNS))])].slice(
         0,
@@ -56,6 +59,10 @@ export async function runAutomationsPass(): Promise<Record<string, number>> {
     if (Date.now() - lastPrune >= PRUNE_EVERY_MS) {
         lastPrune = Date.now();
         pruned = await pruneAutomationHistory();
+        pruned += await pruneEpisodes().catch((caught) => {
+            console.error("polaris: alarm episodes failed to prune:", caught);
+            return 0;
+        });
     }
     return {
         started: (intake ?? 0) + (crossed?.length ?? 0),

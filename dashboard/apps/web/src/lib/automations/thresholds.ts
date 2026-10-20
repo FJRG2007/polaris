@@ -25,7 +25,6 @@ import * as core from "@polaris/core";
 import { fireTrigger } from "./combine";
 import { automationRunner } from "./runner";
 import { loadGraph, type StartedRun } from "./engine";
-import { thresholdSource } from "./threshold-sources";
 import { compare, stepAlarm, worse } from "@/lib/alarm-state";
 import type { MetricReading } from "@/lib/watch/metric-reading";
 
@@ -256,6 +255,9 @@ async function checkOne(
     if (!parsed.success) return null;
     const config = parsed.data;
     const memory = readMemory(row.state, JSON.stringify(node?.config ?? {}));
+    // Loaded here, not at the top: the registry reaches Watch, servers and UPS
+    // code that the rest of the automations pass never needs.
+    const { thresholdSource } = await import("./threshold-sources");
     const provided = thresholdSource(config.source);
     const actor = await automationRunner(row.automation);
     let reading: MetricReading;

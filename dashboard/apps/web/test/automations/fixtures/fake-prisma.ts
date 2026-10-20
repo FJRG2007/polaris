@@ -15,6 +15,7 @@ const UNIQUE: Record<string, string[][]> = {
     automationEvent: [["type", "dedupeKey"]],
     automationTrigger: [["automationId", "nodeId"], ["hookHash"]],
     automationVersion: [["automationId", "number"]],
+    automationAlarmEpisode: [["automationId", "nodeId", "startedAt"]],
     setting: [["key"]]
 };
 
@@ -305,6 +306,18 @@ export function createFakeDb(): FakeDb {
             checkUnique(name, created);
             table(name).push(created);
             return { ...created };
+        },
+        // One `by` field, `_count._all`, and a `having` of `_count gt`: what pruning asks.
+        groupBy: async (args: any) => {
+            const field = args.by[0] as string;
+            const counts = new Map<unknown, number>();
+            for (const row of table(name).filter((entry) => matches(entry, whereOf(args.where))))
+                counts.set(row[field], (counts.get(row[field]) ?? 0) + 1);
+            const least = args.having?.[field]?._count?.gt ?? -1;
+            return [...counts.entries()]
+                .filter(([, count]) => count > least)
+                .slice(0, args.take ?? Infinity)
+                .map(([key, count]) => ({ [field]: key, _count: { _all: count } }));
         },
         deleteMany: async (args: any = {}) => {
             const keep = table(name).filter((row) => !matches(row, whereOf(args.where)));
