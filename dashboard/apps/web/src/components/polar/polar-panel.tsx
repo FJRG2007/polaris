@@ -1279,7 +1279,6 @@ export function PolarChat({
                     </PromptInputFooter>
                 </PromptInput>
             </BorderBeam>
-            <p className="mt-1.5 text-center text-xs text-foreground-subtle">{t("footer")}</p>
             {inCall ? (
                 <VoiceCall
                     messages={chat.messages}
