@@ -14,30 +14,56 @@ import { AGENT_CLIS } from "@polaris/core";
 import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
-import {
-    AnthropicMark,
-    CerebrasMark,
-    DeepSeekMark,
-    GeminiMark,
-    GroqMark,
-    MoonshotMark,
-    OpenAiMark,
-    OpenRouterMark,
-    XaiMark
-} from "./model-marks";
+import * as models from "./model-marks";
 
 /** The Models catalog, keyed by its integration slug. Kept as a map because that
  *  list grows with every provider a run can be handed a key for. */
 const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
-    anthropic: AnthropicMark,
-    openai: OpenAiMark,
-    "google-ai": GeminiMark,
-    xai: XaiMark,
-    deepseek: DeepSeekMark,
-    moonshot: MoonshotMark,
-    groq: GroqMark,
-    cerebras: CerebrasMark,
-    openrouter: OpenRouterMark,
+    anthropic: models.AnthropicMark,
+    openai: models.OpenAiMark,
+    "google-ai": models.GeminiMark,
+    xai: models.XaiMark,
+    deepseek: models.DeepSeekMark,
+    moonshot: models.MoonshotMark,
+    groq: models.GroqMark,
+    cerebras: models.CerebrasMark,
+    openrouter: models.OpenRouterMark,
+    // The seeded tail. A slug missing here is drawn as its monogram, which is
+    // the honest answer for a provider whose mark could not be sourced.
+    mistral: models.MistralMark,
+    zai: models.ZaiMark,
+    minimax: models.MiniMaxMark,
+    llama: models.MetaMark,
+    alibaba: models.AlibabaCloudMark,
+    upstage: models.UpstageMark,
+    inception: models.InceptionMark,
+    arcee: models.ArceeMark,
+    longcat: models.LongCatMark,
+    "stepfun-ai": models.StepFunMark,
+    xiaomi: models.XiaomiMimoMark,
+    volcengine: models.VolcengineMark,
+    modelscope: models.ModelScopeMark,
+    togetherai: models.TogetherAiMark,
+    "fireworks-ai": models.FireworksMark,
+    deepinfra: models.DeepInfraMark,
+    nebius: models.NebiusMark,
+    huggingface: models.HuggingFaceMark,
+    nvidia: models.NvidiaMark,
+    baseten: models.BasetenMark,
+    "ollama-cloud": models.OllamaMark,
+    siliconflow: models.SiliconFlowMark,
+    "novita-ai": models.NovitaMark,
+    scaleway: models.ScalewayMark,
+    ovhcloud: models.OvhMark,
+    wandb: models.WeightsAndBiasesMark,
+    friendli: models.FriendliMark,
+    hetzner: models.HetznerMark,
+    vultr: models.VultrMark,
+    crusoe: models.CrusoeMark,
+    kilo: models.KiloMark,
+    poe: models.PoeMark,
+    opencode: models.OpenCodeMark,
+    "cline-pass": models.ClineMark,
     // The gateway is not a provider, but it is a thing with a name and a mark,
     // and it sits in the same list.
     enigma: brand.EnigmaMark
@@ -137,13 +163,12 @@ const SERVICE_IMAGES: Record<string, string> = {
 /**
  * The initials a provider with no mark here is drawn as.
  *
- * Deliberately a monogram rather than something drawn to look like the vendor's
- * logo. There are sixty model providers and most of them publish only a
- * full-colour mark, or none that is anybody's to redistribute; a shape invented
- * for one of them would be a trademark nobody recognises, which is worse than an
- * honest set of letters. The tile is tinted from the slug by the same function
- * that colours a face with no photo, so two of them in a list are tellable apart
- * before the letters are read.
+ * The fallback for a provider or agent whose official mark could not be sourced
+ * from the vendor or a vector registry, and for anything custom. A shape drawn
+ * to look like the vendor's logo would be a trademark nobody recognises, which
+ * is worse than an honest set of letters. The tile is tinted from the slug by
+ * the same function that colours a face with no photo, so two of them in a list
+ * are tellable apart before the letters are read.
  *
  * The first letters of the first two words, or the first two letters when there
  * is only one word. Punctuation is not a word: "Z.AI" is ZA, not Z-dot.
@@ -223,20 +248,24 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
 }
 
 /**
- * The vendors behind the coding agents, where Polaris already carries their mark.
- *
- * Only the four that are genuinely already here. The others - OpenCode, Cursor,
- * Amp, Goose, Aider, Droid, OpenClaw - publish marks that are not ours to
- * redraw, and a shape invented for one of them would be a trademark nobody
- * recognises. They get the same monogram a model provider with no mark gets:
- * tinted from the id, so two of them in a list are tellable apart before the
- * letters are read.
+ * The coding agents, by catalogue id: each one's official mark where it could be
+ * sourced (the vendor's own file or a vector registry), the monogram otherwise.
+ * Never a shape drawn to resemble one - an agent missing here has no mark that
+ * was found to take, and the monogram is tinted from the id so two of them in a
+ * list are tellable apart before the letters are read.
  */
 const AGENT_MARKS: Record<string, ComponentType<{ className?: string }>> = {
-    claude: AnthropicMark,
-    codex: OpenAiMark,
-    gemini: GeminiMark,
-    copilot: brand.GitHubMark
+    claude: models.AnthropicMark,
+    codex: models.OpenAiMark,
+    gemini: models.GeminiMark,
+    copilot: brand.GitHubMark,
+    opencode: models.OpenCodeMark,
+    cursor: models.CursorMark,
+    goose: models.GooseMark,
+    qwen: models.QwenMark,
+    cline: models.ClineMark,
+    openhands: models.OpenHandsMark,
+    openclaw: models.OpenClawMark
 };
 
 /** The logo for a coding agent, by its catalogue id. `custom` is a tool Polaris

@@ -11,8 +11,12 @@
  * rather than on the screen.
  */
 
+import { createElement } from "react";
+import { AGENT_CLIS } from "@polaris/core";
 import { describe, expect, it } from "vitest";
-import { hasIntegrationLogo } from "@/components/logos";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AgentLogo, IntegrationLogo, hasIntegrationLogo } from "@/components/logos";
+import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 import { INTEGRATIONS } from "@/lib/integrations/registry";
 import { DEVICE_CONNECTIONS } from "@polaris-app/places/src/lib/device-connections";
 
@@ -39,5 +43,66 @@ describe("integration logos", () => {
         // would otherwise be a logo registered for an integration that does not
         // exist while the real one draws the block.
         expect(hasIntegrationLogo("not-an-integration")).toBe(false);
+    });
+});
+
+/**
+ * The providers and agents with no official mark that could be sourced (the
+ * vendor's own file, Simple Icons, svgl or an Iconify logo set). Everything else
+ * in the seeded table and the agent catalogue must draw its mark, so a mark that
+ * stops being wired - or one added without leaving this list - fails here.
+ */
+const MONOGRAM_PROVIDERS = [
+    "cohere",
+    "venice",
+    "sarvam",
+    "chutes",
+    "tinfoil",
+    "gmicloud",
+    "io-net",
+    "berget",
+    "requesty",
+    "zenmux",
+    "nano-gpt",
+    "llmgateway",
+    "helicone",
+    "fastrouter",
+    "anyapi",
+    "unorouter",
+    "orcarouter",
+    "synthetic",
+    "cortecs",
+    "edenai"
+];
+const MONOGRAM_AGENTS = ["amp", "aider", "droid", "crush"];
+
+/** A monogram is the one logo drawn as a tinted span of letters. */
+function isMonogram(markup: string): boolean {
+    return markup.startsWith("<span");
+}
+
+describe("provider and agent logos", () => {
+    it.each(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug))("provider %s", (slug) => {
+        const markup = renderToStaticMarkup(createElement(IntegrationLogo, { slug }));
+        expect(isMonogram(markup)).toBe(MONOGRAM_PROVIDERS.includes(slug));
+    });
+
+    it.each(AGENT_CLIS.map((cli) => [cli.id, cli.label]))("agent %s", (id, label) => {
+        const markup = renderToStaticMarkup(createElement(AgentLogo, { id, label }));
+        expect(isMonogram(markup)).toBe(MONOGRAM_AGENTS.includes(id));
+    });
+
+    it("lists only slugs that exist", () => {
+        const seeds = new Set(MODEL_PROVIDER_SEEDS.map((seed) => seed.slug));
+        const agents = new Set(AGENT_CLIS.map((cli) => cli.id));
+        expect(MONOGRAM_PROVIDERS.filter((slug) => !seeds.has(slug))).toEqual([]);
+        expect(MONOGRAM_AGENTS.filter((id) => !agents.has(id))).toEqual([]);
+    });
+
+    it("keeps the monogram for a slug nobody knows", () => {
+        const markup = renderToStaticMarkup(
+            createElement(AgentLogo, { id: "some-new-agent", label: "Some New Agent" })
+        );
+        expect(isMonogram(markup)).toBe(true);
     });
 });
