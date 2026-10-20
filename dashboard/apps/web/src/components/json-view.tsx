@@ -48,9 +48,18 @@ export function isValidJson(value: string): boolean {
 }
 
 /** The painted layer. Falls back to plain text until the grammar has loaded. */
-function Painted({ code, className }: { code: string; className?: string }) {
-    const highlight = useHighlighter("json");
-    const painted = highlight ? highlight(code, "json") : null;
+function Painted({
+    code,
+    className,
+    language = "json"
+}: {
+    code: string;
+    className?: string;
+    /** A highlight.js token: an extension or a Markdown fence tag. */
+    language?: string;
+}) {
+    const highlight = useHighlighter(language);
+    const painted = highlight ? highlight(code, language) : null;
 
     // The trailing newline gives the last line a box of its own, so the caret at
     // the end of the document stays visible while editing.
@@ -62,6 +71,45 @@ function Painted({ code, className }: { code: string; className?: string }) {
                 <code dangerouslySetInnerHTML={{ __html: `${painted}\n` }} />
             )}
         </pre>
+    );
+}
+
+/**
+ * Code nobody may change, in any grammar the highlighter knows - a curl
+ * command, an HTTP header, a config file - painted the way `JsonView` paints
+ * JSON. Not for logs or prose: those have no grammar and stay plain text.
+ */
+export function CodeView({
+    value,
+    language,
+    className,
+    copyable = true,
+    label
+}: {
+    value: string;
+    /** A highlight.js token: `bash`, `http`, `yaml`, a file's extension. */
+    language: string;
+    className?: string;
+    copyable?: boolean;
+    /** What the copy button copies, for its name. */
+    label: string;
+}) {
+    return (
+        <div
+            className={cn(
+                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
+                className
+            )}
+        >
+            {copyable ? (
+                <CopyButton
+                    value={value}
+                    label={label}
+                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                />
+            ) : null}
+            <Painted code={value} language={language} />
+        </div>
     );
 }
 
@@ -78,24 +126,14 @@ export function JsonView({
     copyable?: boolean;
     label?: string;
 }) {
-    const code = prettyJson(value);
-
     return (
-        <div
-            className={cn(
-                "group relative overflow-auto overscroll-contain rounded-md border border-border bg-muted/40",
-                className
-            )}
-        >
-            {copyable ? (
-                <CopyButton
-                    value={code}
-                    label={label}
-                    className="absolute right-2 top-2 z-10 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                />
-            ) : null}
-            <Painted code={code} />
-        </div>
+        <CodeView
+            value={prettyJson(value)}
+            language="json"
+            className={className}
+            copyable={copyable}
+            label={label}
+        />
     );
 }
 
@@ -159,6 +197,75 @@ export function JsonEditor({
                 </div>
             </div>
             {invalid ? <p className="text-xs text-danger">{message}</p> : null}
+        </div>
+    );
+}
+
+/**
+ * A short editable block of code in any grammar - a shell command, a config
+ * file - painted as it is typed, the way `JsonEditor` paints JSON. The field's
+ * label, validation and error line stay the caller's: this is only the box, so
+ * it takes the `id`, `aria-invalid` and blur a plain textarea would.
+ */
+export function CodeEditor({
+    value,
+    onChange,
+    language,
+    id,
+    label,
+    invalid = false,
+    onBlur,
+    placeholder,
+    disabled = false,
+    className
+}: {
+    value: string;
+    onChange: (next: string) => void;
+    /** A highlight.js token, or null to leave the text unpainted. */
+    language: string | null;
+    /** For a `<label htmlFor>` the caller draws. */
+    id?: string;
+    /** Names the field when no label element points at it. */
+    label?: string;
+    invalid?: boolean;
+    onBlur?: () => void;
+    placeholder?: string;
+    disabled?: boolean;
+    className?: string;
+}) {
+    return (
+        <div
+            className={cn(
+                "overflow-auto overscroll-contain rounded-md border bg-surface",
+                invalid ? "border-danger" : "border-border",
+                className
+            )}
+        >
+            {/* The min height lives on the grid so a click under a short
+                command still lands in the textarea. */}
+            <div className="grid min-h-20 w-fit min-w-full">
+                {language ? (
+                    <Painted code={value} language={language} className="pointer-events-none" />
+                ) : (
+                    <pre className={cn(CODE_LAYER, "pointer-events-none")}>{`${value}\n`}</pre>
+                )}
+                <textarea
+                    id={id}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    onBlur={onBlur}
+                    wrap="off"
+                    spellCheck={false}
+                    disabled={disabled}
+                    placeholder={placeholder}
+                    aria-label={label}
+                    aria-invalid={invalid || undefined}
+                    className={cn(
+                        CODE_LAYER,
+                        "resize-none overflow-hidden border-0 bg-transparent text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
+                    )}
+                />
+            </div>
         </div>
     );
 }

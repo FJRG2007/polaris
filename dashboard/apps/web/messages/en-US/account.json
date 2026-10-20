@@ -1311,5 +1311,18 @@
         "packHint": "Plays instead of the usual sounds until {date}. Turned off, it stays off until then.",
         "preview": "Play the {season} sounds",
         "notSaved": "Your choice could not be saved. Try again in a moment."
+    },
+    "polarTools": {
+        "title": "Polar permissions",
+        "intro": "Actions Polar runs without asking first. Revoke one and Polar asks again.",
+        "empty": "Nothing yet. Pick Always allow on one of Polar's requests and it shows up here.",
+        "anyTarget": "Any target",
+        "onlyTarget": "Only {target}",
+        "allowedOn": "Allowed {date}",
+        "revoke": "Revoke",
+        "revokeLabel": "Revoke {tool}",
+        "revokeFailed": "Couldn't revoke it. Try again.",
+        "unknownTool": "No longer available",
+        "stillChecked": "Polar still runs these as you, only with the access you have at the time."
     }
 }

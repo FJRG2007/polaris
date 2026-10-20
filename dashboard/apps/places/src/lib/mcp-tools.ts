@@ -33,7 +33,7 @@ import { HomeError } from "./home-error";
 import * as automations from "./automations";
 import { operateDevice } from "./device-operation";
 import type { AppHostTypes } from "@polaris/app-host";
-import { onlyReachable, placesReach, requireCameraView } from "./sharing";
+import { onlyReachable, placesReach, requireCameraView, requireDeviceControl } from "./sharing";
 import { matchForModel, type SearchField } from "@polaris/core";
 import {
     DEVICE_ACTIONS,
@@ -391,6 +391,15 @@ const controlTool = () =>
         category: "home",
         scope: "places.control",
         readOnly: false,
+        // The door by its name on the approval card, read through the same
+        // check the call itself makes - a device this person may not work is
+        // not named to them.
+        async target(input, caller) {
+            const { user, install } = await contextFor(caller);
+            await requireDeviceControl(user, input.deviceId);
+            const device = await devices.getDevice(install.id, input.deviceId);
+            return { id: device.id, name: device.name, action: spokenAction(input.action) };
+        },
         async run(input, caller) {
             const { user, install } = await contextFor(caller);
             // The setting, in the shape the device's own kind takes: the panel sends

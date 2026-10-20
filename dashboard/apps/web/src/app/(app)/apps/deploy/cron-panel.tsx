@@ -17,7 +17,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ServiceCronRunView, ServiceCronView } from "@/lib/deploy/service-cron";
-import { Button, ConfirmDeleteDialog, Input, Switch, Textarea, cn } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, Input, Switch, cn } from "@polaris/ui";
+import { CodeEditor } from "@/components/json-view";
 import { ChevronRight, Clock, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import {
     deleteServiceCronAction,
@@ -495,13 +496,12 @@ function CronForm({
                 <span className="text-xs font-medium text-muted-foreground">
                     {t("cron.command")} <span aria-hidden>*</span>
                 </span>
-                <Textarea
+                <CodeEditor
                     value={draft.command}
-                    onChange={(event) => set("command", event.target.value)}
+                    onChange={(next) => set("command", next)}
                     onBlur={leave("command")}
-                    rows={3}
-                    className="font-mono text-xs"
-                    spellCheck={false}
+                    language="bash"
+                    invalid={!!shown("command")}
                     // i18n-ignore: an example command
                     placeholder="npm run cleanup"
                 />

@@ -1311,5 +1311,18 @@
         "packHint": "Suena en lugar de los sonidos de siempre hasta el {date}. Apagado, sigue así hasta entonces.",
         "preview": "Escuchar los sonidos de {season}",
         "notSaved": "No se pudo guardar tu elección. Inténtalo de nuevo en un momento."
+    },
+    "polarTools": {
+        "title": "Permisos de Polar",
+        "intro": "Acciones que Polar ejecuta sin preguntar. Revoca una y vuelve a preguntar.",
+        "empty": "Aún nada. Elige No preguntar en una petición de Polar y saldrá aquí.",
+        "anyTarget": "Cualquiera",
+        "onlyTarget": "Solo {target}",
+        "allowedOn": "Permitido {date}",
+        "revoke": "Revocar",
+        "revokeLabel": "Revocar {tool}",
+        "revokeFailed": "No se pudo revocar. Reinténtalo.",
+        "unknownTool": "Ya no disponible",
+        "stillChecked": "Polar las sigue ejecutando como tú, con el acceso que tengas en ese momento."
     }
 }

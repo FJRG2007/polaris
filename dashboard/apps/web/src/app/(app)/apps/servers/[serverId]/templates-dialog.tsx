@@ -26,6 +26,13 @@ import {
     Skeleton,
     Textarea
 } from "@polaris/ui";
+import { CodeEditor } from "@/components/json-view";
+import { languageForFile } from "@/lib/code-language";
+
+/** The grammar a template file is written in, by its name. */
+function fileLanguage(path: string): string | null {
+    return languageForFile(path.split("/").pop() ?? "")?.id ?? null;
+}
 
 type T = ReturnType<typeof useTranslations<"servers">>;
 
@@ -350,13 +357,13 @@ function Editor({
                             label={t(`${e}.content`)}
                             error={issues.get(`spec.files.${i}.content`)}
                         >
-                            <Textarea
-                                rows={4}
+                            {/* Painted in the grammar its path names: a unit
+                                file, a YAML config, a shell script. */}
+                            <CodeEditor
                                 value={file.content}
-                                className="font-mono text-xs"
-                                onChange={(event) =>
-                                    at("files", i, { content: event.target.value })
-                                }
+                                language={fileLanguage(file.path)}
+                                invalid={!!issues.get(`spec.files.${i}.content`)}
+                                onChange={(next) => at("files", i, { content: next })}
                             />
                         </Field>
                     </div>

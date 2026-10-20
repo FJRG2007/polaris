@@ -100,6 +100,14 @@ export class McpRefusal extends Error {
     }
 }
 
+/** The one thing a call acts on, as a person would name it. */
+export interface McpToolTarget {
+    readonly id: string;
+    readonly name: string;
+    /** What the call does to it, in a word or two: "unlatch". */
+    readonly action?: string;
+}
+
 export interface McpTool<Input = never> {
     readonly name: string;
     /** One line, in the words of somebody deciding whether to call it. This is
@@ -135,6 +143,12 @@ export interface McpTool<Input = never> {
     readonly idempotent?: boolean;
     /** What a client shows a person in place of the name. */
     readonly title?: string;
+    /** For a tool whose input names one thing it acts on (a device, a server):
+     *  that thing's id and name, read with the caller's own access, and the
+     *  word for what it will do to it ("unlatch"). Null, or a throw, when the
+     *  caller may not see it. Polar shows the name on its approval card and
+     *  scopes an "Always allow" for a destructive tool to this id. */
+    target?(input: Input, caller: McpCaller): Promise<McpToolTarget | null>;
     run(input: Input, caller: McpCaller): Promise<McpToolResult>;
 }
 

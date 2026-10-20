@@ -200,7 +200,14 @@
         "destructive": "This can't be undone from here.",
         "details": "Details",
         "accepted": "Approved",
-        "rejected": "Not run"
+        "rejected": "Not run",
+        "always": "Always allow",
+        "alwaysTool": "Polar will run {action} without asking again.",
+        "alwaysTarget": "Polar will do this to {target} without asking again.",
+        "alwaysRevoke": "Undo it in Polar permissions.",
+        "alwaysBack": "Back",
+        "alwaysConfirm": "Allow and run",
+        "alwaysFailed": "Couldn't save that, so nothing ran. Try again."
     },
     "page": {
         "title": "Polar"

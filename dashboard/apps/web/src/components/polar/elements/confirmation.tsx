@@ -9,10 +9,16 @@
  * LICENSE beside this file. Changed: Tailwind 3, Polaris tokens and Button,
  * and the parts it shows by state (request, accepted, rejected) folded into one
  * component that takes the plain-language lines as props.
+ *
+ * "Always allow" follows the connector permissions Claude and ChatGPT offer
+ * per tool: the answer is stored on the server and read by the chat's own
+ * loop, never by this card. For a tool that can destroy, the card says plainly
+ * that it will stop asking - and for which one thing - before it is chosen.
  */
 
-import type { ReactNode } from "react";
 import { Button, cn } from "@polaris/ui";
+import { JsonView } from "@/components/json-view";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check, ShieldAlert, UserRound, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { jsonOf, type ToolState } from "@/components/polar/elements/tool";
@@ -23,6 +29,30 @@ export interface ConfirmationApproval {
     reason?: string;
 }
 
+/** What the server read a call as: the thing it acts on, and what a grant covers. */
+interface CallTarget {
+    target: { name: string; action: string | null } | null;
+    scope: "target" | "tool" | "none";
+}
+
+/** Asks the server what a call acts on, or stores "Always allow" for it. */
+async function askGrants(tool: string, input: unknown, allow: boolean): Promise<CallTarget> {
+    const response = await fetch("/api/polar/tool-grants", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tool, input, allow })
+    });
+    if (!response.ok) throw new Error(`tool-grants ${response.status}`);
+    return (await response.json()) as CallTarget;
+}
+
+/** "Unlatch Studio door", or "Operate a device: Studio door" with no verb. */
+export function callSummary(action: string, target: CallTarget["target"]): string | null {
+    if (!target) return null;
+    if (!target.action) return `${action}: ${target.name}`;
+    return `${target.action.charAt(0).toUpperCase()}${target.action.slice(1)} ${target.name}`;
+}
+
 export function Confirmation({
     state,
     approval,
@@ -30,6 +60,7 @@ export function Confirmation({
     affects,
     destructive,
     input,
+    tool,
     onApprove,
     onReject,
     className
@@ -42,13 +73,61 @@ export function Confirmation({
     affects: string[];
     destructive: boolean;
     input: unknown;
+    /** The tool's name. Given, the card offers "Always allow" and names the
+     *  call's target as the server reads it. */
+    tool?: string;
     onApprove: () => void;
     onReject: () => void;
     className?: string;
 }) {
     const t = useTranslations("polar");
-    if (!approval || state === "input-streaming" || state === "input-available") return null;
     const requested = state === "approval-requested";
+    const asking = requested && !!tool && !!approval;
+    const inputJson = jsonOf(input);
+    const [read, setRead] = useState<CallTarget | null>(null);
+    const [confirming, setConfirming] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [failed, setFailed] = useState(false);
+
+    // The target's name, read as this person on the server. The card already
+    // shows the raw id, so a failure here only leaves it at that.
+    useEffect(() => {
+        if (!asking || !tool) return;
+        let live = true;
+        askGrants(tool, input, false)
+            .then((found) => {
+                if (live) setRead(found);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+        // Keyed by the input as text: a re-render hands a new object for the
+        // same call, and asking again for it would be a wasted round trip.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [asking, tool, inputJson]);
+
+    if (!approval || state === "input-streaming" || state === "input-available") return null;
+    const summary = callSummary(action, read?.target ?? null);
+    const scopeName = read?.scope === "target" && read.target ? read.target.name : null;
+    const alwaysText = scopeName
+        ? t("approval.alwaysTarget", { target: scopeName })
+        : t("approval.alwaysTool", { action });
+
+    async function alwaysAllow() {
+        if (!tool) return;
+        setSaving(true);
+        setFailed(false);
+        try {
+            await askGrants(tool, input, true);
+            onApprove();
+        } catch {
+            setFailed(true);
+        } finally {
+            setSaving(false);
+        }
+    }
+
     let outcome: ReactNode = null;
     if (!requested) {
         outcome = approval.approved ? (
@@ -71,7 +150,9 @@ export function Confirmation({
             )}
         >
             <p className="font-medium text-foreground">{t("approval.question", { action })}</p>
-            {affects.length > 0 ? (
+            {summary ? (
+                <p className="min-w-0 break-words text-sm text-foreground">{summary}</p>
+            ) : affects.length > 0 ? (
                 <p className="min-w-0 text-xs text-muted-foreground">
                     <span className="text-foreground-subtle">{t("approval.affects")} </span>
                     <span className="break-words">{affects.join(", ")}</span>
@@ -87,15 +168,60 @@ export function Confirmation({
             </p>
             <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">{t("approval.details")}</summary>
-                <pre className="mt-1 max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-muted p-2 font-mono text-[11px]">
-                    {jsonOf(input)}
-                </pre>
+                <JsonView
+                    value={inputJson}
+                    className="mt-1 max-h-40"
+                    label={t("approval.details")}
+                />
             </details>
-            {requested ? (
+            {requested && confirming ? (
+                <div className="space-y-2 rounded-md border border-border bg-muted/40 p-2 text-xs">
+                    <p className="text-foreground">
+                        {alwaysText} {t("approval.alwaysRevoke")}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setConfirming(false)}
+                        >
+                            {t("approval.alwaysBack")}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            disabled={saving}
+                            onClick={() => void alwaysAllow()}
+                        >
+                            {t("approval.alwaysConfirm")}
+                        </Button>
+                    </div>
+                </div>
+            ) : null}
+            {requested && failed ? (
+                <p role="alert" className="text-xs text-danger">
+                    {t("approval.alwaysFailed")}
+                </p>
+            ) : null}
+            {requested && !confirming ? (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={onReject}>
                         {t("approval.deny")}
                     </Button>
+                    {asking && read?.scope !== "none" ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={saving}
+                            title={`${alwaysText} ${t("approval.alwaysRevoke")}`}
+                            onClick={() => (destructive ? setConfirming(true) : void alwaysAllow())}
+                        >
+                            {t("approval.always")}
+                        </Button>
+                    ) : null}
                     <Button
                         type="button"
                         variant={destructive ? "danger" : "primary"}
@@ -105,9 +231,8 @@ export function Confirmation({
                         {t("approval.run")}
                     </Button>
                 </div>
-            ) : (
-                outcome
-            )}
+            ) : null}
+            {outcome}
         </div>
     );
 }

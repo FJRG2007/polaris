@@ -1761,6 +1761,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ],
             group: DEVELOPERS_GROUP
         },
+        // What Polar may do without asking first: the "Always allow" answers
+        // from its approval card, each with Revoke.
+        {
+            label: "Polar permissions", // i18n-ignore
+            href: "/account/polar-tools",
+            icon: ShieldCheck,
+            keywords: ["polar", "always allow", "approvals", "permissions", "assistant"],
+            group: DEVELOPERS_GROUP
+        },
         {
             label: "AI provider keys", // i18n-ignore
             href: "/account/ai-keys",

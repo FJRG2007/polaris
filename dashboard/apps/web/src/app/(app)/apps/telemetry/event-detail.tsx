@@ -25,6 +25,15 @@ import { Eye, EyeOff } from "lucide-react";
 import type { EventDetail } from "@/lib/telemetry/report-service";
 import type { ContextGroup, HeaderField, StackFrame } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { JsonView, isValidJson } from "@/components/json-view";
+import { useHighlighter } from "@/lib/code-highlight";
+import { languageForFile } from "@/lib/code-language";
+
+/** The grammar a frame's file is written in, by its name past any query. */
+function frameLanguage(file: string): string | null {
+    const name = file.split(/[?#]/)[0]?.split(/[\\/]/).pop() ?? "";
+    return languageForFile(name)?.id ?? null;
+}
 
 /** A titled box. Every section on this screen is one, so the screen reads as a
  *  list of answers rather than as a wall. */
@@ -69,7 +78,9 @@ function Secret({ value }: { value: string }) {
     const [shown, setShown] = useState(false);
     return (
         <span className="flex items-baseline gap-2">
-            <span className={cn("min-w-0 flex-1 break-all", !shown && "select-none tracking-widest")}>
+            <span
+                className={cn("min-w-0 flex-1 break-all", !shown && "select-none tracking-widest")}
+            >
                 {shown ? value : "•".repeat(Math.min(24, Math.max(8, value.length)))}
             </span>
             <Button
@@ -98,6 +109,13 @@ function Fields({ fields }: { fields: readonly HeaderField[] }) {
     );
 }
 
+/** One source line, painted when its grammar has loaded. */
+function Line({ line, painted }: { line: string; painted: string | null }) {
+    // highlight.js escapes what it is given; the only markup is its own spans.
+    if (painted === null) return <span className="whitespace-pre">{line}</span>;
+    return <span className="whitespace-pre" dangerouslySetInnerHTML={{ __html: painted }} />;
+}
+
 /**
  * One frame, and the code it was on when it is known.
  *
@@ -109,6 +127,10 @@ function Fields({ fields }: { fields: readonly HeaderField[] }) {
  */
 function Frame({ frame }: { frame: StackFrame }) {
     const snippet = frame.pre.length > 0 || frame.post.length > 0 || frame.context !== null;
+    // Painted a line at a time: the rows carry their own numbers and the marked
+    // line, and a snippet is a few lines cut out of a file anyway.
+    const language = snippet ? frameLanguage(frame.file) : null;
+    const highlight = useHighlighter(language);
     const first = (frame.line ?? frame.pre.length + 1) - frame.pre.length;
     return (
         <li
@@ -122,7 +144,9 @@ function Frame({ frame }: { frame: StackFrame }) {
                 <span className="min-w-0 truncate" title={frame.file}>
                     {frame.file}
                 </span>
-                {frame.line !== null && <span className="text-muted-foreground">:{frame.line}</span>}
+                {frame.line !== null && (
+                    <span className="text-muted-foreground">:{frame.line}</span>
+                )}
             </div>
             {snippet && (
                 <pre className="mt-1.5 overflow-x-auto rounded-md bg-muted/60 py-1 text-[0.6875rem] leading-relaxed">
@@ -130,7 +154,13 @@ function Frame({ frame }: { frame: StackFrame }) {
                         ...frame.pre.map((line, at) => ({ line, at: first + at, threw: false })),
                         ...(frame.context === null
                             ? []
-                            : [{ line: frame.context, at: frame.line ?? first + frame.pre.length, threw: true }]),
+                            : [
+                                  {
+                                      line: frame.context,
+                                      at: frame.line ?? first + frame.pre.length,
+                                      threw: true
+                                  }
+                              ]),
                         ...frame.post.map((line, at) => ({
                             line,
                             at: (frame.line ?? first + frame.pre.length) + at + 1,
@@ -150,7 +180,12 @@ function Frame({ frame }: { frame: StackFrame }) {
                             <span className="w-10 shrink-0 select-none text-right text-muted-foreground">
                                 {row.at}
                             </span>
-                            <span className="whitespace-pre">{row.line}</span>
+                            <Line
+                                line={row.line}
+                                painted={
+                                    language && highlight ? highlight(row.line, language) : null
+                                }
+                            />
                         </div>
                     ))}
                 </pre>
@@ -218,7 +253,9 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                 {event.sdk && (
                     <span>
                         {t("event.via", {
-                            sdk: event.sdk.version ? `${event.sdk.name} ${event.sdk.version}` : event.sdk.name
+                            sdk: event.sdk.version
+                                ? `${event.sdk.name} ${event.sdk.version}`
+                                : event.sdk.name
                         })}
                     </span>
                 )}
@@ -265,9 +302,19 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                             <p className="bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
                                 {t("event.body")}
                             </p>
-                            <pre className="overflow-x-auto px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
-                                {body}
-                            </pre>
+                            {/* A JSON body is painted; a form or text body has no
+                                grammar to paint and stays as it came. */}
+                            {isValidJson(body) ? (
+                                <JsonView
+                                    value={body}
+                                    label={t("event.body")}
+                                    className="m-2 max-h-96"
+                                />
+                            ) : (
+                                <pre className="overflow-x-auto px-3 py-2 font-mono text-[0.6875rem] leading-relaxed">
+                                    {body}
+                                </pre>
+                            )}
                         </>
                     )}
                 </Panel>
@@ -295,7 +342,10 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                                     <span className="w-20 shrink-0 truncate text-muted-foreground">
                                         {crumb.category || crumb.type}
                                     </span>
-                                    <span className="min-w-0 flex-1 break-words" title={crumb.message}>
+                                    <span
+                                        className="min-w-0 flex-1 break-words"
+                                        title={crumb.message}
+                                    >
                                         {crumb.message}
                                     </span>
                                 </div>
@@ -303,7 +353,10 @@ export function EventPanel({ event, kept }: { event: EventDetail; kept: number }
                                     <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 pl-[5.5rem] font-mono text-[0.6875rem] text-muted-foreground">
                                         {crumb.data.map((field) => (
                                             <span key={field.key} className="break-all">
-                                                {field.key}: <span className="text-foreground">{field.value}</span>
+                                                {field.key}:{" "}
+                                                <span className="text-foreground">
+                                                    {field.value}
+                                                </span>
                                             </span>
                                         ))}
                                     </div>

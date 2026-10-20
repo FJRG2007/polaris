@@ -200,7 +200,14 @@
         "destructive": "No se puede deshacer aquí.",
         "details": "Detalles",
         "accepted": "Aprobado",
-        "rejected": "Omitido"
+        "rejected": "Omitido",
+        "always": "No preguntar",
+        "alwaysTool": "Polar hará {action} sin volver a preguntar.",
+        "alwaysTarget": "Polar hará esto en {target} sin volver a preguntar.",
+        "alwaysRevoke": "Deshazlo en Permisos de Polar.",
+        "alwaysBack": "Volver",
+        "alwaysConfirm": "Permitir y hacer",
+        "alwaysFailed": "No se guardó y no se ejecutó nada. Reinténtalo."
     },
     "page": {
         "title": "Polar"
