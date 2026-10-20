@@ -104,9 +104,13 @@ export function ShareDialog({
     const t = useTranslations("components");
     const locale = useLocale();
     const capabilityLabel = (one: string) =>
-        CAPABILITIES.has(one) ? t(`share.capabilities.${one}.label` as NamespaceKey<"components">) : one;
+        CAPABILITIES.has(one)
+            ? t(`share.capabilities.${one}.label` as NamespaceKey<"components">)
+            : one;
     const capabilityHint = (one: string) =>
-        CAPABILITIES.has(one) ? t(`share.capabilities.${one}.hint` as NamespaceKey<"components">) : "";
+        CAPABILITIES.has(one)
+            ? t(`share.capabilities.${one}.hint` as NamespaceKey<"components">)
+            : "";
     const dayNames = useMemo(() => core.weekdayNames(locale, "short"), [locale]);
     // The reader's own week, so Monday-first and Sunday-first both draw the days
     // in the order the person expects to read them in.
@@ -314,9 +318,7 @@ export function ShareDialog({
                 <DialogHeader>
                     <DialogTitle>{t("share.title", { name })}</DialogTitle>
                     <DialogDescription>
-                        {bounded
-                            ? t("share.introBounded")
-                            : t("share.intro")}
+                        {bounded ? t("share.introBounded") : t("share.intro")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -327,9 +329,7 @@ export function ShareDialog({
                             <Skeleton className="h-12 w-full" />
                         </>
                     ) : grants.length === 0 ? (
-                        <p className="text-[13px] text-muted-foreground">
-                            {t("share.none")}
-                        </p>
+                        <p className="text-[13px] text-muted-foreground">{t("share.none")}</p>
                     ) : (
                         <ul className="flex flex-col gap-1">
                             {grants.map((grant) => (
@@ -468,10 +468,14 @@ export function ShareDialog({
                         </div>
                     ) : (
                         <Select
-                            aria-label={kind === "team" ? t("share.whichTeam") : t("share.whichRole")}
+                            aria-label={
+                                kind === "team" ? t("share.whichTeam") : t("share.whichRole")
+                            }
                             value={principalId}
                             onValueChange={setPrincipalId}
-                            placeholder={kind === "team" ? t("share.pickTeam") : t("share.pickRole")}
+                            placeholder={
+                                kind === "team" ? t("share.pickTeam") : t("share.pickRole")
+                            }
                             options={groups.map((one) => ({
                                 value: one.id,
                                 label: one.orgName ? `${one.orgName} - ${one.name}` : one.name
@@ -596,7 +600,10 @@ export function ShareDialog({
                                     </fieldset>
 
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <Field label={t("share.fromHour")} htmlFor="share-from-hour">
+                                        <Field
+                                            label={t("share.fromHour")}
+                                            htmlFor="share-from-hour"
+                                        >
                                             <Input
                                                 id="share-from-hour"
                                                 type="time"

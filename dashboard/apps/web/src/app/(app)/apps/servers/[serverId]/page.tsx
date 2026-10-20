@@ -63,7 +63,9 @@ export default async function ServerPage({ params }: { params: Promise<{ serverI
             initialUsage={cached ? { at: cached.at, value: cached.metrics } : undefined}
             protectedBy={protectedBy}
             connectionId={
-                server.kind === "local" ? LOCAL_DOCKER_CONNECTION_ID : `${HOST_DOCKER_PREFIX}${server.id}`
+                server.kind === "local"
+                    ? LOCAL_DOCKER_CONNECTION_ID
+                    : `${HOST_DOCKER_PREFIX}${server.id}`
             }
             // A registered server that turned out to be this machine is folded into
             // the local row upstream, so a host row here is always a remote one and

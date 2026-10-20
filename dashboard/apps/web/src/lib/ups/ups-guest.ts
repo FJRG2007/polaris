@@ -50,10 +50,7 @@ export interface UpsGuestView {
 }
 
 export type UpsGuestRefusal =
-    | "closed"
-    | "notThat"
-    | "tooMany"
-    | `nearby${Capitalize<Exclude<core.NearbyVerdict, "near">>}`;
+    "closed" | "notThat" | "tooMany" | `nearby${Capitalize<Exclude<core.NearbyVerdict, "near">>}`;
 
 /** The live grant and row behind a UPS link, or null when it opens nothing. */
 async function reached(token: string): Promise<{ grant: LiveGrant; row: UpsRow } | null> {

@@ -38,11 +38,7 @@ type UpsRow = NonNullable<Awaited<ReturnType<typeof prisma.ups.findUnique>>>;
 
 /** Why a UPS has no reading, in words the screen translates. */
 export type UpsUnreachable =
-    | "fullEditionNeeded"
-    | "updateNeeded"
-    | "machineUnreachable"
-    | "notFound"
-    | "noAnswer";
+    "fullEditionNeeded" | "updateNeeded" | "machineUnreachable" | "notFound" | "noAnswer";
 
 export type UpsReadResult =
     | {

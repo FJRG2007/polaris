@@ -41,7 +41,8 @@ import {
 /** What a refusal reads as. Anything else is logged and replaced, the same rule
  *  the rest of the app follows: an internal message names paths nobody asked to
  *  publish. */
-type ShareFailure = "share.unreadable" | "share.notWritten" | "share.nobodyFound" | "share.notTakenBack";
+type ShareFailure =
+    "share.unreadable" | "share.notWritten" | "share.nobodyFound" | "share.notTakenBack";
 
 async function refusal(caught: unknown, key: ShareFailure): Promise<{ error: string }> {
     if (caught instanceof GrantError) return { error: caught.message };
@@ -106,7 +107,11 @@ export async function shareAction(
         await requireMayShare(user, kind, String(subjectId));
         const parsed = core.accessGrantSchema.safeParse(input);
         if (!parsed.success) {
-            return { error: parsed.error.issues[0]?.message ?? (await getTranslations("common"))("share.notWritten") };
+            return {
+                error:
+                    parsed.error.issues[0]?.message ??
+                    (await getTranslations("common"))("share.notWritten")
+            };
         }
         // The same scoping the picker was filled from, asked again here: what a
         // form offered is not what a call has to carry.
