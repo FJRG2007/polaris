@@ -23,7 +23,7 @@ import type { PersonRef } from "@/lib/tasks/facts";
 import { CopyButton } from "@/components/copy-button";
 import type { FormView } from "@/lib/tasks/form-service";
 import type { AutomationView } from "@/lib/tasks/automation-service";
-import { Button, Card, CardBody, Input, Select, Switch, cn } from "@polaris/ui";
+import { Button, Card, CardBody, Input, isDirty, Select, Switch, cn } from "@polaris/ui";
 import type { CustomFieldView, StatusView, TagView } from "@/lib/tasks/space-service";
 
 interface RuleContext {
@@ -84,13 +84,25 @@ const BLANK_RULE: RuleDraft = {
     actions: [{ type: "setPriority", targetId: "high" }]
 };
 
+/** A saved rule as the editor holds it. */
+function draftOf(rule: AutomationView): RuleDraft {
+    return {
+        name: rule.name,
+        trigger: rule.trigger,
+        listId: rule.listId,
+        conditions: rule.conditions,
+        actions: [...rule.actions]
+    };
+}
+
 function RuleEditor({
     draft,
     context,
     onChange,
     onSave,
     onCancel,
-    error
+    error,
+    unchanged
 }: {
     draft: RuleDraft;
     context: RuleContext;
@@ -98,6 +110,8 @@ function RuleEditor({
     onSave: () => void;
     onCancel: () => void;
     error: string;
+    /** The rule as it is already saved: nothing to save. */
+    unchanged: boolean;
 }) {
     const t = useTranslations("tasks");
     const tc = useTranslations("common");
@@ -264,7 +278,11 @@ function RuleEditor({
                 {error && <p className="text-xs text-danger">{error}</p>}
 
                 <div className="flex gap-2">
-                    <Button size="sm" onClick={onSave} disabled={!draft.name.trim() || draft.actions.length === 0}>
+                    <Button
+                        size="sm"
+                        onClick={onSave}
+                        disabled={!draft.name.trim() || draft.actions.length === 0 || unchanged}
+                    >
                         {t("automations.saveRule")}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={onCancel}>
@@ -287,6 +305,9 @@ export function AutomationsPanel({
     const [draft, setDraft] = useState<RuleDraft | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const editedRule = editingId ? automations.find((rule) => rule.id === editingId) : undefined;
+    const unchanged =
+        draft !== null && editedRule !== undefined && !isDirty(draftOf(editedRule), draft);
 
     const save = async () => {
         if (!draft) return;
@@ -325,6 +346,7 @@ export function AutomationsPanel({
                     draft={draft}
                     context={context}
                     error={error}
+                    unchanged={unchanged}
                     onChange={setDraft}
                     onSave={save}
                     onCancel={() => {
@@ -368,13 +390,7 @@ export function AutomationsPanel({
                                     type="button"
                                     onClick={() => {
                                         setEditingId(rule.id);
-                                        setDraft({
-                                            name: rule.name,
-                                            trigger: rule.trigger,
-                                            listId: rule.listId,
-                                            conditions: rule.conditions,
-                                            actions: [...rule.actions]
-                                        });
+                                        setDraft(draftOf(rule));
                                     }}
                                     className="rounded-md border border-border px-2 py-1 text-xs transition-colors hover:bg-muted"
                                 >

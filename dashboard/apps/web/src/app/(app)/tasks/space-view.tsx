@@ -33,6 +33,7 @@ import {
     ConfirmDeleteDialog,
     EmptyState,
     Input,
+    isDirty,
     Select,
     cn
 } from "@polaris/ui";
@@ -362,7 +363,18 @@ function StatusesTab({
                             />
                             <Button
                                 size="sm"
-                                disabled={!draft.name.trim() || saving}
+                                disabled={
+                                    !draft.name.trim() ||
+                                    saving ||
+                                    !isDirty(
+                                        {
+                                            name: status.name,
+                                            type: status.type,
+                                            color: status.color
+                                        },
+                                        draft
+                                    )
+                                }
                                 onClick={() => void save()}
                             >
                                 {saving ? t("space.saving") : tc("actions.save")}
@@ -713,7 +725,15 @@ function TagsTab({
                                 }}
                                 className="h-8 min-w-32 flex-1 text-sm"
                             />
-                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                            <Button
+                                size="sm"
+                                disabled={
+                                    !draft.name.trim() ||
+                                    saving ||
+                                    !isDirty({ name: tag.name, color: tag.color }, draft)
+                                }
+                                onClick={() => void save()}
+                            >
                                 {saving ? t("space.saving") : tc("actions.save")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>

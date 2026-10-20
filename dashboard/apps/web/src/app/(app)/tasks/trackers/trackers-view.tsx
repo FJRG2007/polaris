@@ -39,6 +39,7 @@ import {
     DialogTitle,
     EmptyState,
     Input,
+    isDirty,
     Select,
     Switch
 } from "@polaris/ui";
@@ -234,6 +235,24 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
         });
     }, []);
 
+    // A tracker put back as it is saves nothing; a new secret is always a change,
+    // since the stored one is never read back.
+    const unchanged =
+        tracker !== null &&
+        !secret &&
+        !isDirty(
+            {
+                provider: tracker.provider,
+                label: tracker.label,
+                spaceId: tracker.spaceId,
+                listId: tracker.listId,
+                query: tracker.query,
+                config: tracker.config,
+                pushStatus: tracker.pushStatus
+            },
+            { provider, label, spaceId, listId, query, config, pushStatus }
+        );
+
     const lists = spaces?.find((space) => space.id === spaceId)?.lists ?? [];
     useEffect(() => {
         if (lists.length > 0 && !lists.some((list) => list.id === listId)) setListId(lists[0]!.id);
@@ -371,7 +390,10 @@ function TrackerDialog({ tracker, onClose }: { tracker: TrackerView | null; onCl
                     <Button variant="ghost" onClick={onClose}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button onClick={submit} disabled={busy || !label || !spaceId || !listId}>
+                    <Button
+                        onClick={submit}
+                        disabled={busy || !label || !spaceId || !listId || unchanged}
+                    >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {tc("actions.save")}
                     </Button>

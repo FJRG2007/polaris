@@ -71,6 +71,7 @@ import {
     ShortcutHint,
     cn,
     keepFocusOnClose,
+    isDirty,
     shortcutPressed,
     useDeferredFocus
 } from "@polaris/ui";
@@ -214,7 +215,8 @@ function ColumnEditor({
                 />
                 <button
                     type="button"
-                    disabled={!draft.name.trim() || busy}
+                    // The column as it already is: nothing to save.
+                    disabled={!draft.name.trim() || busy || !isDirty(initial, draft)}
                     onClick={() => void submit()}
                     className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
                 >
