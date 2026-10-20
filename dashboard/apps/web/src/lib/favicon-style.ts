@@ -117,7 +117,7 @@ export function faviconBadge(style: FaviconStyle, waiting: number): FaviconBadge
 }
 
 /** A prefix this module put on a title, and nothing a page named itself. */
-const TITLE_BADGE = /^(?:\(\d+\+?\) |\u2022 )/;
+const TITLE_BADGE = /^(?:\(\d+\+?\) |\u2022 )+/;
 
 /**
  * The tab's title with what is waiting in front of it - "(3) Chat", or a dot -
