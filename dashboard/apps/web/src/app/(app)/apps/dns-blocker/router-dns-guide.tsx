@@ -18,6 +18,7 @@ import { Button, CopyButton, Select, Skeleton } from "@polaris/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
     likelyGateway,
+    routerAdminUrl,
     routerBrandsFor,
     routerGuide,
     type RouterBrand,
@@ -110,8 +111,7 @@ export function RouterDnsGuide({
     }, []);
 
     const guide = routerGuide(brand);
-    const gateway = likelyGateway(address);
-    const adminUrl = guide.admin ?? (gateway ? `http://${gateway}` : null);
+    const adminUrl = routerAdminUrl(guide, address);
 
     return (
         <div className="flex flex-col gap-3 text-sm">

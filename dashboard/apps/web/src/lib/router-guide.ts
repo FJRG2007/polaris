@@ -187,7 +187,11 @@ export type RouterForwardValue =
     /** This server's LAN address. */
     | "ip"
     /** "any source", for forms that ask which WAN addresses the rule accepts. */
-    | "anySource";
+    | "anySource"
+    /** The port, in a TCP-only box: filled for a TCP rule, left empty otherwise. */
+    | "tcpPort"
+    /** The port, in a UDP-only box: filled for a UDP rule, left empty otherwise. */
+    | "udpPort";
 
 export interface RouterFormField {
     readonly label: string;
@@ -886,6 +890,16 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         admin: "http://dlinkrouter.local",
         signIn: "The Admin password you set. On a router never set up, leave it blank.",
         forwardPath: "Features > Port Forwarding > Add Rule",
+        forwardFields: [
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Name", value: "name" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "Local IP", value: "ip" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "TCP Port", value: "tcpPort" },
+            // i18n-ignore the router's own label, quoted as its page shows it
+            { label: "UDP Port", value: "udpPort" }
+        ],
         forwardSave: "Apply",
         forwardEnable: null,
         caution:
@@ -1059,11 +1073,13 @@ const SIGNATURES: readonly (readonly [RouterBrand, readonly string[]])[] = [
     ["fritzbox", ["fritz"]],
     ["netgear", ["netgear"]],
     ["mikrotik", ["mikrotik", "routeros"]],
-    // The provider boxes before the makers they are built by: a Livebox names
-    // Arcadyan or Sagemcom, and is still best walked through as a Livebox.
-    ["movistar", ["movistar", "askey", "mitrastar"]],
-    ["livebox", ["livebox", "arcadyan"]],
-    ["vodafone", ["vodafone", "sercomm"]],
+    // The provider boxes by their own names only, before the makers they are built
+    // by: a Livebox that also names Sagemcom is still best walked through as a
+    // Livebox. A bare Arcadyan, Sercomm or Askey says nothing about the provider -
+    // those build boxes for ISPs everywhere - so it is left to the generic guide.
+    ["movistar", ["movistar"]],
+    ["livebox", ["livebox"]],
+    ["vodafone", ["vodafone"]],
     ["sagemcom", ["sagemcom"]],
     ["nokia", ["nokia"]],
     ["xiaomi", ["xiaomi", "miwifi"]],
@@ -1271,6 +1287,16 @@ function distinct(name: string, limit: number, taken: ReadonlySet<string>): stri
  * rather than stated - the address that is certain is the one already in the
  * browser's network settings as the gateway.
  */
+/**
+ * Where the brand's admin page is, for the button that opens it. Null on a brand
+ * whose only way in is a phone app: the gateway address there is not a page.
+ */
+export function routerAdminUrl(guide: RouterBrandGuide, lanIp: string | null): string | null {
+    if (guide.app) return null;
+    const gateway = likelyGateway(lanIp);
+    return guide.admin ?? (gateway ? `http://${gateway}` : null);
+}
+
 export function likelyGateway(lanIp: string | null): string | null {
     if (!lanIp) return null;
     const parts = lanIp.split(".");

@@ -15,6 +15,7 @@ import {
     gameForwardRules,
     likelyGateway,
     mergeProtocolRules,
+    routerAdminUrl,
     routerBrandsFor,
     routerGuide,
     ROUTER_BRANDS
@@ -475,12 +476,30 @@ describe("the routers people actually have", () => {
 
     it("recognizes the new brands from the header their firmware sends", () => {
         expect(detectRouterBrand("Livebox")).toBe("livebox");
-        expect(detectRouterBrand("Arcadyan httpd 1.0")).toBe("livebox");
-        expect(detectRouterBrand("Mitrastar")).toBe("movistar");
-        expect(detectRouterBrand("Sercomm")).toBe("vodafone");
+        expect(detectRouterBrand("Movistar Fibra")).toBe("movistar");
+        expect(detectRouterBrand("Vodafone Power Station")).toBe("vodafone");
         expect(detectRouterBrand("D-Link")).toBe("dlink");
         expect(detectRouterBrand("Linksys")).toBe("linksys");
         expect(detectRouterBrand("Sagemcom")).toBe("sagemcom");
         expect(detectRouterBrand("OpenWrt")).toBe("openwrt");
+    });
+
+    it("leaves a box that names only the maker that built it to the generic guide", () => {
+        for (const header of ["Arcadyan httpd 1.0", "Sercomm", "Askey", "Mitrastar"]) {
+            expect(detectRouterBrand(header), header).toBe("other");
+        }
+    });
+
+    it("splits D-Link's port between its TCP and UDP boxes instead of asking for a protocol", () => {
+        const values = routerGuide("dlink").forwardFields?.map((field) => field.value);
+        expect(values).toEqual(["name", "ip", "tcpPort", "udpPort"]);
+    });
+
+    it("offers no admin page to open on the app-only mesh systems", () => {
+        for (const id of ["googlewifi", "eero"] as const) {
+            expect(routerAdminUrl(routerGuide(id), "192.168.86.20"), id).toBeNull();
+        }
+        expect(routerAdminUrl(routerGuide("other"), "192.168.1.20")).toBe("http://192.168.1.1");
+        expect(routerAdminUrl(routerGuide("tplink"), null)).toBe("http://tplinkwifi.net");
     });
 });
