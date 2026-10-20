@@ -1109,7 +1109,8 @@ export function PolarChat({
                     onSubmit={submit}
                     className={cn(dragging && "border-primary bg-primary/10")}
                     onDragOver={(event) => {
-                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files"))
+                            return;
                         event.preventDefault();
                         setDragging(true);
                     }}
@@ -1118,7 +1119,8 @@ export function PolarChat({
                             setDragging(false);
                     }}
                     onDrop={(event) => {
-                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files")) return;
+                        if (noKeys || !Array.from(event.dataTransfer.types).includes("Files"))
+                            return;
                         event.preventDefault();
                         setDragging(false);
                         addFiles(Array.from(event.dataTransfer.files));

@@ -25,15 +25,7 @@ export type OrbState = (typeof ORB_STATES)[number];
 export type OrbSize = 64 | 32 | 20;
 
 export type ModeKey =
-    | "orbits"
-    | "globe"
-    | "rubik"
-    | "wave"
-    | "web"
-    | "braid"
-    | "ribbon"
-    | "ring"
-    | "morph";
+    "orbits" | "globe" | "rubik" | "wave" | "web" | "braid" | "ribbon" | "ring" | "morph";
 
 export const STATE_TO_MODE: Record<OrbState, ModeKey> = {
     working: "orbits",
