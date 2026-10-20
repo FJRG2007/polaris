@@ -131,9 +131,7 @@ const SECTIONS = Object.entries(APP_SECTIONS)
 /** The app, section and record an address shows. */
 export function screenFor(pathname: string): ScreenDescriptor {
     const path = pathname.replace(/\/+$/, "") || "/";
-    const section = SECTIONS.find(
-        ({ href }) => path === href || path.startsWith(`${href}/`)
-    );
+    const section = SECTIONS.find(({ href }) => path === href || path.startsWith(`${href}/`));
     const app = section?.app ?? path.split("/").filter(Boolean)[0];
     const descriptor: ScreenDescriptor = {
         ...(app ? { app } : {}),

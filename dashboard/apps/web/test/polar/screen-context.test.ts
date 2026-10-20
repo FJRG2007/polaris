@@ -44,7 +44,15 @@ function sample(route: string): string {
 }
 
 const signedIn = routesUnder(join(WEB, "src", "app", "(app)"));
-const bundles = ["calendar", "cloud-servers", "crm", "game-servers", "places", "security-scans", "status-pages"]
+const bundles = [
+    "calendar",
+    "cloud-servers",
+    "crm",
+    "game-servers",
+    "places",
+    "security-scans",
+    "status-pages"
+]
     .flatMap((app) => routesUnder(join(WEB, "..", app, "src", "routes")))
     // Public pages of a bundle (a booking link, a status page) have no Polar.
     .filter((route) => !/^\/(cal|status)\//.test(route));
@@ -55,6 +63,14 @@ describe("screen descriptor", () => {
         expect(dynamic.length).toBeGreaterThan(50);
         const missing = dynamic.filter((route) => !screenRecordFor(sample(route)));
         expect(missing).toEqual([]);
+    });
+
+    it("names the app of every signed-in and installable-app screen", () => {
+        const nameless = [...signedIn, ...bundles].filter(
+            (route) => route !== "/" && !screenFor(sample(route)).app
+        );
+        expect(nameless).toEqual([]);
+        expect(screenFor("/places/cameras").app).toBe("home");
     });
 
     it("names the app and section of every rail entry", () => {

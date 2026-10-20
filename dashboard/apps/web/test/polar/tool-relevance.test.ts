@@ -37,7 +37,12 @@ describe("active tools", () => {
     });
 
     it("keeps what the conversation already reached for", () => {
-        const names = relevance.activeToolNames(catalog, "drive", always, new Set(["games_players"]));
+        const names = relevance.activeToolNames(
+            catalog,
+            "drive",
+            always,
+            new Set(["games_players"])
+        );
         expect(names).toContain("games_players");
         expect(names).not.toContain("mail_list");
     });
@@ -51,21 +56,25 @@ describe("active tools", () => {
 
 describe("find_tools", () => {
     it("ranks by name, then description", () => {
-        expect(relevance.rankTools(catalog, "restart deployment").map((entry) => entry.name)[0]).toBe(
-            "deploy_restart"
-        );
-        expect(relevance.rankTools(catalog, "minecraft players").map((entry) => entry.name)).toEqual([
-            "games_players"
-        ]);
+        expect(
+            relevance.rankTools(catalog, "restart deployment").map((entry) => entry.name)[0]
+        ).toBe("deploy_restart");
+        expect(
+            relevance.rankTools(catalog, "minecraft players").map((entry) => entry.name)
+        ).toEqual(["games_players"]);
         expect(relevance.rankTools(catalog, "?!")).toEqual([]);
     });
 
     it("answers names and one line, which the next step then gets", async () => {
-        const output = await run(relevance.findToolsTool(catalog), relevance.FIND_TOOLS, { query: "players" });
+        const output = await run(relevance.findToolsTool(catalog), relevance.FIND_TOOLS, {
+            query: "players"
+        });
         expect(output).toEqual({
             tools: [{ name: "games_players", description: "Players online on a game server." }]
         });
-        const found = relevance.foundInSteps([{ toolResults: [{ toolName: relevance.FIND_TOOLS, output }] }]);
+        const found = relevance.foundInSteps([
+            { toolResults: [{ toolName: relevance.FIND_TOOLS, output }] }
+        ]);
         expect([...found]).toEqual(["games_players"]);
         const used = relevance.usedInMessages([
             {
@@ -76,7 +85,9 @@ describe("find_tools", () => {
                 ]
             }
         ]);
-        expect([...used].sort()).toEqual([relevance.FIND_TOOLS, "games_players", "mail_list"].sort());
+        expect([...used].sort()).toEqual(
+            [relevance.FIND_TOOLS, "games_players", "mail_list"].sort()
+        );
     });
 });
 
@@ -85,7 +96,10 @@ describe("read_current_view", () => {
         pageContextSchema.parse({ route: "/x", app: "tasks", record });
 
     it("reads the record through its tool, capped and fenced", async () => {
-        const call = vi.fn(async () => ({ ok: true, text: "y".repeat(relevance.VIEW_TEXT_MAX + 50) }));
+        const call = vi.fn(async () => ({
+            ok: true,
+            text: "y".repeat(relevance.VIEW_TEXT_MAX + 50)
+        }));
         const set = relevance.currentViewTool(context({ kind: "task", id: "T-1" }), call);
         const output = (await run(set, relevance.READ_CURRENT_VIEW, {})) as { text: string };
         expect(call).toHaveBeenCalledWith("tasks_get", { task: "T-1" });
@@ -95,7 +109,10 @@ describe("read_current_view", () => {
     });
 
     it("says so when the person cannot read it", async () => {
-        const set = relevance.currentViewTool(context({ kind: "task", id: "T-1" }), async () => null);
+        const set = relevance.currentViewTool(
+            context({ kind: "task", id: "T-1" }),
+            async () => null
+        );
         const output = (await run(set, relevance.READ_CURRENT_VIEW, {})) as { text: string };
         expect(output.text).toContain("cannot read this task");
     });
@@ -111,7 +128,11 @@ describe("read_current_view", () => {
     });
 
     it("works with no screen shared", async () => {
-        const output = (await run(relevance.currentViewTool(null, vi.fn()), relevance.READ_CURRENT_VIEW, {})) as {
+        const output = (await run(
+            relevance.currentViewTool(null, vi.fn()),
+            relevance.READ_CURRENT_VIEW,
+            {}
+        )) as {
             text: string;
         };
         expect(output.text).toContain("not sharing");
