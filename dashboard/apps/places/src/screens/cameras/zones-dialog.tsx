@@ -40,6 +40,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     SegmentedControl,
     Switch,
     cn
@@ -176,6 +177,8 @@ export function ZonesDialog({
 
     const enough = draft.points.length >= zoning.MIN_ZONE_POINTS;
     const incomplete = !draft.name.trim() || !enough;
+    const opened = draft.id ? zones.find((zone) => zone.id === draft.id) : undefined;
+    const unchanged = opened !== undefined && !isDirty(draftOf(opened), draft);
 
     const save = async () => {
         setBusy(true);
@@ -512,8 +515,8 @@ export function ZonesDialog({
                     </Button>
                     <Button
                         onClick={() => void save()}
-                        disabled={busy || incomplete}
-                        aria-disabled={incomplete}
+                        disabled={busy || incomplete || unchanged}
+                        aria-disabled={incomplete || unchanged}
                     >
                         {busy ? (
                             <Loader2 className="size-4 shrink-0 animate-spin" />

@@ -33,6 +33,7 @@ export {
     type MenuExtrasSource
 } from "./lib/menu-extras";
 export { moved, useListOrder } from "./lib/list-order";
+export { isDirty, sameValue } from "./lib/dirty";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";
 export { SizeField, type SizeFieldProps } from "./components/size-field";

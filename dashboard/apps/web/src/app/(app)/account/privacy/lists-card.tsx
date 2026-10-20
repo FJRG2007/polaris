@@ -38,7 +38,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 /** The list being edited, or the empty one being made. */
@@ -200,6 +201,13 @@ function ListDialog({
     const t = useTranslations("accountPrivacy");
     const tc = useTranslations("common");
     const named = core.privacyListSchema.shape.name.safeParse(editing.name).success;
+    const shape = (list: Editing) => ({
+        name: list.name,
+        members: new Set(list.members.map((person) => person.id))
+    });
+    // What the dialog opened with: a list edited back to it saves nothing.
+    const [opened] = useState(() => shape(editing));
+    const unchanged = editing.id !== null && !isDirty(opened, shape(editing));
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -234,7 +242,7 @@ function ListDialog({
                     </Button>
                     <Button
                         size="sm"
-                        disabled={!named || busy}
+                        disabled={!named || busy || unchanged}
                         onClick={() => void onSave(editing)}
                     >
                         {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}

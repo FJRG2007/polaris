@@ -23,6 +23,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select,
     Switch
 } from "@polaris/ui";
@@ -68,6 +69,19 @@ export function AlertDialog({
     const [notify, setNotify] = useState(rule?.notify ?? false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const values = {
+        name,
+        kinds: new Set(kinds),
+        cameraId,
+        label,
+        zones: new Set(zones),
+        hours: hoursOn ? { from, to } : null,
+        recipients: new Set(recipients),
+        notify
+    };
+    // What the dialog opened with: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = rule !== null && !isDirty(loaded, values);
 
     const save = async () => {
         setBusy(true);
@@ -291,7 +305,11 @@ export function AlertDialog({
                     <Button
                         onClick={save}
                         disabled={
-                            busy || !name.trim() || kinds.length === 0 || recipients.length === 0
+                            busy ||
+                            unchanged ||
+                            !name.trim() ||
+                            kinds.length === 0 ||
+                            recipients.length === 0
                         }
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}

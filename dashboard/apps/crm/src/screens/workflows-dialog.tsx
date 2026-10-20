@@ -36,6 +36,7 @@ import {
     DialogTitle,
     EmptyState,
     Input,
+    isDirty,
     SegmentedControl,
     Select,
     useToast
@@ -93,6 +94,8 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const format = hostUi.displayFormat.useDisplayFormat();
     const [rows, setRows] = useState<model.WorkflowView[] | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
+    /** The saved workflow the draft was opened from; null for a new one. */
+    const [loaded, setLoaded] = useState<Draft | null>(null);
     const [saving, setSaving] = useState(false);
     const [notice, setNotice] = useState<{ text: string; copy: string } | null>(null);
     const [options, setOptions] = useState<model.WorkflowOptions>({ taskLists: [], people: [] });
@@ -227,16 +230,21 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
 
     const edit = (row: model.WorkflowView) => {
         setNotice(null);
-        setDraft({
+        const opened = {
             id: row.id,
             name: row.name,
             trigger: row.trigger,
             actions: row.actions,
             enabled: row.enabled
-        });
+        };
+        setDraft(opened);
+        setLoaded(opened);
     };
 
-    const valid = draft !== null && model.workflowInputSchema.safeParse(draft).success;
+    const canSave =
+        draft !== null &&
+        model.workflowInputSchema.safeParse(draft).success &&
+        (loaded === null || isDirty(loaded, draft));
 
     let body: React.ReactNode;
     if (draft) {
@@ -677,8 +685,8 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                 {t("workflows.cancel")}
                             </Button>
                             <Button
-                                disabled={saving || !valid}
-                                aria-disabled={saving || !valid}
+                                disabled={saving || !canSave}
+                                aria-disabled={saving || !canSave}
                                 onClick={() => void save()}
                             >
                                 {t("workflows.save")}
@@ -700,6 +708,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                             onClick={() => {
                                 setNotice(null);
                                 setDraft(blank());
+                                setLoaded(null);
                             }}
                         >
                             <Plus className="size-4" />

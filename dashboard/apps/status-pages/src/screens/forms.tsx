@@ -18,6 +18,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select,
     Switch,
     Textarea,
@@ -104,6 +105,7 @@ function FormDialog({
     schema,
     values,
     submitLabel,
+    saved,
     onSubmit,
     children
 }: {
@@ -113,6 +115,9 @@ function FormDialog({
     schema: ZodTypeAny;
     values: Values;
     submitLabel: string;
+    /** What is stored, in the shape of `values`, when this edits something:
+     *  nothing to send until the form differs from it. */
+    saved?: Values;
     onSubmit: () => Promise<void>;
     children: (errors: Record<string, string>) => ReactNode;
 }) {
@@ -120,7 +125,10 @@ function FormDialog({
     const toast = useToast();
     const [pending, setPending] = useState(false);
     const errors = fieldErrors(schema, values);
-    const ready = Object.keys(errors).length === 0 && !pending;
+    const ready =
+        Object.keys(errors).length === 0 &&
+        !pending &&
+        (saved === undefined || isDirty(saved, values));
     // An empty field is incomplete, not wrong: only a value that is there is
     // reported.
     const shown = Object.fromEntries(
@@ -204,6 +212,7 @@ export function PageDialog({
             schema={pageInput}
             values={normalized}
             submitLabel={initial.id ? t("actions.save") : t("actions.create")}
+            saved={initial.id ? { ...initial, slug: normalizeSlug(initial.slug) } : undefined}
             onSubmit={async () => {
                 const saved = await unwrap(() => savePageAction(normalized), t("errors.generic"));
                 onSaved(saved.id);
@@ -315,6 +324,7 @@ export function ComponentDialog({
             schema={componentInput}
             values={payload}
             submitLabel={initial.id ? t("actions.save") : t("actions.add")}
+            saved={initial.id ? { ...initial, pageId } : undefined}
             onSubmit={async () => {
                 await unwrap(() => saveComponentAction(payload), t("errors.generic"));
                 onSaved();
@@ -454,6 +464,7 @@ export function CheckDialog({
             schema={checkInput}
             values={payload}
             submitLabel={check ? t("actions.save") : t("actions.add")}
+            saved={check ? checkPayload(componentId, check.id, checkValues(check)) : undefined}
             onSubmit={async () => {
                 await unwrap(() => saveCheckAction(payload), t("errors.generic"));
                 onSaved();

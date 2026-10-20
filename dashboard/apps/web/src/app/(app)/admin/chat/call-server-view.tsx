@@ -292,7 +292,16 @@ export function CallServerView() {
                                     placeholder={settings.hasSecret ? t("chat.calls.fields.secretStored") : t("chat.calls.fields.secretPaste")}
                                 />
                             </label>
-                            <Button variant="secondary" onClick={save} disabled={saving}>
+                            <Button
+                                variant="secondary"
+                                onClick={save}
+                                disabled={
+                                    saving ||
+                                    (url.trim() === (settings?.url ?? "") &&
+                                        key.trim() === (settings?.key ?? "") &&
+                                        !secret.trim())
+                                }
+                            >
                                 {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                                 {tc("actions.save")}
                             </Button>

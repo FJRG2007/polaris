@@ -111,7 +111,11 @@ export function MinecraftDomain({
                                 aria-label={t("domain.subdomain")}
                             />
                             <span className="font-mono text-sm text-muted-foreground">{suffix}</span>
-                            <Button size="sm" onClick={save} disabled={pending || normalized.length === 0}>
+                            <Button
+                                size="sm"
+                                onClick={save}
+                                disabled={pending || normalized.length === 0 || preview === hostname}
+                            >
                                 {pending && <Loader2 className="size-4 animate-spin" />} {t("domain.save")}
                             </Button>
                             <Button

@@ -179,6 +179,8 @@ function SetPhoneDialog({
     const [error, setError] = useState<string | null>(null);
 
     const candidate = phoneField.safeParse(phone);
+    // The number already on the account, typed again, is nothing to change.
+    const unchanged = candidate.success && candidate.data === phoneField.safeParse(current).data;
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -230,7 +232,7 @@ function SetPhoneDialog({
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="submit" disabled={busy || !candidate.success}>
+                        <Button type="submit" disabled={busy || !candidate.success || unchanged}>
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
