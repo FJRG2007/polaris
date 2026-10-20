@@ -52,6 +52,9 @@ export function setMicDevice(deviceId: string | null): void {
 export interface MicDevice {
     readonly id: string;
     readonly label: string;
+    /** Whether the browser named it, which it only does once a microphone
+     *  permission has been granted; otherwise the label is a number. */
+    readonly named?: boolean;
 }
 
 /**
@@ -66,6 +69,9 @@ export function useMicrophones(): {
     readonly devices: readonly MicDevice[];
     readonly chosenId: string | null;
     readonly choose: (deviceId: string) => void;
+    /** Asks again, for after a permission was just granted - which the browser
+     *  announces with no event of its own. */
+    readonly refresh: () => Promise<void>;
 } {
     const t = useTranslations("chat");
     const [devices, setDevices] = useState<readonly MicDevice[]>([]);
@@ -79,7 +85,8 @@ export function useMicrophones(): {
                 .filter((device) => device.kind === "audioinput" && device.deviceId)
                 .map((device, index) => ({
                     id: device.deviceId,
-                    label: device.label || t("devices.microphoneN", { n: index + 1 })
+                    label: device.label || t("devices.microphoneN", { n: index + 1 }),
+                    named: Boolean(device.label)
                 }))
         );
     }, []);
@@ -103,5 +110,5 @@ export function useMicrophones(): {
         setMicDevice(deviceId);
     }, []);
 
-    return { devices, chosenId, choose };
+    return { devices, chosenId, choose, refresh: look };
 }

@@ -10,6 +10,7 @@
  * most deployments actually reach for keep their own entries below.
  */
 
+import { SEEDED_SPEECH_INTEGRATIONS } from "@/lib/integrations/speech-providers";
 import { SEEDED_MODEL_INTEGRATIONS, type FreeTier } from "@/lib/integrations/model-providers";
 
 export type { FreeTier } from "@/lib/integrations/model-providers";
@@ -922,7 +923,10 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
     // The rest of the model providers, from the table that also decides what a
     // run is handed and where a pasted key is checked. Last, so the nine above
     // stay at the top of the picker where they are looked for.
-    ...SEEDED_MODEL_INTEGRATIONS
+    ...SEEDED_MODEL_INTEGRATIONS,
+
+    // Keys that only turn speech into text, for Polar's dictation.
+    ...SEEDED_SPEECH_INTEGRATIONS
 ];
 
 /** Look up a catalog entry by slug. */

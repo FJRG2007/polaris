@@ -19,8 +19,19 @@ const state = {
     transcribed: [] as Array<{ audio: Uint8Array }>,
     spoken: [] as Array<{ text: string; voice: string; outputFormat: string }>,
     fail: false,
-    payers: [] as Array<string | null>
+    payers: [] as Array<string | null>,
+    models: [] as Array<string | null | undefined>,
+    recorded: [] as Array<Record<string, unknown>>,
+    overLimit: false,
+    duration: undefined as number | undefined
 };
+
+vi.mock("@/lib/polar/usage", () => ({
+    polarLimitReached: async () => (state.overLimit ? { used: 10, amount: 5, period: "day" } : null),
+    recordPolarUsage: async (input: Record<string, unknown>) => {
+        state.recorded.push(input);
+    }
+}));
 
 vi.mock("@/lib/polar/access", async () =>
     (await import("./fixtures/open-polar-access")).openPolarAccess()
@@ -35,9 +46,16 @@ vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: !state.limited })
 }));
 vi.mock("@/lib/polar/voice", () => ({
-    polarTranscriber: async (_userId: string, payer: string | null) => {
+    polarTranscriber: async (_userId: string, payer: string | null, model?: string | null) => {
         state.payers.push(payer);
-        return state.provider ? { kind: "transcriber" } : null;
+        state.models.push(model);
+        return state.provider
+            ? {
+                  model: { kind: "transcriber" },
+                  option: { provider: "groq", model: "whisper-large-v3-turbo" },
+                  source: payer ?? "own"
+              }
+            : null;
     },
     polarSpeaker: async (_userId: string, payer: string | null) => {
         state.payers.push(payer);
@@ -51,7 +69,7 @@ vi.mock("ai", () => ({
     experimental_transcribe: async (options: { audio: Uint8Array }) => {
         if (state.fail) throw new Error("provider said no");
         state.transcribed.push(options);
-        return { text: "  hello polar  " };
+        return { text: "  hello polar  ", durationInSeconds: state.duration };
     },
     experimental_generateSpeech: async (options: {
         text: string;
@@ -98,6 +116,10 @@ beforeEach(() => {
     state.spoken = [];
     state.fail = false;
     state.payers = [];
+    state.models = [];
+    state.recorded = [];
+    state.overLimit = false;
+    state.duration = undefined;
 });
 
 describe("POST /api/polar/transcribe", () => {
@@ -127,6 +149,43 @@ describe("POST /api/polar/transcribe", () => {
         expect((await transcribeRoute.POST(recording())).status).toBe(401);
         state.user = { id: OWNER, viewingAs: "someone" };
         expect((await transcribeRoute.POST(recording())).status).toBe(403);
+    });
+
+    it("hears with the model picked in the menu, and refuses one that is not a pick", async () => {
+        const picked = "durationMs=1200&model=groq/whisper-large-v3";
+        expect((await transcribeRoute.POST(recording(undefined, undefined, picked))).status).toBe(200);
+        expect(state.models).toEqual(["groq/whisper-large-v3"]);
+        const bad = `durationMs=1200&model=${encodeURIComponent("groq/../etc passwd")}`;
+        expect((await transcribeRoute.POST(recording(undefined, undefined, bad))).status).toBe(400);
+        expect(await transcribeRoute.POST(recording())).toHaveProperty("status", 200);
+        expect(state.models).toEqual(["groq/whisper-large-v3", undefined]);
+    });
+
+    it("records each transcription's length, the provider's when it reports one", async () => {
+        await transcribeRoute.POST(recording(undefined, undefined, "durationMs=1200"));
+        state.duration = 4.2;
+        await transcribeRoute.POST(recording(undefined, undefined, "durationMs=1200&payer=instance"));
+        expect(state.recorded).toEqual([
+            expect.objectContaining({
+                provider: "groq",
+                model: "whisper-large-v3-turbo",
+                payer: "own",
+                threadId: null,
+                audioSeconds: 2
+            }),
+            expect.objectContaining({ payer: "instance", audioSeconds: 5 })
+        ]);
+    });
+
+    it("holds the shared key to the administrator's ceiling, never a person's own", async () => {
+        state.overLimit = true;
+        const shared = await transcribeRoute.POST(
+            recording(undefined, undefined, "durationMs=1200&payer=instance")
+        );
+        expect(shared.status).toBe(429);
+        expect(await shared.json()).toEqual({ error: "usage_limit" });
+        expect(state.transcribed).toHaveLength(0);
+        expect((await transcribeRoute.POST(recording())).status).toBe(200);
     });
 
     it("is rate limited per person", async () => {

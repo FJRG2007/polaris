@@ -95,12 +95,15 @@ export function stepContext(
 
 export async function recordPolarUsage(input: {
     userId: string;
-    threadId: string;
+    /** Null for a transcription, which belongs to no one chat. */
+    threadId: string | null;
     messageId: string | null;
     provider: string;
     model: string;
     payer: Payer;
     usage: AnswerUsage;
+    /** A transcription's length; absent for a chat answer. */
+    audioSeconds?: number;
 }): Promise<void> {
     await prisma.polarUsage.create({
         data: {
@@ -112,7 +115,8 @@ export async function recordPolarUsage(input: {
             payer: input.payer,
             inputTokens: input.usage.inputTokens,
             outputTokens: input.usage.outputTokens,
-            costUsd: input.usage.costUsd
+            costUsd: input.usage.costUsd,
+            audioSeconds: Math.max(0, Math.round(input.audioSeconds ?? 0))
         }
     });
 }

@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
 
 export const POLAR_DISPLAY_KEYS = [
     "showTokens",
@@ -37,14 +38,17 @@ export function displayOf(value: unknown): PolarDisplay {
     return display;
 }
 
-/** A change to Polar's settings: any of the display switches, memory, or both. */
+/** A change to Polar's settings: any of the display switches, memory, the
+ *  dictation model, or several. */
 export const polarPreferencesPatchSchema = z
     .object({
         memory: z.boolean().optional(),
         showTokens: z.boolean().optional(),
         showCost: z.boolean().optional(),
         showContextBar: z.boolean().optional(),
-        autoCompact: z.boolean().optional()
+        autoCompact: z.boolean().optional(),
+        /** The mic menu's model, `provider/model`; null goes back to the default. */
+        transcriptionModel: transcriptionChoiceSchema.nullable().optional()
     })
     .strict()
     .refine((patch) => Object.values(patch).some((value) => value !== undefined), {

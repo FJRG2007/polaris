@@ -60,7 +60,7 @@ afterEach(() => {
 
 const { PolarChat } = await import("@/components/polar/polar-panel");
 
-const UNAVAILABLE = "Speaking to Polar needs an OpenAI or Google AI key.";
+const UNAVAILABLE = "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI.";
 
 async function ready() {
     await waitFor(() => expect(screen.getByText("Model One", { exact: false })).toBeTruthy());

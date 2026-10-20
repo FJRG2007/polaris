@@ -71,7 +71,7 @@ describe("the dictation button", () => {
             wrapper: MessagesWrapper
         });
         const button = screen.getByRole("button", {
-            name: "Speaking to Polar needs an OpenAI or Google AI key."
+            name: "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI."
         });
         expect(button.getAttribute("aria-disabled")).toBe("true");
         fireEvent.click(button);
@@ -184,7 +184,7 @@ describe("the voice mode button", () => {
         rerender(<VoiceModeButton available={false} onOpen={onOpen} onNotice={onNotice} />);
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Speaking to Polar needs an OpenAI or Google AI key."
+                name: "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI."
             })
         );
         expect(onOpen).toHaveBeenCalledTimes(1);

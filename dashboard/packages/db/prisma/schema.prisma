@@ -15145,6 +15145,9 @@ model PolarPreference {
     showCost       Boolean  @default(true)
     showContextBar Boolean  @default(true)
     autoCompact    Boolean  @default(true)
+    // The speech-to-text model dictation and voice mode use, as
+    // `provider/model`. Null, or one whose key is gone, is the fastest held.
+    transcriptionModel String?
     updatedAt      DateTime @updatedAt
 }
 
@@ -15267,6 +15270,9 @@ model PolarUsage {
     outputTokens Int      @default(0)
     // Null when the catalogue has no price for the model: tokens only.
     costUsd      Float?
+    // A transcription's length in seconds, as the provider reported it or as
+    // recorded; 0 for a chat answer.
+    audioSeconds Int      @default(0)
     createdAt    DateTime @default(now())
 
     @@index([userId, createdAt])

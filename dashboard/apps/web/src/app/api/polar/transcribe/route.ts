@@ -3,6 +3,11 @@
  * text: dictation into the composer, and each turn of a voice call. The body is
  * the recording; its Content-Type says what it is. Answers `{ text }`.
  *
+ * The model is the one picked in the mic menu (`model`, else the stored pick),
+ * or the fastest one a key is held for. On the key this Polaris shares, the
+ * administrator's ceilings apply as they do to a chat answer, and every
+ * transcription is recorded in `PolarUsage` with its length in seconds.
+ *
  * The recording is held in memory only for the call to the provider and never
  * stored.
  */
@@ -11,6 +16,7 @@ import { NextResponse } from "next/server";
 import { experimental_transcribe as transcribe } from "ai";
 import { polarCaller } from "@/lib/polar/access";
 import { polarTranscriber } from "@/lib/polar/voice";
+import { polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import {
@@ -44,10 +50,32 @@ export async function POST(request: Request): Promise<Response> {
     if (!bytes) return refuse("too_large", 413);
     if (bytes.byteLength === 0) return refuse("invalid", 400);
 
-    const model = await polarTranscriber(user.id, query.data.payer);
-    if (!model) return refuse("no_voice_provider", 409);
+    const transcriber = await polarTranscriber(user.id, query.data.payer, query.data.model);
+    if (!transcriber) return refuse("no_voice_provider", 409);
+    if (transcriber.source === "instance" && (await polarLimitReached(user.id))) {
+        return refuse("usage_limit", 429);
+    }
     try {
-        const result = await transcribe({ model, audio: bytes, abortSignal: request.signal });
+        const result = await transcribe({
+            model: transcriber.model,
+            audio: bytes,
+            abortSignal: request.signal
+        });
+        // The provider's own length when it reports one, the browser's otherwise.
+        const seconds =
+            typeof result.durationInSeconds === "number" && Number.isFinite(result.durationInSeconds)
+                ? result.durationInSeconds
+                : query.data.durationMs / 1000;
+        await recordPolarUsage({
+            userId: user.id,
+            threadId: null,
+            messageId: null,
+            provider: transcriber.option.provider,
+            model: transcriber.option.model,
+            payer: transcriber.source,
+            usage: { inputTokens: 0, outputTokens: 0, costUsd: null },
+            audioSeconds: Math.ceil(seconds)
+        }).catch((error) => console.error("polar: could not record a transcription", error));
         return NextResponse.json({ text: result.text.trim() });
     } catch (error) {
         console.error("polar: transcription failed", error);
