@@ -433,5 +433,43 @@
         "everyone": "Todos",
         "openLog": "Ver sus consultas",
         "name": "Nombrar"
+    },
+    "transfer": {
+        "title": "Copia y restauración",
+        "intro": "Todos los ajustes del bloqueador en un archivo, para guardar o llevar a otro Polaris.",
+        "export": "Bajar ajustes",
+        "import": "Restaurar archivo",
+        "notJson": "Ese archivo no es de ajustes.",
+        "notExport": "Ese archivo no es una copia del bloqueador.",
+        "invalid": "No se cargó nada: estos ajustes del archivo no son válidos: {fields}.",
+        "same": "El archivo coincide con lo guardado.",
+        "changes": "Cargar este archivo cambia:",
+        "dropsEdits": "Se sustituyen tus cambios sin guardar.",
+        "load": "Cargar en el formulario",
+        "cancel": "Cancelar",
+        "loaded": "Cargado. Revísalo y pulsa Guardar.",
+        "fields": {
+            "sources": "Listas",
+            "customLists": "Tus listas",
+            "allow": "Permitidos",
+            "deny": "Bloqueados",
+            "upstream": "Resolvedor",
+            "customUpstreams": "Tus resolvedores",
+            "records": "Registros",
+            "refreshHours": "Recarga",
+            "aliases": "Alias",
+            "clientGroups": "Grupos",
+            "logDays": "Historial",
+            "devices": "Equipos",
+            "forwards": "Reenvíos",
+            "safeSearch": "Búsqueda segura",
+            "youtube": "Modo YouTube",
+            "schedules": "Horarios",
+            "timeZone": "Zona horaria",
+            "services": "Servicios",
+            "serviceDomains": "Nombres servicio",
+            "namesFrom": "Origen nombres",
+            "engine": "Motor"
+        }
     }
 }

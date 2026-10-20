@@ -433,5 +433,43 @@
         "everyone": "Everyone",
         "openLog": "Open its lookups",
         "name": "Name it"
+    },
+    "transfer": {
+        "title": "Back up and restore",
+        "intro": "Every setting of the blocker as one file, to keep or to move to another Polaris.",
+        "export": "Download settings",
+        "import": "Restore from file",
+        "notJson": "That file is not a settings file.",
+        "notExport": "That file is not an ad blocker export.",
+        "invalid": "Nothing was loaded: these settings in the file are not valid: {fields}.",
+        "same": "The file matches what is saved.",
+        "changes": "Loading this file changes:",
+        "dropsEdits": "Your unsaved changes here are replaced.",
+        "load": "Load into the form",
+        "cancel": "Cancel",
+        "loaded": "Loaded. Check it, then Save to apply.",
+        "fields": {
+            "sources": "Blocklists",
+            "customLists": "Your lists",
+            "allow": "Allowed names",
+            "deny": "Blocked names",
+            "upstream": "Resolver",
+            "customUpstreams": "Your resolvers",
+            "records": "Local records",
+            "refreshHours": "List refresh",
+            "aliases": "Aliases",
+            "clientGroups": "Device groups",
+            "logDays": "Log history",
+            "devices": "Device names",
+            "forwards": "Forwarding",
+            "safeSearch": "Safe search mode",
+            "youtube": "YouTube mode",
+            "schedules": "Schedules",
+            "timeZone": "Time zone",
+            "services": "Services",
+            "serviceDomains": "Service names",
+            "namesFrom": "Names source",
+            "engine": "Engine"
+        }
     }
 }

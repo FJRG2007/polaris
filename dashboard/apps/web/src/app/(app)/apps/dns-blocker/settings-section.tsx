@@ -12,6 +12,7 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { RuleField } from "./fields";
 import { useDnsBlocker, useField } from "./dns-blocker-context";
 import { DnsSaveBar } from "./save-bar";
+import { DnsTransferCard } from "./transfer-card";
 
 export function DnsSettingsSection() {
     const t = useTranslations("dnsBlocker");
@@ -265,6 +266,7 @@ export function DnsSettingsSection() {
                     </label>
                 </CardBody>
             </Card>
+            <DnsTransferCard />
             <DnsSaveBar />
         </div>
     );
