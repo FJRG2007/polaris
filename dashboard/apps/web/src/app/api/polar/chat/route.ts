@@ -170,6 +170,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const startedAt = Date.now();
+    let spent: ReturnType<typeof answerUsage> | undefined;
     const result = streamText({
         model: resolved.model,
         system: polarSystemPrompt(
@@ -207,13 +208,19 @@ export async function POST(request: Request): Promise<Response> {
                     // into, and what it spent, for the line under the answer.
                     {
                         workedMs: Date.now() - startedAt,
-                        usage: answerUsage(part.totalUsage, resolved.option)
+                        usage: (spent = answerUsage(part.totalUsage, resolved.option))
                     }
                   : undefined,
         onFinish: async ({ messages: finished, responseMessage }) => {
             try {
-                const total = await Promise.resolve(result.totalUsage).catch(() => undefined);
-                if (total) {
+                await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
+                    parentFor(index, finished)
+                );
+            } catch (error) {
+                console.error("polar: could not save the turn", error);
+            }
+            if (spent) {
+                try {
                     await recordPolarUsage({
                         userId: user.id,
                         threadId: body.data.threadId,
@@ -221,18 +228,11 @@ export async function POST(request: Request): Promise<Response> {
                         provider: resolved.option.provider,
                         model: resolved.option.model,
                         payer: resolved.credential.source === "instance" ? "instance" : "own",
-                        usage: answerUsage(total, resolved.option)
+                        usage: spent
                     });
+                } catch (error) {
+                    console.error("polar: could not record the turn's usage", error);
                 }
-            } catch (error) {
-                console.error("polar: could not record the turn's usage", error);
-            }
-            try {
-                await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
-                    parentFor(index, finished)
-                );
-            } catch (error) {
-                console.error("polar: could not save the turn", error);
             }
             // A new thread is named by its model once the first answer is in,
             // behind the reply; the screen asks for the title when it is ready.

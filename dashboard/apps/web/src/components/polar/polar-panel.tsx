@@ -1672,7 +1672,9 @@ export function PolarChat({
                                                 })
                                             }
                                             onRegenerate={() => void chat.regenerate()}
-                                            onBranch={() => void branchFrom(message.id)}
+                                            onBranch={
+                                                temporary ? undefined : () => void branchFrom(message.id)
+                                            }
                                         />
                                     );
                                 })}
@@ -1762,7 +1764,6 @@ export function PolarChat({
     );
 }
 
-/** Whether the picker offers this model to the person now. */
 /** The ceiling a refused turn ran into, when that was why: the transport hands
  *  the route's answer over as the error's message. */
 export function limitOf(
@@ -1794,6 +1795,7 @@ export function unreadableOf(error: Error | undefined): string | null {
     }
 }
 
+/** Whether the picker offers this model to the person now. */
 function offered(providers: ModelSelectorProvider[] | null, choice: ModelChoice): boolean {
     return (providers ?? []).some((entry) =>
         entry.models.some(
@@ -1875,7 +1877,7 @@ function MessageView({
     onQuote: () => void;
     onSaveCommand: () => void;
     onRegenerate: () => void;
-    onBranch: () => void;
+    onBranch?: () => void;
 }) {
     const t = useTranslations("polar");
     const mine = message.role === "user";
@@ -2102,7 +2104,7 @@ function MessageView({
                     >
                         <CopyIcon copied={copied} />
                     </MessageAction>
-                    {!busy ? (
+                    {!busy && onBranch ? (
                         <MessageAction label={t("actions.branch")} onClick={onBranch}>
                             <GitBranchPlus />
                         </MessageAction>

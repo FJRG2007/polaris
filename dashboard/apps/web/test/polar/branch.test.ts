@@ -14,7 +14,8 @@ type Row = { id: string; parentId: string | null; role: string; parts: unknown; 
 const state = {
     rows: [] as Row[],
     createdThread: null as Record<string, unknown> | null,
-    createdMessages: [] as Record<string, unknown>[]
+    createdMessages: [] as Record<string, unknown>[],
+    temporary: false
 };
 
 vi.mock("@/lib/polar/attachments", () => ({
@@ -50,9 +51,21 @@ vi.mock("@polaris/db", () => {
         prisma: {
             $transaction: async (run: (client: typeof tx) => Promise<unknown>) => run(tx),
             polarThread: {
-                findFirst: async ({ where }: { where: { id: string; userId: string } }) =>
-                    where.id === THREAD && where.userId === OWNER
-                        ? { title: "Trip", titleSource: "model", choice: null, projectId: null }
+                findFirst: async ({
+                    where
+                }: {
+                    where: { id: string; userId: string; temporary?: boolean };
+                }) =>
+                    where.id === THREAD &&
+                    where.userId === OWNER &&
+                    where.temporary === state.temporary
+                        ? {
+                              title: "Trip",
+                              titleSource: "model",
+                              choice: null,
+                              projectId: null,
+                              branchRootId: null
+                          }
                         : null
             },
             polarMessage: { findMany: async () => [...state.rows].reverse() }
@@ -75,6 +88,7 @@ beforeEach(() => {
     state.rows = [row("a", null), row("b", "a", "assistant"), row("b2", "a", "assistant"), row("c", "b")];
     state.createdThread = null;
     state.createdMessages = [];
+    state.temporary = false;
 });
 
 describe("branchPolarThread", () => {
@@ -95,6 +109,7 @@ describe("branchPolarThread", () => {
         expect(times).toEqual([...times].sort((x, y) => x - y));
         expect(new Set(times).size).toBe(3);
         expect(copied.every((entry) => entry.threadId === thread?.id)).toBe(true);
+        expect(state.createdThread?.branchRootId).toBe(THREAD);
     });
 
     it("stops at the message branched from", async () => {
@@ -108,6 +123,12 @@ describe("branchPolarThread", () => {
     it("refuses another person's thread and a message not in it", async () => {
         expect(await branchPolarThread("someone-else", THREAD, "c")).toBeNull();
         expect(await branchPolarThread(OWNER, THREAD, "missing")).toBeNull();
+        expect(state.createdThread).toBeNull();
+    });
+
+    it("refuses a temporary chat, which a branch would keep", async () => {
+        state.temporary = true;
+        expect(await branchPolarThread(OWNER, THREAD, "c")).toBeNull();
         expect(state.createdThread).toBeNull();
     });
 });

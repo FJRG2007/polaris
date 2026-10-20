@@ -441,7 +441,8 @@ const BRANCH_MAX = 1000;
  * written in. Files are not copied: the branch names the same ones, and
  * deleting either chat leaves them to the one still carrying them.
  *
- * Null when the thread, or the message in it, is not this person's.
+ * Null when the thread, or the message in it, is not this person's, and for a
+ * temporary chat, which is never kept and so is never copied into one that is.
  */
 export async function branchPolarThread(
     userId: string,
@@ -449,8 +450,8 @@ export async function branchPolarThread(
     messageId: string
 ): Promise<PolarThreadRow | null> {
     const source = await prisma.polarThread.findFirst({
-        where: { id: threadId, userId },
-        select: { title: true, titleSource: true, choice: true, projectId: true }
+        where: { id: threadId, userId, temporary: false },
+        select: { title: true, titleSource: true, choice: true, projectId: true, branchRootId: true }
     });
     if (!source) return null;
     const rows = await prisma.polarMessage.findMany({
@@ -482,6 +483,7 @@ export async function branchPolarThread(
                 // A title still being written belongs to the original thread.
                 titleSource: source.titleSource === "generating" ? "placeholder" : source.titleSource,
                 projectId: source.projectId,
+                branchRootId: source.branchRootId ?? threadId,
                 ...(source.choice ? { choice: source.choice as Prisma.InputJsonValue } : {})
             },
             select: ROW_SELECT

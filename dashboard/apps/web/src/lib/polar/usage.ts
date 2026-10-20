@@ -24,6 +24,7 @@ import { prisma } from "@polaris/db";
 import type { LanguageModelUsage } from "ai";
 import type { Payer } from "@/lib/polar/shared";
 import type { PolarModelOption } from "@/lib/polar/models";
+import { since, appliesToPerson, roleAndGroupIds } from "@/lib/agents/agent-usage-limits";
 import type { LimitPeriod, LimitSubject } from "@polaris/core";
 
 /** What one answer spent, as its message metadata carries it. */
@@ -200,12 +201,6 @@ export async function sharedKeySpend(now = new Date()): Promise<SharedKeySpend> 
     };
 }
 
-const PERIOD_MS: Record<LimitPeriod, number> = {
-    day: 24 * 60 * 60 * 1000,
-    week: 7 * 24 * 60 * 60 * 1000,
-    month: 30 * 24 * 60 * 60 * 1000
-};
-
 /** The subjects a chat answers to: the person and what they belong to. */
 const CHAT_SUBJECTS: readonly LimitSubject[] = ["everyone", "user", "role", "group"];
 
@@ -226,26 +221,15 @@ export async function polarLimitReached(userId: string, now = Date.now()): Promi
         where: { metric: "tokens", subjectType: { in: [...CHAT_SUBJECTS] } }
     });
     if (rules.length === 0) return null;
-    const [roles, groups] = await Promise.all([
-        prisma.userRole.findMany({ where: { userId }, select: { roleId: true } }),
-        prisma.groupMember.findMany({ where: { userId }, select: { groupId: true } })
-    ]);
-    const roleIds = new Set(roles.map((row) => row.roleId));
-    const groupIds = new Set(groups.map((row) => row.groupId));
+    const member = await roleAndGroupIds(userId);
     for (const rule of rules) {
-        const subject = rule.subjectType as LimitSubject;
-        const applies =
-            subject === "everyone" ||
-            (subject === "user" && rule.subjectId === userId) ||
-            (subject === "role" && roleIds.has(rule.subjectId)) ||
-            (subject === "group" && groupIds.has(rule.subjectId));
-        if (!applies) continue;
+        if (!appliesToPerson(rule, userId, member)) continue;
         const period = rule.period as LimitPeriod;
         const spent = await prisma.polarUsage.aggregate({
             where: {
                 userId,
                 payer: "instance",
-                createdAt: { gte: new Date(now - (PERIOD_MS[period] ?? PERIOD_MS.month)) }
+                createdAt: { gte: since(period, now) }
             },
             _sum: { inputTokens: true, outputTokens: true }
         });

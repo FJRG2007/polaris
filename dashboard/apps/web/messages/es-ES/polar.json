@@ -369,6 +369,7 @@
         "shortcutHint": "Minúsculas, dígitos y guiones, escritos tras /.",
         "prompt": "Prompt",
         "model": "Modelo del prompt",
+        "modelGone": "Modelo no disponible",
         "cancel": "Cancelar",
         "save": "Guardar",
         "edit": "Editar /{shortcut}",

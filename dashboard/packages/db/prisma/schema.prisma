@@ -15015,6 +15015,9 @@ model PolarThread {
     // A temporary chat: out of every list and search, never read or written to
     // memory, deleted when its tab leaves it and swept after a day otherwise.
     temporary   Boolean           @default(false)
+    // The chat a branch was first copied from, shared by every branch of a
+    // branch, so files they carry in common are looked for only in that family.
+    branchRootId String?          @db.Uuid
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]
@@ -15025,6 +15028,7 @@ model PolarThread {
     @@index([userId, archivedAt, pinnedAt])
     @@index([temporary, updatedAt])
     @@index([projectId, updatedAt(sort: Desc)])
+    @@index([branchRootId])
 }
 
 // A folder of Polar chats. Its instructions are added to the system context of

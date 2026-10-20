@@ -295,10 +295,12 @@ export function CommandsDialog({
     const [deleting, setDeleting] = useState<PolarCommandRow | null>(null);
     const full = store.commands.length >= polarShared.POLAR_COMMAND_MOST;
     const modelName = (choice: ModelChoice) =>
-        providers
-            .flatMap((entry) => entry.models)
-            .find((model) => model.provider === choice.provider && model.model === choice.model)
-            ?.name ?? t("picker.automatic");
+        polarShared.isAutomatic(choice)
+            ? t("picker.automatic")
+            : (providers
+                  .flatMap((entry) => entry.models)
+                  .find((model) => model.provider === choice.provider && model.model === choice.model)
+                  ?.name ?? t("commands.modelGone"));
     return (
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent className="flex max-h-[min(36rem,85dvh)] max-w-lg flex-col gap-3">
@@ -332,7 +334,10 @@ export function CommandsDialog({
                                     {polarShared.firstLine(row.prompt)}
                                 </span>
                             </button>
-                            <span className="hidden max-w-[35%] shrink-0 truncate text-xs text-foreground-subtle sm:inline">
+                            <span
+                                className="hidden max-w-[35%] shrink-0 truncate text-xs text-foreground-subtle sm:inline"
+                                title={modelName(row.choice)}
+                            >
                                 {modelName(row.choice)}
                             </span>
                             <Button

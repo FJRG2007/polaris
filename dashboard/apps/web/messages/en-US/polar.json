@@ -369,6 +369,7 @@
         "shortcutHint": "Lowercase letters, digits and hyphens, typed after /.",
         "prompt": "Prompt",
         "model": "Model for prompt",
+        "modelGone": "Model unavailable",
         "cancel": "Cancel",
         "save": "Save",
         "edit": "Edit /{shortcut}",

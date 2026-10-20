@@ -19,7 +19,7 @@
 
 import Fuse from "fuse.js";
 import Link from "next/link";
-import { Check, Sparkles } from "lucide-react";
+import { Check, Shuffle } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
     DropdownMenu,
@@ -173,7 +173,7 @@ export function ModelSelector({
                             onSelect={() => onChoice(automaticChoice(choice?.intelligence))}
                             className="items-start"
                         >
-                            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                            <Shuffle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
                             <span className="flex min-w-0 flex-col">
                                 <span className="truncate">{t("picker.automatic")}</span>
                                 <span className="text-xs text-muted-foreground">

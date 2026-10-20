@@ -313,7 +313,8 @@ export function threadAttachments(userId: string, threadId: string): Promise<Pol
 /**
  * The files of a thread about to go that no other chat of this person's still
  * carries. One a branch still names moves to the branch instead, so deleting
- * the original does not leave the branch with a broken file.
+ * the original does not leave the branch with a broken file. Only the chats of
+ * the same branch family are read: a chat never branched shares no files.
  */
 export async function keepSharedAttachments(
     userId: string,
@@ -321,12 +322,21 @@ export async function keepSharedAttachments(
     files: readonly PolarStoredFile[]
 ): Promise<PolarStoredFile[]> {
     if (files.length === 0) return [];
+    const thread = await prisma.polarThread.findFirst({
+        where: { id: threadId, userId },
+        select: { branchRootId: true }
+    });
+    const root = thread?.branchRootId ?? threadId;
+    const family = await prisma.polarThread.findMany({
+        where: { userId, id: { not: threadId }, OR: [{ id: root }, { branchRootId: root }] },
+        select: { id: true }
+    });
+    if (family.length === 0) return [...files];
     const carried = await prisma.$queryRaw<{ id: string; threadId: string }[]>(Prisma.sql`
         SELECT DISTINCT ON (a.id) a.id, m."threadId"::text AS "threadId"
         FROM unnest(${files.map((file) => file.id)}::text[]) AS a(id)
         JOIN "PolarMessage" AS m ON m."parts"::text LIKE '%/api/polar/attachments/' || a.id || '%'
-        JOIN "PolarThread" AS t ON t."id" = m."threadId"
-        WHERE t."userId" = ${userId}::uuid AND m."threadId" <> ${threadId}::uuid
+        WHERE m."threadId" = ANY(${family.map((row) => row.id)}::uuid[])
         ORDER BY a.id, m."createdAt" ASC
     `);
     for (const row of carried) {

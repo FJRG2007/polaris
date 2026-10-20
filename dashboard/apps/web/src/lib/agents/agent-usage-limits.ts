@@ -31,8 +31,23 @@ const PERIOD_MS: Record<LimitPeriod, number> = {
 
 /** Counted as a rolling window rather than from a calendar boundary: a calendar
  *  month lets a month's budget be spent twice across a month end. */
-function since(period: LimitPeriod): Date {
-    return new Date(Date.now() - PERIOD_MS[period]);
+export function since(period: LimitPeriod, now = Date.now()): Date {
+    return new Date(now - (PERIOD_MS[period] ?? PERIOD_MS.month));
+}
+
+/** Whether a rule on everyone, a person, a role or a group covers this person. */
+export function appliesToPerson(
+    rule: { subjectType: string; subjectId: string },
+    userId: string,
+    member: { roles: readonly string[]; groups: readonly string[] }
+): boolean {
+    const subject = rule.subjectType as LimitSubject;
+    return (
+        subject === "everyone" ||
+        (subject === "user" && rule.subjectId === userId) ||
+        (subject === "role" && member.roles.includes(rule.subjectId)) ||
+        (subject === "group" && member.groups.includes(rule.subjectId))
+    );
 }
 
 export interface UsageLimitView {
@@ -101,16 +116,13 @@ export async function checkUsageLimits(input: {
     const rules = await prisma.agentUsageLimit.findMany();
     if (rules.length === 0) return { allowed: true };
 
-    const owner = (await roleAndGroupIds(input.ownerId)) ?? { roles: [], groups: [] };
+    const owner = await roleAndGroupIds(input.ownerId);
     const org = (input.repoFullName.split("/")[0] ?? "").toLowerCase();
 
     for (const rule of rules) {
         const subject = rule.subjectType as LimitSubject;
         const applies =
-            subject === "everyone" ||
-            (subject === "user" && rule.subjectId === input.ownerId) ||
-            (subject === "role" && owner.roles.includes(rule.subjectId)) ||
-            (subject === "group" && owner.groups.includes(rule.subjectId)) ||
+            appliesToPerson(rule, input.ownerId, owner) ||
             (subject === "repo" && rule.subjectId.toLowerCase() === input.repoFullName.toLowerCase()) ||
             (subject === "org" && rule.subjectId.toLowerCase() === org);
         if (!applies) continue;
@@ -155,7 +167,7 @@ async function usageSince(
 }
 
 /** Which roles and groups this person is in, for matching rules against. */
-async function roleAndGroupIds(userId: string): Promise<{ roles: string[]; groups: string[] } | null> {
+export async function roleAndGroupIds(userId: string): Promise<{ roles: string[]; groups: string[] }> {
     const [roles, groups] = await Promise.all([
         prisma.userRole.findMany({ where: { userId }, select: { roleId: true } }),
         prisma.groupMember.findMany({ where: { userId }, select: { groupId: true } })
