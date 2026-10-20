@@ -120,7 +120,8 @@ export function SettingsLayout({
         const list = nav.current;
         const chip = list?.querySelector<HTMLElement>('[aria-current="true"]');
         if (!list || !chip || list.scrollWidth <= list.clientWidth) return;
-        const left = chip.offsetLeft - list.offsetLeft;
+        const left =
+            chip.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft;
         if (
             left < list.scrollLeft ||
             left + chip.offsetWidth > list.scrollLeft + list.clientWidth
