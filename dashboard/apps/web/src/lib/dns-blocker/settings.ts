@@ -159,6 +159,8 @@ export const DNS_LIMITS = {
     records: 200,
     upstreams: 8,
     clientGroups: 20,
+    devices: 200,
+    forwards: 50,
     groupClients: 50,
     /** Days of lookups the engine keeps, which is as far back as the screen reads. */
     logDays: 30
@@ -298,6 +300,35 @@ export function normalizeDnsClient(text: string): string | null {
     return /^[a-z0-9*](?:[a-z0-9*._-]{0,62})$/.test(value) ? value : null;
 }
 
+/** A domain answered by another server, such as the router for `home.lan`. */
+export const dnsForwardSchema = z.object({
+    domain: z
+        .string()
+        .transform((value) => normalizeDnsName(value))
+        .refine((value) => HOSTNAME.test(value), "invalidName"),
+    server: z
+        .string()
+        .transform((value) => normalizeUpstream(value) ?? "")
+        .refine((value) => value !== "", "invalidUpstream")
+});
+
+/** A device named by hand: the name the log shows and a group can hold. */
+export const dnsDeviceSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine((value) => /^[a-z0-9](?:[a-z0-9._-]{0,62})$/.test(value), "invalidDeviceName"),
+    address: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .refine(
+            (value) => IPV4.test(value) || (value.includes(":") && IPV6.test(value)),
+            "invalidDeviceAddress"
+        )
+});
+
 const clientSchema = z.string().transform((value, ctx) => {
     const client = normalizeDnsClient(value);
     if (!client) {
@@ -349,6 +380,14 @@ export const dnsSettingsSchema = z.object({
     clientGroups: z.array(dnsClientGroupSchema).max(DNS_LIMITS.clientGroups),
     /** How many days of lookups are kept. */
     logDays: z.number().int().min(1).max(DNS_LIMITS.logDays),
+    /** Domains sent to another server instead of the resolvers above. */
+    forwards: z.array(dnsForwardSchema).max(DNS_LIMITS.forwards),
+    /** Google and Bing answer with explicit results filtered, for every device. */
+    safeSearch: z.boolean(),
+    /** YouTube's restricted mode for every device, or "off". */
+    youtube: z.enum(["off", "moderate", "strict"]),
+    /** Devices named by hand, which win over a name the router reports. */
+    devices: z.array(dnsDeviceSchema).max(DNS_LIMITS.devices),
     /** The router asked for device names (reverse lookups), or "" for none. */
     namesFrom: z
         .string()
@@ -361,6 +400,8 @@ export type DnsRecord = z.infer<typeof dnsRecordSchema>;
 export type DnsCustomList = z.infer<typeof dnsCustomListSchema>;
 export type DnsAlias = z.infer<typeof dnsAliasSchema>;
 export type DnsClientGroup = z.infer<typeof dnsClientGroupSchema>;
+export type DnsDevice = z.infer<typeof dnsDeviceSchema>;
+export type DnsForward = z.infer<typeof dnsForwardSchema>;
 
 export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     sources: DNS_LIST_SOURCES.filter((source) => source.recommended).map((source) => source.id),
@@ -374,6 +415,10 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     aliases: [],
     clientGroups: [],
     logDays: 7,
+    devices: [],
+    forwards: [],
+    safeSearch: false,
+    youtube: "off",
     namesFrom: ""
 };
 
@@ -409,6 +454,10 @@ export function readDnsSettings(raw: unknown): DnsSettings {
         aliases: field("aliases"),
         clientGroups: field("clientGroups"),
         logDays: field("logDays"),
+        devices: field("devices"),
+        forwards: field("forwards"),
+        safeSearch: field("safeSearch"),
+        youtube: field("youtube"),
         namesFrom: field("namesFrom")
     };
 }

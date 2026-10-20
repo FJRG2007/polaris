@@ -109,6 +109,14 @@ export function DnsBlockerView({
     const [groupCategories, setGroupCategories] = useState<dns.DnsCategory[]>([]);
     const [logDays, setLogDays] = useState(String(initial.logDays));
     const [namesFrom, setNamesFrom] = useState(initial.namesFrom);
+    const [devices, setDevices] = useState(initial.devices);
+    const [forwards, setForwards] = useState(initial.forwards);
+    const [safeSearch, setSafeSearch] = useState(initial.safeSearch);
+    const [youtube, setYoutube] = useState(initial.youtube);
+    const [forwardDomain, setForwardDomain] = useState("");
+    const [forwardServer, setForwardServer] = useState("");
+    const [deviceName, setDeviceName] = useState("");
+    const [deviceAddress, setDeviceAddress] = useState("");
 
     /** A rule set from the query log: the lists as saved, without touching
      *  a list somebody is editing here. */
@@ -186,6 +194,10 @@ export function DnsBlockerView({
             aliases,
             clientGroups,
             logDays: days,
+            devices,
+            forwards,
+            safeSearch,
+            youtube,
             namesFrom: namesFrom.trim()
         }),
         [
@@ -200,6 +212,10 @@ export function DnsBlockerView({
             aliases,
             clientGroups,
             days,
+            devices,
+            forwards,
+            safeSearch,
+            youtube,
             namesFrom
         ]
     );
@@ -225,6 +241,21 @@ export function DnsBlockerView({
     const newList = dns.dnsCustomListSchema.safeParse({ url: listUrl, category: listCategory });
     const newRecord = dns.dnsRecordSchema.safeParse({ name: recordName, address: recordAddress });
     const newAlias = dns.dnsAliasSchema.safeParse({ name: aliasName, target: aliasTarget });
+    const newForward = dns.dnsForwardSchema.safeParse({
+        domain: forwardDomain,
+        server: forwardServer
+    });
+    const forwardIssue = newForward.success
+        ? null
+        : (newForward.error.issues.find((issue) =>
+              issue.path[0] === "domain" ? forwardDomain.trim() !== "" : forwardServer.trim() !== ""
+          )?.message ?? null);
+    const newDevice = dns.dnsDeviceSchema.safeParse({ name: deviceName, address: deviceAddress });
+    const deviceIssue = newDevice.success
+        ? null
+        : (newDevice.error.issues.find((issue) =>
+              issue.path[0] === "name" ? deviceName.trim() !== "" : deviceAddress.trim() !== ""
+          )?.message ?? null);
     const badGroupClients = rejected(groupClients, dns.normalizeDnsClient);
     const newGroup = dns.dnsClientGroupSchema.safeParse({
         name: groupName,
@@ -740,6 +771,197 @@ export function DnsBlockerView({
                             {t("aliases.add")}
                         </Button>
                     </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("safe.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("safe.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-6">
+                    <label className="flex items-center gap-2 text-sm">
+                        <Switch checked={safeSearch} onChange={setSafeSearch} />
+                        <span>{t("safe.search")}</span>
+                    </label>
+                    <div className="flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-2">
+                        <span aria-hidden>{t("safe.youtube")}</span>
+                        <Select
+                            className="w-full sm:w-48"
+                            value={youtube}
+                            aria-label={t("safe.youtube")}
+                            onValueChange={(value) => setYoutube(value as typeof youtube)}
+                            options={[
+                                { value: "off", label: t("safe.youtubeOff") },
+                                { value: "moderate", label: t("safe.youtubeModerate") },
+                                { value: "strict", label: t("safe.youtubeStrict") }
+                            ]}
+                        />
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("forwards.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("forwards.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {forwards.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("forwards.empty")}</p>
+                    ) : (
+                        <ul className="flex flex-col gap-2">
+                            {forwards.map((forward, index) => (
+                                <li
+                                    key={`${forward.domain}-${forward.server}-${index}`}
+                                    className="flex min-w-0 items-center gap-2 rounded-md bg-muted p-2 text-sm"
+                                >
+                                    <span className="min-w-0 flex-1 break-all font-mono text-xs">
+                                        {forward.domain}
+                                    </span>
+                                    <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">
+                                        {forward.server}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`${t("forwards.remove")}: ${forward.domain}`}
+                                        title={t("forwards.remove")}
+                                        onClick={() =>
+                                            setForwards((current) =>
+                                                current.filter((_, at) => at !== index)
+                                            )
+                                        }
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                        <Input
+                            className="sm:w-56"
+                            value={forwardDomain}
+                            placeholder="home.lan"
+                            aria-label={t("forwards.domain")}
+                            aria-invalid={forwardIssue === "invalidName"}
+                            onChange={(event) => setForwardDomain(event.target.value)}
+                        />
+                        <Input
+                            className="sm:w-56"
+                            value={forwardServer}
+                            placeholder="192.168.1.1"
+                            aria-label={t("forwards.server")}
+                            aria-invalid={forwardIssue === "invalidUpstream"}
+                            onChange={(event) => setForwardServer(event.target.value)}
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                                !newForward.success || forwards.length >= dns.DNS_LIMITS.forwards
+                            }
+                            onClick={() => {
+                                if (!newForward.success) return;
+                                setForwards((current) => [...current, newForward.data]);
+                                setForwardDomain("");
+                                setForwardServer("");
+                            }}
+                        >
+                            <Plus />
+                            {t("forwards.add")}
+                        </Button>
+                    </div>
+                    {forwardIssue ? (
+                        <span className="text-xs text-danger-ink">
+                            {forwardIssue === "invalidName"
+                                ? t("validation.invalidDomain")
+                                : t("validation.invalidForwardServer")}
+                        </span>
+                    ) : null}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>{t("devices.title")}</CardTitle>
+                    <p className="text-xs text-muted-foreground">{t("devices.intro")}</p>
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                    {devices.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("devices.empty")}</p>
+                    ) : (
+                        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {devices.map((device, index) => (
+                                <li
+                                    key={`${device.name}-${device.address}-${index}`}
+                                    className="flex min-w-0 items-center gap-2 rounded-md bg-muted p-2 text-sm"
+                                >
+                                    <span className="min-w-0 flex-1 break-all font-medium">
+                                        {device.name}
+                                    </span>
+                                    <span className="min-w-0 break-all text-xs text-muted-foreground">
+                                        {device.address}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        aria-label={`${t("devices.remove")}: ${device.name}`}
+                                        title={t("devices.remove")}
+                                        onClick={() =>
+                                            setDevices((current) =>
+                                                current.filter((_, at) => at !== index)
+                                            )
+                                        }
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                        <Input
+                            className="sm:w-56"
+                            value={deviceName}
+                            placeholder={t("devices.namePlaceholder")}
+                            aria-label={t("devices.name")}
+                            aria-invalid={deviceIssue === "invalidDeviceName"}
+                            onChange={(event) => setDeviceName(event.target.value)}
+                        />
+                        <Input
+                            className="sm:w-56"
+                            value={deviceAddress}
+                            placeholder="192.168.1.20"
+                            aria-label={t("devices.address")}
+                            aria-invalid={deviceIssue === "invalidDeviceAddress"}
+                            onChange={(event) => setDeviceAddress(event.target.value)}
+                        />
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                                !newDevice.success || devices.length >= dns.DNS_LIMITS.devices
+                            }
+                            onClick={() => {
+                                if (!newDevice.success) return;
+                                setDevices((current) => [...current, newDevice.data]);
+                                setDeviceName("");
+                                setDeviceAddress("");
+                            }}
+                        >
+                            <Plus />
+                            {t("devices.add")}
+                        </Button>
+                    </div>
+                    {deviceIssue ? (
+                        <span className="text-xs text-danger-ink">
+                            {deviceIssue === "invalidDeviceName"
+                                ? t("validation.invalidDeviceName")
+                                : t("validation.invalidDeviceAddress")}
+                        </span>
+                    ) : null}
                 </CardBody>
             </Card>
 

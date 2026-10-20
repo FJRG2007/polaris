@@ -11,6 +11,7 @@
  */
 
 import { QUERY_LOG_DIR } from "./query-log";
+import { safeSearchAliases } from "./safe-search";
 import {
     DNS_CATEGORIES,
     DNS_LIST_SOURCES,
@@ -89,6 +90,12 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
 
     const { servers, bootstrap } = upstreamsOf(settings);
     const aliased = new Set(settings.aliases.map((alias) => alias.name));
+    const recorded = new Set(settings.records.map((record) => record.name));
+    // A name the operator answers themselves keeps their answer.
+    const safe = safeSearchAliases(settings).filter(
+        (alias) => !aliased.has(alias.name) && !recorded.has(alias.name)
+    );
+    const zoned = [...settings.aliases, ...safe];
     const mapping = new Map<string, string[]>();
     for (const record of settings.records) {
         // The engine lets a zone entry replace a mapped one of the same name,
@@ -124,7 +131,7 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                 maxErrorsPerSource: -1
             }
         },
-        ...(mapping.size > 0 || settings.aliases.length > 0
+        ...(mapping.size > 0 || zoned.length > 0
             ? {
                   customDNS: {
                       customTTL: "5m",
@@ -140,12 +147,13 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
                           : {}),
                       // Aliases (CNAME) can only be written as a zone file; every
                       // name is absolute, so no origin is needed.
-                      ...(settings.aliases.length > 0 ? { zone: aliasZone(settings) } : {})
+                      ...(zoned.length > 0 ? { zone: zoneOf(zoned) } : {})
                   }
               }
             : {}),
-        ...(settings.namesFrom
-            ? { clientLookup: { upstream: settings.namesFrom, singleNameOrder: [1] } }
+        ...(settings.forwards.length > 0 ? { conditional: { mapping: forwardsOf(settings) } } : {}),
+        ...(settings.namesFrom || settings.devices.length > 0
+            ? { clientLookup: clientLookupOf(settings) }
             : {}),
         // Read on the container's loopback only (the HTTP port is never
         // published): how many names each category's lists hold, and when they
@@ -160,9 +168,38 @@ export function blockyConfig(settings: DnsSettings): Record<string, unknown> {
     };
 }
 
+/** Each forwarded domain and the servers it goes to, in the order typed. */
+function forwardsOf(settings: DnsSettings): Record<string, string> {
+    const mapping = new Map<string, string[]>();
+    for (const forward of settings.forwards) {
+        const servers = mapping.get(forward.domain) ?? [];
+        if (!servers.includes(forward.server)) servers.push(forward.server);
+        mapping.set(forward.domain, servers);
+    }
+    return Object.fromEntries([...mapping].map(([domain, servers]) => [domain, servers.join(",")]));
+}
+
+/** Where device names come from: the ones typed here, then the router. */
+function clientLookupOf(settings: DnsSettings): Record<string, unknown> {
+    const clients = new Map<string, string[]>();
+    for (const device of settings.devices) {
+        const addresses = clients.get(device.name) ?? [];
+        if (!addresses.includes(device.address)) addresses.push(device.address);
+        clients.set(device.name, addresses);
+    }
+    return {
+        ...(settings.namesFrom ? { upstream: settings.namesFrom, singleNameOrder: [1] } : {}),
+        ...(clients.size > 0 ? { clients: Object.fromEntries(clients) } : {})
+    };
+}
+
 /** The aliases as zone-file lines, one CNAME each. Exported for tests. */
 export function aliasZone(settings: DnsSettings): string {
-    return inline(settings.aliases.map((alias) => `${alias.name}. 300 IN CNAME ${alias.target}.`));
+    return zoneOf(settings.aliases);
+}
+
+function zoneOf(aliases: readonly { name: string; target: string }[]): string {
+    return inline(aliases.map((alias) => `${alias.name}. 300 IN CNAME ${alias.target}.`));
 }
 
 /** The configuration file's text. */

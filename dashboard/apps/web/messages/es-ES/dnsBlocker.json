@@ -135,7 +135,11 @@
         "aliasClash": "Estos nombres son a la vez alias y nombre local: {names}. Deja solo uno.",
         "invalidClient": "No es una dirección, un rango ni un nombre de dispositivo:",
         "logDays": "Entre 1 y {max} días.",
-        "invalidAddress": "No es una dirección IPv4."
+        "invalidAddress": "No es una dirección IPv4.",
+        "invalidDeviceAddress": "No es una dirección IP, como 192.168.1.20.",
+        "invalidDeviceName": "Letras, cifras, puntos y guiones; sin espacios.",
+        "invalidDomain": "No es un dominio.",
+        "invalidForwardServer": "No es un servidor, como 192.168.1.1."
     },
     "errors": {
         "notInstalled": "Antianuncios no está instalado. Instálalo antes desde el Marketplace.",
@@ -290,5 +294,33 @@
             "devices": "{count, plural, one {Un dispositivo ha} other {# dispositivos han}} usado el bloqueador en las últimas 24 horas:",
             "logOff": "El bloqueador aún no guarda registro, así que Polaris no puede ver qué dispositivos lo usan. Aplica una vez los ajustes de abajo y vuelve a comprobar."
         }
+    },
+    "devices": {
+        "title": "Dispositivos",
+        "intro": "Pon nombre a un dispositivo por su dirección. El registro lo muestra y un grupo lo usa.",
+        "empty": "Sin nombres. Se ven por dirección o por el nombre que les da el router.",
+        "name": "Nombre",
+        "namePlaceholder": "portatil-ana",
+        "address": "Dirección",
+        "add": "Nombrar",
+        "remove": "Quitar nombre"
+    },
+    "forwards": {
+        "title": "Dominios locales",
+        "intro": "Envía un dominio a otro servidor, como el router para home.lan o una zona inversa.",
+        "empty": "Ninguno. Todo va a los resolvedores de arriba.",
+        "domain": "Dominio",
+        "server": "Servidor",
+        "add": "Reenviar",
+        "remove": "Dejar de reenviar"
+    },
+    "safe": {
+        "title": "Búsqueda segura",
+        "intro": "Para todos los equipos de la red. El navegador no puede quitarla.",
+        "search": "Filtrar resultados explícitos en Google y Bing",
+        "youtube": "Modo restringido de YouTube",
+        "youtubeOff": "No",
+        "youtubeModerate": "Moderado",
+        "youtubeStrict": "Estricto"
     }
 }

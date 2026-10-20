@@ -186,3 +186,113 @@ describe("Pi-hole parity settings", () => {
         expect(dns.normalizeDnsClient("a b")).toBeNull();
     });
 });
+
+describe("device names", () => {
+    it("names devices by hand, merged by name, beside the router's names", () => {
+        const devices = [
+            { name: "ana-laptop", address: "192.168.1.20" },
+            { name: "ana-laptop", address: "fd00::20" },
+            { name: "tv", address: "192.168.1.30" }
+        ];
+        expect(render.blockyConfig(settings({ devices })).clientLookup).toEqual({
+            clients: { "ana-laptop": ["192.168.1.20", "fd00::20"], tv: ["192.168.1.30"] }
+        });
+        expect(
+            render.blockyConfig(settings({ devices, namesFrom: "192.168.1.1" })).clientLookup
+        ).toMatchObject({ upstream: "192.168.1.1", singleNameOrder: [1] });
+    });
+
+    it("normalizes a typed name and refuses one with spaces", () => {
+        expect(
+            dns.dnsDeviceSchema.parse({ name: " Ana-Laptop ", address: " 192.168.1.20 " })
+        ).toEqual({ name: "ana-laptop", address: "192.168.1.20" });
+        expect(
+            dns.dnsDeviceSchema.safeParse({ name: "ana laptop", address: "192.168.1.20" }).success
+        ).toBe(false);
+        expect(dns.dnsDeviceSchema.safeParse({ name: "tv", address: "not-an-ip" }).success).toBe(
+            false
+        );
+        expect(dns.readDnsSettings({}).devices).toEqual([]);
+    });
+});
+
+describe("local domains", () => {
+    it("sends each domain to its servers, merged by domain", () => {
+        const forwards = [
+            { domain: "home.lan", server: "192.168.1.1" },
+            { domain: "home.lan", server: "192.168.1.2:5353" },
+            { domain: "168.192.in-addr.arpa", server: "192.168.1.1" }
+        ];
+        expect(render.blockyConfig(settings({ forwards })).conditional).toEqual({
+            mapping: {
+                "home.lan": "192.168.1.1,192.168.1.2:5353",
+                "168.192.in-addr.arpa": "192.168.1.1"
+            }
+        });
+        expect(render.blockyConfig(settings()).conditional).toBeUndefined();
+    });
+
+    it("normalizes the domain and refuses a server that is not one", () => {
+        expect(
+            dns.dnsForwardSchema.parse({ domain: "Home.LAN.", server: " 192.168.1.1 " })
+        ).toEqual({ domain: "home.lan", server: "192.168.1.1" });
+        expect(
+            dns.dnsForwardSchema.safeParse({ domain: "home.lan", server: "router" }).success
+        ).toBe(false);
+        expect(
+            dns.readDnsSettings({ forwards: [{ domain: "x y", server: "1.1.1.1" }] }).forwards
+        ).toEqual([]);
+    });
+});
+
+describe("safe search", () => {
+    const zoneOf = (patch: Partial<dns.DnsSettings>) =>
+        (render.blockyConfig(settings(patch)).customDNS as { zone?: string } | undefined)?.zone ??
+        "";
+
+    it("answers every Google domain and Bing with their locked hosts", () => {
+        const zone = zoneOf({ safeSearch: true });
+        expect(zone).toContain("www.google.com. 300 IN CNAME forcesafesearch.google.com.\n");
+        expect(zone).toContain("www.google.es. 300 IN CNAME forcesafesearch.google.com.\n");
+        expect(zone).toContain("www.bing.com. 300 IN CNAME strict.bing.com.\n");
+        expect(zone).not.toContain("youtube");
+    });
+
+    it("restricts only the YouTube hosts Google names", () => {
+        const zone = zoneOf({ youtube: "moderate" });
+        expect(zone.trim().split("\n")).toEqual([
+            "www.youtube.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "m.youtube.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "youtubei.googleapis.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "youtube.googleapis.com. 300 IN CNAME restrictmoderate.youtube.com.",
+            "www.youtube-nocookie.com. 300 IN CNAME restrictmoderate.youtube.com."
+        ]);
+        expect(zoneOf({ youtube: "strict" })).toContain("IN CNAME restrict.youtube.com.");
+    });
+
+    it("leaves a name the operator answers themselves alone", () => {
+        const zone = zoneOf({
+            safeSearch: true,
+            records: [{ name: "www.google.com", address: "10.0.0.5" }],
+            aliases: [{ name: "www.bing.com", target: "nas.home" }]
+        });
+        expect(zone).not.toContain("www.google.com. 300 IN CNAME forcesafesearch");
+        expect(zone).toContain("www.bing.com. 300 IN CNAME nas.home.\n");
+        expect(zone).not.toContain("www.bing.com. 300 IN CNAME strict.bing.com.");
+    });
+
+    it("is off for a fresh install and for an older stored row", () => {
+        expect(render.blockyConfig(settings()).customDNS).toBeUndefined();
+        expect(dns.readDnsSettings({ youtube: "nonsense" })).toMatchObject({
+            safeSearch: false,
+            youtube: "off"
+        });
+    });
+
+    it("still fits the one environment value with everything on", () => {
+        const encoded = render.encodeBlockyConfig(
+            settings({ safeSearch: true, youtube: "strict" })
+        );
+        expect(encoded.length).toBeLessThan(ENV_VALUE_MAX);
+    });
+});

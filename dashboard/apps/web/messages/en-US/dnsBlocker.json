@@ -135,7 +135,11 @@
         "aliasClash": "These names are both an alias and a local name: {names}. Keep one.",
         "invalidClient": "Not an address, a range or a device name:",
         "logDays": "Between 1 and {max} days.",
-        "invalidAddress": "Not an IPv4 address."
+        "invalidAddress": "Not an IPv4 address.",
+        "invalidDeviceAddress": "Not an IP address, like 192.168.1.20.",
+        "invalidDeviceName": "Letters, digits, dots and dashes; no spaces.",
+        "invalidDomain": "Not a domain name.",
+        "invalidForwardServer": "Not a server address, like 192.168.1.1."
     },
     "errors": {
         "notInstalled": "Ad blocker is not installed. Install it from the Marketplace first.",
@@ -290,5 +294,33 @@
             "devices": "{count, plural, one {One device has} other {# devices have}} used the blocker in the last 24 hours:",
             "logOff": "The blocker is not keeping a log yet, so Polaris cannot see which devices use it. Apply the settings below once and check again."
         }
+    },
+    "devices": {
+        "title": "Device names",
+        "intro": "Name a device by its address. The log shows the name, and a group can hold it.",
+        "empty": "No names yet. Devices show by address, or by the name your router gives them.",
+        "name": "Device name",
+        "namePlaceholder": "ana-laptop",
+        "address": "Device address",
+        "add": "Name it",
+        "remove": "Remove name"
+    },
+    "forwards": {
+        "title": "Local domains",
+        "intro": "Send a domain to another server, like your router for home.lan or a reverse zone.",
+        "empty": "None. Every name goes to the resolvers above.",
+        "domain": "Domain",
+        "server": "Its server",
+        "add": "Forward",
+        "remove": "Stop forwarding"
+    },
+    "safe": {
+        "title": "Safe search filters",
+        "intro": "For every device on the network. A browser setting cannot turn it off.",
+        "search": "Filter explicit results on Google and Bing",
+        "youtube": "YouTube restricted mode",
+        "youtubeOff": "Off",
+        "youtubeModerate": "Moderate",
+        "youtubeStrict": "Strict"
     }
 }
