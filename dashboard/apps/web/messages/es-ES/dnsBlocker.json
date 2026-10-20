@@ -275,7 +275,8 @@
             "fritzbox": "Para IPv6, marca también \"Also announce DNSv6 server via router advertisement (RFC 5006)\". Después puede que fritz.box deje de abrir en tus dispositivos; usa 192.168.178.1.",
             "tplink": "En un Deco, el mismo campo está en la app en More > Advanced > DHCP Server. Reinicia el Deco principal tras guardar.",
             "unifi": "Los dispositivos lo toman al renovar su concesión, normalmente en un día. Apagar y encender el dispositivo es más rápido.",
-            "netgear": "Los dispositivos siguen usando el router como DNS, así que en ellos no cambia nada ni hace falta reconectar."
+            "netgear": "Los dispositivos siguen usando el router como DNS, así que en ellos no cambia nada ni hace falta reconectar.",
+            "zte": "Algunas versiones del operador bloquean esta página o deshacen el cambio sin avisar; si abajo no aparece ningún dispositivo, pide al operador que lo cambie. Si los móviles siguen con anuncios, reciben el DNS del operador por IPv6: pide que desactiven IPv6."
         },
         "check": {
             "title": "¿Lo usan los dispositivos?",

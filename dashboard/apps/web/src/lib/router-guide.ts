@@ -219,9 +219,31 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // i18n-ignore a brand's name
         label: "ZTE",
         // Written from the H3640's own pages; ZTE publishes no manual for ISP firmware.
-        topics: ["forward"],
+        // DNS: the DHCP Server page of ZTE's own guides for the same web interface -
+        // https://www.zteitalia.it/wp-content/uploads/2020/11/ZXHN-H2640V1.0MaintenanceManagement.pdf
+        // (5.3.1, "ISP DNS", "Primary DNS", "Apply") and the H3140 guide at guide.aruba.it,
+        // worded identically. The H3640 shows that page as a tab of Local Network > LAN,
+        // beside DHCP Binding, with no IPv4 level between. Primary DNS can only be typed
+        // once ISP DNS is off (bandaancha.eu/foros/cambiar-dns-router-h3600-v9-1747773);
+        // some ISP builds lock or drop the change (bandaancha.eu/foros
+        // /puede-cambiar-ip-interfaz-wan-zte-h3640-1760078, Hyperoptic's H298A manual), and
+        // the ISP's IPv6 keeps handing devices its own DNS (bandaancha.eu/foros
+        // /desactivar-ipv6-router-pihole-bloqueador-1749414) - both in notes.zte.
+        topics: ["forward", "dns"],
         forwardSource: null,
-        dns: null,
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "Local Network > LAN > DHCP Server, with ISP DNS set to Off",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Primary DNS",
+                value: "address",
+                save: "Apply",
+                source: "https://www.zteitalia.it/wp-content/uploads/2020/11/ZXHN-H2640V1.0MaintenanceManagement.pdf"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: null,
         signIn: "The user and password printed on the label underneath the router. On an ISP box the user is usually `admin` and the password is the one on the label, not the WiFi key.",
         reserve: {
@@ -278,9 +300,25 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         // i18n-ignore a brand's name
         label: "Huawei",
         // Written from the device's own pages; ISP firmware has no public manual.
-        topics: ["forward"],
+        // DNS: Huawei's web page reference for the HG8145V5/HG8245H5 family, as
+        // Makedonski Telekom publishes it (1.6.2.3, "Primary DNS Server", "Apply").
+        // Older units such as the HG8245H keep the page directly under LAN
+        // (https://cleanbrowsing.org/support/routers/huawei-hg8240).
+        topics: ["forward", "dns"],
         forwardSource: null,
-        dns: null,
+        dns: {
+            mode: "direct",
+            lan: {
+                path: "LAN > DHCP Server Configuration (Advanced Configuration > LAN Configuration on newer models)",
+                // i18n-ignore the router's own label, quoted as its page shows it
+                field: "Primary DNS Server",
+                value: "address",
+                save: "Apply",
+                source: "https://www.telekom.mk/content/upatstva/Huawei%20HG8145v5,%20web%20page%20guide.pdf"
+            },
+            ipv6: null,
+            conflict: null
+        },
         admin: "http://192.168.100.1",
         signIn: "The user and password on the label. ISP units keep port forwarding behind an installer account the label does not carry - ask your provider for it if the menu is missing.",
         reserve: {

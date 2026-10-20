@@ -67,6 +67,17 @@ describe("the ad blocker's router steps", () => {
         }
     });
 
+    it("offers ZTE in the picker and walks it through its DHCP Server tab", () => {
+        expect(brands.map((brand) => brand.value)).toContain("zte");
+        const html = renderToStaticMarkup(
+            withMessages(<RouterDnsSteps brand="zte" address="10.0.0.5" />)
+        );
+        expect(html).toContain("Local Network &gt; LAN &gt; DHCP Server, with ISP DNS set to Off");
+        expect(html).toContain("<b class=\"font-medium text-foreground\">Primary DNS</b>");
+        expect(html).toContain("<b class=\"font-medium text-foreground\">Apply</b>");
+        expect(html).toContain("over IPv6");
+    });
+
     it("tells UniFi to switch off its own ad blocking, which overrides any DNS server", () => {
         const html = renderToStaticMarkup(
             withMessages(<RouterDnsSteps brand="unifi" address="10.0.0.5" />)

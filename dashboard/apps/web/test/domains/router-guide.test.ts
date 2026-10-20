@@ -345,6 +345,17 @@ describe("one catalogue for every router topic", () => {
         // UniFi and OpenWrt forwarding was not checked against their docs.
         expect(routerBrandsFor("forward").map((brand) => brand.id)).not.toContain("unifi");
         expect(routerBrandsFor("dns").map((brand) => brand.id)).toContain("unifi");
+        // ISP routers hand out the DNS from their DHCP Server page like any other.
+        expect(routerBrandsFor("dns").map((brand) => brand.id)).toEqual(
+            expect.arrayContaining(["zte", "huawei"])
+        );
+    });
+
+    it("points ZTE at the DHCP Server tab with the ISP's DNS switched off first", () => {
+        const lan = routerGuide("zte").dns?.lan;
+        expect(lan?.path).toBe("Local Network > LAN > DHCP Server, with ISP DNS set to Off");
+        expect(lan?.field).toBe("Primary DNS");
+        expect(lan?.save).toBe("Apply");
     });
 
     it("keeps the brands the domains page already offered", () => {

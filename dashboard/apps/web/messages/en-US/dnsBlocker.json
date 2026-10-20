@@ -275,7 +275,8 @@
             "fritzbox": "For IPv6, also tick \"Also announce DNSv6 server via router advertisement (RFC 5006)\". Afterwards fritz.box may stop opening on your devices; use 192.168.178.1 instead.",
             "tplink": "On a Deco, the same field is in the app under More > Advanced > DHCP Server. Restart the main Deco after saving.",
             "unifi": "Devices pick it up when their lease renews, usually within a day. Turning a device off and on again is quicker.",
-            "netgear": "Devices keep the router as their DNS server, so nothing changes on them and no reconnect is needed."
+            "netgear": "Devices keep the router as their DNS server, so nothing changes on them and no reconnect is needed.",
+            "zte": "Some provider builds lock this page or quietly undo the change; if no device shows up below, ask your provider to set it. If phones still show ads, they get the provider's DNS over IPv6: ask your provider to turn IPv6 off."
         },
         "check": {
             "title": "Are devices using it?",
