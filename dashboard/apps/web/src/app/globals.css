@@ -33,13 +33,36 @@ html {
 }
 
 /*
+ * A box that scrolls on its own holds everything placed inside it.
+ *
+ * Text kept for screen readers only (`sr-only`) is positioned absolutely, so it
+ * belongs to the nearest positioned box above it - and when the scrolling box
+ * is not positioned, that is the page. The rows scrolled out of a 300-line list
+ * then lengthen the page by what they would have measured unclipped: the query
+ * log made a 1,048px screen 13,174px tall, and scrolling ran past the sidebar
+ * into empty space. Zero specificity, so any element that sets its own
+ * position (fixed, absolute, sticky) keeps it.
+ */
+:where(
+    [class*="overflow-auto"],
+    [class*="overflow-scroll"],
+    [class*="overflow-y-auto"],
+    [class*="overflow-y-scroll"],
+    [class*="overflow-x-auto"],
+    [class*="overflow-x-scroll"]
+) {
+    position: relative;
+}
+
+/*
  * The webfonts the root layout loads, folded into the token the whole design
  * system reads. Named separately from --font-sans so the cascade order between
  * this file and the font loader's own stylesheet cannot decide which face wins:
  * the fallbacks after them are what renders while the woff2 is in flight.
  */
 :root {
-    --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    --font-sans:
+        var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
         sans-serif;
     --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", "Cascadia Mono", monospace;
     color-scheme: dark;
