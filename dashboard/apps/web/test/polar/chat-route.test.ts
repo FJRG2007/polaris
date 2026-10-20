@@ -37,7 +37,10 @@ const state = {
     hit: null as null | { used: number; amount: number; period: string },
     recorded: [] as unknown[],
     web: true,
-    models: [] as MockLanguageModelV4[]
+    models: [] as MockLanguageModelV4[],
+    unreadable: null as string | null,
+    failWith: null as null | { statusCode: number; message: string },
+    prompts: [] as unknown[]
 };
 
 vi.mock("@/lib/polar/access", async () => ({
@@ -63,7 +66,10 @@ vi.mock("@/lib/api-session", () => ({
 }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !state.limited }) }));
 vi.mock("@/lib/polar/attachments", () => ({
-    inlinePolarFiles: async (_user: string, messages: unknown) => messages
+    inlinePolarFiles: async (_user: string, messages: unknown, _option: unknown, out: string[]) => {
+        if (state.unreadable) out.push(state.unreadable);
+        return messages;
+    }
 }));
 vi.mock("@/lib/polar/memory", () => ({
     MEMORY_APPROVAL: { polar_remember: "user-approval" },
@@ -87,15 +93,20 @@ vi.mock("@/lib/polar/titles", () => ({
 function model() {
     let step = 0;
     const mock = new MockLanguageModelV4({
-        doStream: async () => ({
-            stream: new ReadableStream({
-                start(controller) {
-                    for (const part of step++ === 0 ? state.parts : says("Here you go."))
-                        controller.enqueue(part);
-                    controller.close();
-                }
-            })
-        })
+        doStream: async (options: { prompt: unknown }) => {
+            state.prompts.push(options.prompt);
+            if (state.failWith)
+                throw Object.assign(new Error(state.failWith.message), state.failWith);
+            return {
+                stream: new ReadableStream({
+                    start(controller) {
+                        for (const part of step++ === 0 ? state.parts : says("Here you go."))
+                            controller.enqueue(part);
+                        controller.close();
+                    }
+                })
+            };
+        }
     });
     state.models.push(mock);
     return mock;
@@ -222,7 +233,15 @@ beforeEach(() => {
     state.signals = [];
     state.web = true;
     state.models = [];
+    state.unreadable = null;
+    state.failWith = null;
+    state.prompts = [];
 });
+
+/** The messages a turn saved, from its savePolarMessages call. */
+function savedTurn(at = 0): UIMessage[] {
+    return (state.saved[at] as [string, string, UIMessage[]])[2];
+}
 
 describe("who may talk to Polar", () => {
     it("turns away a request with no session", async () => {
@@ -306,17 +325,78 @@ describe("what a request has to look like", () => {
         });
     });
 
-    it("refuses a turn on the shared key past an administrator's ceiling", async () => {
+    it("answers a turn on the shared key past an administrator's ceiling with why, and keeps it", async () => {
         state.source = "instance";
         state.hit = { used: 120, amount: 100, period: "day" };
         const answer = await post(body());
-        expect(answer.status).toBe(429);
-        expect(await answer.json()).toEqual({
-            error: "usage_limit",
-            used: 120,
-            amount: 100,
-            period: "day"
+        const text = await answer.text();
+        expect(text).toContain('"type":"data-polar-failure"');
+        expect(state.prompts).toEqual([]);
+        expect(state.ensured).toHaveLength(1);
+        const [question, reply] = savedTurn();
+        expect(question?.id).toBe("u1");
+        expect(reply?.role).toBe("assistant");
+        expect(reply?.id).toBeTruthy();
+        expect(text).toContain(`"messageId":"${reply?.id}"`);
+        expect(reply?.parts).toContainEqual({
+            type: "data-polar-failure",
+            data: { code: "usage_limit", used: 120, amount: 100, period: "day" }
         });
+    });
+
+    it("keeps a turn whose file the model could not read, with the file's name", async () => {
+        state.unreadable = "scan.tiff";
+        const text = await (await post(body())).text();
+        expect(text).toContain("scan.tiff");
+        expect(state.prompts).toEqual([]);
+        expect(savedTurn()[1]?.parts).toContainEqual({
+            type: "data-polar-failure",
+            data: { code: "file_unreadable", name: "scan.tiff" }
+        });
+    });
+
+    it("keeps a provider's refusal in the answer it cut short", async () => {
+        state.failWith = { statusCode: 402, message: "payment required" };
+        const text = await (await post(body())).text();
+        expect(text).toContain('"type":"error"');
+        const reply = savedTurn().at(-1);
+        expect(reply?.role).toBe("assistant");
+        expect(reply?.id).toBeTruthy();
+        expect(reply?.parts).toContainEqual({
+            type: "data-polar-failure",
+            data: {
+                code: "provider",
+                kind: "credit",
+                provider: "Anthropic",
+                slug: "anthropic",
+                payer: "own"
+            }
+        });
+    });
+
+    it("never hands the model a stored failure, nor an answer that was only one", async () => {
+        const failure = {
+            type: "data-polar-failure",
+            data: { code: "file_unreadable", name: "a" }
+        };
+        await (
+            await post(
+                body({
+                    messages: [
+                        { id: "u0", role: "user", parts: [{ type: "text", text: "Read this" }] },
+                        { id: "a0", role: "assistant", parts: [{ type: "step-start" }, failure] },
+                        { id: "u1", role: "user", parts: [{ type: "text", text: "Tidy my tasks" }] }
+                    ]
+                })
+            )
+        ).text();
+        const prompt = JSON.stringify(state.prompts[0]);
+        expect(prompt).not.toContain("data-polar-failure");
+        expect((state.prompts[0] as { role: string }[]).map((entry) => entry.role)).toEqual([
+            "system",
+            "user",
+            "user"
+        ]);
     });
 
     it("never caps a person's own key", async () => {
@@ -341,6 +421,45 @@ describe("what a request has to look like", () => {
         // How long the turn worked, for the line its steps fold into.
         expect(text).toMatch(/"workedMs":\d+/);
         expect(state.saved).toHaveLength(1);
+    });
+
+    it("saves the answer under the id the screen is told, so a reload finds it", async () => {
+        const text = await (await post(body())).text();
+        const start = /"type":"start"[^\n]*?"messageId":"([^"]+)"/.exec(text);
+        expect(start?.[1]).toBeTruthy();
+        const [, , finished] = state.saved[0] as [string, string, UIMessage[]];
+        const answer = finished.at(-1);
+        expect(answer?.role).toBe("assistant");
+        expect(answer?.id).toBe(start?.[1]);
+    });
+
+    it("gives every answer an id of its own", async () => {
+        await (await post(body())).text();
+        await (await post(body())).text();
+        const ids = state.saved.map(
+            (entry) => (entry as [string, string, UIMessage[]])[2].at(-1)?.id
+        );
+        expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    it("keeps the answer's id when a turn continues it", async () => {
+        const text = await (
+            await post(
+                body({
+                    messages: [
+                        {
+                            id: "u1",
+                            role: "user",
+                            parts: [{ type: "text", text: "Tidy my tasks" }]
+                        },
+                        { id: "a1", role: "assistant", parts: [{ type: "text", text: "Sure." }] }
+                    ]
+                })
+            )
+        ).text();
+        expect(text).toContain('"messageId":"a1"');
+        const [, , finished] = state.saved[0] as [string, string, UIMessage[]];
+        expect(finished.map((message) => message.id)).toEqual(["u1", "a1"]);
     });
 
     it("asks for the thread's title once the reply has finished, not before", async () => {

@@ -14,10 +14,14 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import {
     convertToModelMessages,
+    createUIMessageStream,
+    createUIMessageStreamResponse,
+    generateId,
     isStepCount,
     safeValidateUIMessages,
     streamText,
-    type UIMessage
+    type UIMessage,
+    type UIMessageChunk
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
@@ -44,9 +48,13 @@ import { answerUsage, stepContext, polarLimitReached, recordPolarUsage } from "@
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
+    FAILURE_PART,
     classifyProviderFailure,
+    decodePolarFailure,
     encodePolarFailure,
-    failureLogLine
+    failureLogLine,
+    withoutFailures,
+    type StoredFailure
 } from "@/lib/polar/provider-failure";
 import {
     fencePageContext,
@@ -84,6 +92,45 @@ const bodySchema = z.object({
 
 function refuse(code: string, status: number): NextResponse {
     return NextResponse.json({ error: code }, { status });
+}
+
+/**
+ * A turn the model was never asked, answered as a message with why, so the
+ * conversation keeps the question and the reason it went unanswered.
+ */
+function refusedTurn(
+    messages: UIMessage[],
+    failure: StoredFailure,
+    save: (finished: UIMessage[]) => Promise<void>
+): Response {
+    return createUIMessageStreamResponse({
+        stream: createUIMessageStream({
+            originalMessages: messages,
+            generateId,
+            execute: ({ writer }) => {
+                writer.write({ type: "start" });
+                writer.write({ type: FAILURE_PART, data: failure });
+                writer.write({ type: "finish" });
+            },
+            onFinish: ({ messages: finished }) => save(finished)
+        })
+    });
+}
+
+/**
+ * A provider's refusal mid-answer is also written into the answer, just before
+ * the stream's error, so the stored message says why it stopped.
+ */
+function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageChunk> {
+    return new TransformStream({
+        transform(chunk, controller) {
+            if (chunk.type === "error") {
+                const failure = decodePolarFailure(chunk.errorText);
+                if (failure) controller.enqueue({ type: FAILURE_PART, data: failure });
+            }
+            controller.enqueue(chunk);
+        }
+    });
 }
 
 /** The first text of a user message, for a new thread's title. */
@@ -145,12 +192,6 @@ export async function POST(request: Request): Promise<Response> {
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
-    // The administrator's token ceilings bound the key this Polaris shares; a
-    // person's own key is theirs to spend.
-    if (resolved.credential.source === "instance") {
-        const hit = await polarLimitReached(user.id);
-        if (hit) return NextResponse.json({ error: "usage_limit", ...hit }, { status: 429 });
-    }
 
     const owned = await ensurePolarThread(
         user.id,
@@ -182,6 +223,22 @@ export async function POST(request: Request): Promise<Response> {
         index === list.length - 1 && list[index]?.role === "user"
             ? body.data.parentId
             : (list[index - 1]?.id ?? null);
+    const save = async (finished: UIMessage[]): Promise<void> => {
+        try {
+            await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
+                parentFor(index, finished)
+            );
+        } catch (error) {
+            console.error("polar: could not save the turn", error);
+        }
+    };
+
+    // The administrator's token ceilings bound the key this Polaris shares; a
+    // person's own key is theirs to spend.
+    if (resolved.credential.source === "instance") {
+        const hit = await polarLimitReached(user.id);
+        if (hit) return refusedTurn(messages, { code: "usage_limit", ...hit }, save);
+    }
 
     // A file the model cannot read is sent as its text; one with no text to
     // take out stops the turn with its name instead of being dropped unseen.
@@ -195,11 +252,8 @@ export async function POST(request: Request): Promise<Response> {
         resolved.option,
         unreadable
     );
-    if (unreadable.length > 0) {
-        return NextResponse.json(
-            { error: "file_unreadable", name: unreadable[0] },
-            { status: 422 }
-        );
+    if (unreadable[0] !== undefined) {
+        return refusedTurn(messages, { code: "file_unreadable", name: unreadable[0] }, save);
     }
 
     const startedAt = Date.now();
@@ -221,7 +275,7 @@ export async function POST(request: Request): Promise<Response> {
         ]
             .filter(Boolean)
             .join("\n\n"),
-        messages: await convertToModelMessages(sendable),
+        messages: await convertToModelMessages(withoutFailures(sendable)),
         tools,
         toolApproval: {
             ...toolset.approval,
@@ -237,8 +291,7 @@ export async function POST(request: Request): Promise<Response> {
         abortSignal: request.signal
     });
 
-    return result.toUIMessageStreamResponse({
-        originalMessages: messages,
+    const answer = result.toUIMessageStream({
         sendReasoning: true,
         // A provider's own search reports what it read as sources.
         sendSources: true,
@@ -264,14 +317,33 @@ export async function POST(request: Request): Promise<Response> {
                     }
                   : undefined;
         },
+        // The provider's refusal is classified and named, never forwarded: its
+        // body is the provider's own words about the account it belongs to.
+        onError: (error) => {
+            // Automatic tries this provider last for a few minutes.
+            noteProviderFailure(user.id, resolved.option.provider);
+            const failure = classifyProviderFailure(error);
+            console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
+            return encodePolarFailure({
+                code: "provider",
+                kind: failure.kind,
+                provider: resolved.option.providerName,
+                slug: resolved.option.provider,
+                payer: resolved.credential.source
+            });
+        }
+    });
+
+    const stream = createUIMessageStream({
+        originalMessages: messages,
+        // The answer's id is decided here and sent with its first chunk, so the
+        // screen and the stored row share it. Without it the row is saved under
+        // an empty id, which every later answer collides with and is dropped.
+        // A turn that continues an answer keeps that answer's id.
+        generateId,
+        execute: ({ writer }) => writer.merge(answer.pipeThrough(failureIntoAnswer())),
         onFinish: async ({ messages: finished, responseMessage }) => {
-            try {
-                await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
-                    parentFor(index, finished)
-                );
-            } catch (error) {
-                console.error("polar: could not save the turn", error);
-            }
+            await save(finished);
             if (spent) {
                 try {
                     await recordPolarUsage({
@@ -297,21 +369,7 @@ export async function POST(request: Request): Promise<Response> {
                 finished,
                 reasoningFor("fast", resolved.option)
             );
-        },
-        // The provider's refusal is classified and named, never forwarded: its
-        // body is the provider's own words about the account it belongs to.
-        onError: (error) => {
-            // Automatic tries this provider last for a few minutes.
-            noteProviderFailure(user.id, resolved.option.provider);
-            const failure = classifyProviderFailure(error);
-            console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
-            return encodePolarFailure({
-                code: "provider",
-                kind: failure.kind,
-                provider: resolved.option.providerName,
-                slug: resolved.option.provider,
-                payer: resolved.credential.source
-            });
         }
     });
+    return createUIMessageStreamResponse({ stream });
 }

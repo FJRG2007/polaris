@@ -14,8 +14,12 @@ import {
     decodePolarFailure,
     encodePolarFailure,
     failureLogLine,
+    keepStoredFailures,
+    messageFailure,
+    withoutFailures,
     type PolarFailure
 } from "@/lib/polar/provider-failure";
+import type { UIMessage } from "ai";
 
 /** The shape the AI SDK's APICallError carries. */
 function callError(statusCode: number, responseBody = ""): Error {
@@ -138,5 +142,42 @@ describe("standIn", () => {
 
     it("offers nothing when no other provider can serve", () => {
         expect(standIn(failure, "llama-a", [(providers as unknown[])[0]] as never)).toBeNull();
+    });
+});
+
+describe("a failure kept in the conversation", () => {
+    const limit = {
+        type: "data-polar-failure",
+        data: { code: "usage_limit", used: 5, amount: 4, period: "week" }
+    } as UIMessage["parts"][number];
+    const words = { type: "text", text: "Half an answer" } as UIMessage["parts"][number];
+
+    it("reads back what was stored, and nothing that no longer reads", () => {
+        expect(messageFailure({ id: "a", role: "assistant", parts: [words, limit] })).toEqual({
+            code: "usage_limit",
+            used: 5,
+            amount: 4,
+            period: "week"
+        });
+        const broken = { type: "data-polar-failure", data: { code: "usage_limit" } };
+        expect(messageFailure({ id: "a", role: "assistant", parts: [broken as never] })).toBeNull();
+    });
+
+    it("never reaches the model, and an answer that was only a failure goes with it", () => {
+        const messages: UIMessage[] = [
+            { id: "u", role: "user", parts: [words] },
+            { id: "a1", role: "assistant", parts: [{ type: "step-start" }, limit] },
+            { id: "a2", role: "assistant", parts: [words, limit] }
+        ];
+        expect(withoutFailures(messages)).toEqual([
+            messages[0],
+            { id: "a2", role: "assistant", parts: [words] }
+        ]);
+    });
+
+    it("survives a later turn re-sending the answer without it", () => {
+        expect(keepStoredFailures([words], [words, limit])).toEqual([words, limit]);
+        expect(keepStoredFailures([words, limit], [words, limit])).toEqual([words, limit]);
+        expect(keepStoredFailures([words], undefined)).toEqual([words]);
     });
 });

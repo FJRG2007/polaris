@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { PolarFailureNotice } from "./polar-failure";
+import * as polarFailure from "@/lib/polar/provider-failure";
 import { useChat } from "@ai-sdk/react";
 import { usePathname } from "next/navigation";
 import {
@@ -737,7 +738,10 @@ export function PolarChat({
     const busy = chat.status === "submitted" || chat.status === "streaming";
     const online = usePolarOnline();
     const avatarState = avatarStateFor({ open: true, online, busy });
-    const limit = limitOf(chat.error);
+    // A failure the answer itself carries is drawn with it; the error alone is
+    // for a turn that never got an answer to carry one, a dropped connection.
+    const looseError =
+        chat.error && !polarFailure.messageFailure(chat.messages.at(-1)) ? chat.error : null;
     const waitingApproval = chat.messages
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
@@ -1076,6 +1080,21 @@ export function PolarChat({
                 method: "DELETE"
             }).catch(() => undefined);
         }
+    };
+
+    // Asks again on another model, from a failure's "try with" offer.
+    const tryWith = (model: { provider: string; model: string }) => {
+        if (!choice) return;
+        const next: ModelChoice = {
+            ...choice,
+            provider: model.provider,
+            model: model.model,
+            payer: null
+        };
+        // Read by the transport on this very send, before the state below has rendered.
+        live.current = { ...live.current, choice: next };
+        setChoice(next);
+        void chat.regenerate();
     };
 
     const switchVersion = (index: number, version: string) => {
@@ -1896,6 +1915,27 @@ export function PolarChat({
                                                 })
                                             }
                                             onRegenerate={() => void chat.regenerate()}
+                                            renderFailure={(failure) => (
+                                                <PolarFailureNotice
+                                                    failure={failure}
+                                                    isAdmin={isAdmin}
+                                                    providers={providers ?? []}
+                                                    failedModel={choice?.model ?? null}
+                                                    // Only the newest answer offers to
+                                                    // try again; older ones say what
+                                                    // happened.
+                                                    onRetry={
+                                                        index === chat.messages.length - 1
+                                                            ? () => void chat.regenerate()
+                                                            : undefined
+                                                    }
+                                                    onTryWith={
+                                                        index === chat.messages.length - 1
+                                                            ? tryWith
+                                                            : undefined
+                                                    }
+                                                />
+                                            )}
                                             onBranch={
                                                 temporary
                                                     ? undefined
@@ -1918,47 +1958,17 @@ export function PolarChat({
                                         </Shimmer>
                                     </div>
                                 ) : null}
-                                {chat.error ? (
-                                    unreadableOf(chat.error) || limit ? (
-                                        <p
-                                            role="alert"
-                                            className="rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
-                                        >
-                                            {unreadableOf(chat.error)
-                                                ? t("errors.fileUnreadable", {
-                                                      name: unreadableOf(chat.error)!
-                                                  })
-                                                : limit
-                                                  ? t("errors.usageLimit", {
-                                                        used: limit.used,
-                                                        amount: limit.amount,
-                                                        period: t(`usage.periods.${limit.period}`)
-                                                    })
-                                                  : null}
-                                        </p>
-                                    ) : (
-                                        <PolarFailureNotice
-                                            error={chat.error.message}
-                                            isAdmin={isAdmin}
-                                            providers={providers ?? []}
-                                            failedModel={choice?.model ?? null}
-                                            onRetry={() => void chat.regenerate()}
-                                            onTryWith={(model) => {
-                                                if (!choice) return;
-                                                const next: ModelChoice = {
-                                                    ...choice,
-                                                    provider: model.provider,
-                                                    model: model.model,
-                                                    payer: null
-                                                };
-                                                // Read by the transport on this very send,
-                                                // before the state below has rendered.
-                                                live.current = { ...live.current, choice: next };
-                                                setChoice(next);
-                                                void chat.regenerate();
-                                            }}
-                                        />
-                                    )
+                                {looseError ? (
+                                    <PolarFailureNotice
+                                        failure={polarFailure.decodePolarFailure(
+                                            looseError.message
+                                        )}
+                                        isAdmin={isAdmin}
+                                        providers={providers ?? []}
+                                        failedModel={choice?.model ?? null}
+                                        onRetry={() => void chat.regenerate()}
+                                        onTryWith={tryWith}
+                                    />
                                 ) : null}
                             </ConversationContent>
                         </Conversation>
@@ -2018,37 +2028,6 @@ export function PolarChat({
             ) : null}
         </div>
     );
-}
-
-/** The ceiling a refused turn ran into, when that was why: the transport hands
- *  the route's answer over as the error's message. */
-export function limitOf(
-    error: Error | undefined
-): { used: number; amount: number; period: "day" | "week" | "month" } | null {
-    if (!error) return null;
-    try {
-        const body = JSON.parse(error.message) as Record<string, unknown>;
-        const period = body.period;
-        return body.error === "usage_limit" &&
-            typeof body.used === "number" &&
-            typeof body.amount === "number" &&
-            (period === "day" || period === "week" || period === "month")
-            ? { used: body.used, amount: body.amount, period }
-            : null;
-    } catch {
-        return null;
-    }
-}
-
-/** The file a refused turn could not hand the model, when that was why. */
-export function unreadableOf(error: Error | undefined): string | null {
-    if (!error) return null;
-    try {
-        const body = JSON.parse(error.message) as Record<string, unknown>;
-        return body.error === "file_unreadable" && typeof body.name === "string" ? body.name : null;
-    } catch {
-        return null;
-    }
 }
 
 /** The window of the chosen model: the provider's own figure when its API
@@ -2140,7 +2119,8 @@ function MessageView({
     onQuote,
     onSaveCommand,
     onRegenerate,
-    onBranch
+    onBranch,
+    renderFailure
 }: {
     message: UIMessage;
     tools: Record<string, ToolDescription>;
@@ -2154,6 +2134,8 @@ function MessageView({
     onSaveCommand: () => void;
     onRegenerate: () => void;
     onBranch?: () => void;
+    /** Why this answer has nothing else to show, drawn the way the panel words it. */
+    renderFailure: (failure: polarFailure.StoredFailure) => ReactNode;
 }) {
     const t = useTranslations("polar");
     const mine = message.role === "user";
@@ -2288,6 +2270,8 @@ function MessageView({
                     );
                 }
                 if (folded(part)) return null;
+                const failure = polarFailure.failureOf(part);
+                if (failure) return <div key={index}>{renderFailure(failure)}</div>;
                 if (part.type === "text") {
                     if (!part.text.trim()) return null;
                     return (
