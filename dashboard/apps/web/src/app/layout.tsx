@@ -157,12 +157,17 @@ const NAME_FACES = [
     .join(" ");
 
 /** The document's title and description, the description in the reader's
- *  language. The title is the product's name, which is not translated. */
+ *  language, and the rule that keeps every page out of search engines. The
+ *  title is the product's name, which is not translated. */
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("common");
     return {
         title: "Polaris", // i18n-ignore
-        description: t("meta.description")
+        description: t("meta.description"),
+        // Every page, public or not, stays out of search engines and their
+        // caches; next.config's X-Robots-Tag says the same on every response.
+        robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false, noimageindex: true } },
+        referrer: "strict-origin-when-cross-origin"
     };
 }
 
