@@ -99,12 +99,10 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams(search)
 }));
 
-const { DnsBlockerProvider } = await import(
-    "../../src/app/(app)/apps/dns-blocker/dns-blocker-context"
-);
-const { DnsOverviewSection } = await import(
-    "../../src/app/(app)/apps/dns-blocker/overview-section"
-);
+const { DnsBlockerProvider } =
+    await import("../../src/app/(app)/apps/dns-blocker/dns-blocker-context");
+const { DnsOverviewSection } =
+    await import("../../src/app/(app)/apps/dns-blocker/overview-section");
 const { DnsLogSection } = await import("../../src/app/(app)/apps/dns-blocker/log-section");
 const { DnsListsSection } = await import("../../src/app/(app)/apps/dns-blocker/lists-section");
 const { DnsDevicesSection } = await import("../../src/app/(app)/apps/dns-blocker/devices-section");

@@ -34,9 +34,8 @@ vi.mock("@/lib/dns-blocker/service", () => ({
 vi.mock("@/lib/deploy/runtime", () => ({ getPorts: async () => ({ readFile, runIn }) }));
 vi.mock("@/lib/container-files-service", () => ({ resolveContainerName: async () => "engine" }));
 
-const { dnsInsights, engineMetrics, lookupName, rollUpHistory, tailQueries } = await import(
-    "@/lib/dns-blocker/insights"
-);
+const { dnsInsights, engineMetrics, lookupName, rollUpHistory, tailQueries } =
+    await import("@/lib/dns-blocker/insights");
 const { queryFilterSchema } = await import("@/lib/dns-blocker/query-log");
 
 const LINE = [
@@ -180,7 +179,19 @@ describe("engineMetrics", () => {
 describe("rollUpHistory", () => {
     const NOW = Date.parse("2026-10-18T05:00:00Z");
     const line = (time: string, type: string) =>
-        [time, "10.0.0.2", "10.0.0.2", "3", "BLOCKED (ads)", "ads.com.", "0.0.0.0", "NOERROR", type, "A", "x"].join("	");
+        [
+            time,
+            "10.0.0.2",
+            "10.0.0.2",
+            "3",
+            "BLOCKED (ads)",
+            "ads.com.",
+            "0.0.0.0",
+            "NOERROR",
+            type,
+            "A",
+            "x"
+        ].join("	");
 
     it("rolls up the finished days it has no row for, and prunes past a year", async () => {
         days.findMany.mockResolvedValueOnce([{ day: new Date("2026-10-16T00:00:00Z") }]);

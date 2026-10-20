@@ -81,7 +81,9 @@ export function readImport(text: string, current: DnsSettings): DnsImport {
     );
     const parsed = dnsSettingsSchema.safeParse({ ...current, ...given });
     if (!parsed.success) {
-        const fields = [...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "")))];
+        const fields = [
+            ...new Set(parsed.error.issues.map((issue) => String(issue.path[0] ?? "")))
+        ];
         return { ok: false, error: "invalid", fields: fields.filter(Boolean) };
     }
     // The same pass a stored row gets: lists and services no longer offered drop.

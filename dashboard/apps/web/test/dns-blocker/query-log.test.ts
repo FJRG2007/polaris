@@ -269,7 +269,7 @@ describe("name lookup", () => {
         );
         expect(lookup).toMatchObject({ outcome: "allowed", list: "", via: "tcp-tls:1.1.1.1:853" });
         expect(parseLookup("example.com", "Connection refused")).toBeNull();
-        expect(parseLookup("example.com", "{\"reason\":1}")).toBeNull();
+        expect(parseLookup("example.com", '{"reason":1}')).toBeNull();
     });
 });
 

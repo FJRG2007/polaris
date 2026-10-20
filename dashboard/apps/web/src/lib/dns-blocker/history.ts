@@ -136,7 +136,11 @@ function merge(lists: readonly StoredCount[][]): NameCount[] {
  * a name that never made a day's top is not counted: what Pi-hole's long-term
  * view does with its own top lists, and what keeps a year to 365 small rows.
  */
-export function historyFrom(rows: readonly DnsDayRow[], range: DnsHistoryRange, now: number): DnsHistory {
+export function historyFrom(
+    rows: readonly DnsDayRow[],
+    range: DnsHistoryRange,
+    now: number
+): DnsHistory {
     const days = DNS_HISTORY_RANGES[range];
     const last = utcDay(now) - DAY;
     const from = last - (days - 1) * DAY;
@@ -155,7 +159,10 @@ export function historyFrom(rows: readonly DnsDayRow[], range: DnsHistoryRange, 
         allowed[index] = (allowed[index] ?? 0) + row.queries - row.blocked;
         blockedBars[index] = (blockedBars[index] ?? 0) + row.blocked;
     }
-    const clients = kept.flatMap((row) => [...counts(row.topClients), ...counts(row.topBlockedClients)]);
+    const clients = kept.flatMap((row) => [
+        ...counts(row.topClients),
+        ...counts(row.topBlockedClients)
+    ]);
     const clientNames = new Map<string, string>();
     for (const item of clients) if (item.label) clientNames.set(item.name, item.label);
     return {

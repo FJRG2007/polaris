@@ -128,7 +128,9 @@ export function DnsHistoryCard() {
                                 empty={t("insights.none")}
                                 hint={t("insights.filterDomain")}
                                 onPick={(search) =>
-                                    router.push(logHref({ search, outcome: "blocked", range: "30d" }))
+                                    router.push(
+                                        logHref({ search, outcome: "blocked", range: "30d" })
+                                    )
                                 }
                             />
                             <TopList

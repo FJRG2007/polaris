@@ -118,7 +118,10 @@ export function DnsLookupCard() {
                             <Badge variant={blocked ? "danger" : "success"}>
                                 {blocked ? t("lookup.blocked") : t("lookup.allowed")}
                             </Badge>
-                            <span className="min-w-0 truncate font-mono text-sm" title={lookup.domain}>
+                            <span
+                                className="min-w-0 truncate font-mono text-sm"
+                                title={lookup.domain}
+                            >
                                 {lookup.domain}
                             </span>
                         </div>
@@ -141,7 +144,9 @@ export function DnsLookupCard() {
                                 disabled={ruling}
                                 onClick={() => rule(lookup.domain, blocked ? "allow" : "deny")}
                             >
-                                {ruling ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                                {ruling ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 {blocked ? t("lookup.allow") : t("lookup.block")}
                             </Button>
                             <Button asChild size="sm" variant="ghost">

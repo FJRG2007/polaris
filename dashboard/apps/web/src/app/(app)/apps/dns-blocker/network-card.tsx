@@ -58,7 +58,10 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                     value={range}
                     aria-label={t("insights.range")}
                     onValueChange={(value) => setRange(value as DnsRange)}
-                    options={DNS_RANGE_IDS.map((id) => ({ value: id, label: t(`insights.ranges.${id}`) }))}
+                    options={DNS_RANGE_IDS.map((id) => ({
+                        value: id,
+                        label: t(`insights.ranges.${id}`)
+                    }))}
                 />
                 <Button
                     variant="ghost"
@@ -115,12 +118,16 @@ export function DnsNetworkCard({ onName }: { onName: (address: string) => void }
                                             ? Math.round((device.blocked / device.queries) * 1000) /
                                               10
                                             : 0;
-                                    const groups = device.groups.join(", ") || t("network.everyone");
+                                    const groups =
+                                        device.groups.join(", ") || t("network.everyone");
                                     return (
                                         <tr key={device.address} className="border-t">
                                             <td className="max-w-[14rem] p-1 align-top">
                                                 <Link
-                                                    href={logHref({ client: device.address, range })}
+                                                    href={logHref({
+                                                        client: device.address,
+                                                        range
+                                                    })}
                                                     className="flex min-w-0 flex-col hover:underline"
                                                     title={t("network.openLog")}
                                                 >
