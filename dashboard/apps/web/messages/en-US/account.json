@@ -1329,5 +1329,73 @@
         "revokeFailed": "Couldn't revoke it. Try again.",
         "unknownTool": "No longer available",
         "stillChecked": "Polar still runs these as you, only with the access you have at the time."
+    },
+    "polarConnectors": {
+        "title": "Connectors",
+        "intro": "MCP servers you connect to Polar. Their tools are yours only and follow the setting you pick for each one.",
+        "reverse": "Want ChatGPT or Claude to use Polaris instead?",
+        "reverseLink": "Connect an assistant",
+        "add": "Add connector",
+        "empty": "No connectors yet. Add an MCP server to give Polar its tools.",
+        "signedIn": "Signed in. Polar can use this connector now.",
+        "enabled": "Use {name} in Polar",
+        "signIn": "Sign in",
+        "test": "Test connection",
+        "removeLabel": "Remove {name}",
+        "kind": "connector",
+        "removeHint": "Polar stops using its tools and forgets its sign-in.",
+        "noTools": "No tools listed yet. Test the connection to read them.",
+        "writes": "Makes changes",
+        "policyLabel": "What Polar may do with {tool}",
+        "policy": {
+            "allow": "Always allow",
+            "ask": "Needs approval",
+            "block": "Blocked"
+        },
+        "status": {
+            "new": "Not checked",
+            "ok": "Connected",
+            "sign_in": "Sign in needed",
+            "error": "Not answering"
+        },
+        "name": "Name",
+        "namePlaceholder": "e.g. Linear",
+        "url": "Server URL",
+        "urlInvalid": "Enter the full address, starting with https://",
+        "auth": "Sign-in",
+        "authKind": {
+            "none": "None",
+            "bearer": "API key",
+            "oauth": "OAuth"
+        },
+        "token": "API key or token",
+        "oauthHint": "You sign in on the server's own page next. Fill in a client ID only if the server gave you one.",
+        "clientId": "Client ID (optional)",
+        "clientSecret": "Client secret (optional)",
+        "transport": "Connection type",
+        "transportKind": {
+            "http": "Streamable HTTP",
+            "sse": "Older SSE"
+        },
+        "cancel": "Cancel",
+        "save": "Add and test",
+        "addAndSignIn": "Add and sign in",
+        "errors": {
+            "failed": "That didn't work. Try again.",
+            "invalid": "Check the name and address and try again.",
+            "limit": "You have the most connectors allowed. Remove one first.",
+            "duplicate": "You already have a connector with that name.",
+            "address": "That address can't be a server here. Use https://.",
+            "host": "Your administrator doesn't allow servers on that host.",
+            "rate_limited": "Too many changes at once. Wait a minute.",
+            "connectors_off": "Your administrator turned connectors off.",
+            "no_metadata": "The server doesn't say where to sign in. Use an API key instead.",
+            "no_pkce": "The server's sign-in isn't secure enough (no PKCE).",
+            "no_registration": "The server needs a client ID. Add one from its settings.",
+            "insecure": "The server signs in over plain http, which Polar refuses.",
+            "token_refused": "The server refused the sign-in. Try again.",
+            "invalid_answer": "The server answered something Polar can't read.",
+            "signInFailed": "Sign-in didn't finish. Try Sign in again."
+        }
     }
 }

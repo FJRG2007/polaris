@@ -1,7 +1,8 @@
 /**
  * Polar permissions (/account/polar-tools): the actions Polar runs without
  * asking first, each with Revoke. Added from "Always allow" on Polar's
- * approval card; nothing here widens what a tool may reach.
+ * approval card; nothing here widens what a tool may reach. Below them, the
+ * MCP servers this person connected, when the deployment lets them.
  */
 
 import { Suspense } from "react";
@@ -13,6 +14,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { listGrants } from "@/lib/polar/tool-grants";
 import { PolarToolGrants } from "./polar-tool-grants";
+import { PolarConnectors } from "./polar-connectors";
+import { listConnectorViews } from "@/lib/polar/connectors/store";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +36,27 @@ async function GrantsSection({ userId }: { userId: string }) {
     );
 }
 
-export default async function PolarToolsPage() {
+/** The connectors, once read; secrets never leave the server. */
+async function ConnectorsSection({
+    userId,
+    returned
+}: {
+    userId: string;
+    returned: "signed_in" | "failed" | null;
+}) {
+    return <PolarConnectors initial={await listConnectorViews(userId)} returned={returned} />;
+}
+
+export default async function PolarToolsPage({
+    searchParams
+}: {
+    searchParams: Promise<{ connector?: string | string[] }>;
+}) {
     const user = await requireUser();
-    if (!(await polarAccessFor(user.id)).use) redirect(await homePathForUser(user));
+    const access = await polarAccessFor(user.id);
+    if (!access.use) redirect(await homePathForUser(user));
+    const raw = (await searchParams).connector;
+    const returned = raw === "signed_in" || raw === "failed" ? raw : null;
     const t = await getTranslations("account");
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -58,6 +79,20 @@ export default async function PolarToolsPage() {
             >
                 <GrantsSection userId={user.id} />
             </Suspense>
+            {access.connectors && !user.viewingAs ? (
+                <Suspense
+                    fallback={
+                        <Card>
+                            <CardBody className="flex flex-col gap-2">
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                            </CardBody>
+                        </Card>
+                    }
+                >
+                    <ConnectorsSection userId={user.id} returned={returned} />
+                </Suspense>
+            ) : null}
         </div>
     );
 }

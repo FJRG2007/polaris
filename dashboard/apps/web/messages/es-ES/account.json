@@ -1329,5 +1329,73 @@
         "revokeFailed": "No se pudo revocar. Reinténtalo.",
         "unknownTool": "Ya no disponible",
         "stillChecked": "Polar las sigue ejecutando como tú, con el acceso que tengas en ese momento."
+    },
+    "polarConnectors": {
+        "title": "Conectores",
+        "intro": "Servidores MCP que conectas a Polar. Sus herramientas son solo tuyas y siguen el ajuste que elijas en cada una.",
+        "reverse": "¿Quieres que ChatGPT o Claude usen Polaris?",
+        "reverseLink": "Conectar un asistente",
+        "add": "Añadir conector",
+        "empty": "Aún no hay conectores. Añade un servidor MCP para dar sus herramientas a Polar.",
+        "signedIn": "Sesión iniciada. Polar ya puede usar el conector.",
+        "enabled": "Usar {name} en Polar",
+        "signIn": "Entrar",
+        "test": "Probar conexión",
+        "removeLabel": "Quitar {name}",
+        "kind": "conector",
+        "removeHint": "Polar deja de usar sus herramientas y olvida su sesión.",
+        "noTools": "Sin herramientas aún. Prueba la conexión para leerlas.",
+        "writes": "Hace cambios",
+        "policyLabel": "Qué puede hacer Polar con {tool}",
+        "policy": {
+            "allow": "Permitir",
+            "ask": "Pedir permiso",
+            "block": "Bloqueada"
+        },
+        "status": {
+            "new": "Sin probar",
+            "ok": "Conectado",
+            "sign_in": "Falta entrar",
+            "error": "Sin respuesta"
+        },
+        "name": "Nombre",
+        "namePlaceholder": "p. ej. Linear",
+        "url": "URL",
+        "urlInvalid": "Pon la dirección completa, empezando por https://",
+        "auth": "Acceso",
+        "authKind": {
+            "none": "Ninguno",
+            "bearer": "Clave API",
+            "oauth": "OAuth"
+        },
+        "token": "Clave API o token",
+        "oauthHint": "Después entras en la página del servidor. Pon un ID de cliente solo si el servidor te dio uno.",
+        "clientId": "ID de cliente (opcional)",
+        "clientSecret": "Secreto de cliente (opcional)",
+        "transport": "Tipo de conexión",
+        "transportKind": {
+            "http": "HTTP con streaming",
+            "sse": "SSE antiguo"
+        },
+        "cancel": "Cancelar",
+        "save": "Añadir y probar",
+        "addAndSignIn": "Añadir y entrar",
+        "errors": {
+            "failed": "No ha funcionado. Reinténtalo.",
+            "invalid": "Revisa el nombre y la dirección y reinténtalo.",
+            "limit": "Tienes el máximo de conectores. Quita uno antes.",
+            "duplicate": "Ya tienes un conector con ese nombre.",
+            "address": "Esa dirección no sirve como servidor. Usa https://.",
+            "host": "Tu administrador no permite servidores en ese host.",
+            "rate_limited": "Demasiados cambios seguidos. Espera un minuto.",
+            "connectors_off": "Tu administrador ha desactivado los conectores.",
+            "no_metadata": "El servidor no dice dónde entrar. Usa una clave API.",
+            "no_pkce": "El acceso del servidor no es bastante seguro (sin PKCE).",
+            "no_registration": "El servidor pide un ID de cliente. Añade uno suyo.",
+            "insecure": "El servidor usa http sin cifrar para entrar y Polar lo rechaza.",
+            "token_refused": "El servidor rechazó el acceso. Reinténtalo.",
+            "invalid_answer": "El servidor respondió algo que Polar no entiende.",
+            "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
+        }
     }
 }
