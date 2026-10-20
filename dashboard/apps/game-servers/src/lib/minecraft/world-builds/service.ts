@@ -275,12 +275,23 @@ async function surveySite(
                 if (stray > 0) return { why: "occupied" };
             }
         }
-        // Its whole box nothing but air - lifted over the grass in its way - or
-        // it is not built on.
-        for (let lift = 0; lift <= plan.LIFT_MAX; lift += 1) {
+        // Its whole box nothing but air - on the ground once the grass in its
+        // way is cleared, lifted over a flower - or it is not built on.
+        const at = (lift: number) => {
             const origin = plan.originFor(wanted, center, verdict.y + lift);
-            if (await allAir(server, plan.boxFor(wanted, origin)))
-                return { origin, foundation: plan.foundationRuns(tops, origin.y) };
+            return { origin, box: plan.boxFor(wanted, origin) };
+        };
+        const site = (origin: plan.Point): SiteAnswer => ({
+            origin,
+            foundation: plan.foundationRuns(tops, origin.y)
+        });
+        const ground = at(0);
+        if (await allAir(server, ground.box)) return site(ground.origin);
+        for (let lift = 1; lift <= plan.LIFT_MAX; lift += 1) {
+            const lifted = at(lift);
+            if (!(await allAir(server, lifted.box))) continue;
+            await server.sayAll(plan.clearWeeds(ground.box));
+            return site((await allAir(server, ground.box)) ? ground.origin : lifted.origin);
         }
         return { why: "not-air" };
     } finally {
@@ -430,6 +441,13 @@ export async function reconcileWorldBuilds(
                     origin,
                     batchKeyFor(server.installedAppId, wanted.id),
                     site.foundation
+                );
+                // The grass in the foundation's cells goes too, so the dirt
+                // fills them whole instead of round it.
+                await server.sayAll(
+                    site.foundation.flatMap(([x1, x2, z, y1, y2]) =>
+                        plan.clearWeeds({ x1, y1, z1: z, x2, y2, z2: z })
+                    )
                 );
                 await writePlaced(server.installedAppId, (list) => [
                     ...list.filter((one) => !same(one, fresh)),
