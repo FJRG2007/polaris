@@ -32,7 +32,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -108,10 +109,26 @@ export function DeviceDialog({
         ? (roomInputSchema.shape.name.safeParse(roomName).error?.issues[0]?.message ?? null)
         : null;
     const roomIssue = roomIssueRaw ? placesRefusalText(t, roomIssueRaw) : null;
+    // A new room is always a change; otherwise the fields are held against the
+    // device as it was opened.
+    const changed =
+        making ||
+        (device !== null &&
+            isDirty(
+                {
+                    name: device.name,
+                    zone: device.zone,
+                    placeId: device.placeId ?? "",
+                    controllable: device.controllable,
+                    roomId: device.roomId ?? ""
+                },
+                { name, zone, placeId, controllable, roomId }
+            ));
     const canSubmit =
         name.trim().length > 0 &&
         !nameIssue &&
         !saving &&
+        changed &&
         (!making || (roomName.trim().length > 0 && !roomIssue));
     // A room picked at the place before it was changed is not one of this one's.
     const roomOptions = [

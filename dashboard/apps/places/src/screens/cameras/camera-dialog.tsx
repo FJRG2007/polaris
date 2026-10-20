@@ -65,7 +65,8 @@ import {
     Select,
     Skeleton,
     Switch,
-    cn
+    cn,
+    isDirty
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -327,40 +328,46 @@ export function CameraDialog({
     const needsPassword = !usesRtsp && !form.password && !camera?.hasPassword && !inheritsPassword;
     const incomplete = !form.name.trim() || !form.address.trim() || needsPassword;
 
-    const payload = () => ({
-        name: form.name,
-        zone: form.zone,
-        vendor: vendorId,
-        modelId: form.modelId,
-        power: form.power,
-        address: form.address,
-        rtspPort: Number(form.rtspPort) || 554,
-        onvifPort: form.onvifPort ? Number(form.onvifPort) : null,
-        mainPath: form.mainPath,
-        subPath: form.subPath,
-        username: form.username,
+    /** What a save sends for a form, and so what decides whether there is one. */
+    const payloadOf = (state: FormState) => ({
+        name: state.name,
+        zone: state.zone,
+        vendor: vendorForModel(state.modelId, state.vendor),
+        modelId: state.modelId,
+        power: state.power,
+        address: state.address,
+        rtspPort: Number(state.rtspPort) || 554,
+        onvifPort: state.onvifPort ? Number(state.onvifPort) : null,
+        mainPath: state.mainPath,
+        subPath: state.subPath,
+        username: state.username,
         // Only sent when something was typed, so an edit leaves the stored one be.
-        ...(form.password ? { password: form.password } : {}),
-        reachVia: form.reachVia,
-        detector: form.detector,
-        detectorTargetId: needsSomewhereToRun(form.detector) ? form.detectorTargetId : null,
+        ...(state.password ? { password: state.password } : {}),
+        reachVia: state.reachVia,
+        detector: state.detector,
+        detectorTargetId: needsSomewhereToRun(state.detector) ? state.detectorTargetId : null,
         detection: {
-            sensitivity: form.sensitivity,
-            minGapSeconds: Number(form.minGapSeconds) || DEFAULT_DETECTION.minGapSeconds,
-            settleSeconds: Number.isFinite(Number(form.settleSeconds))
-                ? Number(form.settleSeconds)
+            sensitivity: state.sensitivity,
+            minGapSeconds: Number(state.minGapSeconds) || DEFAULT_DETECTION.minGapSeconds,
+            settleSeconds: Number.isFinite(Number(state.settleSeconds))
+                ? Number(state.settleSeconds)
                 : DEFAULT_DETECTION.settleSeconds,
-            classes: form.classes,
-            faceThreshold: Number(form.faceThreshold) || DEFAULT_DETECTION.faceThreshold,
-            hours: form.hoursOn
-                ? { from: Number(form.hoursFrom) || 0, to: Number(form.hoursTo) || 0 }
+            classes: state.classes,
+            faceThreshold: Number(state.faceThreshold) || DEFAULT_DETECTION.faceThreshold,
+            hours: state.hoursOn
+                ? { from: Number(state.hoursFrom) || 0, to: Number(state.hoursTo) || 0 }
                 : null
         },
-        recording: form.recording,
-        storageTarget: form.storageTarget,
-        retentionDays: Number(form.retentionDays) || 7,
-        enabled: form.enabled
+        recording: state.recording,
+        storageTarget: state.storageTarget,
+        retentionDays: Number(state.retentionDays) || 7,
+        enabled: state.enabled
     });
+    const payload = () => payloadOf(form);
+    // The camera as the dialog opened on it. A typed password is always a
+    // change: the stored one is never read back.
+    const [opened] = useState(form);
+    const unchanged = camera !== null && !form.password && !isDirty(payloadOf(opened), payload());
 
     const test = async () => {
         setTesting(true);
@@ -1001,7 +1008,7 @@ export function CameraDialog({
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
                         {t("common.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={busy || incomplete}>
+                    <Button onClick={save} disabled={busy || incomplete || unchanged}>
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {camera ? t("common.save") : t("dialog.addCamera")}
                     </Button>
