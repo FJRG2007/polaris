@@ -26,11 +26,7 @@ import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { inlinePolarFiles } from "@/lib/polar/attachments";
 import { startPolarTitle } from "@/lib/polar/titles";
-import {
-    ensurePolarThread,
-    polarThreadInstructions,
-    savePolarMessages
-} from "@/lib/polar/threads";
+import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
     fencePageContext,

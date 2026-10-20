@@ -76,7 +76,9 @@ beforeEach(() => {
 
 describe("PATCH /api/polar/threads/:id", () => {
     it("pins, archives and files a chat for its owner", async () => {
-        expect((await patch({ pinned: true, archived: false, projectId: PROJECT })).status).toBe(200);
+        expect((await patch({ pinned: true, archived: false, projectId: PROJECT })).status).toBe(
+            200
+        );
         expect(state.changes).toEqual([
             ["u1", ID, { pinned: true, archived: false, projectId: PROJECT }]
         ]);
@@ -84,7 +86,11 @@ describe("PATCH /api/polar/threads/:id", () => {
 
     it("takes a chat out of its project with null", async () => {
         expect((await patch({ projectId: null })).status).toBe(200);
-        expect(state.changes[0]).toEqual(["u1", ID, { pinned: undefined, archived: undefined, projectId: null }]);
+        expect(state.changes[0]).toEqual([
+            "u1",
+            ID,
+            { pinned: undefined, archived: undefined, projectId: null }
+        ]);
     });
 
     it("refuses a field it does not know, and an empty change", async () => {
@@ -116,7 +122,9 @@ describe("while viewing as somebody else", () => {
                 method,
                 ...(body ? { body: JSON.stringify(body) } : {})
             });
-        expect((await projectRoute.PATCH(request("PATCH", { name: "X" }), params)).status).toBe(403);
+        expect((await projectRoute.PATCH(request("PATCH", { name: "X" }), params)).status).toBe(
+            403
+        );
         expect((await projectRoute.DELETE(request("DELETE"), params)).status).toBe(403);
         expect((await shareRoute.DELETE(request("DELETE"), params)).status).toBe(403);
     });

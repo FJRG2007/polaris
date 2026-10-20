@@ -96,7 +96,9 @@ describe("a shared link's conversation", () => {
 describe("project instructions", () => {
     it("reach the model's system context, fenced", () => {
         const prompt = polarSystemPrompt("Ana", "", "Answer in haiku.");
-        expect(prompt).toContain("<project_instructions>\nAnswer in haiku.\n</project_instructions>");
+        expect(prompt).toContain(
+            "<project_instructions>\nAnswer in haiku.\n</project_instructions>"
+        );
     });
 
     it("cannot close their own fence", () => {

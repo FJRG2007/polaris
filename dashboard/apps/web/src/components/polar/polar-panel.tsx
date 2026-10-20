@@ -730,7 +730,6 @@ export function PolarChat({
         textarea.current?.focus();
     };
 
-
     /** Uploads one staged file, drawing its progress, and leaves it ready or failed. */
     const upload = async (key: string, file: File) => {
         const stored = await uploadFile(file, (share) =>

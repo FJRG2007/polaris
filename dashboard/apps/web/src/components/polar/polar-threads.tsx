@@ -119,9 +119,10 @@ export function PolarThreads({
     const [searching, setSearching] = useState(false);
     /** The project dialog: a new one (optionally for a chat to move into it),
      *  or an existing one to edit. */
-    const [projectForm, setProjectForm] = useState<
-        { project: PolarProjectRow | null; moving: PolarThreadRow | null } | null
-    >(null);
+    const [projectForm, setProjectForm] = useState<{
+        project: PolarProjectRow | null;
+        moving: PolarThreadRow | null;
+    } | null>(null);
     const [deletingProject, setDeletingProject] = useState<PolarProjectRow | null>(null);
     const [folded, setFolded] = useState(false);
     useEffect(() => setFolded(readFolded()), []);
@@ -236,21 +237,23 @@ export function PolarThreads({
                                             {t("history.empty")}
                                         </p>
                                     ) : (
-                                        polarShared.groupThreads(sections.recents).map(({ group, rows: list }) => (
-                                            <div
-                                                key={group}
-                                                role="group"
-                                                aria-labelledby={`polar-group-${group}`}
-                                            >
-                                                <p
-                                                    id={`polar-group-${group}`}
-                                                    className="px-2 pb-1 pt-2 text-xs text-foreground-subtle"
+                                        polarShared
+                                            .groupThreads(sections.recents)
+                                            .map(({ group, rows: list }) => (
+                                                <div
+                                                    key={group}
+                                                    role="group"
+                                                    aria-labelledby={`polar-group-${group}`}
                                                 >
-                                                    {t(`history.groups.${group}`)}
-                                                </p>
-                                                {list.map(item)}
-                                            </div>
-                                        ))
+                                                    <p
+                                                        id={`polar-group-${group}`}
+                                                        className="px-2 pb-1 pt-2 text-xs text-foreground-subtle"
+                                                    >
+                                                        {t(`history.groups.${group}`)}
+                                                    </p>
+                                                    {list.map(item)}
+                                                </div>
+                                            ))
                                     )}
                                     <MoreButton sidebar={sidebar} list="recent" />
                                 </div>
@@ -280,7 +283,8 @@ export function PolarThreads({
                             return sidebar.updateProject(projectForm.project.id, input);
                         }
                         const made = await sidebar.createProject(input);
-                        if (made && projectForm.moving) void sidebar.move(projectForm.moving.id, made.id);
+                        if (made && projectForm.moving)
+                            void sidebar.move(projectForm.moving.id, made.id);
                         return made !== null;
                     }}
                 />
@@ -626,10 +630,14 @@ function ThreadItem({
                                             onSelect={() => actions.onMove(row, project.id)}
                                         >
                                             <Folder />
-                                            <span className="min-w-0 truncate" title={project.name}>{project.name}</span>
+                                            <span className="min-w-0 truncate" title={project.name}>
+                                                {project.name}
+                                            </span>
                                         </DropdownMenuItem>
                                     ))}
-                                    <DropdownMenuItem onSelect={take(() => actions.onMoveToNew(row))}>
+                                    <DropdownMenuItem
+                                        onSelect={take(() => actions.onMoveToNew(row))}
+                                    >
                                         <FolderPlus />
                                         {t("history.newProject")}
                                     </DropdownMenuItem>
@@ -695,12 +703,21 @@ function SearchDialog({
                 setFailed(false);
                 fetch(url, { signal: controller.signal })
                     .then((response) => (response.ok ? response.json() : Promise.reject()))
-                    .then((data: { threads?: PolarThreadRow[]; results?: PolarThreadRow[]; more?: boolean }) => {
-                        const found = data.results ?? data.threads ?? [];
-                        if (archived) archivedCursor.current = found.at(-1)?.id ?? archivedCursor.current;
-                        setResults((current) => (page > 0 ? [...(current ?? []), ...found] : found));
-                        setMore(Boolean(data.more));
-                    })
+                    .then(
+                        (data: {
+                            threads?: PolarThreadRow[];
+                            results?: PolarThreadRow[];
+                            more?: boolean;
+                        }) => {
+                            const found = data.results ?? data.threads ?? [];
+                            if (archived)
+                                archivedCursor.current = found.at(-1)?.id ?? archivedCursor.current;
+                            setResults((current) =>
+                                page > 0 ? [...(current ?? []), ...found] : found
+                            );
+                            setMore(Boolean(data.more));
+                        }
+                    )
                     .catch(() => {
                         if (!controller.signal.aborted) setFailed(true);
                     });
@@ -743,7 +760,9 @@ function SearchDialog({
                 )}
                 <div className="-mx-2 min-h-0 flex-1 overflow-y-auto">
                     {failed ? (
-                        <p className="px-2 py-1.5 text-sm text-danger">{t("history.searchFailed")}</p>
+                        <p className="px-2 py-1.5 text-sm text-danger">
+                            {t("history.searchFailed")}
+                        </p>
                     ) : results === null ? null : results.length === 0 ? (
                         <p className="px-2 py-1.5 text-sm text-muted-foreground">
                             {t(archived ? "history.archivedEmpty" : "history.searchEmpty")}
@@ -876,7 +895,9 @@ function ShareDialog({ row, onClose }: { row: PolarThreadRow; onClose: () => voi
                                 label={t("history.shareCopy")}
                                 onClick={() =>
                                     void copy(link.url).then((done) =>
-                                        done ? toast.show({ title: t("history.shareCopied") }) : null
+                                        done
+                                            ? toast.show({ title: t("history.shareCopied") })
+                                            : null
                                     )
                                 }
                             >
@@ -906,7 +927,11 @@ function ShareDialog({ row, onClose }: { row: PolarThreadRow; onClose: () => voi
                                 <Trash2 className="size-4" />
                                 {t("history.shareRevoke")}
                             </Button>
-                            <Button type="button" disabled={working} onClick={() => void change("POST")}>
+                            <Button
+                                type="button"
+                                disabled={working}
+                                onClick={() => void change("POST")}
+                            >
                                 {t("history.shareUpdate")}
                             </Button>
                         </>
@@ -953,7 +978,10 @@ function ProjectDialog({
     const submit = async () => {
         if (!ready || !parsedName.success || !parsedInstructions.success) return;
         setSaving(true);
-        const saved = await onSave({ name: parsedName.data, instructions: parsedInstructions.data });
+        const saved = await onSave({
+            name: parsedName.data,
+            instructions: parsedInstructions.data
+        });
         setSaving(false);
         if (saved) onClose();
     };
@@ -975,7 +1003,10 @@ function ProjectDialog({
                         <DialogDescription>{t("history.projectHint")}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-1">
-                        <label htmlFor="polar-project-name" className="text-xs text-muted-foreground">
+                        <label
+                            htmlFor="polar-project-name"
+                            className="text-xs text-muted-foreground"
+                        >
                             {t("history.projectName")} *
                         </label>
                         <Input

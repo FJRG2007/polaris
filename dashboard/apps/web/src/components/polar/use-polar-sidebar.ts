@@ -229,7 +229,10 @@ export function usePolarSidebar({
                   Object.keys(change).map((key) => [key, before[key as keyof PolarThreadRow]])
               ) as Partial<PolarThreadRow>)
             : null;
-        setRows((current) => current?.map((row) => (row.id === id ? { ...row, ...change } : row)) ?? null);
+        setRows(
+            (current) =>
+                current?.map((row) => (row.id === id ? { ...row, ...change } : row)) ?? null
+        );
         const response = await send(`/api/polar/threads/${id}`, "PATCH", body);
         if (response?.ok) return true;
         if (restore) {
@@ -295,7 +298,9 @@ export function usePolarSidebar({
         const response = await send("/api/polar/projects", "POST", input);
         if (!response?.ok) {
             toast.show({
-                title: t(response?.status === 409 ? "history.projectTooMany" : "history.projectFailed")
+                title: t(
+                    response?.status === 409 ? "history.projectTooMany" : "history.projectFailed"
+                )
             });
             return null;
         }
@@ -313,8 +318,9 @@ export function usePolarSidebar({
         const before = projects?.find((project) => project.id === id);
         setProjects(
             (current) =>
-                current?.map((project) => (project.id === id ? { ...project, ...input } : project)) ??
-                null
+                current?.map((project) =>
+                    project.id === id ? { ...project, ...input } : project
+                ) ?? null
         );
         const response = await send(`/api/polar/projects/${id}`, "PATCH", input);
         if (response?.ok) return true;

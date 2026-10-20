@@ -79,14 +79,19 @@ beforeEach(() => {
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
             const method = init?.method ?? "GET";
-            calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+            calls.push({
+                url,
+                method,
+                body: init?.body ? JSON.parse(String(init.body)) : undefined
+            });
             if (url === "/api/polar/models")
                 return Response.json({ providers: [], tools: {}, isAdmin: false });
             if (url === "/api/polar/threads")
                 return Response.json({ threads: [RECENT], more, pinned, projects: [PROJECT] });
             if (url.startsWith("/api/polar/threads?view=project"))
                 return Response.json({ threads: [FILED], more });
-            if (url.startsWith("/api/polar/search")) return Response.json({ results: [OLD], more: false });
+            if (url.startsWith("/api/polar/search"))
+                return Response.json({ results: [OLD], more: false });
             if (url.includes("cursor=")) return Response.json({ threads: [], more: false });
             if (url === `/api/polar/threads/${OLD.id}` && method === "GET")
                 return Response.json({
@@ -158,7 +163,9 @@ describe("the sections", () => {
         expect(screen.getByRole("button", { name: "Homelab" }).getAttribute("aria-expanded")).toBe(
             "true"
         );
-        expect(within(screen.getByRole("group", { name: "Today" })).queryByText("Filed chat")).toBeNull();
+        expect(
+            within(screen.getByRole("group", { name: "Today" })).queryByText("Filed chat")
+        ).toBeNull();
     });
 
     it("folds Recents and remembers it", async () => {
@@ -197,7 +204,9 @@ describe("the row menu", () => {
         await mountPage();
         const item = screen.getByTitle("Recent chat").parentElement as HTMLElement;
         fireEvent.click(within(item).getByRole("button", { name: "Pin" }));
-        expect(await screen.findByText("Couldn't update the conversation. Try again.")).toBeTruthy();
+        expect(
+            await screen.findByText("Couldn't update the conversation. Try again.")
+        ).toBeTruthy();
         expect(screen.queryByRole("group", { name: "Pinned" })).toBeNull();
         expect(screen.getByText("Recent chat")).toBeTruthy();
     });
@@ -237,7 +246,9 @@ describe("the row menu", () => {
         await mountPage();
         openMenu("Recent chat");
         fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
-        const dialog = await screen.findByRole("alertdialog").catch(() => screen.findByRole("dialog"));
+        const dialog = await screen
+            .findByRole("alertdialog")
+            .catch(() => screen.findByRole("dialog"));
         expect(calls.some((call) => call.method === "DELETE")).toBe(false);
         fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
         await waitFor(() => expect(calls.some((call) => call.method === "DELETE")).toBe(true));
@@ -265,11 +276,10 @@ describe("Show more", () => {
         });
         fireEvent.click(await screen.findByTitle("Old chat"));
         await screen.findByText("Old chat");
-        const recents = screen.getByRole("button", { name: "Recents" }).parentElement as HTMLElement;
+        const recents = screen.getByRole("button", { name: "Recents" })
+            .parentElement as HTMLElement;
         fireEvent.click(within(recents).getByRole("button", { name: "Show more" }));
-        await waitFor(() =>
-            expect(calls.some((call) => call.url.includes("cursor="))).toBe(true)
-        );
+        await waitFor(() => expect(calls.some((call) => call.url.includes("cursor="))).toBe(true));
         expect(calls.find((call) => call.url.includes("cursor="))?.url).toBe(
             `/api/polar/threads?view=recent&cursor=${RECENT.id}`
         );
