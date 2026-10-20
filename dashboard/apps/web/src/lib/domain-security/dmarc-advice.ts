@@ -15,7 +15,11 @@ export type DmarcAdvice =
     /** Reports are read here but none has arrived yet. */
     | { readonly kind: "waitReports" }
     /** Reports go to another service, so the senders are checked there. */
-    | { readonly kind: "readElsewhere"; readonly hosts: readonly string[] }
+    | {
+          readonly kind: "readElsewhere";
+          readonly hosts: readonly string[];
+          readonly to: "quarantine" | "reject";
+      }
     /** No report address at all: nobody can tell which senders pass. */
     | { readonly kind: "noReports" };
 
@@ -27,9 +31,10 @@ export function dmarcAdvice(
     },
     reportHosts: readonly string[]
 ): DmarcAdvice {
+    const next = current === "none" ? "quarantine" : "reject";
     if (!view.reportAddress) {
         return reportHosts.length > 0
-            ? { kind: "readElsewhere", hosts: reportHosts }
+            ? { kind: "readElsewhere", hosts: reportHosts, to: next }
             : { kind: "noReports" };
     }
     if (!view.sources || view.sources.length === 0) return { kind: "waitReports" };
@@ -37,5 +42,5 @@ export function dmarcAdvice(
     // that fails holds the step back.
     const failing = view.sources.filter((source) => source.verdict === "misconfigured").length;
     if (failing > 0) return { kind: "fixSenders", count: failing };
-    return { kind: "tighten", to: current === "none" ? "quarantine" : "reject" };
+    return { kind: "tighten", to: next };
 }

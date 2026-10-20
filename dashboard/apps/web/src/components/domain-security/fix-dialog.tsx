@@ -264,7 +264,8 @@ export function FixDialog({
                                             })
                                           : advice.kind === "readElsewhere"
                                             ? t("fix.advice.readElsewhere", {
-                                                  hosts: advice.hosts.join(", ")
+                                                  hosts: advice.hosts.join(", "),
+                                                  to: advice.to
                                               })
                                             : advice.kind === "waitReports"
                                               ? t("fix.advice.waitReports")

@@ -54,7 +54,13 @@ describe("dmarcAdvice", () => {
         const elsewhere = { reportAddress: null, sources: null };
         expect(dmarcAdvice("none", elsewhere, ["reports.example.test"])).toEqual({
             kind: "readElsewhere",
-            hosts: ["reports.example.test"]
+            hosts: ["reports.example.test"],
+            to: "quarantine"
+        });
+        expect(dmarcAdvice("quarantine", elsewhere, ["reports.example.test"])).toEqual({
+            kind: "readElsewhere",
+            hosts: ["reports.example.test"],
+            to: "reject"
         });
         expect(dmarcAdvice("none", elsewhere, [])).toEqual({ kind: "noReports" });
     });

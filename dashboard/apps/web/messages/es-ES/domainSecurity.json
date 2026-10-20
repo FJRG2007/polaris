@@ -81,7 +81,7 @@
             "tightenReject": "Pasa a Rechazar. Todos los remitentes de los informes de los últimos 30 días pasan, así que el correo que aún falla es falso y se rechaza.",
             "fixSenders": "Mantenla por ahora. {count, plural, one {# servicio envía como {domain} y falla} other {# servicios envían como {domain} y fallan}}: añádelos a SPF o haz que firmen con DKIM (salen como Sin configurar en la lista de remitentes) y luego endurécela.",
             "waitReports": "Mantenla por ahora. Los receptores mandan sus primeros informes en un día; cuando muestren que todos los remitentes pasan, aquí se recomienda el siguiente paso.",
-            "readElsewhere": "Mantenla hasta revisar los informes en {hosts}. Cuando todos los remitentes de allí pasen, elige Cuarentena.",
+            "readElsewhere": "Mantenla hasta revisar los informes en {hosts}. Cuando todos los remitentes de allí pasen, elige {to, select, quarantine {Cuarentena} other {Rechazar}}.",
             "noReports": "Mantenla por ahora. Nadie recibe informes de {domain}, así que no hay forma de saber si todos los remitentes pasan. Añade antes una dirección de informes (rua) a su registro DMARC."
         }
     },

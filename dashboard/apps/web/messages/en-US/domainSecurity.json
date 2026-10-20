@@ -81,7 +81,7 @@
             "tightenReject": "Move to Reject. Every sender in the last 30 days of reports passes, so mail that still fails is forged and is refused.",
             "fixSenders": "Keep it for now. {count, plural, one {# service sends as {domain} and fails} other {# services send as {domain} and fail}}: add them to SPF or have them sign with DKIM (they show as Not set up in the senders list), then tighten.",
             "waitReports": "Keep it for now. Receivers send their first reports within a day; once they show every sender passing, the next step is recommended here.",
-            "readElsewhere": "Keep it until you have checked the reports at {hosts}. Once every sender there passes, choose Quarantine.",
+            "readElsewhere": "Keep it until you have checked the reports at {hosts}. Once every sender there passes, choose {to, select, quarantine {Quarantine} other {Reject}}.",
             "noReports": "Keep it for now. Nobody receives reports for {domain}, so there is no way to tell whether every sender passes. Add a report address (rua) to its DMARC record first."
         }
     },
