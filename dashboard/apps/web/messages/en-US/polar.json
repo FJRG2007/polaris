@@ -97,7 +97,8 @@
         "reply": "Reply to message",
         "copy": "Copy message",
         "regenerate": "Answer again",
-        "copied": "Copied"
+        "copied": "Copied",
+        "branch": "Branch into new chat"
     },
     "noKeys": {
         "title": "Polar needs an AI provider key",
@@ -125,7 +126,10 @@
             "ownKey": "Check your key",
             "tryWith": "Try with {model}",
             "retry": "Try again"
-        }
+        },
+        "branchFailed": "Could not branch this chat. Try again in a moment.",
+        "usageLimit": "You have used {used} of the {amount} tokens this Polaris allows you on its shared key per {period}. Add your own key, or ask an administrator to raise the limit.",
+        "fileUnreadable": "{name} cannot be read by this model and no text could be taken from it. Pick a model that reads this kind of file, or attach it as PDF or text."
     },
     "queue": {
         "title": "Sends next",
@@ -162,6 +166,10 @@
         "placeholder": "Ask Polar, or type / for commands"
     },
     "picker": {
+        "automatic": "Automatic",
+        "automaticHint": "Picks a fast or a reasoning model for each message",
+        "answeredBy": "Answered by {model}",
+        "autoPicked": "Automatic chose {model}",
         "none": "No model",
         "title": "Model, intelligence and key",
         "intelligence": "Intelligence",
@@ -349,5 +357,59 @@
         "composing": "Writing the answer",
         "breathing": "Thinking",
         "shaping": "Reading files"
+    },
+    "commands": {
+        "new": "New command",
+        "newDetail": "Save a prompt you send often",
+        "manage": "Your commands",
+        "intro": "Type / and a shortcut to send its prompt. Anything you type after the shortcut is added below the prompt.",
+        "empty": "No commands yet. Add one for a prompt you send often.",
+        "editTitle": "Edit command",
+        "shortcut": "Shortcut",
+        "shortcutHint": "Lowercase letters, digits and hyphens, typed after /.",
+        "prompt": "Prompt",
+        "model": "Model for prompt",
+        "modelGone": "Model unavailable",
+        "cancel": "Cancel",
+        "save": "Save",
+        "edit": "Edit /{shortcut}",
+        "delete": "Delete /{shortcut}",
+        "deleteTitle": "Delete this command?",
+        "deleteQuestion": "/{shortcut} leaves the / list. Messages already sent with it stay as they are.",
+        "deleteConfirm": "Delete",
+        "kind": "command",
+        "count": "{count} of {most}",
+        "saveAs": "Save as command",
+        "issues": {
+            "format": "Use lowercase letters, digits and hyphens, starting with a letter or digit.",
+            "long": "Keep it to {most} characters.",
+            "builtin": "Polar already has a command with this name.",
+            "taken": "You already have a command with this shortcut."
+        },
+        "errors": {
+            "too_many": "You can keep up to {most} commands. Delete one to add another.",
+            "unknown_model": "That model is no longer available to you. Pick another one or Automatic.",
+            "failed": "The command could not be saved. Try again."
+        }
+    },
+    "usage": {
+        "title": "Usage this month",
+        "intro": "What your chats with Polar have used since the month began.",
+        "summary": "{tokens} tokens since the month began, about {cost} where a price is known.",
+        "failed": "Your usage could not be loaded. Close this and try again.",
+        "empty": "Nothing used yet this month.",
+        "shared": "{answers} answers - shared key",
+        "own": "{answers} answers - your key",
+        "tokens": "{input} in - {output} out",
+        "noPrice": "No price known",
+        "estimate": "Costs are estimates from published prices. Models with no published price count tokens only.",
+        "answer": "{tokens} tokens",
+        "cost": "about {cost}",
+        "breakdown": "{input} tokens in, {output} tokens out",
+        "periods": {
+            "day": "day",
+            "week": "week",
+            "month": "30 days"
+        }
     }
 }

@@ -34,6 +34,8 @@ datasource db {
 model User {
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
+    polarCommands     PolarCommand[]
+    polarUsage        PolarUsage[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -8222,11 +8224,15 @@ model AgentModel {
     effortRungs   String   @default("[]")
     reasoning     Boolean  @default(false)
     attachment    Boolean  @default(false)
-    // USD per million tokens as published. Display only - what an operator is
-    // actually billed is settled by the provider, so this is never summed into
-    // anything Polaris presents as a charge.
+    // USD per million tokens as published. What an operator is actually billed
+    // is settled by the provider, so it is never presented as a charge - Polar
+    // shows what an answer spent as an estimate worked out from it, labelled so.
     costInput     Float?
     costOutput    Float?
+    // What the model reads, as a JSON string array from the index ("text",
+    // "image", "pdf", "audio", "video"). Empty when the index did not say -
+    // which is unknown, not text-only.
+    inputModalities String @default("[]")
     releaseDate   String?
     refreshedAt   DateTime @updatedAt
 
@@ -15009,6 +15015,9 @@ model PolarThread {
     // A temporary chat: out of every list and search, never read or written to
     // memory, deleted when its tab leaves it and swept after a day otherwise.
     temporary   Boolean           @default(false)
+    // The chat a branch was first copied from, shared by every branch of a
+    // branch, so files they carry in common are looked for only in that family.
+    branchRootId String?          @db.Uuid
     createdAt   DateTime          @default(now())
     updatedAt   DateTime          @updatedAt
     messages    PolarMessage[]
@@ -15019,6 +15028,7 @@ model PolarThread {
     @@index([userId, archivedAt, pinnedAt])
     @@index([temporary, updatedAt])
     @@index([projectId, updatedAt(sort: Desc)])
+    @@index([branchRootId])
 }
 
 // A folder of Polar chats. Its instructions are added to the system context of
@@ -15062,6 +15072,25 @@ model PolarPreference {
     updatedAt DateTime @updatedAt
 }
 
+// A "/" command somebody wrote for themselves: typing /shortcut sends the
+// prompt, with whatever follows the shortcut appended, on the model it names
+// for that one turn. One person's: every query names the owner.
+model PolarCommand {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    // Lowercase letters, digits and hyphens, never a built-in command's name.
+    shortcut  String
+    prompt    String
+    // The model choice it runs on ({ provider, model, intelligence, payer }),
+    // "Automatic" included.
+    choice    Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, shortcut])
+}
+
 // A read-only public link to a Polar chat. The raw token lives in the URL only;
 // the row keeps its hash for the lookup and an encrypted copy so the owner can be
 // shown the link again. Revoking deletes the row, so the link answers 404.
@@ -15093,6 +15122,32 @@ model PolarMessage {
     createdAt DateTime    @default(now())
 
     @@index([threadId, createdAt])
+}
+
+// What one Polar answer spent: the provider's own token counts and, when the
+// model catalogue carries a price for the model, the cost worked out from it.
+// A ledger of its own rather than a read of message metadata, so the monthly
+// view and the spending ceilings are one indexed sum, and deleting a chat does
+// not undo what it cost. `threadId` and `messageId` are not keys: the row
+// outlives both.
+model PolarUsage {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    userId       String   @db.Uuid
+    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    threadId     String?  @db.Uuid
+    messageId    String?
+    provider     String
+    model        String
+    // "own" (the person's key) or "instance" (the key this Polaris shares).
+    payer        String
+    inputTokens  Int      @default(0)
+    outputTokens Int      @default(0)
+    // Null when the catalogue has no price for the model: tokens only.
+    costUsd      Float?
+    createdAt    DateTime @default(now())
+
+    @@index([userId, createdAt])
+    @@index([payer, createdAt])
 }
 
 // A picture or file somebody gave Polar. The bytes live on the storage chat

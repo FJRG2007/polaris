@@ -57,7 +57,7 @@
         },
         "limits": {
             "title": "Usage limits",
-            "intro": "A run that would cross any limit that applies to it is refused before it starts, with the reason. Nothing is limited until you add one.",
+            "intro": "A run that would cross any limit that applies to it is refused before it starts, with the reason. Nothing is limited until you add one. Token limits on everyone, a person, a role or a group also cap Polar chats on the shared keys.",
             "add": "Add",
             "remove": "Remove",
             "removeLabel": "Remove this limit",
@@ -412,6 +412,18 @@
                 "label": "Everything else",
                 "description": "Containers on this machine that Polaris did not start."
             }
+        },
+        "polar": {
+            "title": "Polar on the shared AI keys",
+            "description": "What chats with Polar spent this month on the keys this Polaris shares.",
+            "totals": "{tokens} tokens - about {cost} - {answers} answers",
+            "failed": "Polar's spend could not be loaded.",
+            "empty": "Nobody has used the shared keys this month.",
+            "person": "Person",
+            "answers": "Answers",
+            "tokens": "Tokens",
+            "cost": "Est. cost",
+            "unpriced": "{count} answers were on models with no published price and count tokens only."
         }
     },
     "display": {

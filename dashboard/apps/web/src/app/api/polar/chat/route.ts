@@ -32,6 +32,8 @@ import {
     polarMemoryTools
 } from "@/lib/polar/memory";
 import { startPolarTitle } from "@/lib/polar/titles";
+import { noteProviderFailure, turnSignals } from "@/lib/polar/automatic";
+import { answerUsage, polarLimitReached, recordPolarUsage } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import { polarModelOptions, reasoningFor, resolvePolarModel } from "@/lib/polar/models";
 import {
@@ -65,7 +67,10 @@ const bodySchema = z.object({
     /** The project a new thread is filed under; ignored for an existing one. */
     projectId: z.string().uuid().nullable().default(null),
     /** A new thread made temporary: not listed, no memory, deleted on leave. */
-    temporary: z.boolean().default(false)
+    temporary: z.boolean().default(false),
+    /** False for a turn sent on a command's own model: the thread keeps the
+     *  model it was on, so the next message goes back to it. */
+    remember: z.boolean().default(true)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -114,23 +119,30 @@ export async function POST(request: Request): Promise<Response> {
     // the first model this person can use, and the answer says so.
     let choice: ModelChoice = body.data.choice;
     const access = await polarAccessFor(user.id);
-    let resolved = await resolvePolarModel(user.id, choice, access);
+    const signals = turnSignals(messages);
+    let resolved = await resolvePolarModel(user.id, choice, signals, access);
     let fellBackFrom: string | null = null;
     if (resolved === "unknown_model") {
         const first = (await polarModelOptions(user.id, access))[0]?.models[0];
         if (first) {
             fellBackFrom = choice.model;
             choice = { ...choice, provider: first.provider, model: first.model, payer: null };
-            resolved = await resolvePolarModel(user.id, choice, access);
+            resolved = await resolvePolarModel(user.id, choice, signals, access);
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
+    // The administrator's token ceilings bound the key this Polaris shares; a
+    // person's own key is theirs to spend.
+    if (resolved.credential.source === "instance") {
+        const hit = await polarLimitReached(user.id);
+        if (hit) return NextResponse.json({ error: "usage_limit", ...hit }, { status: 429 });
+    }
 
     const owned = await ensurePolarThread(
         user.id,
         body.data.threadId,
         firstText(messages[0]),
-        choice,
+        body.data.remember ? choice : null,
         body.data.projectId,
         body.data.temporary
     );
@@ -149,7 +161,19 @@ export async function POST(request: Request): Promise<Response> {
             ? body.data.parentId
             : (list[index - 1]?.id ?? null);
 
+    // A file the model cannot read is sent as its text; one with no text to
+    // take out stops the turn with its name instead of being dropped unseen.
+    const unreadable: string[] = [];
+    const sendable = await inlinePolarFiles(user.id, messages, resolved.option, unreadable);
+    if (unreadable.length > 0) {
+        return NextResponse.json(
+            { error: "file_unreadable", name: unreadable[0] },
+            { status: 422 }
+        );
+    }
+
     const startedAt = Date.now();
+    let spent: ReturnType<typeof answerUsage> | undefined;
     const result = streamText({
         model: resolved.model,
         system: polarSystemPrompt(
@@ -158,11 +182,15 @@ export async function POST(request: Request): Promise<Response> {
             instructions,
             memories
         ),
-        messages: await convertToModelMessages(await inlinePolarFiles(user.id, messages)),
+        messages: await convertToModelMessages(sendable),
         tools,
         toolApproval: remembers ? { ...toolset.approval, ...MEMORY_APPROVAL } : toolset.approval,
         stopWhen: isStepCount(STEP_MAX),
-        reasoning: reasoningFor(choice.intelligence, resolved.option),
+        // Automatic sends a quick question at the lowest effort.
+        reasoning: reasoningFor(
+            resolved.automatic === "fast" ? "fast" : choice.intelligence,
+            resolved.option
+        ),
         abortSignal: request.signal
     });
 
@@ -175,19 +203,39 @@ export async function POST(request: Request): Promise<Response> {
                       model: resolved.option.name,
                       provider: resolved.option.providerName,
                       payer: resolved.credential.source,
+                      automatic: !!resolved.automatic,
                       fellBackFrom
                   }
                 : part.type === "finish"
-                  ? // How long the turn worked, for the line its steps fold into.
-                    { workedMs: Date.now() - startedAt }
+                  ? // How long the turn worked, for the line its steps fold
+                    // into, and what it spent, for the line under the answer.
+                    {
+                        workedMs: Date.now() - startedAt,
+                        usage: (spent = answerUsage(part.totalUsage, resolved.option))
+                    }
                   : undefined,
-        onFinish: async ({ messages: finished }) => {
+        onFinish: async ({ messages: finished, responseMessage }) => {
             try {
                 await savePolarMessages(user.id, body.data.threadId, finished, (index) =>
                     parentFor(index, finished)
                 );
             } catch (error) {
                 console.error("polar: could not save the turn", error);
+            }
+            if (spent) {
+                try {
+                    await recordPolarUsage({
+                        userId: user.id,
+                        threadId: body.data.threadId,
+                        messageId: responseMessage?.id ?? null,
+                        provider: resolved.option.provider,
+                        model: resolved.option.model,
+                        payer: resolved.credential.source === "instance" ? "instance" : "own",
+                        usage: spent
+                    });
+                } catch (error) {
+                    console.error("polar: could not record the turn's usage", error);
+                }
             }
             // A new thread is named by its model once the first answer is in,
             // behind the reply; the screen asks for the title when it is ready.
@@ -203,13 +251,15 @@ export async function POST(request: Request): Promise<Response> {
         // The provider's refusal is classified and named, never forwarded: its
         // body is the provider's own words about the account it belongs to.
         onError: (error) => {
+            // Automatic tries this provider last for a few minutes.
+            noteProviderFailure(user.id, resolved.option.provider);
             const failure = classifyProviderFailure(error);
             console.warn(failureLogLine("a turn", resolved.option.providerName, failure));
             return encodePolarFailure({
                 code: "provider",
                 kind: failure.kind,
                 provider: resolved.option.providerName,
-                slug: choice.provider,
+                slug: resolved.option.provider,
                 payer: resolved.credential.source
             });
         }

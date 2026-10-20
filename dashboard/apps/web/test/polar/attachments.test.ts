@@ -50,7 +50,10 @@ const state = {
     stored: [] as unknown[],
     rows: [] as Row[],
     reads: [] as string[],
-    removed: [] as string[]
+    removed: [] as string[],
+    threads: [] as { id: string; userId: string; branchRootId: string | null }[],
+    carried: [] as { id: string; threadId: string }[],
+    scanned: [] as string[][]
 };
 
 type Where = {
@@ -104,7 +107,34 @@ vi.mock("@/lib/storage-target", () => ({
     })
 }));
 vi.mock("@polaris/db", () => ({
+    Prisma: { sql: (_strings: TemplateStringsArray, ...values: unknown[]) => values },
     prisma: {
+        $queryRaw: async (values: unknown[]) => {
+            state.scanned.push(values[1] as string[]);
+            return state.carried;
+        },
+        polarThread: {
+            findFirst: async ({ where }: { where: { id: string; userId: string } }) =>
+                state.threads.find(
+                    (entry) => entry.id === where.id && entry.userId === where.userId
+                ) ?? null,
+            findMany: async ({
+                where
+            }: {
+                where: {
+                    userId: string;
+                    id: { not: string };
+                    OR: [{ id: string }, { branchRootId: string }];
+                };
+            }) =>
+                state.threads.filter(
+                    (entry) =>
+                        entry.userId === where.userId &&
+                        entry.id !== where.id.not &&
+                        (entry.id === where.OR[0].id ||
+                            entry.branchRootId === where.OR[1].branchRootId)
+                )
+        },
         polarAttachment: {
             create: async ({
                 data
@@ -136,9 +166,13 @@ vi.mock("@polaris/db", () => ({
 
 const upload = await import("../../src/app/api/polar/attachments/route");
 const read = await import("../../src/app/api/polar/attachments/[id]/route");
-const { inlinePolarFiles, linkPolarAttachments, sweepUnsentPolarAttachments } = await import(
-    "@/lib/polar/attachments"
-);
+const {
+    fileRoute,
+    inlinePolarFiles,
+    keepSharedAttachments,
+    linkPolarAttachments,
+    sweepUnsentPolarAttachments
+} = await import("@/lib/polar/attachments");
 
 beforeEach(() => {
     state.user = { id: OWNER, viewingAs: null };
@@ -146,6 +180,9 @@ beforeEach(() => {
     state.rows = [row(MINE), row(THEIRS, { userId: "33333333-3333-4333-8333-333333333333" })];
     state.reads = [];
     state.removed = [];
+    state.threads = [];
+    state.carried = [];
+    state.scanned = [];
 });
 
 function send(type: string, bytes: Uint8Array, name = "cat.png"): Promise<Response> {
@@ -271,6 +308,51 @@ describe("inlinePolarFiles", () => {
     });
 });
 
+describe("fileRoute", () => {
+    it("sends a file only to a model whose catalogue entry reads that kind", () => {
+        const pdfReader = { inputs: ["text", "image", "pdf"], attachment: true };
+        const textOnly = { inputs: ["text"], attachment: false };
+        expect(fileRoute("application/pdf", pdfReader)).toBe("file");
+        expect(fileRoute("application/pdf", textOnly)).toBe("text");
+        expect(fileRoute("image/png", pdfReader)).toBe("file");
+        expect(fileRoute("image/png", textOnly)).toBe("text");
+        // Nothing known about what it reads: the older flag still says pictures.
+        expect(fileRoute("image/png", { inputs: [], attachment: true })).toBe("file");
+        expect(fileRoute("application/pdf", { inputs: [], attachment: true })).toBe("text");
+        expect(
+            fileRoute(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                pdfReader
+            )
+        ).toBe("text");
+    });
+
+    it("gives a model that cannot see a picture nothing, and names the file", async () => {
+        const unreadable: string[] = [];
+        const [turn] = await inlinePolarFiles(
+            OWNER,
+            [
+                {
+                    id: "u1",
+                    role: "user",
+                    parts: [
+                        {
+                            type: "file",
+                            mediaType: "image/png",
+                            filename: "chart.png",
+                            url: `/api/polar/attachments/${MINE}`
+                        }
+                    ]
+                }
+            ],
+            { inputs: ["text"], attachment: false },
+            unreadable
+        );
+        expect(turn?.parts).toEqual([]);
+        expect(unreadable).toEqual(["chart.png"]);
+    });
+});
+
 describe("a file's lifetime", () => {
     const carrying = (id: string): UIMessage[] => [
         {
@@ -306,5 +388,38 @@ describe("a file's lifetime", () => {
         expect(await sweepUnsentPolarAttachments()).toEqual({ swept: 1 });
         expect(state.rows.map((entry) => entry.id)).toEqual([MINE, NEW]);
         expect(state.removed).toEqual([`p/${OLD}`]);
+    });
+});
+
+describe("keepSharedAttachments", () => {
+    const BRANCH = "44444444-4444-4444-8444-444444444444";
+    const files = () => [{ id: MINE, connectionId: null, path: `p/${MINE}` }];
+
+    it("reads no messages for a chat that was never branched", async () => {
+        state.threads = [{ id: THREAD, userId: OWNER, branchRootId: null }];
+        expect(await keepSharedAttachments(OWNER, THREAD, files())).toEqual(files());
+        expect(state.scanned).toEqual([]);
+    });
+
+    it("looks only in the chat's branches and hands a shared file to the branch", async () => {
+        state.threads = [
+            { id: THREAD, userId: OWNER, branchRootId: null },
+            { id: BRANCH, userId: OWNER, branchRootId: THREAD },
+            { id: NEW, userId: OWNER, branchRootId: null }
+        ];
+        state.rows = [row(MINE, { threadId: THREAD })];
+        state.carried = [{ id: MINE, threadId: BRANCH }];
+        expect(await keepSharedAttachments(OWNER, THREAD, files())).toEqual([]);
+        expect(state.scanned).toEqual([[BRANCH]]);
+        expect(state.rows[0]!.threadId).toBe(BRANCH);
+    });
+
+    it("finds the original from a branch of it", async () => {
+        state.threads = [
+            { id: THREAD, userId: OWNER, branchRootId: null },
+            { id: BRANCH, userId: OWNER, branchRootId: THREAD }
+        ];
+        await keepSharedAttachments(OWNER, BRANCH, files());
+        expect(state.scanned).toEqual([[THREAD]]);
     });
 });

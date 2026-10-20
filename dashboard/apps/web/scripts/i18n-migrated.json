@@ -2082,6 +2082,8 @@
         "web/src/components/polar/elements/work.tsx",
         "web/src/components/polar/polar-voice.tsx",
         "web/src/components/polar/polar-settings.tsx",
+        "web/src/components/polar/polar-commands.tsx",
+        "web/src/components/polar/elements/model-selector.tsx",
         "web/src/lib/polar/export.ts",
         "web/src/app/api/polar/export/route.ts",
         "web/src/app/api/polar/threads/[id]/export/route.ts",

@@ -63,6 +63,10 @@ const rawModelSchema = z.object({
     release_date: z.string().optional(),
     limit: z.object({ context: z.number().optional(), output: z.number().optional() }).optional(),
     cost: z.object({ input: z.number().optional(), output: z.number().optional() }).optional(),
+    modalities: z
+        .object({ input: z.array(z.string()).optional() })
+        .partial()
+        .optional(),
     reasoning_options: z
         .array(z.object({ type: z.string(), values: z.array(z.string()) }))
         .optional()
@@ -95,6 +99,8 @@ export interface CatalogModel {
     attachment: boolean;
     costInput: number | null;
     costOutput: number | null;
+    /** What it reads ("text", "image", "pdf", ...); empty when unknown. */
+    inputModalities: string[];
     releaseDate: string | null;
 }
 
@@ -110,20 +116,34 @@ type ModelRow = {
     attachment: boolean;
     costInput: number | null;
     costOutput: number | null;
+    inputModalities: string;
     releaseDate: string | null;
 };
+
+/** A stored JSON string array, or empty for anything else. */
+function stringList(value: string | undefined): string[] {
+    try {
+        const parsed: unknown = JSON.parse(value ?? "[]");
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
+    } catch {
+        return [];
+    }
+}
 
 function toModel(row: ModelRow): CatalogModel {
     let rungs: string[] = [];
     try {
         const parsed: unknown = JSON.parse(row.effortRungs);
-        if (Array.isArray(parsed)) rungs = parsed.filter((value): value is string => typeof value === "string");
+        if (Array.isArray(parsed))
+            rungs = parsed.filter((value): value is string => typeof value === "string");
     } catch {
         // A row written by a newer shape, or corrupted. No rungs is the safe
         // reading: the setting becomes a documented no-op rather than sending
         // the provider a level it never published.
     }
-    return { ...row, effortRungs: rungs };
+    return { ...row, effortRungs: rungs, inputModalities: stringList(row.inputModalities) };
 }
 
 const SELECT = {
@@ -138,6 +158,7 @@ const SELECT = {
     attachment: true,
     costInput: true,
     costOutput: true,
+    inputModalities: true,
     releaseDate: true
 } as const;
 
@@ -206,6 +227,7 @@ export function parseCatalogPayload(payload: unknown): ModelRow[] {
                 attachment: data.attachment === true,
                 costInput: data.cost?.input ?? null,
                 costOutput: data.cost?.output ?? null,
+                inputModalities: JSON.stringify(data.modalities?.input ?? []),
                 releaseDate: data.release_date ?? null
             });
         }
@@ -240,7 +262,13 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
             cache: "no-store"
         });
         if (!response.ok) {
-            return { ok: false, models: 0, error: (await readerWords("api"))("refusals.aiKeys.catalogAnswered", { status: response.status }) };
+            return {
+                ok: false,
+                models: 0,
+                error: (await readerWords("api"))("refusals.aiKeys.catalogAnswered", {
+                    status: response.status
+                })
+            };
         }
         payload = await response.json();
     } catch (error) {
@@ -249,7 +277,10 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
         return {
             ok: false,
             models: 0,
-            error: error instanceof Error ? error.message : (await readerWords("api"))("refusals.aiKeys.catalogUnreachable")
+            error:
+                error instanceof Error
+                    ? error.message
+                    : (await readerWords("api"))("refusals.aiKeys.catalogUnreachable")
         };
     }
 
@@ -258,12 +289,19 @@ export async function refreshModelCatalog(): Promise<CatalogRefresh> {
     // An empty result is a bad download, not an empty world: replacing the
     // stored catalogue with nothing would leave every picker with one model per
     // provider until the next refresh happened to work.
-    if (rows.length === 0) return { ok: false, models: 0, error: (await readerWords("api"))("refusals.aiKeys.catalogEmpty") };
+    if (rows.length === 0)
+        return {
+            ok: false,
+            models: 0,
+            error: (await readerWords("api"))("refusals.aiKeys.catalogEmpty")
+        };
 
     const providers = [...new Set(rows.map((row) => row.provider))];
     await prisma.$transaction([
         prisma.agentModel.deleteMany({ where: { provider: { in: providers } } }),
-        prisma.agentModel.createMany({ data: rows.map((row) => ({ ...row, refreshedAt: new Date() })) })
+        prisma.agentModel.createMany({
+            data: rows.map((row) => ({ ...row, refreshedAt: new Date() }))
+        })
     ]);
     return { ok: true, models: rows.length };
 }

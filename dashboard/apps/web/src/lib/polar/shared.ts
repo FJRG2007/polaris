@@ -37,6 +37,19 @@ export const modelChoiceSchema = z.object({
 });
 export type ModelChoice = z.infer<typeof modelChoiceSchema>;
 
+/** The provider and model a choice names when it is "Automatic": Polar picks
+ *  the model each turn (`automatic.ts`). No integration has this slug. */
+export const AUTOMATIC = { provider: "auto", model: "auto" } as const;
+
+export function isAutomatic(choice: Pick<ModelChoice, "provider" | "model"> | null | undefined) {
+    return choice?.provider === AUTOMATIC.provider && choice.model === AUTOMATIC.model;
+}
+
+/** The Automatic choice, at the default intelligence. */
+export function automaticChoice(intelligence: Intelligence = "balanced"): ModelChoice {
+    return { kind: "language", ...AUTOMATIC, intelligence, payer: null };
+}
+
 /** Longest string any page-context field keeps. */
 const CONTEXT_TEXT = 200;
 /** Most ids or selected items one page can hand over. */
@@ -90,6 +103,9 @@ export const POLAR_ATTACHMENT_TYPES = [
     "image/gif",
     "image/webp",
     "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "text/plain",
     "text/markdown",
     "text/csv",
@@ -319,3 +335,90 @@ export const memoryTextSchema = z
     .string()
     .transform(normalizeMemoryText)
     .pipe(z.string().min(1).max(POLAR_MEMORY_MAX_CHARS));
+
+/** The "/" commands Polar has of its own, in the order the list shows them. */
+export const POLAR_BUILTIN_COMMANDS = ["new", "model", "page", "file", "tools", "call"] as const;
+export type BuiltinCommand = (typeof POLAR_BUILTIN_COMMANDS)[number];
+
+export const POLAR_COMMAND_SHORTCUT_MAX = 32;
+export const POLAR_COMMAND_PROMPT_MAX = 4000;
+/** Most commands one person keeps. */
+export const POLAR_COMMAND_MOST = 100;
+
+/** Why a shortcut is refused, as a code the form has words for. */
+export const COMMAND_SHORTCUT_ISSUES = ["format", "long", "builtin", "taken"] as const;
+export type CommandShortcutIssue = (typeof COMMAND_SHORTCUT_ISSUES)[number];
+
+/** A shortcut as it is stored: no leading "/", no spaces around, lowercase. */
+export function normalizeShortcut(value: string): string {
+    return value.trim().replace(/^\/+/, "").toLowerCase();
+}
+
+const SHORTCUT_FORMAT = /^[a-z0-9][a-z0-9-]*$/;
+
+export const commandShortcutSchema = z
+    .string()
+    .max(200)
+    .transform(normalizeShortcut)
+    .pipe(
+        z
+            .string()
+            .min(1)
+            .max(POLAR_COMMAND_SHORTCUT_MAX, "long")
+            .regex(SHORTCUT_FORMAT, "format")
+            .refine(
+                (value) => !(POLAR_BUILTIN_COMMANDS as readonly string[]).includes(value),
+                "builtin"
+            )
+    );
+
+export const commandPromptSchema = z.string().trim().min(1).max(POLAR_COMMAND_PROMPT_MAX);
+
+/** One command as the form sends it, created or edited. */
+export const polarCommandInputSchema = z
+    .object({
+        shortcut: commandShortcutSchema,
+        prompt: commandPromptSchema,
+        choice: modelChoiceSchema
+    })
+    .strict();
+export type PolarCommandInput = z.input<typeof polarCommandInputSchema>;
+
+/** One of a person's commands, as the "/" list and the settings show it. */
+export interface PolarCommandRow {
+    id: string;
+    shortcut: string;
+    prompt: string;
+    choice: ModelChoice;
+}
+
+/** What the shortcut of an unsaved command is refused for, if anything: the
+ *  schema's rules plus another command of the same person using it already. */
+export function shortcutIssue(
+    value: string,
+    taken: readonly string[]
+): CommandShortcutIssue | null {
+    const parsed = commandShortcutSchema.safeParse(value);
+    if (!parsed.success) {
+        const message = parsed.error.issues[0]?.message;
+        return (COMMAND_SHORTCUT_ISSUES as readonly string[]).includes(message ?? "")
+            ? (message as CommandShortcutIssue)
+            : "format";
+    }
+    return taken.includes(parsed.data) ? "taken" : null;
+}
+
+/**
+ * The text a command sends: its prompt, then whatever was typed after the
+ * shortcut on a line of its own. The prompt alone when nothing was.
+ */
+export function commandText(prompt: string, typed: string): string {
+    const extra = typed.trim();
+    return extra ? `${prompt.trim()}\n\n${extra}` : prompt.trim();
+}
+
+/** The first line of a prompt, for a one-line description. */
+export function firstLine(text: string, most = 80): string {
+    const line = text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";
+    return line.length > most ? `${line.slice(0, most - 1).trimEnd()}…` : line;
+}

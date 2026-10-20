@@ -17,6 +17,7 @@ const state = {
 
 vi.mock("@/lib/polar/attachments", () => ({
     threadAttachments: async () => [],
+    keepSharedAttachments: async () => [],
     discardPolarAttachments: async () => undefined,
     linkPolarAttachments: async () => undefined
 }));

@@ -20,7 +20,15 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { modelProviderName } from "@/lib/agents/model-key-providers";
-import type { Intelligence, ModelChoice, Payer } from "@/lib/polar/shared";
+import { isAutomatic, type Intelligence, type ModelChoice, type Payer } from "@/lib/polar/shared";
+import {
+    autoRoute,
+    automaticCandidates,
+    failingProviders,
+    PLAIN_TURN,
+    type AutoRoute,
+    type TurnSignals
+} from "@/lib/polar/automatic";
 import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
 import type { ChatCredential } from "@/lib/agents/model-keys";
@@ -64,6 +72,13 @@ export interface PolarModelOption {
     reasoning: boolean;
     attachment: boolean;
     contextTokens: number;
+    /** Price per million input tokens, when the catalogue knows it. */
+    costInput: number | null;
+    /** Price per million output tokens, when the catalogue knows it. */
+    costOutput: number | null;
+    /** What it reads, from the catalogue ("image", "pdf", ...); empty when unknown. */
+    inputs: string[];
+    releaseDate: string | null;
 }
 
 /** One provider as the picker lists it, with who would pay. */
@@ -124,7 +139,11 @@ function catalogueOption(
         name: model.name,
         reasoning: model.reasoning,
         attachment: model.attachment,
-        contextTokens: model.contextTokens
+        contextTokens: model.contextTokens,
+        costInput: model.costInput,
+        costOutput: model.costOutput,
+        inputs: model.inputModalities ?? [],
+        releaseDate: model.releaseDate
     };
 }
 
@@ -136,7 +155,11 @@ function gatewayOption(slug: string, providerName: string, model: string): Polar
         name: model,
         reasoning: false,
         attachment: false,
-        contextTokens: 0
+        contextTokens: 0,
+        costInput: null,
+        costOutput: null,
+        inputs: [],
+        releaseDate: null
     };
 }
 
@@ -164,6 +187,8 @@ export interface ResolvedModel {
     model: LanguageModel;
     option: PolarModelOption;
     credential: ChatCredential;
+    /** Set when Automatic picked the model: the kind of turn it saw. */
+    automatic?: AutoRoute;
 }
 
 /**
@@ -174,10 +199,12 @@ export interface ResolvedModel {
 export async function resolvePolarModel(
     userId: string,
     choice: ModelChoice,
+    signals: TurnSignals = PLAIN_TURN,
     access?: PolarAccess
 ): Promise<ResolvedModel | ModelRefusal> {
     if (choice.kind !== "language") return "unsupported_kind";
     const granted = access ?? (await polarAccessFor(userId));
+    if (isAutomatic(choice)) return resolveAutomatic(userId, signals, granted);
     const provider = (await polarModelOptions(userId, granted)).find(
         (entry) => entry.provider === choice.provider
     );
@@ -212,4 +239,39 @@ export function languageModel(credential: ChatCredential, model: string): Langua
             return createOpenAICompatible({ name: credential.provider, baseURL, apiKey })(model);
         }
     }
+}
+
+/**
+ * The model Automatic answers a turn with: the first candidate whose key can
+ * be read. "no_key" when none can.
+ */
+async function resolveAutomatic(
+    userId: string,
+    signals: TurnSignals,
+    access: PolarAccess
+): Promise<ResolvedModel | ModelRefusal> {
+    const candidates = automaticCandidates(
+        await polarModelOptions(userId, access),
+        signals,
+        failingProviders(userId)
+    );
+    const route = autoRoute(signals);
+    const tried = new Map<string, ChatCredential | null>();
+    for (const option of candidates) {
+        if (!tried.has(option.provider)) {
+            tried.set(
+                option.provider,
+                await polarCredentialFor(userId, option.provider, null, access)
+            );
+        }
+        const credential = tried.get(option.provider);
+        if (!credential) continue;
+        return {
+            model: languageModel(credential, option.model),
+            option,
+            credential,
+            automatic: route
+        };
+    }
+    return "no_key";
 }
