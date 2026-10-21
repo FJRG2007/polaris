@@ -31,7 +31,10 @@ vi.mock("@/lib/agents/session-runtime", () => ({ runInSession: vi.fn() }));
 vi.mock("@/lib/agents/session-work", () => ({ saveSessionWork: vi.fn() }));
 vi.mock("@/lib/tasks/access", () => ({}));
 vi.mock("@/lib/tasks/task-detail-service", () => ({ addComment: vi.fn() }));
-vi.mock("@/lib/agents/agent-readiness", () => ({ agentChoicesFor: vi.fn(), agentOptionsFor: vi.fn() }));
+vi.mock("@/lib/agents/agent-readiness", () => ({
+    agentChoicesFor: vi.fn(),
+    agentOptionsFor: vi.fn()
+}));
 vi.mock("@/lib/agents/session-capacity", () => ({
     capacityRefusal: vi.fn(),
     sessionCapacity: vi.fn(),
@@ -40,8 +43,13 @@ vi.mock("@/lib/agents/session-capacity", () => ({
     workspaceRefusal: vi.fn()
 }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: vi.fn() }));
-vi.mock("@/lib/agents/words", () => ({ agentText: (_t: unknown, text: string) => text, knownAgentText: vi.fn() }));
-vi.mock("@/lib/domain-service", () => ({ appBaseUrl: vi.fn(async () => "https://polaris.example.test/") }));
+vi.mock("@/lib/agents/words", () => ({
+    agentText: (_t: unknown, text: string) => text,
+    knownAgentText: vi.fn()
+}));
+vi.mock("@/lib/domain-service", () => ({
+    appBaseUrl: vi.fn(async () => "https://polaris.example.test/")
+}));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: vi.fn(async () => (key: string) => key) }));
 vi.mock("@/lib/session", () => ({
     requirePermission: vi.fn(async (permission: string) => {
@@ -116,7 +124,10 @@ describe("opening a session's pull request", () => {
 
     it("shows the branch's open pull request instead of opening a second", async () => {
         const create = vi.fn();
-        const { value, recorded } = deps({ pullsForBranch: async () => [pull(3, "closed"), pull(5, "open")], create });
+        const { value, recorded } = deps({
+            pullsForBranch: async () => [pull(3, "closed"), pull(5, "open")],
+            create
+        });
         const result = await review.openSessionPullRequest(session, "enabled", draft, value);
         expect(result).toEqual({ kind: "existing", pull: pull(5, "open") });
         expect(create).not.toHaveBeenCalled();
@@ -125,12 +136,16 @@ describe("opening a session's pull request", () => {
 
     it("opens a new one when the only one was closed without merging", async () => {
         const { value, created } = deps({ pullsForBranch: async () => [pull(3, "closed")] });
-        expect((await review.openSessionPullRequest(session, "enabled", draft, value)).kind).toBe("opened");
+        expect((await review.openSessionPullRequest(session, "enabled", draft, value)).kind).toBe(
+            "opened"
+        );
         expect(created).toHaveLength(1);
     });
 
     it("opens a new one for work that came after the branch's merged one", async () => {
-        const { value, created, recorded } = deps({ pullsForBranch: async () => [pull(4, "merged")] });
+        const { value, created, recorded } = deps({
+            pullsForBranch: async () => [pull(4, "merged")]
+        });
         expect(await review.openSessionPullRequest(session, "enabled", draft, value)).toEqual({
             kind: "opened",
             pull: pull(7, "open")
@@ -177,7 +192,14 @@ describe("opening a session's pull request", () => {
             kind: "refused",
             reason: "readOnly"
         });
-        expect(await review.openSessionPullRequest({ ...session, repoFullName: "" }, "enabled", draft, value)).toEqual({
+        expect(
+            await review.openSessionPullRequest(
+                { ...session, repoFullName: "" },
+                "enabled",
+                draft,
+                value
+            )
+        ).toEqual({
             kind: "refused",
             reason: "workspace"
         });
@@ -186,10 +208,20 @@ describe("opening a session's pull request", () => {
 
     it("stops when there is no installation token, or the push was kept", async () => {
         expect(
-            await review.openSessionPullRequest(session, "enabled", draft, deps({ token: async () => null }).value)
+            await review.openSessionPullRequest(
+                session,
+                "enabled",
+                draft,
+                deps({ token: async () => null }).value
+            )
         ).toEqual({ kind: "refused", reason: "noAuth" });
         const kept = deps({
-            push: async () => ({ kind: "kept", commits: 1, branch: session.branch, reason: "rejected" })
+            push: async () => ({
+                kind: "kept",
+                commits: 1,
+                branch: session.branch,
+                reason: "rejected"
+            })
         });
         expect(await review.openSessionPullRequest(session, "enabled", draft, kept.value)).toEqual({
             kind: "refused",
@@ -197,9 +229,16 @@ describe("opening a session's pull request", () => {
             pushReason: "rejected"
         });
         const policy = deps({
-            push: async () => ({ kind: "kept", commits: 1, branch: session.branch, reason: "policy" })
+            push: async () => ({
+                kind: "kept",
+                commits: 1,
+                branch: session.branch,
+                reason: "policy"
+            })
         });
-        expect(await review.openSessionPullRequest(session, "enabled", draft, policy.value)).toEqual({
+        expect(
+            await review.openSessionPullRequest(session, "enabled", draft, policy.value)
+        ).toEqual({
             kind: "refused",
             reason: "readOnly"
         });
@@ -220,7 +259,11 @@ describe("the draft", () => {
             title: "  Fix   the login  ",
             prompt: "Make it work\nwith SSO",
             sessionUrl: "https://polaris.example.test/apps/agents/sessions/x",
-            words: { fallbackTitle: "Fallback", asked: "Asked:", openedFrom: (url) => `From ${url}` }
+            words: {
+                fallbackTitle: "Fallback",
+                asked: "Asked:",
+                openedFrom: (url) => `From ${url}`
+            }
         });
         expect(result.title).toBe("Fix the login");
         expect(result.body).toBe(
@@ -246,7 +289,9 @@ describe("who may use it", () => {
     it("refuses an account without agents.manage, and never reaches the machine", async () => {
         state.allowed = false;
         await expect(sessionChangesAction({ sessionId: SESSION_ID })).rejects.toThrow("forbidden");
-        await expect(sessionFileDiffAction({ sessionId: SESSION_ID, path: "a.ts" })).rejects.toThrow("forbidden");
+        await expect(
+            sessionFileDiffAction({ sessionId: SESSION_ID, path: "a.ts" })
+        ).rejects.toThrow("forbidden");
         await expect(
             openSessionPullRequestAction({ sessionId: SESSION_ID, title: "x", body: "" })
         ).rejects.toThrow("forbidden");
@@ -256,22 +301,30 @@ describe("who may use it", () => {
 
     it("answers a session this account does not reach as gone", async () => {
         state.session = null;
-        expect(await openSessionPullRequestAction({ sessionId: SESSION_ID, title: "x", body: "" })).toEqual({
+        expect(
+            await openSessionPullRequestAction({ sessionId: SESSION_ID, title: "x", body: "" })
+        ).toEqual({
             error: "sessions.errors.gone"
         });
-        expect(await sessionChangesAction({ sessionId: SESSION_ID })).toEqual({ error: "sessions.errors.gone" });
+        expect(await sessionChangesAction({ sessionId: SESSION_ID })).toEqual({
+            error: "sessions.errors.gone"
+        });
         expect(runInSession).not.toHaveBeenCalled();
         expect(saveSessionWork).not.toHaveBeenCalled();
     });
 
     it("validates input before anything else", async () => {
-        expect(await sessionFileDiffAction({ sessionId: SESSION_ID, path: "../../etc/passwd" })).toEqual({
+        expect(
+            await sessionFileDiffAction({ sessionId: SESSION_ID, path: "../../etc/passwd" })
+        ).toEqual({
             error: "session.changes.errors.invalid"
         });
         expect(await sessionChangesAction({ sessionId: "not-a-uuid" })).toEqual({
             error: "session.changes.errors.invalid"
         });
-        expect(await openSessionPullRequestAction({ sessionId: SESSION_ID, title: "   ", body: "" })).toEqual({
+        expect(
+            await openSessionPullRequestAction({ sessionId: SESSION_ID, title: "   ", body: "" })
+        ).toEqual({
             error: "session.ship.errors.invalid"
         });
     });

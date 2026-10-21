@@ -49,14 +49,28 @@ function git(cwd: string, ...args: string[]): string {
 
 describe("parsing", () => {
     it("reads numstat lines, binary ones included", () => {
-        expect(parseNumstatLine("3\t1\tsrc/a b.ts")).toEqual({ added: 3, removed: 1, path: "src/a b.ts" });
-        expect(parseNumstatLine("-\t-\tlogo.png")).toEqual({ added: null, removed: null, path: "logo.png" });
+        expect(parseNumstatLine("3\t1\tsrc/a b.ts")).toEqual({
+            added: 3,
+            removed: 1,
+            path: "src/a b.ts"
+        });
+        expect(parseNumstatLine("-\t-\tlogo.png")).toEqual({
+            added: null,
+            removed: null,
+            path: "logo.png"
+        });
         expect(parseNumstatLine("garbage")).toBeNull();
     });
 
     it("reads a page and where the next one starts", () => {
         const listing = parseChangesList(
-            ["noise", "polaris-changes: ok abc123 3", "1\t0\ta", "2\t2\tb", "polaris-changes: more 2"].join("\n")
+            [
+                "noise",
+                "polaris-changes: ok abc123 3",
+                "1\t0\ta",
+                "2\t2\tb",
+                "polaris-changes: more 2"
+            ].join("\n")
         );
         expect(listing).toEqual({
             kind: "ok",
@@ -75,20 +89,33 @@ describe("parsing", () => {
 
     it("refuses a chunk that is not base64 rather than decoding garbage", () => {
         expect(parseDiffChunk("polaris-changes: chunk 10\nnot base64!")).toBeNull();
-        expect(parseDiffChunk("polaris-changes: large 999999")).toEqual({ kind: "large", size: 999999 });
+        expect(parseDiffChunk("polaris-changes: large 999999")).toEqual({
+            kind: "large",
+            size: 999999
+        });
     });
 
     it("only reads paths inside the checkout", () => {
         expect(safeChangePath("src/app.ts")).toBe(true);
         expect(safeChangePath("a b/ñ.md")).toBe(true);
-        for (const path of ["", "/etc/passwd", "../secret", "a/../../b", "-rf", "a//b", "a\nb", "x\u0000"]) {
+        for (const path of [
+            "",
+            "/etc/passwd",
+            "../secret",
+            "a/../../b",
+            "-rf",
+            "a//b",
+            "a\nb",
+            "x\u0000"
+        ]) {
             expect(safeChangePath(path)).toBe(false);
         }
     });
 });
 
 describe("reading a diff in chunks", () => {
-    const encode = (size: number, bytes: Buffer) => `polaris-changes: chunk ${size}\n${bytes.toString("base64")}\n`;
+    const encode = (size: number, bytes: Buffer) =>
+        `polaris-changes: chunk ${size}\n${bytes.toString("base64")}\n`;
 
     it("joins chunks back into the whole diff, a character split across two included", async () => {
         const text = `@@ -1 +1 @@\n+${"é".repeat(DIFF_CHUNK_BYTES)}\n`;
@@ -105,7 +132,10 @@ describe("reading a diff in chunks", () => {
     it("fails rather than showing a diff with a hole when a chunk comes back short", async () => {
         const all = Buffer.alloc(DIFF_CHUNK_BYTES * 2, "a");
         const diff = await readFileDiff(async (offset) =>
-            encode(all.length, all.subarray(offset, offset + (offset === 0 ? 100 : DIFF_CHUNK_BYTES)))
+            encode(
+                all.length,
+                all.subarray(offset, offset + (offset === 0 ? 100 : DIFF_CHUNK_BYTES))
+            )
         );
         expect(diff).toEqual({ kind: "failed" });
     });
@@ -119,7 +149,9 @@ describe("reading a diff in chunks", () => {
         const offsets: number[] = [];
         const diff = await readFileDiff(async (offset) => {
             offsets.push(offset);
-            return offsets.length === 1 ? versioned(before, "1", offset) : versioned(after, "2", offset);
+            return offsets.length === 1
+                ? versioned(before, "1", offset)
+                : versioned(after, "2", offset);
         });
         expect(diff).toEqual({ kind: "diff", text: after.toString("utf8") });
         expect(offsets).toEqual([0, DIFF_CHUNK_BYTES, 0, DIFF_CHUNK_BYTES]);
@@ -164,7 +196,10 @@ describe("against a real checkout", { timeout: 120_000 }, () => {
         // Not committed, and never added.
         writeFileSync(join(work, "kept.txt"), "one\nTWO\nthree\nfour\n");
         writeFileSync(join(work, "new file.md"), "# hello\n");
-        writeFileSync(join(work, "big.txt"), `${"x".repeat(99)}\n`.repeat(Math.ceil(MAX_DIFF_BYTES / 100) + 10));
+        writeFileSync(
+            join(work, "big.txt"),
+            `${"x".repeat(99)}\n`.repeat(Math.ceil(MAX_DIFF_BYTES / 100) + 10)
+        );
         writeFileSync(join(work, "mid.txt"), `${"y".repeat(99)}\n`.repeat(400));
     }, 120_000);
 
@@ -173,10 +208,14 @@ describe("against a real checkout", { timeout: 120_000 }, () => {
     });
 
     const diffOf = (path: string) =>
-        readFileDiff(async (offset) => run(fileDiffScript({ workdir: work, baseRef: "main", path, offset })));
+        readFileDiff(async (offset) =>
+            run(fileDiffScript({ workdir: work, baseRef: "main", path, offset }))
+        );
 
     it("lists committed, uncommitted and untracked changes against the base", () => {
-        const listing = parseChangesList(run(listChangesScript({ workdir: work, baseRef: "main", offset: 0 })));
+        const listing = parseChangesList(
+            run(listChangesScript({ workdir: work, baseRef: "main", offset: 0 }))
+        );
         expect(listing?.kind).toBe("ok");
         if (listing?.kind !== "ok") return;
         const byPath = Object.fromEntries(listing.files.map((file) => [file.path, file]));
@@ -188,12 +227,16 @@ describe("against a real checkout", { timeout: 120_000 }, () => {
     });
 
     it("finds the base from origin/HEAD when the session recorded none", () => {
-        const listing = parseChangesList(run(listChangesScript({ workdir: work, baseRef: "", offset: 0 })));
+        const listing = parseChangesList(
+            run(listChangesScript({ workdir: work, baseRef: "", offset: 0 }))
+        );
         expect(listing?.kind).toBe("ok");
     });
 
     it("pages from an offset", () => {
-        const listing = parseChangesList(run(listChangesScript({ workdir: work, baseRef: "main", offset: 3 })));
+        const listing = parseChangesList(
+            run(listChangesScript({ workdir: work, baseRef: "main", offset: 3 }))
+        );
         expect(listing?.kind === "ok" && listing.files.length).toBe(2);
     });
 
@@ -225,7 +268,11 @@ describe("against a real checkout", { timeout: 120_000 }, () => {
 
     it("says so when there is no checkout", () => {
         const missing = join(root, "nowhere");
-        expect(parseChangesList(run(listChangesScript({ workdir: missing, baseRef: "main", offset: 0 })))).toEqual({
+        expect(
+            parseChangesList(
+                run(listChangesScript({ workdir: missing, baseRef: "main", offset: 0 }))
+            )
+        ).toEqual({
             kind: "nocheckout"
         });
     });

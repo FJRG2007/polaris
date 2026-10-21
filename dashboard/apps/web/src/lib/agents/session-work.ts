@@ -221,7 +221,8 @@ export async function saveSessionWork(
     if (!row || !row.repo?.repoFullName) return { kind: "none" };
     const onHost = row.place === "host";
     if (onHost ? !options.host : !row.containerId) return { kind: "none" };
-    const policy = options.neverDefault && row.repo.push === "enabled" ? "restricted" : row.repo.push;
+    const policy =
+        options.neverDefault && row.repo.push === "enabled" ? "restricted" : row.repo.push;
 
     const ports = new HostdPorts();
     const kept = (reason: SessionWorkReason, commits = 0, branch = row.branch): SaveOutcome => ({
@@ -252,7 +253,12 @@ export async function saveSessionWork(
             } else {
                 const bytes = Buffer.from(header, "utf8");
                 try {
-                    await ports.writeFile(row.containerId!, path, Readable.from([bytes]), bytes.length);
+                    await ports.writeFile(
+                        row.containerId!,
+                        path,
+                        Readable.from([bytes]),
+                        bytes.length
+                    );
                     authFile = path;
                 } catch (error) {
                     console.error(

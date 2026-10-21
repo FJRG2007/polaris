@@ -43,7 +43,12 @@ export default async function AgentSessionPage({
                         : t("pages.sessionWorkspace")
                 }
             />
-            <SessionDetail session={session} events={events} messages={messages} canControl={canControl} />
+            <SessionDetail
+                session={session}
+                events={events}
+                messages={messages}
+                canControl={canControl}
+            />
         </>
     );
 }

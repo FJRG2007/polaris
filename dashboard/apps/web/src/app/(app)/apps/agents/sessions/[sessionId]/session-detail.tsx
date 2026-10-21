@@ -289,7 +289,6 @@ export function SessionDetail({ session, events, messages, canControl = false }:
             {/* Kept mounted while the changes are shown, so an open terminal
                 and what was typed survive a look at the diff. */}
             <div className={view === "changes" ? "hidden" : "space-y-4"}>
-
                 {boot ? (
                     <Card>
                         <CardBody className="space-y-3">
@@ -338,7 +337,9 @@ export function SessionDetail({ session, events, messages, canControl = false }:
                             {/* Said here rather than only in the terminal, because
                                 this is the screen somebody is on while they wonder
                                 whether it is always going to be this slow. */}
-                            <p className="text-muted-foreground text-xs">{t("session.installsOnce")}</p>
+                            <p className="text-muted-foreground text-xs">
+                                {t("session.installsOnce")}
+                            </p>
                         </CardBody>
                     </Card>
                 ) : null}
@@ -450,7 +451,9 @@ export function SessionDetail({ session, events, messages, canControl = false }:
                         </CardHeader>
                         <CardBody>
                             {events.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">{t("session.noEvents")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("session.noEvents")}
+                                </p>
                             ) : (
                                 <ul className="space-y-1.5">
                                     {events.slice(-40).map((event, index) => (

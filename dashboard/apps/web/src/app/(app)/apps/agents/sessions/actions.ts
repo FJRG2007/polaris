@@ -467,12 +467,19 @@ export interface SessionShipView {
     draft: { title: string; body: string };
     /** The linked pull request as GitHub has it now; `state` is null when
      *  GitHub would not say. */
-    pull: { number: number; url: string; title: string; state: "open" | "closed" | "merged" | null } | null;
+    pull: {
+        number: number;
+        url: string;
+        title: string;
+        state: "open" | "closed" | "merged" | null;
+    } | null;
 }
 
 /** What the ship button needs: whether it may be offered, the draft it opens
  *  with, and the pull request the session already links. */
-export async function sessionShipAction(input: unknown): Promise<{ view?: SessionShipView; error?: string }> {
+export async function sessionShipAction(
+    input: unknown
+): Promise<{ view?: SessionShipView; error?: string }> {
     const t = await getTranslations("agents");
     const parsed = sessionIdSchema.safeParse(input);
     if (!parsed.success) return { error: t("session.changes.errors.invalid") };
@@ -534,5 +541,11 @@ export async function openSessionPullRequestAction(
             return { error: t(`session.work.reasons.${result.pushReason ?? "other"}`) };
         return { error: t(`session.ship.refusals.${result.reason}`) };
     }
-    return { pull: { number: result.pull.number, url: result.pull.url, existing: result.kind === "existing" } };
+    return {
+        pull: {
+            number: result.pull.number,
+            url: result.pull.url,
+            existing: result.kind === "existing"
+        }
+    };
 }

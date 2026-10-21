@@ -1019,11 +1019,7 @@ export async function resolveGithubRepo(
  * all of them: git asks for a username, is refused a terminal, and stops.
  */
 export type RepoAccess =
-    | "reachable"
-    | "token-refused"
-    | "out-of-reach"
-    | "sso-required"
-    | "unknown";
+    "reachable" | "token-refused" | "out-of-reach" | "sso-required" | "unknown";
 
 /**
  * Ask GitHub about `owner/repo` as this token, and report which of the four it
@@ -1639,7 +1635,9 @@ export async function repoDefaultBranch(
         });
         if (!res.ok) return null;
         const data = (await res.json()) as { default_branch?: string };
-        return typeof data.default_branch === "string" && data.default_branch ? data.default_branch : null;
+        return typeof data.default_branch === "string" && data.default_branch
+            ? data.default_branch
+            : null;
     } catch {
         return null;
     }
@@ -1699,12 +1697,7 @@ export async function createPullRequest(
 /** The states GitHub accepts for a deployment. `error` is the one a cancel lands
  *  on: there is no cancelled state, and leaving it in progress is worse. */
 export type DeploymentState =
-    | "queued"
-    | "in_progress"
-    | "success"
-    | "failure"
-    | "error"
-    | "inactive";
+    "queued" | "in_progress" | "success" | "failure" | "error" | "inactive";
 
 /**
  * What GitHub did with an announcement.
