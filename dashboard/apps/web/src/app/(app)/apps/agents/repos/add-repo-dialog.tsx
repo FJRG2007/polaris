@@ -157,7 +157,9 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
+                        <label className="text-sm font-medium">
+                            {t("sessions.form.repository")}
+                        </label>
                         {repo ? (
                             <div className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2">
                                 <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
@@ -222,12 +224,16 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     }
                                 />
                                 {providers.length === 0 ? (
-                                    <p className="text-xs text-warning">{t("repoDialog.connectProvider")}</p>
+                                    <p className="text-xs text-warning">
+                                        {t("repoDialog.connectProvider")}
+                                    </p>
                                 ) : null}
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-sm font-medium">{t("repoDialog.effort")}</label>
+                                <label className="text-sm font-medium">
+                                    {t("repoDialog.effort")}
+                                </label>
                                 <Select
                                     value={effort}
                                     onValueChange={setEffort}
@@ -248,7 +254,9 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                 onGate={setGate}
                             />
 
-                            <p className="text-xs text-muted-foreground">{t("repoDialog.startsRestricted")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("repoDialog.startsRestricted")}
+                            </p>
                         </>
                     ) : null}
 
@@ -266,7 +274,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={!repo || !model || loading || pending || gap !== null}>
+                    <Button
+                        onClick={save}
+                        disabled={!repo || !model || loading || pending || gap !== null}
+                    >
                         {pending ? t("repoDialog.adding") : t("repoDialog.add")}
                     </Button>
                 </DialogFooter>

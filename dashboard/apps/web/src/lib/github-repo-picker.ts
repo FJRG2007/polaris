@@ -11,7 +11,11 @@
 import { z } from "zod";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { resolveGithubRepo, searchGithubRepos, type GithubRepo } from "@/lib/github-service";
-import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
+import {
+    githubCredentialsForUser,
+    githubTokenForUser,
+    listReposForUser
+} from "@/lib/github-access";
 import { githubInstallGapForRepo } from "@/lib/github-app-reach";
 
 export interface PickerRepoList {

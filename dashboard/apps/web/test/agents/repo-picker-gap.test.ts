@@ -43,8 +43,8 @@ describe("a pasted repository the App cannot reach", () => {
     });
 
     it("is not offered when the App is not the reason", async () => {
-        expect(
-            await pickerRepoSearch("user-1", "bytehide/Backend", { installGaps: true })
-        ).toEqual([]);
+        expect(await pickerRepoSearch("user-1", "bytehide/Backend", { installGaps: true })).toEqual(
+            []
+        );
     });
 });

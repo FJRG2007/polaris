@@ -33,7 +33,11 @@
 import { z } from "zod";
 import { githubAppInstallUrl } from "@/lib/github-service";
 import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
-import { credentialFor, githubCredentialsForUser, type GithubCredential } from "@/lib/github-access";
+import {
+    credentialFor,
+    githubCredentialsForUser,
+    type GithubCredential
+} from "@/lib/github-access";
 
 const API = "https://api.github.com";
 const CALL_TIMEOUT_MS = 10_000;

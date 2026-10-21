@@ -161,7 +161,11 @@ export function SessionsView({ sessions }: { sessions: SessionView[] }) {
                                     )}
                                 </span>
                                 <span className={`shrink-0 text-xs ${TONE[session.state]}`}>
-                                    {sessionStateWord(t, session.state, session.lastEventAt !== null)}
+                                    {sessionStateWord(
+                                        t,
+                                        session.state,
+                                        session.lastEventAt !== null
+                                    )}
                                 </span>
                                 {core.isSessionOver(session.state) ? null : (
                                     <Button size="sm" variant="ghost" onClick={() => stop(session)}>
@@ -295,7 +299,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                 <div className="space-y-3">
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("sessions.form.title")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sessions.form.title")}
+                        </span>
                         <Input
                             value={title}
                             onChange={(event) => setTitle(event.target.value)}
@@ -304,7 +310,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     </label>
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("sessions.form.repository")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sessions.form.repository")}
+                        </span>
                         <Select
                             value={repoId}
                             onValueChange={(value) => {
@@ -327,7 +335,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     </label>
 
                     {workspace ? (
-                        <p className="text-xs text-muted-foreground">{t("sessions.form.workspaceHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("sessions.form.workspaceHint")}
+                        </p>
                     ) : null}
                     {noRepos ? (
                         <p className="text-xs text-muted-foreground">
@@ -342,7 +352,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     ) : null}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("sessions.form.agent")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sessions.form.agent")}
+                        </span>
                         <AgentSelect
                             options={agents}
                             value={cli}
@@ -355,7 +367,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     {cli === core.CUSTOM_AGENT_CLI ? (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("sessions.form.command")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("sessions.form.command")}
+                            </span>
                             <Input
                                 value={command}
                                 onChange={(event) => setCommand(event.target.value)}
@@ -365,7 +379,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     ) : null}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("sessions.form.where")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sessions.form.where")}
+                        </span>
                         <Select
                             value={place}
                             onValueChange={(value) => setPlace(value as core.AgentSessionPlace)}
@@ -386,7 +402,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                             <div className="min-w-0">
                                 <p className="text-sm">{t("sessions.form.shared")}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {sharedHome ? t("sessions.form.sharedOn") : t("sessions.form.sharedOff")}
+                                    {sharedHome
+                                        ? t("sessions.form.sharedOn")
+                                        : t("sessions.form.sharedOff")}
                                 </p>
                             </div>
                             <Switch checked={sharedHome} onChange={setSharedHome} />
@@ -395,7 +413,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     {place === "host" ? (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("sessions.form.whichServer")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("sessions.form.whichServer")}
+                            </span>
                             <Select
                                 value={hostId}
                                 onValueChange={setHostId}
@@ -410,7 +430,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
 
                     {workspace ? null : (
                         <label className="block space-y-1">
-                            <span className="text-xs text-muted-foreground">{t("sessions.form.branch")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("sessions.form.branch")}
+                            </span>
                             <Input
                                 value={baseRef}
                                 onChange={(event) => setBaseRef(event.target.value)}
@@ -420,7 +442,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     )}
 
                     <label className="block space-y-1">
-                        <span className="text-xs text-muted-foreground">{t("sessions.form.prompt")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sessions.form.prompt")}
+                        </span>
                         <Textarea
                             value={prompt}
                             onChange={(event) => setPrompt(event.target.value)}
@@ -456,12 +480,16 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
                         <div className="min-w-0">
                             <p className="text-sm">{t("sessions.form.enigma")}</p>
-                            <p className="text-xs text-muted-foreground">{t("sessions.form.enigmaHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("sessions.form.enigmaHint")}
+                            </p>
                         </div>
                         <Switch checked={enigma} onChange={setEnigma} />
                     </div>
 
-                    {gap ? <GithubAppGapNotice gap={gap} checking={busy} onCheckAgain={submit} /> : null}
+                    {gap ? (
+                        <GithubAppGapNotice gap={gap} checking={busy} onCheckAgain={submit} />
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 

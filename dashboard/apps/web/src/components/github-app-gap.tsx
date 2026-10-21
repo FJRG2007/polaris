@@ -59,12 +59,16 @@ export function GithubAppGapNotice({
                     <Button asChild size="sm">
                         {gap.url.startsWith("/") ? (
                             <Link href={gap.url}>
-                                <span className="min-w-0 truncate" title={action}>{action}</span>
+                                <span className="min-w-0 truncate" title={action}>
+                                    {action}
+                                </span>
                             </Link>
                         ) : (
                             <a href={gap.url} target="_blank" rel="noopener noreferrer">
                                 <ExternalLink className="size-4 shrink-0" />
-                                <span className="min-w-0 truncate" title={action}>{action}</span>
+                                <span className="min-w-0 truncate" title={action}>
+                                    {action}
+                                </span>
                             </a>
                         )}
                     </Button>

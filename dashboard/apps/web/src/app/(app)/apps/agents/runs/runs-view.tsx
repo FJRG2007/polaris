@@ -266,7 +266,9 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
+                        <label className="text-sm font-medium">
+                            {t("sessions.form.repository")}
+                        </label>
                         <Select
                             value={repoFullName}
                             onValueChange={(value) => {
@@ -285,7 +287,9 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                             placeholder={t("runs.whatPlaceholder")}
                         />
                     </div>
-                    {gap ? <GithubAppGapNotice gap={gap} checking={pending} onCheckAgain={start} /> : null}
+                    {gap ? (
+                        <GithubAppGapNotice gap={gap} checking={pending} onCheckAgain={start} />
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>

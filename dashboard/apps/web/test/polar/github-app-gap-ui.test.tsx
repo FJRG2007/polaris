@@ -50,9 +50,9 @@ describe("the install notice", () => {
                 />
             </MessagesWrapper>
         );
-        expect(
-            screen.getByRole("link", { name: "Choose repositories" }).getAttribute("href")
-        ).toBe(url);
+        expect(screen.getByRole("link", { name: "Choose repositories" }).getAttribute("href")).toBe(
+            url
+        );
         expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
     });
 
@@ -87,7 +87,9 @@ describe("Polar's rules for repositories", () => {
     it("tells the model to read first, relay the App's reason, and never open a session to read", () => {
         const prompt = polarSystemPrompt("Ana", null, "", true);
         expect(prompt).toContain("call the repo_ tools first");
-        expect(prompt).toContain("Never say you cannot reach a repository without having tried them");
+        expect(prompt).toContain(
+            "Never say you cannot reach a repository without having tried them"
+        );
         expect(prompt).toContain("Polaris GitHub app is not installed");
         expect(prompt).toContain("Never propose starting an Agents session to read a repository");
     });
