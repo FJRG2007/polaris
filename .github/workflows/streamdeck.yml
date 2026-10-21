@@ -6,29 +6,50 @@ name: Stream Deck plugin
 # somewhere for people to get it from: `streamdeck pack` writes one
 # `.streamDeckPlugin` file, a double click installs it, and the Downloads page
 # links the newest `streamdeck-v*` release these steps produce. The Elgato
-# Marketplace listing is uploaded by hand from that same file.
+# Marketplace listing is uploaded by hand from that same file
+# (docs/streamdeck-publishing.md: Elgato has no upload API).
 #
 # A pull request that touches the plugin is built, validated against Elgato's
 # manifest schema and packed here, because nothing else checks those: its
 # typecheck and tests already run with every other workspace in `dashboard-ci`
-# and are not repeated. A release is tag-driven, like the extension and the CLI:
-# push `streamdeck-v<version>` matching `version` in
-# `dashboard/apps/streamdeck/package.json`. The build refuses a tag that does not
-# match, and refuses a manifest whose `Version` is not that version plus `.0`,
-# because the Stream Deck app reads the manifest and people quote the tag.
+# and are not repeated.
+#
+# **Every change ships by itself.** A push to `main` that changes what the
+# plugin ships is released: the version is the newest `streamdeck-v*` tag with
+# its patch moved on (or `package.json`'s, when somebody raised that past every
+# release to ask for a minor or major), stamped into `package.json` and the
+# manifest only in this build - no bump commit, no version check on pull
+# requests. The release creates its tag at the pushed commit, so nobody tags by
+# hand; a tag pushed by hand still releases exactly that version. Every release
+# shares one concurrency group, so two pushes never pick the same number, and a
+# re-run finds the tag already on its commit and repeats that release instead of
+# cutting another. A run for a commit an existing release already contains does
+# nothing.
 
 on:
   push:
+    branches: [main]
     tags:
       - "streamdeck-v*"
+    # Not evaluated for tag pushes. Tests and docs ship nothing.
+    paths:
+      - "dashboard/apps/streamdeck/**"
+      - "!dashboard/apps/streamdeck/test/**"
+      - "!dashboard/apps/streamdeck/vitest.config.ts"
+      - "!dashboard/apps/streamdeck/**/*.md"
   pull_request:
     paths:
       - "dashboard/apps/streamdeck/**"
+      - "dashboard/scripts/release-version.mjs"
       - ".github/workflows/streamdeck.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: streamdeck-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -37,9 +58,77 @@ defaults:
 env:
   # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
   NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+  PREFIX: streamdeck-v
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      release: ${{ steps.plan.outputs.release }}
+      notes: ${{ steps.plan.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every tag, to number this release after the newest one.
+          fetch-depth: 0
+
+      - name: The manifest carries the package's version
+        run: |
+          version="$(node -p "require('./apps/streamdeck/package.json').version")"
+          manifest="$(node -p "require('./apps/streamdeck/io.github.fjrg2007.polaris.sdPlugin/manifest.json').Version")"
+          if [ "$manifest" != "$version.0" ]; then
+            echo "manifest.json says $manifest but package.json says $version (expected $version.0)." >&2
+            exit 1
+          fi
+
+      - name: Which version, and whether to release it
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          pkg=apps/streamdeck/package.json
+          release=false
+          if [ "${REF#refs/tags/$PREFIX}" != "$REF" ]; then
+            version="${GITHUB_REF_NAME#"$PREFIX"}"
+            release=true
+          elif [ "$EVENT" != "pull_request" ] && [ "$REF" = "refs/heads/main" ]; then
+            here="$(git tag --points-at HEAD -l "$PREFIX*" --sort=-v:refname | head -n1)"
+            newest="$(git tag -l "$PREFIX*" --sort=-v:refname | head -n1)"
+            if [ -n "$here" ]; then
+              # A re-run: repeat the release this commit already has.
+              version="${here#"$PREFIX"}"
+              release=true
+            elif [ -n "$newest" ] && git merge-base --is-ancestor HEAD "$newest"; then
+              echo "$newest already contains this commit; nothing to release."
+              version="${newest#"$PREFIX"}"
+            else
+              version="$(git tag -l "$PREFIX*" | node scripts/release-version.mjs next --prefix "$PREFIX" --package "$pkg")"
+              release=true
+            fi
+          else
+            version="$(node -p "require('./$pkg').version")"
+          fi
+          node -e 'if (!/^\d+\.\d+\.\d+$/.test(process.argv[1])) { console.error(`"${process.argv[1]}" is not x.y.z`); process.exit(1); }' "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+          # What changed in the plugin since the release before this one, as the
+          # release's notes (and the Marketplace version's, pasted from there).
+          previous="$(git tag -l "$PREFIX*" --sort=-v:refname | grep -v -x "$PREFIX$version" | head -n1 || true)"
+          range="${previous:+$previous..}HEAD"
+          delimiter="notes-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+          {
+            echo "notes<<$delimiter"
+            git log --no-merges --format='- %s' "$range" -- apps/streamdeck ':!apps/streamdeck/test' | head -n 50
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version $version, release: $release."
+
   build:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -51,23 +140,13 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
-      - name: The manifest carries the package's version
+      - name: Stamp the version into this build
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          version="$(node -p "require('./apps/streamdeck/package.json').version")"
-          manifest="$(node -p "require('./apps/streamdeck/io.github.fjrg2007.polaris.sdPlugin/manifest.json').Version")"
-          if [ "$manifest" != "$version.0" ]; then
-            echo "manifest.json says $manifest but package.json says $version (expected $version.0)." >&2
-            exit 1
-          fi
-
-      - name: The tag has to match that version
-        if: startsWith(github.ref, 'refs/tags/streamdeck-v')
-        run: |
-          expected="streamdeck-v$(node -p "require('./apps/streamdeck/package.json').version")"
-          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
-            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
-            exit 1
-          fi
+          node scripts/release-version.mjs stamp --version "$VERSION" \
+            --package apps/streamdeck/package.json \
+            --manifest apps/streamdeck/io.github.fjrg2007.polaris.sdPlugin/manifest.json
 
       - run: npm ci --prefer-offline
 
@@ -84,8 +163,8 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/streamdeck-v')
-    needs: build
+    if: needs.plan.outputs.release == 'true'
+    needs: [plan, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -99,8 +178,13 @@ jobs:
         # v2.6.2
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Polaris for Stream Deck ${{ github.ref_name }}
+          # Created at the commit this run built when it does not exist yet. A
+          # tag made with this workflow's token starts no other workflow, so
+          # this run is the only release of it.
+          tag_name: ${{ env.PREFIX }}${{ needs.plan.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Polaris for Stream Deck ${{ env.PREFIX }}${{ needs.plan.outputs.version }}
+          body: ${{ needs.plan.outputs.notes }}
           # This repository releases the dashboard too, and that is what "latest"
           # should keep meaning.
           make_latest: "false"
