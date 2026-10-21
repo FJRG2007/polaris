@@ -713,6 +713,19 @@
         "history": "Código",
         "session": "Sesión de código",
         "allSessions": "Ver sesiones",
-        "steps": "{count, plural, one {# paso} other {# pasos}}"
+        "steps": "{count, plural, one {# paso} other {# pasos}}",
+        "where": "Lugar de trabajo",
+        "workspaceHint": "Un espacio vacío",
+        "searchRepos": "Buscar repositorios",
+        "noRepoMatch": "Ningún repositorio",
+        "addRepos": "Más repositorios",
+        "addReposHint": "Abre GitHub para dar acceso a más repositorios",
+        "addReposUnavailable": "Este Polaris no tiene la App de GitHub",
+        "connectInAgents": "Conectar repositorio",
+        "refresh": "Recargar lista",
+        "agentSettings": "Ver agentes",
+        "notSignedIn": "Sin conectar",
+        "noFiles": "Una sesión de agente aún no admite adjuntos",
+        "noVoice": "La voz va al chat de Polar, no a un agente"
     }
 }

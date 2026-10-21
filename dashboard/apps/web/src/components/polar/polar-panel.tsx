@@ -122,7 +122,6 @@ import { Tool, ToolInput, ToolOutput, type ToolState } from "@/components/polar/
 import { avatarStateFor } from "@/components/polar/motion/avatar-engine";
 import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-avatar";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
-import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
@@ -152,15 +151,7 @@ import {
     MessageContent,
     MessageResponse
 } from "@/components/polar/elements/message";
-import {
-    PromptInput,
-    PromptInputAttach,
-    PromptInputFooter,
-    PromptInputHeader,
-    PromptInputSubmit,
-    PromptInputTextarea,
-    PromptInputTools
-} from "@/components/polar/elements/prompt-input";
+import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
     cleanContextText,
     isAutomatic,
@@ -184,12 +175,7 @@ import { PolarShareDialog } from "@/components/polar/polar-sharing";
 import type { PolarMark } from "@/lib/polar/answer-feedback";
 import type { PolarRefine } from "@/lib/polar/prompt";
 import * as answerActions from "@/components/polar/polar-answer-actions";
-import {
-    DictationButton,
-    VoiceCall,
-    VoiceModeButton,
-    type VoiceNotice
-} from "@/components/polar/polar-voice";
+import { VoiceCall, type VoiceNotice } from "@/components/polar/polar-voice";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -759,6 +745,16 @@ export function PolarChat({
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [modelOpen, setModelOpen] = useState(false);
+    /** The microphone's needs, shared by Chat's composer and Code's. */
+    const voiceKit = useMemo<PolarVoiceKit>(
+        () => ({
+            voice,
+            payer: choice?.payer ?? null,
+            onTranscriber: chooseTranscriber,
+            isAdmin
+        }),
+        [voice, choice?.payer, chooseTranscriber, isAdmin]
+    );
     // New chats are temporary while this is on: not listed, no memory, deleted
     // when the chat is left. It stays on for the next new chat, as ChatGPT's does.
     const [temporary, setTemporary] = useState(false);
@@ -1392,7 +1388,10 @@ export function PolarChat({
     const droppable = (types: readonly string[]) =>
         !noKeys && (types.includes("Files") || droppedItems.carriesItems(types));
     const dropHandlers = {
+        // Code's composer takes no files: a drop there must not land, unseen,
+        // on the chat kept mounted underneath.
         onDragOver: (event: React.DragEvent) => {
+            if (code.mode !== "chat") return;
             if (!droppable(Array.from(event.dataTransfer.types))) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
@@ -1404,7 +1403,7 @@ export function PolarChat({
         },
         onDrop: (event: React.DragEvent) => {
             const types = Array.from(event.dataTransfer.types);
-            if (!droppable(types)) return;
+            if (code.mode !== "chat" || !droppable(types)) return;
             event.preventDefault();
             setDragging(false);
             const items = droppedItems.carriesItems(types)
@@ -1934,12 +1933,42 @@ export function PolarChat({
             ) : null}
             {/* Voice mode takes the composer's place, as in ChatGPT; the
                 composer stays mounted, so a draft is still there after. */}
-            <BorderBeam active={chat.status === "streaming"} className={cn(inCall && "hidden")}>
-                <PromptInput
-                    onSubmit={submit}
-                    className={cn(dragging && "border-primary bg-primary/10")}
-                >
-                    <PromptInputHeader>
+            <PolarComposer
+                kit={voiceKit}
+                notice={voiceNotice}
+                onNotice={setVoiceNotice}
+                streaming={chat.status === "streaming"}
+                hidden={inCall}
+                highlighted={dragging}
+                inputId={ids.input}
+                label={t("composer.label")}
+                value={input}
+                onValueChange={(value) => {
+                    if (value) setSuggested(null);
+                    setInput(value);
+                }}
+                placeholder={ghost ?? t("composer.placeholder")}
+                disabled={noKeys}
+                textareaRef={textarea}
+                textareaProps={{
+                    "aria-describedby": ghost ? ids.suggestion : undefined,
+                    "aria-controls": slashOpen ? ids.slash : undefined,
+                    "aria-activedescendant":
+                        slashOpen && slashHighlight >= 0
+                            ? suggestionOptionId(ids.slash, slashHighlight)
+                            : undefined,
+                    onKeyDown: onComposerKey,
+                    onPaste: (event) => {
+                        const pasted = pastedFiles(event.clipboardData);
+                        if (pasted.length > 0) {
+                            event.preventDefault();
+                            addFiles(pasted);
+                        }
+                    }
+                }}
+                onSubmit={submit}
+                header={
+                    <>
                         {context ? (
                             <Chip
                                 title={t("context.title")}
@@ -1962,71 +1991,10 @@ export function PolarChat({
                                 onRemove={() => setEditing(null)}
                             />
                         ) : null}
-                    </PromptInputHeader>
-                    <AttachmentList
-                        files={files}
-                        className="mb-2 mt-1"
-                        onRemove={removeFile}
-                        onRetry={retryFile}
-                    />
-                    {fileError ? (
-                        <p role="alert" className="mb-1 text-xs text-danger-ink">
-                            {fileError}
-                        </p>
-                    ) : null}
-                    {voiceNotice ? (
-                        <div
-                            role="alert"
-                            className="mb-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-                        >
-                            <span
-                                className={
-                                    voiceNotice === "unavailable"
-                                        ? "text-muted-foreground"
-                                        : "text-danger-ink"
-                                }
-                            >
-                                {voiceNotice === "unavailable"
-                                    ? t("voice.unavailable")
-                                    : voiceNotice === "micDenied" ||
-                                        voiceNotice === "cannotRecord" ||
-                                        voiceNotice === "modelNotSaved"
-                                      ? t(`voice.${voiceNotice}`)
-                                      : t(`voice.errors.${voiceNotice}`)}
-                            </span>
-                            {voiceNotice === "unavailable" ? (
-                                <>
-                                    <Link
-                                        href="/account/ai-keys"
-                                        className="text-primary hover:underline"
-                                    >
-                                        {t("noKeys.own")}
-                                    </Link>
-                                    {isAdmin ? (
-                                        <Link
-                                            href="/admin/integrations/models"
-                                            className="text-primary hover:underline"
-                                        >
-                                            {t("noKeys.admin")}
-                                        </Link>
-                                    ) : null}
-                                </>
-                            ) : null}
-                            <button
-                                type="button"
-                                className="ml-auto text-muted-foreground hover:text-foreground"
-                                aria-label={t("voice.dismiss")}
-                                title={t("voice.dismiss")}
-                                onClick={() => setVoiceNotice(null)}
-                            >
-                                <X className="size-3.5" />
-                            </button>
-                        </div>
-                    ) : null}
-                    <label htmlFor={ids.input} className="sr-only">
-                        {t("composer.label")}
-                    </label>
-                    {ghost ? (
+                    </>
+                }
+                beforeInput={
+                    ghost ? (
                         <>
                             <span id={ids.suggestion} className="sr-only">
                                 {t("composer.suggestion.described", { text: ghost })}
@@ -2047,95 +2015,43 @@ export function PolarChat({
                                 </Button>
                             </div>
                         </>
-                    ) : null}
-                    <PromptInputTextarea
-                        ref={textarea}
-                        id={ids.input}
-                        value={input}
-                        maxLength={20000}
-                        disabled={noKeys}
-                        placeholder={ghost ?? t("composer.placeholder")}
-                        aria-describedby={ghost ? ids.suggestion : undefined}
-                        aria-controls={slashOpen ? ids.slash : undefined}
-                        aria-activedescendant={
-                            slashOpen && slashHighlight >= 0
-                                ? suggestionOptionId(ids.slash, slashHighlight)
-                                : undefined
-                        }
-                        onKeyDown={onComposerKey}
-                        onChange={(event) => {
-                            if (event.target.value) setSuggested(null);
-                            setInput(event.target.value);
-                        }}
-                        onSubmitKey={submit}
-                        onPaste={(event) => {
-                            const pasted = pastedFiles(event.clipboardData);
-                            if (pasted.length > 0) {
-                                event.preventDefault();
-                                addFiles(pasted);
-                            }
-                        }}
+                    ) : null
+                }
+                picker={
+                    <ModelSelector
+                        providers={providers ?? []}
+                        choice={choice}
+                        onChoice={setChoice}
+                        open={modelOpen}
+                        onOpenChange={setModelOpen}
                     />
-                    <PromptInputFooter>
-                        <PromptInputTools>
-                            <span id={ids.attach} className="contents">
-                                <PromptInputAttach
-                                    label={t("files.add")}
-                                    accept={POLAR_ATTACHMENT_TYPES}
-                                    disabled={noKeys || files.length >= POLAR_ATTACHMENT_MOST}
-                                    onFiles={addFiles}
-                                    onFailed={setFileError}
-                                />
-                            </span>
-                            <DictationButton
-                                available={voice.dictation}
-                                disabled={noKeys}
-                                payer={choice?.payer}
-                                transcribers={voice.transcribers}
-                                transcriber={voice.transcriber}
-                                onTranscriber={chooseTranscriber}
-                                onNotice={setVoiceNotice}
-                                onText={(text) => {
-                                    setInput((current) =>
-                                        current.trim() ? `${current.trimEnd()} ${text}` : text
-                                    );
-                                    textarea.current?.focus();
-                                }}
-                            />
-                            <ModelSelector
-                                providers={providers ?? []}
-                                choice={choice}
-                                onChoice={setChoice}
-                                open={modelOpen}
-                                onOpenChange={setModelOpen}
-                            />
-                        </PromptInputTools>
-                        {/* One button, as in ChatGPT: with nothing typed or
-                            attached it starts a voice conversation, and it
-                            sends once there is something to send. */}
-                        {!busy && !input.trim() && files.length === 0 ? (
-                            <VoiceModeButton
-                                primary
-                                available={voice.dictation}
-                                disabled={noKeys || !choice}
-                                onNotice={setVoiceNotice}
-                                onOpen={() => {
-                                    answerActions.stopReading();
-                                    setInCall(true);
-                                }}
-                            />
-                        ) : (
-                            <PromptInputSubmit
-                                busy={busy}
-                                disabled={!choice || files.some(stillStaging)}
-                                sendLabel={t("actions.send")}
-                                stopLabel={t("actions.stop")}
-                                onStop={() => void chat.stop()}
-                            />
-                        )}
-                    </PromptInputFooter>
-                </PromptInput>
-            </BorderBeam>
+                }
+                attachId={ids.attach}
+                attach={{
+                    files,
+                    error: fileError,
+                    accept: POLAR_ATTACHMENT_TYPES,
+                    disabled: noKeys || files.length >= POLAR_ATTACHMENT_MOST,
+                    onFiles: addFiles,
+                    onFailed: setFileError,
+                    onRemove: removeFile,
+                    onRetry: retryFile
+                }}
+                voiceMode={{
+                    disabled: noKeys || !choice,
+                    onOpen: () => {
+                        answerActions.stopReading();
+                        setInCall(true);
+                    }
+                }}
+                submit={{
+                    busy,
+                    disabled: !choice || files.some(stillStaging),
+                    sendLabel: t("actions.send"),
+                    stopLabel: t("actions.stop"),
+                    onStop: () => void chat.stop()
+                }}
+            />
             {inCall ? (
                 <VoiceCall
                     messages={chat.messages}
@@ -2361,6 +2277,7 @@ export function PolarChat({
                             code={code}
                             fullPage={fullPage}
                             avatar={<PolarAvatar state={avatarState} size={64} />}
+                            voiceKit={voiceKit}
                         />
                     </div>
                 )}

@@ -36,6 +36,9 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
+vi.mock("@/lib/github-service", () => ({
+    githubAppInstallUrl: async () => "https://github.com/apps/polaris-test/installations/new"
+}));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     listSessionsAction: async (limit?: number, page?: unknown) => {
         state.listed += 1;
@@ -79,7 +82,8 @@ vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
     }
 }));
 
-const { polarCodeOverview, polarCodeStart, polarCodeThread } = await import("@/lib/polar/code");
+const { polarCodeChoices, polarCodeOverview, polarCodeStart, polarCodeThread } =
+    await import("@/lib/polar/code");
 
 beforeEach(() => {
     state.held = new Set();
@@ -191,5 +195,20 @@ describe("polarCodeStart", () => {
     it("hands the body to the Agents start action for somebody who can manage", async () => {
         state.held.add("agents.manage");
         expect(await polarCodeStart(USER, {})).toEqual({ id: "started" });
+    });
+});
+
+describe("polarCodeChoices", () => {
+    it("is nothing for somebody who can only read sessions", async () => {
+        state.held.add("agents.read");
+        expect(await polarCodeChoices(USER)).toBeNull();
+    });
+
+    it("carries the App's install page, for adding repositories", async () => {
+        state.held.add("agents.manage");
+        expect(await polarCodeChoices(USER)).toMatchObject({
+            repos: [],
+            installUrl: "https://github.com/apps/polaris-test/installations/new"
+        });
     });
 });

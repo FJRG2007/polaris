@@ -14,6 +14,7 @@
 
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
+import { githubAppInstallUrl } from "@/lib/github-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { sessionCursor } from "@/lib/agents/session-cursor";
@@ -165,12 +166,22 @@ export async function polarCodeThread(
     };
 }
 
-export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>>;
+export type PolarCodeChoices = Awaited<ReturnType<typeof sessionChoicesAction>> & {
+    /** GitHub's page for installing Polaris's App on more repositories, or null
+     *  where no App is set up (a token connection, or none). */
+    readonly installUrl: string | null;
+};
 
 /** What the composer offers - repositories and agents - or null for somebody
  *  who cannot start a session. */
 export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoices | null> {
-    return (await accessOf(user)) === "manage" ? sessionChoicesAction() : null;
+    if ((await accessOf(user)) !== "manage") return null;
+    const [choices, installUrl] = await Promise.all([
+        sessionChoicesAction(),
+        // Unknown is no button rather than no choices.
+        githubAppInstallUrl().catch(() => null)
+    ]);
+    return { ...choices, installUrl };
 }
 
 /** Start a session: the Agents app's own start, with its own validation. */

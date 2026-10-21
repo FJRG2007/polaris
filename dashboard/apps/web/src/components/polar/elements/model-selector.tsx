@@ -90,6 +90,10 @@ export function modelIndex(providers: ModelSelectorProvider[]): Fuse<ModelEntry>
     );
 }
 
+/** The picker's button on the composer's tool row; Code's agent picker wears it too. */
+export const MODEL_TRIGGER =
+    "inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground";
+
 function Mark({ on }: { on: boolean }) {
     return (
         <Check
@@ -134,7 +138,7 @@ export function ModelSelector({
                 <button
                     type="button"
                     title={t("picker.title")}
-                    className="inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                    className={MODEL_TRIGGER}
                 >
                     <span className="truncate text-foreground">
                         {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
