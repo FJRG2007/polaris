@@ -441,6 +441,9 @@ export function ToolSettings({
     webAllowed,
     webOn,
     onWeb,
+    connectorsAllowed = false,
+    connectorsOn = true,
+    onConnectors,
     tools,
     off,
     onTool
@@ -448,12 +451,18 @@ export function ToolSettings({
     webAllowed: boolean;
     webOn: boolean;
     onWeb: (on: boolean) => void;
-    tools: Record<string, { title: string }>;
+    /** Whether the deployment lets this person use their own MCP connectors. */
+    connectorsAllowed?: boolean;
+    connectorsOn?: boolean;
+    onConnectors?: (on: boolean) => void;
+    tools: Record<string, { title: string; connector?: string }>;
     off: readonly string[];
     onTool: (name: string, on: boolean) => void;
 }) {
     const t = useTranslations("polar");
-    const listed = Object.entries(tools).sort(([, a], [, b]) => a.title.localeCompare(b.title));
+    const listed = Object.entries(tools)
+        .filter(([, tool]) => !tool.connector || (connectorsAllowed && connectorsOn))
+        .sort(([, a], [, b]) => a.title.localeCompare(b.title));
     return (
         <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
             <ul className="flex flex-col divide-y divide-border">
@@ -467,6 +476,20 @@ export function ToolSettings({
                     <li className="pb-1.5 text-xs text-muted-foreground">
                         {t("settings.tools.webOff")}
                     </li>
+                ) : null}
+                {connectorsAllowed && onConnectors ? (
+                    <>
+                        <ToolRow
+                            label={t("settings.tools.connectors")}
+                            checked={connectorsOn}
+                            onChange={onConnectors}
+                        />
+                        <li className="pb-1.5 text-xs text-muted-foreground">
+                            <a href="/account/polar-tools" className="text-primary hover:underline">
+                                {t("settings.tools.manageConnectors")}
+                            </a>
+                        </li>
+                    </>
                 ) : null}
                 {listed.map(([name, tool]) => (
                     <ToolRow

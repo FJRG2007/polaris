@@ -274,6 +274,7 @@ const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
 /** Whether this viewer left web search on in the composer. */
 const WEB_KEY = "polar.web";
+const CONNECTORS_KEY = "polar.connectors";
 /** The tools this viewer switched off in Polar's settings. */
 const TOOLS_OFF_KEY = "polar.toolsOff";
 const THREAD_KEY = "polar.thread";
@@ -716,6 +717,11 @@ export function PolarChat({
     const [webAllowed, setWebAllowed] = useState(false);
     const [webOn, setWebOn] = useState(true);
     useEffect(() => setWebOn(readStored(WEB_KEY) !== "off"), []);
+    // The person's own MCP connectors: the administrator's to allow and this
+    // viewer's to switch off, the same way.
+    const [connectorsAllowed, setConnectorsAllowed] = useState(false);
+    const [connectorsOn, setConnectorsOn] = useState(true);
+    useEffect(() => setConnectorsOn(readStored(CONNECTORS_KEY) !== "off"), []);
     const [toolsOff, setToolsOff] = useState<string[]>([]);
     useEffect(() => {
         try {
@@ -772,7 +778,8 @@ export function PolarChat({
         turnChoice,
         refine,
         web,
-        toolsOff
+        toolsOff,
+        connectorsOn
     });
     live.current = {
         threadId,
@@ -783,7 +790,8 @@ export function PolarChat({
         turnChoice,
         refine,
         web,
-        toolsOff
+        toolsOff,
+        connectorsOn
     };
 
     const transport = useMemo(
@@ -807,6 +815,7 @@ export function PolarChat({
                             temporary: live.current.temporary,
                             web: live.current.web,
                             off: live.current.toolsOff,
+                            connectors: live.current.connectorsOn,
                             refine: refining,
                             parentId:
                                 messages.length > 1
@@ -858,6 +867,7 @@ export function PolarChat({
                         isAdmin: boolean;
                         voice?: VoiceAvailability;
                         spendsDeployment?: boolean;
+                        connectors?: boolean;
                         web?: boolean;
                     } | null
                 ) => {
@@ -868,6 +878,7 @@ export function PolarChat({
                     setSpendsDeployment(data.spendsDeployment ?? true);
                     setVoice({ ...NO_VOICE, ...data.voice });
                     setWebAllowed(data.web === true);
+                    setConnectorsAllowed(data.connectors === true);
                     setChoice((current) => {
                         // Automatic stays while there is any model to pick from.
                         if (isAutomatic(current) && data.providers.length > 0) return current;
@@ -1962,6 +1973,12 @@ export function PolarChat({
                             onWeb={(on) => {
                                 writeStored(WEB_KEY, on ? "on" : "off");
                                 setWebOn(on);
+                            }}
+                            connectorsAllowed={connectorsAllowed}
+                            connectorsOn={connectorsOn}
+                            onConnectors={(on) => {
+                                writeStored(CONNECTORS_KEY, on ? "on" : "off");
+                                setConnectorsOn(on);
                             }}
                             tools={tools}
                             off={toolsOff}

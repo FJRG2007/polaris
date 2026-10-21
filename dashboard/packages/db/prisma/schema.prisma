@@ -37,6 +37,7 @@ model User {
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
     polarToolGrants   PolarToolGrant[]
+    polarConnectors   PolarConnector[]
     polarAttachments  PolarAttachment[]
     polarMemories     PolarMemory[]
     polarPreference   PolarPreference?
@@ -15098,6 +15099,34 @@ model PolarToolGrant {
     createdAt  DateTime @default(now())
 
     @@unique([ownerId, tool, target])
+}
+
+// A remote MCP server one person connected to Polar. Its secret (a bearer token,
+// or the OAuth client and tokens, and an authorization in flight) is one
+// envelope-encrypted blob under the master key and never leaves the server.
+// `tools` is the list the server answered when last checked; `toolPolicies`
+// maps a tool's own name to "allow", "ask" or "block".
+model PolarConnector {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    ownerId      String    @db.Uuid
+    owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name         String
+    url          String
+    transport    String    @default("http")
+    auth         String    @default("none")
+    enabled      Boolean   @default(true)
+    secret       Bytes?
+    secretNonce  Bytes?
+    secretKeyId  String?
+    tools        Json      @default("[]")
+    toolPolicies Json      @default("{}")
+    status       String    @default("new")
+    lastError    String?
+    checkedAt    DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    @@unique([ownerId, name])
 }
 
 // A folder of Polar chats. Its instructions are added to the system context of

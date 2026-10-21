@@ -367,7 +367,9 @@
         "tools": {
             "title": "Herramientas",
             "intro": "Lo que Polar puede usar en un chat. Si apagas una, no se le ofrece.",
-            "webOff": "Tu administrador ha desactivado la búsqueda web."
+            "webOff": "Tu administrador ha desactivado la búsqueda web.",
+            "connectors": "Tus conectores",
+            "manageConnectors": "Añadir o gestionar conectores MCP"
         },
         "data": {
             "title": "Tus chats",

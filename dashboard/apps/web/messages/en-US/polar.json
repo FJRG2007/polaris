@@ -367,7 +367,9 @@
         "tools": {
             "title": "Polar's tools",
             "intro": "What Polar may use in a chat. One switched off is never offered to it.",
-            "webOff": "Your administrator has turned web search off."
+            "webOff": "Your administrator has turned web search off.",
+            "connectors": "Your connectors",
+            "manageConnectors": "Add or manage MCP connectors"
         },
         "data": {
             "title": "Your chats",

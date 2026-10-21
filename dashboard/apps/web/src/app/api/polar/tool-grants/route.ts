@@ -16,6 +16,8 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { callerMayUse } from "@/lib/mcp/protocol";
 import { polarCaller as mcpCaller } from "@/lib/polar/tools";
 import { callTarget, grantScope, grantableTool, saveGrant } from "@/lib/polar/tool-grants";
+import { allowConnectorTool } from "@/lib/polar/connectors/tools";
+import { isConnectorToolName } from "@/lib/polar/connectors/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +59,13 @@ export async function POST(request: Request): Promise<Response> {
     const body = bodySchema.safeParse(raw);
     if (!body.success) return refuse("invalid", 400);
 
+    // A connector's tool has no target to scope to: allowing it sets the
+    // tool's own answer on the Connectors screen to "always allow".
+    if (isConnectorToolName(body.data.tool)) {
+        const allowed = body.data.allow ? await allowConnectorTool(user.id, body.data.tool) : true;
+        if (!allowed) return refuse("not_found", 404);
+        return NextResponse.json({ target: null, scope: "tool", allowed: body.data.allow });
+    }
     const caller = await mcpCaller(user);
     const entry = await grantableTool(body.data.tool, (candidate) =>
         callerMayUse(candidate, caller)
