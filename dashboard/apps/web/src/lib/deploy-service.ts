@@ -573,7 +573,7 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
     if (environment.isDefault) throw new Error("The default environment cannot be deleted");
     await tearDownEnvironment(environmentId, ownerId);
     await prisma.environment.delete({ where: { id: environmentId } });
-    await dropGrantsOfGoneDomains();
+    await dropGrantsOfGoneDomains().catch(() => undefined);
 }
 
 /**
@@ -626,7 +626,7 @@ export async function deleteProject(projectId: string, ownerId: string) {
     if (!project) throw new Error("Only the project's owner can delete it");
     await tearDownProject(projectId, ownerId);
     await prisma.project.delete({ where: { id: projectId } });
-    await dropGrantsOfGoneDomains();
+    await dropGrantsOfGoneDomains().catch(() => undefined);
 }
 
 export interface CreateApplicationInput {
@@ -2015,7 +2015,7 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
-    await dropGrantsOfGoneDomains();
+    await dropGrantsOfGoneDomains().catch(() => undefined);
     await syncAppRoutes().catch(() => undefined);
 }
 

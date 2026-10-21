@@ -172,7 +172,7 @@ const routes: Adapter = {
         await prisma.domain.deleteMany({
             where: { applicationId, kind: { not: "release" }, hostname: { notIn: hostnames } }
         });
-        await dropGrantsOfGoneDomains();
+        await dropGrantsOfGoneDomains().catch(() => undefined);
         const { dashboardHosts } = await import("@/lib/domain-edge");
         const [dashboard, pages] = await Promise.all([
             dashboardHosts(),
