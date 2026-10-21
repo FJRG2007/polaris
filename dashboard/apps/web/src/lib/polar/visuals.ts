@@ -95,7 +95,10 @@ const nodeId = z
 const diagramView = z.object({
     kind: z.literal("diagram"),
     direction: z.enum(["down", "right"]).optional(),
-    nodes: z.array(z.object({ id: nodeId, label: z.string().min(1).max(60) })).min(1).max(24),
+    nodes: z
+        .array(z.object({ id: nodeId, label: z.string().min(1).max(60) }))
+        .min(1)
+        .max(24),
     edges: z
         .array(z.object({ from: nodeId, to: nodeId, label: z.string().max(30).optional() }))
         .max(40)
@@ -157,7 +160,8 @@ export const polarVisualSchema = z
     })
     .superRefine((value, context) => {
         const problem = viewProblem(value.view);
-        if (problem) context.addIssue({ code: z.ZodIssueCode.custom, path: ["view"], message: problem });
+        if (problem)
+            context.addIssue({ code: z.ZodIssueCode.custom, path: ["view"], message: problem });
     });
 
 export type PolarVisual = z.infer<typeof polarVisualSchema>;
@@ -270,7 +274,8 @@ const ARITY: Record<FunctionName, [number, number]> = {
 /** A calculator formula parsed into a tree, or why it does not read. Nothing
  *  the model wrote is ever run as code: this tree is all that is evaluated. */
 export function parseFormula(source: string): Formula | string {
-    const tokens = source.match(/\d+(?:\.\d+)?(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z0-9_]*|[-+*/%^(),]|\S/gi) ?? [];
+    const tokens =
+        source.match(/\d+(?:\.\d+)?(?:e[+-]?\d+)?|[A-Za-z_][A-Za-z0-9_]*|[-+*/%^(),]|\S/gi) ?? [];
     let at = 0;
     const peek = (): string | undefined => tokens[at];
     const fail = (why: string): never => {
@@ -337,7 +342,8 @@ export function parseFormula(source: string): Formula | string {
             }
             expect(")");
             const [least, most] = ARITY[name as FunctionName];
-            if (args.length < least || args.length > most) fail(`${token} takes a different number of values`);
+            if (args.length < least || args.length > most)
+                fail(`${token} takes a different number of values`);
             return { op: "call", name: name as FunctionName, args };
         }
         return fail(`"${token}" is not allowed`);
@@ -432,21 +438,33 @@ function markdownCell(value: string | number | null | undefined): string {
     return inline(value).replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
-function markdownTable(header: readonly string[], rows: readonly (readonly (string | number | null)[])[]): string {
+function markdownTable(
+    header: readonly string[],
+    rows: readonly (readonly (string | number | null)[])[]
+): string {
     const line = (cells: readonly (string | number | null)[]) =>
         `| ${header.map((_, index) => markdownCell(cells[index])).join(" | ")} |`;
-    return [line(header), `| ${header.map(() => "---").join(" | ")} |`, ...rows.map(line)].join("\n");
+    return [line(header), `| ${header.map(() => "---").join(" | ")} |`, ...rows.map(line)].join(
+        "\n"
+    );
 }
 
 /** A view's rows as a grid of cells: what its CSV and Markdown table hold.
  *  Null for a view that is not tabular. */
-export function visualGrid(view: PolarView): { header: string[]; rows: (string | number | null)[][] } | null {
+export function visualGrid(
+    view: PolarView
+): { header: string[]; rows: (string | number | null)[][] } | null {
     switch (view.kind) {
         case "table":
             return { header: view.columns.map((column) => column.label), rows: view.rows };
         case "chart":
             return {
-                header: ["", ...view.series.map((line) => (view.unit ? `${line.label} (${view.unit})` : line.label))],
+                header: [
+                    "",
+                    ...view.series.map((line) =>
+                        view.unit ? `${line.label} (${view.unit})` : line.label
+                    )
+                ],
                 rows: view.categories.map((category, index) => [
                     category,
                     ...view.series.map((line) => line.values[index] ?? null)
@@ -473,32 +491,45 @@ export function visualMarkdown(visual: PolarVisual): string {
             return (
                 title +
                 view.items
-                    .map((item) => `- **${inline(item.label)}**: ${inline(item.value)}${item.detail ? ` (${inline(item.detail)})` : ""}`)
+                    .map(
+                        (item) =>
+                            `- **${inline(item.label)}**: ${inline(item.value)}${item.detail ? ` (${inline(item.detail)})` : ""}`
+                    )
                     .join("\n")
             );
         case "steps":
             return (
                 title +
                 view.items
-                    .map((item, index) => `${index + 1}. **${inline(item.title)}**${item.detail ? ` - ${inline(item.detail)}` : ""}`)
+                    .map(
+                        (item, index) =>
+                            `${index + 1}. **${inline(item.title)}**${item.detail ? ` - ${inline(item.detail)}` : ""}`
+                    )
                     .join("\n")
             );
         case "diagram": {
             const names = new Map(view.nodes.map((node) => [node.id, inline(node.label)]));
             const linked = new Set(view.edges.flatMap((edge) => [edge.from, edge.to]));
             const lines = view.edges.map(
-                (edge) => `- ${names.get(edge.from)} -> ${names.get(edge.to)}${edge.label ? ` (${inline(edge.label)})` : ""}`
+                (edge) =>
+                    `- ${names.get(edge.from)} -> ${names.get(edge.to)}${edge.label ? ` (${inline(edge.label)})` : ""}`
             );
-            for (const node of view.nodes) if (!linked.has(node.id)) lines.push(`- ${names.get(node.id)}`);
+            for (const node of view.nodes)
+                if (!linked.has(node.id)) lines.push(`- ${names.get(node.id)}`);
             return title + lines.join("\n");
         }
         case "calculator": {
             const values = startingValues(view);
             const fields = view.fields.map(
-                (field) => `- ${inline(field.label)}: ${field.value}${field.unit ? ` ${inline(field.unit)}` : ""}`
+                (field) =>
+                    `- ${inline(field.label)}: ${field.value}${field.unit ? ` ${inline(field.unit)}` : ""}`
             );
             const outputs = view.outputs.map((output) => {
-                const value = formatResult(calculate(output.formula, values), output.decimals ?? 2, "en-US");
+                const value = formatResult(
+                    calculate(output.formula, values),
+                    output.decimals ?? 2,
+                    "en-US"
+                );
                 return `- **${inline(output.label)}** = ${inline(output.formula)} = ${value}${output.unit ? ` ${inline(output.unit)}` : ""}`;
             });
             return title + [...fields, ...outputs].join("\n");
@@ -526,7 +557,9 @@ export function visualCsv(view: PolarView): string | null {
 }
 
 /** A stored part as text: its Markdown when it holds a view, else "". */
-export function visualPartMarkdown(part: { type?: unknown; input?: unknown } | null | undefined): string {
+export function visualPartMarkdown(
+    part: { type?: unknown; input?: unknown } | null | undefined
+): string {
     if (!isVisualPart(part)) return "";
     const visual = visualOf(part?.input);
     return visual ? visualMarkdown(visual) : "";

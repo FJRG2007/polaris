@@ -55,7 +55,14 @@ const wide = {
 
 const VIEWS: Record<string, unknown> = {
     table: wide,
-    chart: { view: { kind: "chart", type: "bar", categories: ["a", "b", "c"], series: [{ label: "S", values: [3, -1, null] }] } },
+    chart: {
+        view: {
+            kind: "chart",
+            type: "bar",
+            categories: ["a", "b", "c"],
+            series: [{ label: "S", values: [3, -1, null] }]
+        }
+    },
     timeline: {
         view: {
             kind: "chart",
@@ -65,9 +72,16 @@ const VIEWS: Record<string, unknown> = {
         }
     },
     stats: { view: { kind: "stats", items: [{ label: "Uptime", value: "99.99%", tone: "good" }] } },
-    steps: { view: { kind: "steps", items: [{ title: "One" }, { title: "Two", detail: "Then this" }] } },
+    steps: {
+        view: { kind: "steps", items: [{ title: "One" }, { title: "Two", detail: "Then this" }] }
+    },
     comparison: {
-        view: { kind: "comparison", options: ["A", "B"], rows: [{ label: "Cost", values: ["Low", "High"] }], pick: 1 }
+        view: {
+            kind: "comparison",
+            options: ["A", "B"],
+            rows: [{ label: "Cost", values: ["Low", "High"] }],
+            pick: 1
+        }
     },
     diagram: {
         view: {
@@ -89,17 +103,22 @@ const VIEWS: Record<string, unknown> = {
 };
 
 describe("the frame", () => {
-    it.each(Object.keys(VIEWS))("holds %s to the column with no scroll but a sideways one", (kind) => {
-        const { container } = draw(VIEWS[kind]);
-        const figure = container.querySelector("figure")!;
-        expect(figure.className).toContain("max-w-full");
-        expect(figure.className).toContain("min-w-0");
-        expect(figure.className).toContain("overflow-hidden");
-        // Nothing scrolls up and down inside the chat's own scroll.
-        expect(container.querySelector("[class*='overflow-y-auto'], [class*='overflow-auto']")).toBeNull();
-        const sideways = container.querySelectorAll("[class*='overflow-x-auto']");
-        expect(sideways.length).toBe(["table", "comparison", "diagram"].includes(kind) ? 1 : 0);
-    });
+    it.each(Object.keys(VIEWS))(
+        "holds %s to the column with no scroll but a sideways one",
+        (kind) => {
+            const { container } = draw(VIEWS[kind]);
+            const figure = container.querySelector("figure")!;
+            expect(figure.className).toContain("max-w-full");
+            expect(figure.className).toContain("min-w-0");
+            expect(figure.className).toContain("overflow-hidden");
+            // Nothing scrolls up and down inside the chat's own scroll.
+            expect(
+                container.querySelector("[class*='overflow-y-auto'], [class*='overflow-auto']")
+            ).toBeNull();
+            const sideways = container.querySelectorAll("[class*='overflow-x-auto']");
+            expect(sideways.length).toBe(["table", "comparison", "diagram"].includes(kind) ? 1 : 0);
+        }
+    );
 
     it("scrolls a wide table inside its one box", () => {
         const { container } = draw(wide);
@@ -116,7 +135,9 @@ describe("the frame", () => {
         expect(body.style.maxHeight).toBe(`${VISUAL_FOLD_PX}px`);
         fireEvent.click(screen.getByRole("button", { name: "Show all" }));
         expect(body.style.maxHeight).toBe("");
-        expect(screen.getByRole("button", { name: "Show less" }).getAttribute("aria-expanded")).toBe("true");
+        expect(
+            screen.getByRole("button", { name: "Show less" }).getAttribute("aria-expanded")
+        ).toBe("true");
     });
 
     it("copies the view as Markdown", async () => {
@@ -124,13 +145,23 @@ describe("the frame", () => {
         Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
         draw(VIEWS.steps);
         fireEvent.click(screen.getByRole("button", { name: "Copy as text" }));
-        await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith("1. **One**\n2. **Two** - Then this"));
+        await vi.waitFor(() =>
+            expect(writeText).toHaveBeenCalledWith("1. **One**\n2. **Two** - Then this")
+        );
     });
 
     it("shows the view's text when drawing it fails", () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         chartThrows.on = true;
-        const { container } = draw({ title: "Sales", view: { kind: "chart", type: "bar", categories: ["Jan"], series: [{ label: "S", values: [7] }] } });
+        const { container } = draw({
+            title: "Sales",
+            view: {
+                kind: "chart",
+                type: "bar",
+                categories: ["Jan"],
+                series: [{ label: "S", values: [7] }]
+            }
+        });
         const figure = container.querySelector("figure") as HTMLElement;
         expect(within(figure).getByRole("cell", { name: "Jan" })).toBeTruthy();
         expect(within(figure).getByRole("cell", { name: "7" })).toBeTruthy();
@@ -149,7 +180,9 @@ describe("the views", () => {
         expect(svg.getAttribute("style")).toContain("max-width");
         expect(svg.getAttribute("style")).toContain("min-width");
         expect(svg.parentElement!.className).toContain("overflow-x-auto");
-        expect(within(svg as unknown as HTMLElement).getAllByText("Browser").length).toBeGreaterThan(0);
+        expect(
+            within(svg as unknown as HTMLElement).getAllByText("Browser").length
+        ).toBeGreaterThan(0);
     });
 
     it("lays a loop out without hanging", () => {

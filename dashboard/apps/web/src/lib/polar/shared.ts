@@ -645,7 +645,8 @@ export interface SharedPolarFile {
 }
 
 /** One piece of a shared answer, in order: words, or a view Polar drew. */
-export type SharedPolarBlock = { kind: "text"; text: string } | { kind: "visual"; visual: PolarVisual };
+export type SharedPolarBlock =
+    { kind: "text"; text: string } | { kind: "visual"; visual: PolarVisual };
 
 export interface SharedPolarMessage {
     id: string;

@@ -48,7 +48,8 @@ export function layersOf(view: DiagramView): Map<string, number> {
     const layer = new Map<string, number>(view.nodes.map((node) => [node.id, 0]));
     // Longest path over what is now acyclic: relax in topological order.
     const indegree = new Map<string, number>(view.nodes.map((node) => [node.id, 0]));
-    for (const targets of forward.values()) for (const to of targets) indegree.set(to, indegree.get(to)! + 1);
+    for (const targets of forward.values())
+        for (const to of targets) indegree.set(to, indegree.get(to)! + 1);
     const queue = view.nodes.filter((node) => indegree.get(node.id) === 0).map((node) => node.id);
     while (queue.length > 0) {
         const id = queue.shift()!;
@@ -76,11 +77,17 @@ export function VisualDiagram({ view, label }: { view: DiagramView; label: strin
         const names = new Map(view.nodes.map((node) => [node.id, node.label]));
         const placed = new Map<string, Placed>();
         rows.forEach((row, depth) => {
-            const offset = ((widest - row.length) * (down ? NODE_W + GAP_ACROSS : NODE_H + GAP_ACROSS)) / 2;
+            const offset =
+                ((widest - row.length) * (down ? NODE_W + GAP_ACROSS : NODE_H + GAP_ACROSS)) / 2;
             row.forEach((id, index) => {
                 const along = depth * ((down ? NODE_H : NODE_W) + GAP_ALONG);
                 const across = offset + index * ((down ? NODE_W : NODE_H) + GAP_ACROSS);
-                placed.set(id, { id, label: names.get(id)!, x: down ? across : along, y: down ? along : across });
+                placed.set(id, {
+                    id,
+                    label: names.get(id)!,
+                    x: down ? across : along,
+                    y: down ? along : across
+                });
             });
         });
         const depth = rows.length;
@@ -101,7 +108,15 @@ export function VisualDiagram({ view, label }: { view: DiagramView; label: strin
                 style={{ maxWidth: natural, minWidth: Math.round(natural * MIN_SCALE) }}
             >
                 <defs>
-                    <marker id={arrow} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <marker
+                        id={arrow}
+                        viewBox="0 0 8 8"
+                        refX="7"
+                        refY="4"
+                        markerWidth="7"
+                        markerHeight="7"
+                        orient="auto-start-reverse"
+                    >
                         <path d="M0 0 L8 4 L0 8 z" fill="hsl(var(--muted-foreground))" />
                     </marker>
                 </defs>
@@ -111,19 +126,34 @@ export function VisualDiagram({ view, label }: { view: DiagramView; label: strin
                     const start = down
                         ? { x: from.x + NODE_W / 2, y: from.y + NODE_H }
                         : { x: from.x + NODE_W, y: from.y + NODE_H / 2 };
-                    const end = down ? { x: to.x + NODE_W / 2, y: to.y } : { x: to.x, y: to.y + NODE_H / 2 };
+                    const end = down
+                        ? { x: to.x + NODE_W / 2, y: to.y }
+                        : { x: to.x, y: to.y + NODE_H / 2 };
                     const forward = down ? end.y > start.y : end.x > start.x;
                     // A step back, a loop or a step within one layer bends out of the way.
-                    const bend = down ? { x: Math.max(start.x, end.x) + NODE_W / 2 + 12, y: (start.y + end.y) / 2 } : { x: (start.x + end.x) / 2, y: Math.max(start.y, end.y) + NODE_H };
+                    const bend = down
+                        ? {
+                              x: Math.max(start.x, end.x) + NODE_W / 2 + 12,
+                              y: (start.y + end.y) / 2
+                          }
+                        : { x: (start.x + end.x) / 2, y: Math.max(start.y, end.y) + NODE_H };
                     const d = forward
                         ? down
                             ? `M${start.x} ${start.y} C${start.x} ${start.y + GAP_ALONG / 2} ${end.x} ${end.y - GAP_ALONG / 2} ${end.x} ${end.y}`
                             : `M${start.x} ${start.y} C${start.x + GAP_ALONG / 2} ${start.y} ${end.x - GAP_ALONG / 2} ${end.y} ${end.x} ${end.y}`
                         : `M${start.x} ${start.y} Q${bend.x} ${bend.y} ${end.x} ${end.y}`;
-                    const middle = forward ? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } : bend;
+                    const middle = forward
+                        ? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }
+                        : bend;
                     return (
                         <g key={index}>
-                            <path d={d} fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth={1.25} markerEnd={`url(#${arrow})`} />
+                            <path
+                                d={d}
+                                fill="none"
+                                stroke="hsl(var(--muted-foreground))"
+                                strokeWidth={1.25}
+                                markerEnd={`url(#${arrow})`}
+                            />
                             {edge.label ? (
                                 <text
                                     x={middle.x}

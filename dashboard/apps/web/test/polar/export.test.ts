@@ -190,7 +190,11 @@ describe("formats", () => {
                                     }
                                 }
                             },
-                            { type: "tool-polar_show", state: "output-error", input: { view: { kind: "x" } } }
+                            {
+                                type: "tool-polar_show",
+                                state: "output-error",
+                                input: { view: { kind: "x" } }
+                            }
                         ],
                         metadata: null,
                         createdAt: at
@@ -199,7 +203,9 @@ describe("formats", () => {
             },
             NAMES
         );
-        expect(markdown).toContain("Here they are.\n\n| Plan | Price |\n| --- | --- |\n| Pro | 12 |");
+        expect(markdown).toContain(
+            "Here they are.\n\n| Plan | Price |\n| --- | --- |\n| Pro | 12 |"
+        );
         expect(markdown).not.toContain("Usó polar_show");
     });
 

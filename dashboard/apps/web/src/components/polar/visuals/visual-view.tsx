@@ -80,7 +80,10 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
     return (
         <figure className="flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-lg border border-border bg-card">
             <figcaption className="flex min-w-0 items-center gap-2 border-b border-border py-1 pl-3 pr-1">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={name}>
+                <span
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+                    title={name}
+                >
                     {name}
                 </span>
                 {csv !== null ? (
@@ -88,7 +91,9 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
                         label={t("visual.download")}
                         onClick={() =>
                             downloadBytes(
-                                new Blob([String.fromCharCode(0xfeff), csv], { type: "text/csv;charset=utf-8" }),
+                                new Blob([String.fromCharCode(0xfeff), csv], {
+                                    type: "text/csv;charset=utf-8"
+                                }),
                                 `${fileName(name)}.csv`
                             )
                         }
@@ -127,7 +132,11 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
                     onClick={() => setOpen((value) => !value)}
                     className="flex items-center justify-center gap-1 border-t border-border py-1.5 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
                 >
-                    {open ? <ChevronUp className="size-3.5 shrink-0" /> : <ChevronDown className="size-3.5 shrink-0" />}
+                    {open ? (
+                        <ChevronUp className="size-3.5 shrink-0" />
+                    ) : (
+                        <ChevronDown className="size-3.5 shrink-0" />
+                    )}
                     {open ? t("visual.collapse") : t("visual.expand")}
                 </button>
             ) : null}
@@ -137,11 +146,20 @@ export function PolarVisualView({ visual }: { visual: PolarVisual }) {
 
 /** A name a downloaded file can carry. */
 function fileName(name: string): string {
-    return name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "polar";
+    return (
+        name
+            .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 80) || "polar"
+    );
 }
 
 /** Draws the view's text instead when the view itself throws. */
-class VisualBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+class VisualBoundary extends Component<
+    { fallback: ReactNode; children: ReactNode },
+    { failed: boolean }
+> {
     override state = { failed: false };
     static getDerivedStateFromError() {
         return { failed: true };
@@ -164,7 +182,9 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
                     align={view.columns.map(
                         (column, index) =>
                             column.align ??
-                            (view.rows.every((row) => row[index] === null || typeof row[index] === "number")
+                            (view.rows.every(
+                                (row) => row[index] === null || typeof row[index] === "number"
+                            )
                                 ? "end"
                                 : "start")
                     )}
@@ -181,8 +201,14 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
             return (
                 <ul className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,9rem),1fr))] gap-2">
                     {view.items.map((item, index) => (
-                        <li key={index} className="flex min-w-0 flex-col gap-0.5 rounded-md bg-muted/50 px-3 py-2">
-                            <span className="truncate text-xs text-muted-foreground" title={item.label}>
+                        <li
+                            key={index}
+                            className="flex min-w-0 flex-col gap-0.5 rounded-md bg-muted/50 px-3 py-2"
+                        >
+                            <span
+                                className="truncate text-xs text-muted-foreground"
+                                title={item.label}
+                            >
                                 {item.label}
                             </span>
                             <span
@@ -197,7 +223,10 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
                                 {item.value}
                             </span>
                             {item.detail ? (
-                                <span className="line-clamp-2 break-words text-xs text-foreground-subtle" title={item.detail}>
+                                <span
+                                    className="line-clamp-2 break-words text-xs text-foreground-subtle"
+                                    title={item.detail}
+                                >
                                     {item.detail}
                                 </span>
                             ) : null}
@@ -214,9 +243,13 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
                                 {index + 1}
                             </span>
                             <div className="flex min-w-0 flex-col gap-0.5 pt-0.5">
-                                <span className="break-words text-sm font-medium text-foreground">{item.title}</span>
+                                <span className="break-words text-sm font-medium text-foreground">
+                                    {item.title}
+                                </span>
                                 {item.detail ? (
-                                    <span className="break-words text-sm text-muted-foreground">{item.detail}</span>
+                                    <span className="break-words text-sm text-muted-foreground">
+                                        {item.detail}
+                                    </span>
                                 ) : null}
                             </div>
                         </li>
@@ -230,7 +263,9 @@ function ViewBody({ view, label }: { view: PolarView; label: string }) {
 
 function cellText(value: string | number | null): string {
     if (value === null) return "";
-    return typeof value === "number" ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value) : value;
+    return typeof value === "number"
+        ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 6 }).format(value)
+        : value;
 }
 
 /** A table: the one box in a view that scrolls, and only sideways. */
@@ -297,7 +332,13 @@ function Grid({
     );
 }
 
-function Comparison({ view, label }: { view: Extract<PolarView, { kind: "comparison" }>; label: string }) {
+function Comparison({
+    view,
+    label
+}: {
+    view: Extract<PolarView, { kind: "comparison" }>;
+    label: string;
+}) {
     const t = useTranslations("polar");
     const pick = view.pick !== undefined ? view.pick + 1 : undefined;
     return (
@@ -322,7 +363,10 @@ function Comparison({ view, label }: { view: Extract<PolarView, { kind: "compari
 }
 
 /** One field's typed text as a number, or why it is not one it takes. */
-function readField(field: CalculatorView["fields"][number], typed: string): number | "empty" | "invalid" {
+function readField(
+    field: CalculatorView["fields"][number],
+    typed: string
+): number | "empty" | "invalid" {
     const trimmed = typed.trim().replace(",", ".");
     if (trimmed === "") return "empty";
     const value = Number(trimmed);
@@ -335,11 +379,15 @@ function readField(field: CalculatorView["fields"][number], typed: string): numb
 function Calculator({ view }: { view: CalculatorView }) {
     const t = useTranslations("polar");
     const [typed, setTyped] = useState<Record<string, string>>(() =>
-        Object.fromEntries(Object.entries(startingValues(view)).map(([id, value]) => [id, String(value)]))
+        Object.fromEntries(
+            Object.entries(startingValues(view)).map(([id, value]) => [id, String(value)])
+        )
     );
     const read = view.fields.map((field) => readField(field, typed[field.id] ?? ""));
     const whole = read.every((value) => typeof value === "number");
-    const values = Object.fromEntries(view.fields.map((field, index) => [field.id, read[index] as number]));
+    const values = Object.fromEntries(
+        view.fields.map((field, index) => [field.id, read[index] as number])
+    );
     const baseId = useId();
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -357,7 +405,11 @@ function Calculator({ view }: { view: CalculatorView }) {
                                 : null;
                     return (
                         <div key={field.id} className="flex min-w-0 flex-col gap-1">
-                            <label htmlFor={id} className="truncate text-xs text-muted-foreground" title={field.label}>
+                            <label
+                                htmlFor={id}
+                                className="truncate text-xs text-muted-foreground"
+                                title={field.label}
+                            >
                                 {field.label}
                                 {field.unit ? ` (${field.unit})` : ""}
                             </label>
@@ -370,8 +422,15 @@ function Calculator({ view }: { view: CalculatorView }) {
                                 max={field.max}
                                 step={field.step ?? "any"}
                                 aria-invalid={state === "invalid" || undefined}
-                                aria-describedby={state === "invalid" && range ? `${id}-range` : undefined}
-                                onChange={(event) => setTyped((current) => ({ ...current, [field.id]: event.target.value }))}
+                                aria-describedby={
+                                    state === "invalid" && range ? `${id}-range` : undefined
+                                }
+                                onChange={(event) =>
+                                    setTyped((current) => ({
+                                        ...current,
+                                        [field.id]: event.target.value
+                                    }))
+                                }
                             />
                             {state === "invalid" && range ? (
                                 <span id={`${id}-range`} className="text-xs text-danger-ink">
@@ -385,11 +444,22 @@ function Calculator({ view }: { view: CalculatorView }) {
             <dl className="flex min-w-0 flex-col gap-1 border-t border-border pt-3">
                 {view.outputs.map((output, index) => (
                     <div key={index} className="flex min-w-0 items-baseline justify-between gap-3">
-                        <dt className="min-w-0 truncate text-sm text-muted-foreground" title={output.label}>
+                        <dt
+                            className="min-w-0 truncate text-sm text-muted-foreground"
+                            title={output.label}
+                        >
                             {output.label}
                         </dt>
-                        <dd className="shrink-0 text-base font-semibold tabular-nums text-foreground" aria-live="polite">
-                            {whole ? formatResult(calculate(output.formula, values), output.decimals ?? 2) : "-"}
+                        <dd
+                            className="shrink-0 text-base font-semibold tabular-nums text-foreground"
+                            aria-live="polite"
+                        >
+                            {whole
+                                ? formatResult(
+                                      calculate(output.formula, values),
+                                      output.decimals ?? 2
+                                  )
+                                : "-"}
                             {output.unit ? ` ${output.unit}` : ""}
                         </dd>
                     </div>

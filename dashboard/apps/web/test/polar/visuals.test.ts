@@ -34,7 +34,12 @@ describe("the catalogue", () => {
                 }
             },
             { view: { kind: "stats", items: [{ label: "Uptime", value: "99.9%", tone: "good" }] } },
-            { view: { kind: "steps", items: [{ title: "Install" }, { title: "Run", detail: "npm start" }] } },
+            {
+                view: {
+                    kind: "steps",
+                    items: [{ title: "Install" }, { title: "Run", detail: "npm start" }]
+                }
+            },
             {
                 view: {
                     kind: "comparison",
@@ -64,7 +69,10 @@ describe("the catalogue", () => {
                 }
             }
         ];
-        for (const input of ok) expect(visuals.polarVisualSchema.safeParse(input).success, JSON.stringify(input)).toBe(true);
+        for (const input of ok)
+            expect(visuals.polarVisualSchema.safeParse(input).success, JSON.stringify(input)).toBe(
+                true
+            );
     });
 
     it("refuses what does not fit", () => {
@@ -88,9 +96,28 @@ describe("the catalogue", () => {
                     series: [{ label: "S", values: [1] }]
                 }
             },
-            { view: { kind: "comparison", options: ["A", "B"], rows: [{ label: "x", values: ["1"] }] } },
-            { view: { kind: "comparison", options: ["A", "B"], rows: [{ label: "x", values: ["1", "2"] }], pick: 3 } },
-            { view: { kind: "diagram", nodes: [{ id: "a", label: "A" }], edges: [{ from: "a", to: "ghost" }] } },
+            {
+                view: {
+                    kind: "comparison",
+                    options: ["A", "B"],
+                    rows: [{ label: "x", values: ["1"] }]
+                }
+            },
+            {
+                view: {
+                    kind: "comparison",
+                    options: ["A", "B"],
+                    rows: [{ label: "x", values: ["1", "2"] }],
+                    pick: 3
+                }
+            },
+            {
+                view: {
+                    kind: "diagram",
+                    nodes: [{ id: "a", label: "A" }],
+                    edges: [{ from: "a", to: "ghost" }]
+                }
+            },
             { view: { kind: "diagram", nodes: [{ id: "a b", label: "A" }], edges: [] } },
             {
                 view: {
@@ -120,17 +147,27 @@ describe("the catalogue", () => {
                     outputs: [{ label: "Y", formula: "x * 2" }]
                 }
             },
-            { view: { kind: "stats", items: Array.from({ length: 9 }, () => ({ label: "a", value: "1" })) } },
+            {
+                view: {
+                    kind: "stats",
+                    items: Array.from({ length: 9 }, () => ({ label: "a", value: "1" }))
+                }
+            },
             { view: { kind: "steps", items: [{ title: "x".repeat(121) }] } }
         ];
-        for (const input of bad) expect(visuals.polarVisualSchema.safeParse(input).success, JSON.stringify(input)).toBe(false);
+        for (const input of bad)
+            expect(visuals.polarVisualSchema.safeParse(input).success, JSON.stringify(input)).toBe(
+                false
+            );
     });
 
     it("is an object at the top, so every provider takes it as a tool's parameters", async () => {
         const tool = polarVisualTools()[visuals.POLAR_VISUAL_TOOL]!;
         const schema = await (tool.inputSchema as { jsonSchema: unknown }).jsonSchema;
         expect((schema as { type?: string }).type).toBe("object");
-        expect(await tool.execute!(table as never, { toolCallId: "t", messages: [] } as never)).toEqual({
+        expect(
+            await tool.execute!(table as never, { toolCallId: "t", messages: [] } as never)
+        ).toEqual({
             ok: true,
             text: "Shown to the person."
         });
@@ -140,12 +177,18 @@ describe("the catalogue", () => {
         expect(visuals.isVisualPart({ type: "tool-polar_show" })).toBe(true);
         expect(visuals.isVisualPart({ type: "tool-polar_remember" })).toBe(false);
         expect(visuals.visualOf({ view: { kind: "table" } })).toBeNull();
-        expect(visuals.visualPartMarkdown({ type: "tool-polar_show", input: { view: { kind: "nope" } } })).toBe("");
+        expect(
+            visuals.visualPartMarkdown({
+                type: "tool-polar_show",
+                input: { view: { kind: "nope" } }
+            })
+        ).toBe("");
     });
 });
 
 describe("formulas", () => {
-    const run = (formula: string, values: Record<string, number> = {}) => visuals.calculate(formula, values);
+    const run = (formula: string, values: Record<string, number> = {}) =>
+        visuals.calculate(formula, values);
 
     it("follows the usual precedence", () => {
         expect(run("1 + 2 * 3")).toBe(7);
@@ -164,7 +207,18 @@ describe("formulas", () => {
     });
 
     it("refuses anything that is not arithmetic", () => {
-        for (const source of ["", "1 +", "(1", "a.b", "eval(1)", "1 2", "x[0]", "'a'", "pow(1)", "round(1, 2)"]) {
+        for (const source of [
+            "",
+            "1 +",
+            "(1",
+            "a.b",
+            "eval(1)",
+            "1 2",
+            "x[0]",
+            "'a'",
+            "pow(1)",
+            "round(1, 2)"
+        ]) {
             expect(typeof visuals.parseFormula(source), source).toBe("string");
         }
     });
@@ -174,15 +228,25 @@ describe("as text", () => {
     it("writes a table as a Markdown table, escaping its pipes", () => {
         const markdown = visuals.visualMarkdown(visuals.visualOf(table)!);
         expect(markdown).toBe(
-            ["**Plans**", "", "| Plan | Price |", "| --- | --- |", "| Basic | 5 |", "| Pro \\| team | 12.5 |"].join("\n")
+            [
+                "**Plans**",
+                "",
+                "| Plan | Price |",
+                "| --- | --- |",
+                "| Basic | 5 |",
+                "| Pro \\| team | 12.5 |"
+            ].join("\n")
         );
     });
 
     it("writes the other kinds as lists a reader can follow", () => {
         const md = (view: unknown) => visuals.visualMarkdown(visuals.visualOf({ view })!);
-        expect(md({ kind: "steps", items: [{ title: "Install" }, { title: "Run", detail: "npm start" }] })).toBe(
-            "1. **Install**\n2. **Run** - npm start"
-        );
+        expect(
+            md({
+                kind: "steps",
+                items: [{ title: "Install" }, { title: "Run", detail: "npm start" }]
+            })
+        ).toBe("1. **Install**\n2. **Run** - npm start");
         expect(
             md({
                 kind: "diagram",
@@ -201,9 +265,9 @@ describe("as text", () => {
                 outputs: [{ label: "Double", formula: "n * 2" }]
             })
         ).toBe("- Count: 4\n- **Double** = n * 2 = 8");
-        expect(md({ kind: "stats", items: [{ label: "Uptime", value: "99.9%", detail: "30 days" }] })).toBe(
-            "- **Uptime**: 99.9% (30 days)"
-        );
+        expect(
+            md({ kind: "stats", items: [{ label: "Uptime", value: "99.9%", detail: "30 days" }] })
+        ).toBe("- **Uptime**: 99.9% (30 days)");
     });
 
     it("writes a chart's numbers as a table and as CSV", () => {
@@ -223,10 +287,18 @@ describe("as text", () => {
     it("quotes CSV cells and keeps a spreadsheet from reading one as a formula", () => {
         const csv = visuals.visualCsv(
             visuals.visualOf({
-                view: { kind: "table", columns: [{ label: "A" }, { label: "B" }], rows: [["=1+1", 'say "hi", ok']] }
+                view: {
+                    kind: "table",
+                    columns: [{ label: "A" }, { label: "B" }],
+                    rows: [["=1+1", 'say "hi", ok']]
+                }
             })!.view
         );
         expect(csv).toBe(`A,B\r\n'=1+1,"say ""hi"", ok"`);
-        expect(visuals.visualCsv(visuals.visualOf({ view: { kind: "steps", items: [{ title: "x" }] } })!.view)).toBeNull();
+        expect(
+            visuals.visualCsv(
+                visuals.visualOf({ view: { kind: "steps", items: [{ title: "x" }] } })!.view
+            )
+        ).toBeNull();
     });
 });

@@ -27,10 +27,14 @@ function format(value: number | null, unit?: string): string {
 /** The times of a line over dates, or null when it is not one the time chart draws. */
 function timesOf(view: ChartView): number[] | null {
     if (view.type !== "line" || view.categories.length < 2) return null;
-    if (view.series.some((line) => line.values.some((value) => value !== null && value < 0))) return null;
-    const times = view.categories.map((category) => (DAY.test(category) ? Date.parse(category) : Number.NaN));
+    if (view.series.some((line) => line.values.some((value) => value !== null && value < 0)))
+        return null;
+    const times = view.categories.map((category) =>
+        DAY.test(category) ? Date.parse(category) : Number.NaN
+    );
     if (times.some((time) => !Number.isFinite(time))) return null;
-    for (let index = 1; index < times.length; index++) if (times[index]! <= times[index - 1]!) return null;
+    for (let index = 1; index < times.length; index++)
+        if (times[index]! <= times[index - 1]!) return null;
     return times;
 }
 
@@ -67,7 +71,9 @@ function ChartValues({ view, label }: { view: ChartView; label: string }) {
                                     {cell}
                                 </th>
                             ) : (
-                                <td key={index}>{format(typeof cell === "number" ? cell : null)}</td>
+                                <td key={index}>
+                                    {format(typeof cell === "number" ? cell : null)}
+                                </td>
                             )
                         )}
                     </tr>
@@ -87,7 +93,11 @@ function ChartPicture({ view, label }: { view: ChartView; label: string }) {
                 to={times.at(-1)!}
                 format={(value) => format(value, view.unit)}
                 formatTime={(at) =>
-                    new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "2-digit" }).format(at)
+                    new Intl.DateTimeFormat(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "2-digit"
+                    }).format(at)
                 }
                 series={view.series.map((line, index) => ({
                     key: String(index),
@@ -102,7 +112,9 @@ function ChartPicture({ view, label }: { view: ChartView; label: string }) {
 
 function CategoryChart({ view, label }: { view: ChartView; label: string }) {
     const [hover, setHover] = useState<number | null>(null);
-    const values = view.series.flatMap((line) => line.values.filter((value): value is number => value !== null));
+    const values = view.series.flatMap((line) =>
+        line.values.filter((value): value is number => value !== null)
+    );
     const top = Math.max(0, ...values);
     const bottom = Math.min(0, ...values);
     const span = top - bottom || 1;
@@ -130,11 +142,17 @@ function CategoryChart({ view, label }: { view: ChartView; label: string }) {
                     ))}
                 </ul>
             ) : null}
-            <p className="min-h-4 min-w-0 truncate text-xs tabular-nums text-muted-foreground" aria-live="polite">
+            <p
+                className="min-h-4 min-w-0 truncate text-xs tabular-nums text-muted-foreground"
+                aria-live="polite"
+            >
                 {shown === null
                     ? ""
                     : `${view.categories[shown]}: ${view.series
-                          .map((line) => `${view.series.length > 1 ? `${line.label} ` : ""}${format(line.values[shown] ?? null, view.unit)}`)
+                          .map(
+                              (line) =>
+                                  `${view.series.length > 1 ? `${line.label} ` : ""}${format(line.values[shown] ?? null, view.unit)}`
+                          )
                           .join(", ")}`}
             </p>
             <div className="flex min-w-0 gap-2">
@@ -181,25 +199,35 @@ function CategoryChart({ view, label }: { view: ChartView; label: string }) {
                                     hover === index && "bg-muted/60"
                                 )}
                                 onPointerEnter={() => setHover(index)}
-                                onPointerLeave={() => setHover((current) => (current === index ? null : current))}
+                                onPointerLeave={() =>
+                                    setHover((current) => (current === index ? null : current))
+                                }
                                 title={category}
                             >
                                 {view.type === "bar"
                                     ? view.series.map((line, series) => {
                                           const value = line.values[index];
                                           if (value === null || value === undefined) {
-                                              return <span key={series} className="min-w-0 flex-1" />;
+                                              return (
+                                                  <span key={series} className="min-w-0 flex-1" />
+                                              );
                                           }
                                           const from = Math.min(at(value), zero);
                                           const to = Math.max(at(value), zero);
                                           return (
-                                              <span key={series} className="relative min-w-0 flex-1">
+                                              <span
+                                                  key={series}
+                                                  className="relative min-w-0 flex-1"
+                                              >
                                                   <span
                                                       className="absolute inset-x-0 rounded-sm"
                                                       style={{
                                                           top: `${from * 100}%`,
                                                           height: `max(1px, ${(to - from) * 100}%)`,
-                                                          background: SERIES_COLORS[series % SERIES_COLORS.length]
+                                                          background:
+                                                              SERIES_COLORS[
+                                                                  series % SERIES_COLORS.length
+                                                              ]
                                                       }}
                                                   />
                                               </span>
@@ -212,7 +240,9 @@ function CategoryChart({ view, label }: { view: ChartView; label: string }) {
                 </div>
             </div>
             <div className="flex min-w-0 gap-2" aria-hidden>
-                <span className="invisible shrink-0 text-[11px] tabular-nums">{format(top, undefined)}</span>
+                <span className="invisible shrink-0 text-[11px] tabular-nums">
+                    {format(top, undefined)}
+                </span>
                 <div className="flex min-w-0 flex-1">
                     {view.categories.map((category, index) => (
                         <span
