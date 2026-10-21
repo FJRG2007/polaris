@@ -70,6 +70,12 @@ export const calendarExtension: AppExtension = {
 
     eventTitles: async (userId, ids) => (await import("./event-titles")).eventTitles(userId, ids),
 
+    presenceBusy: async (asks, window) =>
+        (await import("./presence-busy")).presenceBusy(asks, window),
+
+    presenceCalendars: async (userId) =>
+        (await import("./presence-busy")).presenceCalendars(userId),
+
     // What a connected assistant may do with the calendar: read it, and - on
     // the scope that says so - change it, by the app's own rules.
     mcpTools: async () => (await import("./mcp-tools")).calendarMcpTools(),

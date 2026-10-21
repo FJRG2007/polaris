@@ -1487,5 +1487,11 @@
         "connect": "Connect GitHub",
         "checkAgain": "Check again",
         "noAppPage": "This Polaris has no GitHub app to install. An administrator connects one under Settings."
+    },
+    "presenceAuto": {
+        "call": "In a call",
+        "meeting": "In a meeting",
+        "busyCall": "Do not disturb - in a call",
+        "busyMeeting": "Do not disturb - in a meeting"
     }
 }

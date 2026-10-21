@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { usePresenceRefresh } from "@/components/presence-store";
+import { usePresence, usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import {
@@ -40,6 +40,7 @@ import {
     MAX_WINDOW_MS,
     windowEndsAt,
     presenceInForce,
+    autoPresenceWord,
     statusInForce,
     AUTOMATIC_TIME_ZONE,
     type DisplayFormat,
@@ -245,6 +246,27 @@ export function AccountMenu({
      * finer than anybody notices and coarser than anything this costs.
      */
     const now = useNow(30_000);
+    /**
+     * What automatic status is saying about this account - on a call, in a
+     * meeting - from the same store every face is drawn from, so it clears when
+     * the call or the meeting does without this menu having to be told.
+     */
+    const automatic = usePresence(id)?.auto ?? null;
+    const automaticLine = automatic
+        ? [
+              t(`account.automatic.${autoPresenceWord(automatic)}`),
+              automatic.until && automatic.title
+                  ? t("account.automatic.untilTitle", {
+                        time: endLabel(automatic.until, format),
+                        title: automatic.title
+                    })
+                  : automatic.until
+                    ? t("account.until", { time: endLabel(automatic.until, format) })
+                    : ""
+          ]
+              .filter(Boolean)
+              .join(" - ")
+        : "";
     // Through the rule itself rather than a comparison written out again here.
     // It is a pure function for exactly this reason: the dot beside a face, the
     // screen that writes a schedule and this picker have to agree about when a
@@ -445,6 +467,11 @@ export function AccountMenu({
                             {name}
                         </span>
                         <span className="block truncate">{email}</span>
+                        {automaticLine && (
+                            <span className="mt-1 block truncate" title={automaticLine}>
+                                {automaticLine}
+                            </span>
+                        )}
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {/* Where the status lives in every application that has one: on

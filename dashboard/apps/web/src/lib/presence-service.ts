@@ -36,6 +36,7 @@ import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
 import { type Presence, type PresenceChoice } from "@polaris/core";
 import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
 import { activeSchedulesFor, schedulesOf, scheduleZoneOf } from "@/lib/presence-schedule-service";
+import { meetingsNow } from "@/lib/presence-auto-service";
 
 // The vocabulary lives in core, because the picker that sets it is a client
 // component and this file reaches for Prisma the moment it is imported.
@@ -77,6 +78,14 @@ export interface PresenceView {
      * this reader cannot see is here is doing nothing as far as they know.
      */
     readonly activity: readonly core.ActivityView[];
+    /**
+     * The automatic status in force - on a call, in a busy calendar event - or
+     * null when none is. Only for somebody whose own choice is `auto` and who is
+     * here: a chosen status always wins, and offline carries nothing. Anybody
+     * but the account itself is told the reason only, never the event's title
+     * or when it ends.
+     */
+    readonly auto: core.AutoPresenceView | null;
 }
 
 /**
@@ -110,7 +119,10 @@ export async function presenceFor(
                 // the accounts - almost all of them - whose choice is
                 // "automatic". Without it their windows are read on the clock of
                 // whichever machine Polaris runs on.
-                deviceTimeZone: true
+                deviceTimeZone: true,
+                // Automatic status. Empty for almost everybody, which reads as
+                // the defaults.
+                autoPresence: true
             }
         }),
         // The freshest session per account, from one query rather than one each,
@@ -143,16 +155,33 @@ export async function presenceFor(
     const now = Date.now();
     const at = new Date(now);
     const answer = new Map<string, PresenceView>();
+    const zoneOf = (person: (typeof people)[number]) =>
+        core.effectiveTimeZone(
+            core.resolveDisplayPreferences(
+                platformPrefs,
+                core.parseDisplayPreferences(person.displayPrefs)
+            ).timeZone,
+            person.deviceTimeZone
+        );
+    // Here, on `auto`, and with automatic status to work out once the calendar
+    // has been asked about the few of them who switched it on.
+    const automatic: { person: (typeof people)[number]; settings: core.AutoPresence }[] = [];
     // Gone by their sessions alone, with nothing chosen to say so - the only
     // people a game server here can speak for.
     const away = new Set<string>();
     for (const person of people) {
         const mine = person.id === viewer.id;
-        const inCall = calls.get(person.id) ?? null;
+        const inCall = calls.joinable.get(person.id) ?? null;
         if (!mine && !visible.has(person.id)) {
             // Not "unknown": there is no third colour, and a dot that is absent
             // for some people and grey for others says which is which.
-            answer.set(person.id, { status: "offline", note: "", inCall, activity: [] });
+            answer.set(person.id, {
+                status: "offline",
+                note: "",
+                inCall,
+                activity: [],
+                auto: null
+            });
             continue;
         }
         const rules = schedules.get(person.id) ?? [];
@@ -161,19 +190,14 @@ export async function presenceFor(
             rules,
             // Worked out only for the few accounts that have a window, because
             // it means parsing a blob of preferences per person.
-            rules.length > 0
-                ? core.effectiveTimeZone(
-                      core.resolveDisplayPreferences(
-                          platformPrefs,
-                          core.parseDisplayPreferences(person.displayPrefs)
-                      ).timeZone,
-                      person.deviceTimeZone
-                  )
-                : core.AUTOMATIC_TIME_ZONE,
+            rules.length > 0 ? zoneOf(person) : core.AUTOMATIC_TIME_ZONE,
             at
         );
         const status = statusOf(held.choice, seen.get(person.id), now);
         if (status === "offline" && held.choice === "auto") away.add(person.id);
+        if (status !== "offline" && held.choice === "auto") {
+            automatic.push({ person, settings: core.parseAutoPresence(person.autoPresence) });
+        }
         answer.set(person.id, {
             status,
             // Only while they are actually here. Both halves matter: a status
@@ -184,8 +208,38 @@ export async function presenceFor(
                     ? person.statusText.trim()
                     : "",
             inCall,
-            activity: []
+            activity: [],
+            auto: null
         });
+    }
+
+    if (automatic.length > 0) {
+        const meetings = await meetingsNow(
+            automatic
+                .filter(({ settings }) => settings.meeting.enabled)
+                .map(({ person, settings }) => ({
+                    id: person.id,
+                    settings: settings.meeting,
+                    zone: zoneOf(person)
+                })),
+            at
+        );
+        for (const { person, settings } of automatic) {
+            const view = answer.get(person.id);
+            if (!view) continue;
+            const auto = core.autoPresenceOf("auto", settings, {
+                onCall: calls.seated.has(person.id),
+                meeting: meetings.get(person.id)?.current ?? null
+            });
+            if (!auto) continue;
+            answer.set(person.id, {
+                ...view,
+                // The same "busy" a chosen do not disturb is, so everything that
+                // honours one honours the other.
+                status: auto.busy ? "busy" : view.status,
+                auto: person.id === viewer.id ? auto : core.autoPresenceForOthers(auto)
+            });
+        }
     }
 
     // Asked only about the people drawn as here, which on most screens is a
@@ -336,16 +390,18 @@ function statusOf(chosen: string, lastSeen: Date | undefined, now: number): Pres
 }
 
 /**
- * Who of these is on a call the reader could walk into.
+ * Who of these is on a call, and which of those calls the reader could walk into.
  *
- * The reader's own reach decides, which is what makes this safe to draw beside a
- * face anywhere in Polaris: a call in a conversation they are not in is not
- * mentioned at all, rather than mentioned and refused.
+ * The reader's own reach decides `joinable`, which is what makes it safe to draw
+ * beside a face anywhere in Polaris: a call in a conversation they are not in is
+ * not mentioned at all, rather than mentioned and refused. `seated` is everybody
+ * on any live call, for automatic status - which says "In a call" and nothing
+ * about which one.
  */
 async function callsFor(
     viewer: { id: string },
     ids: readonly string[]
-): Promise<Map<string, string>> {
+): Promise<{ joinable: Map<string, string>; seated: Set<string> }> {
     const seats = await prisma.meetingParticipant.findMany({
         where: {
             userId: { in: [...ids] },
@@ -358,7 +414,8 @@ async function callsFor(
         },
         select: { userId: true, meeting: { select: { channelId: true } } }
     });
-    if (seats.length === 0) return new Map();
+    const seated = new Set(seats.map((seat) => seat.userId!).filter(Boolean));
+    if (seats.length === 0) return { joinable: new Map(), seated };
 
     const reachable = await reachableChannelIds(viewer);
     const found = new Map<string, string>();
@@ -367,7 +424,7 @@ async function callsFor(
         if (!channelId || !reachable.has(channelId)) continue;
         if (!found.has(seat.userId!)) found.set(seat.userId!, channelId);
     }
-    return found;
+    return { joinable: found, seated };
 }
 
 /**

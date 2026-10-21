@@ -12,7 +12,8 @@
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
-import { presenceScheduleSchema } from "@polaris/core";
+import { autoPresenceSchema, presenceScheduleSchema } from "@polaris/core";
+import { saveAutoPresence } from "@/lib/presence-auto-service";
 import {
     createSchedule,
     deleteSchedule,
@@ -66,4 +67,18 @@ export async function deleteScheduleAction(id: unknown): Promise<{ error?: strin
     const result = await deleteSchedule(user.id, String(id));
     if (!result.error) revalidatePath(PAGE);
     return result;
+}
+
+/**
+ * Save automatic status. The whole setting at once, checked against the schema
+ * the card checks against; calendar ids are only ever read back scoped to the
+ * account's own calendars, so naming somebody else's counts for nothing.
+ */
+export async function saveAutoPresenceAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = autoPresenceSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("accountPrivacy"))("auto.failed") };
+    await saveAutoPresence(user.id, parsed.data);
+    revalidatePath(PAGE);
+    return {};
 }

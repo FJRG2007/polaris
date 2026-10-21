@@ -14,7 +14,7 @@
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { McpSearchProvider } from "@/lib/mcp/search";
-import type { Locale, PendingAppLink } from "@polaris/core";
+import type { BusyEvent, Locale, PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 
@@ -200,6 +200,23 @@ export interface AppExtension {
         userId: string,
         ids: readonly string[]
     ) => Promise<Readonly<Record<string, string>>>;
+
+    /** The busy events reaching a window, by person, for automatic status
+     *  ("In a meeting"). Titles are for the account itself; the dashboard
+     *  never says them to anybody else. */
+    readonly presenceBusy?: (
+        asks: readonly {
+            readonly userId: string;
+            readonly calendarIds: readonly string[] | null;
+            readonly zone: string;
+        }[],
+        window: { from: Date; to: Date }
+    ) => Promise<ReadonlyMap<string, readonly BusyEvent[]>>;
+
+    /** The calendars a person may pick from for automatic status. */
+    readonly presenceCalendars?: (
+        userId: string
+    ) => Promise<readonly { id: string; name: string; color: string }[]>;
 
     /** The reader's next events, for the Overview card, soonest first. */
     readonly upcomingEvents?: (userId: string, limit: number) => Promise<readonly UpcomingEvent[]>;
