@@ -377,7 +377,27 @@
                 "plan": "Plan",
                 "region": "Región",
                 "denied_deployManage": "Necesitas permiso para gestionar los servicios.",
-                "denied_databasesManage": "Necesitas permiso para gestionar las bases de datos."
+                "denied_databasesManage": "Necesitas permiso para gestionar las bases de datos.",
+                "tls": "Cifrado",
+                "tlsOn": "TLS",
+                "tlsOff": "Sin cifrar",
+                "issues": {
+                    "nameRequired": "Hace falta un nombre",
+                    "tooLong": "Es demasiado largo",
+                    "provider": "Elige un proveedor",
+                    "providerEngine": "Ese proveedor no ofrece este motor",
+                    "required": "Obligatorio",
+                    "brokers": "Escribe los brokers como host:puerto, separados por comas",
+                    "saslPair": "Un usuario SASL necesita nombre y contraseña",
+                    "urlHttp": "Usa una dirección que empiece por https:// o http://",
+                    "urlAmqp": "Usa una dirección que empiece por amqps:// o amqp://",
+                    "urlCredentials": "Pon el usuario y la contraseña en sus campos, no en la dirección",
+                    "https": "Usa una dirección https://",
+                    "amqpName": "Usa letras, números, guiones y guiones bajos",
+                    "apiKey": "Pega la clave de API de CloudAMQP",
+                    "plan": "Usa un id de plan de CloudAMQP, como lemur",
+                    "region": "Usa proveedor::región, como amazon-web-services::us-east-1"
+                }
             }
         },
         "autoDeployDialog": {

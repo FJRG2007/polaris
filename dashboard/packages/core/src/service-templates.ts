@@ -100,7 +100,8 @@ export const WORDPRESS_FORWARDED_HTTPS =
  * RabbitMQ are not here: they are data engines of the "new database" flow
  * (`schemas/data-engines.ts`), where they can run on a server or in a cloud.
  * A service created from one of their old templates is a plain service and
- * keeps working as one.
+ * keeps working as one; MinIO's setup can still be run again on it
+ * (`serviceTemplateOfService`).
  */
 export const RETIRED_TEMPLATE_IDS = [
     "kafka",
@@ -919,6 +920,52 @@ export const serviceTemplateIdSchema = z.enum(
 
 export function serviceTemplate(id: string): ServiceTemplate | null {
     return SERVICE_TEMPLATES.find((template) => template.id === id) ?? null;
+}
+
+/**
+ * The retired templates whose services still have a setup to run again: never
+ * offered, only found for a service an earlier release created from one.
+ */
+const RETIRED_SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
+    {
+        id: "minio",
+        name: "MinIO",
+        description: "S3-compatible object storage with a web console.",
+        image: "minio/minio:latest",
+        port: 9001,
+        command: ["server", "/data", "--console-address", ":9001"],
+        env: {
+            MINIO_BROWSER_REDIRECT_URL: PUBLIC_URL_PLACEHOLDER,
+            MINIO_ROOT_USER: "minio",
+            OPENSHIP_BUCKET: "uploads"
+        },
+        secrets: ["MINIO_ROOT_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/data" }],
+        prepare: [
+            {
+                title: "Create the first bucket",
+                command:
+                    'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" > /dev/null && mc mb --ignore-existing "local/$OPENSHIP_BUCKET" > /dev/null && printf \'%s\' "$OPENSHIP_BUCKET"',
+                readiness: {
+                    test: 'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"',
+                    intervalMs: 1000,
+                    retries: 30
+                }
+            }
+        ],
+        firstRun:
+            "Sign in to the console as minio with the MINIO_ROOT_PASSWORD variable. The S3 API answers on port 9000 at the service's private domain, and the first bucket is named in OPENSHIP_BUCKET."
+    }
+];
+
+/** The template an existing service was created from, offered or retired. */
+export function serviceTemplateOfService(id: unknown): ServiceTemplate | null {
+    if (typeof id !== "string") return null;
+    return (
+        serviceTemplate(id) ??
+        RETIRED_SERVICE_TEMPLATES.find((template) => template.id === id) ??
+        null
+    );
 }
 
 /** Whether creating a template takes more than one deploy of one container. */

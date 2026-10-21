@@ -10,6 +10,7 @@ import {
     freeTemplateName,
     runPrepareSteps,
     serviceTemplate,
+    serviceTemplateOfService,
     templateNeedsSetup,
     templateVariables,
     SERVICE_TEMPLATES,
@@ -123,18 +124,24 @@ describe("the templates added with a database, a companion or setup", () => {
         expect(freshrss).toMatchObject({ image: "freshrss/freshrss:latest", port: 80 });
         expect(freshrss.prepare?.[0]?.readiness).toEqual({ test: "test -d /var/www/FreshRSS/cli", intervalMs: 3000, retries: 30 });
 
-        const minio = serviceTemplate("minio")!;
+        // Retired to the database flow, but its setup still runs on the services made from it.
+        const minio = serviceTemplateOfService("minio")!;
         expect(minio).toMatchObject({ image: "minio/minio:latest", port: 9001 });
         expect(minio.command).toEqual(["server", "/data", "--console-address", ":9001"]);
         expect(minio.prepare?.[0]?.readiness).toMatchObject({ intervalMs: 1000, retries: 30 });
         expect(minio.prepare?.[0]?.command).toContain('mc mb --ignore-existing "local/$OPENSHIP_BUCKET"');
     });
 
-    it("transcribes Kafka as its console and a broker companion", () => {
-        const kafka = serviceTemplate("kafka")!;
-        expect(kafka).toMatchObject({ image: "ghcr.io/kafbat/kafka-ui:latest", port: 8080 });
-        expect(kafka.companion).toMatchObject({ suffix: "broker", image: "apache/kafka:4.0.0", port: 9092 });
-        expect(kafka.companion?.volumes).toEqual([{ name: "data", mountPath: "/var/lib/kafka/data" }]);
+    it("transcribes Open WebUI as its interface and an Ollama companion", () => {
+        const webui = serviceTemplate("open-webui")!;
+        expect(webui).toMatchObject({ image: "ghcr.io/open-webui/open-webui:v0.6.30", port: 8080 });
+        expect(webui.companion).toMatchObject({ suffix: "ollama", image: "ollama/ollama:0.40.4", port: 11434 });
+        expect(webui.companion?.volumes).toEqual([{ name: "models", mountPath: "/root/.ollama" }]);
+    });
+
+    it("no longer offers the engines that moved to the database flow", () => {
+        expect(serviceTemplate("kafka")).toBeNull();
+        expect(serviceTemplate("minio")).toBeNull();
     });
 
     it("leaves the plain templates as one deploy of one container", () => {
@@ -185,14 +192,15 @@ describe("templateVariables", () => {
     });
 
     it("points a console at its companion, and the companion at itself", () => {
-        const kafka = serviceTemplate("kafka")!;
-        const ui = templateVariables(kafka, { self: "events", companion: "events-broker" }, () => "p");
-        expect(ui.find((entry) => entry.key === "KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS")?.value).toBe(
-            "${{events-broker.POLARIS_PRIVATE_DOMAIN}}:9092"
+        const webui = serviceTemplate("open-webui")!;
+        const ui = templateVariables(webui, { self: "chat", companion: "chat-ollama" }, () => "p");
+        expect(ui.find((entry) => entry.key === "OLLAMA_BASE_URL")?.value).toBe(
+            "http://${{chat-ollama.POLARIS_PRIVATE_DOMAIN}}:11434"
         );
-        const broker = templateVariables(kafka.companion!, { self: "events-broker" }, () => "p");
-        expect(broker.find((entry) => entry.key === "KAFKA_CONTROLLER_QUORUM_VOTERS")?.value).toBe(
-            "1@${{events-broker.POLARIS_PRIVATE_DOMAIN}}:9093"
+        const companion = { ...webui.companion!, env: { OLLAMA_HOST: "{{self.POLARIS_PRIVATE_DOMAIN}}:11434" } };
+        const ollama = templateVariables(companion, { self: "chat-ollama" }, () => "p");
+        expect(ollama.find((entry) => entry.key === "OLLAMA_HOST")?.value).toBe(
+            "${{chat-ollama.POLARIS_PRIVATE_DOMAIN}}:11434"
         );
     });
 

@@ -27,6 +27,7 @@ import { RepoConfigPreview } from "./repo-config-preview";
 import { CloudProviderIcon, DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
 import { CloudDatabaseForm } from "./cloud-database-form";
+import { Field } from "./form-field";
 import { databaseFormAccess, offeredServiceTypes } from "./service-type-access";
 import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
@@ -36,7 +37,7 @@ import type { ElsewhereSummary } from "@/lib/deploy/external-services";
 import { DockerMark, GitHubMark } from "@/components/brand-icons";
 import { RepoPicker, type PickerRepo } from "@/components/repo-picker";
 import { SERVICE_LIST_METRICS_MS, useServiceMetrics } from "./service-metrics";
-import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
     DatabaseTopologyField,
     hasTopologyChoice,
@@ -218,6 +219,8 @@ export interface ProjectSummary {
             /** True when this is a database living inside another instance rather
              *  than a container of its own. */
             hostedOnInstance?: boolean;
+            /** True when it lives in a cloud: no container, nothing to deploy. */
+            cloud?: boolean;
             /** How many databases are hosted inside this one, which is what makes
              *  removing it destroy more than itself. */
             hostedCount?: number;
@@ -607,26 +610,28 @@ function DatabaseCard({
             {error && <p className="text-xs text-danger">{error}</p>}
 
             {canManage && can("databases.manage") && (
-                <div className="mt-auto flex items-center gap-1 border-t border-border/60 pt-3">
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={pending}
-                        className="mr-auto"
-                        onClick={() =>
-                            startTransition(async () => {
-                                await deployActions.deployDatabaseAction(database.id);
-                                onChanged();
-                            })
-                        }
-                    >
-                        {pending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                            <Rocket className="size-4" />
-                        )}{" "}
-                        {t("view.provision")}
-                    </Button>
+                <div className="mt-auto flex items-center justify-end gap-1 border-t border-border/60 pt-3">
+                    {!database.cloud && (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={pending}
+                            className="mr-auto"
+                            onClick={() =>
+                                startTransition(async () => {
+                                    await deployActions.deployDatabaseAction(database.id);
+                                    onChanged();
+                                })
+                            }
+                        >
+                            {pending ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <Rocket className="size-4" />
+                            )}{" "}
+                            {t("view.provision")}
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         size="icon"
@@ -1709,9 +1714,10 @@ function NewDatabaseFields({ environmentId, onDone }: { environmentId: string; o
         });
     }
 
-    if (isDataEngine(engine) && where !== "server") {
-        return (
-        <div className="flex flex-col gap-3">
+    // The name, the engine and where it runs are asked the same way wherever
+    // it runs; only what follows them changes.
+    const header = (
+        <>
             <Field label={t("view.name")}>
                 <Input
                     value={name}
@@ -1744,51 +1750,27 @@ function NewDatabaseFields({ environmentId, onDone }: { environmentId: string; o
                     />
                 </Field>
             )}
-            <CloudDatabaseForm
-                environmentId={environmentId}
-                engine={engine}
-                name={name}
-                provider={where}
-                onDone={onDone}
-            />
-        </div>
+        </>
+    );
+
+    if (isDataEngine(engine) && where !== "server") {
+        return (
+            <div className="flex flex-col gap-3">
+                {header}
+                <CloudDatabaseForm
+                    environmentId={environmentId}
+                    engine={engine}
+                    name={name}
+                    provider={where}
+                    onDone={onDone}
+                />
+            </div>
         );
     }
 
     return (
         <div className="flex flex-col gap-3">
-            <Field label={t("view.name")}>
-                <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    // i18n-ignore: an example database name
-                    placeholder="my-db"
-                    autoFocus
-                />
-            </Field>
-            <Field label={t("view.database.engine")}>
-                <Select
-                    value={engine}
-                    onValueChange={(value) => setEngine(value as ManagedEngine)}
-                    options={ENGINE_OPTIONS}
-                />
-            </Field>
-            {isDataEngine(engine) && (
-                <Field label={t("view.database.cloud.where")}>
-                    <Select
-                        value={where}
-                        onValueChange={setWhere}
-                        options={[
-                            { value: "server", label: t("view.database.cloud.onServer") },
-                            ...cloudProvidersFor(engine).map((one) => ({
-                                value: one.id,
-                                label: one.label,
-                                icon: <CloudProviderIcon provider={one.id} className="size-5" />
-                            }))
-                        ]}
-                    />
-                </Field>
-            )}
+            {header}
             {engine === "redis" && (
                 <Field
                     label={t("view.database.runsAs")}
@@ -2204,16 +2186,6 @@ function DomainDialog({
                 </div>
             </DialogContent>
         </Dialog>
-    );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-    return (
-        <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{label}</span>
-            {children}
-            {hint && <span className="text-xs text-muted-foreground/70">{hint}</span>}
-        </label>
     );
 }
 

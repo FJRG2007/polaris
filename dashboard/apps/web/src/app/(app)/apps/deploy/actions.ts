@@ -13,7 +13,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
-import { firstIssue, reply } from "./reply";
+import { failure, firstIssue, reply } from "./reply";
 import { normalizeRoot } from "@polaris/deploy";
 import {
     requireVariableScopeAccess,
@@ -1959,7 +1959,7 @@ export async function connectCloudDatabaseAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("databases.createFailed") };
+        return { error: await failure(caught, "databases.createFailed") };
     }
 }
 
@@ -1979,7 +1979,7 @@ export async function createCloudAmqpDatabaseAction(
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("databases.createFailed") };
+        return { error: await failure(caught, "databases.createFailed") };
     }
 }
 
@@ -2005,10 +2005,7 @@ export async function databaseConnectionAction(
         const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
         return { connection: await databaseConnection(databaseId, access.ownerId) };
     } catch (caught) {
-        return {
-            error:
-                caught instanceof Error ? caught.message : await reply("databases.connectionFailed")
-        };
+        return { error: await failure(caught, "databases.connectionFailed") };
     }
 }
 

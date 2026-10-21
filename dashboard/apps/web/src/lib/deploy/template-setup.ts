@@ -319,8 +319,7 @@ export async function rerunTemplateSetup(applicationId: string, ownerId: string)
 function templateOf(sourceConfig: string): core.ServiceTemplate | null {
     try {
         const source = JSON.parse(sourceConfig) as { templateId?: unknown };
-        const id = core.serviceTemplateIdSchema.safeParse(source.templateId);
-        return id.success ? core.serviceTemplate(id.data) : null;
+        return core.serviceTemplateOfService(source.templateId);
     } catch {
         return null;
     }

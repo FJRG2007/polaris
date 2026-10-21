@@ -619,6 +619,12 @@ export const CLOUD_FIELDS: Readonly<
 
 export const KAFKA_SASL_MECHANISMS = ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"] as const;
 
+/**
+ * The words of every issue below, as keys of the `deploy` catalog: the form and
+ * the action translate them where they are shown.
+ */
+const ISSUE = "view.database.cloud.issues";
+
 /** The schemes each engine's address may use. Kafka's is a broker list instead. */
 const URL_SCHEMES: Readonly<Record<Exclude<DataEngine, "kafka">, readonly string[]>> = {
     minio: ["https:", "http:"],
@@ -630,7 +636,7 @@ const URL_SCHEMES: Readonly<Record<Exclude<DataEngine, "kafka">, readonly string
     rabbitmq: ["amqps:", "amqp:"]
 };
 
-const text = (max: number) => z.string().trim().max(max).default("");
+const text = (max: number) => z.string().trim().max(max, `${ISSUE}.tooLong`).default("");
 
 /** `HOST:PORT` for one broker: a DNS name or IPv4 address and a port. */
 const BROKER = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?:\d{1,5}$/;
@@ -671,38 +677,41 @@ function urlText(url: URL): string {
 export const cloudConnectSchema = z
     .object({
         environmentId: z.string().uuid(),
-        name: z.string().trim().min(1, "A name is required").max(64),
+        name: z.string().trim().min(1, `${ISSUE}.nameRequired`).max(64, `${ISSUE}.tooLong`),
         engine: z.enum(DATA_ENGINES),
         provider: z
             .string()
             .trim()
-            .refine((id) => DATA_CLOUD_PROVIDERS.some((one) => one.id === id), "Choose a provider"),
+            .refine((id) => DATA_CLOUD_PROVIDERS.some((one) => one.id === id), `${ISSUE}.provider`),
         url: text(2048),
         username: text(256),
-        password: z.string().max(1024).default(""),
-        token: z.string().trim().max(4096).default(""),
+        password: z.string().max(1024, `${ISSUE}.tooLong`).default(""),
+        token: z.string().trim().max(4096, `${ISSUE}.tooLong`).default(""),
         database: text(256),
         org: text(256),
         region: text(64),
         managementUrl: text(2048),
-        saslMechanism: z.enum(["", ...KAFKA_SASL_MECHANISMS]).default("")
+        saslMechanism: z.enum(["", ...KAFKA_SASL_MECHANISMS]).default(""),
+        /** Kafka at another provider only: whether its brokers speak TLS. Every
+         *  listed provider requires it. */
+        tls: z.boolean().default(true)
     })
     .superRefine((value, ctx) => {
         const issue = (path: CloudField | "provider", message: string) =>
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message });
         if (!cloudProvidersFor(value.engine).some((one) => one.id === value.provider)) {
-            issue("provider", "That provider does not offer this engine");
+            issue("provider", `${ISSUE}.providerEngine`);
         }
         for (const { field, required } of CLOUD_FIELDS[value.engine]) {
-            if (required && !value[field]) issue(field, "Required");
+            if (required && !value[field]) issue(field, `${ISSUE}.required`);
         }
         if (value.engine === "kafka") {
             const brokers = normalizeBrokers(value.url);
             if (brokers && !brokers.split(",").every((one) => BROKER.test(one))) {
-                issue("url", "List the brokers as host:port, separated by commas");
+                issue("url", `${ISSUE}.brokers`);
             }
             if (Boolean(value.username) !== Boolean(value.password)) {
-                issue(value.username ? "password" : "username", "A SASL user needs both a name and a password");
+                issue(value.username ? "password" : "username", `${ISSUE}.saslPair`);
             }
             return;
         }
@@ -710,14 +719,14 @@ export const cloudConnectSchema = z
             const url = normalizeEndpointUrl(value.url);
             const schemes = URL_SCHEMES[value.engine];
             if (!url || !schemes.includes(url.protocol)) {
-                issue("url", `Use an address starting with ${schemes.map((s) => `${s}//`).join(" or ")}`);
+                issue("url", `${ISSUE}.${value.engine === "rabbitmq" ? "urlAmqp" : "urlHttp"}`);
             } else if ((url.username || url.password) && value.engine !== "rabbitmq") {
-                issue("url", "Put the user and password in their own fields, not in the address");
+                issue("url", `${ISSUE}.urlCredentials`);
             }
         }
         if (value.managementUrl) {
             const url = normalizeEndpointUrl(value.managementUrl);
-            if (!url || url.protocol !== "https:") issue("managementUrl", "Use an https:// address");
+            if (!url || url.protocol !== "https:") issue("managementUrl", `${ISSUE}.https`);
         }
     })
     .transform((value) => ({
@@ -738,6 +747,7 @@ export type CloudConnect = z.output<typeof cloudConnectSchema>;
 export function cloudEndpoint(input: CloudConnect): DataEndpoint {
     if (input.engine === "kafka") {
         const sasl = Boolean(input.username);
+        const tls = input.provider !== "other" || input.tls;
         return {
             ...EMPTY_ENDPOINT,
             url: input.url,
@@ -748,7 +758,7 @@ export function cloudEndpoint(input: CloudConnect): DataEndpoint {
             password: input.password,
             saslMechanism: sasl ? input.saslMechanism || "PLAIN" : "",
             // A managed broker is reached over TLS; the ones listed all require it.
-            securityProtocol: sasl ? "SASL_SSL" : "SSL"
+            securityProtocol: `${sasl ? "SASL_" : ""}${tls ? "SSL" : "PLAINTEXT"}`
         };
     }
     const url = new URL(input.url);
@@ -788,21 +798,21 @@ export const cloudAmqpCreateSchema = z.object({
     name: z
         .string()
         .trim()
-        .min(1, "A name is required")
-        .max(64)
-        .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, "Use letters, digits, dashes and underscores"),
-    apiKey: z.string().trim().min(8, "Paste the API key from CloudAMQP").max(256),
+        .min(1, `${ISSUE}.nameRequired`)
+        .max(64, `${ISSUE}.tooLong`)
+        .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/, `${ISSUE}.amqpName`),
+    apiKey: z.string().trim().min(8, `${ISSUE}.apiKey`).max(256, `${ISSUE}.tooLong`),
     /** A plan id from CloudAMQP's list, such as `lemur` (free) or `bunny-1`. */
     plan: z
         .string()
         .trim()
         .toLowerCase()
-        .regex(/^[a-z0-9-]{2,40}$/, "Use a plan id from CloudAMQP, such as lemur"),
+        .regex(/^[a-z0-9-]{2,40}$/, `${ISSUE}.plan`),
     /** `provider::region`, such as `amazon-web-services::us-east-1`. */
     region: z
         .string()
         .trim()
         .toLowerCase()
-        .regex(/^[a-z0-9-]+::[a-z0-9-]+$/, "Use provider::region, such as amazon-web-services::us-east-1")
+        .regex(/^[a-z0-9-]+::[a-z0-9-]+$/, `${ISSUE}.region`)
 });
 export type CloudAmqpCreateInput = z.input<typeof cloudAmqpCreateSchema>;

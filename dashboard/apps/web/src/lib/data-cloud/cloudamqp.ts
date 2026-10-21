@@ -9,6 +9,8 @@
  * `ready` is true, and `DELETE /api/instances/{id}`.
  */
 
+import { CloudError, type CloudErrorKey } from "./errors";
+
 export const CLOUDAMQP_API = "https://customer.cloudamqp.com/api/instances";
 
 /** A request to an address the caller has already vetted. */
@@ -27,12 +29,10 @@ function authorization(apiKey: string): string {
 }
 
 /** Throws with what CloudAMQP answered, without echoing the key. */
-async function expectOk(response: Response, what: string): Promise<void> {
+async function expectOk(response: Response, failed: CloudErrorKey): Promise<void> {
     if (response.ok) return;
-    if (response.status === 401 || response.status === 403) {
-        throw new Error("CloudAMQP refused the API key");
-    }
-    throw new Error(`CloudAMQP could not ${what} (HTTP ${response.status})`);
+    if (response.status === 401 || response.status === 403) throw new CloudError("amqpKeyRefused");
+    throw new CloudError(failed, { status: response.status });
 }
 
 function readInstance(raw: unknown): CloudAmqpInstance {
@@ -54,16 +54,16 @@ export async function createCloudAmqpInstance(
     apiKey: string,
     input: { readonly name: string; readonly plan: string; readonly region: string }
 ): Promise<CloudAmqpInstance> {
-    const headers = { authorization: authorization(apiKey), accept: "application/json" };
-    const listed = await request(CLOUDAMQP_API, { method: "GET", headers });
-    await expectOk(listed, "list your instances");
-    const existing = ((await listed.json()) as unknown[]).map(readInstance);
-    const same = existing.find((one) => one.name === input.name);
+    const same = await findCloudAmqpInstance(request, apiKey, input.name);
     if (same) return same;
 
     const created = await request(CLOUDAMQP_API, {
         method: "POST",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: {
+            authorization: authorization(apiKey),
+            accept: "application/json",
+            "content-type": "application/json"
+        },
         body: JSON.stringify({
             name: input.name,
             plan: input.plan,
@@ -71,8 +71,23 @@ export async function createCloudAmqpInstance(
             tags: ["polaris"]
         })
     });
-    await expectOk(created, "create the instance");
+    await expectOk(created, "amqpCreateFailed");
     return readInstance(await created.json());
+}
+
+/** The instance by the name it was created under, if there is one. */
+export async function findCloudAmqpInstance(
+    request: CloudFetch,
+    apiKey: string,
+    name: string
+): Promise<CloudAmqpInstance | null> {
+    const listed = await request(CLOUDAMQP_API, {
+        method: "GET",
+        headers: { authorization: authorization(apiKey), accept: "application/json" }
+    });
+    await expectOk(listed, "amqpListFailed");
+    const existing = ((await listed.json()) as unknown[]).map(readInstance);
+    return existing.find((one) => one.name === name) ?? null;
 }
 
 export async function getCloudAmqpInstance(
@@ -84,7 +99,7 @@ export async function getCloudAmqpInstance(
         method: "GET",
         headers: { authorization: authorization(apiKey), accept: "application/json" }
     });
-    await expectOk(response, "read the instance");
+    await expectOk(response, "amqpReadFailed");
     return readInstance(await response.json());
 }
 
@@ -99,5 +114,5 @@ export async function deleteCloudAmqpInstance(
         headers: { authorization: authorization(apiKey) }
     });
     if (response.status === 404) return;
-    await expectOk(response, "delete the instance");
+    await expectOk(response, "amqpDeleteFailed");
 }

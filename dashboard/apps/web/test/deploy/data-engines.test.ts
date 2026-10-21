@@ -142,6 +142,40 @@ describe("connecting an existing instance", () => {
         ).toBe(false);
     });
 
+    it("gives every issue as a key the form translates", () => {
+        const result = core.cloudConnectSchema.safeParse({ ...base, engine: "couchdb", provider: "other", url: "ftp://a.b" });
+        expect(result.success).toBe(false);
+        for (const issue of result.success ? [] : result.error.issues) {
+            expect(issue.message).toMatch(/^view\.database\.cloud\.issues\.[A-Za-z]+$/);
+        }
+    });
+
+    it("reaches Kafka at another provider over TLS unless told it is plaintext", () => {
+        const kafka = (provider: string, extra: Record<string, unknown>) =>
+            core.cloudEndpoint(
+                core.cloudConnectSchema.parse({ ...base, engine: "kafka", provider, url: "broker.example.com:9092", ...extra })
+            ).securityProtocol;
+        expect(kafka("other", {})).toBe("SSL");
+        expect(kafka("other", { tls: false })).toBe("PLAINTEXT");
+        expect(kafka("other", { tls: false, username: "u", password: "p" })).toBe("SASL_PLAINTEXT");
+        // A listed provider requires TLS whatever the form sent.
+        expect(kafka("confluent-cloud", { tls: false, username: "u", password: "p" })).toBe("SASL_SSL");
+    });
+
+    it("checks a plaintext Kafka broker without TLS", async () => {
+        const { testCloudConnection } = await import("@/lib/data-cloud/service");
+        const openSocket = vi.fn(async (_host: string, _port: number, _tls: boolean) => undefined);
+        const input = core.cloudConnectSchema.parse({
+            ...base,
+            engine: "kafka",
+            provider: "other",
+            url: "broker.example.com:9092",
+            tls: false
+        });
+        await testCloudConnection(input, vi.fn(), openSocket);
+        expect(openSocket).toHaveBeenCalledWith("broker.example.com", 9092, false);
+    });
+
     it("refuses an address that resolves to a private network", async () => {
         const { testCloudConnection } = await import("@/lib/data-cloud/service");
         const input = core.cloudConnectSchema.parse({
@@ -151,7 +185,7 @@ describe("connecting an existing instance", () => {
             url: "http://127.0.0.1:8108",
             token: "k"
         });
-        await expect(testCloudConnection(input)).rejects.toThrow("cannot be reached");
+        await expect(testCloudConnection(input)).rejects.toMatchObject({ key: "privateAddress" });
     });
 
     it("tests the key against the engine's own API", async () => {
@@ -164,7 +198,7 @@ describe("connecting an existing instance", () => {
             url: "https://xyz.a1.typesense.net",
             token: "k"
         });
-        await expect(testCloudConnection(input, request)).rejects.toThrow("API key was refused");
+        await expect(testCloudConnection(input, request)).rejects.toMatchObject({ key: "keyRefused" });
         expect(request).toHaveBeenCalledWith("https://xyz.a1.typesense.net/collections", {
             headers: { "x-typesense-api-key": "k" }
         });
@@ -221,9 +255,9 @@ describe("CloudAMQP", () => {
 
     it("says the key was refused without echoing it", async () => {
         const request = vi.fn(async () => new Response("", { status: 401 }));
-        await expect(cloudamqp.getCloudAmqpInstance(request, "key-123", "1")).rejects.toThrow(
-            "CloudAMQP refused the API key"
-        );
+        await expect(cloudamqp.getCloudAmqpInstance(request, "key-123", "1")).rejects.toMatchObject({
+            key: "amqpKeyRefused"
+        });
     });
 });
 
@@ -231,5 +265,12 @@ describe("one-click templates", () => {
     it("no longer offers the engines that moved to databases", () => {
         const ids = core.SERVICE_TEMPLATES.map((template) => template.id);
         for (const retired of core.RETIRED_TEMPLATE_IDS) expect(ids).not.toContain(retired);
+    });
+
+    it("still knows MinIO's setup for a service an earlier release made from it", () => {
+        expect(core.serviceTemplate("minio")).toBeNull();
+        expect(core.serviceTemplateOfService("minio")?.prepare?.length).toBe(1);
+        expect(core.serviceTemplateOfService("kafka")).toBeNull();
+        expect(core.serviceTemplateOfService(undefined)).toBeNull();
     });
 });

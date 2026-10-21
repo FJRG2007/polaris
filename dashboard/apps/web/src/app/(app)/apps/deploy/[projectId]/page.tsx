@@ -224,6 +224,7 @@ export default async function DeployProjectPage({
                 engine: database.engine,
                 status: database.status,
                 hostedOnInstance: database.parentId !== null,
+                cloud: database.provider !== "",
                 hostedCount: database._count.children
             }))
         }))

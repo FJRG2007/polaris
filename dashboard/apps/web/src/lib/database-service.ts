@@ -26,6 +26,7 @@ import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { prepareDeployNames, recordLiveNames } from "./deploy/private-names";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { CloudError } from "./data-cloud/errors";
 import {
     limitsOf,
     deployLogPath,
@@ -539,16 +540,10 @@ function dataConnection(slug: string, endpoint: core.DataEndpoint): DatabaseConn
 
 /** An instance in a cloud is reached where its stored endpoint says. */
 function cloudConnection(
-    row: { readonly slug: string; readonly status: string; readonly providerError: string | null },
+    row: { readonly slug: string },
     creds: DbCredentials
 ): DatabaseConnection {
-    if (!creds.cloud?.endpoint.url) {
-        throw new Error(
-            row.status === "provisioning"
-                ? "The provider is still creating this instance"
-                : (row.providerError ?? "This instance has no address")
-        );
-    }
+    if (!creds.cloud?.endpoint.url) throw new CloudError("notReady");
     return dataConnection(row.slug, creds.cloud.endpoint);
 }
 
@@ -1006,6 +1001,7 @@ export async function stopDatabaseForBin(databaseId: string, ownerId: string): P
         include: { target: true }
     });
     if (!db) throw new Error("Database not found");
+    if (db.provider) return;
     const ports = await getPorts(db.target as TargetRow, ownerId);
     try {
         await ports.composeDown(`polaris-db-${shortHash(db.id, 8)}`);
@@ -1028,8 +1024,12 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
     // An instance in a cloud has no container here. One Polaris created there
     // is deleted there first, so it does not go on billing the user.
     if (db.provider) {
-        const { deleteCloudInstance } = await import("./data-cloud/service");
-        await deleteCloudInstance(db.provider, db.providerResourceId, await databaseCredentials(db.id, ownerId));
+        const { removeCloudInstance } = await import("./data-cloud/service");
+        await removeCloudInstance(db.id, {
+            ownerId,
+            projectId: db.environment.projectId,
+            orgId: db.environment.project.orgId
+        });
         await prisma.deployment.deleteMany({
             where: { deployableType: "database", deployableId: databaseId }
         });
