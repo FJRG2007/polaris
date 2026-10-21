@@ -1,0 +1,101 @@
+name: Companion module
+
+# Build the Bitfocus Companion module and attach the package to a release.
+#
+# The module ships to Companion rather than into an image: `companion-module-build`
+# writes one `polaris-<version>.tgz`, Companion's Modules page imports it with
+# "Import module package", and the Downloads page links the newest
+# `companion-v*` release these steps produce.
+#
+# A pull request that touches the module is built and packed here, because
+# nothing else checks that Companion's packer accepts it; its typecheck and
+# tests already run with every other workspace in `dashboard-ci`. A release is
+# tag-driven, like the Stream Deck plugin: push `companion-v<version>` matching
+# `version` in `dashboard/apps/companion/package.json`, which is also the version
+# the packer writes into the manifest Companion reads.
+#
+# The build passes `--ignore-license-rules`: the packer refuses AGPL-3.0, which
+# is the policy for modules listed in Bitfocus's own store. This package is not
+# listed there; it is downloaded from this repository's releases.
+
+on:
+  push:
+    tags:
+      - "companion-v*"
+  pull_request:
+    paths:
+      - "dashboard/apps/companion/**"
+      - "dashboard/apps/streamdeck/src/polaris.ts"
+      - "dashboard/apps/streamdeck/src/sse.ts"
+      - "dashboard/apps/streamdeck/src/address.ts"
+      - "dashboard/apps/streamdeck/src/backoff.ts"
+      - ".github/workflows/companion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: The tag has to match the package's version
+        if: startsWith(github.ref, 'refs/tags/companion-v')
+        run: |
+          expected="companion-v$(node -p "require('./apps/companion/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
+            exit 1
+          fi
+
+      - run: npm ci --prefer-offline
+
+      - run: npm run build --workspace @polaris/companion
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polaris-companion
+          # Repo-relative: `defaults.run.working-directory` applies to `run` steps
+          # and to nothing else.
+          path: dashboard/apps/companion/*.tgz
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/companion-v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polaris-companion
+          path: package
+      - name: Attach to release
+        # v2.6.2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Polaris for Companion ${{ github.ref_name }}
+          # This repository releases the dashboard too, and that is what "latest"
+          # should keep meaning.
+          make_latest: "false"
+          files: package/*.tgz
