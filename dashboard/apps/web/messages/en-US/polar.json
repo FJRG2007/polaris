@@ -713,6 +713,21 @@
         "history": "Code",
         "session": "Coding session",
         "allSessions": "All sessions",
-        "steps": "{count, plural, one {# step} other {# steps}}"
+        "steps": "{count, plural, one {# step} other {# steps}}",
+        "where": "Where the agent works",
+        "workspaceHint": "An empty workspace",
+        "searchRepos": "Search repositories",
+        "noRepoMatch": "No repository matches",
+        "addRepos": "Add repositories",
+        "addReposHint": "Opens GitHub to grant access to more repositories",
+        "addReposUnavailable": "An administrator sets this up",
+        "connectInAgents": "Connect a repository",
+        "refresh": "Refresh the list",
+        "agentSettings": "Manage agents",
+        "notSignedIn": "Not signed in",
+        "searchAgents": "Find an agent",
+        "noAgentMatch": "No agents match",
+        "noFiles": "An agent session can't take attached files yet",
+        "noVoice": "Voice talks to Polar's chat, not to an agent"
     }
 }

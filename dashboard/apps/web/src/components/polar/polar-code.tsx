@@ -5,9 +5,9 @@
  *
  * A Chat / Code switch at the top of Polar, the way the chat apps that also run
  * coding agents lay theirs out. Code is the same chat - the same welcome, the
- * same composer, the same thread and the same history in the sidebar - with the
- * repository, the branch and the agent as pickers on the composer, the way the
- * model picker sits on Chat's.
+ * same composer (`polar-composer`), the same thread and the same history in the
+ * sidebar - with the agent where Chat's composer has its model, and the
+ * repository and branch in a bar above the task (`polar-code-context`).
  *
  * Code never answers with the chat model. Sending starts an Agents session
  * through the Agents app's own `startSessionAction` - the same harness, Enigma
@@ -32,7 +32,7 @@ import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, cn, Input, SegmentedControl, Select } from "@polaris/ui";
+import { Button, cn, SegmentedControl } from "@polaris/ui";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
 import { Message, MessageContent, MessageResponse } from "@/components/polar/elements/message";
@@ -46,13 +46,16 @@ import {
     useTransition,
     type ReactNode
 } from "react";
+import type { GithubAppGap } from "@/lib/github-app-reach";
+import type { VoiceNotice } from "@/components/polar/polar-voice";
+import { GithubAppGapNotice } from "@/components/github-app-gap";
+import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import {
-    PromptInput,
-    PromptInputFooter,
-    PromptInputSubmit,
-    PromptInputTextarea,
-    PromptInputTools
-} from "@/components/polar/elements/prompt-input";
+    AgentPicker,
+    CodeRepoBar,
+    CodeSessionBar,
+    NO_REPO
+} from "@/components/polar/polar-code-context";
 import type {
     PolarCodeAccess,
     PolarCodeChoices,
@@ -61,23 +64,13 @@ import type {
     PolarCodeRow,
     PolarCodeThread
 } from "@/lib/polar/code";
-import {
-    Bot,
-    Code2,
-    ExternalLink,
-    FolderGit2,
-    GitBranch,
-    MessageSquare,
-    TriangleAlert
-} from "lucide-react";
+import { Code2, ExternalLink, MessageSquare, TriangleAlert } from "lucide-react";
 
 export type PolarMode = "chat" | "code";
 
 const MODE_KEY = "polar.mode";
 const OVERVIEW_KEY = "polar.code.overview.v2";
 const SESSIONS_PAGE = "/apps/agents/sessions";
-/** The repository picker's "none": a workspace with nothing checked out. */
-const NO_REPO = "workspace";
 /** How often the history is asked again while Code is on screen. */
 const LIST_MS = 10_000;
 /** How often a live session's thread is asked again. */
@@ -275,23 +268,70 @@ export function PolarModeSwitch({ code }: { code: PolarCodeState }) {
     );
 }
 
+/** What a new task offers - repositories and agents - read once Code may start
+ *  one, and again on a refresh (after adding repositories on GitHub). */
+function useCodeChoices(canStart: boolean) {
+    const [choices, setChoices] = useState<Choices | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [repoId, setRepoId] = useState("");
+    const [agentKey, setAgentKey] = useState("");
+
+    const load = useCallback(() => {
+        setRefreshing(true);
+        void runAction(() => readPoll<Choices | null>("/api/polar/code/choices", {}), setError)
+            .then((loaded) => {
+                if (!loaded) return;
+                setError(null);
+                setChoices(loaded);
+                // A pick that is gone (a repository disconnected meanwhile) falls back.
+                setRepoId((current) =>
+                    current === NO_REPO || loaded.repos.some((repo) => repo.id === current)
+                        ? current
+                        : (loaded.repos[0]?.id ?? NO_REPO)
+                );
+                const ready =
+                    loaded.agents.find((agent) => agent.readiness !== "missing") ??
+                    loaded.agents[0];
+                setAgentKey((current) =>
+                    loaded.agents.some((agent) => agent.key === current)
+                        ? current
+                        : (ready?.key ?? "")
+                );
+            })
+            .finally(() => setRefreshing(false));
+    }, []);
+
+    useEffect(() => {
+        if (canStart) load();
+    }, [canStart, load]);
+
+    return { choices, error, refreshing, load, repoId, setRepoId, agentKey, setAgentKey };
+}
+
 /**
  * The Code side, in Chat's own frame: a new task opens on the same welcome as a
  * new chat, and a session reads as a chat thread with the composer under it.
- * The history is the sidebar's, beside the chats.
+ * Where the task works sits in a bar above it; the history is the sidebar's,
+ * beside the chats.
  */
 export function PolarCodeView({
     code,
     fullPage,
-    avatar
+    avatar,
+    voiceKit
 }: {
     code: PolarCodeState;
     fullPage: boolean;
     /** Polar's avatar at the welcome's size, as Chat draws it. */
     avatar: ReactNode;
+    /** Chat's microphone, so dictation works here exactly as it does there. */
+    voiceKit: PolarVoiceKit;
 }) {
     const t = useTranslations("polar");
     const canStart = code.access === "manage";
+    const picks = useCodeChoices(canStart);
+    const [baseRef, setBaseRef] = useState("");
     const started = (id: string) => {
         code.open(id);
         code.refresh();
@@ -304,22 +344,53 @@ export function PolarCodeView({
                 sessionId={code.selected}
                 canPrompt={canStart}
                 fullPage={fullPage}
+                voiceKit={voiceKit}
             />
         );
 
+    const bar = canStart ? (
+        <CodeRepoBar
+            fullPage={fullPage}
+            choices={picks.choices}
+            repoId={picks.repoId}
+            onRepo={picks.setRepoId}
+            branch={baseRef}
+            onBranch={setBaseRef}
+            onRefresh={picks.load}
+            refreshing={picks.refreshing}
+            disabled={false}
+        />
+    ) : null;
     const composer = (
-        <CodeStart canStart={canStart} pending={code.access === null} onStarted={started} />
+        <CodeStart
+            canStart={canStart}
+            pending={code.access === null}
+            choices={picks.choices}
+            choicesError={picks.error}
+            repoId={picks.repoId}
+            baseRef={baseRef}
+            agentKey={picks.agentKey}
+            onAgent={picks.setAgentKey}
+            voiceKit={voiceKit}
+            onStarted={started}
+        />
     );
     if (fullPage)
         return (
-            <PolarWelcome avatar={avatar} title={t("code.heading")}>
-                {composer}
-            </PolarWelcome>
+            <>
+                {bar}
+                <PolarWelcome avatar={avatar} title={t("code.heading")}>
+                    {composer}
+                </PolarWelcome>
+            </>
         );
     return (
-        <PolarThreadFrame fullPage={false} dock={composer}>
-            <ConversationEmptyState icon={avatar} description={t("code.heading")} />
-        </PolarThreadFrame>
+        <>
+            {bar}
+            <PolarThreadFrame fullPage={false} dock={composer}>
+                <ConversationEmptyState icon={avatar} description={t("code.heading")} />
+            </PolarThreadFrame>
+        </>
     );
 }
 
@@ -335,10 +406,6 @@ const DOT: Record<PolarCodeRow["state"], string> = {
 export function StateDot({ state }: { state: PolarCodeRow["state"] }) {
     return <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", DOT[state])} />;
 }
-
-/** A picker on the composer's tool row, drawn the way the model picker is. */
-const PICKER =
-    "h-7 w-auto min-w-0 max-w-full gap-1 border-0 bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:bg-card-hover hover:text-foreground";
 
 type Choices = PolarCodeChoices;
 
@@ -358,40 +425,50 @@ function Notice({ error, children }: { error?: boolean; children: ReactNode }) {
     );
 }
 
-/** A new task: Chat's composer, with where to work as pickers on it. */
+/** Chat's composer as Code takes it: no files and no voice conversation for an
+ *  agent session (said on the buttons), the same microphone. */
+function useCodeComposerParts() {
+    const t = useTranslations("polar");
+    const [notice, setNotice] = useState<VoiceNotice | null>(null);
+    return {
+        notice,
+        setNotice,
+        attach: { refusal: t("code.noFiles") },
+        voiceMode: { refusal: t("code.noVoice") }
+    };
+}
+
+/** A new task: Chat's composer, with the agent where Chat has its model. */
 function CodeStart({
     canStart,
     pending,
+    choices,
+    choicesError,
+    repoId,
+    baseRef,
+    agentKey,
+    onAgent,
+    voiceKit,
     onStarted
 }: {
     canStart: boolean;
     pending: boolean;
+    choices: Choices | null;
+    choicesError: string | null;
+    repoId: string;
+    baseRef: string;
+    agentKey: string;
+    onAgent: (key: string) => void;
+    voiceKit: PolarVoiceKit;
     onStarted: (id: string) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
-    const [choices, setChoices] = useState<Choices | null>(null);
+    const parts = useCodeComposerParts();
     const [prompt, setPrompt] = useState("");
-    const [repoId, setRepoId] = useState("");
-    const [baseRef, setBaseRef] = useState("");
-    const [agentKey, setAgentKey] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [gap, setGap] = useState<GithubAppGap | null>(null);
     const [busy, startTransition] = useTransition();
-
-    useEffect(() => {
-        if (!canStart) return;
-        void runAction(
-            () => readPoll<Choices | null>("/api/polar/code/choices", {}),
-            setError
-        ).then((loaded) => {
-            if (!loaded) return;
-            setChoices(loaded);
-            setRepoId((current) => current || (loaded.repos[0]?.id ?? NO_REPO));
-            const ready =
-                loaded.agents.find((agent) => agent.readiness !== "missing") ?? loaded.agents[0];
-            setAgentKey((current) => current || (ready?.key ?? ""));
-        });
-    }, [canStart]);
 
     const agent: AgentOption | null =
         choices?.agents.find((option) => option.key === agentKey) ?? null;
@@ -403,27 +480,31 @@ function CodeStart({
     const submit = () => {
         if (!ready || busy || !agent) return;
         setError(null);
+        setGap(null);
         const text = prompt.trim();
         startTransition(() => {
             void runAction(
                 () =>
-                    postCode<{ id?: string; error?: string }>("/api/polar/code/start", {
-                        repoId: workspace ? null : repoId,
-                        title: titleFromPrompt(text),
-                        cli: agent.cli,
-                        accountId: agent.accountId,
-                        useMachineLogin: agent.machine,
-                        place: "local",
-                        sharedHome: false,
-                        hostId: null,
-                        baseRef: workspace ? "" : baseRef.trim(),
-                        prompt: text,
-                        taskId: null,
-                        unattended: null,
-                        // Code in Polar is the harness's work: Enigma on, the rest
-                        // following the repository and the instance.
-                        enigma: { enabled: true }
-                    }),
+                    postCode<{ id?: string; error?: string; githubGap?: GithubAppGap }>(
+                        "/api/polar/code/start",
+                        {
+                            repoId: workspace ? null : repoId,
+                            title: titleFromPrompt(text),
+                            cli: agent.cli,
+                            accountId: agent.accountId,
+                            useMachineLogin: agent.machine,
+                            place: "local",
+                            sharedHome: false,
+                            hostId: null,
+                            baseRef: workspace ? "" : baseRef.trim(),
+                            prompt: text,
+                            taskId: null,
+                            unattended: null,
+                            // Code in Polar is the harness's work: Enigma on, the
+                            // rest following the repository and the instance.
+                            enigma: { enabled: true }
+                        }
+                    ),
                 setError
             ).then((result) => {
                 if (!result) return;
@@ -432,91 +513,47 @@ function CodeStart({
                     setPrompt("");
                     onStarted(result.id);
                 }
-                if (result.error) setError(result.error);
+                if (result.githubGap) setGap(result.githubGap);
+                else if (result.error) setError(result.error);
             });
         });
     };
 
+    const shownError = error ?? choicesError;
     return (
-        <div className="flex min-w-0 flex-col gap-2">
-            <PromptInput onSubmit={submit} aria-busy={pending || undefined}>
-                <label htmlFor={inputId} className="sr-only">
-                    {t("code.promptLabel")}
-                </label>
-                <PromptInputTextarea
-                    id={inputId}
-                    value={prompt}
-                    maxLength={PROMPT_MAX}
-                    disabled={!canStart || busy}
-                    placeholder={t("code.placeholder")}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    onSubmitKey={submit}
-                />
-                <PromptInputFooter className="items-end">
-                    <PromptInputTools className="flex-wrap">
-                        {canStart ? (
-                            <>
-                                <Select
-                                    aria-label={t("code.repository")}
-                                    value={repoId}
-                                    onValueChange={setRepoId}
-                                    disabled={choices === null || busy}
-                                    placeholder={t("code.repository")}
-                                    className={cn(PICKER, "max-w-[14rem]")}
-                                    options={[
-                                        {
-                                            value: NO_REPO,
-                                            label: t("code.workspace"),
-                                            icon: <FolderGit2 className="size-3.5" />
-                                        },
-                                        ...(choices?.repos ?? []).map((repo) => ({
-                                            value: repo.id,
-                                            label: repo.name,
-                                            icon: <FolderGit2 className="size-3.5" />
-                                        }))
-                                    ]}
-                                />
-                                {workspace ? null : (
-                                    <span className="flex h-7 min-w-0 items-center gap-1 rounded-md px-2 text-muted-foreground focus-within:bg-card-hover hover:bg-card-hover">
-                                        <GitBranch className="size-3.5 shrink-0" aria-hidden />
-                                        <Input
-                                            aria-label={t("code.branch")}
-                                            title={t("code.branch")}
-                                            value={baseRef}
-                                            onChange={(event) => setBaseRef(event.target.value)}
-                                            disabled={busy}
-                                            placeholder={t("code.branchPlaceholder")}
-                                            className="h-6 w-28 min-w-0 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
-                                        />
-                                    </span>
-                                )}
-                                <Select
-                                    aria-label={t("code.agent")}
-                                    value={agentKey}
-                                    onValueChange={setAgentKey}
-                                    disabled={choices === null || busy}
-                                    placeholder={t("code.agent")}
-                                    className={cn(PICKER, "max-w-[14rem]")}
-                                    options={(choices?.agents ?? []).map((option) => ({
-                                        value: option.key,
-                                        label: option.account
-                                            ? `${option.label} - ${option.account}`
-                                            : option.label,
-                                        icon: <Bot className="size-3.5" />
-                                    }))}
-                                />
-                            </>
-                        ) : null}
-                    </PromptInputTools>
-                    <PromptInputSubmit
-                        busy={false}
-                        disabled={!ready || busy}
-                        sendLabel={t("code.start")}
-                        stopLabel={t("code.start")}
-                        onStop={() => undefined}
-                    />
-                </PromptInputFooter>
-            </PromptInput>
+        <div className="flex min-w-0 flex-col gap-2" aria-busy={pending || undefined}>
+            <PolarComposer
+                kit={voiceKit}
+                notice={parts.notice}
+                onNotice={parts.setNotice}
+                inputId={inputId}
+                label={t("code.promptLabel")}
+                value={prompt}
+                onValueChange={setPrompt}
+                placeholder={t("code.placeholder")}
+                disabled={!canStart || busy}
+                maxLength={PROMPT_MAX}
+                onSubmit={submit}
+                picker={
+                    canStart ? (
+                        <AgentPicker
+                            agents={choices?.agents ?? null}
+                            value={agentKey}
+                            onChange={onAgent}
+                            disabled={busy}
+                        />
+                    ) : null
+                }
+                attach={parts.attach}
+                voiceMode={parts.voiceMode}
+                submit={{
+                    busy: false,
+                    disabled: !ready || busy,
+                    sendLabel: t("code.start"),
+                    stopLabel: t("code.start"),
+                    onStop: () => undefined
+                }}
+            />
             {!canStart && !pending ? <Notice>{t("code.readOnly")}</Notice> : null}
             {unlinked ? (
                 <Notice>
@@ -534,7 +571,8 @@ function CodeStart({
                     </Link>
                 </Notice>
             ) : null}
-            {error ? <Notice error>{error}</Notice> : null}
+            {gap ? <GithubAppGapNotice gap={gap} onCheckAgain={submit} checking={busy} /> : null}
+            {shownError ? <Notice error>{shownError}</Notice> : null}
         </div>
     );
 }
@@ -543,14 +581,17 @@ function CodeStart({
 function CodeThread({
     sessionId,
     canPrompt,
-    fullPage
+    fullPage,
+    voiceKit
 }: {
     sessionId: string;
     canPrompt: boolean;
     fullPage: boolean;
+    voiceKit: PolarVoiceKit;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
+    const parts = useCodeComposerParts();
     // Undefined while the first answer is on its way; null when it is not there.
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
     const [failed, setFailed] = useState(false);
@@ -605,53 +646,46 @@ function CodeThread({
         <Notice>{t("code.readOnly")}</Notice>
     ) : (
         <div className="flex min-w-0 flex-col gap-2">
-            <PromptInput onSubmit={send}>
-                <label htmlFor={inputId} className="sr-only">
-                    {t("code.reply")}
-                </label>
-                <PromptInputTextarea
-                    id={inputId}
-                    value={reply}
-                    maxLength={PROMPT_MAX}
-                    disabled={busy}
-                    placeholder={t("code.reply")}
-                    onChange={(event) => setReply(event.target.value)}
-                    onSubmitKey={send}
-                />
-                <PromptInputFooter>
-                    <PromptInputTools />
-                    <PromptInputSubmit
-                        busy={false}
-                        disabled={!reply.trim() || busy}
-                        sendLabel={t("code.send")}
-                        stopLabel={t("code.send")}
-                        onStop={() => undefined}
-                    />
-                </PromptInputFooter>
-            </PromptInput>
+            <PolarComposer
+                kit={voiceKit}
+                notice={parts.notice}
+                onNotice={parts.setNotice}
+                inputId={inputId}
+                label={t("code.reply")}
+                value={reply}
+                onValueChange={setReply}
+                placeholder={t("code.reply")}
+                disabled={busy}
+                maxLength={PROMPT_MAX}
+                onSubmit={send}
+                picker={null}
+                attach={parts.attach}
+                voiceMode={parts.voiceMode}
+                submit={{
+                    busy: false,
+                    disabled: !reply.trim() || busy,
+                    sendLabel: t("code.send"),
+                    stopLabel: t("code.send"),
+                    onStop: () => undefined
+                }}
+            />
             {error ? <Notice error>{error}</Notice> : null}
         </div>
     );
 
     return (
-        <PolarThreadFrame fullPage={fullPage} dock={dock}>
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+        <>
+            <CodeSessionBar
+                fullPage={fullPage}
+                repo={session?.repo ?? ""}
+                branch={session?.branch ?? ""}
+            >
                 {session ? (
                     <span className="flex shrink-0 items-center gap-1.5">
                         <StateDot state={session.state} />
                         {session.stateLabel}
                     </span>
                 ) : null}
-                <span
-                    className="min-w-0 flex-1 truncate"
-                    title={
-                        session ? `${session.title}\n${session.repo} ${session.branch}` : undefined
-                    }
-                >
-                    {session
-                        ? `${session.repo || t("code.workspace")}${session.branch ? ` - ${session.branch}` : ""}`
-                        : ""}
-                </span>
                 <Link
                     href={`${SESSIONS_PAGE}/${sessionId}`}
                     aria-label={t("code.openSession")}
@@ -660,76 +694,83 @@ function CodeThread({
                 >
                     <ExternalLink className="size-4" />
                 </Link>
-            </div>
-            {thread === undefined && failed ? (
-                <div className="flex flex-col items-start gap-2">
-                    <p role="alert" className="text-sm text-muted-foreground">
-                        {t("code.unreachable")}
-                    </p>
-                    <Button type="button" size="sm" variant="outline" onClick={read}>
-                        {t("code.retry")}
-                    </Button>
-                </div>
-            ) : thread === undefined ? (
-                <div className="space-y-2" aria-busy>
-                    {[0, 1, 2].map((key) => (
-                        <div key={key} className="h-5 rounded bg-muted motion-safe:animate-pulse" />
-                    ))}
-                </div>
-            ) : thread === null ? (
-                <p className="text-sm text-muted-foreground">{t("code.gone")}</p>
-            ) : (
-                <>
-                    {blocks.map((block, index) =>
-                        block.kind === "message" ? (
-                            <CodeMessage key={`${block.entry.at}-${index}`} entry={block.entry} />
-                        ) : (
-                            <Work
-                                key={`${block.entries[0]?.at}-${index}`}
-                                messageId={`code:${sessionId}:${index}`}
-                                streaming={live && index === blocks.length - 1}
-                                current={block.entries.at(-1)?.text ?? null}
-                                tools={block.entries.length}
-                                failed={0}
-                                seconds={null}
-                                summary={t("code.steps", { count: block.entries.length })}
-                            >
-                                <ol className="space-y-1">
-                                    {block.entries.map((entry, line) => (
-                                        <li
-                                            key={`${entry.at}-${line}`}
-                                            className="flex min-w-0 gap-1.5"
-                                        >
-                                            <span className="shrink-0 font-medium">
-                                                {entry.text}
-                                            </span>
-                                            {entry.detail ? (
-                                                <span
-                                                    className="min-w-0 truncate"
-                                                    title={entry.detail}
-                                                >
-                                                    {entry.detail}
+            </CodeSessionBar>
+            <PolarThreadFrame fullPage={fullPage} dock={dock}>
+                {thread === undefined && failed ? (
+                    <div className="flex flex-col items-start gap-2">
+                        <p role="alert" className="text-sm text-muted-foreground">
+                            {t("code.unreachable")}
+                        </p>
+                        <Button type="button" size="sm" variant="outline" onClick={read}>
+                            {t("code.retry")}
+                        </Button>
+                    </div>
+                ) : thread === undefined ? (
+                    <div className="space-y-2" aria-busy>
+                        {[0, 1, 2].map((key) => (
+                            <div
+                                key={key}
+                                className="h-5 rounded bg-muted motion-safe:animate-pulse"
+                            />
+                        ))}
+                    </div>
+                ) : thread === null ? (
+                    <p className="text-sm text-muted-foreground">{t("code.gone")}</p>
+                ) : (
+                    <>
+                        {blocks.map((block, index) =>
+                            block.kind === "message" ? (
+                                <CodeMessage
+                                    key={`${block.entry.at}-${index}`}
+                                    entry={block.entry}
+                                />
+                            ) : (
+                                <Work
+                                    key={`${block.entries[0]?.at}-${index}`}
+                                    messageId={`code:${sessionId}:${index}`}
+                                    streaming={live && index === blocks.length - 1}
+                                    current={block.entries.at(-1)?.text ?? null}
+                                    tools={block.entries.length}
+                                    failed={0}
+                                    seconds={null}
+                                    summary={t("code.steps", { count: block.entries.length })}
+                                >
+                                    <ol className="space-y-1">
+                                        {block.entries.map((entry, line) => (
+                                            <li
+                                                key={`${entry.at}-${line}`}
+                                                className="flex min-w-0 gap-1.5"
+                                            >
+                                                <span className="shrink-0 font-medium">
+                                                    {entry.text}
                                                 </span>
-                                            ) : null}
-                                        </li>
-                                    ))}
-                                </ol>
-                            </Work>
-                        )
-                    )}
-                    {thread.entries.length === 0 && live ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <ThinkingOrb state="breathing" size={20} decorative />
-                            <Shimmer>{t("code.quiet")}</Shimmer>
-                        </div>
-                    ) : null}
-                    {thread.error ? <Notice error>{thread.error}</Notice> : null}
-                </>
-            )}
-        </PolarThreadFrame>
+                                                {entry.detail ? (
+                                                    <span
+                                                        className="min-w-0 truncate"
+                                                        title={entry.detail}
+                                                    >
+                                                        {entry.detail}
+                                                    </span>
+                                                ) : null}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </Work>
+                            )
+                        )}
+                        {thread.entries.length === 0 && live ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <ThinkingOrb state="breathing" size={20} decorative />
+                                <Shimmer>{t("code.quiet")}</Shimmer>
+                            </div>
+                        ) : null}
+                        {thread.error ? <Notice error>{thread.error}</Notice> : null}
+                    </>
+                )}
+            </PolarThreadFrame>
+        </>
     );
 }
-
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
 function CodeMessage({ entry }: { entry: PolarCodeEntry }) {

@@ -15,6 +15,7 @@ const started: unknown[] = [];
 
 const CHOICES = {
     sharedWorkspace: false,
+    installUrl: "https://github.com/apps/polaris-test/installations/new",
     repos: [{ id: "22222222-2222-4222-8222-222222222222", name: "acme/web" }],
     hosts: [],
     agents: [
@@ -50,6 +51,14 @@ const { codeBlocks, PolarCodeView, PolarModeSwitch, titleFromPrompt, usePolarCod
     await import("@/components/polar/polar-code");
 
 let access: "none" | "read" | "manage" = "none";
+
+/** Chat's microphone as Polar's chat lends it to Code. */
+const KIT = {
+    voice: { dictation: true, speech: false, transcribers: [], transcriber: null },
+    payer: null,
+    onTranscriber: () => undefined,
+    isAdmin: false
+};
 let thread: unknown = null;
 
 /** The switch, the history's rows as the sidebar offers them, and the side on screen. */
@@ -68,7 +77,7 @@ function Harness() {
                 ))}
             </ul>
             {code.mode === "code" ? (
-                <PolarCodeView code={code} fullPage={false} avatar={null} />
+                <PolarCodeView code={code} fullPage={false} avatar={null} voiceKit={KIT} />
             ) : (
                 <p>chat-view</p>
             )}
@@ -137,7 +146,7 @@ describe("the Chat / Code switch", () => {
         await waitFor(() => expect((codeOption as HTMLButtonElement).disabled).toBe(false));
         fireEvent.click(codeOption);
         const box = await screen.findByRole("textbox", { name: "Task for the agent" });
-        await screen.findByRole("combobox", { name: "Repository" });
+        await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
         fireEvent.change(box, { target: { value: "Fix the login form\nwith tests" } });
         const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
         await waitFor(() => expect(send.disabled).toBe(false));

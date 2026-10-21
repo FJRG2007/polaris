@@ -383,6 +383,7 @@ export function VoiceModeButton({
     available,
     disabled,
     primary,
+    refusal,
     onOpen,
     onNotice
 }: {
@@ -391,12 +392,16 @@ export function VoiceModeButton({
     /** Drawn as the send button, which it stands in for while there is
      *  nothing to send. */
     primary?: boolean;
+    /** Why a voice conversation cannot be had here at all: shown on the
+     *  button, which then does nothing. */
+    refusal?: string;
     onOpen: () => void;
     onNotice: (notice: VoiceNotice | null) => void;
 }) {
     const t = useTranslations("polar");
-    const label = available ? t("voice.call") : t("voice.unavailable");
+    const label = refusal ?? (available ? t("voice.call") : t("voice.unavailable"));
     const open = () => {
+        if (refusal) return;
         if (!available) return onNotice("unavailable");
         if (!canRecord()) return onNotice("cannotRecord");
         onNotice(null);
