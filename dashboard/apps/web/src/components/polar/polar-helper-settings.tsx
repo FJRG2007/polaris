@@ -82,9 +82,9 @@ export function HelperSettings({ providers }: { providers: ModelSelectorProvider
     return (
         <section className="flex flex-col gap-2">
             <div className="min-w-0">
-                <h3 className="text-sm font-medium text-foreground">
+                <h2 className="text-sm font-medium text-foreground">
                     {t("settings.helper.title")}
-                </h3>
+                </h2>
                 <p className="text-xs text-muted-foreground">{t("settings.helper.intro")}</p>
             </div>
             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
@@ -134,4 +134,23 @@ export function HelperSettings({ providers }: { providers: ModelSelectorProvider
             </ul>
         </section>
     );
+}
+
+/** The extras section on the settings page, with the models this person can
+ *  pick read from the server; until then a pick is not reported unavailable. */
+export function PolarHelperSettings() {
+    const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
+    useEffect(() => {
+        let live = true;
+        void fetch("/api/polar/models")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { providers?: ModelSelectorProvider[] } | null) => {
+                if (live && data?.providers) setProviders(data.providers);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, []);
+    return <HelperSettings providers={providers} />;
 }

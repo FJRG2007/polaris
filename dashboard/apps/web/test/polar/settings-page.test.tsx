@@ -81,6 +81,7 @@ afterEach(() => {
 
 const { PolarToolSettings } = await import("@/components/polar/polar-settings");
 const { PolarChat } = await import("@/components/polar/polar-panel");
+const { PolarHelperSettings } = await import("@/components/polar/polar-helper-settings");
 
 const page = () => render(<PolarToolSettings />, { wrapper: MessagesWrapper });
 
