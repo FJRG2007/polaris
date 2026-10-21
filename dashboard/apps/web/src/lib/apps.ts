@@ -569,14 +569,6 @@ export function sectionOffered(section: AppSection, gate: SectionGate): boolean 
  * Apps with no entry render no rail.
  */
 /**
- * The two headings the Apps rail is read under.
- *
- * Ten entries in one flat list is ten things to read every time you are looking
- * for one, and they are not ten of a kind: four are things you run, three are the
- * machines they run on, three are how you watch and protect them. The rail groups
- * them so the eye lands on the third of the list it wants.
- */
-/**
  * The heading the camera screens sit under in the Home rail.
  *
  * Home is the house, and cameras are the first thing in it rather than the whole
@@ -587,8 +579,22 @@ export function sectionOffered(section: AppSection, gate: SectionGate): boolean 
 const CAMERAS_GROUP = "Cameras";
 const DEVICES_GROUP = "Devices";
 
+/**
+ * The headings the Apps rail is read under.
+ *
+ * Twenty entries under three headings left nine under Machines and seven under
+ * Operations - each a list to read through, not a place the eye lands. Grouped
+ * the way infrastructure consoles split theirs: what you build with, the machines,
+ * the network in front of them, the data and services on them, and how they are
+ * watched. Deploy and the Marketplace stay ungrouped at the top, because they are
+ * where most visits start. No heading holds more than seven entries
+ * (`test/navigation/rail-group-sizes.test.ts`).
+ */
+const DEVELOPMENT_GROUP = "Development";
 const MACHINES_GROUP = "Machines";
-const OPERATIONS_GROUP = "Operations";
+const NETWORK_GROUP = "Network";
+const DATA_GROUP = "Data & services";
+const OBSERVABILITY_GROUP = "Observability";
 
 /** What people call the Ad blocker when they search for it: the rail and the
  *  store both find it by these. */
@@ -620,16 +626,21 @@ const DEVELOPERS_GROUP = "Developers";
 /**
  * The headings the Management rail is read under.
  *
- * Fifteen entries in one list is a wall, and an operator arrives at it with one
- * of four questions: who is here, what they may do, how Polaris reaches people,
- * and how the deployment itself is set up. Overview and Activity stay ungrouped
- * at the top, because they are where you look before you know which of the four
- * you want.
+ * An operator arrives with one question: who is here, what they may do, how
+ * Polaris reaches people, or how the deployment itself is set up. That last one
+ * was a single Platform heading of thirteen entries, so it is split the way
+ * GitHub, Vercel and Nextcloud split their own settings: the deployment's basics,
+ * what it connects to, where its data lives, and what it is using. Overview,
+ * Activity and Evidence stay ungrouped at the top, because they are where you
+ * look before you know which question you have.
  */
 const ADMIN_PEOPLE_GROUP = "People";
 const ADMIN_ACCESS_GROUP = "Access";
 const ADMIN_COMMUNICATION_GROUP = "Communication";
-const ADMIN_PLATFORM_GROUP = "Platform";
+const ADMIN_GENERAL_GROUP = "General";
+const ADMIN_INTEGRATIONS_GROUP = "Integrations & AI";
+const ADMIN_STORAGE_GROUP = "Storage & data";
+const ADMIN_USAGE_GROUP = "Usage & health";
 
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
@@ -777,99 +788,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["install", "catalog"]
         },
         {
-            label: "Servers", // i18n-ignore
-            href: "/apps/servers",
-            needs: "system.manage",
-            icon: Server,
-            group: MACHINES_GROUP,
-            keywords: ["hosts", "machines", "ssh"]
-        },
-        {
-            label: "Compare", // i18n-ignore
-            href: "/apps/servers/compare",
-            needs: "system.manage",
-            icon: GitCompareArrows,
-            group: MACHINES_GROUP,
-            keywords: ["side by side", "cpu", "memory", "disk", "network", "load"]
-        },
-        {
-            label: "Insights", // i18n-ignore
-            href: "/apps/servers/insights",
-            needs: "system.manage",
-            icon: ChartLine,
-            group: MACHINES_GROUP,
-            keywords: ["anomalies", "unusual", "forecast", "disk full", "capacity", "trend"]
-        },
-        {
-            label: "Rollouts", // i18n-ignore
-            href: "/apps/servers/rollouts",
-            needs: "system.manage",
-            icon: Rocket,
-            group: MACHINES_GROUP,
-            keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"]
-        },
-        {
-            // Part of Servers on every Polaris (see `native-apps`); the same
-            // permission its screen and every one of its actions asks.
-            label: "Security scans", // i18n-ignore
-            href: "/apps/servers/security",
-            needs: "system.manage",
-            icon: ScanSearch,
-            group: MACHINES_GROUP,
-            keywords: [
-                "security",
-                "malware",
-                "antivirus",
-                "quarantine",
-                "file integrity",
-                "hardening",
-                "vulnerabilities",
-                "cve",
-                "sbom"
-            ]
-        },
-        {
-            label: "Cloud servers", // i18n-ignore
-            href: "/apps/servers/cloud",
-            needs: "system.manage",
-            icon: Cloud,
-            group: MACHINES_GROUP,
-            keywords: [
-                "cloud",
-                "digitalocean",
-                "hetzner",
-                "vultr",
-                "linode",
-                "aws",
-                "azure",
-                "google cloud",
-                "ionos",
-                "vps",
-                "cost"
-            ]
-        },
-        {
-            label: "Runners", // i18n-ignore
-            href: "/apps/runners",
-            needs: "system.manage",
-            icon: Workflow,
-            group: MACHINES_GROUP,
-            keywords: ["github actions", "ci"]
-        },
-        {
-            label: "Tunnels", // i18n-ignore
-            href: "/apps/tunnels",
-            needs: "deploy.manage",
-            icon: Network,
-            group: MACHINES_GROUP,
-            keywords: ["wireguard", "nat", "cgnat", "expose", "public address", "vpn"]
-        },
-        {
             label: "Agents", // i18n-ignore
             href: "/apps/agents",
             needs: "agents.read",
             icon: Bot,
-            keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"]
+            keywords: ["coding agent", "ai", "review", "pull requests", "issues", "github"],
+            group: DEVELOPMENT_GROUP
         },
         {
             label: "Code", // i18n-ignore
@@ -885,45 +809,128 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "github",
                 "waiting on me",
                 "assigned to me"
-            ]
+            ],
+            group: DEVELOPMENT_GROUP
+        },
+        {
+            label: "Runners", // i18n-ignore
+            href: "/apps/runners",
+            needs: "system.manage",
+            icon: Workflow,
+            keywords: ["github actions", "ci"],
+            group: DEVELOPMENT_GROUP
+        },
+        {
+            label: "Servers", // i18n-ignore
+            href: "/apps/servers",
+            needs: "system.manage",
+            icon: Server,
+            keywords: ["hosts", "machines", "ssh"],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Compare", // i18n-ignore
+            href: "/apps/servers/compare",
+            needs: "system.manage",
+            icon: GitCompareArrows,
+            keywords: ["side by side", "cpu", "memory", "disk", "network", "load"],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Insights", // i18n-ignore
+            href: "/apps/servers/insights",
+            needs: "system.manage",
+            icon: ChartLine,
+            keywords: ["anomalies", "unusual", "forecast", "disk full", "capacity", "trend"],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Rollouts", // i18n-ignore
+            href: "/apps/servers/rollouts",
+            needs: "system.manage",
+            icon: Rocket,
+            keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"],
+            group: MACHINES_GROUP
+        },
+        {
+            // Part of Servers on every Polaris (see `native-apps`); the same
+            // permission its screen and every one of its actions asks.
+            label: "Security scans", // i18n-ignore
+            href: "/apps/servers/security",
+            needs: "system.manage",
+            icon: ScanSearch,
+            keywords: [
+                "security",
+                "malware",
+                "antivirus",
+                "quarantine",
+                "file integrity",
+                "hardening",
+                "vulnerabilities",
+                "cve",
+                "sbom"
+            ],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Cloud servers", // i18n-ignore
+            href: "/apps/servers/cloud",
+            needs: "system.manage",
+            icon: Cloud,
+            keywords: [
+                "cloud",
+                "digitalocean",
+                "hetzner",
+                "vultr",
+                "linode",
+                "aws",
+                "azure",
+                "google cloud",
+                "ionos",
+                "vps",
+                "cost"
+            ],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Containers", // i18n-ignore
+            href: "/apps/containers",
+            icon: Container,
+            keywords: ["docker"],
+            group: MACHINES_GROUP
+        },
+        {
+            label: "Tunnels", // i18n-ignore
+            href: "/apps/tunnels",
+            needs: "deploy.manage",
+            icon: Network,
+            keywords: ["wireguard", "nat", "cgnat", "expose", "public address", "vpn"],
+            group: NETWORK_GROUP
         },
         {
             label: "Firewall", // i18n-ignore
             href: "/apps/firewall",
             needs: "deploy.manage",
             icon: ShieldCheck,
-            group: OPERATIONS_GROUP,
-            keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"]
+            keywords: ["waf", "ip", "allowlist", "denylist", "block", "access"],
+            group: NETWORK_GROUP
         },
         {
-            label: "Analytics", // i18n-ignore
-            href: "/apps/analytics",
-            needs: "deploy.manage",
-            icon: ChartColumn,
-            group: OPERATIONS_GROUP,
-            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"]
-        },
-        {
-            label: "Telemetry", // i18n-ignore
-            href: "/apps/telemetry",
-            needs: "deploy.manage",
-            icon: Bug,
-            group: OPERATIONS_GROUP,
-            keywords: [
-                "errors",
-                "exceptions",
-                "crashes",
-                "stack trace",
-                "sentry",
-                "issues",
-                "logging"
-            ]
+            // With the tunnels and the firewall: a service the operator runs for
+            // their network. Only here once it is installed, and only for an
+            // administrator - it answers every device's lookups.
+            label: "Ad blocker", // i18n-ignore
+            href: "/apps/dns-blocker",
+            adminOnly: true,
+            requiresApp: "dns-blocker",
+            icon: ShieldBan,
+            keywords: [...DNS_BLOCKER_KEYWORDS],
+            group: NETWORK_GROUP
         },
         {
             label: "Databases", // i18n-ignore
             href: "/apps/databases",
             icon: Database,
-            group: OPERATIONS_GROUP,
             keywords: [
                 "sql",
                 "query",
@@ -938,22 +945,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "rows",
                 "browse",
                 "client"
-            ]
-        },
-        {
-            label: "Containers", // i18n-ignore
-            href: "/apps/containers",
-            icon: Container,
-            group: MACHINES_GROUP,
-            keywords: ["docker"]
+            ],
+            group: DATA_GROUP
         },
         {
             label: "Backups", // i18n-ignore
             href: "/apps/backups",
             adminOnly: true,
             icon: Archive,
-            group: OPERATIONS_GROUP,
-            keywords: ["restore", "snapshots"]
+            keywords: ["restore", "snapshots"],
+            group: DATA_GROUP
         },
         {
             // Here rather than under Management: a mail server is a service the
@@ -967,7 +968,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             needs: "mailserver.manage",
             requiresApp: "mail-server",
             icon: Mails,
-            group: OPERATIONS_GROUP,
             keywords: [
                 "smtp",
                 "imap",
@@ -983,19 +983,32 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "aliases",
                 "forwards",
                 "catch-all"
-            ]
+            ],
+            group: DATA_GROUP
         },
         {
-            // Beside the mail server for the same reason: a service the operator
-            // runs for their network. Only here once it is installed, and only
-            // for an administrator - it answers every device's lookups.
-            label: "Ad blocker", // i18n-ignore
-            href: "/apps/dns-blocker",
-            adminOnly: true,
-            requiresApp: "dns-blocker",
-            icon: ShieldBan,
-            group: OPERATIONS_GROUP,
-            keywords: [...DNS_BLOCKER_KEYWORDS]
+            label: "Analytics", // i18n-ignore
+            href: "/apps/analytics",
+            needs: "deploy.manage",
+            icon: ChartColumn,
+            keywords: ["visitors", "traffic", "pageviews", "referrers", "metrics", "umami"],
+            group: OBSERVABILITY_GROUP
+        },
+        {
+            label: "Telemetry", // i18n-ignore
+            href: "/apps/telemetry",
+            needs: "deploy.manage",
+            icon: Bug,
+            keywords: [
+                "errors",
+                "exceptions",
+                "crashes",
+                "stack trace",
+                "sentry",
+                "issues",
+                "logging"
+            ],
+            group: OBSERVABILITY_GROUP
         }
     ],
     watch: [
@@ -2085,54 +2098,20 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Consumption", // i18n-ignore
-            href: "/admin/consumption",
+            label: "Get started", // i18n-ignore
+            href: "/admin/setup",
             adminOnly: true,
-            icon: Gauge,
-            keywords: [
-                "usage",
-                "resources",
-                "memory",
-                "ram",
-                "cpu",
-                "disk",
-                "footprint",
-                "what is using",
-                "containers",
-                "apps",
-                "marketplace"
-            ],
-            group: ADMIN_PLATFORM_GROUP
+            icon: Rocket,
+            keywords: ["setup", "first run", "wizard", "install apps", "onboarding"],
+            group: ADMIN_GENERAL_GROUP
         },
         {
-            label: "Billing", // i18n-ignore
-            href: "/admin/billing",
+            label: "Updates & settings", // i18n-ignore
+            href: "/admin/settings",
             adminOnly: true,
-            icon: Wallet,
-            keywords: [
-                "cost",
-                "costs",
-                "prices",
-                "rates",
-                "charge back",
-                "chargeback",
-                "invoice",
-                "statement",
-                "budget",
-                "spend",
-                "usage",
-                "vcpu",
-                "per project"
-            ],
-            group: ADMIN_PLATFORM_GROUP
-        },
-        {
-            label: "Domains", // i18n-ignore
-            href: "/admin/domains",
-            adminOnly: true,
-            icon: Globe,
-            keywords: ["dns", "tunnels", "certificates"],
-            group: ADMIN_PLATFORM_GROUP
+            icon: Settings,
+            keywords: ["version", "upgrade"],
+            group: ADMIN_GENERAL_GROUP
         },
         {
             label: "Display defaults", // i18n-ignore
@@ -2140,7 +2119,46 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             icon: SlidersHorizontal,
             keywords: ["units", "formats"],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_GENERAL_GROUP
+        },
+        {
+            label: "Domains", // i18n-ignore
+            href: "/admin/domains",
+            adminOnly: true,
+            icon: Globe,
+            keywords: ["dns", "tunnels", "certificates"],
+            group: ADMIN_GENERAL_GROUP
+        },
+        {
+            label: "Integrations", // i18n-ignore
+            href: "/admin/integrations",
+            adminOnly: true,
+            icon: Blocks,
+            keywords: ["github", "cloudflare", "connect"],
+            group: ADMIN_INTEGRATIONS_GROUP
+        },
+        {
+            label: "AI provider keys", // i18n-ignore
+            href: "/admin/integrations/models",
+            adminOnly: true,
+            icon: Sparkles,
+            keywords: [
+                "models",
+                "providers",
+                "anthropic",
+                "claude",
+                "openai",
+                "gemini",
+                "grok",
+                "deepseek",
+                "kimi",
+                "groq",
+                "cerebras",
+                "openrouter",
+                "api key",
+                "agents"
+            ],
+            group: ADMIN_INTEGRATIONS_GROUP
         },
         {
             label: "Agent defaults", // i18n-ignore
@@ -2156,7 +2174,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "pull requests",
                 "issues"
             ],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_INTEGRATIONS_GROUP
         },
         {
             label: "Storage locations", // i18n-ignore
@@ -2176,7 +2194,24 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "space",
                 "full"
             ],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_STORAGE_GROUP
+        },
+        {
+            label: "Uploads", // i18n-ignore
+            href: "/admin/uploads",
+            adminOnly: true,
+            icon: HardDrive,
+            keywords: [
+                "attachments",
+                "files",
+                "storage",
+                "nas",
+                "size limit",
+                "avatars",
+                "profile photos",
+                "gravatar"
+            ],
+            group: ADMIN_STORAGE_GROUP
         },
         {
             label: "Keeping records", // i18n-ignore
@@ -2202,55 +2237,49 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "bodies",
                 "cache"
             ],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_STORAGE_GROUP
         },
         {
-            label: "Uploads", // i18n-ignore
-            href: "/admin/uploads",
+            label: "Consumption", // i18n-ignore
+            href: "/admin/consumption",
             adminOnly: true,
-            icon: HardDrive,
+            icon: Gauge,
             keywords: [
-                "attachments",
-                "files",
-                "storage",
-                "nas",
-                "size limit",
-                "avatars",
-                "profile photos",
-                "gravatar"
+                "usage",
+                "resources",
+                "memory",
+                "ram",
+                "cpu",
+                "disk",
+                "footprint",
+                "what is using",
+                "containers",
+                "apps",
+                "marketplace"
             ],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_USAGE_GROUP
         },
         {
-            label: "Integrations", // i18n-ignore
-            href: "/admin/integrations",
+            label: "Billing", // i18n-ignore
+            href: "/admin/billing",
             adminOnly: true,
-            icon: Blocks,
-            keywords: ["github", "cloudflare", "connect"],
-            group: ADMIN_PLATFORM_GROUP
-        },
-        {
-            label: "AI provider keys", // i18n-ignore
-            href: "/admin/integrations/models",
-            adminOnly: true,
-            icon: Sparkles,
+            icon: Wallet,
             keywords: [
-                "models",
-                "providers",
-                "anthropic",
-                "claude",
-                "openai",
-                "gemini",
-                "grok",
-                "deepseek",
-                "kimi",
-                "groq",
-                "cerebras",
-                "openrouter",
-                "api key",
-                "agents"
+                "cost",
+                "costs",
+                "prices",
+                "rates",
+                "charge back",
+                "chargeback",
+                "invoice",
+                "statement",
+                "budget",
+                "spend",
+                "usage",
+                "vcpu",
+                "per project"
             ],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_USAGE_GROUP
         },
         {
             label: "Diagnostics", // i18n-ignore
@@ -2258,23 +2287,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             adminOnly: true,
             icon: Stethoscope,
             keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"],
-            group: ADMIN_PLATFORM_GROUP
-        },
-        {
-            label: "Updates & settings", // i18n-ignore
-            href: "/admin/settings",
-            adminOnly: true,
-            icon: Settings,
-            keywords: ["version", "upgrade"],
-            group: ADMIN_PLATFORM_GROUP
-        },
-        {
-            label: "Get started", // i18n-ignore
-            href: "/admin/setup",
-            adminOnly: true,
-            icon: Rocket,
-            keywords: ["setup", "first run", "wizard", "install apps", "onboarding"],
-            group: ADMIN_PLATFORM_GROUP
+            group: ADMIN_USAGE_GROUP
         }
     ]
 };
