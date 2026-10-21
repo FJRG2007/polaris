@@ -11,7 +11,8 @@
 /** Which captures belong to which catalog app, in the order they are shown. */
 const SHOTS: Readonly<Record<string, readonly string[]>> = {
     calendar: ["calendar", "calendar-time"],
-    "game-servers": ["games"]
+    "game-servers": ["games", "game-players", "game-console", "game-inventory", "game-events"],
+    home: ["places"]
 };
 
 export interface AppScreenshot {
@@ -33,4 +34,18 @@ export function appScreenshots(catalogId: string, locale: string): AppScreenshot
         dark: { desktop: file(slug, "dark", "desktop"), mobile: file(slug, "dark", "mobile") },
         light: { desktop: file(slug, "light", "desktop"), mobile: file(slug, "light", "mobile") }
     }));
+}
+
+/**
+ * The one capture a store card shows: the app's first screenshot, or null for an
+ * app that has none, which the card answers with its designed placeholder rather
+ * than with a picture of something the app is not.
+ */
+export function appPreview(catalogId: string, locale: string): AppScreenshot | null {
+    return appScreenshots(catalogId, locale)[0] ?? null;
+}
+
+/** Whether a real capture of the app exists at all. */
+export function hasScreenshots(catalogId: string): boolean {
+    return (SHOTS[catalogId]?.length ?? 0) > 0;
 }

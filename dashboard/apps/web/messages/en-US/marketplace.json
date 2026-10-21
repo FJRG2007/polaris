@@ -31,7 +31,20 @@
         "description": "Install and run apps on your servers in one click.",
         "search": "Search apps",
         "noMatch": "Nothing here matches that.",
-        "installed": "Installed"
+        "installed": "Installed",
+        "categories": "Categories",
+        "allCategories": "All",
+        "sortLabel": "Sort by",
+        "sort": {
+            "featured": "Featured",
+            "name": "Name",
+            "recent": "Recently added"
+        },
+        "featured": "Featured",
+        "shelves": {
+            "polaris": "Polaris apps",
+            "community": "From other developers"
+        }
     },
     "uninstall": {
         "games": "{name} leaves the switcher and stops running its checks. Delete your game servers first; worlds are never deleted by uninstalling.",
@@ -54,7 +67,14 @@
         "configure": "Configure",
         "installing": "Installing",
         "install": "Install",
-        "comingSoon": "Coming soon"
+        "comingSoon": "Coming soon",
+        "more": "More for {name}",
+        "details": "Details",
+        "installed": "Installed",
+        "unavailable": "Not available yet",
+        "locked": "Needs permission",
+        "lockedHint": "Installing apps needs permission to manage apps. Ask an admin.",
+        "preview": "{name} preview"
     },
     "wizard": {
         "title": "Install {name}",
@@ -95,6 +115,18 @@
             "ark": "A dinosaur survival island for PC players, on the map you choose.",
             "hytale": "A Hytale world of your own, run from the server files on your account.",
             "fivem": "Grand Theft Auto V on a server of your own, running the resources you choose."
-        }
+        },
+        "previous": "Previous screenshot",
+        "next": "Next screenshot",
+        "position": "{index} of {count}",
+        "added": "Added",
+        "needs": "What it needs",
+        "needsNothing": "Nothing on your servers: it runs inside the dashboard.",
+        "needsServer": "A server to run its container on.",
+        "needsPorts": "Ports it opens: {ports}.",
+        "needsStorage": "Storage for: {volumes}.",
+        "needsSettings": "Settings you fill in: {fields}.",
+        "needsOnce": "One install serves everyone on this Polaris.",
+        "needsPermission": "Installing it needs permission to manage apps."
     }
 }

@@ -16,10 +16,10 @@ import { appScreenshots } from "@/lib/apps/app-screenshots";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
-import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { findApp, isInstallable, type AppManifest } from "@/lib/apps/catalog";
+import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import {
     CAPABILITY_KEYS,
@@ -28,8 +28,10 @@ import {
     statusLabel,
     useOneClickInstall
 } from "../marketplace-view";
-import styles from "./screenshots.module.css";
-import { ImageViewer, thumbnailOf, type ViewedImage } from "@/components/image-viewer";
+import { ScreenshotGallery } from "./screenshot-gallery";
+import { AppPreview, PrimaryActionButton, StatusBadge } from "../store-card";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { ADDED_ON, installBadge, primaryAction } from "@/lib/apps/marketplace-store";
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
@@ -84,36 +86,59 @@ function imageVersion(image: string | undefined): string | null {
     return tag && tag !== "latest" ? tag : null;
 }
 
+/**
+ * What installing the app takes, read off its manifest: a server and what the
+ * container asks of it, or nothing at all for an app that is part of the
+ * dashboard; and the permission the install action checks.
+ */
+export function appNeeds(t: NamespaceTranslator<"marketplace">, app: AppManifest): string[] {
+    const lines: string[] = [];
+    if (app.installMethod === "builtin") lines.push(t("detail.needsNothing"));
+    else {
+        lines.push(t("detail.needsServer"));
+        const ports = app.template?.ports ?? [];
+        if (ports.length > 0)
+            lines.push(
+                t("detail.needsPorts", {
+                    ports: ports
+                        .map((port) => `${port.host ?? port.container}/${port.protocol}`)
+                        .join(", ")
+                })
+            );
+        const volumes = app.template?.volumes ?? [];
+        if (volumes.length > 0)
+            lines.push(
+                t("detail.needsStorage", {
+                    volumes: volumes.map((volume) => volume.label).join(", ")
+                })
+            );
+        const fields = promptedEnvVars(app);
+        if (fields.length > 0)
+            lines.push(
+                t("detail.needsSettings", { fields: fields.map((field) => field.label).join(", ") })
+            );
+    }
+    if (app.instanceWide) lines.push(t("detail.needsOnce"));
+    lines.push(t("detail.needsPermission"));
+    return lines;
+}
+
 export function AppDetail({ appId, children }: { appId: string; children: ReactNode }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
     const locale = useLocale();
     const app = useLocalizedApp(appId);
-    const [viewing, setViewing] = useState<ViewedImage | null>(null);
-    const [gallery, setGallery] = useState<ViewedImage[]>([]);
     if (!app) return null;
     const from = appProvenance(app);
     const shots = appScreenshots(app.id, locale);
     const image = app.template?.image;
     const version = imageVersion(image);
-    // The screenshots as the viewer pages through them, in the reader's theme
-    // at the moment one is opened: the page picks by CSS, so the class on the
-    // document then is the answer, and a theme switched later is read afresh.
-    const open = (index: number) => {
-        const root = document.documentElement;
-        const light =
-            root.classList.contains("light") ||
-            (root.classList.contains("system") &&
-                window.matchMedia("(prefers-color-scheme: light)").matches);
-        const now: ViewedImage[] = shots.map((shot, at) => ({
-            url: shot[light ? "light" : "dark"].desktop,
-            name: t("detail.screenshotAlt", { name: app.name, index: at + 1 })
-        }));
-        setGallery(now);
-        setViewing(now[index] ?? null);
-    };
-
+    const added = ADDED_ON[app.id]
+        ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(
+              new Date(`${ADDED_ON[app.id]}T00:00:00Z`)
+          )
+        : null;
     return (
         <div className="flex min-w-0 flex-col gap-6">
             <Link
@@ -135,57 +160,16 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
 
             {children}
 
-            {shots.length > 0 && (
-                <section
-                    className="flex min-w-0 flex-col gap-3"
-                    aria-label={t("detail.screenshots")}
-                >
-                    <h2 className="text-sm font-medium">{t("detail.screenshots")}</h2>
-                    <div className="flex snap-x gap-3 overflow-x-auto pb-2">
-                        {shots.map((shot, index) => {
-                            const alt = t("detail.screenshotAlt", {
-                                name: app.name,
-                                index: index + 1
-                            });
-                            return (
-                                <figure
-                                    key={shot.dark.desktop}
-                                    className="w-[85%] max-w-2xl shrink-0 snap-start sm:w-[70%]"
-                                >
-                                    <button
-                                        type="button"
-                                        aria-label={t("detail.openScreenshot", { name: alt })}
-                                        onClick={() => open(index)}
-                                        className="block w-full cursor-zoom-in rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    >
-                                        {(["dark", "light"] as const).map((theme) => (
-                                            <picture key={theme} className={styles[theme]}>
-                                                <source
-                                                    media="(max-width: 640px)"
-                                                    srcSet={shot[theme].mobile}
-                                                />
-                                                {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
-                                                <img
-                                                    src={shot[theme].desktop}
-                                                    alt={alt}
-                                                    loading={index === 0 ? "eager" : "lazy"}
-                                                    className="border-border w-full rounded-md border"
-                                                />
-                                            </picture>
-                                        ))}
-                                    </button>
-                                </figure>
-                            );
-                        })}
-                    </div>
-                    <ImageViewer
-                        image={viewing}
-                        gallery={gallery}
-                        onNavigate={setViewing}
-                        onClose={() => setViewing(null)}
-                        origin={thumbnailOf}
-                    />
-                </section>
+            {/* The real captures, or - for an app nobody has captured yet - the
+                same designed preview its card shows, never a mocked-up screen. */}
+            {shots.length > 0 ? (
+                <ScreenshotGallery name={app.name} shots={shots} />
+            ) : (
+                <AppPreview
+                    app={app}
+                    shot={null}
+                    className="max-w-2xl rounded-lg border border-border"
+                />
             )}
 
             {app.id === GAME_SERVERS_APP_ID ? <SupportedGames /> : null}
@@ -209,6 +193,17 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
             )}
 
             <section className="flex min-w-0 flex-col gap-2">
+                <h2 className="text-sm font-medium">{t("detail.needs")}</h2>
+                <ul className="text-muted-foreground flex list-disc flex-col gap-1 pl-5 text-sm">
+                    {appNeeds(t, app).map((line) => (
+                        <li key={line} className="break-words">
+                            {line}
+                        </li>
+                    ))}
+                </ul>
+            </section>
+
+            <section className="flex min-w-0 flex-col gap-2">
                 <h2 className="text-sm font-medium">{t("detail.information")}</h2>
                 <dl className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
                     <Fact label={t("detail.developer")}>{from.developer}</Fact>
@@ -216,6 +211,7 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                         {categoryLabel(words, app.category, navLabel)}
                     </Fact>
                     {version && <Fact label={t("detail.version")}>{version}</Fact>}
+                    {added && <Fact label={t("detail.added")}>{added}</Fact>}
                     {image && (
                         <Fact label={t("detail.image")}>
                             <code className="break-all text-xs">{image}</code>
@@ -281,41 +277,40 @@ export function AppInstallPanel({
     const [removing, setRemoving] = useState<DetailInstall | null>(null);
     if (!app) return null;
     const manifest = findApp(appId) ?? app;
-    // One install per Polaris, or per owner: a second would be refused.
-    const offerInstall = isInstallable(app) && !(app.singleton && installs.length > 0);
     const openHref = (item: InstalledAppReaderView) => app.opensAt ?? `/apps/installed/${item.id}`;
+    const action = primaryAction(app, {
+        installs,
+        canInstall,
+        installing: installingId === app.id
+    });
+    const badge = installBadge(app, installs);
 
     return (
         <section className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-                {app.singleton && installs[0] && (
-                    <Link href={openHref(installs[0])}>
-                        <Button>{t("card.open")}</Button>
-                    </Link>
+                {action.kind !== "locked" && (
+                    <PrimaryActionButton
+                        action={action}
+                        onInstall={() => install(manifest)}
+                        disabled={installingId !== null}
+                        size="md"
+                    />
                 )}
-                {app.comingSoon && (
-                    <Badge className="text-muted-foreground">{t("card.comingSoon")}</Badge>
+                {action.kind === "install" && action.configurable && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => setWizard(true)}
+                        disabled={installingId !== null}
+                        title={t("card.configureHint")}
+                    >
+                        {t("card.configure")}
+                    </Button>
                 )}
-                {offerInstall && canInstall && (
-                    <>
-                        <Button onClick={() => install(manifest)} disabled={installingId !== null}>
-                            {installingId && <Loader2 className="size-4 animate-spin" />}
-                            {installingId ? t("card.installing") : t("card.install")}
-                        </Button>
-                        {app.installMethod !== "builtin" && (
-                            <Button
-                                variant="secondary"
-                                onClick={() => setWizard(true)}
-                                disabled={installingId !== null}
-                                title={t("card.configureHint")}
-                            >
-                                {t("card.configure")}
-                            </Button>
-                        )}
-                    </>
+                {badge?.kind === "status" && (
+                    <StatusBadge status={badge.status} label={statusLabel(t, badge.status)} />
                 )}
             </div>
-            {offerInstall && !canInstall && (
+            {action.kind === "locked" && (
                 <p className="text-muted-foreground text-sm">{t("detail.readOnly")}</p>
             )}
             {error && <p className="text-danger text-sm">{error}</p>}

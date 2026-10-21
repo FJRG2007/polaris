@@ -1,50 +1,57 @@
 "use client";
 
 /**
- * The marketplace grid and the per-app install wizard. The catalog is imported
- * directly (it is static and client-safe); the installed state comes from the
- * server. Installing opens a dialog that reuses Deploy's notions of a target
- * server and per-volume storage (a server-local volume or a NAS mount), then
- * calls the deploy.manage-gated install action.
+ * The marketplace, laid out as a store, and the per-app install wizard. The
+ * catalog is imported directly (it is static and client-safe), so the whole
+ * listing paints with the shell; the installed state and what this reader may
+ * do come from the server with the page.
  *
- * It reads as a store now rather than as a list of what happens to be declared,
- * and four things are what changed:
- *
- * - **A search field.** Every store has one, and a page of categories somebody
- *   has to scroll to find "Minecraft" is a page that gets scrolled past. Fuzzy,
- *   so a near miss and a category still land.
- * - **Coming soon goes last.** It was mixed in with what can actually be
- *   installed, so the first row of a category could be three things nobody can
- *   have. They are still shown - saying what is coming is the point of declaring
- *   them - underneath, and out of the way.
- * - **Every card says who is behind it.** A store that does not say where a thing
- *   comes from is a store nobody should install from. Read off the image the app
- *   installs rather than typed in - see `appProvenance`.
+ * - **Search, categories and a sort** above everything, the first thing
+ *   somebody arriving with a name or a need in mind reaches for. What is shown
+ *   and in what order is decided in `lib/apps/marketplace-store`.
+ * - **A featured row** of apps that can be installed today and have a real
+ *   capture to show, then the apps on two shelves: Polaris's own, and other
+ *   developers' software Polaris installs.
+ * - **Every card leads with one action** - Install, Installing, Open, or why
+ *   not - and a small badge for how its install is doing. Configure, Details
+ *   and Uninstall live in the card's overflow menu instead of a row of buttons
+ *   that all look equally important.
  * - **Installed lists apps, not their parts.** A camera relay and six Minecraft
- *   servers are not seven things somebody installed; they are what two apps run.
- *   The manifests already said so (`internal` and `ownedBy`) and this screen was
- *   the one place not reading it.
+ *   servers are what two apps run, not eight installs (`internal`, `ownedBy`).
+ *
+ * The catalog is a dozen apps, so the grid is drawn whole: there is nothing
+ * here a virtualized list or a second page would save.
  */
 
-import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2, Search } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
-import { appProvenance } from "@/lib/apps/provenance";
-import { Loader2, Search, Trash2 } from "lucide-react";
-import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
-import { defaultInstallInput } from "@/lib/apps/install-defaults";
-import type { InstalledAppReaderView } from "@/lib/apps/install-service";
-import { useEffect, useMemo, useState, useTransition } from "react";
 import { UninstallDialog } from "./uninstall-dialog";
+import { appProvenance } from "@/lib/apps/provenance";
+import { appPreview } from "@/lib/apps/app-screenshots";
+import { defaultInstallInput } from "@/lib/apps/install-defaults";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import type { InstalledAppReaderView } from "@/lib/apps/install-service";
+import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import {
     appsByCategory,
     findApp,
-    isInstallable,
     promptedEnvVars,
     type AppCapability,
     type AppManifest
 } from "@/lib/apps/catalog";
+import {
+    STORE_SORTS,
+    featuredApps,
+    filterStoreApps,
+    installBadge,
+    primaryAction,
+    storeCategories,
+    storeShelves,
+    type StoreCategory,
+    type StoreSort
+} from "@/lib/apps/marketplace-store";
 import {
     installAppAction,
     listInstallTargetsAction,
@@ -53,10 +60,16 @@ import {
     type StorageConnectionOption
 } from "./actions";
 import {
+    AppPreview,
+    OverflowMenu,
+    PrimaryActionButton,
+    StatusBadge,
+    StoreCardFrame,
+    type OverflowEntry
+} from "./store-card";
+import {
     Badge,
     Button,
-    Card,
-    CardBody,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -67,11 +80,11 @@ import {
     Select,
     cn
 } from "@polaris/ui";
-import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
-import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { validationMessage } from "@/components/i18n/validation-message";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
 type Words = NamespaceTranslator<"marketplace">;
 
@@ -97,117 +110,161 @@ export function statusLabel(t: Words, status: string): string {
     return STATUSES.has(status) ? t(`statuses.${status}` as NamespaceKey<"marketplace">) : status;
 }
 
+/** An install as the grid is handed it, with whether this reader may uninstall it
+ *  (`uninstallAccess`, the check the uninstall action makes). */
+export type StoreInstallRow = InstalledAppReaderView & { readonly canUninstall?: boolean };
+
 export function MarketplaceView({
     installed,
-    initialQuery = ""
+    initialQuery = "",
+    canInstall = false
 }: {
-    installed: InstalledAppReaderView[];
+    installed: StoreInstallRow[];
     /** What the search starts with - an app's name, when a screen sent somebody
      *  here to install that app. */
     initialQuery?: string;
+    /** deploy.manage, the permission the install action requires. */
+    canInstall?: boolean;
 }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
+    const locale = useLocale();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
+    const [removing, setRemoving] = useState<StoreInstallRow | null>(null);
     const [query, setQuery] = useState(initialQuery);
+    const [category, setCategory] = useState<StoreCategory>("all");
+    const [sort, setSort] = useState<StoreSort>("featured");
+
     // In the reader's words, so the cards and the search say what they read. An
     // app or a category named after a screen takes the rail's label for it.
-    const groups = useMemo(
+    const all = useMemo(
         () =>
-            appsByCategory().map((group) => ({
-                category: categoryLabel(words, group.category, navLabel),
-                apps: group.apps.map((app) => localizeApp(words, app, navLabel))
-            })),
+            appsByCategory().flatMap((group) =>
+                group.apps.map((app) => localizeApp(words, app, navLabel))
+            ),
         [words, navLabel]
     );
+    const categories = useMemo(() => storeCategories(all), [all]);
+    const shown = useMemo(
+        () => filterStoreApps(all, { query, category, sort, locale }),
+        [all, query, category, sort, locale]
+    );
+    const browsing = !query.trim() && category === "all";
+    const featured = useMemo(() => (browsing ? featuredApps(all) : []), [all, browsing]);
 
     const { install, installingId, error } = useOneClickInstall();
 
-    /** Everything on offer, in one list for the search. */
-    const all = useMemo(() => groups.flatMap((group) => group.apps), [groups]);
-
-    /**
-     * What the grid draws: the categories, or one flat list of matches.
-     *
-     * A search that still drew category headings would draw four headings with
-     * one card under each, which is a worse answer than the list. Within either,
-     * what can be installed comes before what is only announced.
-     */
-    const shown = useMemo(() => {
-        const term = query.trim();
-        if (term) {
-            const hits = searchItems(all, term, APP_FIELDS);
-            return hits.length === 0
-                ? []
-                : [{ category: t("view.results"), apps: sortOffered(hits) }];
-        }
-        return groups.map((group) => ({ category: group.category, apps: sortOffered(group.apps) }));
-    }, [groups, all, query, t]);
-
-    const installedByCatalog = useMemo(() => {
-        const map = new Map<string, number>();
-        for (const item of installed) map.set(item.catalogId, (map.get(item.catalogId) ?? 0) + 1);
-        return map;
-    }, [installed]);
-
-    // An app that only runs once per Polaris opens instead of offering a second
-    // install that the server would refuse.
-    const singletonInstall = useMemo(() => {
-        const map = new Map<string, string>();
+    const installsByCatalog = useMemo(() => {
+        const map = new Map<string, StoreInstallRow[]>();
         for (const item of installed)
-            if (!map.has(item.catalogId)) map.set(item.catalogId, item.id);
+            map.set(item.catalogId, [...(map.get(item.catalogId) ?? []), item]);
         return map;
     }, [installed]);
+
+    const card = (app: AppManifest, featuredCard = false) => (
+        <StoreCard
+            key={app.id}
+            app={app}
+            installs={installsByCatalog.get(app.id) ?? []}
+            canInstall={canInstall}
+            installing={installingId === app.id}
+            disabled={installingId !== null}
+            featured={featuredCard}
+            onInstall={() => install(app)}
+            onConfigure={() => setWizardApp(app)}
+            onUninstall={setRemoving}
+        />
+    );
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
             <PageHeader title={t("view.title")} description={t("view.description")} />
 
-            {/* Above everything, the way a store puts it: the first thing
-                somebody arriving with a name in mind reaches for. */}
-            <div className="relative max-w-md">
-                <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
-                <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={t("view.search")}
-                    aria-label={t("view.search")}
-                    className="pl-8"
-                />
+            <div className="flex min-w-0 flex-col gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <div className="relative min-w-0 flex-1 basis-60 sm:max-w-md">
+                        <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2" />
+                        <Input
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={t("view.search")}
+                            aria-label={t("view.search")}
+                            className="pl-8"
+                        />
+                    </div>
+                    <Select
+                        value={sort}
+                        onValueChange={(value) => setSort(value as StoreSort)}
+                        aria-label={t("view.sortLabel")}
+                        className="w-44"
+                        options={STORE_SORTS.map((value) => ({
+                            value,
+                            label: t(`view.sort.${value}`)
+                        }))}
+                    />
+                </div>
+                <div
+                    role="group"
+                    aria-label={t("view.categories")}
+                    className="flex min-w-0 flex-wrap gap-1.5"
+                >
+                    {(["all", ...categories] as StoreCategory[]).map((value) => (
+                        <Button
+                            key={value}
+                            size="sm"
+                            variant={category === value ? "primary" : "secondary"}
+                            aria-pressed={category === value}
+                            onClick={() => setCategory(value)}
+                        >
+                            {value === "all"
+                                ? t("view.allCategories")
+                                : categoryLabel(words, value, navLabel)}
+                        </Button>
+                    ))}
+                </div>
             </div>
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            {installed.length > 0 && !query.trim() && <InstalledSection installed={installed} />}
+            {browsing && installed.length > 0 && (
+                <InstalledSection installed={installed} onUninstall={setRemoving} />
+            )}
+
+            {featured.length > 0 && (
+                <section className="flex min-w-0 flex-col gap-3" aria-label={t("view.featured")}>
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                        {t("view.featured")}
+                    </h2>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {featured.map((app) => card(app, true))}
+                    </div>
+                </section>
+            )}
 
             {shown.length === 0 ? (
                 <p className="text-muted-foreground py-10 text-center text-sm">
                     {t("view.noMatch")}
                 </p>
-            ) : null}
-
-            {shown.map((group) => (
-                <section key={group.category} className="flex flex-col gap-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">{group.category}</h2>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {group.apps.map((app) => (
-                            <AppCard
-                                key={app.id}
-                                app={app}
-                                installedCount={installedByCatalog.get(app.id) ?? 0}
-                                openHref={openHrefFor(app, singletonInstall)}
-                                installing={installingId === app.id}
-                                disabled={installingId !== null}
-                                onInstall={() => install(app)}
-                                onConfigure={() => setWizardApp(app)}
-                            />
-                        ))}
-                    </div>
-                </section>
-            ))}
+            ) : (
+                storeShelves(shown).map((group) => (
+                    <section
+                        key={group.shelf}
+                        className="flex min-w-0 flex-col gap-3"
+                        aria-label={t(`view.shelves.${group.shelf}`)}
+                    >
+                        <h2 className="text-sm font-medium text-muted-foreground">
+                            {t(`view.shelves.${group.shelf}`)}
+                        </h2>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                            {group.apps.map((app) => card(app))}
+                        </div>
+                    </section>
+                ))
+            )}
 
             {wizardApp && <InstallWizard app={wizardApp} onClose={() => setWizardApp(null)} />}
+            {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
         </div>
     );
 }
@@ -256,49 +313,6 @@ export function useOneClickInstall(): {
 }
 
 /**
- * Where Open goes for an app that is already installed.
- *
- * Usually the app's own page. An app that runs nothing says where it really
- * lives (`opensAt`), because its install page would be a row of lifecycle
- * buttons over a status that can only ever read "not running" - a click that
- * exists to be clicked through.
- */
-function openHrefFor(app: AppManifest, singletonInstall: Map<string, string>): string | null {
-    if (!app.singleton || !singletonInstall.has(app.id)) return null;
-    return app.opensAt ?? `/apps/installed/${singletonInstall.get(app.id)}`;
-}
-
-/**
- * What can be installed, before what is only announced.
- *
- * Coming soon is worth showing - it is why those manifests exist - but mixed in
- * it meant the first row of a category could be three things nobody can have.
- * Order is otherwise left alone: the catalog's is deliberate.
- */
-/**
- * What a store search reads of an app: the name, the summary and the category,
- * weighted in that order - people search a store for a name, occasionally for
- * what a thing does, and the category is the tie-break rather than the answer.
- * The description is deliberately left out: it is a paragraph, and matching
- * inside one puts apps at the top for a word buried in their third sentence.
- * The manifest's keywords are read instead, for the name of the kind of thing an
- * app is when its own name is not it - "dns" found the Mail server, whose
- * summary mentions DNS, and not the Ad blocker, whose whole job is DNS.
- */
-const APP_FIELDS: readonly SearchField<AppManifest>[] = [
-    { text: (app) => app.name, weight: 3 },
-    { text: (app) => app.summary, weight: 2 },
-    { text: (app) => app.keywords, weight: 1 },
-    { text: (app) => app.category, weight: 1 }
-];
-
-function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
-    return [...apps].sort(
-        (left, right) => Number(left.comingSoon ?? false) - Number(right.comingSoon ?? false)
-    );
-}
-
-/**
  * The apps somebody has installed - the apps, not the containers they run.
  *
  * A camera relay, a face recognizer and six Minecraft servers are not eight
@@ -311,77 +325,90 @@ function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
  * server, and hiding it because the catalog no longer describes it is how a
  * container becomes unreachable from the product that started it.
  */
-function ownInstalls(installed: readonly InstalledAppReaderView[]): InstalledAppReaderView[] {
+function ownInstalls<T extends InstalledAppReaderView>(installed: readonly T[]): T[] {
     return installed.filter((item) => {
         const manifest = findApp(item.catalogId);
         return !manifest || !manifest.internal;
     });
 }
 
-function InstalledSection({ installed }: { installed: InstalledAppReaderView[] }) {
+function InstalledSection({
+    installed,
+    onUninstall
+}: {
+    installed: StoreInstallRow[];
+    onUninstall: (item: StoreInstallRow) => void;
+}) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
-    const [removing, setRemoving] = useState<InstalledAppReaderView | null>(null);
+    const router = useRouter();
     const own = ownInstalls(installed);
     if (own.length === 0) return null;
 
     return (
-        <section className="flex flex-col gap-3">
-            {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
+        <section className="flex min-w-0 flex-col gap-3" aria-label={t("view.installed")}>
             <h2 className="text-sm font-medium text-muted-foreground">{t("view.installed")}</h2>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {own.map((item) => {
                     const manifest = findApp(item.catalogId);
+                    const href = manifest?.opensAt ?? `/apps/installed/${item.id}`;
+                    const badge = manifest ? installBadge(manifest, [item]) : null;
+                    const entries: OverflowEntry[] = [];
+                    if (manifest)
+                        entries.push({
+                            key: "details",
+                            label: t("card.details"),
+                            onSelect: () => router.push(`/apps/marketplace/${manifest.id}`)
+                        });
+                    // Offered from the same check the uninstall action makes, so a
+                    // reader the server would refuse is never shown it.
+                    if (item.canUninstall)
+                        entries.push({
+                            key: "uninstall",
+                            label: t("uninstall.confirm"),
+                            danger: true,
+                            onSelect: () => onUninstall(item)
+                        });
                     return (
-                        <div key={item.id} className="group relative">
-                            <Link href={manifest?.opensAt ?? `/apps/installed/${item.id}`}>
-                                <Card className="transition-colors hover:border-border">
-                                    <CardBody className="flex items-center gap-3 py-3 pr-12">
-                                        {manifest ? (
-                                            <AppMark app={manifest} size={36} />
-                                        ) : (
-                                            <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md" />
-                                        )}
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">
-                                                {item.name}
-                                            </p>
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                {manifest
-                                                    ? categoryLabel(
-                                                          words,
-                                                          manifest.category,
-                                                          navLabel
-                                                      )
-                                                    : item.catalogId}
-                                            </p>
-                                        </div>
-                                        <Badge
-                                            className={cn(
-                                                item.status === "failed" &&
-                                                    "border-danger-edge text-danger",
-                                                item.status === "running" &&
-                                                    "border-success-edge text-success"
-                                            )}
-                                        >
-                                            {statusLabel(t, item.status)}
-                                        </Badge>
-                                    </CardBody>
-                                </Card>
-                            </Link>
-                            {/* Beside the card rather than inside the link, so pressing
-                                it never also opens the app. */}
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                aria-label={t("uninstall.named", { name: item.name })}
-                                title={t("uninstall.named", { name: item.name })}
-                                onClick={() => setRemoving(item)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-danger"
-                            >
-                                <Trash2 className="size-4" />
+                        <div
+                            key={item.id}
+                            className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5"
+                        >
+                            {manifest ? (
+                                <AppMark app={manifest} size={36} />
+                            ) : (
+                                <div className="border-border bg-surface grid size-9 shrink-0 place-items-center rounded-md" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                                <Link
+                                    href={href}
+                                    className="block truncate text-sm font-medium hover:underline"
+                                    title={item.name}
+                                >
+                                    {item.name}
+                                </Link>
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                    <span className="truncate text-xs text-muted-foreground">
+                                        {manifest
+                                            ? categoryLabel(words, manifest.category, navLabel)
+                                            : item.catalogId}
+                                    </span>
+                                    {badge?.kind === "status" && (
+                                        <StatusBadge
+                                            status={item.status}
+                                            label={statusLabel(t, item.status)}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                            <Button asChild size="sm" variant="secondary">
+                                <Link href={href}>{t("card.open")}</Link>
                             </Button>
+                            <OverflowMenu
+                                label={t("card.more", { name: item.name })}
+                                entries={entries}
+                            />
                         </div>
                     );
                 })}
@@ -404,115 +431,147 @@ export function by(t: Words, from: { developer: string; distributor: string }): 
         : t("card.byImage", { developer: from.developer, distributor: from.distributor });
 }
 
-function AppCard({
+function StoreCard({
     app,
-    installedCount,
-    openHref,
+    installs,
+    canInstall,
     installing,
     disabled,
+    featured,
     onInstall,
-    onConfigure
+    onConfigure,
+    onUninstall
 }: {
     app: AppManifest;
-    installedCount: number;
-    /** Where its one instance lives, for an app that only runs once. */
-    openHref: string | null;
+    installs: StoreInstallRow[];
+    canInstall: boolean;
     installing: boolean;
     /** Another install is running; one at a time keeps the target's deploy queue
      *  and this page's feedback honest. */
     disabled: boolean;
+    featured: boolean;
     onInstall: () => void;
     onConfigure: () => void;
+    onUninstall: (item: StoreInstallRow) => void;
 }) {
     const t = useTranslations("marketplace");
-    const installable = isInstallable(app);
+    const words = useTranslations("catalog");
+    const navLabel = useNavLabel();
+    const locale = useLocale();
+    const router = useRouter();
     // Who made it and who ships the image, read off what the app installs rather
     // than typed in - see `appProvenance`.
     const from = appProvenance(app);
+    const action = primaryAction(app, { installs, canInstall, installing });
+    const badge = installBadge(app, installs);
+    const detailHref = `/apps/marketplace/${app.id}`;
+
+    const entries: OverflowEntry[] = [
+        { key: "details", label: t("card.details"), onSelect: () => router.push(detailHref) }
+    ];
+    if (action.kind === "install" && action.configurable)
+        entries.push({
+            key: "configure",
+            label: t("card.configure"),
+            onSelect: onConfigure,
+            disabled
+        });
+    const removable = app.singleton ? installs[0] : undefined;
+    if (removable?.canUninstall)
+        entries.push({
+            key: "uninstall",
+            label: t("uninstall.confirm"),
+            danger: true,
+            onSelect: () => onUninstall(removable)
+        });
+
     return (
-        <Card className={cn("flex h-full flex-col", app.comingSoon && "opacity-75")}>
-            <CardBody className="flex h-full flex-col gap-3">
-                <div className="flex items-start gap-3">
-                    <AppMark app={app} size={40} />
-                    <div className="min-w-0">
-                        <Link
-                            href={`/apps/marketplace/${app.id}`}
-                            className="block truncate text-sm font-medium hover:underline"
-                        >
-                            {app.name}
-                        </Link>
-                        {/* Who is behind it, in the line the category used to
-                            have to itself. The category is a heading two inches
-                            above; whose software this is was nowhere. */}
-                        <p className="text-muted-foreground truncate text-xs" title={by(t, from)}>
-                            {by(t, from)}
-                        </p>
-                    </div>
-                </div>
-                <p className="line-clamp-3 text-sm text-muted-foreground">{app.summary}</p>
-                <div className="flex flex-wrap gap-1">
-                    {app.capabilities.map((capability) => (
-                        <Badge key={capability}>{t(CAPABILITY_KEYS[capability])}</Badge>
-                    ))}
-                </div>
-                {app.consent && (
-                    <p className="text-xs text-muted-foreground">
-                        {t.rich("card.consent", {
-                            label: app.consent.label,
-                            link: (chunks) => (
-                                <a
-                                    key="consent"
-                                    href={app.consent?.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="underline underline-offset-2 hover:text-foreground"
-                                >
-                                    {chunks}
-                                </a>
-                            )
-                        })}
+        <StoreCardFrame
+            muted={app.comingSoon}
+            preview={
+                // The name below is the link a keyboard reaches; the picture is
+                // the same destination for a pointer.
+                <Link
+                    href={detailHref}
+                    tabIndex={-1}
+                    aria-hidden
+                    className="block border-b border-border"
+                >
+                    <AppPreview app={app} shot={appPreview(app.id, locale)} eager={featured} />
+                </Link>
+            }
+        >
+            <div className="flex min-w-0 items-start gap-3">
+                <AppMark app={app} size={40} />
+                <div className="min-w-0 flex-1">
+                    <Link
+                        href={detailHref}
+                        className="block truncate text-sm font-medium hover:underline"
+                        title={app.name}
+                    >
+                        {app.name}
+                    </Link>
+                    <p className="text-muted-foreground truncate text-xs" title={by(t, from)}>
+                        {by(t, from)}
                     </p>
+                </div>
+            </div>
+            <p
+                className={cn(
+                    "text-sm text-muted-foreground",
+                    featured ? "line-clamp-3" : "line-clamp-2"
                 )}
-                <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-                    {installedCount > 0 ? (
-                        <span className="text-xs text-muted-foreground">
-                            {t("card.installedCount", { count: installedCount })}
-                        </span>
-                    ) : (
-                        <span />
+            >
+                {app.summary}
+            </p>
+            <div className="flex min-w-0 flex-wrap gap-1">
+                <Badge>{categoryLabel(words, app.category, navLabel)}</Badge>
+                {app.capabilities.map((capability) => (
+                    <Badge key={capability} className="text-muted-foreground">
+                        {t(CAPABILITY_KEYS[capability])}
+                    </Badge>
+                ))}
+            </div>
+            {app.consent && (
+                <p className="text-xs text-muted-foreground">
+                    {t.rich("card.consent", {
+                        label: app.consent.label,
+                        link: (chunks) => (
+                            <a
+                                key="consent"
+                                href={app.consent?.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-2 hover:text-foreground"
+                            >
+                                {chunks}
+                            </a>
+                        )
+                    })}
+                </p>
+            )}
+            <div className="mt-auto flex min-w-0 items-center justify-between gap-2 pt-1">
+                <div className="flex min-w-0 items-center gap-1.5">
+                    {badge?.kind === "status" && (
+                        <StatusBadge status={badge.status} label={statusLabel(t, badge.status)} />
                     )}
-                    {openHref ? (
-                        <Link href={openHref}>
-                            <Button size="sm" variant="secondary">
-                                {t("card.open")}
-                            </Button>
-                        </Link>
-                    ) : installable ? (
-                        <div className="flex items-center gap-1">
-                            {/* A builtin app runs nothing, so there is no server,
-                                storage or setting to choose before installing it. */}
-                            {app.installMethod === "builtin" ? null : (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={onConfigure}
-                                    disabled={disabled}
-                                    title={t("card.configureHint")}
-                                >
-                                    {t("card.configure")}
-                                </Button>
-                            )}
-                            <Button size="sm" onClick={onInstall} disabled={disabled}>
-                                {installing && <Loader2 className="size-4 animate-spin" />}
-                                {installing ? t("card.installing") : t("card.install")}
-                            </Button>
-                        </div>
-                    ) : (
-                        <Badge className="text-muted-foreground">{t("card.comingSoon")}</Badge>
+                    {badge?.kind === "installed" && <Badge>{t("card.installed")}</Badge>}
+                    {!app.singleton && installs.length > 0 && (
+                        <span className="truncate text-xs text-muted-foreground">
+                            {t("card.installedCount", { count: installs.length })}
+                        </span>
                     )}
                 </div>
-            </CardBody>
-        </Card>
+                <div className="flex shrink-0 items-center gap-1">
+                    <PrimaryActionButton
+                        action={action}
+                        onInstall={onInstall}
+                        disabled={disabled}
+                    />
+                    <OverflowMenu label={t("card.more", { name: app.name })} entries={entries} />
+                </div>
+            </div>
+        </StoreCardFrame>
     );
 }
 

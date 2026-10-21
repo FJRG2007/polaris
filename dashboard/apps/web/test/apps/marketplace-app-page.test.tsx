@@ -87,6 +87,8 @@ describe("the app page", () => {
         });
         expect(screen.queryByRole("button", { name: /^Install/ })).toBeNull();
         expect(screen.getByText(/needs permission to manage apps/)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /Needs permission/ })).toBeNull();
+        expect(screen.getAllByText(/Ask an admin/)).toHaveLength(1);
     });
 
     it("offers Install and Configure to a reader who may", () => {

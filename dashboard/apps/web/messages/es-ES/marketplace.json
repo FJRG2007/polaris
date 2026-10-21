@@ -31,7 +31,20 @@
         "description": "Instala y ejecuta apps en tus servidores con un clic.",
         "search": "Buscar apps",
         "noMatch": "Aquí nada coincide con eso.",
-        "installed": "Instaladas"
+        "installed": "Instaladas",
+        "categories": "Categorías",
+        "allCategories": "Todas",
+        "sortLabel": "Orden",
+        "sort": {
+            "featured": "Destacadas",
+            "name": "Nombre",
+            "recent": "Añadidas hace poco"
+        },
+        "featured": "Destacadas",
+        "shelves": {
+            "polaris": "Apps de Polaris",
+            "community": "De otros desarrolladores"
+        }
     },
     "uninstall": {
         "games": "{name} sale del selector y deja de hacer sus comprobaciones. Elimina antes tus servidores de juegos; desinstalar nunca borra mundos.",
@@ -54,7 +67,14 @@
         "configure": "Configurar",
         "installing": "Instalando",
         "install": "Instalar",
-        "comingSoon": "Próximamente"
+        "comingSoon": "Próximamente",
+        "more": "Más de {name}",
+        "details": "Detalles",
+        "installed": "Instalada",
+        "unavailable": "Aún no disponible",
+        "locked": "Requiere permiso",
+        "lockedHint": "Instalar apps requiere permiso para gestionarlas. Pídeselo a un admin.",
+        "preview": "Vista de {name}"
     },
     "wizard": {
         "title": "Instalar {name}",
@@ -95,6 +115,18 @@
             "ark": "Una isla de supervivencia con dinosaurios para PC, en el mapa que elijas.",
             "hytale": "Tu propio mundo de Hytale, con los archivos de servidor de tu cuenta.",
             "fivem": "Grand Theft Auto V en tu propio servidor, con los recursos que elijas."
-        }
+        },
+        "previous": "Captura anterior",
+        "next": "Captura siguiente",
+        "position": "{index} de {count}",
+        "added": "Añadida",
+        "needs": "Qué necesita",
+        "needsNothing": "Nada en tus servidores: funciona dentro del panel.",
+        "needsServer": "Un servidor donde ejecutar su contenedor.",
+        "needsPorts": "Puertos que abre: {ports}.",
+        "needsStorage": "Almacenamiento para: {volumes}.",
+        "needsSettings": "Ajustes que rellenas: {fields}.",
+        "needsOnce": "Una instalación sirve a todos en este Polaris.",
+        "needsPermission": "Instalarla requiere permiso para gestionar apps."
     }
 }
