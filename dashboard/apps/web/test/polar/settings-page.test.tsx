@@ -8,10 +8,11 @@
  */
 
 import { resolve } from "node:path";
+import config from "../../next.config.mjs";
 import { MessagesWrapper } from "../setup/i18n";
 import { existsSync, readFileSync } from "node:fs";
 import { SettingsBack } from "@/app/(app)/polar/settings/settings-back";
-import { SETTINGS_FROM_CHAT_KEY, polarToolsTarget } from "@/lib/polar/settings-path";
+import { SETTINGS_FROM_CHAT_KEY } from "@/lib/polar/settings-path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { groupToolsByServer, offWithServers } from "@/lib/polar/tool-servers";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -235,12 +236,29 @@ describe("the settings page", () => {
         expect(source).not.toMatch(/DialogContent|PolarSettings\(/);
     });
 
-    it("takes over /account/polar-tools, sign-in answer included", () => {
-        expect(polarToolsTarget(undefined)).toBe("/polar/settings#permissions");
-        expect(polarToolsTarget("signed_in")).toBe(
-            "/polar/settings?connector=signed_in#connectors"
+    it("takes over /account/polar-tools, sign-in answer included", async () => {
+        // A 307 before anything is drawn; the query is carried across by Next.
+        const rules = (await config.redirects()).filter(
+            (rule) => rule.source === "/account/polar-tools"
         );
-        expect(polarToolsTarget("failed")).toBe("/polar/settings?connector=failed#connectors");
-        expect(polarToolsTarget("<script>")).toBe("/polar/settings#permissions");
+        expect(rules).toEqual([
+            {
+                source: "/account/polar-tools",
+                has: [{ type: "query", key: "connector", value: "(?:signed_in|failed)" }],
+                destination: "/polar/settings#connectors",
+                permanent: false
+            },
+            {
+                source: "/account/polar-tools",
+                destination: "/polar/settings#permissions",
+                permanent: false
+            }
+        ]);
+        // Next anchors the value as `^value$`.
+        const answer = new RegExp(`^${rules[0]?.has?.[0]?.value}$`);
+        expect(answer.test("signed_in") && answer.test("failed")).toBe(true);
+        expect(["<script>", "signed_in_x", "x_failed"].some((v) => answer.test(v))).toBe(false);
+        const page = resolve(__dirname, "../../src/app/(app)/account/polar-tools/page.tsx");
+        expect(existsSync(page)).toBe(false);
     });
 });

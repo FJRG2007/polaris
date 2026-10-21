@@ -196,6 +196,21 @@ const nextConfig = {
         // Model keys belong to the account, not to the Agents app. People
         // bookmark the screen they keep credentials on.
         { source: "/apps/agents/keys", destination: "/account/ai-keys", permanent: false },
+        // Polar's tools and permissions moved into its settings page. A
+        // connector sign-in that started before an update still comes back here
+        // with `?connector=`; the query is carried across, so it lands on the
+        // connectors with its answer. Anything else lands on the permissions.
+        {
+            source: "/account/polar-tools",
+            has: [{ type: "query", key: "connector", value: "(?:signed_in|failed)" }],
+            destination: "/polar/settings#connectors",
+            permanent: false
+        },
+        {
+            source: "/account/polar-tools",
+            destination: "/polar/settings#permissions",
+            permanent: false
+        },
         // Linear and Jira are connected from Connected accounts, beside every
         // other account. The Tasks menu and bookmarks still name the old screen;
         // the hub shows the section only to whoever can manage tasks.

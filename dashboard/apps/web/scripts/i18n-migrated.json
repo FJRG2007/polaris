@@ -2104,7 +2104,6 @@
         "web/src/components/polar/motion/border-beam.tsx",
         "web/src/components/polar/elements/tool.tsx",
         "web/src/components/polar/elements/confirmation.tsx",
-        "web/src/app/(app)/account/polar-tools/page.tsx",
         "web/src/app/(app)/polar/settings/polar-tool-grants.tsx",
         "web/src/app/(app)/polar/settings/polar-connectors.tsx",
         "web/src/app/(app)/polar/settings/page.tsx",
