@@ -373,27 +373,50 @@ export function DictationMenu({
 export function VoiceModeButton({
     available,
     disabled,
+    primary,
     onOpen,
     onNotice
 }: {
     available: boolean;
     disabled?: boolean;
+    /** Drawn as the send button, which it stands in for while there is
+     *  nothing to send. */
+    primary?: boolean;
     onOpen: () => void;
     onNotice: (notice: VoiceNotice | null) => void;
 }) {
     const t = useTranslations("polar");
+    const label = available ? t("voice.call") : t("voice.unavailable");
+    const open = () => {
+        if (!available) return onNotice("unavailable");
+        if (!canRecord()) return onNotice("cannotRecord");
+        onNotice(null);
+        onOpen();
+    };
+    if (primary) {
+        return (
+            <Button
+                type="button"
+                variant="primary"
+                size="icon-sm"
+                aria-label={label}
+                title={label}
+                aria-disabled={!available || undefined}
+                disabled={disabled}
+                className={cn(!available && "opacity-50")}
+                onClick={open}
+            >
+                <AudioLines />
+            </Button>
+        );
+    }
     return (
         <PromptInputButton
-            label={available ? t("voice.call") : t("voice.unavailable")}
+            label={label}
             aria-disabled={!available || undefined}
             disabled={disabled}
             className={cn(!available && "opacity-50")}
-            onClick={() => {
-                if (!available) return onNotice("unavailable");
-                if (!canRecord()) return onNotice("cannotRecord");
-                onNotice(null);
-                onOpen();
-            }}
+            onClick={open}
         >
             <AudioLines />
         </PromptInputButton>
