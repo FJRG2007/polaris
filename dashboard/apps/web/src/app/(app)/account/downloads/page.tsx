@@ -168,7 +168,7 @@ export default async function DownloadsPage() {
                 decks={decks}
                 install={
                     <DeckInstallSteps
-                        address={serverUrl.replace(/\/+$/, "")}
+                        address={serverUrl?.replace(/\/+$/, "") ?? null}
                         pluginFile={
                             <Suspense fallback={<Skeleton className="h-9 w-48" />}>
                                 <StreamDeckRelease repo={repo} />

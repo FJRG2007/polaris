@@ -60,11 +60,12 @@ export function DeckInstallSteps({
     pluginFile: React.ReactNode;
     /** The Companion module's `.tgz` button. */
     moduleFile: React.ReactNode;
-    /** This Polaris's address, which Companion's connection asks for. */
-    address: string;
+    /** This Polaris's address, which Companion's connection asks for, or null to use the one the page is on. */
+    address: string | null;
 }) {
     const t = useTranslations("account");
     const [host, setHost] = useState<DeckHost>("streamdeck");
+    const [origin, setOrigin] = useState(address ?? "");
     // A choice the reader made outranks the one that was detected.
     const picked = useRef(false);
 
@@ -73,6 +74,10 @@ export function DeckInstallSteps({
     useEffect(() => {
         if (!picked.current) setHost(detectDeckHost(navigator.userAgent));
     }, []);
+
+    useEffect(() => {
+        if (!address) setOrigin(window.location.origin);
+    }, [address]);
 
     const press = (chunks: React.ReactNode[]) => {
         const text = chunks.join("");
@@ -146,11 +151,11 @@ export function DeckInstallSteps({
                         <span className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
                             <code
                                 className="min-w-0 flex-1 truncate text-foreground"
-                                title={address}
+                                title={origin}
                             >
-                                {address}
+                                {origin}
                             </code>
-                            <CopyButton value={address} />
+                            <CopyButton value={origin} />
                         </span>
                     </li>
                     <li>{t("downloads.streamdeck.install.approveCode")}</li>

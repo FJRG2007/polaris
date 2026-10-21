@@ -34,11 +34,11 @@ const RELEASE: AppDownload = {
     ]
 } as unknown as AppDownload;
 
-function steps(userAgent: string) {
+function steps(userAgent: string, address: string | null = "https://polaris.example.com") {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue(userAgent);
     render(
         <DeckInstallSteps
-            address="https://polaris.example.com"
+            address={address}
             pluginFile={<a href="/plugin">plugin file</a>}
             moduleFile={<a href="/module">module file</a>}
         />,
@@ -89,6 +89,13 @@ describe("the app a deck is installed in", () => {
         // It acts as the reader, and is disconnected where their decks are.
         expect(screen.getByText(/It uses your account/)).toBeTruthy();
         expect(screen.getByText("Advanced")).toBeTruthy();
+    });
+
+    it("gives Companion the address this page is on when none is configured", async () => {
+        steps("Mozilla/5.0 (Windows NT 10.0; Win64; x64)", null);
+        fireEvent.click(screen.getByRole("combobox", { name: "Where you install it" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Bitfocus Companion" }));
+        expect(screen.getByText(window.location.origin)).toBeTruthy();
     });
 
     it("never offers a choice that does not work yet", async () => {
