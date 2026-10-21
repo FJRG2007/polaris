@@ -20,6 +20,18 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@polaris/auth", () => ({
     revokeApiKey: async (userId: string, id: string) => void revoked.push({ userId, id })
 }));
+vi.mock("@polaris/config", async (original) => ({
+    ...(await original<typeof import("@polaris/config")>()),
+    loadEnv: () => ({ POLARIS_REPO: "FJRG2007/polaris" })
+}));
+vi.mock("@/lib/app-releases", () => ({
+    streamDeckDownload: async () => ({
+        url: "https://github.com/x/y",
+        version: "0.1.4",
+        files: []
+    }),
+    companionDownload: async () => null
+}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/api-key-auth", () => ({ authenticateApiKey: async () => principal }));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => "en-US" }));
@@ -107,11 +119,14 @@ describe("deck routes", () => {
         expect((await run.POST(post("/api/deck/run", { action: "chat.unread" }))).status).toBe(401);
     });
 
-    it("hand a deck its catalogue, uncached, counted against its own key", async () => {
+    it("hand a deck its catalogue and the newest releases, uncached, counted against its own key", async () => {
         const response = await actions.GET(get("/api/deck/actions"));
         expect(response.status).toBe(200);
         expect(response.headers.get("cache-control")).toBe("no-store");
-        expect(await response.json()).toEqual({ actions: [{ id: "chat.unread" }] });
+        expect(await response.json()).toEqual({
+            actions: [{ id: "chat.unread" }],
+            latest: { streamdeck: "0.1.4", companion: null, downloadsPath: "/account/downloads" }
+        });
         expect(buckets).toEqual(["deck-call:k1"]);
     });
 

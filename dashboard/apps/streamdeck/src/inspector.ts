@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { hub } from "./hub";
+import { updateFor } from "./update";
 import streamDeck from "@elgato/streamdeck";
 import type { DeckAction } from "./polaris";
 
@@ -37,6 +38,7 @@ export async function tellInspector(surface: Surface): Promise<void> {
         address: hub.credentials?.address ?? null,
         account: hub.credentials?.account ?? null,
         connecting: hub.connecting,
+        update: updateFor(hub.latest, hub.client.version, hub.credentials?.address ?? null),
         catalogue: offered(hub.catalogue, surface) as never
     });
 }

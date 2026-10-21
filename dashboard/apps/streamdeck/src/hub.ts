@@ -24,6 +24,7 @@ import {
     Unauthorized,
     type Credentials,
     type DeckAction,
+    type DeckReleases,
     type DeckState,
     type Link,
     type RunResult
@@ -56,6 +57,8 @@ class Hub {
     link: Link = "unset";
     connecting: Connecting = { phase: "idle" };
     catalogue: DeckAction[] = [];
+    /** The newest releases this Polaris knows of, from the last catalogue. */
+    latest: DeckReleases | null = null;
     #catalogueAt = 0;
     readonly #instances = new Map<string, Instance>();
     readonly #states = new Map<string, DeckState>();
@@ -150,7 +153,9 @@ class Hub {
         if (!force && Date.now() - this.#catalogueAt < 5_000) return;
         this.#catalogueAt = Date.now();
         try {
-            this.catalogue = await this.client.catalogue(credentials);
+            const listing = await this.client.listing(credentials);
+            this.catalogue = listing.actions;
+            this.latest = listing.latest;
             this.link = "online";
         } catch (caught) {
             this.#failed(caught);
@@ -349,6 +354,7 @@ class Hub {
         this.credentials = null;
         this.link = "unset";
         this.catalogue = [];
+        this.latest = null;
         this.#states.clear();
         await streamDeck.settings.setGlobalSettings({});
         this.#redrawAll();

@@ -25,6 +25,33 @@ export interface DeckAction {
     readonly path?: string;
 }
 
+/** The newest released plugin and Companion module, as Polaris knows them. */
+export interface DeckReleases {
+    readonly streamdeck: string | null;
+    readonly companion: string | null;
+    /** The page of that Polaris that offers both. */
+    readonly downloadsPath: string;
+}
+
+/** What `GET /api/deck/actions` answers. `latest` is missing from a Polaris
+ *  older than the field. */
+export interface DeckListing {
+    readonly actions: DeckAction[];
+    readonly latest: DeckReleases | null;
+}
+
+/** `latest` as it arrived, kept only when every part has the expected type. */
+export function readReleases(raw: unknown): DeckReleases | null {
+    const value = raw as Partial<Record<keyof DeckReleases, unknown>> | null;
+    if (!value || typeof value !== "object" || typeof value.downloadsPath !== "string") return null;
+    const version = (field: unknown) => (typeof field === "string" ? field : null);
+    return {
+        streamdeck: version(value.streamdeck),
+        companion: version(value.companion),
+        downloadsPath: value.downloadsPath
+    };
+}
+
 export interface DeckField {
     readonly name: string;
     readonly type: "text" | "number" | "choice";
@@ -171,10 +198,16 @@ export class PolarisClient {
     }
 
     async catalogue(credentials: Credentials): Promise<DeckAction[]> {
+        return (await this.listing(credentials)).actions;
+    }
+
+    /** The catalogue, and the newest releases Polaris knows of. */
+    async listing(credentials: Credentials): Promise<DeckListing> {
         const response = await this.fetcher(`${credentials.address}/api/deck/actions`, {
             headers: this.#headers(credentials.token)
         });
-        return (await this.#json<{ actions: DeckAction[] }>(response)).actions;
+        const body = await this.#json<{ actions: DeckAction[]; latest?: unknown }>(response);
+        return { actions: body.actions, latest: readReleases(body.latest) };
     }
 
     async run(

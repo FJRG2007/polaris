@@ -182,6 +182,7 @@ interface Held {
 }
 
 const cache = new Map<string, Held>();
+const pending = new Map<string, Promise<AppDownload | null>>();
 
 /** What a walk came back with: the answer, and the first page's `etag`. A `304`
  *  on that page is `unchanged`, meaning the answer already held still stands. */
@@ -251,7 +252,20 @@ export async function appDownload(repo: string, prefix: string): Promise<AppDown
     const held = cache.get(key);
     if (held && now - held.at < CACHE_TTL_MS) return held.found;
 
-    const asked = await ask(trimmed, prefix, held?.etag ?? null);
+    const running = pending.get(key);
+    if (running) return running;
+    const lookup = refresh(trimmed, prefix, key, held).finally(() => pending.delete(key));
+    pending.set(key, lookup);
+    return lookup;
+}
+
+async function refresh(
+    repo: string,
+    prefix: string,
+    key: string,
+    held: Held | undefined
+): Promise<AppDownload | null> {
+    const asked = await ask(repo, prefix, held?.etag ?? null);
     if ("unchanged" in asked && held) {
         cache.set(key, { ...held, at: Date.now() });
         return held.found;

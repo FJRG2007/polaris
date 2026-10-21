@@ -3,11 +3,11 @@
     "Description": "Teclas y diales para tu Polaris: envía un mensaje, cambia tu estado, mira mensajes sin leer, alarmas y despliegues, y maneja los dispositivos de tus lugares.",
     "Category": "Polaris",
     "io.github.fjrg2007.polaris.key": {
-        "Name": "Tecla Polaris",
+        "Name": "Acción",
         "Tooltip": "Ejecuta una acción de Polaris o muestra su estado en vivo."
     },
     "io.github.fjrg2007.polaris.dial": {
-        "Name": "Dial Polaris",
+        "Name": "Dial de dispositivo",
         "Tooltip": "Ajusta un dispositivo de Polaris, como el brillo de una luz."
     },
     "io.github.fjrg2007.polaris.timer": {

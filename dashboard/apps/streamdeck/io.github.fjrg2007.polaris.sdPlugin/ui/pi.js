@@ -114,6 +114,17 @@
             );
             if (status.link === "offline")
                 box.append(el("p", { class: "notice", text: words.offline }));
+            if (status.update)
+                box.append(
+                    el("p", { class: "notice", text: fill(words.update, status.update) }),
+                    el("div", { class: "buttons" }, [
+                        el("button", {
+                            type: "button",
+                            text: words.getUpdate,
+                            on: { click: () => send("openUrl", { url: status.update.url }) }
+                        })
+                    ])
+                );
             box.append(
                 el("div", { class: "buttons" }, [
                     el("button", {

@@ -94,6 +94,10 @@ commands.
 - **Desktop app** ships as platform installers attached to a GitHub release on
   `desktop-v*` tags (`.github/workflows/desktop.yml`). See
   [`../../desktop/README.md`](../../desktop/README.md).
+- **Stream Deck plugin** ships as a `.streamDeckPlugin` file attached to a
+  `streamdeck-v*` release, cut by itself whenever a push to `main` changes what
+  the plugin ships (`.github/workflows/streamdeck.yml`). The Elgato Marketplace
+  listing is uploaded by hand: [`../streamdeck-publishing.md`](../streamdeck-publishing.md).
 
 ## Conventions
 
