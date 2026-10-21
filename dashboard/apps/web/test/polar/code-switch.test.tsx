@@ -45,9 +45,8 @@ vi.mock("next/link", () => ({
     )
 }));
 
-const { PolarCode, PolarModeSwitch, titleFromPrompt, usePolarCode } = await import(
-    "@/components/polar/polar-code"
-);
+const { PolarCode, PolarModeSwitch, titleFromPrompt, usePolarCode } =
+    await import("@/components/polar/polar-code");
 
 let access: "none" | "read" | "manage" = "none";
 let thread: unknown = null;
@@ -145,7 +144,9 @@ describe("the Chat / Code switch", () => {
         window.localStorage.setItem("polar.mode", "code");
         render(<Harness />, { wrapper: MessagesWrapper });
         expect(await screen.findByText(/needs permission to manage Agents/)).toBeTruthy();
-        const box = screen.getByRole("textbox", { name: "Task for the agent" }) as HTMLTextAreaElement;
+        const box = screen.getByRole("textbox", {
+            name: "Task for the agent"
+        }) as HTMLTextAreaElement;
         expect(box.disabled).toBe(true);
     });
 

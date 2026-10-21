@@ -38,14 +38,21 @@ vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
         state.listed += 1;
         return [session, { ...session, id: "s2", state: "stopped", repoFullName: "" }];
     },
-    sessionChoicesAction: async () => ({ agents: [], repos: [], hosts: [], sharedWorkspace: false }),
+    sessionChoicesAction: async () => ({
+        agents: [],
+        repos: [],
+        hosts: [],
+        sharedWorkspace: false
+    }),
     startSessionAction: async () => ({ id: "started" }),
     promptSessionAction: async () => ({}),
     sessionDetailAction: async () => {
         state.detailed += 1;
         return {
             session,
-            messages: [{ role: "user", body: "Fix it", authorId: "u1", at: "2026-10-20T10:00:01.000Z" }],
+            messages: [
+                { role: "user", body: "Fix it", authorId: "u1", at: "2026-10-20T10:00:01.000Z" }
+            ],
             events: [
                 { kind: "tool.start", detail: "", subject: "Edit", at: "2026-10-20T10:00:03.000Z" },
                 { kind: "session.start", detail: "", subject: "", at: "2026-10-20T10:00:00.500Z" },

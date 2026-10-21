@@ -33,7 +33,15 @@ import type {
     PolarCodeRow,
     PolarCodeThread
 } from "@/lib/polar/code";
-import { ArrowLeft, ArrowUp, Code2, ExternalLink, MessageSquare, Plus, TriangleAlert } from "lucide-react";
+import {
+    ArrowLeft,
+    ArrowUp,
+    Code2,
+    ExternalLink,
+    MessageSquare,
+    Plus,
+    TriangleAlert
+} from "lucide-react";
 
 export type PolarMode = "chat" | "code";
 
@@ -122,7 +130,10 @@ export function usePolarCode(): PolarCodeState {
         writeStored(MODE_KEY, next);
     }, []);
 
-    return useMemo(() => ({ mode, setMode, overview, refresh }), [mode, setMode, overview, refresh]);
+    return useMemo(
+        () => ({ mode, setMode, overview, refresh }),
+        [mode, setMode, overview, refresh]
+    );
 }
 
 /** Chat / Code, beside Polar's name. */
@@ -186,11 +197,17 @@ export function PolarCode({ code, split }: { code: PolarCodeState; split: boolea
                     <div className="px-2 pt-2">
                         <NewRow onClick={() => open(null)} />
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">{list}</div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
+                        {list}
+                    </div>
                 </aside>
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                     {selected ? (
-                        <CodeThread sessionId={selected} canPrompt={access === "manage"} onBack={null} />
+                        <CodeThread
+                            sessionId={selected}
+                            canPrompt={access === "manage"}
+                            onBack={null}
+                        />
                     ) : (
                         home
                     )}
@@ -201,7 +218,11 @@ export function PolarCode({ code, split }: { code: PolarCodeState; split: boolea
 
     if (selected)
         return (
-            <CodeThread sessionId={selected} canPrompt={access === "manage"} onBack={() => open(null)} />
+            <CodeThread
+                sessionId={selected}
+                canPrompt={access === "manage"}
+                onBack={() => open(null)}
+            />
         );
     return (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -264,11 +285,18 @@ function SessionList({
                             session.id === activeId && "bg-muted"
                         )}
                     >
-                        <span className="w-full min-w-0 truncate text-sm text-foreground" title={session.title}>{session.title}</span>
+                        <span
+                            className="w-full min-w-0 truncate text-sm text-foreground"
+                            title={session.title}
+                        >
+                            {session.title}
+                        </span>
                         <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                             <StateDot state={session.state} />
                             <span className="shrink-0">{session.stateLabel}</span>
-                            <span className="min-w-0 truncate">{session.repo || t("code.workspace")}</span>
+                            <span className="min-w-0 truncate">
+                                {session.repo || t("code.workspace")}
+                            </span>
                         </span>
                     </button>
                 </li>
@@ -305,19 +333,25 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
 
     useEffect(() => {
         if (!canStart) return;
-        void runAction(() => readPoll<Choices | null>("/api/polar/code/choices", {}), setError).then((loaded) => {
+        void runAction(
+            () => readPoll<Choices | null>("/api/polar/code/choices", {}),
+            setError
+        ).then((loaded) => {
             if (!loaded) return;
             setChoices(loaded);
             setRepoId((current) => current || (loaded.repos[0]?.id ?? NO_REPO));
-            const ready = loaded.agents.find((agent) => agent.readiness !== "missing") ?? loaded.agents[0];
+            const ready =
+                loaded.agents.find((agent) => agent.readiness !== "missing") ?? loaded.agents[0];
             setAgentKey((current) => current || (ready?.key ?? ""));
         });
     }, [canStart]);
 
-    const agent: AgentOption | null = choices?.agents.find((option) => option.key === agentKey) ?? null;
+    const agent: AgentOption | null =
+        choices?.agents.find((option) => option.key === agentKey) ?? null;
     const workspace = repoId === NO_REPO;
     const unlinked = agent?.readiness === "missing" ? agent : null;
-    const ready = canStart && choices !== null && agent !== null && !unlinked && prompt.trim().length > 0;
+    const ready =
+        canStart && choices !== null && agent !== null && !unlinked && prompt.trim().length > 0;
 
     const submit = () => {
         if (!ready || busy || !agent) return;
@@ -358,7 +392,9 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
 
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 px-3 pt-6">
-            <h2 className="text-center text-lg font-semibold text-foreground">{t("code.heading")}</h2>
+            <h2 className="text-center text-lg font-semibold text-foreground">
+                {t("code.heading")}
+            </h2>
             {!canStart ? (
                 <p className="text-center text-sm text-muted-foreground">{t("code.readOnly")}</p>
             ) : null}
@@ -367,7 +403,11 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
                     value={prompt}
                     onChange={(event) => setPrompt(event.target.value)}
                     onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                        if (
+                            event.key === "Enter" &&
+                            !event.shiftKey &&
+                            !event.nativeEvent.isComposing
+                        ) {
                             event.preventDefault();
                             submit();
                         }
@@ -403,7 +443,10 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
                         className="h-8 w-auto min-w-0 max-w-full flex-1 basis-40 text-xs"
                         options={[
                             { value: NO_REPO, label: t("code.workspace") },
-                            ...(choices?.repos ?? []).map((repo) => ({ value: repo.id, label: repo.name }))
+                            ...(choices?.repos ?? []).map((repo) => ({
+                                value: repo.id,
+                                label: repo.name
+                            }))
                         ]}
                     />
                     {workspace ? null : (
@@ -425,7 +468,9 @@ function CodeHome({ canStart, onStarted }: { canStart: boolean; onStarted: (id: 
                         className="h-8 w-auto min-w-0 max-w-full flex-1 basis-40 text-xs"
                         options={(choices?.agents ?? []).map((option) => ({
                             value: option.key,
-                            label: option.account ? `${option.label} - ${option.account}` : option.label
+                            label: option.account
+                                ? `${option.label} - ${option.account}`
+                                : option.label
                         }))}
                     />
                 </div>
@@ -524,7 +569,10 @@ function CodeThread({
                         <ArrowLeft />
                     </MessageAction>
                 ) : null}
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={session?.title}>
+                <span
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-foreground"
+                    title={session?.title}
+                >
                     {session?.title ?? ""}
                 </span>
                 {session ? (
@@ -546,7 +594,10 @@ function CodeThread({
                 {thread === undefined ? (
                     <div className="space-y-2">
                         {[0, 1, 2, 3].map((key) => (
-                            <div key={key} className="h-5 rounded bg-muted motion-safe:animate-pulse" />
+                            <div
+                                key={key}
+                                className="h-5 rounded bg-muted motion-safe:animate-pulse"
+                            />
                         ))}
                     </div>
                 ) : thread === null ? (
@@ -554,13 +605,18 @@ function CodeThread({
                 ) : (
                     <>
                         {session && (session.repo || session.branch) ? (
-                            <p className="mb-3 truncate text-xs text-muted-foreground" title={session.branch}>
+                            <p
+                                className="mb-3 truncate text-xs text-muted-foreground"
+                                title={session.branch}
+                            >
                                 {session.repo || t("code.workspace")}
                                 {session.branch ? ` - ${session.branch}` : ""}
                             </p>
                         ) : null}
                         {thread.entries.length === 0 ? (
-                            live ? <p className="text-sm text-muted-foreground">{t("code.quiet")}</p> : null
+                            live ? (
+                                <p className="text-sm text-muted-foreground">{t("code.quiet")}</p>
+                            ) : null
                         ) : (
                             <ol className="space-y-2">
                                 {thread.entries.map((entry, index) =>
@@ -581,9 +637,14 @@ function CodeThread({
                                             key={`${entry.at}-${index}`}
                                             className="flex min-w-0 gap-1.5 text-xs text-muted-foreground"
                                         >
-                                            <span className="shrink-0 font-medium">{entry.text}</span>
+                                            <span className="shrink-0 font-medium">
+                                                {entry.text}
+                                            </span>
                                             {entry.detail ? (
-                                                <span className="min-w-0 truncate" title={entry.detail}>
+                                                <span
+                                                    className="min-w-0 truncate"
+                                                    title={entry.detail}
+                                                >
                                                     {entry.detail}
                                                 </span>
                                             ) : null}
@@ -593,7 +654,10 @@ function CodeThread({
                             </ol>
                         )}
                         {thread.error ? (
-                            <p role="alert" className="mt-3 flex items-start gap-1.5 text-xs text-danger">
+                            <p
+                                role="alert"
+                                className="mt-3 flex items-start gap-1.5 text-xs text-danger"
+                            >
                                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                                 <span className="min-w-0 break-words">{thread.error}</span>
                             </p>
@@ -614,7 +678,11 @@ function CodeThread({
                                 value={reply}
                                 onChange={(event) => setReply(event.target.value)}
                                 onKeyDown={(event) => {
-                                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                                    if (
+                                        event.key === "Enter" &&
+                                        !event.shiftKey &&
+                                        !event.nativeEvent.isComposing
+                                    ) {
                                         event.preventDefault();
                                         send();
                                     }

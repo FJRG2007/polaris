@@ -2218,10 +2218,16 @@ export function PolarChat({
                             >
                                 <Ghost />
                             </MessageAction>
-                            <MessageAction label={t("commands.manage")} onClick={() => setManaging(true)}>
+                            <MessageAction
+                                label={t("commands.manage")}
+                                onClick={() => setManaging(true)}
+                            >
                                 <SquareSlash />
                             </MessageAction>
-                            <MessageAction label={t("usage.title")} onClick={() => setShowUsage(true)}>
+                            <MessageAction
+                                label={t("usage.title")}
+                                onClick={() => setShowUsage(true)}
+                            >
                                 <Gauge />
                             </MessageAction>
                             {/* A page, not a dialog: it holds every section and the
@@ -2231,7 +2237,9 @@ export function PolarChat({
                                 returns to the page the panel was open on, still open. */}
                             <MessageAction
                                 label={t("settings.open")}
-                                onClick={() => settingsPath.openFromChat((href) => router.push(href))}
+                                onClick={() =>
+                                    settingsPath.openFromChat((href) => router.push(href))
+                                }
                             >
                                 <Settings2 />
                             </MessageAction>
@@ -2247,7 +2255,10 @@ export function PolarChat({
                         <>
                             {chatMode ? (
                                 <>
-                                    <MessageAction label={t("actions.new")} onClick={() => startNew()}>
+                                    <MessageAction
+                                        label={t("actions.new")}
+                                        onClick={() => startNew()}
+                                    >
                                         <Plus />
                                     </MessageAction>
                                     <MessageAction

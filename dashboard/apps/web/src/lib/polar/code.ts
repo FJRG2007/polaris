@@ -113,7 +113,10 @@ export async function polarCodeThread(
     sessionId: string
 ): Promise<PolarCodeThread | null> {
     if ((await accessOf(user)) === "none") return null;
-    const [detail, t] = await Promise.all([sessionDetailAction(sessionId), getTranslations("agents")]);
+    const [detail, t] = await Promise.all([
+        sessionDetailAction(sessionId),
+        getTranslations("agents")
+    ]);
     if (!detail) return null;
     const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
         at: message.at,
@@ -161,7 +164,10 @@ export async function polarCodeStart(
 }
 
 /** Say the next thing to a running session, through the Agents app's own reply. */
-export async function polarCodePrompt(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+export async function polarCodePrompt(
+    user: SessionUser,
+    input: unknown
+): Promise<{ error?: string }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return promptSessionAction(input);

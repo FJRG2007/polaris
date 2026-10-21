@@ -10,7 +10,10 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 
 const NO_STORE = { "cache-control": "no-store" };
 
-export async function codeAnswer(read: () => Promise<unknown>, path: string): Promise<NextResponse> {
+export async function codeAnswer(
+    read: () => Promise<unknown>,
+    path: string
+): Promise<NextResponse> {
     try {
         return NextResponse.json({ value: toWire(await read()) }, { headers: NO_STORE });
     } catch (caught) {
