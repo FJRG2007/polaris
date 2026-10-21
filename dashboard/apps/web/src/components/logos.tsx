@@ -13,6 +13,7 @@ import type { ComponentType } from "react";
 import { AGENT_CLIS } from "@polaris/core";
 import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
+import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
 import {
     AnthropicMark,
     CerebrasMark,
@@ -192,7 +193,8 @@ export function hasIntegrationLogo(slug: string): boolean {
         slug in SERVICE_IMAGES ||
         slug in SERVICE_MARKS ||
         slug in MODEL_MARKS ||
-        SEEDED_SLUGS.has(slug)
+        SEEDED_SLUGS.has(slug) ||
+        SPEECH_PROVIDER_SEEDS.some((seed) => seed.slug === slug)
     );
 }
 
@@ -215,6 +217,8 @@ export function IntegrationLogo({ slug, className }: { slug: string; className?:
     if (Mark) return <Mark className={className} />;
     const seeded = MODEL_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
     if (seeded) return <ProviderMonogram slug={slug} name={seeded.name} className={className} />;
+    const speech = SPEECH_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
+    if (speech) return <ProviderMonogram slug={slug} name={speech.name} className={className} />;
     return <Blocks className={className} />;
 }
 

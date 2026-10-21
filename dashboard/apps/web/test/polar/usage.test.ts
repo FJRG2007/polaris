@@ -14,6 +14,7 @@ const state = {
         amount: number;
     }[],
     spent: 0,
+    audioSeconds: 0,
     roles: [] as string[],
     where: null as unknown
 };
@@ -26,17 +27,25 @@ vi.mock("@polaris/db", () => ({
         polarUsage: {
             aggregate: async ({ where }: { where: unknown }) => {
                 state.where = where;
-                return { _sum: { inputTokens: state.spent, outputTokens: 0 } };
+                return {
+                    _sum: {
+                        inputTokens: state.spent,
+                        outputTokens: 0,
+                        audioSeconds: state.audioSeconds
+                    }
+                };
             }
         }
     }
 }));
 
-const { answerUsage, monthStart, polarLimitReached } = await import("@/lib/polar/usage");
+const { answerUsage, monthStart, polarLimitReached, AUDIO_TOKENS_PER_SECOND } =
+    await import("@/lib/polar/usage");
 
 beforeEach(() => {
     state.rules = [];
     state.spent = 0;
+    state.audioSeconds = 0;
     state.roles = [];
     state.where = null;
 });
@@ -131,6 +140,23 @@ describe("polarLimitReached", () => {
             }
         ];
         state.spent = 999;
+        expect(await polarLimitReached("u1")).toBeNull();
+    });
+
+    it("counts transcribed audio toward the token ceiling", async () => {
+        state.rules = [
+            {
+                subjectType: "everyone",
+                subjectId: "",
+                metric: "tokens",
+                period: "day",
+                amount: 3200
+            }
+        ];
+        state.audioSeconds = 100;
+        expect(AUDIO_TOKENS_PER_SECOND).toBe(32);
+        expect(await polarLimitReached("u1")).toEqual({ used: 3200, amount: 3200, period: "day" });
+        state.audioSeconds = 99;
         expect(await polarLimitReached("u1")).toBeNull();
     });
 });

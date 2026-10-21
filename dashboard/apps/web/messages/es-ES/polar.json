@@ -291,16 +291,18 @@
         "silent": "Polar no oye nada. Revisa tu micrófono.",
         "transcribing": "Transcribiendo",
         "call": "Modo de voz",
-        "unavailable": "Hablar con Polar requiere una clave de OpenAI o Google AI.",
+        "unavailable": "Hablar con Polar requiere una clave de voz, como Groq u OpenAI.",
         "micDenied": "Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.",
         "cannotRecord": "Este navegador no puede grabar audio.",
+        "modelNotSaved": "No se ha guardado el modelo. Vuelve a probar.",
         "errors": {
-            "no_voice_provider": "Polar no puede oírte sin una clave de OpenAI o Google AI.",
+            "no_voice_provider": "Polar no puede oírte sin una clave de voz, como Groq u OpenAI.",
             "transcribe_failed": "No se ha entendido. Vuelve a probar.",
             "rate_limited": "Demasiados intentos. Espera un minuto.",
             "too_large": "La grabación es demasiado larga.",
             "speak_failed": "Polar no ha podido leer esta respuesta. Está en pantalla.",
-            "no_speech_provider": "Polar no puede hablar sin una clave de OpenAI o Google AI. Sus respuestas siguen en pantalla."
+            "no_speech_provider": "Polar no puede hablar sin una clave de OpenAI o Google AI. Sus respuestas siguen en pantalla.",
+            "usage_limit": "Has llegado al límite de la clave compartida. Usa una tuya."
         },
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
@@ -320,7 +322,15 @@
         "you": "Tú",
         "polar": "Polar",
         "captions": "Subtítulos",
-        "dismiss": "Cerrar"
+        "dismiss": "Cerrar",
+        "menu": {
+            "open": "Micrófono y modelo",
+            "microphone": "Micrófono",
+            "systemDefault": "Del sistema",
+            "allow": "Permite el micro para ver nombres",
+            "denied": "Bloqueado. Permítelo en el navegador.",
+            "model": "Modelo"
+        }
     },
     "memory": {
         "remember": "Recordar",

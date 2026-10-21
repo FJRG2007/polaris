@@ -656,6 +656,29 @@ export function PolarChat({
     const [isAdmin, setIsAdmin] = useState(false);
     const [spendsDeployment, setSpendsDeployment] = useState(true);
     const [voice, setVoice] = useState<VoiceAvailability>(NO_VOICE);
+    /** The mic menu's model: shown at once, stored behind it, put back if the
+     *  store refuses. */
+    const chooseTranscriber = useCallback((id: string) => {
+        let before: string | null = null;
+        setVoice((current) => {
+            before = current.transcriber;
+            return { ...current, transcriber: id };
+        });
+        void fetch("/api/polar/preferences", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transcriptionModel: id })
+        })
+            .then((response) => {
+                if (!response.ok) throw new Error(String(response.status));
+            })
+            .catch(() => {
+                setVoice((current) =>
+                    current.transcriber === id ? { ...current, transcriber: before } : current
+                );
+                setVoiceNotice("modelNotSaved");
+            });
+    }, []);
     const [voiceNotice, setVoiceNotice] = useState<VoiceNotice | null>(null);
     const [inCall, setInCall] = useState(false);
     const [choice, setChoice] = useState<ModelChoice | null>(null);
@@ -843,7 +866,7 @@ export function PolarChat({
                     setTools(data.tools ?? {});
                     setIsAdmin(data.isAdmin);
                     setSpendsDeployment(data.spendsDeployment ?? true);
-                    setVoice(data.voice ?? NO_VOICE);
+                    setVoice({ ...NO_VOICE, ...data.voice });
                     setWebAllowed(data.web === true);
                     setChoice((current) => {
                         // Automatic stays while there is any model to pick from.
@@ -1704,7 +1727,9 @@ export function PolarChat({
                             >
                                 {voiceNotice === "unavailable"
                                     ? t("voice.unavailable")
-                                    : voiceNotice === "micDenied" || voiceNotice === "cannotRecord"
+                                    : voiceNotice === "micDenied" ||
+                                        voiceNotice === "cannotRecord" ||
+                                        voiceNotice === "modelNotSaved"
                                       ? t(`voice.${voiceNotice}`)
                                       : t(`voice.errors.${voiceNotice}`)}
                             </span>
@@ -1779,6 +1804,9 @@ export function PolarChat({
                                 available={voice.dictation}
                                 disabled={noKeys}
                                 payer={choice?.payer}
+                                transcribers={voice.transcribers}
+                                transcriber={voice.transcriber}
+                                onTranscriber={chooseTranscriber}
                                 onNotice={setVoiceNotice}
                                 onText={(text) => {
                                     setInput((current) =>
@@ -1824,6 +1852,7 @@ export function PolarChat({
                     status={chat.status}
                     speech={voice.speech}
                     payer={choice?.payer}
+                    transcriber={voice.transcriber}
                     tools={tools}
                     onSend={(text) => void sendSpoken(text)}
                     onStop={() => void chat.stop()}

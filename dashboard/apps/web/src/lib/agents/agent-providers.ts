@@ -11,6 +11,7 @@
  * run reuses an existing agent subscription instead of a raw provider key.
  */
 
+import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
 import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
 
 /** One provider Polaris can hand a run. */
@@ -50,6 +51,15 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
     // lists. Their slugs are their ids in the public model index, so the prefix
     // and the slug are the same word and cannot drift apart.
     ...MODEL_PROVIDER_SEEDS.map((seed) => ({
+        slug: seed.slug,
+        name: seed.name,
+        envVar: seed.envVar,
+        modelPrefix: seed.slug
+    })),
+
+    // Speech-to-text keys (`speech-providers.ts`): stored and handed over the
+    // same way, though no model slug is ever prefixed with them.
+    ...SPEECH_PROVIDER_SEEDS.map((seed) => ({
         slug: seed.slug,
         name: seed.name,
         envVar: seed.envVar,

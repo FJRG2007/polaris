@@ -30,7 +30,7 @@ vi.mock("@polaris/db", () => ({
             upsert: async (args: {
                 where: unknown;
                 create: unknown;
-                update: Record<string, boolean>;
+                update: Record<string, boolean | string | null>;
             }) => {
                 state.upserts.push(args);
                 return { memory: true, ...args.update };
@@ -83,7 +83,8 @@ describe("chat display settings", () => {
             showTokens: true,
             showCost: true,
             showContextBar: true,
-            autoCompact: true
+            autoCompact: true,
+            transcriptionModel: null
         });
     });
 
@@ -93,7 +94,8 @@ describe("chat display settings", () => {
             showTokens: false,
             showCost: true,
             showContextBar: false,
-            autoCompact: true
+            autoCompact: true,
+            transcriptionModel: "groq/whisper-large-v3-turbo"
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
@@ -110,6 +112,20 @@ describe("chat display settings", () => {
                 select: expect.any(Object)
             }
         ]);
+    });
+
+    it("store the dictation model, clear it, and refuse one that is not a pick", async () => {
+        const picked = await patch({ transcriptionModel: "deepgram/nova-3" });
+        expect(picked.status).toBe(200);
+        expect(await picked.json()).toMatchObject({ transcriptionModel: "deepgram/nova-3" });
+        expect((await patch({ transcriptionModel: null })).status).toBe(200);
+        expect(state.upserts.map((entry) => entry.update)).toEqual([
+            { transcriptionModel: "deepgram/nova-3" },
+            { transcriptionModel: null }
+        ]);
+        expect((await patch({ transcriptionModel: "not a model" })).status).toBe(400);
+        expect((await patch({ transcriptionModel: 3 })).status).toBe(400);
+        expect(state.upserts).toHaveLength(2);
     });
 
     it("refuse an empty change, an unknown key and a value that is not a switch", async () => {

@@ -20,8 +20,7 @@ const recorder = {
     stop: vi.fn(),
     cancel: vi.fn(),
     onRecorded: null as
-        | null
-        | ((file: File, sound: { durationMs: number; waveform: string }) => void)
+        null | ((file: File, sound: { durationMs: number; waveform: string }) => void)
 };
 let recordable = true;
 
@@ -37,9 +36,8 @@ vi.mock("@/app/(app)/chat/voice-recorder", () => ({
     }
 }));
 
-const { DictationButton, VoiceCall, VoiceModeButton } = await import(
-    "@/components/polar/polar-voice"
-);
+const { DictationButton, VoiceCall, VoiceModeButton } =
+    await import("@/components/polar/polar-voice");
 
 beforeEach(() => {
     recorder.recording = false;
@@ -71,7 +69,7 @@ describe("the dictation button", () => {
             wrapper: MessagesWrapper
         });
         const button = screen.getByRole("button", {
-            name: "Speaking to Polar needs an OpenAI or Google AI key."
+            name: "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI."
         });
         expect(button.getAttribute("aria-disabled")).toBe("true");
         fireEvent.click(button);
@@ -184,7 +182,7 @@ describe("the voice mode button", () => {
         rerender(<VoiceModeButton available={false} onOpen={onOpen} onNotice={onNotice} />);
         fireEvent.click(
             screen.getByRole("button", {
-                name: "Speaking to Polar needs an OpenAI or Google AI key."
+                name: "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI."
             })
         );
         expect(onOpen).toHaveBeenCalledTimes(1);

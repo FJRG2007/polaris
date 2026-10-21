@@ -18,10 +18,27 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ToolState } from "@/components/polar/elements/tool";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { PromptInputButton } from "@/components/polar/elements/prompt-input";
-import { AudioLines, Check, Loader2, Mic, MicOff, PhoneOff, X } from "lucide-react";
+import { AudioLines, Check, ChevronDown, Loader2, Mic, MicOff, PhoneOff, X } from "lucide-react";
 import { affectedBy, Confirmation } from "@/components/polar/elements/confirmation";
 import { measureVoice, speaking, type VoiceLevel } from "@/app/(app)/chat/voice-level";
-import { Button, cn, Dialog, DialogContent, DialogDescription, DialogTitle } from "@polaris/ui";
+import type { TranscriptionOption } from "@/lib/polar/transcription";
+import { setMicDevice, useMicrophones } from "@/app/(app)/chat/mic-device";
+import {
+    Button,
+    cn,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger
+} from "@polaris/ui";
 import {
     canRecord,
     recordingType,
@@ -39,18 +56,28 @@ import {
 
 /** Why a transcription did not come back, as a code the screen has words for. */
 export type TranscribeError =
-    "transcribe_failed" | "rate_limited" | "too_large" | "no_voice_provider";
+    "transcribe_failed" | "rate_limited" | "too_large" | "no_voice_provider" | "usage_limit";
+
+const TRANSCRIBE_ERRORS: readonly TranscribeError[] = [
+    "rate_limited",
+    "too_large",
+    "no_voice_provider",
+    "usage_limit"
+];
 
 /** Send a recording to be read; the text, or why not. */
 export async function transcribeAudio(
     audio: Blob,
     durationMs: number,
     payer: Payer | null = null,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    /** The model picked in the mic menu; absent, the server's stored pick. */
+    model?: string | null
 ): Promise<{ text: string } | { error: TranscribeError }> {
     const capped = Math.min(Math.max(0, Math.round(durationMs)), VOICE_MAX_SECONDS * 1000);
     const query = new URLSearchParams({ durationMs: String(capped) });
     if (payer) query.set("payer", payer);
+    if (model) query.set("model", model);
     try {
         const response = await fetch(`/api/polar/transcribe?${query}`, {
             method: "POST",
@@ -65,10 +92,7 @@ export async function transcribeAudio(
         if (response.ok && typeof data?.text === "string") return { text: data.text };
         const code = data?.error;
         return {
-            error:
-                code === "rate_limited" || code === "too_large" || code === "no_voice_provider"
-                    ? code
-                    : "transcribe_failed"
+            error: TRANSCRIBE_ERRORS.find((known) => known === code) ?? "transcribe_failed"
         };
     } catch {
         return { error: "transcribe_failed" };
@@ -77,7 +101,11 @@ export async function transcribeAudio(
 
 /** What a voice button says when it is pressed but cannot work. */
 export type VoiceNotice =
-    "unavailable" | "micDenied" | "cannotRecord" | Exclude<TranscribeError, "no_voice_provider">;
+    | "unavailable"
+    | "micDenied"
+    | "cannotRecord"
+    | "modelNotSaved"
+    | Exclude<TranscribeError, "no_voice_provider">;
 
 /**
  * The microphone in the composer. Unavailable stays visible and focusable, and
@@ -87,6 +115,9 @@ export function DictationButton({
     available,
     disabled,
     payer = null,
+    transcribers = [],
+    transcriber = null,
+    onTranscriber,
     onText,
     onNotice
 }: {
@@ -94,6 +125,10 @@ export function DictationButton({
     disabled?: boolean;
     /** Who pays, as picked for the chat. */
     payer?: Payer | null;
+    /** The models a key is held for, and the one in use. */
+    transcribers?: readonly TranscriptionOption[];
+    transcriber?: string | null;
+    onTranscriber?: (id: string) => void;
     onText: (text: string) => void;
     onNotice: (notice: VoiceNotice | null) => void;
 }) {
@@ -101,14 +136,16 @@ export function DictationButton({
     const [transcribing, setTranscribing] = useState(false);
     const recorder = useVoiceRecording((file, sound) => {
         setTranscribing(true);
-        void transcribeAudio(file, sound.durationMs, payer).then((result) => {
-            setTranscribing(false);
-            if ("text" in result) {
-                if (result.text) onText(result.text);
-            } else {
-                onNotice(result.error === "no_voice_provider" ? "unavailable" : result.error);
+        void transcribeAudio(file, sound.durationMs, payer, undefined, transcriber).then(
+            (result) => {
+                setTranscribing(false);
+                if ("text" in result) {
+                    if (result.text) onText(result.text);
+                } else {
+                    onNotice(result.error === "no_voice_provider" ? "unavailable" : result.error);
+                }
             }
-        });
+        );
     });
     const notice = useRef(onNotice);
     notice.current = onNotice;
@@ -149,12 +186,12 @@ export function DictationButton({
         );
     }
     const usable = available && !disabled;
-    return (
+    const button = (
         <PromptInputButton
             label={available ? t("voice.dictate") : t("voice.unavailable")}
             aria-disabled={!usable || undefined}
             disabled={disabled}
-            className={cn(!available && "opacity-50")}
+            className={cn(!available && "opacity-50", available && "rounded-r-none")}
             onClick={() => {
                 if (!available) return onNotice("unavailable");
                 if (!canRecord()) return onNotice("cannotRecord");
@@ -164,6 +201,171 @@ export function DictationButton({
         >
             <Mic />
         </PromptInputButton>
+    );
+    if (!available) return button;
+    return (
+        <span className="inline-flex items-center">
+            {button}
+            <DictationMenu
+                disabled={disabled}
+                transcribers={transcribers}
+                transcriber={transcriber}
+                onTranscriber={onTranscriber}
+            />
+        </span>
+    );
+}
+
+/**
+ * The caret beside the microphone: which input to record from (shared with
+ * Chat's calls and voice messages, per browser) and which model hears it.
+ * The device names only exist once the browser has been allowed a microphone,
+ * so until then the list offers to ask.
+ */
+export function DictationMenu({
+    disabled,
+    transcribers,
+    transcriber,
+    onTranscriber
+}: {
+    disabled?: boolean;
+    transcribers: readonly TranscriptionOption[];
+    transcriber: string | null;
+    onTranscriber?: (id: string) => void;
+}) {
+    const t = useTranslations("polar");
+    const { devices, chosenId, choose, refresh } = useMicrophones();
+    const [denied, setDenied] = useState(false);
+    const unnamed = devices.length === 0 || devices.some((device) => !device.named);
+    const chosen = devices.some((device) => device.id === chosenId) ? chosenId : null;
+    const groups: Array<{ provider: string; name: string; options: TranscriptionOption[] }> = [];
+    for (const option of transcribers) {
+        const group = groups.find((entry) => entry.provider === option.provider);
+        if (group) group.options.push(option);
+        else
+            groups.push({
+                provider: option.provider,
+                name: option.providerName,
+                options: [option]
+            });
+    }
+    const current = transcribers.find((option) => option.id === transcriber);
+
+    const allow = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            for (const track of stream.getTracks()) track.stop();
+            setDenied(false);
+        } catch {
+            setDenied(true);
+        }
+        await refresh();
+    };
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={disabled}
+                    aria-label={t("voice.menu.open")}
+                    title={t("voice.menu.open")}
+                    className="w-5 rounded-l-none"
+                >
+                    <ChevronDown className="size-3" />
+                </Button>
+            </DropdownMenuTrigger>
+            {/* Upward: the composer sits at the bottom of the panel. */}
+            <DropdownMenuContent align="start" side="top" className="w-64">
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <Mic />
+                        <span className="min-w-0 flex-1 truncate">
+                            {t("voice.menu.microphone")}
+                        </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-64">
+                        <DropdownMenuItem onSelect={() => setMicDevice(null)}>
+                            <Check
+                                className={cn(
+                                    "size-3.5",
+                                    chosen === null ? "opacity-100" : "opacity-0"
+                                )}
+                            />
+                            <span className="min-w-0 truncate">
+                                {t("voice.menu.systemDefault")}
+                            </span>
+                        </DropdownMenuItem>
+                        {devices.map((device) => (
+                            <DropdownMenuItem key={device.id} onSelect={() => choose(device.id)}>
+                                <Check
+                                    className={cn(
+                                        "size-3.5",
+                                        device.id === chosen ? "opacity-100" : "opacity-0"
+                                    )}
+                                />
+                                <span className="min-w-0 truncate" title={device.label}>
+                                    {device.label}
+                                </span>
+                            </DropdownMenuItem>
+                        ))}
+                        {unnamed && (
+                            <DropdownMenuItem
+                                onSelect={(event) => {
+                                    event.preventDefault();
+                                    void allow();
+                                }}
+                            >
+                                <span className="min-w-0 whitespace-normal text-muted-foreground">
+                                    {denied ? t("voice.menu.denied") : t("voice.menu.allow")}
+                                </span>
+                            </DropdownMenuItem>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <AudioLines />
+                        <span className="min-w-0 flex-1 truncate">{t("voice.menu.model")}</span>
+                        {current && (
+                            <span
+                                className="min-w-0 max-w-28 truncate text-xs text-muted-foreground"
+                                title={current.label}
+                            >
+                                {current.label}
+                            </span>
+                        )}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto overscroll-contain">
+                        {groups.map((group) => (
+                            <div key={group.provider} role="group" aria-label={group.name}>
+                                <DropdownMenuLabel>{group.name}</DropdownMenuLabel>
+                                {group.options.map((option) => (
+                                    <DropdownMenuItem
+                                        key={option.id}
+                                        onSelect={() => onTranscriber?.(option.id)}
+                                    >
+                                        <Check
+                                            className={cn(
+                                                "size-3.5",
+                                                option.id === transcriber
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                            )}
+                                        />
+                                        <span className="min-w-0 truncate" title={option.label}>
+                                            {option.label}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </div>
+                        ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
@@ -249,6 +451,8 @@ export interface VoiceCallProps {
     speech: boolean;
     /** Who pays, as picked for the chat. */
     payer?: Payer | null;
+    /** The model picked in the mic menu, `provider/model`. */
+    transcriber?: string | null;
     tools: Record<string, { title: string; destructive: boolean }>;
     /** Send what was said as the next message of this thread. */
     onSend: (text: string) => void;
@@ -432,7 +636,9 @@ export function VoiceCall(props: VoiceCallProps) {
                 void transcribeAudio(
                     blob,
                     Date.now() - entry.began,
-                    latest.current.payer ?? null
+                    latest.current.payer ?? null,
+                    undefined,
+                    latest.current.transcriber ?? null
                 ).then((result) => {
                     if (cancelled || live.current.ended) return;
                     if ("error" in result) {

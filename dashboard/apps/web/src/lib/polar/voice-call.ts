@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { transcriptionChoiceSchema, type TranscriptionOption } from "@/lib/polar/transcription";
 import { PAYERS } from "@/lib/polar/shared";
 
 /** Largest recording the transcription route takes. Five minutes of Opus is a
@@ -44,7 +45,10 @@ export const transcribeQuerySchema = z.object({
         .min(0)
         .max(VOICE_MAX_SECONDS * 1000),
     /** Who pays, as picked for the chat; absent means the usual order. */
-    payer: z.enum(PAYERS).nullable().default(null)
+    payer: z.enum(PAYERS).nullable().default(null),
+    /** The model picked in the mic menu (`provider/model`); absent means the
+     *  stored pick. One whose key is gone falls back to the fastest held. */
+    model: transcriptionChoiceSchema.optional()
 });
 
 /** The body of a speech request. */
@@ -59,9 +63,18 @@ export interface VoiceAvailability {
     dictation: boolean;
     /** Text to speech: the call's spoken answers. */
     speech: boolean;
+    /** Every model a key is held for, for the mic menu. */
+    transcribers: TranscriptionOption[];
+    /** The one in use: the pick, or the fastest held. */
+    transcriber: string | null;
 }
 
-export const NO_VOICE: VoiceAvailability = { dictation: false, speech: false };
+export const NO_VOICE: VoiceAvailability = {
+    dictation: false,
+    speech: false,
+    transcribers: [],
+    transcriber: null
+};
 
 /** Markdown that reads badly out loud: code, links, emphasis, list markers. */
 function speakable(text: string): string {
