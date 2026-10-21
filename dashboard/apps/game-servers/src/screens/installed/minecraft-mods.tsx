@@ -47,7 +47,7 @@ import { hostUi } from "@polaris/app-host/client";
 import type { AppHostTypes } from "@polaris/app-host";
 
 const { useConfirm } = hostUi.confirmDialog;
-const { readSnapshot, writeSnapshot } = hostUi.snapshotCache;
+const { readSnapshot, writeSnapshot, dropSnapshots } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
 const { mergeUnchanged } = hostUi.structuralMerge;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
@@ -236,10 +236,12 @@ export function MinecraftMods({
                     return;
                 }
                 const found = data.projects ?? [];
-                setResults((current) => (current === null ? found : mergeUnchanged(current, found)));
+                setResults((current) =>
+                    current === null ? found : mergeUnchanged(current, found)
+                );
                 setSearchFailed(false);
                 setError(null);
-                writeSnapshot(modBrowseKey(subject, term, tag), found);
+                if (term.trim() === "") writeSnapshot(modBrowseKey(subject, term, tag), found);
             } catch {
                 // Superseded by a newer search, or the screen was left: neither
                 // is a failure to show.
@@ -300,6 +302,7 @@ export function MinecraftMods({
                 setConflicts((current) => mergeUnchanged(current, reading.conflicts));
                 setRequires((current) => mergeUnchanged(current, reading.requires));
                 setRefused((current) => mergeUnchanged(current, reading.refused));
+                dropSnapshots(`server-mods:${subject}:`);
                 writeSnapshot(modListKey(subject, entries), reading);
             } catch {
                 if (!signal.aborted) unread();

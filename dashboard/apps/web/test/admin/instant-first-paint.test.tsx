@@ -24,7 +24,9 @@ const reads = vi.hoisted(() => ({
     })
 }));
 
-vi.mock("@/lib/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "admin-1", isAdmin: true })) }));
+vi.mock("@/lib/session", () => ({
+    requireAdmin: vi.fn(async () => ({ id: "admin-1", isAdmin: true }))
+}));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: vi.fn(async () => (key: string) => key) }));
 vi.mock("@/lib/display-prefs-service", () => ({
     getPlatformDisplayPreferences: reads.platform,
@@ -156,6 +158,30 @@ describe("the retention counts", () => {
         keep("admin.retention.totals", totals);
         heldFetch();
         const { container } = render(<RetentionView policy={policy} />);
+        expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+    });
+
+    it("says the count failed and offers to ask again, instead of a skeleton forever", async () => {
+        const fetch = vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }));
+        vi.stubGlobal("fetch", fetch);
+        const { container } = render(<RetentionView policy={policy} />);
+
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
+        const calls = fetch.mock.calls.length;
+        await act(async () => fireEvent.click(screen.getByRole("button", { name: /retry/i })));
+        await waitFor(() => expect(fetch.mock.calls.length).toBe(calls + 1));
+    });
+
+    it("says the kept counts are old when asking again fails", async () => {
+        keep("admin.retention.totals", totals);
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({ ok: false, status: 500, json: async () => ({}) }))
+        );
+        const { container } = render(<RetentionView policy={policy} />);
+
+        expect((await screen.findByRole("alert")).textContent).toMatch(/stale/i);
         expect(container.querySelectorAll(".animate-pulse")).toHaveLength(0);
     });
 });

@@ -10,7 +10,7 @@
  * replaces it only where something moved.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import type { InstalledAppSetting } from "@/lib/apps/install-service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -127,7 +127,9 @@ describe("the installed list", () => {
     });
 
     it("keeps a reading per list, so an edited list is not drawn from another's", () => {
-        expect(modListKey(SUBJECT, ["sodium"])).not.toBe(modListKey(SUBJECT, ["sodium", "lithium"]));
+        expect(modListKey(SUBJECT, ["sodium"])).not.toBe(
+            modListKey(SUBJECT, ["sodium", "lithium"])
+        );
         expect(modListKey(SUBJECT, ["sodium"])).not.toBe(
             modListKey("server-2:fabric:1.21.4", ["sodium"])
         );
@@ -150,5 +152,56 @@ describe("the marketplace", () => {
         );
 
         expect(screen.getByText("Lithium (kept)")).toBeTruthy();
+    });
+
+    it("keeps the shelf a tab opens on, not every search typed", async () => {
+        const fetches = heldFetch();
+        render(
+            <MinecraftMods
+                installedAppId="server-1"
+                settings={settings("")}
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        fetches.release(reading("unused"), {
+            projects: [{ ...row("lithium", "Lithium"), versions: [] }]
+        });
+
+        expect(await screen.findByText("Lithium", {}, SETTLED)).toBeTruthy();
+        expect(readSnapshot(modBrowseKey(SUBJECT, "", ""), 60_000)).not.toBeNull();
+        for (const box of screen.getAllByRole("textbox", { name: /modrinth/i }))
+            fireEvent.change(box, { target: { value: "lith" } });
+        await waitFor(
+            () =>
+                expect(
+                    vi
+                        .mocked(fetch)
+                        .mock.calls.some(([input]) => input.toString().includes("query=lith&"))
+                ).toBe(true),
+            SETTLED
+        );
+        await act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
+        expect(readSnapshot(modBrowseKey(SUBJECT, "lith", ""), 60_000)).toBeNull();
+    });
+});
+
+describe("what a list keeps", () => {
+    it("keeps one reading per server, dropping the list it replaced", async () => {
+        writeSnapshot(modListKey(SUBJECT, ["lithium"]), reading("Lithium (old list)"));
+        const fetches = heldFetch();
+        render(
+            <MinecraftMods
+                installedAppId="server-1"
+                settings={settings("sodium")}
+                playersOnline={0}
+                onSaved={vi.fn()}
+            />
+        );
+        fetches.release(reading("Sodium (fresh)"), { projects: [] });
+
+        expect(await screen.findByText("Sodium (fresh)", {}, SETTLED)).toBeTruthy();
+        expect(readSnapshot(modListKey(SUBJECT, ["lithium"]), 60_000)).toBeNull();
+        expect(readSnapshot(modListKey(SUBJECT, ["sodium"]), 60_000)).not.toBeNull();
     });
 });

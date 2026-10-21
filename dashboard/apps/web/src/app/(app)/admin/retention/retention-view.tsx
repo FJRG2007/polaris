@@ -89,8 +89,30 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
         );
     };
 
+    const unread = live.error ?? live.stale;
+
     return (
         <div className="flex flex-col gap-4">
+            {unread !== null ? (
+                <div className="flex flex-wrap items-center gap-3">
+                    <p role="alert" className="text-sm text-danger">
+                        {t(
+                            live.error !== null
+                                ? "retention.counts.loadFailed"
+                                : "retention.counts.stale"
+                        )}
+                    </p>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={live.refreshing}
+                        onClick={live.refresh}
+                    >
+                        {live.refreshing ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {t("retention.counts.retry")}
+                    </Button>
+                </div>
+            ) : null}
             {RETENTION_SUBJECTS.map((subject) => {
                 const counts = totals?.[subject] ?? null;
                 const keeping = policy[subject];
@@ -126,7 +148,7 @@ export function RetentionView({ policy }: { policy: RetentionPolicy }) {
                             {/* What is in there now, against what is saved rather
                                 than against what is on the selector - so the
                                 number does not change while somebody is deciding. */}
-                            {!counts || !record ? (
+                            {live.error !== null ? null : !counts || !record ? (
                                 <div className="border-t border-border pt-3">
                                     <Skeleton className="h-4 w-64 max-w-full" />
                                 </div>
