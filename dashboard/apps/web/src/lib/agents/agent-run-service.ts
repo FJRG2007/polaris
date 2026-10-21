@@ -13,6 +13,7 @@
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { parseGateSteps, type GateStepReport } from "@/lib/agents/agent-gate";
+import { noticeRunFinished } from "@/lib/agents/agent-notices";
 import {
     isTerminalRunState,
     type AgentExecution,
@@ -241,6 +242,9 @@ export async function finishAgentRun(runId: string, input: FinishRunInput): Prom
             failureKind: input.failureKind ?? null
         }
     });
+    // Only the call that actually closed it tells anybody, so the three that race
+    // here are one notice. A cancel is not news: somebody pressed it.
+    if (count > 0 && input.state !== "cancelled") await noticeRunFinished(runId, input.state);
     return count > 0;
 }
 
@@ -254,17 +258,31 @@ export async function finishAgentRun(runId: string, input: FinishRunInput): Prom
  */
 export async function sweepStaleRuns(): Promise<number> {
     const cutoff = new Date(Date.now() - RUN_STALE_MS);
-    const { count } = await prisma.agentRun.updateMany({
+    const stale = await prisma.agentRun.findMany({
         where: { state: { in: ["queued", "running"] }, createdAt: { lt: cutoff } },
-        data: {
-            state: "failed",
-            finishedAt: new Date(),
-            tokenHash: null,
-            // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
-            error: "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as."
-        }
+        select: { id: true },
+        take: 500
     });
-    return count;
+    let closed = 0;
+    for (const run of stale) {
+        // One at a time and still guarded on the state: a run that reported in
+        // between the read and this write keeps its real outcome, and only the
+        // write that closed it tells anybody.
+        const { count } = await prisma.agentRun.updateMany({
+            where: { id: run.id, state: { in: ["queued", "running"] } },
+            data: {
+                state: "failed",
+                finishedAt: new Date(),
+                tokenHash: null,
+                // i18n-ignore stored with the run and said in the reader's words by lib/agents/words.ts
+                error: "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as."
+            }
+        });
+        if (count === 0) continue;
+        closed += 1;
+        await noticeRunFinished(run.id, "failed");
+    }
+    return closed;
 }
 
 /** Whether this run can still be cancelled. */

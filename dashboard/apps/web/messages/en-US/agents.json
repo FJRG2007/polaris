@@ -263,7 +263,26 @@
         "ended": "This session has ended. Its branch, {branch}, is still there.",
         "answerHere": "It is waiting on you. Answer it here.",
         "sendNext": "Send it the next thing.",
-        "send": "Send"
+        "send": "Send",
+        "work": {
+            "pushed": "{count, plural, one {Pushed # commit to {branch}} other {Pushed # commits to {branch}}}",
+            "clean": "Nothing to push: everything was already on GitHub.",
+            "kept": "Could not push - work was kept",
+            "keptMore": "The machine stays up with the work in it until you push or discard it.",
+            "reasons": {
+                "rejected": "GitHub refused the push, usually because the branch moved on or is protected.",
+                "policy": "This repository's settings do not let agents push this branch.",
+                "auth": "Polaris could not get access to the repository on GitHub. Check the connection under Agents settings.",
+                "unreachable": "Polaris could not reach the session's machine.",
+                "other": "The push did not go through."
+            },
+            "retry": "Try the push again",
+            "discard": "Discard work",
+            "discardTitle": "Discard this session's work?",
+            "discardDescription": "The machine and every change that was not pushed are deleted. This cannot be undone.",
+            "discarded": "Work discarded",
+            "retryFailed": "Still could not push. The work is kept."
+        }
     },
     "rules": {
         "noRepos": "Add a repository first. Rules are per repository.",

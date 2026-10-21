@@ -100,6 +100,7 @@ export const NOTIFICATION_GROUPS = [
     "mail",
     "network",
     "people",
+    "agents",
     "system"
 ] as const;
 
@@ -116,6 +117,7 @@ export const NOTIFICATION_GROUP_LABEL: Record<NotificationGroup, string> = {
     mail: "Mail",
     network: "Network",
     people: "People",
+    agents: "Agents",
     system: "Polaris"
 };
 
@@ -879,6 +881,43 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Update available",
         description: "A new Polaris build is published and ready to install.",
         level: "info",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "agent.waiting",
+        group: "agents",
+        label: "An agent needs you",
+        description: "A session stopped on a question or a permission prompt and is waiting for an answer.",
+        level: "warning",
+        // On the bell and not in the mail: running an agent in the background is
+        // the whole reason to want this, and a question asked twice in an hour
+        // is two emails nobody wanted.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.run",
+        group: "agents",
+        label: "A background run finished",
+        description: "An agent run started by a trigger or from Polaris succeeded or failed.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.ended",
+        group: "agents",
+        label: "A session ended on its own",
+        description: "A session failed, stopped reporting, or its agent exited without anybody pressing Stop.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "agent.work",
+        group: "agents",
+        label: "A session's work could not be pushed",
+        description: "A session ended with commits or changes Polaris could not push, so it kept them for you.",
+        level: "danger",
+        // Mailed: until somebody pushes or discards it, that work exists in one
+        // container and nowhere else.
         defaults: { inapp: true, email: true }
     },
     {

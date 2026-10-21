@@ -101,12 +101,14 @@ async function endedAt(kind: Kind, ids: string[]): Promise<Map<string, Date | nu
     if (kind === "session") {
         const rows = await prisma.agentSession.findMany({
             where: { id: { in: ids } },
-            select: { id: true, state: true, finishedAt: true }
+            select: { id: true, state: true, finishedAt: true, workState: true }
         });
         return new Map(
             rows.map((row) => [
                 row.id,
-                row.state === "stopped" || row.state === "failed"
+                // Kept on purpose: its work could not be pushed, and the
+                // container is the only copy until somebody pushes or discards it.
+                (row.state === "stopped" || row.state === "failed") && row.workState !== "kept"
                     ? (row.finishedAt ?? new Date(0))
                     : null
             ])

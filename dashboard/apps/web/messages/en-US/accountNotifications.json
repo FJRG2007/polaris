@@ -519,6 +519,22 @@
         "upsReport": {
             "label": "A UPS report is ready",
             "description": "A scheduled UPS report was saved to your drive."
+        },
+        "agentWaiting": {
+            "label": "An agent needs you",
+            "description": "A session stopped on a question or a permission prompt and is waiting for an answer."
+        },
+        "agentRun": {
+            "label": "A background run finished",
+            "description": "An agent run started by a trigger or from Polaris succeeded or failed."
+        },
+        "agentEnded": {
+            "label": "A session ended on its own",
+            "description": "A session failed, stopped reporting, or its agent exited without anybody pressing Stop."
+        },
+        "agentWork": {
+            "label": "A session's work could not be pushed",
+            "description": "A session ended with commits or changes Polaris could not push, so it kept them for you."
         }
     },
     "groups": {
@@ -532,6 +548,7 @@
         "mail": "Mail",
         "network": "Network",
         "people": "People",
+        "agents": "Agents",
         "system": "Polaris"
     },
     "badges": {

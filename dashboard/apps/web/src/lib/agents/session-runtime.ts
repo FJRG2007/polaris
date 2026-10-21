@@ -30,6 +30,8 @@ import { credentialsForAgent } from "@/lib/agents/agent-readiness";
 import { secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
 import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
 import { claudeHookSettings, hookScript, mcpConfig, shellQuote } from "./session-hooks";
+import { endContainerSession, type SaveOutcome } from "./session-work";
+import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import {
     addSessionMessage,
     finishSession,
@@ -695,14 +697,17 @@ export async function captureSession(sessionId: string, lines = 200): Promise<st
 /**
  * End a session and take its machine with it.
  *
- * The container goes; on a server the tmux session is killed and the worktree is
- * left where it is. That asymmetry is deliberate - a container is Polaris's and is
- * disposable, and a directory on somebody's own server holds work they may not
- * have pushed yet. Removing it is theirs to do.
+ * The container goes, but only after its work is saved: anything committed or
+ * left uncommitted is pushed to the session's branch first, and a container
+ * whose work could not be pushed is kept rather than removed (see
+ * `session-work.ts`). On a server the tmux session is killed and the worktree is
+ * left where it is - a directory on somebody's own server is theirs to remove.
+ *
+ * Returns what became of the work, or null where there was no container.
  */
-export async function stopSession(sessionId: string): Promise<void> {
+export async function stopSession(sessionId: string): Promise<SaveOutcome | null> {
     const placement = await sessionPlacement(sessionId);
-    if (!placement) return;
+    if (!placement) return null;
     // The decision is recorded before the machine is touched, and that ordering
     // is the whole of why Stop appeared to need pressing twice.
     //
@@ -716,15 +721,18 @@ export async function stopSession(sessionId: string): Promise<void> {
     // swallowed either way, so this changes when the person is answered rather
     // than whether the machine goes.
     await finishSession(sessionId, "stopped");
+    // Whoever pressed Stop has answered whatever it was waiting on.
+    await clearSessionWaiting(sessionId);
     if (placement.place === "host") {
         await runInSession(
             sessionId,
             `tmux kill-session -t ${shellQuote(commands.TMUX_SESSION)} || true`,
             { evenIfFinished: true }
         ).catch(() => undefined);
-    } else if (placement.containerId) {
-        await new HostdPorts().composeDown(placement.containerId).catch(() => undefined);
+        return null;
     }
+    if (!placement.containerId) return null;
+    return endContainerSession(sessionId);
 }
 
 /**
@@ -742,7 +750,7 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
             state: { notIn: ["stopped", "failed"] },
             OR: [{ lastEventAt: { lt: cutoff } }, { lastEventAt: null, createdAt: { lt: cutoff } }]
         },
-        select: { id: true }
+        select: { id: true, place: true, containerId: true }
     });
     for (const session of stale) {
         await finishSession(
@@ -750,6 +758,14 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
             "failed",
             "The machine running this session stopped reporting."
         );
+        await clearSessionWaiting(session.id);
+        await noticeSessionEnded(session.id, "silent");
+        // The same path as Stop: the work is pushed before the container goes,
+        // and a container whose work could not be pushed stays.
+        if (session.place !== "host" && session.containerId)
+            await endContainerSession(session.id).catch((error) => {
+                console.error(`polaris: could not end the container of session ${session.id}:`, error);
+            });
     }
     return stale.length;
 }

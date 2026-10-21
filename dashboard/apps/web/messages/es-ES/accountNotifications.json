@@ -519,6 +519,22 @@
         "upsReport": {
             "label": "Informe de SAI listo",
             "description": "Se guardó en tu unidad un informe programado de un SAI."
+        },
+        "agentWaiting": {
+            "label": "Un agente te necesita",
+            "description": "Una sesión se paró en una pregunta o un permiso y espera tu respuesta."
+        },
+        "agentRun": {
+            "label": "Terminó una ejecución",
+            "description": "Una ejecución de agente lanzada por un disparador o desde Polaris salió bien o mal."
+        },
+        "agentEnded": {
+            "label": "Una sesión terminó sola",
+            "description": "Una sesión falló, dejó de informar o su agente salió sin que nadie pulsara Detener."
+        },
+        "agentWork": {
+            "label": "No se subió el trabajo",
+            "description": "Una sesión terminó con commits o cambios que Polaris no pudo subir, y los guardó."
         }
     },
     "groups": {
@@ -532,6 +548,7 @@
         "mail": "Correo",
         "network": "Red",
         "people": "Personas",
+        "agents": "Agentes",
         "system": "Polaris"
     },
     "badges": {

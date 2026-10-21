@@ -19,6 +19,7 @@ import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import * as work from "@/lib/agents/session-work";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
@@ -354,6 +355,34 @@ export async function stopSessionAction(sessionId: string): Promise<{ error?: st
     // And the session's own page, which is where the button was pressed. Only
     // the list was revalidated, so the screen somebody was actually looking at
     // waited for its next poll to notice.
+    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
+    return {};
+}
+
+/**
+ * Try again to push the work a stopped session kept. On success the container
+ * goes, exactly as it would have on Stop; otherwise it stays and says so.
+ */
+export async function retrySessionPushAction(sessionId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const session = await sessions.getSession(sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (session.work?.state !== "kept") return {};
+    const outcome = await work.endContainerSession(sessionId);
+    revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
+    if (outcome.kind === "kept") return { error: t("session.work.retryFailed") };
+    return {};
+}
+
+/** Let the work a stopped session kept go, with its container. */
+export async function discardSessionWorkAction(sessionId: string): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const session = await sessions.getSession(sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (session.work?.state !== "kept") return {};
+    await work.discardSessionWork(sessionId);
     revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};
 }
