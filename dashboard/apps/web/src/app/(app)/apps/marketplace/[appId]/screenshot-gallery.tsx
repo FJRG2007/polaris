@@ -44,6 +44,26 @@ export function ScreenshotGallery({ name, shots }: { name: string; shots: AppScr
         item?.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "start" });
     };
 
+    const onScroll = () => {
+        const box = strip.current;
+        if (!box || box.children.length === 0) return;
+        if (box.scrollLeft + box.clientWidth >= box.scrollWidth - 1) {
+            setCurrent(box.children.length - 1);
+            return;
+        }
+        const left = box.getBoundingClientRect().left;
+        let nearest = 0;
+        let distance = Number.POSITIVE_INFINITY;
+        Array.from(box.children).forEach((child, index) => {
+            const gap = Math.abs(child.getBoundingClientRect().left - left);
+            if (gap < distance) {
+                distance = gap;
+                nearest = index;
+            }
+        });
+        setCurrent(nearest);
+    };
+
     const open = (index: number) => {
         const theme = lightNow() ? "light" : "dark";
         const now: ViewedImage[] = shots.map((shot, at) => ({
@@ -100,6 +120,7 @@ export function ScreenshotGallery({ name, shots }: { name: string; shots: AppScr
                 aria-label={t("detail.screenshots")}
                 tabIndex={0}
                 onKeyDown={onKeyDown}
+                onScroll={onScroll}
                 className="flex snap-x snap-mandatory gap-3 overflow-x-auto rounded-md pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 {shots.map((shot, index) => (

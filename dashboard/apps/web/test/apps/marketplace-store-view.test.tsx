@@ -69,7 +69,9 @@ describe("the store listing", () => {
         const crm = cardOf("CRM");
         expect(within(crm).queryByRole("button", { name: "Install" })).toBeNull();
         const locked = within(crm).getByRole("button", { name: /Needs permission/ });
-        expect((locked as HTMLButtonElement).disabled).toBe(true);
+        expect(locked.getAttribute("aria-disabled")).toBe("true");
+        expect((locked as HTMLButtonElement).disabled).toBe(false);
+        expect(locked.getAttribute("title")).toMatch(/Ask an admin/);
     });
 
     it("leads with Open for an app this Polaris already has", () => {
@@ -121,5 +123,29 @@ describe("an app's page without captures", () => {
         fireEvent.keyDown(strip, { key: "ArrowLeft" });
         fireEvent.keyDown(strip, { key: "ArrowLeft" });
         expect(screen.getByText("1 of 5")).toBeTruthy();
+    });
+
+    it("follows the strip when it is swiped instead of paged", () => {
+        render(
+            <AppDetail appId="game-servers">
+                <div />
+            </AppDetail>,
+            { wrapper: MessagesWrapper }
+        );
+        const strip = screen.getByRole("group", { name: "Screenshots" });
+        const figures = Array.from(strip.children) as HTMLElement[];
+        const rect = (left: number) => ({ left }) as DOMRect;
+        strip.getBoundingClientRect = () => rect(0);
+        Object.defineProperty(strip, "clientWidth", { value: 500, configurable: true });
+        Object.defineProperty(strip, "scrollWidth", { value: 2000, configurable: true });
+        figures.forEach((figure, index) => {
+            figure.getBoundingClientRect = () => rect(index * 400 - 800);
+        });
+        strip.scrollLeft = 800;
+        fireEvent.scroll(strip);
+        expect(screen.getByText("3 of 5")).toBeTruthy();
+        strip.scrollLeft = 1500;
+        fireEvent.scroll(strip);
+        expect(screen.getByText("5 of 5")).toBeTruthy();
     });
 });

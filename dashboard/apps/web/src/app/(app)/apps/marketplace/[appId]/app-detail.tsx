@@ -19,7 +19,7 @@ import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { findApp, isInstallable, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
+import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import {
     CAPABILITY_KEYS,
@@ -269,8 +269,6 @@ export function AppInstallPanel({
     const [removing, setRemoving] = useState<DetailInstall | null>(null);
     if (!app) return null;
     const manifest = findApp(appId) ?? app;
-    // One install per Polaris, or per owner: a second would be refused.
-    const offerInstall = isInstallable(app) && !(app.singleton && installs.length > 0);
     const openHref = (item: InstalledAppReaderView) => app.opensAt ?? `/apps/installed/${item.id}`;
     const action = primaryAction(app, {
         installs,
@@ -282,12 +280,14 @@ export function AppInstallPanel({
     return (
         <section className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-                <PrimaryActionButton
-                    action={action}
-                    onInstall={() => install(manifest)}
-                    disabled={installingId !== null}
-                    size="md"
-                />
+                {action.kind !== "locked" && (
+                    <PrimaryActionButton
+                        action={action}
+                        onInstall={() => install(manifest)}
+                        disabled={installingId !== null}
+                        size="md"
+                    />
+                )}
                 {action.kind === "install" && action.configurable && (
                     <Button
                         variant="secondary"
@@ -302,7 +302,7 @@ export function AppInstallPanel({
                     <StatusBadge status={badge.status} label={statusLabel(t, badge.status)} />
                 )}
             </div>
-            {offerInstall && !canInstall && (
+            {action.kind === "locked" && (
                 <p className="text-muted-foreground text-sm">{t("detail.readOnly")}</p>
             )}
             {error && <p className="text-danger text-sm">{error}</p>}

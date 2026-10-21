@@ -118,7 +118,12 @@ export function PrimaryActionButton({
             );
         case "locked":
             return (
-                <Button size={size} disabled title={t("card.lockedHint")}>
+                <Button
+                    size={size}
+                    aria-disabled
+                    title={t("card.lockedHint")}
+                    className="cursor-not-allowed opacity-50"
+                >
                     <Lock className="size-3.5" />
                     {t("card.locked")}
                 </Button>
