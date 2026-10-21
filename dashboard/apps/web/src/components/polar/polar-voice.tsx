@@ -498,8 +498,9 @@ export interface VoiceCallProps {
 }
 
 /** One sentence ready to be said: audio from a key here, or text for the
- *  browser's own voice, or why it cannot be said at all. */
-type Spoken = { audio: Blob } | { browser: string } | { error: CallError };
+ *  browser's own voice (with why the key could not say it, when one tried),
+ *  or why it cannot be said at all. */
+type Spoken = { audio: Blob } | { browser: string; cause?: CallError } | { error: CallError };
 
 /** The microphone level (0-100) the orb reads as full. A voice rarely reads
  *  much above this, so a normal one fills it. */
@@ -648,14 +649,14 @@ export function VoiceCall(props: VoiceCallProps) {
                 continue;
             }
             if ("browser" in item && !browserCanSpeak()) {
-                dispatch({ type: "failed", error: "no_speech_provider" });
+                dispatch({ type: "failed", error: item.cause ?? "no_speech_provider" });
                 continue;
             }
             dispatch({ type: "speaking" });
             if ("audio" in item) {
                 await playAudio(item.audio);
             } else {
-                setBrowserVoice(true);
+                if (!item.cause) setBrowserVoice(true);
                 voicing.current = "browser";
                 const speech = speakInBrowser(item.browser, lang.current, () => {
                     wordAt.current = performance.now();
@@ -700,11 +701,14 @@ export function VoiceCall(props: VoiceCallProps) {
                     if (response.ok) return { audio: await response.blob() };
                     // No key here speaks this language: the browser does, and
                     // is asked straight away for the rest of the call.
-                    if (response.status === 409) serverVoice.current = false;
-                    return { browser: sentence };
+                    if (response.status === 409) {
+                        serverVoice.current = false;
+                        return { browser: sentence };
+                    }
+                    return { browser: sentence, cause: "speak_failed" };
                 })
                 // A voice that failed still leaves one that works.
-                .catch((): Spoken => ({ browser: sentence }))
+                .catch((): Spoken => ({ browser: sentence, cause: "speak_failed" }))
                 .finally(() => fetches.current.delete(controller));
             queue.current.push(pending);
             void pump();
@@ -720,7 +724,6 @@ export function VoiceCall(props: VoiceCallProps) {
         const last = props.messages.at(-1);
         if (props.messages.length > baseline.current && last?.role === "assistant") {
             const text = replyText(last);
-            dispatch({ type: "reply", text });
             if (waitingParts(last).length > 0) {
                 dispatch({ type: "approval" });
                 return;
@@ -897,12 +900,20 @@ export function VoiceCall(props: VoiceCallProps) {
     }, []);
 
     // Escape ends the call from anywhere on the page, except inside a menu or a
-    // dialog, which Escape closes first.
+    // dialog, which Escape closes first, or a field elsewhere on the page.
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.defaultPrevented) return;
             const target = event.target instanceof Element ? event.target : null;
             if (target?.closest("[role=dialog],[role=alertdialog],[role=menu],[role=listbox]")) {
+                return;
+            }
+            if (
+                target?.closest(
+                    "input,textarea,select,[contenteditable]:not([contenteditable=false])"
+                ) &&
+                !target.closest("[data-voice-call]")
+            ) {
                 return;
             }
             end();

@@ -173,10 +173,6 @@ export interface CallState {
     phase: CallPhase;
     muted: boolean;
     ended: boolean;
-    /** What you said last, for the captions. */
-    heard: string;
-    /** Polar's answer so far, for the captions. */
-    reply: string;
     error: CallError | null;
     /** Bumped each time you speak over Polar: playback and the turn stop. */
     interruptions: number;
@@ -189,7 +185,6 @@ export type CallEvent =
     | { type: "speech-end" }
     | { type: "transcribed"; text: string }
     | { type: "failed"; error: CallError }
-    | { type: "reply"; text: string }
     | { type: "speaking" }
     | { type: "reply-done" }
     | { type: "approval" }
@@ -202,8 +197,6 @@ export const INITIAL_CALL: CallState = {
     phase: "listening",
     muted: false,
     ended: false,
-    heard: "",
-    reply: "",
     error: null,
     interruptions: 0,
     discarded: 0
@@ -232,7 +225,7 @@ export function callReducer(state: CallState, event: CallEvent): CallState {
             if (state.phase !== "transcribing") return state;
             const text = event.text.trim();
             if (!text) return { ...state, phase: "listening" };
-            return { ...state, phase: "thinking", heard: text, reply: "" };
+            return { ...state, phase: "thinking" };
         }
         case "failed":
             // A missing voice still leaves the answer on screen.
@@ -240,10 +233,6 @@ export function callReducer(state: CallState, event: CallEvent): CallState {
                 state.phase !== "transcribing"
                 ? { ...state, error: event.error }
                 : { ...state, phase: "listening", error: event.error };
-        case "reply":
-            return state.phase === "thinking" || state.phase === "speaking"
-                ? { ...state, reply: event.text }
-                : state;
         case "speaking":
             return state.phase === "thinking" ? { ...state, phase: "speaking" } : state;
         case "reply-done":

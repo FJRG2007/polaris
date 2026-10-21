@@ -43,6 +43,35 @@ vi.mock("@/app/(app)/chat/voice-level", () => ({
     speaking: (level: number, threshold: number) => level >= threshold
 }));
 
+function openMicrophone() {
+    recordType = "audio/webm";
+    vi.stubGlobal(
+        "MediaRecorder",
+        class {
+            state = "inactive";
+            ondataavailable: ((event: { data: Blob }) => void) | null = null;
+            onstop: (() => void) | null = null;
+            start() {
+                this.state = "recording";
+            }
+            stop() {
+                this.state = "inactive";
+                this.ondataavailable?.({ data: new Blob(["sound"]) });
+                this.onstop?.();
+            }
+        }
+    );
+    Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+            getUserMedia: vi.fn(async () => ({
+                getAudioTracks: () => [{}],
+                getTracks: () => []
+            }))
+        }
+    });
+}
+
 const { DictationButton, VoiceCall, VoiceModeButton } =
     await import("@/components/polar/polar-voice");
 
@@ -257,33 +286,58 @@ describe("the voice call", () => {
         expect(second.onEnd).toHaveBeenCalledTimes(1);
     });
 
-    it("hears, thinks, and says the answer with the browser's voice when no key can", async () => {
-        recordType = "audio/webm";
-        vi.stubGlobal(
-            "MediaRecorder",
-            class {
-                state = "inactive";
-                ondataavailable: ((event: { data: Blob }) => void) | null = null;
-                onstop: (() => void) | null = null;
-                start() {
-                    this.state = "recording";
-                }
-                stop() {
-                    this.state = "inactive";
-                    this.ondataavailable?.({ data: new Blob(["sound"]) });
-                    this.onstop?.();
-                }
-            }
+    it("keeps the call when Escape is pressed in a field elsewhere on the page", () => {
+        denyMicrophone();
+        const base = props();
+        render(
+            <>
+                <input aria-label="Search mail" />
+                <VoiceCall {...base} />
+            </>,
+            { wrapper: MessagesWrapper }
         );
-        Object.defineProperty(navigator, "mediaDevices", {
-            configurable: true,
-            value: {
-                getUserMedia: vi.fn(async () => ({
-                    getAudioTracks: () => [{}],
-                    getTracks: () => []
-                }))
-            }
+        fireEvent.keyDown(screen.getByRole("textbox", { name: "Search mail" }), { key: "Escape" });
+        expect(base.onEnd).not.toHaveBeenCalled();
+    });
+
+    it("says the key failed, not that none can speak, when the browser cannot take over", async () => {
+        openMicrophone();
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async (url: string) =>
+                url.startsWith("/api/polar/transcribe")
+                    ? new Response(JSON.stringify({ text: "Hello" }), { status: 200 })
+                    : new Response(JSON.stringify({ error: "speak_failed" }), { status: 502 })
+            )
+        );
+        const base = props();
+        const view = render(<VoiceCall {...base} />, { wrapper: MessagesWrapper });
+        micLevel = 80;
+        await waitFor(() => expect(orb()).toBe("hearing"), { timeout: 2000 });
+        micLevel = 0;
+        await waitFor(() => expect(base.onSend).toHaveBeenCalledWith("Hello"), {
+            timeout: 4000
         });
+        view.rerender(
+            <VoiceCall
+                {...base}
+                messages={[
+                    { id: "u", role: "user", parts: [{ type: "text", text: "Hello" }] },
+                    { id: "a", role: "assistant", parts: [{ type: "text", text: "Hi there." }] }
+                ]}
+                status="ready"
+            />
+        );
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toBe(
+                "Polar couldn't say this answer out loud. It's on screen."
+            )
+        );
+        expect(screen.queryByText("Speaking with your browser's voice")).toBeNull();
+    }, 10_000);
+
+    it("hears, thinks, and says the answer with the browser's voice when no key can", async () => {
+        openMicrophone();
         const fetched: string[] = [];
         const bodies: unknown[] = [];
         vi.stubGlobal(
