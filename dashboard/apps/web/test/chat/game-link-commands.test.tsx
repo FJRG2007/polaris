@@ -141,7 +141,8 @@ describe("the mark", () => {
             <>
                 <GameLinkMark links={[]} />
                 <GameLinkChips links={[]} />
-            </>, { wrapper: MessagesWrapper }
+            </>,
+            { wrapper: MessagesWrapper }
         );
         expect(container.innerHTML).toBe("");
     });
