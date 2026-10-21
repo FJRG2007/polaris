@@ -190,9 +190,9 @@ const defaultDeps: ShipDeps = {
             host: (script) => runInSession(session.id, script, { evenIfFinished: true })
         });
     },
-    pullsForBranch: github.pullRequestsForBranch,
-    defaultBranch: github.repoDefaultBranch,
-    create: github.createPullRequest,
+    pullsForBranch: (...args) => github.pullRequestsForBranch(...args),
+    defaultBranch: (...args) => github.repoDefaultBranch(...args),
+    create: (...args) => github.createPullRequest(...args),
     record: async (sessionId, pull) => {
         await prisma.agentSession.update({
             where: { id: sessionId },

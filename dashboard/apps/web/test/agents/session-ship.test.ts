@@ -27,6 +27,11 @@ vi.mock("@/lib/github-service", () => ({
     createPullRequest: vi.fn(),
     readPullRequest: vi.fn()
 }));
+// What the GitHub App reach check imports; the real one reaches the OAuth adapters.
+vi.mock("@/lib/github-access", () => ({
+    credentialFor: vi.fn(),
+    githubCredentialsForUser: vi.fn(async () => [])
+}));
 vi.mock("@/lib/agents/session-runtime", () => ({ runInSession: vi.fn() }));
 vi.mock("@/lib/agents/session-work", () => ({ saveSessionWork: vi.fn() }));
 vi.mock("@/lib/tasks/access", () => ({}));
