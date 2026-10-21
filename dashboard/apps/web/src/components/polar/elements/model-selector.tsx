@@ -135,11 +135,7 @@ export function ModelSelector({
             }}
         >
             <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    title={t("picker.title")}
-                    className={MODEL_TRIGGER}
-                >
+                <button type="button" title={t("picker.title")} className={MODEL_TRIGGER}>
                     <span className="truncate text-foreground">
                         {automatic ? t("picker.automatic") : (model?.name ?? t("picker.none"))}
                     </span>

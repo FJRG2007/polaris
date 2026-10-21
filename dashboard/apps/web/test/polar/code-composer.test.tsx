@@ -241,8 +241,6 @@ describe("the repository bar", () => {
 
         press(bar);
         fireEvent.click(await screen.findByRole("menuitem", { name: "Refresh the list" }));
-        expect(
-            await screen.findByRole("menuitem", { name: /acme\/web/ })
-        ).toBeTruthy();
+        expect(await screen.findByRole("menuitem", { name: /acme\/web/ })).toBeTruthy();
     });
 });

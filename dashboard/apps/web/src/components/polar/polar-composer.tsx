@@ -21,11 +21,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BorderBeam } from "@/components/polar/motion/border-beam";
 import { useRef, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 import { AttachmentList, type AttachmentData } from "@/components/polar/elements/attachments";
-import {
-    DictationButton,
-    VoiceModeButton,
-    type VoiceNotice
-} from "@/components/polar/polar-voice";
+import { DictationButton, VoiceModeButton, type VoiceNotice } from "@/components/polar/polar-voice";
 import {
     PromptInput,
     PromptInputAttach,
@@ -63,8 +59,7 @@ export type ComposerAttach =
 
 /** A voice conversation from this composer, or why there is none. */
 export type ComposerVoiceMode =
-    | { readonly refusal: string }
-    | { readonly disabled: boolean; readonly onOpen: () => void };
+    { readonly refusal: string } | { readonly disabled: boolean; readonly onOpen: () => void };
 
 type TextareaExtras = Omit<
     TextareaHTMLAttributes<HTMLTextAreaElement>,
@@ -283,10 +278,14 @@ function VoiceNoticeLine({
             role="alert"
             className="mb-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
         >
-            <span className={notice === "unavailable" ? "text-muted-foreground" : "text-danger-ink"}>
+            <span
+                className={notice === "unavailable" ? "text-muted-foreground" : "text-danger-ink"}
+            >
                 {notice === "unavailable"
                     ? t("voice.unavailable")
-                    : notice === "micDenied" || notice === "cannotRecord" || notice === "modelNotSaved"
+                    : notice === "micDenied" ||
+                        notice === "cannotRecord" ||
+                        notice === "modelNotSaved"
                       ? t(`voice.${notice}`)
                       : t(`voice.errors.${notice}`)}
             </span>

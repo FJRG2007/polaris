@@ -65,11 +65,15 @@ function Where({ repo, branch }: { repo: string; branch: string }) {
     return (
         <>
             <FolderGit2 className="size-3.5 shrink-0" aria-hidden />
-            <span className="min-w-0 truncate text-foreground" title={repo}>{repo}</span>
+            <span className="min-w-0 truncate text-foreground" title={repo}>
+                {repo}
+            </span>
             {branch ? (
                 <>
                     <GitBranch className="size-3.5 shrink-0" aria-hidden />
-                    <span className="min-w-0 max-w-[40%] shrink-[2] truncate" title={branch}>{branch}</span>
+                    <span className="min-w-0 max-w-[40%] shrink-[2] truncate" title={branch}>
+                        {branch}
+                    </span>
                 </>
             ) : null}
         </>
@@ -157,7 +161,10 @@ export function CodeRepoBar({
                     setOpen(next);
                 }}
             >
-                <DropdownMenuTrigger asChild disabled={disabled || (choices === null && refreshing)}>
+                <DropdownMenuTrigger
+                    asChild
+                    disabled={disabled || (choices === null && refreshing)}
+                >
                     <button
                         type="button"
                         aria-label={`${t("code.where")}: ${full}`}
@@ -285,9 +292,7 @@ export function CodeRepoBar({
 }
 
 function Mark({ on }: { on: boolean }) {
-    return (
-        <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />
-    );
+    return <Check className={cn("ml-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
 }
 
 /** What an agent option is called: its name, and the account where one is named. */
@@ -327,7 +332,9 @@ export function AgentPicker({
                         {picked?.label ?? t("code.agent")}
                     </span>
                     {picked?.account ? (
-                        <span className="min-w-0 truncate" title={picked.account}>{picked.account}</span>
+                        <span className="min-w-0 truncate" title={picked.account}>
+                            {picked.account}
+                        </span>
                     ) : null}
                 </button>
             </DropdownMenuTrigger>
@@ -336,7 +343,11 @@ export function AgentPicker({
                 className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
             >
                 {searchable ? (
-                    <MenuSearch value={query} onChange={setQuery} placeholder={t("code.searchAgents")} />
+                    <MenuSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("code.searchAgents")}
+                    />
                 ) : null}
                 <DropdownMenuLabel>{t("code.agent")}</DropdownMenuLabel>
                 {shown.map((option) => (
