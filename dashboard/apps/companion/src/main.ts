@@ -78,6 +78,8 @@ export default class PolarisInstance extends InstanceBase<Schema> {
         if (changed) {
             this.#states.clear();
             await this.#connection.start(config.address ?? "", readCredentials(secrets));
+        } else if (this.#connection.needsSignIn) {
+            void this.#connection.signIn();
         }
     }
 

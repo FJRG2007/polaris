@@ -91,7 +91,10 @@ export class Connection {
         if (typed.trim() === "") return this.#set({ phase: "unset" });
         if (!address) return this.#set({ phase: "invalid" });
         this.credentials = kept && kept.address === address ? kept : null;
-        if (!this.credentials) return this.signIn();
+        if (!this.credentials) {
+            void this.signIn();
+            return;
+        }
         this.#set({ phase: "connecting" });
         await this.refreshCatalogue(true);
         this.#refresh = setInterval(() => void this.refreshCatalogue(false), CATALOGUE_TTL_MS);
@@ -236,6 +239,8 @@ export class Connection {
                 }
                 if (claimed.status === "pending") continue;
                 if (claimed.status === "approved") {
+                    const previous = this.credentials;
+                    this.#stopStream();
                     this.credentials = {
                         address,
                         token: claimed.token,
@@ -255,6 +260,7 @@ export class Connection {
                     }
                     this.#streamed = null;
                     this.#scheduleRestart(0);
+                    if (previous && previous.token !== claimed.token) await this.#revoke(previous);
                     return;
                 }
                 return this.#set({ phase: "sign-in-failed", reason: claimed.status });
@@ -276,10 +282,17 @@ export class Connection {
         this.host.catalogue([]);
         this.host.save(null);
         this.#set({ phase: "unauthorized" });
-        if (credentials) {
-            await this.client.end(credentials).catch((caught: unknown) => {
-                this.host.log("warn", `Polaris did not revoke the key: ${String(caught)}`);
-            });
-        }
+        if (credentials) await this.#revoke(credentials);
+    }
+
+    async #revoke(credentials: Credentials): Promise<void> {
+        await this.client.end(credentials).catch((caught: unknown) => {
+            this.host.log("warn", `Polaris did not revoke the key: ${String(caught)}`);
+        });
+    }
+
+    /** Whether there is no usable key, so saving the settings should ask for a new code. */
+    get needsSignIn(): boolean {
+        return this.current.phase === "sign-in-failed" || this.current.phase === "unauthorized";
     }
 }

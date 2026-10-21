@@ -98,8 +98,100 @@ describe("signing in", () => {
         const { host, phases } = recorder();
         const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
         await connection.start(ADDRESS, { address: "https://other.example.com", token: "t" });
+        await vi.waitFor(() => expect(phases).toEqual(["sign-in-failed"]));
         expect(String(fetcher.mock.calls[0]?.[0])).toBe(`${ADDRESS}/api/deck/authorize`);
-        expect(phases).toEqual(["sign-in-failed"]);
+        connection.stop();
+    });
+
+    it("returns from start while the code waits for approval", async () => {
+        vi.useFakeTimers();
+        const fetcher = vi.fn(async (url: string | URL | Request) =>
+            String(url).endsWith("/api/deck/authorize")
+                ? json({
+                      userCode: "ABCD-EFGH",
+                      deviceCode: "dev",
+                      pollMs: 1000,
+                      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+                      approvePath: "/device"
+                  })
+                : json({ status: "pending" })
+        );
+        const { host } = recorder();
+        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        let returned = false;
+        void connection.start(ADDRESS, null).then(() => (returned = true));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(returned).toBe(true);
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(connection.current.phase).toBe("signing-in");
+        connection.stop();
+    });
+
+    it("asks for a new code again after one is refused", async () => {
+        vi.useFakeTimers();
+        let opened = 0;
+        const fetcher = vi.fn(async (url: string | URL | Request) => {
+            if (!String(url).endsWith("/api/deck/authorize")) return json({ status: "denied" });
+            opened += 1;
+            return json({
+                userCode: "ABCD-EFGH",
+                deviceCode: "dev",
+                pollMs: 1000,
+                expiresAt: new Date(Date.now() + 60_000).toISOString(),
+                approvePath: "/device"
+            });
+        });
+        const { host } = recorder();
+        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        await connection.start(ADDRESS, null);
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(connection.current.phase).toBe("sign-in-failed");
+        expect(connection.needsSignIn).toBe(true);
+        void connection.signIn();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(opened).toBe(2);
+        expect(connection.current.phase).toBe("signing-in");
+        expect(connection.needsSignIn).toBe(false);
+        connection.stop();
+    });
+
+    it("revokes the key it held once a new sign-in is approved", async () => {
+        vi.useFakeTimers();
+        const calls: string[] = [];
+        const fetcher = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+            const path = String(url).slice(ADDRESS.length);
+            calls.push(`${init?.method ?? "GET"} ${path} ${new Headers(init?.headers).get("authorization") ?? ""}`);
+            if (path === "/api/deck/authorize") {
+                return json({
+                    userCode: "ABCD-EFGH",
+                    deviceCode: "dev",
+                    pollMs: 1000,
+                    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+                    approvePath: "/device"
+                });
+            }
+            if (path === "/api/deck/authorize/claim") {
+                return json({
+                    status: "approved",
+                    token: "plr_new",
+                    keyId: "k2",
+                    account: { name: "Ada", email: "ada@example.test" }
+                });
+            }
+            if (path === "/api/deck/session") return new Response(null, { status: 204 });
+            if (path === "/api/deck/actions") return json({ actions: CATALOGUE });
+            return new Response(null, { status: 404 });
+        });
+        const { host } = recorder();
+        const connection = new Connection(new PolarisClient("0.1.0", fetcher as typeof fetch), host);
+        await connection.start(ADDRESS, { address: ADDRESS, token: "plr_old", keyId: "k1" });
+        const signedIn = connection.signIn();
+        await vi.advanceTimersByTimeAsync(1500);
+        await signedIn;
+        expect(connection.credentials?.token).toBe("plr_new");
+        const revoked = calls.filter((call) => call.startsWith("DELETE /api/deck/session"));
+        expect(revoked).toHaveLength(1);
+        expect(revoked[0]).toContain("plr_old");
         connection.stop();
     });
 
