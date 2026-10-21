@@ -61,6 +61,7 @@ import { polarPreferences } from "@/lib/polar/preferences";
 import { startPolarSuggestion } from "@/lib/polar/suggestions";
 import {
     helperReasoning,
+    helperMaySpend,
     polarHelperModel,
     recordHelperUsage,
     type PolarHelper
@@ -481,8 +482,11 @@ export async function POST(request: Request): Promise<Response> {
             startPolarTitle(
                 user.id,
                 body.data.threadId,
-                helper.then((side) => {
-                    const job: PolarHelper = side ?? { resolved, source: "chat" };
+                helper.then(async (side) => {
+                    const job: PolarHelper =
+                        side && (await helperMaySpend(user.id, side))
+                            ? side
+                            : { resolved, source: "chat" };
                     return {
                         model: job.resolved.model,
                         reasoning: helperReasoning(job),

@@ -1982,7 +1982,7 @@ export function PolarChat({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="max-w-full"
+                                    className="min-h-11 max-w-full"
                                     aria-label={t("composer.suggestion.use", { text: ghost })}
                                     onClick={() => acceptSuggestion(ghost)}
                                 >
