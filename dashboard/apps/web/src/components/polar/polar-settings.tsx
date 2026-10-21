@@ -22,7 +22,11 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { serversOffOf, useToolPrefs, type ToolPrefs } from "@/components/polar/tool-prefs";
-import { groupToolsByServer, type ServedTool, type ToolServerGroup } from "@/lib/polar/tool-servers";
+import {
+    groupToolsByServer,
+    type ServedTool,
+    type ToolServerGroup
+} from "@/lib/polar/tool-servers";
 import { looksSecret, normalizeMemoryText, POLAR_MEMORY_MAX_CHARS } from "@/lib/polar/shared";
 
 export interface MemoryRow {
@@ -613,14 +617,17 @@ export function PolarToolSettings() {
             // Nothing cached; the skeleton stays until the answer.
         }
         void fetch("/api/polar/models")
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: Partial<ToolsAnswer> | null) => {
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then((data: Partial<ToolsAnswer>) => {
                 const next: ToolsAnswer = {
-                    tools: data?.tools ?? {},
+                    tools: data.tools ?? {},
                     // Not knowing is not a refusal: the chat route drops web
                     // search where an administrator turned it off.
-                    web: data?.web !== false,
-                    connectors: data?.connectors === true
+                    web: data.web !== false,
+                    connectors: data.connectors === true
                 };
                 setAnswer(next);
                 try {

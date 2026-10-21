@@ -81,6 +81,7 @@ import {
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
 import * as polarShared from "@/lib/polar/shared";
+import * as settingsPath from "@/lib/polar/settings-path";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
@@ -1560,7 +1561,8 @@ export function PolarChat({
             startNew();
             return setTemporary(!temporary);
         }
-        if (command === "memory") return router.push("/polar/settings#memory");
+        if (command === "memory")
+            return settingsPath.openFromChat((href) => router.push(href), "#memory");
         if (command === "context") return setShowContext(true);
         if (command === "usage") {
             return chat.messages.length === 0 ? setShowUsage(true) : setShowContext(true);
@@ -2211,7 +2213,7 @@ export function PolarChat({
                         returns to the page the panel was open on, still open. */}
                     <MessageAction
                         label={t("settings.open")}
-                        onClick={() => router.push("/polar/settings")}
+                        onClick={() => settingsPath.openFromChat((href) => router.push(href))}
                     >
                         <Settings2 />
                     </MessageAction>

@@ -10,7 +10,8 @@
 import { resolve } from "node:path";
 import { MessagesWrapper } from "../setup/i18n";
 import { existsSync, readFileSync } from "node:fs";
-import { polarToolsTarget } from "@/lib/polar/settings-path";
+import { SettingsBack } from "@/app/(app)/polar/settings/settings-back";
+import { SETTINGS_FROM_CHAT_KEY, polarToolsTarget } from "@/lib/polar/settings-path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { groupToolsByServer, offWithServers } from "@/lib/polar/tool-servers";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -18,6 +19,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 const kept = new Map<string, string>();
 const pushed: string[] = [];
 let answer: Record<string, unknown> = {};
+let wentBack = false;
 
 vi.mock("@ai-sdk/react", () => ({
     useChat: () => ({
@@ -33,7 +35,10 @@ vi.mock("@ai-sdk/react", () => ({
 }));
 vi.mock("next/navigation", () => ({
     usePathname: () => "/tasks",
-    useRouter: () => ({ push: (href: string) => void pushed.push(href), back: () => undefined })
+    useRouter: () => ({
+        push: (href: string) => void pushed.push(href),
+        back: () => void (wentBack = true)
+    })
 }));
 
 const TOOLS = {
@@ -50,6 +55,7 @@ const TOOLS = {
 beforeEach(() => {
     kept.clear();
     pushed.length = 0;
+    wentBack = false;
     answer = { providers: [], tools: TOOLS, isAdmin: false, web: true, connectors: true };
     const storage = {
         getItem: (key: string) => kept.get(key) ?? null,
@@ -91,7 +97,10 @@ describe("web search", () => {
         const toggle = await screen.findByRole("switch", { name: "Search the web" });
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         cleanup();
-        vi.stubGlobal("fetch", vi.fn(async () => Response.json({}, { status: 500 })));
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => Response.json({}, { status: 500 }))
+        );
         page();
         const again = await screen.findByRole("switch", { name: "Search the web" });
         expect(again.getAttribute("aria-checked")).toBe("true");
@@ -163,6 +172,24 @@ describe("tools by MCP server", () => {
         expect(JSON.parse(kept.get("polar.serversOff")!)).toEqual([]);
     });
 
+    it("keeps the list it last saw when the server's answer fails", async () => {
+        const cached = { tools: TOOLS, web: true, connectors: true };
+        const session = new Map([["polar.settingsTools", JSON.stringify(cached)]]);
+        vi.stubGlobal("sessionStorage", {
+            getItem: (key: string) => session.get(key) ?? null,
+            setItem: (key: string, value: string) => void session.set(key, value),
+            removeItem: (key: string) => void session.delete(key)
+        });
+        const failing = vi.fn(async () => Response.json({}, { status: 500 }));
+        vi.stubGlobal("fetch", failing);
+        page();
+        expect(await screen.findByRole("button", { name: /Linear/ })).toBeTruthy();
+        await vi.waitFor(() => expect(failing).toHaveBeenCalled());
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(screen.getByRole("button", { name: /Linear/ })).toBeTruthy();
+        expect(JSON.parse(session.get("polar.settingsTools")!)).toEqual(cached);
+    });
+
     it("hides the connectors where the deployment does not allow them", async () => {
         answer = { ...answer, connectors: false };
         page();
@@ -180,6 +207,27 @@ describe("the settings page", () => {
         expect(screen.queryByRole("dialog")).toBeNull();
     });
 
+    it("goes back to the chat that opened it, and to Polar's page otherwise", () => {
+        const session = new Map<string, string>([[SETTINGS_FROM_CHAT_KEY, "1"]]);
+        vi.stubGlobal("sessionStorage", {
+            getItem: (key: string) => session.get(key) ?? null,
+            setItem: (key: string, value: string) => void session.set(key, value),
+            removeItem: (key: string) => void session.delete(key)
+        });
+        window.history.pushState({}, "", "/polar/settings");
+        render(<SettingsBack label="Back to chat" />);
+        expect(session.has(SETTINGS_FROM_CHAT_KEY)).toBe(false);
+        fireEvent.click(screen.getByRole("link", { name: "Back to chat" }));
+        expect(wentBack).toBe(true);
+        cleanup();
+        wentBack = false;
+        render(<SettingsBack label="Back to chat" />);
+        const link = screen.getByRole("link", { name: "Back to chat" });
+        expect(link.getAttribute("href")).toBe("/polar");
+        fireEvent.click(link);
+        expect(wentBack).toBe(false);
+    });
+
     it("is a route, and the settings component holds no dialog", () => {
         const root = resolve(__dirname, "../../src");
         expect(existsSync(resolve(root, "app/(app)/polar/settings/page.tsx"))).toBe(true);
@@ -189,7 +237,9 @@ describe("the settings page", () => {
 
     it("takes over /account/polar-tools, sign-in answer included", () => {
         expect(polarToolsTarget(undefined)).toBe("/polar/settings#permissions");
-        expect(polarToolsTarget("signed_in")).toBe("/polar/settings?connector=signed_in#connectors");
+        expect(polarToolsTarget("signed_in")).toBe(
+            "/polar/settings?connector=signed_in#connectors"
+        );
         expect(polarToolsTarget("failed")).toBe("/polar/settings?connector=failed#connectors");
         expect(polarToolsTarget("<script>")).toBe("/polar/settings#permissions");
     });
