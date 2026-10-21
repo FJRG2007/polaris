@@ -20,7 +20,8 @@ let archived = { code: 0, output: "" };
 
 function answer(argv: readonly string[]): { code: number; output: string } {
     const [command] = argv;
-    if (command === "ls") return { code: 0, output: edition === "java" ? "world\nlogs" : "Bedrock level" };
+    if (command === "ls")
+        return { code: 0, output: edition === "java" ? "world\nlogs" : "Bedrock level" };
     if (command === "tar") return archived;
     if (command === "stat") return { code: 0, output: "4096\n" };
     return { code: 0, output: "" };
@@ -28,7 +29,11 @@ function answer(argv: readonly string[]): { code: number; output: string } {
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     containerFailure: (output: string, failure: string) => output.trim() || failure,
-    withServerContainer: async (_ownerId: string, installedAppId: string, work: (server: unknown) => Promise<unknown>) =>
+    withServerContainer: async (
+        _ownerId: string,
+        installedAppId: string,
+        work: (server: unknown) => Promise<unknown>
+    ) =>
         work({
             installedAppId,
             applicationId: "app-1",
@@ -77,10 +82,13 @@ vi.mock("@/lib/apps/install-config", () => ({
     readInstallConfig: () => ({})
 }));
 
-const { createWorldBackup } = await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
+const { createWorldBackup } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/world-service");
 
-const published = () => ran.some((argv) => argv[0] === "mv" && !argv[argv.length - 1]!.endsWith(".part"));
-const partialRemoved = () => ran.some((argv) => argv[0] === "rm" && argv[argv.length - 1]!.endsWith(".tar.gz.part"));
+const published = () =>
+    ran.some((argv) => argv[0] === "mv" && !argv[argv.length - 1]!.endsWith(".part"));
+const partialRemoved = () =>
+    ran.some((argv) => argv[0] === "rm" && argv[argv.length - 1]!.endsWith(".tar.gz.part"));
 
 beforeEach(() => {
     ran = [];
@@ -114,7 +122,10 @@ describe("a world copy tar finished while files moved", () => {
 
     it("fails on Bedrock whatever moved, and takes the partial file away", async () => {
         edition = "bedrock";
-        archived = { code: 1, output: "tar: worlds/Bedrock level/db/000123.log: file changed as we read it\n" };
+        archived = {
+            code: 1,
+            output: "tar: worlds/Bedrock level/db/000123.log: file changed as we read it\n"
+        };
 
         await expect(createWorldBackup("owner-1", "install-1")).rejects.toThrow("000123.log");
         expect(published()).toBe(false);

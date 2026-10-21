@@ -74,7 +74,11 @@ export const LEVEL_ASIDE_DIR = `${DATA_DIR}/.polaris-worlds`;
  */
 export function isPluginOf(file: string, project: string): boolean {
     const bare = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-    return file.toLowerCase().endsWith(".jar") && bare(file).startsWith(bare(project)) && bare(project).length > 0;
+    return (
+        file.toLowerCase().endsWith(".jar") &&
+        bare(file).startsWith(bare(project)) &&
+        bare(project).length > 0
+    );
 }
 
 /**
@@ -107,7 +111,10 @@ export const VERSIONED_CONFIG = [
 ] as const;
 
 /** The level each image generates into when it is told nothing else. */
-const DEFAULT_LEVEL: Record<MinecraftEdition, string> = { java: "world", bedrock: "Bedrock level" /* i18n-ignore: a folder name the game writes */ };
+const DEFAULT_LEVEL: Record<MinecraftEdition, string> = {
+    java: "world",
+    bedrock: "Bedrock level" /* i18n-ignore: a folder name the game writes */
+};
 
 /** The variable that names the level folder, per edition. */
 const LEVEL_KEY: Record<MinecraftEdition, string> = { java: "LEVEL", bedrock: "LEVEL_NAME" };
@@ -222,7 +229,11 @@ export function backupName(at: Date): string {
  * chunk may be half old and half new. So is anything on Bedrock, whose world is
  * a LevelDB that a fixed wait after `save hold` does not prove has stopped. Pure.
  */
-export function onlyMovedUnderTar(edition: MinecraftEdition, code: number, output: string): boolean {
+export function onlyMovedUnderTar(
+    edition: MinecraftEdition,
+    code: number,
+    output: string
+): boolean {
     if (edition !== "java" || code !== 1) return false;
     const lines = output
         .split("\n")
@@ -230,7 +241,8 @@ export function onlyMovedUnderTar(edition: MinecraftEdition, code: number, outpu
         .filter(Boolean);
     if (lines.length === 0) return false;
     return lines.every((line) => {
-        const moved = /^tar: (.+): (file changed as we read it|File removed before we read it)$/.exec(line);
+        const moved =
+            /^tar: (.+): (file changed as we read it|File removed before we read it)$/.exec(line);
         if (moved === null || moved[1]!.endsWith(".mca")) return false;
         return moved[2] === "file changed as we read it" || isScratchSave(moved[1]!);
     });
@@ -260,7 +272,11 @@ export function backupTakenAt(name: string): Date | null {
  * sorts by name.
  */
 export function folderStamp(at: Date): string {
-    return at.toISOString().slice(0, 19).replace(/[:T-]/g, "").replace(/(\d{8})(\d{6})/, "$1-$2");
+    return at
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[:T-]/g, "")
+        .replace(/(\d{8})(\d{6})/, "$1-$2");
 }
 
 /**
@@ -325,11 +341,31 @@ export interface LevelTypeOption {
 export const FLAT_LEVEL_TYPE = "minecraft:flat";
 
 export const LEVEL_TYPES: readonly LevelTypeOption[] = [
-    { value: "minecraft:normal", label: "blueprint.levelTypes.normal", detail: "blueprint.levelTypes.normalDetail" },
-    { value: "minecraft:large_biomes", label: "blueprint.levelTypes.largeBiomes", detail: "blueprint.levelTypes.largeBiomesDetail" },
-    { value: "minecraft:amplified", label: "blueprint.levelTypes.amplified", detail: "blueprint.levelTypes.amplifiedDetail" },
-    { value: "minecraft:single_biome_surface", label: "blueprint.levelTypes.singleBiome", detail: "blueprint.levelTypes.singleBiomeDetail" },
-    { value: FLAT_LEVEL_TYPE, label: "blueprint.levelTypes.flat", detail: "blueprint.levelTypes.flatDetail" }
+    {
+        value: "minecraft:normal",
+        label: "blueprint.levelTypes.normal",
+        detail: "blueprint.levelTypes.normalDetail"
+    },
+    {
+        value: "minecraft:large_biomes",
+        label: "blueprint.levelTypes.largeBiomes",
+        detail: "blueprint.levelTypes.largeBiomesDetail"
+    },
+    {
+        value: "minecraft:amplified",
+        label: "blueprint.levelTypes.amplified",
+        detail: "blueprint.levelTypes.amplifiedDetail"
+    },
+    {
+        value: "minecraft:single_biome_surface",
+        label: "blueprint.levelTypes.singleBiome",
+        detail: "blueprint.levelTypes.singleBiomeDetail"
+    },
+    {
+        value: FLAT_LEVEL_TYPE,
+        label: "blueprint.levelTypes.flat",
+        detail: "blueprint.levelTypes.flatDetail"
+    }
 ];
 
 export const DEFAULT_LEVEL_TYPE = "minecraft:normal";
@@ -410,7 +446,16 @@ export const LEVEL_MARKER = "level.dat";
  * The marker is the game's own answer to the question.
  */
 export function levelMarkerArgv(edition: MinecraftEdition): string[] {
-    return ["find", levelParent(edition), "-mindepth", "2", "-maxdepth", "2", "-name", LEVEL_MARKER];
+    return [
+        "find",
+        levelParent(edition),
+        "-mindepth",
+        "2",
+        "-maxdepth",
+        "2",
+        "-name",
+        LEVEL_MARKER
+    ];
 }
 
 /**
@@ -452,7 +497,9 @@ export function restorePlan(
         const source = named[0];
         return source ? [{ from: source, to: level }] : [];
     }
-    const primary = named.find((entry) => !named.some((other) => other !== entry && isDimensionOf(entry, other)));
+    const primary = named.find(
+        (entry) => !named.some((other) => other !== entry && isDimensionOf(entry, other))
+    );
     if (!primary) return [];
     return named.flatMap((entry) => {
         if (entry === primary) return [{ from: entry, to: level }];
