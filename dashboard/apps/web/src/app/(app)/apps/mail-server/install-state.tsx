@@ -50,7 +50,7 @@ export function MailServerInstallState({
         <div className="flex flex-col gap-3">
             <EmptyState
                 icon={<Mails />}
-                title={t("install.title")}
+                title={canInstall ? t("install.title") : t("install.titleAsk")}
                 description={canInstall ? t("install.body") : t("install.bodyAsk")}
                 action={
                     canInstall ? (

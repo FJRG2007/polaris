@@ -237,19 +237,25 @@ async function scopedProjectWhere(userId: string, orgId: string | null) {
     return { AND: [await visibleProjectWhere(userId), { orgId }] };
 }
 
+/** The most projects, and environments in each, a template picker is offered. */
+const PROJECT_TARGET_LIMIT = 200;
+const ENVIRONMENT_TARGET_LIMIT = 50;
+
 /** The projects on one shelf with their environments, names only: where a
  *  template from the marketplace can be deployed. Each create is still checked
- *  against the project on its own. */
+ *  against the project on its own. Bounded, the ones worked on last first. */
 export async function listProjectTargets(userId: string, orgId: string | null) {
     return prisma.project.findMany({
         where: await scopedProjectWhere(userId, orgId),
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: PROJECT_TARGET_LIMIT,
         select: {
             id: true,
             name: true,
             environments: {
                 select: { id: true, name: true, isDefault: true },
-                orderBy: { createdAt: "asc" }
+                orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }],
+                take: ENVIRONMENT_TARGET_LIMIT
             }
         }
     });

@@ -144,6 +144,8 @@
         "noProjects": "It is deployed into a project, and you have none yet.",
         "newProject": "Create a project",
         "project": "Project",
+        "projectSearch": "Search projects",
+        "projectNone": "No project matches",
         "environment": "Environment",
         "next": "Continue"
     },

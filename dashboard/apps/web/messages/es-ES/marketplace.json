@@ -144,6 +144,8 @@
         "noProjects": "Se despliega en un proyecto, y aún no tienes ninguno.",
         "newProject": "Crear un proyecto",
         "project": "Proyecto",
+        "projectSearch": "Buscar proyectos",
+        "projectNone": "Ninguno coincide",
         "environment": "Entorno",
         "next": "Continuar"
     },

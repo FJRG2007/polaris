@@ -368,7 +368,8 @@
     "install": {
         "title": "Install Mail server from Polaris apps",
         "body": "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Installing downloads nothing - a server is set up only when you choose a machine for it.",
-        "bodyAsk": "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Ask somebody who can install apps to add it.",
+        "titleAsk": "Mail server is not installed",
+        "bodyAsk": "Mail at your own domains: SPF, DKIM and DMARC written and checked, mailboxes and aliases. Ask an administrator to add it.",
         "pending": "Installing",
         "install": "Install",
         "view": "View in Polaris apps"

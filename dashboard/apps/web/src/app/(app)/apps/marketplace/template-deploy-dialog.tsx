@@ -21,6 +21,7 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
+    SearchableSelect,
     Select
 } from "@polaris/ui";
 
@@ -104,10 +105,13 @@ export function TemplateDeployDialog({
                 ) : (
                     <div className="flex flex-col gap-3">
                         <Field label={t("templateDeploy.project")}>
-                            <Select
+                            <SearchableSelect
+                                className="w-full"
                                 value={projectId}
                                 onValueChange={pickProject}
                                 aria-label={t("templateDeploy.project")}
+                                searchPlaceholder={t("templateDeploy.projectSearch")}
+                                emptyText={t("templateDeploy.projectNone")}
                                 options={targets.map((item) => ({
                                     value: item.id,
                                     label: item.name

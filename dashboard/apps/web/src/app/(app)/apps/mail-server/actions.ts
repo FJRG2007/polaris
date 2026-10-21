@@ -30,7 +30,7 @@ import { installApp } from "@/lib/apps/install-service";
 import * as appInstall from "@/lib/mail-server/app-install";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { MailServerUnreachable } from "@/lib/mail-server/transport";
-import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
+import { requireAdmin, requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { reached, SETUP_STEPS, type SetupStep } from "@/lib/mail-server/steps";
 import {
     listServers,
@@ -118,11 +118,11 @@ function refreshApp(): void {
 
 /**
  * Install the app from its own screen, the same install the marketplace makes.
- * Gated on what installs any marketplace app. Runs nothing: the engine is only
+ * Admin-only, like installing any Polaris app. Runs nothing: the engine is only
  * pulled when a server is set up.
  */
 export async function installMailServerAppAction(): Promise<Result> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requireAdmin();
     try {
         const manifest = findApp(appInstall.MAIL_SERVER_APP);
         if (!manifest) return { error: await say("errors.notInCatalog") };
@@ -152,7 +152,7 @@ export async function installMailServerAppAction(): Promise<Result> {
 /** Uninstall the app for the whole Polaris. Refused while any mail server is
  *  still set up - see `uninstallMailServerApp`. */
 export async function uninstallMailServerAppAction(): Promise<Result> {
-    const user = await requirePermission("deploy.manage");
+    const user = await requireAdmin();
     try {
         const removed = await appInstall.uninstallMailServerApp({
             id: user.id,

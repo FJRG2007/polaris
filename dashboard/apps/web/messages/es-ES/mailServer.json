@@ -368,7 +368,8 @@
     "install": {
         "title": "Instala el servidor de correo desde Apps de Polaris",
         "body": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Instalarlo no descarga nada: el servidor solo se instala cuando eliges una máquina para él.",
-        "bodyAsk": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Pide a alguien que pueda instalar apps que lo añada.",
+        "titleAsk": "Servidor de correo sin instalar",
+        "bodyAsk": "Correo en tus propios dominios: SPF, DKIM y DMARC escritos y comprobados, buzones y alias. Pide a un administrador que lo añada.",
         "pending": "Instalando",
         "install": "Instalar",
         "view": "Ver en Apps de Polaris"

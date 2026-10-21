@@ -39,8 +39,17 @@ vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
 vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({
     uninstallInstalledAppAction: vi.fn()
 }));
+// Every Polaris offers Deploy templates, so an empty store is staged here.
+let emptyStore = false;
+vi.mock("@/lib/apps/marketplace-store", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("@/lib/apps/marketplace-store")>();
+    return { ...actual, storeApps: () => (emptyStore ? [] : actual.storeApps()) };
+});
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    emptyStore = false;
+});
 
 const offered = appsByCategory().flatMap((group) => group.apps);
 const polarisIds = offered.filter((app) => storeScope(app) === "polaris").map((app) => app.id);
@@ -134,6 +143,7 @@ describe("the user marketplace", () => {
     });
 
     it("says so when it has nothing, and points an admin to Polaris apps", () => {
+        emptyStore = true;
         render(<MarketplaceView installed={[]} canBrowsePolaris />, { wrapper: MessagesWrapper });
         expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Open Polaris apps" }).getAttribute("href")).toBe(
@@ -144,6 +154,7 @@ describe("the user marketplace", () => {
     });
 
     it("offers no link to the admin screen to anybody else", () => {
+        emptyStore = true;
         render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
         expect(screen.queryByRole("link", { name: "Open Polaris apps" })).toBeNull();
