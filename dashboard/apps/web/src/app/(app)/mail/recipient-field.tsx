@@ -9,9 +9,8 @@
  * focus - all five, because everybody has learned a different one.
  *
  * Suggestions come from what the mailboxes have actually corresponded with,
- * ranked so the person written to daily is first. Nothing is offered until two
- * characters have been typed: a list that appears on the first keystroke is a
- * list of everybody.
+ * ranked so the person written to daily is first - see `contact-suggestions`,
+ * which the search panel's address fields share.
  *
  * The address is validated as it is entered rather than at send time. A field
  * that has not been filled in is incomplete, not wrong, so an empty one says
@@ -21,13 +20,9 @@
 import { X } from "lucide-react";
 import * as core from "@polaris/core";
 import { Input, cn } from "@polaris/ui";
-import { useMail } from "./mail-shell";
-import { suggestContactsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useMemo, useRef, useState } from "react";
-
-/** How long typing settles before contacts are asked for. */
-const SETTLE_MS = 200;
+import { ContactSuggestionList, useContactSuggestions } from "./contact-suggestions";
+import { useMemo, useRef, useState } from "react";
 
 export function RecipientField({
     label,
@@ -41,33 +36,14 @@ export function RecipientField({
     autoFocus?: boolean;
 }) {
     const t = useTranslations("mailCompose");
-    const { shelf } = useMail();
     const [typed, setTyped] = useState("");
-    const [suggestions, setSuggestions] = useState<{ address: string; name: string }[]>([]);
-    const [highlight, setHighlight] = useState(0);
     const box = useRef<HTMLInputElement | null>(null);
+    const chips = useRef<HTMLDivElement | null>(null);
+    const held = useMemo(() => value.map((entry) => entry.address), [value]);
+    const offered = useContactSuggestions(typed, held);
+    const { suggestions, highlight } = offered;
 
     const invalid = useMemo(() => typed.trim().length > 0 && !looksLikeAddress(typed), [typed]);
-
-    useEffect(() => {
-        const needle = typed.trim();
-        if (needle.length < 2) {
-            setSuggestions([]);
-            return;
-        }
-        const timer = setTimeout(() => {
-            void (async () => {
-                const outcome = await suggestContactsAction(needle, shelf);
-                setSuggestions(
-                    outcome.suggestions.filter(
-                        (one) => !value.some((held) => core.sameAddress(held.address, one.address))
-                    )
-                );
-                setHighlight(0);
-            })();
-        }, SETTLE_MS);
-        return () => clearTimeout(timer);
-    }, [typed, value, shelf]);
 
     function commit(entry: { address: string; name: string }): void {
         if (!looksLikeAddress(entry.address)) return;
@@ -77,14 +53,15 @@ export function RecipientField({
         }
         onChange([...value, { name: entry.name, address: entry.address.trim().toLowerCase() }]);
         setTyped("");
-        setSuggestions([]);
+        offered.clear();
     }
 
     return (
-        <div className="relative flex items-start gap-2 text-[12px] text-muted-foreground">
+        <div className="flex items-start gap-2 text-[12px] text-muted-foreground">
             <span className="w-12 shrink-0 pt-1.5">{label}</span>
             <div className="min-w-0 flex-1">
                 <div
+                    ref={chips}
                     className={cn(
                         "flex min-h-8 flex-wrap items-center gap-1 rounded-md border border-border bg-field px-1.5 py-1",
                         invalid && "border-danger"
@@ -135,14 +112,12 @@ export function RecipientField({
                         onKeyDown={(event) => {
                             if (event.key === "ArrowDown" && suggestions.length > 0) {
                                 event.preventDefault();
-                                setHighlight((held) => (held + 1) % suggestions.length);
+                                offered.move(1);
                                 return;
                             }
                             if (event.key === "ArrowUp" && suggestions.length > 0) {
                                 event.preventDefault();
-                                setHighlight(
-                                    (held) => (held - 1 + suggestions.length) % suggestions.length
-                                );
+                                offered.move(-1);
                                 return;
                             }
                             if (
@@ -170,6 +145,14 @@ export function RecipientField({
                                 if (event.key === "Enter") event.preventDefault();
                                 return;
                             }
+                            if (event.key === "Escape" && suggestions.length > 0) {
+                                // The list, not the composer: Escape closes the
+                                // nearest thing that is open.
+                                event.preventDefault();
+                                event.stopPropagation();
+                                offered.clear();
+                                return;
+                            }
                             if (event.key === "Backspace" && typed === "" && value.length > 0) {
                                 onChange(value.slice(0, -1));
                             }
@@ -180,40 +163,16 @@ export function RecipientField({
                     <p className="mt-0.5 text-[11px] text-danger">{t("recipients.invalid")}</p>
                 ) : null}
 
-                {suggestions.length > 0 ? (
-                    <ul className="absolute left-14 right-0 z-50 mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-md border border-border bg-elevated py-1 shadow-popover">
-                        {suggestions.map((entry, index) => (
-                            <li key={entry.address}>
-                                <button
-                                    type="button"
-                                    className={cn(
-                                        "flex w-full items-baseline gap-2 px-2 py-1.5 text-left text-[13px]",
-                                        index === highlight
-                                            ? "bg-option-hover text-foreground"
-                                            : "text-muted-foreground"
-                                    )}
-                                    // Pressing a suggestion must not blur the box
-                                    // first, or the half-typed address commits and
-                                    // the suggestion lands on top of it.
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => {
-                                        commit(entry);
-                                        box.current?.focus();
-                                    }}
-                                >
-                                    <span className="min-w-0 truncate text-foreground">
-                                        {core.addressName(entry)}
-                                    </span>
-                                    {entry.name.trim() ? (
-                                        <span className="min-w-0 truncate text-[12px] text-foreground-subtle">
-                                            {entry.address}
-                                        </span>
-                                    ) : null}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                ) : null}
+                <ContactSuggestionList
+                    anchor={chips}
+                    suggestions={suggestions}
+                    highlight={highlight}
+                    onHighlight={offered.setHighlight}
+                    onChoose={(entry) => {
+                        commit(entry);
+                        box.current?.focus();
+                    }}
+                />
             </div>
         </div>
     );
