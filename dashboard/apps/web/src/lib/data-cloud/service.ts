@@ -20,7 +20,8 @@ import { loadEnv } from "@polaris/config";
 import { slugify } from "@polaris/deploy";
 import { connect as tcpConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
-import { encryptCredentials } from "@polaris/storage";
+import { decryptCredentials, encryptCredentials } from "@polaris/storage";
+import { randomBytes } from "node:crypto";
 import type { DbCredentials } from "@/lib/database-service";
 import { signAwsRequest } from "@/lib/integrations/aws-sign";
 import { assertEnvironmentRoom } from "@/lib/orgs/quota-service";
@@ -201,9 +202,10 @@ export async function connectCloudDatabase(
     });
 }
 
-/** How long a CloudAMQP instance is waited on, as its Terraform provider does. */
-const CREATE_WAIT_MS = 30 * 60_000;
-const POLL_MS = 10_000;
+/** How long a CloudAMQP create is followed, as its Terraform provider waits. */
+export const CREATE_WAIT_MS = 30 * 60_000;
+/** How often rows still being created are looked at. */
+const POLL_MS = 15_000;
 
 /** The endpoint of a ready CloudAMQP instance. */
 function amqpEndpoint(url: string): core.DataEndpoint {
@@ -219,8 +221,13 @@ function amqpEndpoint(url: string): core.DataEndpoint {
 }
 
 /**
- * Create a RabbitMQ in CloudAMQP with the user's API key, store the row as
- * provisioning, and follow it until CloudAMQP says it is ready.
+ * Create a RabbitMQ in CloudAMQP with the user's API key.
+ *
+ * The row is written first, as provisioning, with everything the create needs
+ * (key, plan, region, and the instance name it is created under there), so a
+ * restart at any point leaves a row the watcher can carry on from. The name is
+ * this row's own - `slug-<random>` - so finding it again by name can never adopt
+ * an instance the user made themselves.
  */
 export async function createCloudAmqpDatabase(
     ownerId: string,
@@ -235,50 +242,159 @@ export async function createCloudAmqpDatabase(
     });
     if (!environment) throw new Error("Environment not found");
     const slug = await claimSlug(input.environmentId, input.name);
-    const instance = await cloudamqp.createCloudAmqpInstance(request, input.apiKey, input);
-    const endpoint = instance.ready && instance.url ? amqpEndpoint(instance.url) : null;
     const row = await prisma.managedDatabase.create({
         data: {
             ...cloudRow(input.environmentId, targetId, input.name, slug, "rabbitmq", "cloudamqp"),
-            providerResourceId: instance.id,
-            status: endpoint ? "running" : "provisioning",
+            status: "provisioning",
             ...sealed({
-                username: endpoint?.username ?? "",
-                password: endpoint?.password ?? "",
-                database: endpoint?.database ?? "",
-                cloud: { endpoint: endpoint ?? core.cloudEndpointPlaceholder(), apiKey: input.apiKey }
+                username: "",
+                password: "",
+                database: "",
+                cloud: {
+                    endpoint: core.cloudEndpointPlaceholder(),
+                    apiKey: input.apiKey,
+                    plan: input.plan,
+                    region: input.region,
+                    remoteName: `${slug}-${randomBytes(4).toString("hex")}`.slice(0, 60)
+                }
             })
         }
     });
-    if (!endpoint) void followCloudAmqp(row.id, instance.id, input.apiKey, request);
+    // The first step now, so a refused key is on screen at once; the watcher
+    // takes every step after it.
+    await advanceCloudProvision(row.id, request).catch(() => undefined);
     return row;
 }
 
-/** Poll until the instance is ready, then store where it is. */
-export async function followCloudAmqp(
+/** Decrypt the blob of a row already loaded. */
+function openSealed(row: {
+    encryptedCredential: Uint8Array | null;
+    credentialNonce: Uint8Array | null;
+    credentialKeyId: string | null;
+}): DbCredentials | null {
+    if (!row.encryptedCredential || !row.credentialNonce) return null;
+    return decryptCredentials<DbCredentials>(
+        {
+            ciphertext: Buffer.from(row.encryptedCredential),
+            nonce: Buffer.from(row.credentialNonce),
+            keyId: row.credentialKeyId ?? ""
+        },
+        loadEnv().POLARIS_MASTER_KEY
+    );
+}
+
+/** Mark a row failed with words for the screen, once: only from provisioning. */
+async function failProvision(databaseId: string, reason: string): Promise<void> {
+    await prisma.managedDatabase.updateMany({
+        where: { id: databaseId, status: "provisioning" },
+        data: { status: "failed", providerError: reason }
+    });
+}
+
+const inFlight = new Set<string>();
+
+/**
+ * Take one step on a row CloudAMQP is creating: create it there if that never
+ * happened, otherwise ask whether it is ready, and store where it is once it
+ * is. Every step can be repeated - the create finds its own instance by name,
+ * and each write only moves a row that is still provisioning - so a restart, a
+ * second tick or a retried request does no harm.
+ */
+export async function advanceCloudProvision(
     databaseId: string,
-    instanceId: string,
-    apiKey: string,
     request: cloudamqp.CloudFetch = publicRequest,
-    wait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    now: Date = new Date()
 ): Promise<void> {
-    const deadline = Date.now() + CREATE_WAIT_MS;
-    while (Date.now() < deadline) {
-        const instance = await cloudamqp.getCloudAmqpInstance(request, apiKey, instanceId).catch(() => null);
-        if (instance?.ready && instance.url) {
-            const endpoint = amqpEndpoint(instance.url);
-            await prisma.managedDatabase.update({
-                where: { id: databaseId },
-                data: {
-                    status: "running",
-                    ...sealed({ username: endpoint.username, password: endpoint.password, database: endpoint.database, cloud: { endpoint, apiKey } })
-                }
-            });
+    if (inFlight.has(databaseId)) return;
+    inFlight.add(databaseId);
+    try {
+        const row = await prisma.managedDatabase.findFirst({
+            where: { id: databaseId, provider: "cloudamqp", status: "provisioning" }
+        });
+        if (!row) return;
+        const cloud = openSealed(row)?.cloud;
+        if (!cloud?.apiKey || !cloud.remoteName || !cloud.plan || !cloud.region) {
+            await failProvision(row.id, "Polaris lost what it needed to create this instance. Delete it and create it again.");
             return;
         }
-        await wait(POLL_MS);
+        if (now.getTime() - row.createdAt.getTime() > CREATE_WAIT_MS) {
+            await failProvision(
+                row.id,
+                "CloudAMQP did not finish creating this instance within 30 minutes. Delete it here to remove it there too."
+            );
+            return;
+        }
+        let instance: cloudamqp.CloudAmqpInstance;
+        try {
+            if (row.providerResourceId) {
+                instance = await cloudamqp.getCloudAmqpInstance(request, cloud.apiKey, row.providerResourceId);
+            } else {
+                instance = await cloudamqp.createCloudAmqpInstance(request, cloud.apiKey, {
+                    name: cloud.remoteName,
+                    plan: cloud.plan,
+                    region: cloud.region
+                });
+                if (instance.id) {
+                    await prisma.managedDatabase.updateMany({
+                        where: { id: row.id, providerResourceId: null },
+                        data: { providerResourceId: instance.id }
+                    });
+                }
+            }
+        } catch (error) {
+            // A refused key or a refused create will not fix itself; anything
+            // else (a timeout, a 5xx) is tried again on the next tick.
+            const message = error instanceof Error ? error.message : "";
+            if (message === "CloudAMQP refused the API key") {
+                await failProvision(row.id, "CloudAMQP refused the API key. Delete this instance and create it with a valid key.");
+            } else if (/could not create the instance \(HTTP 4\d\d\)/.test(message)) {
+                await failProvision(row.id, `${message}. Check the plan and region, then create it again.`);
+            }
+            return;
+        }
+        if (!instance.ready || !instance.url) return;
+        const endpoint = amqpEndpoint(instance.url);
+        await prisma.managedDatabase.updateMany({
+            where: { id: row.id, status: "provisioning" },
+            data: {
+                status: "running",
+                providerError: null,
+                ...sealed({
+                    username: endpoint.username,
+                    password: endpoint.password,
+                    database: endpoint.database,
+                    cloud: { ...cloud, endpoint }
+                })
+            }
+        });
+    } finally {
+        inFlight.delete(databaseId);
     }
-    await prisma.managedDatabase.update({ where: { id: databaseId }, data: { status: "failed" } });
+}
+
+/** One pass over every row still being created in a cloud. */
+export async function resumeCloudProvisions(
+    request: cloudamqp.CloudFetch = publicRequest,
+    now: Date = new Date()
+): Promise<void> {
+    const rows = await prisma.managedDatabase.findMany({
+        where: { provider: "cloudamqp", status: "provisioning", binnedAt: null },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+        take: 50
+    });
+    for (const row of rows) await advanceCloudProvision(row.id, request, now).catch(() => undefined);
+}
+
+let watching = false;
+
+/** Started once per process, after a predecessor has gone (see instrumentation). */
+export function startCloudProvisionWatch(): void {
+    if (watching) return;
+    watching = true;
+    const tick = () => void resumeCloudProvisions().catch(() => undefined);
+    tick();
+    setInterval(tick, POLL_MS).unref();
 }
 
 /** Remove what Polaris created in a cloud; a connected instance is left alone. */

@@ -375,7 +375,9 @@
                 "field_saslMechanism": "SASL mechanism",
                 "apiKey": "CloudAMQP API key",
                 "plan": "Plan",
-                "region": "Region"
+                "region": "Region",
+                "denied_deployManage": "You need permission to manage this project's services.",
+                "denied_databasesManage": "You need permission to manage this project's databases."
             }
         },
         "autoDeployDialog": {

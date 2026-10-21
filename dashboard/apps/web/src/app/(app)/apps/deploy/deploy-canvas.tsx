@@ -52,6 +52,8 @@ import {
 } from "lucide-react";
 import * as geometry from "./canvas-geometry";
 import { dbTone, StatusPill } from "./status-pill";
+import { useProjectCan } from "./access-context";
+import { offeredServiceTypes } from "./service-type-access";
 import {
     NewServiceDialog,
     SERVICE_TYPES,
@@ -308,6 +310,7 @@ export function DeployCanvas({
         null
     );
     const [acting, setActing] = useState(false);
+    const can = useProjectCan();
     const [newService, setNewService] = useState<{ open: boolean; view: ServiceView }>({
         open: false,
         view: "list"
@@ -765,7 +768,7 @@ export function DeployCanvas({
                             <Plus className="size-4" /> {t("view.newService")}
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
-                            {SERVICE_TYPES.map((type) => (
+                            {offeredServiceTypes(SERVICE_TYPES, can).map((type) => (
                                 <ContextMenuItem
                                     key={type.id}
                                     onSelect={() => openNewService(type.id)}

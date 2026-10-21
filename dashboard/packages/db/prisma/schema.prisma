@@ -5409,6 +5409,8 @@ model ManagedDatabase {
     provider            String   @default("")
     /// The provider's id for an instance Polaris created there.
     providerResourceId  String?
+    /// Why creating it there failed, in words for the screen.
+    providerError       String?
     // Set while it sits in the recycle bin: containers removed, data kept, hidden
     // from every list. Cleared by a restore; the row goes when it is purged.
     binnedAt            DateTime?
@@ -5432,6 +5434,7 @@ model ManagedDatabase {
     @@index([parentId])
     @@index([upgradeState, upgradeAt])
     @@index([binnedAt])
+    @@index([provider, status])
 }
 
 // One PostgreSQL base backup in an instance's point-in-time archive. The files

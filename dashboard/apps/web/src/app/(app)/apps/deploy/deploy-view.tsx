@@ -24,9 +24,10 @@ import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
-import { DbEngineIcon } from "@/components/db-engine-icon";
+import { CloudProviderIcon, DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
 import { CloudDatabaseForm } from "./cloud-database-form";
+import { databaseFormAccess, offeredServiceTypes } from "./service-type-access";
 import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
@@ -1010,7 +1011,7 @@ function ServiceTypeList({ onPick }: { onPick: (view: Exclude<ServiceView, "list
     const can = useProjectCan();
     // Starting a database is its own grant, so it is offered only to whoever
     // holds it - the form behind it would refuse anyway.
-    const types = SERVICE_TYPES.filter((type) => type.id !== "database" || can("databases.manage"));
+    const types = offeredServiceTypes(SERVICE_TYPES, can);
     return (
         <div className="flex flex-col gap-1">
             {types.map((type) => (
@@ -1607,6 +1608,18 @@ const redisTopologyOptions = (t: NamespaceTranslator<"deploy">): SelectOption[] 
 
 function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
     const t = useTranslations("deploy");
+    const can = useProjectCan();
+    // Every way in is behind deploy.manage; the database grant is checked here
+    // too, so a form that cannot be sent says why instead of failing on submit.
+    const access = databaseFormAccess(true, can);
+    if (!access.allowed) {
+        return <p className="text-sm text-muted-foreground">{t(`view.database.cloud.denied_${access.reason}`)}</p>;
+    }
+    return <NewDatabaseFields environmentId={environmentId} onDone={onDone} />;
+}
+
+function NewDatabaseFields({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+    const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
@@ -1722,7 +1735,11 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                         onValueChange={setWhere}
                         options={[
                             { value: "server", label: t("view.database.cloud.onServer") },
-                            ...cloudProvidersFor(engine).map((one) => ({ value: one.id, label: one.label }))
+                            ...cloudProvidersFor(engine).map((one) => ({
+                                value: one.id,
+                                label: one.label,
+                                icon: <CloudProviderIcon provider={one.id} className="size-5" />
+                            }))
                         ]}
                     />
                 </Field>
@@ -1763,7 +1780,11 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                         onValueChange={setWhere}
                         options={[
                             { value: "server", label: t("view.database.cloud.onServer") },
-                            ...cloudProvidersFor(engine).map((one) => ({ value: one.id, label: one.label }))
+                            ...cloudProvidersFor(engine).map((one) => ({
+                                value: one.id,
+                                label: one.label,
+                                icon: <CloudProviderIcon provider={one.id} className="size-5" />
+                            }))
                         ]}
                     />
                 </Field>

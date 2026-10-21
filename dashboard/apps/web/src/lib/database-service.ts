@@ -67,7 +67,15 @@ export interface DbCredentials {
     token?: string;
     /** An instance that lives in a cloud: how it is reached, and - for one
      *  Polaris created there - the key that manages it. */
-    cloud?: { endpoint: core.DataEndpoint; apiKey?: string };
+    cloud?: {
+        endpoint: core.DataEndpoint;
+        apiKey?: string;
+        /** A create still in progress: what it is asked for, and the name the
+         *  instance has there, which is how a repeated create finds it. */
+        plan?: string;
+        region?: string;
+        remoteName?: string;
+    };
 }
 
 /** What decides the command an instance runs with, beyond its credentials. */
@@ -531,14 +539,14 @@ function dataConnection(slug: string, endpoint: core.DataEndpoint): DatabaseConn
 
 /** An instance in a cloud is reached where its stored endpoint says. */
 function cloudConnection(
-    row: { readonly slug: string; readonly status: string },
+    row: { readonly slug: string; readonly status: string; readonly providerError: string | null },
     creds: DbCredentials
 ): DatabaseConnection {
     if (!creds.cloud?.endpoint.url) {
         throw new Error(
             row.status === "provisioning"
                 ? "The provider is still creating this instance"
-                : "This instance has no address"
+                : (row.providerError ?? "This instance has no address")
         );
     }
     return dataConnection(row.slug, creds.cloud.endpoint);

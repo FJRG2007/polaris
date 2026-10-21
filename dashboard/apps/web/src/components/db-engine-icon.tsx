@@ -13,8 +13,8 @@
 import { cn } from "@polaris/ui";
 import type { JSX, SVGProps } from "react";
 import { Archive, Database } from "lucide-react";
-import { dbEngineLabel, isStorageEngine, type DbEngine } from "@polaris/core";
-import { MariaDbMark, MongoDbMark, MySqlMark, PostgresMark, RedisMark } from "./brand-icons";
+import { dbEngineLabel, isStorageEngine } from "@polaris/core";
+import * as marks from "./brand-icons";
 
 interface EngineBrand {
     readonly Mark: (props: SVGProps<SVGSVGElement>) => JSX.Element;
@@ -27,21 +27,63 @@ interface EngineBrand {
     readonly themedClass?: string;
 }
 
-const BRANDS: Partial<Record<DbEngine, EngineBrand>> = {
-    postgres: { Mark: PostgresMark, color: "#4169E1" },
-    mysql: { Mark: MySqlMark, color: "#4479A1" },
-    mariadb: { Mark: MariaDbMark, color: "#003545", themedClass: "db-mark-mariadb" },
-    mongo: { Mark: MongoDbMark, color: "#47A248" },
-    redis: { Mark: RedisMark, color: "#FF4438" }
+// Typesense publishes only a wordmark, which does not fit a square chip, so it
+// keeps the generic glyph rather than a mark drawn to look like theirs.
+const BRANDS: Readonly<Record<string, EngineBrand>> = {
+    postgres: { Mark: marks.PostgresMark, color: "#4169E1" },
+    mysql: { Mark: marks.MySqlMark, color: "#4479A1" },
+    mariadb: { Mark: marks.MariaDbMark, color: "#003545", themedClass: "db-mark-mariadb" },
+    mongo: { Mark: marks.MongoDbMark, color: "#47A248" },
+    redis: { Mark: marks.RedisMark, color: "#FF4438" },
+    minio: { Mark: marks.MinioMark, color: "#C72E49" },
+    meilisearch: { Mark: marks.MeilisearchMark, color: "#FF5CAA" },
+    clickhouse: { Mark: marks.ClickHouseMark, color: "#FFCC01", themedClass: "db-mark-clickhouse" },
+    influxdb: { Mark: marks.InfluxDbMark, color: "#22ADF6" },
+    couchdb: { Mark: marks.CouchDbMark, color: "#E42528" },
+    kafka: { Mark: marks.KafkaMark, color: "#231F20", themedClass: "db-mark-kafka" },
+    rabbitmq: { Mark: marks.RabbitMqMark, color: "#FF6600" }
+};
+
+/**
+ * The cloud providers' marks. A provider that is a product of an engine's own
+ * company wears the engine's mark; Confluent, Aiven, IBM Cloudant, CloudAMQP and
+ * Typesense Cloud are not in any open icon set and have no square mark in a
+ * press kit we could source, so they show the generic glyph.
+ */
+const PROVIDER_BRANDS: Readonly<Record<string, EngineBrand>> = {
+    // The AWS letters are currentColor (ink on light, white on dark); the smile
+    // keeps its own orange, which also tints the chip.
+    "aws-s3": { Mark: marks.AwsMark, color: "#FF9900", themedClass: "text-foreground" },
+    "cloudflare-r2": { Mark: marks.CloudflareMark, color: "#F38020" },
+    "backblaze-b2": { Mark: marks.BackblazeMark, color: "#E21E29" },
+    "meilisearch-cloud": BRANDS.meilisearch!,
+    "clickhouse-cloud": BRANDS.clickhouse!,
+    "influxdb-cloud": BRANDS.influxdb!
 };
 
 /** The engine's mark on its tinted chip. An object store is shown as what it is
  *  to the reader - storage, not a product - and an engine this build does not
  *  know as a generic database, so a row still renders. */
 export function DbEngineIcon({ engine, className }: { engine: string; className?: string }) {
-    const brand = BRANDS[engine as DbEngine];
+    return <BrandChip brand={BRANDS[engine]} storage={isStorageEngine(engine)} className={className} />;
+}
+
+/** Where a data engine lives: a cloud provider's mark on the same chip. */
+export function CloudProviderIcon({ provider, className }: { provider: string; className?: string }) {
+    return <BrandChip brand={PROVIDER_BRANDS[provider]} storage={false} className={className} />;
+}
+
+function BrandChip({
+    brand,
+    storage,
+    className
+}: {
+    brand: EngineBrand | undefined;
+    storage: boolean;
+    className?: string;
+}) {
     if (!brand) {
-        const Glyph = isStorageEngine(engine) ? Archive : Database;
+        const Glyph = storage ? Archive : Database;
         return (
             <span
                 className={cn(
