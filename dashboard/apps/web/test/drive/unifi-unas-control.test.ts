@@ -133,9 +133,7 @@ describe("unifi-unas-control", () => {
             expect(control.unasAlerts(single, [], NOW)).toEqual([]);
         }
         const lost = metrics({ pools: [{ ...metrics().pools[0], membersPresent: 3 }] });
-        expect(control.unasAlerts(lost, [], NOW).map((a) => a.kind)).toEqual([
-            "pool-unprotected"
-        ]);
+        expect(control.unasAlerts(lost, [], NOW).map((a) => a.kind)).toEqual(["pool-unprotected"]);
     });
 
     it("newAlerts returns only conditions that just started", () => {
