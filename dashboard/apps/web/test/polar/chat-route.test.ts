@@ -67,6 +67,8 @@ vi.mock("@/lib/api-session", () => ({
             ? NextResponse.json({ error: "unauthorized" }, { status: 401 })
             : { ...USER, ...(state.user as object) }
 }));
+// The repository tools ask for a linked GitHub account; nobody here has one.
+vi.mock("@/lib/github-access", () => ({ githubTokenForUser: async () => null }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: !state.limited }) }));
 vi.mock("@/lib/polar/attachments", () => ({
     inlinePolarFiles: async (_user: string, messages: unknown, _option: unknown, out: string[]) => {
@@ -612,6 +614,62 @@ describe("Polar on the web", () => {
     it("offers no web tool for a turn the person switched it off for", async () => {
         const names = await offered(body({ web: false }));
         expect(names.filter((name) => /web|page/.test(name))).toEqual([]);
+    });
+
+    const REPO_TOOLS = [
+        "repo_commits",
+        "repo_list_files",
+        "repo_overview",
+        "repo_read_file",
+        "repo_search"
+    ];
+
+    it("offers the repository tools when the page shared is a repository", async () => {
+        const names = await offered(
+            body({
+                context: {
+                    route: "/",
+                    site: { url: "https://github.com/acme/backend/tree/master", title: "backend" }
+                }
+            })
+        );
+        expect(names).toEqual(expect.arrayContaining(REPO_TOOLS));
+    });
+
+    it("offers the repository tools when the person wrote a repository's address", async () => {
+        const names = await offered(
+            body({
+                messages: [
+                    {
+                        id: "u1",
+                        role: "user",
+                        parts: [
+                            { type: "text", text: "Which PHP does https://gitlab.com/g/s/p use?" }
+                        ]
+                    }
+                ]
+            })
+        );
+        expect(names).toEqual(expect.arrayContaining(REPO_TOOLS));
+    });
+
+    it("does not send the repository tools on a turn about no repository", async () => {
+        const names = await offered(
+            body({
+                context: { route: "/", site: { url: "https://example.com/post", title: "Post" } }
+            })
+        );
+        expect(names.filter((name) => name.startsWith("repo_"))).toEqual([]);
+    });
+
+    it("does not offer the repository tools with the web switched off", async () => {
+        const names = await offered(
+            body({
+                web: false,
+                context: { route: "/", site: { url: "https://github.com/a/b", title: "b" } }
+            })
+        );
+        expect(names.filter((name) => name.startsWith("repo_"))).toEqual([]);
     });
 
     it("does not offer a tool the person switched off in Polar's settings", async () => {

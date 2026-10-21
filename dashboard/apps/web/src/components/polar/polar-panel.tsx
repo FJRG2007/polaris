@@ -127,6 +127,7 @@ import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activi
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
+import { repoStepOf } from "@/lib/polar/code-host";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
 import { sendFile } from "@/components/transfers/move-file";
@@ -2740,6 +2741,12 @@ function MessageView({
                 : name);
     // A web step names what it searched for or which site it read.
     const stepTitle = (name: string, input: unknown) => {
+        const repo = repoStepOf(name, input);
+        if (repo) {
+            return repo.kind === "search"
+                ? t("repo.search", { repo: repo.repo, query: repo.detail })
+                : t(`repo.${repo.kind}`, { repo: repo.repo, path: repo.detail });
+        }
         const step = webStepOf(name, input);
         if (!step) return toolName(name);
         if (step.kind === "read") return t("web.reading", { site: step.detail });

@@ -587,6 +587,13 @@
         "sources": "Fuentes",
         "calls": "{searches, plural, one {# búsqueda} other {# búsquedas}} - {pages, plural, one {# página leída} other {# páginas leídas}}"
     },
+    "repo": {
+        "overview": "Viendo {repo}",
+        "list": "Viendo {path}",
+        "read": "Leyendo {path}",
+        "search": "Buscando {query} en {repo}",
+        "commits": "Viendo commits de {repo}"
+    },
     "control": {
         "busy": "Espera a que termine la respuesta.",
         "empty": "Envía un mensaje primero.",

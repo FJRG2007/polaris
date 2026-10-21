@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import type { PolarVisual } from "@/lib/polar/visuals";
+import { parseRepoAddress, repoLabel } from "@/lib/polar/code-host";
 
 /** How hard the model thinks. Mapped to the AI SDK's provider-neutral
  *  `reasoning` call option, which each provider translates to its own effort
@@ -325,6 +326,13 @@ function fenceSiteScreen(site: SiteContext): string {
     if (site.title) lines.push(`title: ${site.title}`);
     if (site.selection || site.selected) lines.push("they have text selected on it");
     lines.push("read_current_view reads its text");
+    // A repository page lists files without their contents: say which one it is,
+    // so its files are read rather than guessed from the listing.
+    const repo = parseRepoAddress(site.url);
+    if (repo) {
+        const host = repo.host === "github" ? "GitHub" : "GitLab";
+        lines.push(`${host} repository ${repoLabel(repo)}: the repo_ tools read its files`);
+    }
     return ["<screen>", ...lines, "</screen>"].join("\n");
 }
 
