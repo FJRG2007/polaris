@@ -151,7 +151,7 @@
         "switchOn": "Activar",
         "test": "Probar",
         "remove": "Quitar",
-        "smsNotReady": "Los mensajes de texto no se enviarán hasta que haya un remitente de SMS conectado en <link>Canales</link>.",
+        "smsNotReady": "Los SMS no se enviarán hasta que haya un remitente de SMS conectado en <link>Correo y SMS</link>.",
         "testSent": "Aviso de prueba enviado.",
         "lastUsed": "Último uso {time}",
         "checkForm": "Revisa los datos",

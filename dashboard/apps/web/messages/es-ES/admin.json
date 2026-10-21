@@ -1172,17 +1172,27 @@
         "certificateContactLink": "Revisar el correo de certificados"
     },
     "email": {
-        "title": "Correo cuenta",
-        "description": "El canal de correo por el que Polaris envía los mensajes de cuenta.",
+        "title": "Correo y SMS",
+        "description": "Los remitentes por los que Polaris envía correo y SMS, y el que lleva el correo de cuenta.",
         "none": "No enviar correo de cuenta",
         "channel": "{name} - {provider}",
         "channelBroken": "{name} - {provider} (no funciona)",
         "saved": "Guardado.",
-        "empty": "Aún no hay ningún canal de correo. Añade uno en <link>Bandeja > Canales</link> y vuelve para elegirlo aquí.",
+        "empty": "Aún no hay ningún remitente de correo. Añade uno arriba y elígelo aquí.",
         "sendThrough": "Enviar por",
         "hint": "La verificación de direcciones, el restablecimiento de contraseñas y los códigos de inicio de sesión por correo pasan por este canal. Sin ninguno elegido, Polaris no envía correo y no están disponibles.",
         "errors": {
             "unknownChannel": "Canal desconocido."
+        },
+        "senders": {
+            "title": "Remitentes",
+            "hint": "Las cuentas por las que Polaris envía su correo. Manda una prueba tras añadir una.",
+            "add": "Añadir remitente",
+            "empty": "Aún no hay remitentes de correo. Añade uno para que Polaris envíe correo."
+        },
+        "accountMail": {
+            "title": "Correo cuenta",
+            "hint": "Qué remitente lleva verificaciones, cambios de contraseña y códigos de acceso."
         }
     },
     "evidence": {
@@ -1325,7 +1335,6 @@
             "qrWaiting": "Esperando el escaneo...",
             "addTitle": "Añadir un canal",
             "addDescription": "Elige una plataforma y cómo conectarla. Añade todas las que quieras y gestiónalas desde una sola bandeja.",
-            "bridgeMissing": "El puente de mensajería aún no está instalado. Instálalo desde <link>Apps de Polaris</link> para activar los canales.",
             "connectTitle": "Conectar {name}",
             "variantDescription": "Elige cómo conectar {name}.",
             "back": "Atrás",
@@ -1457,10 +1466,9 @@
     },
     "inboxChannels": {
         "title": "Canales",
-        "intro": "Todo lo que usa Polaris para comunicarse: los canales de mensajería por los que envían la Bandeja de entrada y las alertas de Watch, y los remitentes de su correo.",
+        "intro": "Los canales de mensajería por los que envían la Bandeja y las alertas de Watch.",
         "connect": "Conectar un canal",
-        "bridgeMissing": "El puente de mensajería aún no está en marcha. Instálalo desde <link>Apps de Polaris</link> para conectar canales de mensajería. Los remitentes de correo funcionan sin él.",
-        "empty": "Aún no hay nada conectado. Conecta un canal de mensajería para empezar a chatear, o un remitente de correo para que Polaris pueda enviar el correo de inicio de sesión.",
+        "empty": "Aún no hay nada conectado. Conecta un canal de mensajería para empezar a chatear.",
         "status": "{status, select, connected {conectado} connecting {conectando} qr {QR} error {error} disconnected {desconectado} ready {listo} other {{status}}}",
         "connected": "Conectado",
         "readyToSend": "Listo para enviar",
@@ -1488,10 +1496,6 @@
             "intro": "Elige qué conectar. Añade todos los que quieras y gestiónalos desde una sola bandeja.",
             "messaging": "Mensajería",
             "messagingHint": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas.",
-            "messagingHintNoBridge": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas. Necesita el puente de mensajería, que se instala desde <link>Apps de Polaris</link>.",
-            "email": "Correo",
-            "emailHint": "Cómo envía Polaris su propio correo: verificación de direcciones, restablecimiento de contraseñas, enlaces y códigos de inicio de sesión.",
-            "docs": "Guía",
             "setUp": "Preparar"
         },
         "email": {
@@ -2300,8 +2304,8 @@
                 "description": "Límites de mensajes y archivos, cuánto tiempo se puede editar uno y qué deja al borrarse."
             },
             "email": {
-                "title": "Correo",
-                "description": "Como quién envía correo Polaris, y el canal que lleva los mensajes de inicio de sesión."
+                "title": "Correo y SMS",
+                "description": "Los remitentes de correo y SMS, y el que lleva los mensajes de inicio de sesión."
             },
             "domains": {
                 "title": "Dominios",

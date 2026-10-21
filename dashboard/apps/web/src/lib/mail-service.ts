@@ -1,8 +1,8 @@
 /**
  * Email channels: the control plane for how Polaris sends mail.
  *
- * They live in the same Channel table as the messaging channels and appear
- * beside them under Inbox > Channels, but nothing about them goes through the
+ * They live in the same Channel table as the messaging channels and are set up
+ * under Management > Email & SMS, but nothing about them goes through the
  * bridge. Mail is sent from this process, over HTTPS or SMTP, so verification
  * links and sign-in codes keep working on a deployment that never installed the
  * messaging bridge at all - an account locked out because an optional app is not
@@ -83,7 +83,7 @@ function toView(row: {
 }
 
 /**
- * Email channels, oldest first. Scoped to one owner for the Channels page, and
+ * Email channels, oldest first. Scoped to one owner for their sender list, and
  * unscoped for the administrator choosing which one carries the sign-in mail -
  * that choice is instance-wide, so it has to see every channel there is.
  */

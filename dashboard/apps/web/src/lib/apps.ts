@@ -2028,8 +2028,11 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_ACCESS_GROUP
         },
         {
+            // The messaging bridge's two-way chat. Only here once the bridge is
+            // installed: without it nothing on these screens can connect or send.
             label: "Inbox", // i18n-ignore
             href: "/admin/inbox",
+            requiresApp: "messaging-bridge",
             icon: MessagesSquare,
             keywords: [
                 "conversations",
@@ -2043,13 +2046,18 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_COMMUNICATION_GROUP
         },
         {
-            label: "Email", // i18n-ignore
+            // Senders belong to whoever added them, so anybody who can open the
+            // Inbox can add their own; only the account-mail choice is an admin's.
+            label: "Email & SMS", // i18n-ignore
             href: "/admin/email",
-            adminOnly: true,
+            needs: "inbox.read",
             icon: Mail,
             keywords: [
                 "smtp",
                 "sender",
+                "sms",
+                "texts",
+                "twilio",
                 "resend",
                 "brevo",
                 "mailjet",

@@ -225,7 +225,6 @@
         "Drafts": "Drafts",
         "Drive": "Drive",
         "Drop points": "Drop points",
-        "Email": "Email",
         "Events": "Events",
         "Everything": "Everything",
         "Evidence": "Evidence",
@@ -368,7 +367,8 @@
         "Polar": "Polar",
         "Query log": "Query log",
         "Lists": "Lists",
-        "Local DNS": "Local DNS"
+        "Local DNS": "Local DNS",
+        "Email & SMS": "Email & SMS"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

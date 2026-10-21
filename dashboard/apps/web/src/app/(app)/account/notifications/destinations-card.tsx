@@ -201,7 +201,7 @@ export function DestinationsCard({
                                             link: (chunks) => (
                                                 <Link
                                                     key="link"
-                                                    href="/admin/inbox/channels"
+                                                    href="/admin/email"
                                                     className="underline"
                                                 >
                                                     {chunks}

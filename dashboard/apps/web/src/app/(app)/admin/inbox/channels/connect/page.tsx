@@ -1,8 +1,6 @@
 /**
- * The channel marketplace: every way Polaris can be connected to something, in
- * one place. Messaging channels and email senders are both listed here because
- * an operator looking for "how do I connect X" should not have to know which of
- * the two X happens to be.
+ * The channel marketplace: every messaging platform the Inbox can be connected
+ * to. Email and SMS senders are added under Email & SMS.
  */
 
 import { requirePermission } from "@/lib/session";

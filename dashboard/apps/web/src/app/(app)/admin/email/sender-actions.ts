@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Email-channel actions. Separate from the messaging actions next door because
+ * Email-sender actions. Apart from the Inbox's messaging actions because
  * nothing here touches the bridge: mail is sent by this process, so a channel is
  * stored, its credentials checked, and a test message put through, all in the
  * request that asked for it.
@@ -70,7 +70,7 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
             targetId: result.channel.id,
             metadata: { provider: result.channel.provider }
         });
-        revalidatePath("/admin/inbox/channels");
+        revalidatePath("/admin/email");
     }
     return result;
 }
@@ -90,7 +90,7 @@ export async function updateEmailChannelAction(channelId: unknown, input: unknow
             targetType: "channel",
             targetId: id.data
         });
-        revalidatePath("/admin/inbox/channels");
+        revalidatePath("/admin/email");
     }
     return result;
 }
@@ -108,7 +108,7 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
         targetType: "channel",
         targetId: id.data
     });
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return {};
 }
 
@@ -120,7 +120,7 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
     if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
     const result = await recheckEmailChannel(id.data);
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return result;
 }
 
@@ -151,6 +151,6 @@ export async function sendTestEmailAction(channelId: unknown, to: unknown): Prom
         subject: t("inboxChannels.email.testSubject"),
         text: t("inboxChannels.email.testBody")
     });
-    revalidatePath("/admin/inbox/channels");
+    revalidatePath("/admin/email");
     return result;
 }

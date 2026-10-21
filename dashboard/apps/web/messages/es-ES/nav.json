@@ -225,7 +225,6 @@
         "Drafts": "Borradores",
         "Drive": "Drive",
         "Drop points": "Buzones",
-        "Email": "Correo",
         "Events": "Eventos",
         "Everything": "Todo",
         "Evidence": "Pruebas",
@@ -368,7 +367,8 @@
         "Polar": "Polar",
         "Query log": "Consultas",
         "Lists": "Listas",
-        "Local DNS": "DNS local"
+        "Local DNS": "DNS local",
+        "Email & SMS": "Correo y SMS"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

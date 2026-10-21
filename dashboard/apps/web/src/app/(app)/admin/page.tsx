@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
+import { isAppInstalled } from "@/lib/apps/install-presence";
 import {
     Activity,
     Blocks,
@@ -31,7 +32,8 @@ import {
  * The Management app's home: one card per administration area. The areas
  * themselves are the existing admin pages; this page (and the app's sidebar)
  * gather them into a single place instead of the account menu. Each card's
- * words are `overview.sections.<key>` in the `admin` catalog.
+ * words are `overview.sections.<key>` in the `admin` catalog. The Inbox card,
+ * like its rail entry, waits for the messaging bridge to be installed.
  */
 const SECTIONS = [
     { key: "users", href: "/admin/users", icon: Users },
@@ -59,13 +61,14 @@ const SECTIONS = [
 
 export default async function ManagementPage() {
     await requireAdmin();
-    const t = await getTranslations("admin");
+    const [t, bridge] = await Promise.all([getTranslations("admin"), isAppInstalled("messaging-bridge")]);
+    const sections = SECTIONS.filter((section) => section.key !== "inbox" || bridge);
 
     return (
         <>
             <PageHeader title={t("overview.title")} description={t("overview.description")} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {SECTIONS.map((section) => {
+                {sections.map((section) => {
                     const Icon = section.icon;
                     return (
                         <Link

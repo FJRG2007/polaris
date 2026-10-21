@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Channels page: everything Polaris talks through in one list - messaging
- * channels and email senders alike - each as a card opening a Manage dialog to
+ * Channels page: the messaging channels the Inbox and Watch alerts send over,
+ * each as a card opening a Manage dialog to
  * rename it, replace its credentials or config, reconnect (or re-link WhatsApp
  * Web by scanning a fresh QR in place), or remove it. Connecting is a page of its
  * own, so every way in is offered side by side instead of one being a button and
@@ -10,35 +10,23 @@
  */
 
 import Link from "next/link";
-import { SmsSenderCard } from "./sms-sender-card";
-import { MAIL_PROVIDER_INFO } from "@polaris/core";
+import { ChannelCard } from "../../channel-card";
 import type { ChannelView } from "@/lib/messaging-service";
-import type { EmailChannelView } from "@/lib/mail-service";
 import { DiscordSetupPanel } from "../discord-setup-panel";
-import { EmailChannelDialog } from "./email-channel-dialog";
-import type { SmsSenderView } from "@/lib/notifications/sms-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useState, useTransition, type ComponentType } from "react";
+import { useEffect, useState, useTransition } from "react";
 import * as polls from "../inbox-polls";
-import {
-    CHANNEL_STATUS_TONE,
-    EMAIL_CHANNEL_MARK,
-    PLATFORM_LOGO,
-    platformLabel
-} from "../platform-meta";
+import { CHANNEL_STATUS_TONE, PLATFORM_LOGO, platformLabel } from "../platform-meta";
 import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
 import {
-    CheckCircle2,
     Loader2,
     MessagesSquare,
     Plus,
     QrCode,
-    RefreshCw,
-    Settings2
+    RefreshCw
 } from "lucide-react";
 import {
-    Badge,
     Button,
     Card,
     CardBody,
@@ -102,23 +90,10 @@ function channelKind(channel: ChannelView): ChannelKind {
     return channel.platform as ChannelKind;
 }
 
-export function ChannelsView({
-    initialChannels,
-    initialEmailChannels,
-    smsSenders,
-    bridgeReady
-}: {
-    initialChannels: ChannelView[];
-    initialEmailChannels: EmailChannelView[];
-    smsSenders: SmsSenderView[];
-    bridgeReady: boolean;
-}) {
+export function ChannelsView({ initialChannels }: { initialChannels: ChannelView[] }) {
     const t = useTranslations("admin");
     const [channels, setChannels] = useState(initialChannels);
     const [managing, setManaging] = useState<ChannelView | null>(null);
-    const [emailChannels, setEmailChannels] = useState(initialEmailChannels);
-    // Only ever an existing sender: adding one is the marketplace's job.
-    const [emailDialog, setEmailDialog] = useState<EmailChannelView | null>(null);
 
     function patchChannel(id: string, patch: Partial<ChannelView>) {
         setChannels((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
@@ -141,25 +116,7 @@ export function ChannelsView({
                 </Button>
             </div>
 
-            {!bridgeReady && (
-                <Card>
-                    <CardBody className="text-sm text-muted-foreground">
-                        {t.rich("inboxChannels.bridgeMissing", {
-                            link: (chunks) => (
-                                <Link
-                                    key="link"
-                                    href="/admin/apps?app=messaging-bridge"
-                                    className="text-primary hover:underline"
-                                >
-                                    {chunks}
-                                </Link>
-                            )
-                        })}
-                    </CardBody>
-                </Card>
-            )}
-
-            {channels.length === 0 && emailChannels.length === 0 ? (
+            {channels.length === 0 ? (
                 <Card>
                     <CardBody className="text-sm text-muted-foreground">
                         {t("inboxChannels.empty")}
@@ -194,52 +151,7 @@ export function ChannelsView({
                             />
                         );
                     })}
-                    {emailChannels.map((channel) => (
-                        <ChannelCard
-                            key={channel.id}
-                            Logo={EMAIL_CHANNEL_MARK.Logo}
-                            color={EMAIL_CHANNEL_MARK.color}
-                            name={channel.name}
-                            status={channel.status}
-                            statusLabel={t("inboxChannels.status", {
-                                status: channel.status === "connected" ? "ready" : channel.status
-                            })}
-                            detail={[MAIL_PROVIDER_INFO[channel.provider].label, channel.from]
-                                .filter(Boolean)
-                                .join(" - ")}
-                            error={channel.error}
-                            ready={
-                                channel.status === "connected" && !channel.error
-                                    ? t("inboxChannels.readyToSend")
-                                    : null
-                            }
-                            onManage={() => setEmailDialog(channel)}
-                        />
-                    ))}
                 </div>
-            )}
-
-            <SmsSenderCard senders={smsSenders} />
-
-            {emailDialog && (
-                <EmailChannelDialog
-                    channel={emailDialog}
-                    onClose={() => setEmailDialog(null)}
-                    onSaved={(saved) => {
-                        setEmailChannels((prev) =>
-                            prev.some((item) => item.id === saved.id)
-                                ? prev.map((item) => (item.id === saved.id ? saved : item))
-                                : [...prev, saved]
-                        );
-                        // Keep the dialog on the saved channel so the test message
-                        // is available straight after adding it.
-                        setEmailDialog(saved);
-                    }}
-                    onRemoved={(id) => {
-                        setEmailChannels((prev) => prev.filter((item) => item.id !== id));
-                        setEmailDialog(null);
-                    }}
-                />
             )}
 
             {managing && (
@@ -254,67 +166,6 @@ export function ChannelsView({
                 />
             )}
         </div>
-    );
-}
-
-/** One connected channel, whatever it carries. A messaging channel and an email
- *  sender differ only in what their subtitle says, so they share a card: the list
- *  reads as one set of things Polaris talks through rather than two. */
-function ChannelCard({
-    Logo,
-    color,
-    name,
-    status,
-    statusLabel,
-    detail,
-    error,
-    ready,
-    onManage
-}: {
-    Logo: ComponentType<{ className?: string }>;
-    color?: string;
-    name: string;
-    status: string;
-    statusLabel: string;
-    detail: string;
-    /** Why the last check or send failed, when it did. */
-    error?: string | null;
-    /** The line shown when the channel is working, or null when it is not. */
-    ready: string | null;
-    onManage: () => void;
-}) {
-    const t = useTranslations("admin");
-    return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex items-start gap-3">
-                    <div
-                        className="grid size-10 shrink-0 place-items-center rounded-md"
-                        style={{ color, backgroundColor: color ? `${color}1a` : undefined }}
-                    >
-                        <Logo className="size-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                            <h2 className="truncate text-sm font-medium">{name}</h2>
-                            <Badge className={cn(CHANNEL_STATUS_TONE[status])}>{statusLabel}</Badge>
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
-                    </div>
-                </div>
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
-                <div className="flex items-center justify-end gap-2">
-                    {ready ? (
-                        <span className="mr-auto inline-flex items-center gap-1 text-xs text-success">
-                            <CheckCircle2 className="size-3.5" /> {ready}
-                        </span>
-                    ) : null}
-                    <Button size="sm" variant="secondary" onClick={onManage}>
-                        <Settings2 className="size-4" /> {t("inboxChannels.manage.button")}
-                    </Button>
-                </div>
-            </CardBody>
-        </Card>
     );
 }
 
