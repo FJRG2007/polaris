@@ -66,8 +66,7 @@ function accountOf(credentials: Credentials): petkit.PetkitAccount {
     const email = credentials.email?.trim().toLowerCase();
     const country = credentials.country?.trim().toUpperCase();
     const typed = credentials.password ?? "";
-    const passwordMd5 =
-        credentials.passwordMd5?.trim() || (typed ? petkit.md5(typed) : "");
+    const passwordMd5 = credentials.passwordMd5?.trim() || (typed ? petkit.md5(typed) : "");
     if (!email || !country || !passwordMd5)
         throw new HomeError("That connection is missing its sign-in");
     return { email, country, passwordMd5, timezone: timezone() };
@@ -118,7 +117,8 @@ async function withSession<T>(
         try {
             return await run(session, account);
         } catch (caught) {
-            if (!(caught instanceof petkit.PetkitError) || caught.failure !== "expired") throw caught;
+            if (!(caught instanceof petkit.PetkitError) || caught.failure !== "expired")
+                throw caught;
             sessions.delete(key);
             return await run(await signIn(account), account);
         }
@@ -185,7 +185,10 @@ export function useOf(entry: unknown): litter.LitterUse | null {
         timeIn !== null && timeOut !== null && timeOut >= timeIn
             ? clampInt(timeOut - timeIn, 0, 24 * 60 * 60)
             : null;
-    const pet = typeof record.petName === "string" && record.petName.trim() ? record.petName.trim().slice(0, 80) : null;
+    const pet =
+        typeof record.petName === "string" && record.petName.trim()
+            ? record.petName.trim().slice(0, 80)
+            : null;
     return { at, pet, grams: grams || null, seconds };
 }
 
@@ -279,7 +282,8 @@ async function readAll(credentials: Credentials): Promise<DeviceSnapshot[]> {
                     records.set(key, { at: Date.now(), uses });
                 } catch (caught) {
                     // The visits are the extra; the box's own state still draws.
-                    if (caught instanceof petkit.PetkitError && caught.failure === "expired") throw caught;
+                    if (caught instanceof petkit.PetkitError && caught.failure === "expired")
+                        throw caught;
                     uses = held?.uses ?? [];
                 }
             }
@@ -296,7 +300,10 @@ function spendCommand(account: petkit.PetkitAccount): void {
     const now = Date.now();
     const recent = (commands.get(key) ?? []).filter((at) => now - at < 60_000);
     if (recent.length >= COMMANDS_PER_MINUTE)
-        throw new DriverError("Too many commands to PETKIT in a minute; try again shortly", "refused");
+        throw new DriverError(
+            "Too many commands to PETKIT in a minute; try again shortly",
+            "refused"
+        );
     recent.push(now);
     commands.set(key, recent);
 }
@@ -387,7 +394,8 @@ export const petkitCloudDriver: DeviceDriver = {
         const account = accountOf(credentials);
         spendCommand(account);
         const id = Number(device.externalId);
-        if (!Number.isSafeInteger(id)) throw new DriverError("That device is not on this account", "refused");
+        if (!Number.isSafeInteger(id))
+            throw new DriverError("That device is not on this account", "refused");
         await withSession(credentials, async (session, signed) => {
             const known = (await petkit.listDevices(fetcher, session, signed.timezone)).find(
                 (entry) => entry.id === id && petkit.isLitterType(entry.type)
@@ -400,7 +408,14 @@ export const petkitCloudDriver: DeviceDriver = {
             }
             const wire = wireFor(known.type, action, view, command);
             if (wire.kind === "control")
-                await petkit.controlDevice(fetcher, session, signed.timezone, known, wire.key, wire.value);
+                await petkit.controlDevice(
+                    fetcher,
+                    session,
+                    signed.timezone,
+                    known,
+                    wire.key,
+                    wire.value
+                );
             else if (wire.kind === "settings")
                 await petkit.updateSettings(fetcher, session, signed.timezone, known, wire.kv);
             else await petkit.resetDeodorant(fetcher, session, signed.timezone, known);

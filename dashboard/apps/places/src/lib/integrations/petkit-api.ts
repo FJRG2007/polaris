@@ -215,7 +215,8 @@ async function call(
 /** Their `{ result }` / `{ error: { code, msg } }` envelope. */
 export function unwrap(body: unknown): unknown {
     const record = asRecord(body);
-    if (!record) throw new PetkitError("PETKIT answered in a shape Polaris does not read", "refused");
+    if (!record)
+        throw new PetkitError("PETKIT answered in a shape Polaris does not read", "refused");
     const error = asRecord(record.error);
     if (error) {
         const code = Number(error.code ?? 0);
@@ -268,7 +269,11 @@ export async function gatewayFor(
 }
 
 /** The session out of a sign-in's answer. */
-export function sessionOf(result: unknown, gateway: string, now: number = Date.now()): PetkitSession {
+export function sessionOf(
+    result: unknown,
+    gateway: string,
+    now: number = Date.now()
+): PetkitSession {
     const session = asRecord(asRecord(result)?.session);
     const id = typeof session?.id === "string" ? session.id : "";
     const expiresIn = Number(session?.expiresIn ?? 0);
@@ -312,7 +317,8 @@ export function devicesOf(result: unknown): PetkitDevice[] {
         for (const entry of list) {
             const device = asRecord(entry);
             const id = Number(device?.deviceId);
-            const type = typeof device?.deviceType === "string" ? device.deviceType.toLowerCase() : "";
+            const type =
+                typeof device?.deviceType === "string" ? device.deviceType.toLowerCase() : "";
             if (!device || !Number.isSafeInteger(id) || !type) continue;
             const name = typeof device.deviceName === "string" ? device.deviceName.trim() : "";
             seen.set(id, { id, type, typeCode: Number(device.typeCode ?? 0) || 0, name });
@@ -358,7 +364,8 @@ export async function deviceDetail(
         timezone
     });
     const record = asRecord(result);
-    if (!record) throw new PetkitError("PETKIT answered in a shape Polaris does not read", "refused");
+    if (!record)
+        throw new PetkitError("PETKIT answered in a shape Polaris does not read", "refused");
     return record;
 }
 
@@ -408,7 +415,10 @@ export function recordsRequest(
         };
     return {
         path: `${type}/getDeviceRecord`,
-        query: { [type === "t3" ? "day" : "date"]: Number(dayStamp(timezone, at)), deviceId: device.id }
+        query: {
+            [type === "t3" ? "day" : "date"]: Number(dayStamp(timezone, at)),
+            deviceId: device.id
+        }
     };
 }
 

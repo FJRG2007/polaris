@@ -1005,10 +1005,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
         reach: "anywhere",
         summary: en("connections.petkit-cloud.summary"),
         note: en("connections.petkit-cloud.note"),
-        steps: [
-            en("connections.petkit-cloud.steps.s0"),
-            en("connections.petkit-cloud.steps.s1")
-        ],
+        steps: [en("connections.petkit-cloud.steps.s0"), en("connections.petkit-cloud.steps.s1")],
         fields: [
             {
                 key: "country",

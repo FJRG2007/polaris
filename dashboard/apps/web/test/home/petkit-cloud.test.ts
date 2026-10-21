@@ -26,13 +26,23 @@ const FIXTURE_REGIONS = {
     result: {
         list: [
             { accountType: "email", gateway: GATEWAY, id: "DE", name: "Germany" },
-            { accountType: "email", gateway: "https://other.example-petkit.test/latest/", id: "US", name: "United States" }
+            {
+                accountType: "email",
+                gateway: "https://other.example-petkit.test/latest/",
+                id: "US",
+                name: "United States"
+            }
         ]
     }
 };
 const fixtureSession = (id: string) => ({
     result: {
-        session: { id, userId: "fixture-user", expiresIn: 604800, createdAt: "2026-10-21T10:00:00.000+0000" }
+        session: {
+            id,
+            userId: "fixture-user",
+            expiresIn: 604800,
+            createdAt: "2026-10-21T10:00:00.000+0000"
+        }
     }
 });
 const FIXTURE_FAMILY = {
@@ -41,8 +51,26 @@ const FIXTURE_FAMILY = {
             groupId: 1,
             name: "Fixture home",
             deviceList: [
-                { deviceId: 100001, deviceType: "t4", deviceName: "Fixture Pura Max", typeCode: 0, groupId: 1, createdAt: 0, type: 7, uniqueId: "fx-1" },
-                { deviceId: 200002, deviceType: "d4", deviceName: "Fixture feeder", typeCode: 0, groupId: 1, createdAt: 0, type: 11, uniqueId: "fx-2" }
+                {
+                    deviceId: 100001,
+                    deviceType: "t4",
+                    deviceName: "Fixture Pura Max",
+                    typeCode: 0,
+                    groupId: 1,
+                    createdAt: 0,
+                    type: 7,
+                    uniqueId: "fx-1"
+                },
+                {
+                    deviceId: 200002,
+                    deviceType: "d4",
+                    deviceName: "Fixture feeder",
+                    typeCode: 0,
+                    groupId: 1,
+                    createdAt: 0,
+                    type: 11,
+                    uniqueId: "fx-2"
+                }
             ]
         }
     ]
@@ -57,7 +85,14 @@ const fixtureDetail = (overrides: Record<string, unknown> = {}) => ({
         name: "Fixture Pura Max",
         inTimes: 3,
         lastOutTime: 1792573200,
-        settings: { autoWork: 1, avoidRepeat: 1, kitten: 0, deepClean: 0, lightMode: 1, manualLock: 0 },
+        settings: {
+            autoWork: 1,
+            avoidRepeat: 1,
+            kitten: 0,
+            deepClean: 0,
+            lightMode: 1,
+            manualLock: 0
+        },
         state: {
             pim: 1,
             sandPercent: 64,
@@ -71,7 +106,13 @@ const fixtureDetail = (overrides: Record<string, unknown> = {}) => ({
 });
 const FIXTURE_RECORDS = {
     result: [
-        { eventType: 10, petId: 7, petName: "Fixture cat", timestamp: 1792569600, content: { petWeight: 4350, timeIn: 1792569600, timeOut: 1792569690 } },
+        {
+            eventType: 10,
+            petId: 7,
+            petName: "Fixture cat",
+            timestamp: 1792569600,
+            content: { petWeight: 4350, timeIn: 1792569600, timeOut: 1792569690 }
+        },
         { eventType: 5, timestamp: 1792569800, content: { startReason: 0, result: 2 } }
     ]
 };
@@ -87,7 +128,10 @@ let calls: Call[] = [];
 let respond: (call: Call) => unknown;
 
 function json(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" }
+    });
 }
 
 beforeEach(() => {
@@ -117,7 +161,11 @@ function defaultCloud(detail = fixtureDetail()) {
         if (path.endsWith("/group/family/list")) return FIXTURE_FAMILY;
         if (path.endsWith("/t4/device_detail")) return detail;
         if (path.endsWith("/t4/getDeviceRecord")) return FIXTURE_RECORDS;
-        if (path.endsWith("/t4/controlDevice") || path.endsWith("/t4/updateSettings") || path.endsWith("/t4/deodorantReset"))
+        if (
+            path.endsWith("/t4/controlDevice") ||
+            path.endsWith("/t4/updateSettings") ||
+            path.endsWith("/t4/deodorantReset")
+        )
             return { result: "success" };
         return json({ error: { code: 404, msg: "fixture: unexpected path" } });
     };
@@ -136,9 +184,15 @@ describe("PETKIT sign-in", () => {
         expect(login.form.get("encrypt")).toBe("1");
         expect(login.form.get("region")).toBe("de");
         expect(login.form.get("oldVersion")).toBe("13.2.1");
-        expect(login.form.get("client")).toMatch(/^\{'locale': 'en-US', .*'timezoneId': '.+', 'timezone': '-?\d+\.\d+'\}$/);
+        expect(login.form.get("client")).toMatch(
+            /^\{'locale': 'en-US', .*'timezoneId': '.+', 'timezone': '-?\d+\.\d+'\}$/
+        );
         // Stored without the typed password, with the session it got.
-        expect(stored).toMatchObject({ email: "owner@example.com", country: "DE", session: "fixture-session-1" });
+        expect(stored).toMatchObject({
+            email: "owner@example.com",
+            country: "DE",
+            session: "fixture-session-1"
+        });
         expect(stored && "password" in stored).toBe(false);
         expect(stored?.passwordMd5).toBe(petkit.md5("fixture-password"));
         // Every later call carries the session.
@@ -158,13 +212,17 @@ describe("PETKIT sign-in", () => {
     });
 
     it("sends China straight to its own server", async () => {
-        expect(await petkit.gatewayFor(async () => json({}), "CN", "UTC")).toBe(petkit.PETKIT_CHINA);
+        expect(await petkit.gatewayFor(async () => json({}), "CN", "UTC")).toBe(
+            petkit.PETKIT_CHINA
+        );
     });
 
     it("prints a time zone offset as Python prints a float", () => {
         expect(petkit.timezoneOffset("UTC")).toBe("0.0");
         expect(petkit.timezoneOffset("Asia/Kolkata")).toBe("5.5");
-        expect(petkit.timezoneOffset("Europe/Madrid", new Date("2026-01-15T12:00:00Z"))).toBe("1.0");
+        expect(petkit.timezoneOffset("Europe/Madrid", new Date("2026-01-15T12:00:00Z"))).toBe(
+            "1.0"
+        );
     });
 });
 
@@ -192,10 +250,22 @@ describe("PETKIT litter boxes", () => {
             usesToday: 3,
             fault: null,
             deodorizerResettable: true,
-            options: { "auto-clean": true, "avoid-repeat": true, kitten: false, "deep-clean": false, display: true, "child-lock": false }
+            options: {
+                "auto-clean": true,
+                "avoid-repeat": true,
+                kitten: false,
+                "deep-clean": false,
+                display: true,
+                "child-lock": false
+            }
         });
         expect(box!.litter!.uses).toEqual([
-            { at: new Date(1792569600 * 1000).toISOString(), pet: "Fixture cat", grams: 4350, seconds: 90 }
+            {
+                at: new Date(1792569600 * 1000).toISOString(),
+                pet: "Fixture cat",
+                grams: 4350,
+                seconds: 90
+            }
         ]);
         expect(kinds.litterView(box!.litter)).not.toBeNull();
         const records = calls.find((call) => call.url.pathname.endsWith("/t4/getDeviceRecord"))!;
@@ -220,7 +290,8 @@ describe("PETKIT litter boxes", () => {
                 ended = true;
                 return { error: { code: 5, msg: "fixture: session expired" } };
             }
-            if (call.url.pathname.endsWith("/user/login")) return fixtureSession("fixture-session-renewed");
+            if (call.url.pathname.endsWith("/user/login"))
+                return fixtureSession("fixture-session-renewed");
             return cloud(call);
         };
         const boxes = await driver.list(stored);
@@ -234,42 +305,96 @@ describe("PETKIT litter boxes", () => {
     it("reads a running cycle, a full bin and a fault", () => {
         const view = litterOf(
             { id: 1, type: "t4", typeCode: 0, name: "x" },
-            fixtureDetail({ workState: { workMode: 0, workProcess: 10 }, boxFull: true, errorMsg: "fixture fault" }).result,
+            fixtureDetail({
+                workState: { workMode: 0, workProcess: 10 },
+                boxFull: true,
+                errorMsg: "fixture fault"
+            }).result,
             []
         );
-        expect(view).toMatchObject({ status: "cleaning", workMode: 0, binFull: true, fault: "fixture fault" });
+        expect(view).toMatchObject({
+            status: "cleaning",
+            workMode: 0,
+            binFull: true,
+            fault: "fixture fault"
+        });
     });
 });
 
 describe("PETKIT commands", () => {
     it("builds each action's wire form", () => {
         const idle = kinds.litterView({
-            type: "t4", status: "idle", workMode: null, litterPercent: 50, litterLow: false, binFull: false,
-            deodorizerDays: null, usesToday: null, lastUseAt: null, uses: [], fault: null, options: {}, deodorizerResettable: true
+            type: "t4",
+            status: "idle",
+            workMode: null,
+            litterPercent: 50,
+            litterLow: false,
+            binFull: false,
+            deodorizerDays: null,
+            usesToday: null,
+            lastUseAt: null,
+            uses: [],
+            fault: null,
+            options: {},
+            deodorizerResettable: true
         })!;
         const running = { ...idle, status: "cleaning" as const, workMode: 0 };
-        expect(wireFor("t4", "clean", idle)).toEqual({ kind: "control", key: "start_action", value: 0 });
-        expect(wireFor("t4", "dump", idle)).toEqual({ kind: "control", key: "start_action", value: 1 });
-        expect(wireFor("t4", "pause", running)).toEqual({ kind: "control", key: "stop_action", value: 0 });
-        expect(wireFor("t4", "resume", running)).toEqual({ kind: "control", key: "continue_action", value: 0 });
+        expect(wireFor("t4", "clean", idle)).toEqual({
+            kind: "control",
+            key: "start_action",
+            value: 0
+        });
+        expect(wireFor("t4", "dump", idle)).toEqual({
+            kind: "control",
+            key: "start_action",
+            value: 1
+        });
+        expect(wireFor("t4", "pause", running)).toEqual({
+            kind: "control",
+            key: "stop_action",
+            value: 0
+        });
+        expect(wireFor("t4", "resume", running)).toEqual({
+            kind: "control",
+            key: "continue_action",
+            value: 0
+        });
         expect(() => wireFor("t4", "pause", idle)).toThrow(DriverError);
         expect(wireFor("t4", "reset-deodorizer", idle)).toEqual({ kind: "deodorant" });
         expect(() => wireFor("t3", "reset-deodorizer", idle)).toThrow(DriverError);
-        expect(wireFor("t4", "set-option", idle, { action: "set-option", option: "child-lock", on: true })).toEqual({
+        expect(
+            wireFor("t4", "set-option", idle, {
+                action: "set-option",
+                option: "child-lock",
+                on: true
+            })
+        ).toEqual({
             kind: "settings",
             kv: { manualLock: 1 }
         });
-        expect(petkit.controlForm(100001, "start_action", 0)).toEqual({ id: 100001, kv: '{"start_action":0}', type: "start" });
+        expect(petkit.controlForm(100001, "start_action", 0)).toEqual({
+            id: 100001,
+            kv: '{"start_action":0}',
+            type: "start"
+        });
     });
 
     it("sends clean, a setting and a deodorizer reset to the box", async () => {
         const stored = (await driver.verify(typed))!;
         const box = { externalId: "100001", kind: "litter" };
         await driver.act(stored, box, "clean");
-        await driver.act(stored, box, "set-option", { action: "set-option", option: "auto-clean", on: false });
+        await driver.act(stored, box, "set-option", {
+            action: "set-option",
+            option: "auto-clean",
+            on: false
+        });
         await driver.act(stored, box, "reset-deodorizer");
         const control = calls.find((call) => call.url.pathname.endsWith("/t4/controlDevice"))!;
-        expect(Object.fromEntries(control.form)).toEqual({ id: "100001", kv: '{"start_action":0}', type: "start" });
+        expect(Object.fromEntries(control.form)).toEqual({
+            id: "100001",
+            kv: '{"start_action":0}',
+            type: "start"
+        });
         const settings = calls.find((call) => call.url.pathname.endsWith("/t4/updateSettings"))!;
         expect(Object.fromEntries(settings.form)).toEqual({ id: "100001", kv: '{"autoWork":0}' });
         const reset = calls.find((call) => call.url.pathname.endsWith("/t4/deodorantReset"))!;
@@ -278,7 +403,9 @@ describe("PETKIT commands", () => {
 
     it("refuses a device that is not a litter box on the account", async () => {
         const stored = (await driver.verify(typed))!;
-        await expect(driver.act(stored, { externalId: "200002", kind: "litter" }, "clean")).rejects.toBeInstanceOf(DriverError);
+        await expect(
+            driver.act(stored, { externalId: "200002", kind: "litter" }, "clean")
+        ).rejects.toBeInstanceOf(DriverError);
     });
 
     it("limits commands per account per minute", async () => {
@@ -291,31 +418,73 @@ describe("PETKIT commands", () => {
 
 describe("litter box events", () => {
     const base = kinds.litterView({
-        type: "t4", status: "idle", workMode: null, litterPercent: 50, litterLow: false, binFull: false,
-        deodorizerDays: null, usesToday: null, lastUseAt: null, uses: [], fault: null, options: {}, deodorizerResettable: true
+        type: "t4",
+        status: "idle",
+        workMode: null,
+        litterPercent: 50,
+        litterLow: false,
+        binFull: false,
+        deodorizerDays: null,
+        usesToday: null,
+        lastUseAt: null,
+        uses: [],
+        fault: null,
+        options: {},
+        deodorizerResettable: true
     })!;
 
     it("says what has just started, once", () => {
         expect(kinds.litterAttention(base, { ...base, binFull: true })).toEqual(["bin-full"]);
-        expect(kinds.litterAttention({ ...base, binFull: true }, { ...base, binFull: true })).toEqual([]);
-        expect(kinds.litterAttention(base, { ...base, litterLow: true, fault: "jam" })).toEqual(["litter-low", "fault"]);
-        expect(kinds.litterAttention({ ...base, fault: "jam" }, { ...base, fault: "jam" })).toEqual([]);
+        expect(
+            kinds.litterAttention({ ...base, binFull: true }, { ...base, binFull: true })
+        ).toEqual([]);
+        expect(kinds.litterAttention(base, { ...base, litterLow: true, fault: "jam" })).toEqual([
+            "litter-low",
+            "fault"
+        ]);
+        expect(kinds.litterAttention({ ...base, fault: "jam" }, { ...base, fault: "jam" })).toEqual(
+            []
+        );
         // A first reading is not news.
         expect(kinds.litterAttention(null, { ...base, binFull: true })).toEqual([]);
     });
 
     it("checks a setting against what the box reports", () => {
         const view = { ...base, options: { kitten: false } };
-        expect(kinds.commandIssue({ kind: "litter", climate: null, air: null, litter: view }, { action: "set-option", option: "kitten", on: true })).toBeNull();
-        expect(kinds.commandIssue({ kind: "litter", climate: null, air: null, litter: view }, { action: "set-option", option: "child-lock", on: true })).not.toBeNull();
-        expect(kinds.actionsFor("litter")).toEqual(["clean", "pause", "resume", "dump", "reset-deodorizer", "set-option"]);
+        expect(
+            kinds.commandIssue(
+                { kind: "litter", climate: null, air: null, litter: view },
+                { action: "set-option", option: "kitten", on: true }
+            )
+        ).toBeNull();
+        expect(
+            kinds.commandIssue(
+                { kind: "litter", climate: null, air: null, litter: view },
+                { action: "set-option", option: "child-lock", on: true }
+            )
+        ).not.toBeNull();
+        expect(kinds.actionsFor("litter")).toEqual([
+            "clean",
+            "pause",
+            "resume",
+            "dump",
+            "reset-deodorizer",
+            "set-option"
+        ]);
         expect(kinds.grantActionFor("dump")).toBe("operate");
     });
 
     it("keeps the box's own words on a fault in the history", () => {
         const event = {
-            id: "e1", deviceId: "d1", deviceName: "Box", action: "fault", actor: "", via: "device",
-            outcome: "ok", note: "jam", at: new Date(0).toISOString()
+            id: "e1",
+            deviceId: "d1",
+            deviceName: "Box",
+            action: "fault",
+            actor: "",
+            via: "device",
+            outcome: "ok",
+            note: "jam",
+            at: new Date(0).toISOString()
         };
         expect(kinds.describeEvent(event)).toContain("jam");
         expect(kinds.describeEvent({ ...event, note: "" })).not.toContain(" - ");
@@ -342,7 +511,11 @@ describe("PETKIT connection and words", () => {
     it("is registered with a country, an email and a secret password", () => {
         const connection = deviceConnection("petkit-cloud")!;
         expect(connection.kinds).toEqual(["litter"]);
-        expect(connection.fields.map((field) => field.key)).toEqual(["country", "email", "password"]);
+        expect(connection.fields.map((field) => field.key)).toEqual([
+            "country",
+            "email",
+            "password"
+        ]);
         expect(connection.fields.find((field) => field.key === "password")?.secret).toBe(true);
         expect(connection.fields[0]!.choices?.some((choice) => choice.value === "CN")).toBe(true);
     });
@@ -353,7 +526,9 @@ describe("PETKIT connection and words", () => {
             const keys = [
                 ...kinds.LITTER_STATUSES.map((status) => `devices.litter.statuses.${status}`),
                 ...kinds.LITTER_OPTIONS.map((option) => `devices.litter.options.${option}`),
-                ...["clean", "pause", "resume", "dump", "reset-deodorizer"].map((action) => `devices.actions.${action}`),
+                ...["clean", "pause", "resume", "dump", "reset-deodorizer"].map(
+                    (action) => `devices.actions.${action}`
+                ),
                 ...kinds.LITTER_ATTENTION.map((which) => `litterAlerts.${which}.title`)
             ];
             for (const key of keys) expect(t.has(key), `${locale} ${key}`).toBe(true);

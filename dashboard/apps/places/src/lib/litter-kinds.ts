@@ -42,7 +42,10 @@ const WORK_MODES: Readonly<Record<number, LitterStatus>> = {
     9: "maintenance"
 };
 
-export function litterStatusOf(workMode: number | null | undefined, running: boolean): LitterStatus {
+export function litterStatusOf(
+    workMode: number | null | undefined,
+    running: boolean
+): LitterStatus {
     if (!running) return "idle";
     return (workMode !== null && workMode !== undefined && WORK_MODES[workMode]) || "working";
 }
@@ -85,7 +88,12 @@ export const litterUseSchema = z.object({
     pet: z.string().max(80).nullable(),
     /** The cat's weight as the box weighed it, in grams. */
     grams: z.number().int().min(0).max(30_000).nullable(),
-    seconds: z.number().int().min(0).max(24 * 60 * 60).nullable()
+    seconds: z
+        .number()
+        .int()
+        .min(0)
+        .max(24 * 60 * 60)
+        .nullable()
 });
 export type LitterUse = z.infer<typeof litterUseSchema>;
 
