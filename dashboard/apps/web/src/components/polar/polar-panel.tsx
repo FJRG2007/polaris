@@ -814,17 +814,21 @@ export function PolarChat({
     const [, setTreeTick] = useState(0);
     const toast = useToast();
 
+    // Polar's own screens are not a page to ask about: a chip saying "/polar"
+    // under Polar is the chat quoting itself.
     const context = useMemo(
         () =>
             !withPage
                 ? null
                 : site !== undefined
                   ? site && { route: pathname, title: site.title, site }
-                  : pageContextFrom(
-                        pathname,
-                        typeof document === "undefined" ? "" : document.title,
-                        state?.extra ?? null
-                    ),
+                  : onPolarPage(pathname)
+                    ? null
+                    : pageContextFrom(
+                          pathname,
+                          typeof document === "undefined" ? "" : document.title,
+                          state?.extra ?? null
+                      ),
         [withPage, pathname, state?.extra, site]
     );
     // Another page in the browser is another thing to leave out or not.
