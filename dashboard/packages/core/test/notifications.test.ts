@@ -65,6 +65,18 @@ describe("rule resolution", () => {
         expect(isMuted(rule)).toBe(false);
     });
 
+    it("never puts an update waiting on the bell, whatever was saved, and keeps its mail", () => {
+        expect(resolveRule({}, "system.update")).toEqual({ inapp: false, email: true, destinations: [] });
+        const saved = { "system.update": { inapp: true, email: false, destinations: ["d1"] } };
+        expect(resolveRule(saved, "system.update")).toEqual({
+            inapp: false,
+            email: false,
+            destinations: ["d1"]
+        });
+        // What it reports afterwards - an install started or failed - still does.
+        expect(resolveRule({}, "system.updated").inapp).toBe(true);
+    });
+
     it("does not hand back the stored array, so a caller cannot mutate the rules", () => {
         const saved = { "watch.ok": { inapp: true, email: false, destinations: ["d1"] } };
         resolveRule(saved, "watch.ok").destinations.push("d2");

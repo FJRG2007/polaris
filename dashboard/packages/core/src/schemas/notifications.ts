@@ -140,6 +140,13 @@ export interface NotificationEventInfo {
      * having that page open is no reason to mark it read on arrival.
      */
     unreadWhenViewing?: boolean;
+    /**
+     * Never reaches the bell, whatever the rule says: the screen it is about
+     * already carries it. An update waiting is shown on the Apps list and in
+     * Settings, so a bell row as well was the same news twice. Mail and
+     * webhooks still follow the account's rule.
+     */
+    offBell?: boolean;
     /** Where the rule starts before anyone changes it. */
     defaults: { inapp: boolean; email: boolean };
 }
@@ -906,7 +913,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         label: "Update available",
         description: "A new Polaris build is published and ready to install.",
         level: "info",
-        defaults: { inapp: true, email: true }
+        offBell: true,
+        defaults: { inapp: false, email: true }
     },
     {
         id: "agent.waiting",
@@ -1025,7 +1033,7 @@ export function defaultRule(event: NotificationEventInfo): NotificationRule {
 /**
  * The rule in force for one event: what the account saved, else the catalogue
  * default. A critical event always keeps the bell, so muting one can silence
- * mail and webhooks but never the record itself.
+ * mail and webhooks but never the record itself; an off-bell one never has it.
  */
 export function resolveRule(
     preferences: NotificationPreferences,
@@ -1036,6 +1044,7 @@ export function resolveRule(
     const saved = preferences[eventId];
     const rule = saved ? { ...saved, destinations: [...saved.destinations] } : defaultRule(event);
     if (event.critical) rule.inapp = true;
+    if (event.offBell) rule.inapp = false;
     return rule;
 }
 

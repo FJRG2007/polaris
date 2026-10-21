@@ -108,6 +108,8 @@ const INTERVAL_MS = Number(process.env.POLARIS_UPDATE_WATCH_MS) || 5 * 60_000;
 const FIRST_PASS_MS = 40_000;
 
 let started = false;
+/** Whether this container has cleared the bell of "update ready" rows. */
+let bellSwept = false;
 
 /** How this deployment installs updates on its own. */
 export async function getAutoUpdatePolicy(): Promise<AutoUpdatePolicy> {
@@ -349,6 +351,13 @@ async function retireLandedNotices(status: UpdateStatus): Promise<void> {
 
 /** One pass: notice, then install if it is time to. */
 export async function checkForUpdate(): Promise<void> {
+    // An update waiting is shown on the Apps list, never on the bell (the
+    // catalogue marks it `offBell`). Builds before that left a row on every
+    // operator's bell; once per container is enough to clear them.
+    if (!bellSwept) {
+        await deleteNotificationsByType([READY_EVENT]);
+        bellSwept = true;
+    }
     const status = await getUpdateStatus();
     // Before anything else: the build this deployment was told about may be the
     // one it is now serving - or there may be nothing left to install at all -
