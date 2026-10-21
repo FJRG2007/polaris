@@ -511,7 +511,7 @@ export function MinecraftSidebar({
 
             {/* The preview kept in view, and what can be written in the room
                 under it that the longer form beside it leaves. */}
-            <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--header-height)+1rem)] lg:max-h-[calc(100dvh-var(--header-height)-2rem)] lg:self-start">
+            <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-var(--header-height)-2rem)] lg:self-start">
                 <SidebarPreview sidebar={draft} />
                 <VariablesHelp edition="java" scope="server" className="lg:min-h-0" />
             </div>

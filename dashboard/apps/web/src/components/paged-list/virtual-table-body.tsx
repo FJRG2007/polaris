@@ -4,8 +4,8 @@
  * The body of a table that may hold thousands of rows, drawing only the ones on
  * screen.
  *
- * The page itself scrolls - the shell has no scrolling panel of its own - so the
- * rows are windowed against the window, offset by where the table starts. Above
+ * The shell's content area is what scrolls (see shellScroller), so the rows are
+ * windowed against it, offset by where the table starts inside it. Above
  * and below the drawn rows sit two empty rows the height of everything not
  * drawn, which keeps the scrollbar honest and the columns lined up: a table
  * cannot be absolutely positioned row by row without losing the column widths
@@ -20,7 +20,8 @@
  * page is asked for: well before the end, so scrolling does not stop at it.
  */
 
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { shellScroller } from "@polaris/ui";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
 
 /** How close to the last row, in rows, the next page is asked for. */
@@ -57,20 +58,24 @@ export function VirtualTableBody<T>({
     const body = useRef<HTMLTableSectionElement>(null);
     const [margin, setMargin] = useState(0);
 
-    // Where the table starts on the page. Read again when the window changes
-    // size, because what sits above it reflows.
+    // Where the table starts inside the scrolling area. Read again when the
+    // window changes size, because what sits above it reflows.
     useIsomorphicLayoutEffect(() => {
         const measure = () => {
             const element = body.current;
-            if (element) setMargin(element.getBoundingClientRect().top + window.scrollY);
+            const scroller = element ? shellScroller(element) : null;
+            if (!element || !scroller) return;
+            const top = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+            setMargin(top + scroller.scrollTop);
         };
         measure();
         window.addEventListener("resize", measure);
         return () => window.removeEventListener("resize", measure);
     }, []);
 
-    const virtualizer = useWindowVirtualizer({
+    const virtualizer = useVirtualizer({
         count: items.length,
+        getScrollElement: () => (body.current ? shellScroller(body.current) : null),
         estimateSize: () => estimate,
         overscan: 8,
         scrollMargin: margin,

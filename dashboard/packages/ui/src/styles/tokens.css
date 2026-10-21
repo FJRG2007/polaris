@@ -452,10 +452,11 @@ thead th {
 
 /* A screen that is an application inside the application - Mail, Chat, a document
    (see PAGE_BLEED in shell/app-shell.tsx) - owns every scrollbar on it: its list,
-   its conversation, its pages each scroll inside themselves. The window must not
-   scroll as well, whatever else lands on the page, or one wheel moves the whole
-   screen and its panes together. */
-html:has(.page-bleed) {
+   its conversation, its pages each scroll inside themselves. The shell's content
+   area must not scroll as well, whatever else lands on the page, or one wheel
+   moves the whole screen and its panes together. */
+html:has(.page-bleed),
+[data-shell-scroll]:has(.page-bleed) {
     overflow: hidden;
 }
 
