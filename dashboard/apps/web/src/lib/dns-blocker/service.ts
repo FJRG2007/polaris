@@ -27,7 +27,8 @@ import { setEnvVar } from "@/lib/env-var-service";
 import { deployApplication } from "@/lib/deploy-service";
 import { createVolume } from "@/lib/deploy-volume-service";
 import { QUERY_LOG_DIR } from "./query-log";
-import { encodeBlockyConfig } from "./render";
+import { encodeBlockyConfig, ruleFiles } from "./render";
+import { forgetEngineFiles, writeEngineFiles } from "./engine-files";
 import { DNS_CHECK_NAME } from "./settings";
 import { clockChangeDecision } from "./clock-change";
 import { resolveServiceNames } from "./services-registry";
@@ -46,6 +47,8 @@ import {
 export const DNS_CONFIG_ENV = "BLOCKY_CONFIG_BASE64";
 /** The key the settings live under on the app's install row. */
 const CONFIG_KEY = "dns";
+/** The reputation pass's place in the query log. */
+const CURSOR_KEY = "dnsLogCursor";
 
 /** Why something the operator asked for was not done, as a key the screen says
  *  in their language (`dnsBlocker` `errors.<code>`). */
@@ -152,6 +155,18 @@ export async function engineConfigCurrent(
     return stored?.value === encodeBlockyConfig(settings);
 }
 
+/** Where the reputation pass stopped reading the query log, or null. Kept in
+ *  the app's own config beside the settings, which nothing on screen edits. */
+export async function readLogCursor(): Promise<unknown> {
+    const row = await requireApp();
+    return readInstallConfig(row.config)[CURSOR_KEY] ?? null;
+}
+
+export async function saveLogCursor(cursor: unknown): Promise<void> {
+    const row = await requireApp();
+    await patchInstallConfig(row.id, { [CURSOR_KEY]: cursor });
+}
+
 /** The settings as stored, whole whatever was stored. */
 export async function readSettings(): Promise<DnsSettings> {
     const row = await requireApp();
@@ -233,13 +248,25 @@ async function ensureLogVolume(engine: EngineRow): Promise<void> {
  *  to this machine's current address when there is one. A failed deploy is
  *  logged and marked on the engine, where the status reads it as `portHeld`,
  *  and refused so the press that asked for it is not answered with success. */
+/** Put the rules' files in the DNS server. Never the reason a save fails: the
+ *  next save or pass writes them again. */
+async function syncRules(settings: DnsSettings): Promise<void> {
+    await writeEngineFiles(ruleFiles(settings)).catch((error: unknown) =>
+        console.error("polaris: the network filter's rules were not written:", error)
+    );
+}
+
 async function apply(
     engine: EngineRow,
     encoded: string,
     actorId: string,
-    address: string | null
+    address: string | null,
+    settings: DnsSettings
 ): Promise<void> {
     if (!engine.applicationId) return;
+    // Written into the running server first, so a configuration that moves the
+    // rules out of itself finds them there the moment it starts: no gap.
+    if (engine.status === "running") await syncRules(settings);
     if (address) await bindEngineTo(engine, address);
     await ensureLogVolume(engine).catch((error: unknown) =>
         // History is worth keeping, never worth a resolver that does not start.
@@ -252,6 +279,9 @@ async function apply(
     });
     try {
         await deployApplication(engine.applicationId, engine.ownerId, actorId);
+        // The container may be new: every file again, and the lists loaded.
+        forgetEngineFiles();
+        await syncRules(settings);
         if (engine.status !== "running") {
             await prisma.installedApp.update({
                 where: { id: engine.id },
@@ -289,7 +319,15 @@ export async function saveSettings(input: unknown, actorId: string): Promise<Dns
     const encoded = encodedConfig(settings);
     await patchInstallConfig(row.id, { [CONFIG_KEY]: settings });
     const engine = await engineRow();
-    if (engine) await apply(engine, encoded, actorId, await getHostLanIp().catch(() => null));
+    if (!engine) return settings;
+    // A change that leaves the configuration as it is - a rule added or
+    // removed - is a file written, never a redeploy, which would leave every
+    // device without names while the server comes back.
+    if (engine.status === "running" && (await engineConfigCurrent(engine, settings))) {
+        await syncRules(settings);
+        return settings;
+    }
+    await apply(engine, encoded, actorId, await getHostLanIp().catch(() => null), settings);
     return settings;
 }
 
@@ -342,7 +380,7 @@ export async function turnOn(actorId: string): Promise<void> {
     if (engine) {
         // A running engine holds port 53 itself; only a failed one is checked.
         if (await lastDeployFailed(engine)) await checkPort(address);
-        await apply(engine, encoded, actorId, address);
+        await apply(engine, encoded, actorId, address, settings);
         return;
     }
     await checkPort(address);
@@ -417,6 +455,12 @@ export async function reapplyAfterClockChange(
     console.info(
         `polaris: the network filter's schedules moved with the clock in ${settings.timeZone}; applying them again`
     );
-    await apply(engine, decision.encoded, engine.ownerId, await getHostLanIp().catch(() => null));
+    await apply(
+        engine,
+        decision.encoded,
+        engine.ownerId,
+        await getHostLanIp().catch(() => null),
+        settings
+    );
     return { applied: true };
 }

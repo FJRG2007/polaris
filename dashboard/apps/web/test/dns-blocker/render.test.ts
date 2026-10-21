@@ -32,7 +32,9 @@ function servers(config: Record<string, unknown>): string[] {
 describe("blockyConfig", () => {
     it("always blocks the check name in the polaris group, even with nothing else on", () => {
         const config = render.blockyConfig(settings({ sources: [] }));
-        expect(blocking(config).denylists).toEqual({ polaris: [`${dns.DNS_CHECK_NAME}\n`] });
+        expect(blocking(config).denylists).toEqual({
+            polaris: [`${dns.DNS_CHECK_NAME}\n`, render.RULES_DENY_PATH]
+        });
         expect(blocking(config).clientGroupsBlock.default).toEqual(["polaris"]);
     });
 
@@ -49,22 +51,30 @@ describe("blockyConfig", () => {
         expect(denylists.ads).toEqual([url("hagezi-pro")]);
         expect(denylists.malware).toEqual([url("hagezi-tif")]);
         expect(denylists.social).toEqual(["https://lists.example.test/social.txt"]);
-        expect(denylists.polaris).toEqual([`${dns.DNS_CHECK_NAME}\nads.example.test\n`]);
+        // The rules are a file the engine loads, never part of the configuration.
+        expect(denylists.polaris).toEqual([`${dns.DNS_CHECK_NAME}\n`, render.RULES_DENY_PATH]);
         expect(clientGroupsBlock.default).toEqual(["ads", "malware", "social", "polaris"]);
     });
 
-    it("writes the allow list once, in the polaris group, and leaves it out when empty", () => {
-        expect(blocking(render.blockyConfig(settings())).allowlists).toBeUndefined();
-        const config = render.blockyConfig(
-            settings({
-                sources: ["hagezi-pro", "hagezi-tif"],
-                allow: ["ok.example.test", "*.cdn.example.test"]
-            })
+    it("names the allow file once, in the polaris group, whether or not it holds a rule", () => {
+        const none = render.blockyConfig(settings());
+        const some = render.blockyConfig(
+            settings({ allow: ["ok.example.test", "*.cdn.example.test"], deny: ["ads.example.test"] })
         );
-        expect(blocking(config).allowlists).toEqual({
-            polaris: ["ok.example.test\n*.cdn.example.test\n"]
-        });
-        expect(blocking(config).clientGroupsBlock.default).toContain("polaris");
+        expect(blocking(none).allowlists).toEqual({ polaris: [render.RULES_ALLOW_PATH] });
+        // A rule added or removed leaves the configuration - and so the running
+        // server - exactly as it was.
+        expect(some).toEqual(none);
+        expect(blocking(some).clientGroupsBlock.default).toContain("polaris");
+    });
+
+    it("writes the rules as the two files the configuration names", () => {
+        const files = render.ruleFiles({ allow: ["ok.example.test"], deny: ["*.ads.test", "/^ad/"] });
+        expect(files.get(render.RULES_ALLOW_PATH)).toBe("# Polaris: your rules\nok.example.test\n");
+        expect(files.get(render.RULES_DENY_PATH)).toBe("# Polaris: your rules\n*.ads.test\n/^ad/\n");
+        expect(render.ruleFiles({ allow: [], deny: [] }).get(render.RULES_DENY_PATH)).toBe(
+            "# Polaris: your rules\n"
+        );
     });
 
     it("uses the preset's resolvers, and a fallback bootstrap only for encrypted custom ones", () => {

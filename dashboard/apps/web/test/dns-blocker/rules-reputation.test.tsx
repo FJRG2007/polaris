@@ -95,18 +95,72 @@ describe("reputation", () => {
             "A"
         ].join("\t");
 
-    it("asks about allowed public names only, newest first, each once", () => {
-        const text = [
-            line("old.example"),
-            line("blocked.example", "BLOCKED", "BLOCKED (ads)"),
-            line("nas.lan"),
-            line("printer"),
-            line("new.example"),
-            line("new.example"),
-            line("10.0.0.1")
-        ].join("\n");
-        expect(reputation.namesFromLog(text, 10)).toEqual(["new.example", "old.example"]);
-        expect(reputation.namesFromLog(text, 1)).toEqual(["new.example"]);
+    const log = (...domains: string[]) => domains.map((domain) => `${line(domain)}\n`).join("");
+    const read = (text: string, offset: number, maxBytes?: number, chunk = 7) => {
+        const slice = new reputation.LogSlice(offset, maxBytes);
+        const bytes = Buffer.from(text);
+        for (let at = 0; at < bytes.length; at += chunk)
+            if (!slice.add(bytes.subarray(at, at + chunk))) break;
+        return slice.finish();
+    };
+
+    it("reads allowed public names once each, in order, from the cursor on", () => {
+        const text =
+            log("a.example") +
+            `${line("blocked.example", "BLOCKED", "BLOCKED (ads)")}\n` +
+            log("nas.lan", "printer", "b.example", "a.example", "10.0.0.1");
+        const all = read(text, 0);
+        expect(all.entries.map((entry) => entry.domain)).toEqual(["a.example", "b.example"]);
+        expect(all).toMatchObject({ end: Buffer.byteLength(text), truncated: false, complete: true });
+        const fromB = read(text, all.entries[1]!.start);
+        expect(fromB.entries.map((entry) => entry.domain)).toEqual(["b.example", "a.example"]);
+    });
+
+    it("leaves a half-written last line for the next pass", () => {
+        const text = `${log("a.example")}${line("b.example").slice(0, 20)}`;
+        const slice = read(text, 0);
+        expect(slice.entries.map((entry) => entry.domain)).toEqual(["a.example"]);
+        expect(slice.end).toBe(Buffer.byteLength(log("a.example")));
+    });
+
+    it("catches up over passes when a pass may read only so much", () => {
+        const text = log("a.example", "b.example", "c.example", "d.example");
+        const lineBytes = Buffer.byteLength(log("a.example"));
+        const seen: string[] = [];
+        let offset = 0;
+        for (let pass = 0; pass < 10 && offset < Buffer.byteLength(text); pass += 1) {
+            const slice = read(text, offset, lineBytes * 2);
+            seen.push(...slice.entries.map((entry) => entry.domain));
+            offset = reputation.cursorAfter(slice.entries, new Set(seen), slice.end);
+        }
+        expect(seen).toEqual(["a.example", "b.example", "c.example", "d.example"]);
+        expect(offset).toBe(Buffer.byteLength(text));
+    });
+
+    it("stops the cursor at the first name the budget did not reach", () => {
+        const text = log("a.example", "b.example", "c.example");
+        const slice = read(text, 0);
+        const handled = new Set(["a.example"]);
+        expect(reputation.cursorAfter(slice.entries, handled, slice.end)).toBe(slice.entries[1]!.start);
+        handled.add("b.example").add("c.example");
+        expect(reputation.cursorAfter(slice.entries, handled, slice.end)).toBe(slice.end);
+    });
+
+    it("notices a file shorter than the cursor, cut or replaced", () => {
+        expect(read(log("a.example"), 10_000).truncated).toBe(true);
+    });
+
+    it("finishes the day the cursor is in before starting the new one", () => {
+        expect(reputation.readPlan(null, "/logs/2026-10-21.log")).toEqual([
+            { file: "/logs/2026-10-21.log", offset: 0 }
+        ]);
+        expect(reputation.readPlan({ file: "/logs/2026-10-21.log", offset: 9 }, "/logs/2026-10-21.log")).toEqual([
+            { file: "/logs/2026-10-21.log", offset: 9 }
+        ]);
+        expect(reputation.readPlan({ file: "/logs/2026-10-20.log", offset: 9 }, "/logs/2026-10-21.log")).toEqual([
+            { file: "/logs/2026-10-20.log", offset: 9 },
+            { file: "/logs/2026-10-21.log", offset: 0 }
+        ]);
     });
 
     it("keeps a flagged verdict longer than a clean one", () => {

@@ -9,22 +9,26 @@
  */
 
 import { prisma } from "@polaris/db";
-import { Readable } from "node:stream";
-import { createHash } from "node:crypto";
-import { readSettings } from "./service";
+import { readLogCursor, readSettings, saveLogCursor } from "./service";
 import { takeLookup } from "@/lib/reputation-budget";
-import { TAIL_BYTES, queryLogPath } from "./query-log";
-import { engineTarget, refreshLists } from "./insights";
+import { queryLogPath } from "./query-log";
+import { writeEngineFiles } from "./engine-files";
+import { engineTarget } from "./insights";
 import { domainReputation } from "@/lib/integrations/dymo";
 import { dnsReputationOn, type DnsSettings } from "./settings";
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import {
     LOOKUPS_PER_PASS,
     PUBLISHED_MAX,
-    namesFromLog,
+    LogSlice,
+    cursorAfter,
+    logCursorSchema,
+    readPlan,
     reputationFiles,
     reputationListPath,
     verdictExpiry,
+    type LogCursor,
+    type LogSliceRead,
     type ReputationOff
 } from "./reputation";
 
@@ -87,19 +91,12 @@ async function check(apiKey: string, settings: DnsSettings, domain: string): Pro
     }
 }
 
-/** The hash of what was last written to each file, so an unchanged set is not
- *  written, nor the lists loaded again, every pass. In memory: a restart
- *  writes the files once more. */
-const published = new Map<string, string>();
-
 /** Write each category's file into the DNS server when it changed, and have it
  *  load its lists again. `lookupsOn` false writes them empty: with no key or
  *  the integration off, nothing is blocked by reputation, remembered or not. */
 async function publish(settings: DnsSettings, lookupsOn: boolean): Promise<void> {
     const categories = dnsReputationOn(settings.reputation);
     if (categories.length === 0) return;
-    const target = await engineTarget();
-    if (!target.ports.writeFile) return;
     const verdicts = lookupsOn
         ? await prisma.dnsReputation.findMany({
               where: { flagged: true, expiresAt: { gt: new Date() } },
@@ -108,18 +105,49 @@ async function publish(settings: DnsSettings, lookupsOn: boolean): Promise<void>
               take: PUBLISHED_MAX
           })
         : [];
-    let changed = false;
-    for (const [category, text] of reputationFiles(verdicts, categories)) {
-        const path = reputationListPath(category);
-        const key = `${target.container}:${path}`;
-        const hash = createHash("sha256").update(text).digest("hex");
-        if (published.get(key) === hash) continue;
-        const bytes = Buffer.from(text, "utf8");
-        await target.ports.writeFile(target.container, path, Readable.from([bytes]), bytes.length);
-        published.set(key, hash);
-        changed = true;
+    const files = new Map<string, string>();
+    for (const [category, text] of reputationFiles(verdicts, categories))
+        files.set(reputationListPath(category), text);
+    await writeEngineFiles(files);
+}
+
+/** Names out of `names` that already have a current verdict, asked in
+ *  bounded batches. */
+async function alreadyKnown(names: readonly string[]): Promise<Set<string>> {
+    const known = new Set<string>();
+    for (let at = 0; at < names.length; at += 500) {
+        const rows = await prisma.dnsReputation.findMany({
+            where: { domain: { in: names.slice(at, at + 500) }, expiresAt: { gt: new Date() } },
+            select: { domain: true }
+        });
+        for (const row of rows) known.add(row.domain);
     }
-    if (changed) await refreshLists();
+    return known;
+}
+
+/** One file of the log from the cursor, through the runtime's file stream (not
+ *  a command, whose output is cut). Null when the file is not there. */
+async function readSlice(
+    target: Awaited<ReturnType<typeof engineTarget>>,
+    step: LogCursor
+): Promise<LogSliceRead | null> {
+    let stream: ReadableStream<Uint8Array>;
+    try {
+        stream = await target.ports.readFile(target.container, step.file);
+    } catch {
+        return null;
+    }
+    const slice = new LogSlice(step.offset);
+    const reader = stream.getReader();
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done || !slice.add(value)) break;
+        }
+    } finally {
+        await reader.cancel().catch(() => undefined);
+    }
+    return slice.finish();
 }
 
 /**
@@ -138,25 +166,34 @@ export async function runReputationPass(): Promise<{ checked: number; skipped?: 
 
     const target = await engineTarget().catch(() => null);
     if (!target) return { checked: 0 };
-    const tail = await target.ports.runIn(target.container, [
-        "tail",
-        "-c",
-        String(TAIL_BYTES),
-        queryLogPath(new Date())
-    ]);
-    const names = tail.code === 0 ? namesFromLog(tail.output, 200) : [];
-    const known = names.length
-        ? await prisma.dnsReputation.findMany({
-              where: { domain: { in: names }, expiresAt: { gt: new Date() } },
-              select: { domain: true }
-          })
-        : [];
-    const current = new Set(known.map((row) => row.domain));
+    const stored = logCursorSchema.safeParse(await readLogCursor());
+    const today = queryLogPath(new Date());
     let checked = 0;
-    for (const domain of names.filter((name) => !current.has(name))) {
-        if (checked >= LOOKUPS_PER_PASS) break;
-        if (!(await check(access.apiKey, settings, domain))) break;
-        checked += 1;
+    for (const step of readPlan(stored.success ? stored.data : null, today)) {
+        const slice = await readSlice(target, step);
+        // A past day's file already deleted: on to today. Today's not there
+        // yet: nothing has been asked today.
+        if (!slice) {
+            if (step.file === today) break;
+            continue;
+        }
+        if (slice.truncated) {
+            await saveLogCursor({ file: step.file, offset: 0 });
+            break;
+        }
+        const handled = await alreadyKnown(slice.entries.map((entry) => entry.domain));
+        for (const { domain } of slice.entries) {
+            if (handled.has(domain)) continue;
+            if (checked >= LOOKUPS_PER_PASS) break;
+            if (!(await check(access.apiKey, settings, domain))) break;
+            handled.add(domain);
+            checked += 1;
+        }
+        const offset = cursorAfter(slice.entries, handled, slice.end);
+        await saveLogCursor({ file: step.file, offset });
+        // Stopped short - the budget, or the bytes one pass reads: the next
+        // pass goes on from here.
+        if (offset < slice.end || !slice.complete) break;
     }
     // A verdict long past asking again is not worth keeping.
     await prisma.dnsReputation.deleteMany({
@@ -193,7 +230,6 @@ export async function recheckDomain(domain: string): Promise<"checked" | Reputat
 
 /** Publish again after the settings changed which categories are on. */
 export async function republishReputation(): Promise<void> {
-    published.clear();
     const settings = await readSettings();
     const { off } = await lookupAccess(settings);
     if (off === "noCategory") return;

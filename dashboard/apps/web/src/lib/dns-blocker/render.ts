@@ -29,6 +29,23 @@ import {
 /** The port the engine answers its HTTP API on, inside the container. */
 export const DNS_ENGINE_HTTP_PORT = 4000;
 
+/** Where the operator's own rules are written on the engine's volume. */
+export const RULES_ALLOW_PATH = `${QUERY_LOG_DIR}/rules-allow.txt`;
+export const RULES_DENY_PATH = `${QUERY_LOG_DIR}/rules-deny.txt`;
+
+/**
+ * The operator's rules as the two files the configuration names, one rule per
+ * line in the syntax the engine reads in a list. A comment line keeps an empty
+ * file a list that loads.
+ */
+export function ruleFiles(settings: Pick<DnsSettings, "allow" | "deny">): Map<string, string> {
+    const file = (rules: readonly string[]) => inline(["# Polaris: your rules", ...rules]);
+    return new Map([
+        [RULES_ALLOW_PATH, file(settings.allow)],
+        [RULES_DENY_PATH, file(settings.deny)]
+    ]);
+}
+
 /** The group holding the operator's own blocked names. */
 const OWN_GROUP = "polaris";
 
@@ -77,7 +94,10 @@ export function blockyConfig(
     }
     const servicesOf = (ids: readonly string[]) =>
         ids.map(dnsServiceList).filter((list) => denylists[list]);
-    denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
+    // The check name stays inline, so the status check answers even before
+    // the rules' file is written; the rules themselves are a file Polaris
+    // writes, so editing one is a reload rather than a redeploy.
+    denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME]), RULES_DENY_PATH];
     // The domains Dymo flagged, one file per category on the engine's own
     // volume, written by Polaris and loaded again when it changes. They block
     // for every device, like the operator's own names.
@@ -110,8 +130,9 @@ export function blockyConfig(
     // The engine checks a name against the allow lists of every group a client
     // blocks with before any deny list, so one copy, in the group that always
     // has a deny list, covers them all.
-    const allowlists =
-        settings.allow.length > 0 ? { [OWN_GROUP]: [inline(settings.allow)] } : undefined;
+    // Always named, even with no rule in it, so the first allowed name is a
+    // file written and not a configuration changed.
+    const allowlists = { [OWN_GROUP]: [RULES_ALLOW_PATH] };
 
     // Never the operator's own group: it holds the name the status check asks for.
     const scheduled = engineSchedules(
@@ -155,7 +176,7 @@ export function blockyConfig(
         ...(bootstrap.length > 0 ? { bootstrapDns: bootstrap.map((ip) => `tcp+udp:${ip}`) } : {}),
         blocking: {
             denylists,
-            ...(allowlists ? { allowlists } : {}),
+            allowlists,
             clientGroupsBlock,
             ...(scheduled ?? {}),
             blockType: settings.engine.blockReply,
