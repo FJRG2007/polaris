@@ -97,6 +97,13 @@
             "invalid": "That is not a date and time.",
             "past": "Pick a moment that has not passed.",
             "tooFar": "Pick a moment inside the next year."
+        },
+        "automatic": {
+            "call": "In a call",
+            "meeting": "In a meeting",
+            "busyCall": "Do not disturb - in a call",
+            "busyMeeting": "Do not disturb - in a meeting",
+            "untilTitle": "until {time} - {title}"
         }
     },
     "apps": {

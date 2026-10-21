@@ -97,6 +97,13 @@
             "invalid": "Esa fecha y hora no es válida.",
             "past": "Elige un momento que no haya pasado.",
             "tooFar": "Elige un momento dentro del próximo año."
+        },
+        "automatic": {
+            "call": "En llamada",
+            "meeting": "En reunión",
+            "busyCall": "No molestar - en llamada",
+            "busyMeeting": "No molestar - en reunión",
+            "untilTitle": "hasta {time} - {title}"
         }
     },
     "apps": {

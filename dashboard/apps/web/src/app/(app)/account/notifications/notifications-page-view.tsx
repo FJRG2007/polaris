@@ -18,6 +18,8 @@ import type { InGameChoice } from "@/lib/chat/in-game-choice";
 import { NotificationsView } from "./notifications-view";
 import { NotificationSettingsView } from "./notification-settings-view";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
+import type { DoNotDisturbView } from "@/lib/presence-service";
 
 export function NotificationsPageView({
     rules,
@@ -27,7 +29,8 @@ export function NotificationsPageView({
     messagesInGame,
     inGameReady = true,
     badgesClearOnVisit = null,
-    quiet = null
+    quiet = null,
+    paused = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -41,9 +44,17 @@ export function NotificationsPageView({
     badgesClearOnVisit?: boolean | null;
     /** Quiet hours and the zone they are read in; null leaves the card out. */
     quiet?: { hours: QuietHours; timeZone: string } | null;
+    /** Do not disturb as it stands when the page opened, or null when off. */
+    paused?: DoNotDisturbView | null;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
     const t = useTranslations("accountNotifications");
+    const format = useDisplayFormat();
+    // The time alone when it ends today, the date with it otherwise.
+    const untilLabel = (until: string) => {
+        const at = new Date(until);
+        return format.date(at) === format.date(new Date()) ? format.time(at) : format.dateTime(at);
+    };
 
     const tabs = [
         { id: "history" as const, label: t("tabs.history"), icon: Bell },
@@ -52,6 +63,19 @@ export function NotificationsPageView({
 
     return (
         <div className="flex flex-col gap-4">
+            {paused?.on ? (
+                <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <p className="font-medium">
+                        {paused.until
+                            ? t("dnd.pausedUntil", { time: untilLabel(paused.until) })
+                            : t("dnd.paused")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        {paused.reason ? `${t(`dnd.${paused.reason}`)} ` : ""}
+                        {t("dnd.critical")}
+                    </p>
+                </div>
+            ) : null}
             <div className="flex gap-1 border-b border-border">
                 {tabs.map((entry) => (
                     <button

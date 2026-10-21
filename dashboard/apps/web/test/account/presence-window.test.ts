@@ -58,6 +58,9 @@ vi.mock("@/lib/privacy-service", () => ({
         new Set(userIds)
 }));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
+// What people are doing is its own test. Mocked here because the real module
+// reaches the sign-in package on import, which has nothing to do with a window.
+vi.mock("@/lib/presence-activity/service", () => ({ activitiesFor: async () => new Map() }));
 vi.mock("@/lib/chat/meetings", () => ({ PARTICIPANT_TTL_MS: 60_000 }));
 // Nobody here has written a schedule. That they beat a choice, and when, is
 // asserted next door in status-schedule.test.ts.

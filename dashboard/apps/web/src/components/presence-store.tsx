@@ -20,7 +20,7 @@
  * changing.
  */
 
-import type { ActivityView, Presence } from "@polaris/core";
+import type { ActivityView, AutoPresenceView, Presence } from "@polaris/core";
 import {
     createContext,
     useCallback,
@@ -47,6 +47,9 @@ export interface PresenceOf {
      *  whenever they are drawn as offline. Absent from a server that predates
      *  it, which is a tab left open across an update. */
     readonly activity?: readonly ActivityView[];
+    /** Why they are showing what they are - on a call, in a meeting - when
+     *  automatic status says so. Absent from a server that predates it. */
+    readonly auto?: AutoPresenceView | null;
 }
 
 /** The event `announcePresence` raises, heard by the provider. */

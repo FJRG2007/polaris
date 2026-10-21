@@ -17,6 +17,7 @@
 import { claimForDevice } from "@/lib/device-once";
 import { notifyDesktop } from "@/lib/desktop-notify";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
+import { arrivalsMayAlert } from "@polaris/core";
 import { useSessionScope } from "@/components/session-scope";
 import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
@@ -198,14 +199,22 @@ export function NotificationsProvider({
                     const payload = JSON.parse(data) as {
                         items?: NotificationView[];
                         chime?: unknown;
+                        quiet?: unknown;
                     };
                     if (!Array.isArray(payload.items)) return;
+                    // Do not disturb, as the server worked it out: rows still
+                    // land, and only a critical one may sound or raise a notice.
+                    const quiet = payload.quiet === true;
+                    const fresh = payload.items.filter(
+                        (row) => !row.read && !seen.current.has(row.id)
+                    );
                     // Inside the desktop app a finished deploy is also a notice
                     // from the system, as the app's own pushes are: a build is
                     // exactly what somebody switches away from while it runs.
                     // Taken before the rows below are marked as seen.
                     if (desktopBridge() && noticeAllowed("alerts")) {
                         for (const row of arrivedDeployResults(seen.current, payload.items)) {
+                            if (!arrivalsMayAlert(quiet, [row])) continue;
                             void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then(
                                 (mine) => {
                                     if (!mine || document.hasFocus()) return;
@@ -238,7 +247,12 @@ export function NotificationsProvider({
                     // this says nothing, and a missing answer must not mute a
                     // device.
                     const elected = payload.chime !== false;
-                    if (arrived && elected && notificationSoundEnabled()) {
+                    if (
+                        arrived &&
+                        elected &&
+                        notificationSoundEnabled() &&
+                        arrivalsMayAlert(quiet, fresh)
+                    ) {
                         void claimForDevice(`${scope}:notification-chime`).then((mine) => {
                             if (mine) playNotificationSound();
                         });

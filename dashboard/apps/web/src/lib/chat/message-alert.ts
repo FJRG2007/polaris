@@ -21,6 +21,9 @@ export interface ArrivalContext {
     readonly attended: boolean;
     /** Whether the reader has message sounds switched on. */
     readonly soundOn: boolean;
+    /** Whether the reader is in do not disturb: the card still shows, with no
+     *  sound and no notice outside the window. */
+    readonly doNotDisturb?: boolean;
 }
 
 export interface ArrivalAlert {
@@ -38,8 +41,8 @@ export function arrivalAlert(context: ArrivalContext): ArrivalAlert {
     if (context.inThatChat && context.attended) return QUIET;
     return {
         toast: !context.inThatChat,
-        sound: context.soundOn,
-        desktop: !context.attended
+        sound: context.soundOn && !context.doNotDisturb,
+        desktop: !context.attended && !context.doNotDisturb
     };
 }
 

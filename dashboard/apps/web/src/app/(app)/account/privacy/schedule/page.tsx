@@ -12,19 +12,27 @@
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { ScheduleView } from "./schedule-view";
+import { AutoStatusCard } from "./auto-status-card";
 import { scheduleSettingsOf } from "@/lib/presence-schedule-service";
+import { autoPresenceCalendarsOf, autoPresenceSettingsOf } from "@/lib/presence-auto-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function StatusSchedulePage() {
     const session = await requireUser();
     const t = await getTranslations("accountPrivacy");
-    const settings = await scheduleSettingsOf(session.id);
+    const [settings, automatic, calendars] = await Promise.all([
+        scheduleSettingsOf(session.id),
+        autoPresenceSettingsOf(session.id),
+        autoPresenceCalendarsOf(session.id)
+    ]);
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("schedule.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("schedule.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("schedule.page.intro")}</p>
             </div>
             <ScheduleView
@@ -32,6 +40,7 @@ export default async function StatusSchedulePage() {
                 timeZone={settings.timeZone}
                 pinned={settings.pinned}
             />
+            <AutoStatusCard initial={automatic} calendars={calendars} isAdmin={session.isAdmin} />
         </div>
     );
 }

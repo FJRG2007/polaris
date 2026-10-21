@@ -191,6 +191,7 @@ export * from "./i18n/detect.js";
 export * from "./i18n/messages.js";
 export * from "./i18n/catalogs.js";
 export * from "./schemas/presence-schedule.js";
+export * from "./schemas/presence-auto.js";
 export * from "./schemas/comments.js";
 export * from "./schemas/notifications.js";
 export * from "./schemas/alert-filters.js";

@@ -12,7 +12,7 @@
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import { withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
-import type { Locale } from "@polaris/core";
+import type { BusyEvent, Locale } from "@polaris/core";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
@@ -288,6 +288,29 @@ export async function upcomingEventsFor(
 ): Promise<UpcomingEvent[] | null> {
     for (const extension of await installedWith("upcomingEvents")) {
         return [...(await extension.upcomingEvents!(userId, limit))];
+    }
+    return null;
+}
+
+/** The busy events reaching a window for these people, from the app that
+ *  keeps calendars, or null when no installed app does. */
+export async function presenceBusyFor(
+    asks: readonly { userId: string; calendarIds: readonly string[] | null; zone: string }[],
+    window: { from: Date; to: Date }
+): Promise<ReadonlyMap<string, readonly BusyEvent[]> | null> {
+    for (const extension of await installedWith("presenceBusy")) {
+        return extension.presenceBusy!(asks, window);
+    }
+    return null;
+}
+
+/** The calendars this account may pick for automatic status, or null when no
+ *  installed app keeps calendars. */
+export async function presenceCalendarsFor(
+    userId: string
+): Promise<{ id: string; name: string; color: string }[] | null> {
+    for (const extension of await installedWith("presenceCalendars")) {
+        return [...(await extension.presenceCalendars!(userId))];
     }
     return null;
 }

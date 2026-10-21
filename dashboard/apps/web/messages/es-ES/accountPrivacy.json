@@ -248,5 +248,27 @@
         "add": "Añadir",
         "nothingListed": "No se ha podido listar nada.",
         "chooseRunning": "Elegir entre lo que se está ejecutando en este ordenador"
+    },
+    "auto": {
+        "title": "Estado automático",
+        "description": "Muestra dónde estás mientras dure. Un estado que elijas tú siempre manda.",
+        "call": "En una llamada de Polaris",
+        "callHint": "Termina al salir de la llamada.",
+        "meeting": "En eventos marcados ocupado",
+        "meetingHint": "Los eventos libres, cancelados o rechazados no cuentan. Los demás solo ven que estás en una reunión, nunca su título.",
+        "effect": "Qué hace",
+        "effectStatus": "Mostrarlo como estado",
+        "effectBusy": "Activar No molestar",
+        "calendars": "Calendarios que cuentan",
+        "allCalendars": "Todos mis calendarios",
+        "noCalendars": "Aún no tienes calendarios propios.",
+        "noCalendarApp": "Instala la app Calendario para usar tus eventos.",
+        "noCalendarAppMember": "Calendario no está instalado aquí. Tus administradores pueden añadirlo.",
+        "calendarLimit": "Hasta {count} calendarios.",
+        "allDay": "Contar eventos de todo el día",
+        "before": "Minutos antes",
+        "after": "Minutos después",
+        "saved": "Estado automático guardado.",
+        "failed": "No se pudo guardar el estado automático. Inténtalo de nuevo."
     }
 }

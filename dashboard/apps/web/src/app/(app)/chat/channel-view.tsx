@@ -372,6 +372,7 @@ export function ChannelView({
     // channel would stay bold until the next message turned up.
     const attending = useAttention(() => catchUpMarkRef.current?.(true));
     const dismissToast = useToast().dismiss;
+    const showToast = useToast().show;
     // How long the list insists on the bottom after a conversation opens.
     // Everything that lands late - pictures, link cards, players, a font - grows
     // it, and the browser's own scroll anchoring moves the position while that
@@ -2296,6 +2297,15 @@ export function ChannelView({
                 { meetingId: result.meetingId, channelId, title: callTitle, ...placed(result) },
                 withVideo
             );
+            // Rung without a sound: they see the call, and the caller is told
+            // why it may go unanswered.
+            if (result.inDoNotDisturb) {
+                showToast({
+                    key: `call-dnd:${channelId}`,
+                    title: t("callDoNotDisturb", { name: callTitle }),
+                    body: t("callDoNotDisturbBody")
+                });
+            }
         } else setError("That call could not be joined. Try again.");
         checkCall();
     }

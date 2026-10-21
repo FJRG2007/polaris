@@ -39,6 +39,7 @@ import { Avatar } from "./avatar";
 import { Button } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useSessionScope } from "./session-scope";
+import { useDoNotDisturb } from "./do-not-disturb";
 import { claimForDevice } from "@/lib/device-once";
 import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
@@ -446,8 +447,12 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
      * opened halfway through does not join in, and it is remembered here so that
      * a re-render deciding to ring the same call again asks nobody a second time.
      */
-    const sounding =
-        showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null;
+    // In do not disturb the card is still drawn and still answers; only the
+    // ring and the notice outside the window are held back.
+    const quiet = useDoNotDisturb();
+    const sounding = quiet
+        ? null
+        : (showing.find((entry) => !silenced.includes(entry.meetingId))?.meetingId ?? null);
     /**
      * Which tab of this device answers for a call: its sound AND its notice.
      *
@@ -519,6 +524,8 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             // operating system's notice is the same interruption in another
             // form, and somebody who has just silenced one has said so.
             if (silenced.includes(entry.meetingId)) continue;
+            // Do not disturb: seen in the app, not raised over everything else.
+            if (quiet) continue;
             // Marked before the claim, the audio and the permission prompt
             // resolve, so a second frame does not raise a second notice for the
             // same call.
@@ -567,7 +574,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         for (const meetingId of mine.current.keys()) {
             if (!live.has(meetingId)) mine.current.delete(meetingId);
         }
-    }, [alertClaim, showing, silenced]);
+    }, [alertClaim, showing, silenced, quiet]);
 
     // Nothing outlives the screen: a notice left behind by a page that has gone
     // is one nobody can dismiss from inside Polaris.

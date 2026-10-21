@@ -248,5 +248,27 @@
         "add": "Add",
         "nothingListed": "Nothing could be listed.",
         "chooseRunning": "Choose from what is running on this computer"
+    },
+    "auto": {
+        "title": "Automatic status",
+        "description": "Show what you are in while it lasts. A status you pick yourself always wins.",
+        "call": "While I'm in a Polaris call",
+        "callHint": "Ends when you leave the call.",
+        "meeting": "During busy calendar events",
+        "meetingHint": "Events marked free, cancelled or declined never count. Others see only that you are in a meeting, never its title.",
+        "effect": "What it does",
+        "effectStatus": "Show it as my status",
+        "effectBusy": "Turn on Do not disturb",
+        "calendars": "Calendars that count",
+        "allCalendars": "Every calendar I own",
+        "noCalendars": "You have no calendars of your own yet.",
+        "noCalendarApp": "Install the Calendar app to use your events.",
+        "noCalendarAppMember": "Calendar isn't installed here. Your administrators can add it.",
+        "calendarLimit": "Up to {count} calendars.",
+        "allDay": "Count events that last all day",
+        "before": "Minutes before",
+        "after": "Minutes after",
+        "saved": "Automatic status saved.",
+        "failed": "Could not save automatic status. Try again."
     }
 }

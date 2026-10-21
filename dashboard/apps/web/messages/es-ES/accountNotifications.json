@@ -689,5 +689,14 @@
                 "username": "Sin dos puntos ni saltos."
             }
         }
+    },
+    "dnd": {
+        "paused": "Pausado por No molestar",
+        "pausedUntil": "Pausado por No molestar hasta {time}",
+        "chosen": "Lo activaste tú.",
+        "schedule": "Lo activó tu horario semanal.",
+        "call": "Estás en una llamada.",
+        "meeting": "Estás en una reunión.",
+        "critical": "Todo sigue llegando a la campana, sin sonidos ni avisos. Las alertas críticas, como las de seguridad, sí llegan."
     }
 }

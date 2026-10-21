@@ -29,7 +29,7 @@ import { ringGlow, ringWidth } from "@/lib/profile-style-css";
 import { useProfileStyle } from "@/components/profile-style-store";
 import { AvatarDecorationArt } from "@/components/avatar-decoration";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { decorationOf, type Presence } from "@polaris/core";
+import { autoPresenceWord, decorationOf, type Presence } from "@polaris/core";
 
 /**
  * The box the decoration paints in: the face, plus its band on every side.
@@ -259,6 +259,10 @@ export function Avatar({
     const band = decoration ? ringWidth(decoration, size) : 0;
     const inner = size;
     const where = presence ? { status: presence, inCall: false } : known;
+    // "In a meeting" rather than only "Do not disturb": the reason is what
+    // tells somebody whether to wait a minute or an afternoon.
+    const auto = presence ? null : (known?.auto ?? null);
+    const autoWord = auto ? t(`presenceAuto.${autoPresenceWord(auto)}`) : null;
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
@@ -485,8 +489,8 @@ export function Avatar({
                 </span>
             ) : (
                 <span
-                    aria-label={t(`presence.${where.status}`)}
-                    title={t(`presence.${where.status}`)}
+                    aria-label={autoWord ?? t(`presence.${where.status}`)}
+                    title={autoWord ?? t(`presence.${where.status}`)}
                     className={cn(
                         "absolute -bottom-0.5 -right-0.5 rounded-full ring-2 ring-background",
                         PRESENCE_COLOURS[where.status]

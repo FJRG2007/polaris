@@ -951,6 +951,25 @@ export function notificationEvent(id: string): NotificationEventInfo | null {
     return EVENT_BY_ID.get(id) ?? null;
 }
 
+/**
+ * Whether an event of this type is heard through do not disturb.
+ *
+ * The critical ones - a sign-in to approve, a security change - break through,
+ * the way Slack, Teams and macOS Focus let the urgent few through a silenced
+ * device. Everything else still lands in the bell, without a sound or a notice.
+ */
+export function breaksDoNotDisturb(type: string): boolean {
+    return EVENT_BY_ID.get(type)?.critical === true;
+}
+
+/**
+ * Whether these new arrivals may make a sound or raise a notice: always when
+ * not in do not disturb, and in it only when one of them is critical.
+ */
+export function arrivalsMayAlert(quiet: boolean, arrivals: readonly { type: string }[]): boolean {
+    return !quiet || arrivals.some((arrival) => breaksDoNotDisturb(arrival.type));
+}
+
 export function isNotificationEvent(id: string): boolean {
     return EVENT_BY_ID.has(id);
 }

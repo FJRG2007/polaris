@@ -203,6 +203,11 @@ model User {
     // closes; one made before it is the rule's to take over. Null for an account
     // that has never chosen, which is every account until it does.
     presenceSetAt DateTime?
+    // Automatic status: JSON read through `parseAutoPresence` in @polaris/core -
+    // whether a call or a busy calendar event says "In a call" / "In a meeting"
+    // or turns on do not disturb. Empty is the defaults, which is every account
+    // until it opens the setting.
+    autoPresence  String   @default("")
     // Second gate for admin-only routes, independent of role permissions.
     isAdmin       Boolean  @default(false)
     // When set, the account is banned: sign-in is refused and sessions are void.

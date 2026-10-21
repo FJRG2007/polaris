@@ -47,6 +47,7 @@ import { claimForDevice } from "@/lib/device-once";
 import { useCallback, useEffect, useRef } from "react";
 import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
+import { useDoNotDisturb } from "@/components/do-not-disturb";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -226,6 +227,9 @@ export function MessageToasts() {
     // apart from the other side of a conversation catching up.
     const device = useRef(scope);
     device.current = scope;
+    /** Do not disturb as it is now, for the batch handler built once below. */
+    const quiet = useRef(false);
+    quiet.current = useDoNotDisturb();
 
     const flush = useCallback(async () => {
         const heard = new Map(pending.current);
@@ -240,7 +244,8 @@ export function MessageToasts() {
             const alert = arrivalAlert({
                 inThatChat,
                 attended: tabIsWatched(),
-                soundOn: notificationSoundEnabled()
+                soundOn: notificationSoundEnabled(),
+                doNotDisturb: quiet.current
             });
             // Somebody is reading it, here or in another tab of this browser.
             if (!alert.toast && !alert.sound && !alert.desktop) continue;
