@@ -19,7 +19,7 @@ import { OutageTable } from "./outage-table";
 import { MergeGapForm } from "./merge-gap-form";
 import * as rules from "@/lib/connectivity/outages";
 import { checkConnectivityAction } from "./actions";
-import { DowntimeHeatmap } from "./downtime-heatmap";
+import { DowntimeHeatmap } from "@/components/metrics/downtime-heatmap";
 import * as list from "@/lib/connectivity/outage-list";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";

@@ -25,7 +25,7 @@ import {
     breakdownTitle,
     MetricBreakdownDialog,
     type OpenBreakdown
-} from "@/app/(app)/watch/watch-metric-breakdown";
+} from "@/components/metrics/metric-breakdown";
 
 export function WatchSubjectDetail({
     kind,

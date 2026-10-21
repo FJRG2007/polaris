@@ -1538,7 +1538,7 @@
         "web/src/app/(app)/watch/watch-view.tsx",
         "web/src/app/(app)/watch/watch-cards.tsx",
         "web/src/app/(app)/watch/watch-containers.tsx",
-        "web/src/app/(app)/watch/watch-metric-breakdown.tsx",
+        "web/src/components/metrics/metric-breakdown.tsx",
         "web/src/app/(app)/watch/watch-subject-detail.tsx",
         "web/src/app/(app)/watch/actions.ts",
         "web/src/lib/watch/alarm-evaluator.ts",

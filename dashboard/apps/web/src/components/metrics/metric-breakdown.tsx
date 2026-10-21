@@ -26,7 +26,7 @@ import { formatBytes } from "@polaris/core";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { subjectBreakdownAction } from "./actions";
+import { subjectBreakdownAction } from "@/app/(app)/breakdown-actions";
 import { formatAge } from "@/app/(app)/apps/containers/freshness";
 import { formatRate, percent } from "@/components/metrics-history";
 import { Box, HardDrive, Layers, MoreHorizontal, SearchX } from "lucide-react";
