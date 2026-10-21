@@ -8,8 +8,8 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deploy/ports-hostd", () => ({ HostdPorts: class {} }));
@@ -55,10 +55,16 @@ function checkout(): { root: string; work: string; remote: string } {
     return { root, work, remote };
 }
 
-function run(work: string, root: string, policy = "restricted", auth = true): ReturnType<typeof parseSaveWork> {
+function run(
+    work: string,
+    root: string,
+    policy = "restricted",
+    auth = true,
+    branch = "polaris/fix"
+): ReturnType<typeof parseSaveWork> {
     const authFile = auth ? posix(join(root, "auth")) : "";
     if (auth) writeFileSync(join(root, "auth"), "X-Fixture: yes");
-    const script = saveWorkScript({ workdir: posix(work), branch: "polaris/fix", policy, authFile });
+    const script = saveWorkScript({ workdir: posix(work), branch, defaultBranch: "main", policy, authFile });
     const output = execFileSync("sh", ["-c", script], { encoding: "utf8" });
     return parseSaveWork(output);
 }
@@ -81,11 +87,38 @@ describe("the save-work script", () => {
         expect(git(work, "status", "--porcelain")).toBe("");
     });
 
-    it("refuses to push the default branch when pushes are restricted", () => {
-        const { root, work } = checkout();
+    it("pushes to the session's branch even when the agent checked out the default one", () => {
+        const { root, work, remote } = checkout();
         git(work, "checkout", "-q", "main");
         writeFileSync(join(work, "c.txt"), "c\n");
-        expect(run(work, root)).toMatchObject({ status: "refused", commits: 1, branch: "main" });
+        expect(run(work, root, "enabled")).toMatchObject({ status: "pushed", commits: 1, branch: "polaris/fix" });
+        expect(git(remote, "log", "--format=%s", "polaris/fix")).toContain("WIP:");
+        expect(git(remote, "log", "--format=%s", "main")).not.toContain("WIP:");
+    });
+
+    it("refuses a session branch that is the default branch under every policy", () => {
+        for (const policy of ["restricted", "enabled"]) {
+            const { root, work, remote } = checkout();
+            writeFileSync(join(work, "c.txt"), "c\n");
+            expect(run(work, root, policy, true, "main")).toMatchObject({ status: "refused", commits: 1, branch: "main" });
+            expect(git(remote, "log", "--format=%s", "main")).not.toContain("WIP:");
+            expect(existsSync(join(root, "auth"))).toBe(false);
+        }
+    });
+
+    it("knows the default branch from GitHub when a single-branch clone has no origin/HEAD", () => {
+        const { root, remote } = checkout();
+        const seed = join(root, "seed");
+        git(seed, "checkout", "-q", "-b", "release");
+        git(seed, "push", "-q", posix(remote), "release");
+        const work = join(root, "single");
+        const url = `file://${posix(remote)}`;
+        execFileSync("git", ["clone", "-q", "--depth", "50", "--branch", "release", url, work]);
+        git(work, "config", "user.email", "fixture@example.test");
+        git(work, "config", "user.name", "Fixture");
+        expect(() => git(work, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")).toThrow();
+        writeFileSync(join(work, "h.txt"), "h\n");
+        expect(run(work, root, "enabled", true, "main")).toMatchObject({ status: "refused", branch: "main" });
     });
 
     it("pushes nothing at all when the repository is read-only for agents", () => {

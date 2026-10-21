@@ -22,7 +22,7 @@ import * as commands from "./session-commands";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import type { SessionWorkReason } from "./session-service";
 import { clearWorkKept, noticeWorkKept } from "./agent-notices";
-import { cloneAuthHeader, githubAppInstallationToken } from "@/lib/github-service";
+import { cloneAuthHeader, resolveGithubRepo, githubAppInstallationToken } from "@/lib/github-service";
 
 /** Where a checkout lives inside a session's container when the row has none. */
 const DEFAULT_WORKDIR = "/session/repo";
@@ -38,8 +38,12 @@ const WIP_MESSAGE = "WIP: work left in the session when it stopped";
 
 export interface SaveWorkInput {
     workdir: string;
-    /** The session's own branch, for a checkout whose HEAD is detached. */
+    /** The session's own branch: the only one the work is ever pushed to,
+     *  whatever the checkout has on it now. */
     branch: string;
+    /** The repository's default branch as GitHub reports it, or empty when
+     *  that could not be asked. Never pushed to, under any policy. */
+    defaultBranch: string;
     /** The repository's push setting: `disabled`, `restricted` or `enabled`. */
     policy: string;
     /** Where in the container the push credential was written, or empty for
@@ -67,7 +71,7 @@ export function saveWorkScript(input: SaveWorkInput): string {
         // own account, and git refuses a repository owned by somebody else.
         "g() { git -c safe.directory='*' \"$@\"; }",
         `g rev-parse --git-dir >/dev/null 2>&1 || { echo "${MARK} none 0 -"; exit 0; }`,
-        `branch=$(g symbolic-ref --quiet --short HEAD 2>/dev/null || echo ${shellQuote(input.branch)})`,
+        `branch=${shellQuote(input.branch)}`,
         // Exactly one line of status at most: whether there is anything, not what.
         "dirty=$(g status --porcelain 2>/dev/null | head -n 1 | wc -l | tr -d ' ')",
         // Not reachable from anything the remote is known to have.
@@ -90,12 +94,12 @@ export function saveWorkScript(input: SaveWorkInput): string {
         'if [ "$policy" = "disabled" ]; then',
         `  echo "${MARK} refused $count $branch"; exit 0`,
         "fi",
-        'if [ "$policy" != "enabled" ]; then',
-        // Restricted: never the repository's default branch.
-        "  default=$(g symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')",
-        '  if [ -n "$default" ] && [ "$branch" = "$default" ]; then',
-        `    echo "${MARK} refused $count $branch"; exit 0`,
-        "  fi",
+        // Never the repository's default branch, whatever the policy.
+        `default=${shellQuote(input.defaultBranch)}`,
+        "remote=$(g symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')",
+        'if [ -z "$branch" ] || [ "$branch" = "$default" ] || [ "$branch" = "$remote" ]; then',
+        `  [ -n ${shellQuote(input.authFile)} ] && rm -f ${shellQuote(input.authFile)}`,
+        `  echo "${MARK} refused $count \${branch:--}"; exit 0`,
         "fi",
         `auth=""`,
         `if [ -n ${shellQuote(input.authFile)} ] && [ -f ${shellQuote(input.authFile)} ]; then`,
@@ -194,9 +198,13 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
     });
 
     let authFile = "";
+    let defaultBranch = "";
     if (row.repo.push !== "disabled") {
-        const owner = row.repo.repoFullName.split("/")[0] ?? "";
+        const [owner = "", name = ""] = row.repo.repoFullName.split("/");
         const token = await githubAppInstallationToken(owner).catch(() => null);
+        const repo = token ? await resolveGithubRepo(owner, name, token).catch(() => null) : null;
+        if (token && !repo) return kept("unreachable");
+        defaultBranch = repo?.defaultBranch ?? "";
         const header = cloneAuthHeader(token);
         if (header) {
             const path = `/tmp/polaris-push-${randomUUID()}`;
@@ -216,6 +224,7 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
         const script = saveWorkScript({
             workdir: row.workdir || DEFAULT_WORKDIR,
             branch: row.branch,
+            defaultBranch,
             policy: row.repo.push,
             authFile
         });
@@ -267,8 +276,9 @@ async function recordOutcome(sessionId: string, outcome: SaveOutcome): Promise<v
 
 /**
  * Save the work, then take the container down - or keep it, when the work
- * could not be saved. The one path Stop, the sweep and Try again all take, so
- * none of them can remove a container the others would have kept.
+ * could not be saved. The one path Stop, the sweep, Try again and the reaper of
+ * leftover containers all take, so none of them can remove a container the
+ * others would have kept.
  *
  * Returns the outcome so a caller can answer the person who pressed something.
  */

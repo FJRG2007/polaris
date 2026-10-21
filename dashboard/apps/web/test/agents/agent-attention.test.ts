@@ -120,7 +120,8 @@ vi.mock("@/lib/deploy/ports-hostd", () => ({
 }));
 vi.mock("@/lib/github-service", () => ({
     githubAppInstallationToken: async () => "installation-token",
-    cloneAuthHeader: (token: string | null) => (token ? `Authorization: Basic ${token}` : null)
+    cloneAuthHeader: (token: string | null) => (token ? `Authorization: Basic ${token}` : null),
+    resolveGithubRepo: async () => ({ fullName: "acme/web", defaultBranch: "main", private: true })
 }));
 // What the runtime reaches for to start a session; nothing here starts one.
 vi.mock("@polaris/ssh", () => ({ execCommand: vi.fn() }));

@@ -7,13 +7,38 @@
  * on its way, and nothing outside the prefix is ever touched.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({ prisma: {} }));
-vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
-vi.mock("@/lib/deploy/ports-hostd", () => ({ HostdPorts: class {} }));
+const state = vi.hoisted(() => ({
+    sessions: [] as Record<string, unknown>[],
+    listed: [] as Record<string, unknown>[],
+    composeDown: vi.fn(async () => undefined),
+    endContainerSession: vi.fn(async () => ({ kind: "pushed", commits: 1, branch: "polaris/x" }))
+}));
 
-const { ENDED_GRACE_MS, leftoverProjects } = await import("@/lib/agents/leftover-containers");
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        agentSession: { findMany: async () => state.sessions },
+        agentSigninAttempt: { findMany: async () => [] }
+    }
+}));
+vi.mock("@polaris/hostd-client", () => ({
+    HostdClient: class {
+        async dockerRequest(_method: string, path: string) {
+            const listed = path.includes("polaris-session-") ? state.listed : [];
+            return { status: 200, body: JSON.stringify(listed) };
+        }
+    }
+}));
+vi.mock("@/lib/deploy/ports-hostd", () => ({
+    HostdPorts: class {
+        composeDown = state.composeDown;
+    }
+}));
+vi.mock("@/lib/agents/session-work", () => ({ endContainerSession: state.endContainerSession }));
+
+const { ENDED_GRACE_MS, leftoverProjects, reapLeftoverContainers } =
+    await import("@/lib/agents/leftover-containers");
 
 const NOW = new Date("2026-09-28T12:00:00Z");
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
@@ -56,5 +81,46 @@ describe("which containers are left over", () => {
             createdAt: ago(86_400_000)
         };
         expect(leftoverProjects([stranger], PREFIX, new Map(), NOW)).toEqual([]);
+    });
+});
+
+describe("reaping a session that ended on its own", () => {
+    beforeEach(() => {
+        state.composeDown.mockClear();
+        state.endContainerSession.mockClear();
+        state.listed = [
+            {
+                Names: [`/${PREFIX}${ID}-agent-1`],
+                Labels: { "com.docker.compose.project": `${PREFIX}${ID}` },
+                Created: Math.floor(ago(86_400_000).getTime() / 1000)
+            }
+        ];
+    });
+
+    it("saves its work first instead of taking the container down blind", async () => {
+        state.sessions = [
+            { id: ID, state: "stopped", finishedAt: ago(86_400_000), workState: null, containerId: `${PREFIX}${ID}` }
+        ];
+        expect(await reapLeftoverContainers(NOW)).toBe(1);
+        expect(state.endContainerSession).toHaveBeenCalledWith(ID);
+        expect(state.composeDown).not.toHaveBeenCalled();
+    });
+
+    it("does not count one whose work had to be kept", async () => {
+        state.sessions = [
+            { id: ID, state: "failed", finishedAt: ago(86_400_000), workState: null, containerId: `${PREFIX}${ID}` }
+        ];
+        state.endContainerSession.mockResolvedValueOnce({ kind: "kept", commits: 2, branch: "polaris/x" } as never);
+        expect(await reapLeftoverContainers(NOW)).toBe(0);
+        expect(state.composeDown).not.toHaveBeenCalled();
+    });
+
+    it("takes down one whose work was already pushed without asking again", async () => {
+        state.sessions = [
+            { id: ID, state: "stopped", finishedAt: ago(86_400_000), workState: "pushed", containerId: `${PREFIX}${ID}` }
+        ];
+        expect(await reapLeftoverContainers(NOW)).toBe(1);
+        expect(state.endContainerSession).not.toHaveBeenCalled();
+        expect(state.composeDown).toHaveBeenCalledWith(`${PREFIX}${ID}`);
     });
 });
