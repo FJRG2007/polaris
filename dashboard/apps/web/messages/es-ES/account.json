@@ -269,7 +269,11 @@
                 "title": "Creada por plr login en un equipo. También aparece en Sesiones, donde se puede cerrar; plr logout también la revoca."
             },
             "reference": "Referencia API",
-            "usage": "Uso"
+            "usage": "Uso",
+            "streamdeck": {
+                "badge": "Stream Deck",
+                "title": "Creada al conectar el plugin de Polaris en un Stream Deck. Descargas muestra los decks conectados y puede desconectarlos."
+            }
         },
         "form": {
             "neverExpires": "No caduca",
@@ -1259,6 +1263,21 @@
             "signInHint": "Conecta la CLI a este Polaris y lo abre en el navegador para aprobarlo. Sin navegador, muestra un código para escribirlo aquí.",
             "server": "No se instala en un equipo que ejecuta un servidor Polaris: ambos responden a plr y polaris.",
             "next": "Prueba"
+        },
+        "streamdeck": {
+            "title": "Stream Deck",
+            "description": "Teclas y diales para Polaris: envía un mensaje, ponte ocupado, mira mensajes sin leer, alarmas y avisos, reinicia una app, enciende una luz o ejecuta una rutina.",
+            "download": "Descargar {version}",
+            "downloadNone": "Descargar",
+            "notReleased": "Todavía no se ha publicado ninguna versión.",
+            "connectHint": "Abre el archivo para instalarlo en la app de Stream Deck, pulsa Conectar en los ajustes de cualquier tecla de Polaris y aprueba aquí el código.",
+            "connected": "Decks conectados",
+            "noneConnected": "No hay ningún Stream Deck conectado a esta cuenta.",
+            "lastUsed": "Último uso <time></time>",
+            "notUsedYet": "Sin usar aún",
+            "disconnect": "Desconectar",
+            "disconnectTitle": "¿Desconectar {name}?",
+            "disconnectHint": "Sus teclas dejan de funcionar al momento. Volver a conectarlo pide un código nuevo."
         }
     },
     "cli": {
@@ -1276,7 +1295,11 @@
         "asksTo": "Pide permiso para",
         "scope": {
             "deployRead": "Ver tus apps, sus despliegues y sus registros",
-            "deployManage": "Desplegar, revertir, reiniciar y detener tus apps"
+            "deployManage": "Desplegar, revertir, reiniciar y detener tus apps",
+            "chatUse": "Enviar mensajes y ver lo pendiente en Chat",
+            "homeRead": "Ver tus lugares y el estado de sus dispositivos",
+            "homeControl": "Encender y ajustar los dispositivos que puedes usar",
+            "homeManage": "Ejecutar las rutinas de tus lugares"
         },
         "consent": "Si dices que sí, este equipo recibe una clave que actúa en nombre de tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Claves de API, donde puedes revocarla, y plr logout también la revoca.",
         "working": "Procesando",
@@ -1397,6 +1420,38 @@
             "refused": "Ese servidor está en una dirección privada que tu administrador no permite.",
             "unreachable": "El servidor no respondió. Revisa la dirección o reinténtalo más tarde.",
             "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
+        }
+    },
+    "streamdeck": {
+        "page": {
+            "title": "Conectar un Stream Deck",
+            "intro": "Escribe el código que muestra el plugin de Polaris. No se conecta nada hasta que lo apruebes."
+        },
+        "title": "Conectar {device}",
+        "code": "Código {code}",
+        "system": "Sistema",
+        "version": "Versión",
+        "askedFrom": "Pedido desde",
+        "on": "En",
+        "unknown": "Sin datos",
+        "asksTo": "Pide poder",
+        "consent": "Si aceptas, este Stream Deck recibe una clave que actúa por tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Claves de API y en Descargas, donde puedes desconectarlo.",
+        "working": "Procesando",
+        "approve": "Conectarlo",
+        "deny": "Rechazarlo",
+        "signedIn": "Conectado.",
+        "signedInHint": "Vuelve al Stream Deck; el plugin sigue solo. La clave aparece en <link>Claves de API</link>.",
+        "turnedAway": "Rechazado.",
+        "turnedAwayHint": "No se ha entregado nada. El plugin lo indica y se detiene.",
+        "codeLabel": "El código que muestra el plugin",
+        "looking": "Buscando",
+        "find": "Buscar",
+        "errors": {
+            "tooMany": "Se han probado demasiados códigos. Espera unos minutos.",
+            "notACode": "Eso no es un código del plugin de Stream Deck.",
+            "nothingWaiting": "No hay nada esperando con ese código. Pulsa Conectar en el plugin para obtener uno nuevo.",
+            "cannotAnswer": "No se puede responder a esa solicitud.",
+            "noScopes": "Tu cuenta no puede usar nada de lo que ofrece un Stream Deck. Pide acceso a un administrador."
         }
     }
 }

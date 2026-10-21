@@ -24,17 +24,43 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
+import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
+import { streamDeckDownload } from "@/lib/app-releases";
 import { publicAppUrl } from "@/lib/domain-service";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { getTranslations } from "@/lib/i18n/request";
+import { StreamDeckFile, StreamDeckSection, type ConnectedDeck } from "./streamdeck-section";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { Badge, Card, CardBody, CardHeader, CardTitle, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
+
+/** The Stream Deck installer, once GitHub has answered. */
+async function StreamDeckRelease({ repo }: { repo: string }) {
+    return <StreamDeckFile download={await streamDeckDownload(repo)} />;
+}
+
+/** The decks connected to this account: its live keys of kind "streamdeck". */
+async function connectedDecks(userId: string): Promise<ConnectedDeck[]> {
+    const now = Date.now();
+    return (await listApiKeys(userId))
+        .filter(
+            (key) =>
+                key.kind === "streamdeck" &&
+                !key.revokedAt &&
+                (!key.expiresAt || Date.parse(key.expiresAt) > now)
+        )
+        .map((key) => ({
+            id: key.id,
+            name: key.name,
+            createdAt: key.createdAt,
+            lastUsedAt: key.lastUsedAt
+        }));
+}
 
 /** The shape of a list of files, while the release is being looked up. */
 function FilesSkeleton() {
@@ -48,12 +74,13 @@ function FilesSkeleton() {
 }
 
 export default async function DownloadsPage() {
-    const [, t, serverUrl] = await Promise.all([
-        requireUser(),
+    const user = await requireUser();
+    const [t, serverUrl, decks] = await Promise.all([
         getTranslations("account"),
         // The address the CLI signs in to. Null falls back to the one this page
         // is open on, which the reader has just proven reaches this Polaris.
-        publicAppUrl().catch(() => null)
+        publicAppUrl().catch(() => null),
+        connectedDecks(user.id)
     ]);
     const repo = loadEnv().POLARIS_REPO;
 
@@ -122,6 +149,15 @@ export default async function DownloadsPage() {
             </Card>
 
             <CliSection repo={repo} serverUrl={serverUrl} />
+
+            <StreamDeckSection
+                decks={decks}
+                file={
+                    <Suspense fallback={<Skeleton className="h-9 w-48" />}>
+                        <StreamDeckRelease repo={repo} />
+                    </Suspense>
+                }
+            />
 
             <Card>
                 <CardHeader>

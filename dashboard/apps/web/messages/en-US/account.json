@@ -269,7 +269,11 @@
                 "title": "Made by plr login on a computer. It is also listed under Sessions, where it can be signed out; plr logout revokes it too."
             },
             "reference": "API reference",
-            "usage": "Usage"
+            "usage": "Usage",
+            "streamdeck": {
+                "badge": "Stream Deck",
+                "title": "Made by connecting the Polaris plugin on a Stream Deck. Downloads lists the connected decks and can disconnect them."
+            }
         },
         "form": {
             "neverExpires": "Never expires",
@@ -1259,6 +1263,21 @@
             "signInHint": "Points the CLI at this Polaris and opens it in your browser to approve. With no browser, it shows a code to enter here.",
             "server": "It will not install on a computer that runs a Polaris server: both answer to plr and polaris.",
             "next": "Try"
+        },
+        "streamdeck": {
+            "title": "Stream Deck",
+            "description": "Keys and dials for Polaris: send a message, set yourself busy, see unread messages, alarms and notifications, restart an app, switch a light or run a routine.",
+            "download": "Download {version}",
+            "downloadNone": "Download",
+            "notReleased": "No version has been published yet.",
+            "connectHint": "Open the file to install it in the Stream Deck app, then press Connect in the settings of any Polaris key and approve the code here.",
+            "connected": "Connected decks",
+            "noneConnected": "No Stream Deck is connected to this account.",
+            "lastUsed": "Last used <time></time>",
+            "notUsedYet": "Not used yet",
+            "disconnect": "Disconnect",
+            "disconnectTitle": "Disconnect {name}?",
+            "disconnectHint": "Its keys stop working at once. Connecting it again needs a new code."
         }
     },
     "cli": {
@@ -1276,7 +1295,11 @@
         "asksTo": "It is asking to",
         "scope": {
             "deployRead": "See your apps, their deployments and their logs",
-            "deployManage": "Deploy, roll back, restart and stop your apps"
+            "deployManage": "Deploy, roll back, restart and stop your apps",
+            "chatUse": "Send messages and see what is unread in Chat",
+            "homeRead": "See your places and the state of their devices",
+            "homeControl": "Switch and adjust the devices you can use",
+            "homeManage": "Run the routines in your places"
         },
         "consent": "Saying yes gives this computer a key that acts for your account for a year, limited to what is listed above. It is listed under API keys, where you can revoke it, and plr logout revokes it too.",
         "working": "Working",
@@ -1397,6 +1420,38 @@
             "refused": "That server is on a private address your administrator doesn't allow.",
             "unreachable": "The server didn't answer. Check the address or try again later.",
             "signInFailed": "Sign-in didn't finish. Try Sign in again."
+        }
+    },
+    "streamdeck": {
+        "page": {
+            "title": "Connect a Stream Deck",
+            "intro": "Type the code the Polaris plugin is showing. Nothing is connected until you say so."
+        },
+        "title": "Connect {device}",
+        "code": "Code {code}",
+        "system": "System",
+        "version": "Plugin version",
+        "askedFrom": "Asked from",
+        "on": "On",
+        "unknown": "Unknown",
+        "asksTo": "It is asking to",
+        "consent": "Saying yes gives this Stream Deck a key that acts for your account for a year, limited to what is listed above. It is listed under API keys and Downloads, where you can disconnect it.",
+        "working": "Working",
+        "approve": "Connect it",
+        "deny": "Turn it away",
+        "signedIn": "Connected.",
+        "signedInHint": "Go back to the Stream Deck; the plugin carries on by itself. The key is listed under <link>API keys</link>.",
+        "turnedAway": "Turned away.",
+        "turnedAwayHint": "Nothing was handed over. The plugin says so and stops.",
+        "codeLabel": "The code the plugin is showing",
+        "looking": "Looking",
+        "find": "Find it",
+        "errors": {
+            "tooMany": "Too many codes tried. Wait a few minutes.",
+            "notACode": "That is not a code from the Stream Deck plugin.",
+            "nothingWaiting": "Nothing is waiting on that code. Press Connect in the plugin again for a new one.",
+            "cannotAnswer": "That request cannot be answered.",
+            "noScopes": "Your account cannot use anything a Stream Deck offers. Ask an administrator for access."
         }
     }
 }
