@@ -27,6 +27,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
+import { ReplacesRow } from "./replaces-row";
 import { UninstallDialog } from "./uninstall-dialog";
 import { appProvenance } from "@/lib/apps/provenance";
 import { appPreview } from "@/lib/apps/app-screenshots";
@@ -509,6 +510,7 @@ function BuiltInSection({ query }: { query: string }) {
                                         {t("polaris.builtInHint")}
                                     </span>
                                 </div>
+                                <ReplacesRow appId={app.id} compact className="mt-1.5" />
                             </div>
                             <Button asChild size="sm" variant="secondary">
                                 <Link href={app.href}>{t("card.open")}</Link>

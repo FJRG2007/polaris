@@ -96,6 +96,7 @@
     },
     "detail": {
         "back": "Catálogo",
+        "replaces": "Sustituye a",
         "screenshots": "Capturas",
         "screenshotAlt": "{name}, captura {index}",
         "about": "Info",

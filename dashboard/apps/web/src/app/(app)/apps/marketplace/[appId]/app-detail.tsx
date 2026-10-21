@@ -40,6 +40,7 @@ import {
 } from "@/lib/apps/marketplace-store";
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
+import { ReplacesRow } from "../replaces-row";
 
 /** The manifest, in the reader's words. Null for an id the catalog does not know. */
 function useLocalizedApp(appId: string): AppManifest | null {
@@ -186,6 +187,8 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
                     {app.description}
                 </p>
             </section>
+
+            <ReplacesRow appId={app.id} />
 
             {app.capabilities.length > 0 && (
                 <section className="flex min-w-0 flex-col gap-2">

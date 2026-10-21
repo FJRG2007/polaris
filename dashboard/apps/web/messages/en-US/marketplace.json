@@ -96,6 +96,7 @@
     },
     "detail": {
         "back": "All apps",
+        "replaces": "Replaces",
         "screenshots": "Screenshots",
         "screenshotAlt": "{name}, screenshot {index}",
         "about": "About",
