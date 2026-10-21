@@ -2128,6 +2128,7 @@
         "web/src/app/(app)/polar/settings/polar-connectors.tsx",
         "web/src/app/(app)/polar/settings/page.tsx",
         "web/src/app/(app)/polar/settings/settings-back.tsx",
+        "web/src/app/(app)/polar/settings/settings-sidebar.tsx",
         "web/src/components/polar/elements/work.tsx",
         "web/src/components/polar/polar-voice.tsx",
         "web/src/components/polar/polar-settings.tsx",

@@ -8,7 +8,7 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { SettingsWithSidebar } from "@/app/(app)/polar/settings/settings-sidebar";
 
 const pushed: string[] = [];
@@ -108,5 +108,19 @@ describe("the settings page's conversation list", () => {
         fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
         expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
         expect(kept.get("polar.sidebar")).toBe("shown");
+    });
+
+    it("opens the list as a drawer on a narrow screen", async () => {
+        vi.stubGlobal("matchMedia", (query: string) => ({
+            matches: false,
+            media: query,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined
+        }));
+        draw();
+        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
+        const drawer = await screen.findByRole("dialog");
+        fireEvent.click(within(drawer).getByText("Trip to Lisbon"));
+        expect(pushed).toEqual(["/polar?thread=t1"]);
     });
 });
