@@ -43,7 +43,8 @@ async function countUse(grant: LiveGrant | null): Promise<void> {
 
 function failed(error: unknown): NasActionResult {
     if (error instanceof z.ZodError) return { ok: false, error: "failed" };
-    if (error instanceof Error && error.message === "notFound") return { ok: false, error: "notFound" };
+    if (error instanceof Error && error.message === "notFound")
+        return { ok: false, error: "notFound" };
     console.error("polaris: a NAS action failed:", error);
     return { ok: false, error: "failed" };
 }
@@ -93,7 +94,8 @@ export async function setNasPlaceAction(id: unknown, placeId: unknown): Promise<
         const at = await reached(id, "manage");
         if (!at) return { ok: false, error: "notFound" };
         const place = idSchema.nullable().parse(placeId ?? null);
-        if (!(await nasService.setNasPlace(at.row.id, place))) return { ok: false, error: "notFound" };
+        if (!(await nasService.setNasPlace(at.row.id, place)))
+            return { ok: false, error: "notFound" };
         await recordAudit({
             actorId: at.user.id,
             action: "nas.place",

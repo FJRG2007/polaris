@@ -56,7 +56,11 @@ function metrics(disks: UnasMetrics["disks"], pools = 1): UnasMetrics {
 }
 
 describe("statusOf", () => {
-    const sample = metrics([disk(1), disk(2), disk(3, { present: false, model: null, serial: null })]);
+    const sample = metrics([
+        disk(1),
+        disk(2),
+        disk(3, { present: false, model: null, serial: null })
+    ]);
 
     it("keeps serials for the owner and drops them for a visitor", () => {
         expect(statusOf(sample, false).disks[0]!.serial).toBe("SN-1");
@@ -95,7 +99,12 @@ describe("allDisks", () => {
 
     it("answers null when nothing reports a reading", () => {
         const summary = nasView.allDisks([]);
-        expect(summary).toMatchObject({ count: 0, maxTemp: null, minTemp: null, avgPowerOnHours: null });
+        expect(summary).toMatchObject({
+            count: 0,
+            maxTemp: null,
+            minTemp: null,
+            avgPowerOnHours: null
+        });
     });
 });
 

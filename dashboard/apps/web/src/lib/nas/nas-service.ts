@@ -132,7 +132,10 @@ export async function runNasBackup(
 
 export async function setNasPlace(connectionId: string, placeId: string | null): Promise<boolean> {
     if (placeId) {
-        const place = await prisma.place.findUnique({ where: { id: placeId }, select: { id: true } });
+        const place = await prisma.place.findUnique({
+            where: { id: placeId },
+            select: { id: true }
+        });
         if (!place) return false;
     }
     const updated = await prisma.storageConnection.updateMany({

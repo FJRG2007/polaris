@@ -38,7 +38,10 @@ describe("a NAS lent per action", () => {
     });
 
     it("keeps a grant written before actions existed at everything it reached", () => {
-        expect(standingFromGrants([grant("control", [])])).toMatchObject({ fan: true, backup: true });
+        expect(standingFromGrants([grant("control", [])])).toMatchObject({
+            fan: true,
+            backup: true
+        });
     });
 
     it("is nothing without a grant", () => {

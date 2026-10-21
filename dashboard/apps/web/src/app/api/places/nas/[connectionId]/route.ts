@@ -21,7 +21,10 @@ export async function GET(
 ): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
-    const id = z.string().uuid().safeParse((await params).connectionId);
+    const id = z
+        .string()
+        .uuid()
+        .safeParse((await params).connectionId);
     const row = id.success ? await nasRow(id.data) : null;
     // Somebody it was not lent to is told it is not there, not that it is shut.
     const standing = row ? await nasStanding(user, row.id) : null;

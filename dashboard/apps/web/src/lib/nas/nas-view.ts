@@ -42,7 +42,9 @@ export function allDisks(disks: readonly NasDisk[]): {
 } {
     const present = disks.filter((disk) => disk.present);
     const temps = present.flatMap((disk) => (disk.temperature === null ? [] : [disk.temperature]));
-    const hours = present.flatMap((disk) => (disk.powerOnHours === null ? [] : [disk.powerOnHours]));
+    const hours = present.flatMap((disk) =>
+        disk.powerOnHours === null ? [] : [disk.powerOnHours]
+    );
     return {
         count: present.length,
         maxTemp: temps.length > 0 ? Math.max(...temps) : null,

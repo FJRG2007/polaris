@@ -34,7 +34,6 @@ export const BACKUP_TASKS_PATH = "/proxy/drive/api/v2/remote-backup/tasks";
 export const backupRunPath = (taskId: string) =>
     `/proxy/drive/api/v2/remote-backup/run-task/${encodeURIComponent(taskId)}`;
 
-
 export type UnasFanProfile = "quiet" | "balanced" | "cooling";
 /** Option -> value the Drive API takes (Balanced is sent as `default`). */
 export const FAN_PROFILE_API: Record<UnasFanProfile, string> = {
@@ -91,7 +90,6 @@ export function parseBackupTasks(data: unknown): UnasBackupTask[] {
         ];
     });
 }
-
 
 export type UnasAlertKind =
     /** Raised by the watcher when the console does not answer, not by unasAlerts. */
