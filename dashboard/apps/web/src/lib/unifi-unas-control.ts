@@ -196,6 +196,28 @@ export function newAlerts(
     return current.filter((alert) => !before.has(alert.key));
 }
 
+/** The NAS answered nothing. Not one of unasAlerts': it needs no snapshot. */
+export const OFFLINE_KEY = "offline";
+/** The key prefixes of unasAlerts' backup conditions. */
+const BACKUP_KEY_PREFIXES = ["backup:", "overdue:"] as const;
+
+/**
+ * The stored keys this reading cannot speak to, kept as they were so they do
+ * not clear now and start again on the next reading. Offline keeps every
+ * condition the NAS was in; a reading without backup tasks keeps the backup
+ * ones. Pure.
+ */
+export function heldKeys(
+    previousKeys: readonly string[],
+    reading: "offline" | "no-tasks" | "full"
+): string[] {
+    if (reading === "full") return [];
+    if (reading === "offline") return previousKeys.filter((key) => key !== OFFLINE_KEY);
+    return previousKeys.filter((key) =>
+        BACKUP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+    );
+}
+
 /**
  * One console session per account, reused until the console stops taking it,
  * so a poll does not open a new `rememberMe` session on the NAS every time.

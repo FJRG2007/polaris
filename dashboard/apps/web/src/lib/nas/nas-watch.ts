@@ -18,22 +18,22 @@
 import { prisma } from "@polaris/db";
 import type { UnasMetrics } from "@/lib/unifi-unas";
 import {
+    heldKeys,
     newAlerts,
     unasAlerts,
+    OFFLINE_KEY,
     type UnasAlert,
     type UnasBackupTask
 } from "@/lib/unifi-unas-control";
 import { emitAutomationEvent } from "@/lib/automations/outbox";
 import { pruneNasSamples, recordNasSample } from "./nas-history";
 
+export { heldKeys, OFFLINE_KEY } from "@/lib/unifi-unas-control";
+
 /** The prefix every NAS event name starts with. */
 export const NAS_EVENT_PREFIX = "nas.";
-/** The NAS answered nothing this tick. Not one of unasAlerts': it needs no snapshot. */
-export const OFFLINE_KEY = "offline";
 /** Missed polls in a row before the NAS counts as offline, so one timeout is not an outage. */
 export const OFFLINE_AFTER_MISSES = 2;
-/** The key prefixes of unasAlerts' backup conditions. */
-const BACKUP_KEY_PREFIXES = ["backup:", "overdue:"] as const;
 
 /** Polls missed in a row, per connection. In this process only: a restart counts again. */
 const misses = new Map<string, number>();
@@ -77,23 +77,6 @@ export function offlineAlert(nasName: string): UnasAlert {
     return { kind: "offline", key: OFFLINE_KEY, subject: nasName, value: null };
 }
 
-/**
- * The stored keys this reading cannot speak to, kept as they were so they do
- * not clear now and start again on the next reading. Offline keeps every
- * condition the NAS was in; a reading without backup tasks keeps the backup
- * ones. Pure.
- */
-export function heldKeys(
-    previousKeys: readonly string[],
-    reading: "offline" | "no-tasks" | "full"
-): string[] {
-    if (reading === "full") return [];
-    if (reading === "offline") return previousKeys.filter((key) => key !== OFFLINE_KEY);
-    return previousKeys.filter((key) =>
-        BACKUP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
-    );
-}
-
 interface WatchedNas {
     readonly id: string;
     readonly name: string;
@@ -116,6 +99,8 @@ async function send(
             // One event per condition start: a crash and retry of the same tick
             // finds the row it already wrote.
             dedupeKey: `${event.name}:${nas.id}:${String(event.payload.subject)}:${ts.getTime()}`
+        }).catch((error: unknown) => {
+            console.error(`polaris: the NAS event ${event.name} could not be sent:`, error);
         });
     }
     const keys = [...new Set([...alerts.map((alert) => alert.key), ...held])].sort();
@@ -156,9 +141,9 @@ export async function watchNas(
             return;
         }
         misses.delete(nas.id);
-        await recordNasSample(nas.id, metrics, ts);
         const held = heldKeys(nas.nasAlertKeys, tasks === null ? "no-tasks" : "full");
         await send(watched, unasAlerts(metrics, tasks ?? [], ts), held, ts);
+        await recordNasSample(nas.id, metrics, ts);
         await pruneNasSamples(ts.getTime());
     } catch (error) {
         console.error("polaris: a NAS reading could not be kept:", error);

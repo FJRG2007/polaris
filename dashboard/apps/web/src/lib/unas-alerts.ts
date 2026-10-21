@@ -21,6 +21,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getUnasTarget } from "@/lib/storage-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import {
+    heldKeys,
     listBackupTasks,
     unasAlerts,
     type UnasAlert,
@@ -36,9 +37,6 @@ const OVERVIEW_HREF = "/drive/overview";
 
 /** The bell's notices about one NAS, newest first, read to sweep them. */
 const SWEEP_MOST = 200;
-
-/** The stored keys of backup alerts, held when a reading has no backup tasks. */
-const BACKUP_KEY_PREFIXES = ["backup:", "overdue:"] as const;
 
 /** The kinds unasAlerts raises; offline is the NAS page watcher's alone. */
 type NoticeKind = Exclude<UnasAlertKind, "offline">;
@@ -74,12 +72,10 @@ export function noticePlan(
     tasksRead: boolean
 ): { fresh: UnasAlert[]; standing: Set<string> } {
     const stored = new Set(storedKeys);
-    const standing = new Set(alerts.map((alert) => alert.key));
-    if (!tasksRead) {
-        for (const key of storedKeys) {
-            if (BACKUP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) standing.add(key);
-        }
-    }
+    const standing = new Set([
+        ...alerts.map((alert) => alert.key),
+        ...heldKeys(storedKeys, tasksRead ? "full" : "no-tasks")
+    ]);
     return { fresh: alerts.filter((alert) => !stored.has(alert.key)), standing };
 }
 
