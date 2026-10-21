@@ -598,7 +598,6 @@ export async function fileDraftOnServerAction(draftId: string) {
     return {};
 }
 
-/** Who to offer as somebody types a recipient. */
 /** What a suggestion lookup may be asked: a fragment of a name or an address
  *  somebody is typing, never a paragraph. */
 const contactLookupSchema = z.object({
@@ -606,6 +605,7 @@ const contactLookupSchema = z.object({
     shelf: z.string().trim().max(64).optional()
 });
 
+/** Who to offer as somebody types a recipient. */
 export async function suggestContactsAction(query: unknown, shelf?: unknown) {
     const parsed = contactLookupSchema.safeParse({ query, shelf });
     if (!parsed.success) return { suggestions: [] };
