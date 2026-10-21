@@ -1,30 +1,28 @@
 "use client";
 
 /**
- * Polar's settings, opened from the gear in Polar's header: what it remembers
- * about the person (with the switch that turns memory off), and everything
- * else that is theirs to manage. Every change shows at once and is put back if
- * the server refuses it.
+ * The sections of Polar's settings page (/polar/settings), opened from the
+ * gear in Polar's header: what it remembers about the person (with the switch
+ * that turns memory off), the tools it may use, and what they keep. Every
+ * change shows at once and is put back if the server refuses it.
  */
 
-import { Check, Download, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronRight, Download, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
     Button,
     buttonVariants,
+    cn,
     ConfirmDeleteDialog,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
     Input,
+    PolarisMark,
     Skeleton,
     Switch,
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { DisplaySettings } from "@/components/polar/polar-display";
+import { serversOffOf, useToolPrefs, type ToolPrefs } from "@/components/polar/tool-prefs";
+import { groupToolsByServer, type ServedTool, type ToolServerGroup } from "@/lib/polar/tool-servers";
 import { looksSecret, normalizeMemoryText, POLAR_MEMORY_MAX_CHARS } from "@/lib/polar/shared";
 
 export interface MemoryRow {
@@ -92,7 +90,7 @@ function Section({
         <section className="flex flex-col gap-2">
             <div className="flex min-w-0 items-start gap-3">
                 <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-medium text-foreground">{title}</h3>
+                    <h2 className="text-sm font-medium text-foreground">{title}</h2>
                     {description ? (
                         <p className="text-xs text-muted-foreground">{description}</p>
                     ) : null}
@@ -432,43 +430,137 @@ function ToolRow({
     );
 }
 
-/**
- * What Polar may use in a chat. A tool switched off here is not offered to the
- * model at all, so it can neither use it nor ask to. Web search is the
- * administrator's to allow before it is the reader's to use.
- */
-export function ToolSettings({
-    webAllowed,
-    webOn,
-    onWeb,
-    connectorsAllowed = false,
-    connectorsOn = true,
-    onConnectors,
-    tools,
+/** A server's mark: Polaris's own star, or the connector's first letter. */
+function ServerMark({ group }: { group: ToolServerGroup }) {
+    if (group.kind === "polaris") return <PolarisMark nameClassName="hidden" />;
+    return (
+        <span
+            aria-hidden
+            className="flex size-[18px] shrink-0 items-center justify-center rounded bg-muted text-[0.6875rem] font-semibold uppercase text-muted-foreground"
+        >
+            {Array.from(group.name.trim())[0] ?? "?"}
+        </span>
+    );
+}
+
+/** One MCP server: its switch, and its tools behind a disclosure. */
+function ServerRow({
+    group,
+    on,
     off,
+    onServer,
     onTool
 }: {
-    webAllowed: boolean;
-    webOn: boolean;
-    onWeb: (on: boolean) => void;
-    /** Whether the deployment lets this person use their own MCP connectors. */
-    connectorsAllowed?: boolean;
-    connectorsOn?: boolean;
-    onConnectors?: (on: boolean) => void;
-    tools: Record<string, { title: string; connector?: string }>;
+    group: ToolServerGroup;
+    on: boolean;
     off: readonly string[];
+    onServer: (on: boolean) => void;
     onTool: (name: string, on: boolean) => void;
 }) {
     const t = useTranslations("polar");
-    const listed = Object.entries(tools)
-        .filter(([, tool]) => !tool.connector || (connectorsAllowed && connectorsOn))
-        .sort(([, a], [, b]) => a.title.localeCompare(b.title));
+    const [open, setOpen] = useState(false);
+    const listId = useId();
+    const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
+    const total = group.tools.length;
+    const chosen = group.tools.filter((tool) => !off.includes(tool.name)).length;
+    return (
+        <li className="py-1.5">
+            <div className="flex min-w-0 items-center gap-2">
+                <button
+                    type="button"
+                    aria-expanded={open}
+                    aria-controls={listId}
+                    onClick={() => setOpen(!open)}
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <ChevronRight
+                        aria-hidden
+                        className={cn(
+                            "size-3.5 shrink-0 text-foreground-subtle transition-transform duration-fast",
+                            open && "rotate-90"
+                        )}
+                    />
+                    <ServerMark group={group} />
+                    <span className="min-w-0 truncate text-sm font-medium" title={name}>
+                        {name}
+                    </span>
+                    {group.kind === "polaris" ? (
+                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
+                            {t("settings.tools.builtIn")}
+                        </span>
+                    ) : null}
+                    <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                        {on
+                            ? t("settings.tools.count", { on: chosen, total })
+                            : t("settings.tools.serverOff")}
+                    </span>
+                </button>
+                <Switch
+                    checked={on}
+                    aria-label={t("settings.tools.serverToggle", { server: name })}
+                    onChange={onServer}
+                />
+            </div>
+            {open ? (
+                <div id={listId} className="pl-6">
+                    {!on ? (
+                        <p className="pt-1 text-xs text-muted-foreground">
+                            {t("settings.tools.offNote", { server: name })}
+                        </p>
+                    ) : null}
+                    <ul className="flex flex-col divide-y divide-border">
+                        {group.tools.map((tool) => (
+                            <ToolRow
+                                key={tool.name}
+                                label={tool.title}
+                                checked={!off.includes(tool.name)}
+                                disabled={!on}
+                                onChange={(next) => onTool(tool.name, next)}
+                            />
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
+        </li>
+    );
+}
+
+/**
+ * What Polar may use in a chat, by the MCP server each tool comes from:
+ * Polaris's own (built in), then every connector. A tool or a server switched
+ * off here is not offered to the model at all, so it can neither use it nor
+ * ask to. Web search is the administrator's to allow before it is the
+ * reader's to use.
+ */
+export function ToolSettings({
+    webAllowed,
+    connectorsAllowed = false,
+    tools,
+    prefs,
+    onWeb,
+    onTool,
+    onServer
+}: {
+    webAllowed: boolean;
+    /** Whether the deployment lets this person use their own MCP connectors. */
+    connectorsAllowed?: boolean;
+    tools: Record<string, ServedTool>;
+    prefs: ToolPrefs;
+    onWeb: (on: boolean) => void;
+    onTool: (name: string, on: boolean) => void;
+    onServer: (server: string, on: boolean) => void;
+}) {
+    const t = useTranslations("polar");
+    const serversOff = serversOffOf(prefs, tools);
+    const groups = groupToolsByServer(tools).filter(
+        (group) => group.kind === "polaris" || connectorsAllowed
+    );
     return (
         <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
             <ul className="flex flex-col divide-y divide-border">
                 <ToolRow
                     label={t("web.toggle")}
-                    checked={webAllowed && webOn}
+                    checked={webAllowed && prefs.webOn}
                     disabled={!webAllowed}
                     onChange={onWeb}
                 />
@@ -477,58 +569,88 @@ export function ToolSettings({
                         {t("settings.tools.webOff")}
                     </li>
                 ) : null}
-                {connectorsAllowed && onConnectors ? (
-                    <>
-                        <ToolRow
-                            label={t("settings.tools.connectors")}
-                            checked={connectorsOn}
-                            onChange={onConnectors}
-                        />
-                        <li className="pb-1.5 text-xs text-muted-foreground">
-                            <a href="/account/polar-tools" className="text-primary hover:underline">
-                                {t("settings.tools.manageConnectors")}
-                            </a>
-                        </li>
-                    </>
-                ) : null}
-                {listed.map(([name, tool]) => (
-                    <ToolRow
-                        key={name}
-                        label={tool.title}
-                        checked={!off.includes(name)}
-                        onChange={(on) => onTool(name, on)}
+                {groups.map((group) => (
+                    <ServerRow
+                        key={group.id}
+                        group={group}
+                        on={!serversOff.includes(group.id)}
+                        off={prefs.toolsOff}
+                        onServer={(on) => onServer(group.id, on)}
+                        onTool={onTool}
                     />
                 ))}
             </ul>
+            {connectorsAllowed ? (
+                <p className="text-xs">
+                    <a href="#connectors" className="text-primary hover:underline">
+                        {t("settings.tools.manageConnectors")}
+                    </a>
+                </p>
+            ) : null}
         </Section>
     );
 }
 
-/** The settings dialog. `sections` past memory are added by their features. */
-export function PolarSettings({
-    open,
-    onOpenChange,
-    children
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    children?: ReactNode;
-}) {
+interface ToolsAnswer {
+    tools: Record<string, ServedTool>;
+    web: boolean;
+    connectors: boolean;
+}
+
+const TOOLS_CACHE_KEY = "polar.settingsTools";
+
+/** The tools section on the settings page: the list as last seen at once,
+ *  then the server's. */
+export function PolarToolSettings() {
+    const { prefs, setWeb, setTool, setServer } = useToolPrefs();
+    const [answer, setAnswer] = useState<ToolsAnswer | null>(null);
     const t = useTranslations("polar");
+    useEffect(() => {
+        try {
+            const cached = window.sessionStorage.getItem(TOOLS_CACHE_KEY);
+            if (cached) setAnswer(JSON.parse(cached) as ToolsAnswer);
+        } catch {
+            // Nothing cached; the skeleton stays until the answer.
+        }
+        void fetch("/api/polar/models")
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: Partial<ToolsAnswer> | null) => {
+                const next: ToolsAnswer = {
+                    tools: data?.tools ?? {},
+                    // Not knowing is not a refusal: the chat route drops web
+                    // search where an administrator turned it off.
+                    web: data?.web !== false,
+                    connectors: data?.connectors === true
+                };
+                setAnswer(next);
+                try {
+                    window.sessionStorage.setItem(TOOLS_CACHE_KEY, JSON.stringify(next));
+                } catch {
+                    // Not cached; the next visit asks again.
+                }
+            })
+            .catch(() =>
+                setAnswer((current) => current ?? { tools: {}, web: true, connectors: false })
+            );
+    }, []);
+    if (!answer) {
+        return (
+            <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+            </Section>
+        );
+    }
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[85vh] max-w-lg flex-col overflow-hidden">
-                <DialogHeader>
-                    <DialogTitle>{t("settings.title")}</DialogTitle>
-                    <DialogDescription>{t("settings.intro")}</DialogDescription>
-                </DialogHeader>
-                <div className="flex min-h-0 flex-col gap-6 overflow-y-auto overscroll-contain pr-1">
-                    {open ? <MemorySettings /> : null}
-                    <DisplaySettings />
-                    <DataSettings />
-                    {children}
-                </div>
-            </DialogContent>
-        </Dialog>
+        <ToolSettings
+            webAllowed={answer.web}
+            connectorsAllowed={answer.connectors}
+            tools={answer.tools}
+            prefs={prefs}
+            onWeb={setWeb}
+            onTool={setTool}
+            onServer={(server, on) => setServer(server, on, answer.tools)}
+        />
     );
 }

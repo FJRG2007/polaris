@@ -16,7 +16,7 @@ import Link from "next/link";
 import { PolarFailureNotice } from "./polar-failure";
 import * as polarFailure from "@/lib/polar/provider-failure";
 import { useChat } from "@ai-sdk/react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
     DefaultChatTransport,
     lastAssistantMessageIsCompleteWithApprovalResponses,
@@ -79,8 +79,7 @@ import {
     X
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
-import { PolarSettings, ToolSettings } from "@/components/polar/polar-settings";
-import { HelperSettings } from "@/components/polar/polar-helper-settings";
+import * as toolPrefs from "@/components/polar/tool-prefs";
 import * as polarShared from "@/lib/polar/shared";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
@@ -283,11 +282,6 @@ export function pageContextFrom(
 
 const OPEN_KEY = "polar.open";
 const WIDTH_KEY = "polar.width";
-/** Whether this viewer left web search on in the composer. */
-const WEB_KEY = "polar.web";
-const CONNECTORS_KEY = "polar.connectors";
-/** The tools this viewer switched off in Polar's settings. */
-const TOOLS_OFF_KEY = "polar.toolsOff";
 const THREAD_KEY = "polar.thread";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
@@ -469,7 +463,7 @@ function textOf(message: UIMessage): string {
         .trim();
 }
 
-type ToolDescription = { title: string; writes: boolean; destructive: boolean };
+type ToolDescription = { title: string; writes: boolean; destructive: boolean; connector?: string };
 type StoredMessage = UIMessage & { parentId: string | null };
 
 const COMMANDS = polarShared.POLAR_BUILTIN_COMMANDS;
@@ -757,30 +751,19 @@ export function PolarChat({
     const [collapsed, setCollapsed] = useState(false);
     const [drawer, setDrawer] = useState(false);
     const [modelOpen, setModelOpen] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
     // New chats are temporary while this is on: not listed, no memory, deleted
     // when the chat is left. It stays on for the next new chat, as ChatGPT's does.
     const [temporary, setTemporary] = useState(false);
     // Web search: the administrator's to allow (`webAllowed`, from the server)
-    // and this viewer's to switch off; on unless they did.
-    const [webAllowed, setWebAllowed] = useState(false);
-    const [webOn, setWebOn] = useState(true);
-    useEffect(() => setWebOn(readStored(WEB_KEY) !== "off"), []);
-    // The person's own MCP connectors: the administrator's to allow and this
-    // viewer's to switch off, the same way.
-    const [connectorsAllowed, setConnectorsAllowed] = useState(false);
-    const [connectorsOn, setConnectorsOn] = useState(true);
-    useEffect(() => setConnectorsOn(readStored(CONNECTORS_KEY) !== "off"), []);
-    const [toolsOff, setToolsOff] = useState<string[]>([]);
-    useEffect(() => {
-        try {
-            const kept: unknown = JSON.parse(readStored(TOOLS_OFF_KEY) ?? "[]");
-            if (Array.isArray(kept))
-                setToolsOff(kept.filter((name): name is string => typeof name === "string"));
-        } catch {
-            // Unreadable: every tool on, as for somebody who never chose.
-        }
-    }, []);
+    // and this viewer's to switch off; on unless either did. Taken as allowed
+    // until the server says otherwise - it was read as "not allowed" before,
+    // so a slow or failed models answer showed web search off to everybody.
+    // The chat route still drops it for a deployment that turned it off.
+    const [webAllowed, setWebAllowed] = useState(true);
+    // What this viewer switched off in Polar's settings, kept in step with the
+    // settings page while this panel stays open.
+    const { prefs } = toolPrefs.useToolPrefs();
+    const router = useRouter();
     const [slashActive, setSlashActive] = useState(0);
     const [slashDismissed, setSlashDismissed] = useState(false);
     const commands = polarCommands.usePolarCommands();
@@ -829,7 +812,10 @@ export function PolarChat({
     );
     // Another page in the browser is another thing to leave out or not.
     useEffect(() => setWithPage(true), [site?.url]);
-    const web = webAllowed && webOn;
+    const web = webAllowed && prefs.webOn;
+    const toolsOff = prefs.toolsOff;
+    const serversOff = toolPrefs.serversOffOf(prefs, tools);
+    const connectorsOn = !prefs.connectorsOff;
     const live = useRef({
         threadId,
         choice,
@@ -840,6 +826,7 @@ export function PolarChat({
         refine,
         web,
         toolsOff,
+        serversOff,
         connectorsOn
     });
     live.current = {
@@ -852,6 +839,7 @@ export function PolarChat({
         refine,
         web,
         toolsOff,
+        serversOff,
         connectorsOn
     };
 
@@ -876,6 +864,7 @@ export function PolarChat({
                             temporary: live.current.temporary,
                             web: live.current.web,
                             off: live.current.toolsOff,
+                            serversOff: live.current.serversOff,
                             connectors: live.current.connectorsOn,
                             refine: refining,
                             parentId:
@@ -939,7 +928,6 @@ export function PolarChat({
                     setSpendsDeployment(data.spendsDeployment ?? true);
                     setVoice({ ...NO_VOICE, ...data.voice });
                     setWebAllowed(data.web === true);
-                    setConnectorsAllowed(data.connectors === true);
                     setChoice((current) => {
                         // Automatic stays while there is any model to pick from.
                         if (isAutomatic(current) && data.providers.length > 0) return current;
@@ -1572,7 +1560,7 @@ export function PolarChat({
             startNew();
             return setTemporary(!temporary);
         }
-        if (command === "memory") return setSettingsOpen(true);
+        if (command === "memory") return router.push("/polar/settings#memory");
         if (command === "context") return setShowContext(true);
         if (command === "usage") {
             return chat.messages.length === 0 ? setShowUsage(true) : setShowContext(true);
@@ -2216,35 +2204,17 @@ export function PolarChat({
                     <MessageAction label={t("usage.title")} onClick={() => setShowUsage(true)}>
                         <Gauge />
                     </MessageAction>
-                    <MessageAction label={t("settings.open")} onClick={() => setSettingsOpen(true)}>
+                    {/* A page, not a dialog: it holds every section and the
+                        connectors, which is more than a dialog over the chat
+                        reads well. The panel is hidden on Polar's own pages, so
+                        settings open in the main window and the browser's back
+                        returns to the page the panel was open on, still open. */}
+                    <MessageAction
+                        label={t("settings.open")}
+                        onClick={() => router.push("/polar/settings")}
+                    >
                         <Settings2 />
                     </MessageAction>
-                    <PolarSettings open={settingsOpen} onOpenChange={setSettingsOpen}>
-                        <ToolSettings
-                            webAllowed={webAllowed}
-                            webOn={webOn}
-                            onWeb={(on) => {
-                                writeStored(WEB_KEY, on ? "on" : "off");
-                                setWebOn(on);
-                            }}
-                            connectorsAllowed={connectorsAllowed}
-                            connectorsOn={connectorsOn}
-                            onConnectors={(on) => {
-                                writeStored(CONNECTORS_KEY, on ? "on" : "off");
-                                setConnectorsOn(on);
-                            }}
-                            tools={tools}
-                            off={toolsOff}
-                            onTool={(name, on) => {
-                                const next = on
-                                    ? toolsOff.filter((one) => one !== name)
-                                    : [...toolsOff, name];
-                                writeStored(TOOLS_OFF_KEY, JSON.stringify(next));
-                                setToolsOff(next);
-                            }}
-                        />
-                        <HelperSettings providers={providers} />
-                    </PolarSettings>
                     {fullPage ? (
                         !wide || collapsed ? (
                             <MessageAction label={t("actions.new")} onClick={() => startNew()}>

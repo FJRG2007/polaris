@@ -1473,6 +1473,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: MessagesSquare,
             hidden: true,
             keywords: ["assistant", "ai", "ask", "chat", "history", "polar"]
+        },
+        {
+            label: "Polar settings", // i18n-ignore
+            href: "/polar/settings",
+            icon: Settings,
+            hidden: true,
+            keywords: ["memory", "tools", "mcp", "connectors", "web search", "polar"]
         }
     ],
     notes: [

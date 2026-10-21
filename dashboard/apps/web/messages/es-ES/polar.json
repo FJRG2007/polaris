@@ -371,8 +371,13 @@
             "title": "Herramientas",
             "intro": "Lo que Polar puede usar en un chat. Si apagas una, no se le ofrece.",
             "webOff": "Tu administrador ha desactivado la búsqueda web.",
-            "connectors": "Tus conectores",
-            "manageConnectors": "Añadir o gestionar conectores MCP"
+            "manageConnectors": "Añadir o gestionar conectores MCP",
+            "polaris": "Polaris",
+            "builtIn": "Integrado",
+            "count": "{on} de {total} activas",
+            "serverOff": "Desactivado",
+            "serverToggle": "Usar {server}",
+            "offNote": "Todas sus herramientas siguen apagadas mientras {server} lo esté. Lo que elijas abajo se guarda."
         },
         "data": {
             "title": "Tus chats",
@@ -398,6 +403,10 @@
             "modelHint": "Automático usa tu modelo más rápido.",
             "unavailable": "Ese modelo no está disponible, así que se usa Automático.",
             "failed": "No se pudo guardar el ajuste. Prueba otra vez."
+        },
+        "back": "Volver al chat",
+        "nav": {
+            "permissions": "Permisos y conectores"
         }
     },
     "temporary": {

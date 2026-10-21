@@ -620,6 +620,14 @@ describe("Polar on the web", () => {
         expect(names).toContain("delete_task");
     });
 
+    it("offers none of Polaris's tools while its server is switched off, whatever each one says", async () => {
+        const names = await offered(body({ serversOff: ["polaris"] }));
+        expect(names).not.toContain("read_tasks");
+        expect(names).not.toContain("delete_task");
+        // Web search is its own switch, not one of Polaris's tools.
+        expect(names.some((name) => /web/.test(name))).toBe(true);
+    });
+
     it("reads the record on screen through its reader", async () => {
         state.parts = calls("read_current_view", {});
         const text = await (

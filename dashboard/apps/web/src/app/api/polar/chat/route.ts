@@ -31,6 +31,7 @@ import {
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { connectorStandIns, polarConnectorTools } from "@/lib/polar/connectors/tools";
+import { offWithServers } from "@/lib/polar/tool-servers";
 import {
     FIND_TOOLS,
     READ_CURRENT_VIEW,
@@ -114,7 +115,10 @@ const bodySchema = z.object({
     /** Whether the person left web search on for this turn. */
     web: z.boolean().default(true),
     /** Polar's tools the person switched off in its settings: not offered. */
-    off: z.array(z.string().max(200)).max(500).default([]),
+    off: z.array(z.string().max(200)).max(2000).default([]),
+    /** The MCP servers the person switched off as a whole (`tool-servers.ts`):
+     *  none of their tools is offered, whatever each one's own switch says. */
+    serversOff: z.array(z.string().max(300)).max(100).default([]),
     /** An answer asked again from its row with more detail or fewer words. */
     refine: z.enum(POLAR_REFINES).nullable().default(null),
     /** Whether the person left their connectors on for this turn. */
@@ -198,7 +202,10 @@ export async function POST(request: Request): Promise<Response> {
     ]);
     // Tools the person switched off in Polar's settings: never offered, and
     // never turned up by find_tools either.
-    const off = new Set(body.data.off);
+    const off = offWithServers(body.data.off, body.data.serversOff, {
+        ...Object.fromEntries(Object.keys(toolset.tools).map((name) => [name, {}])),
+        ...connectorSet.described
+    });
     const catalog = toolset.catalog.filter((entry) => !off.has(entry.name));
     // Known to the check even while memory is off, so an older turn that used
     // them still reads as valid.
