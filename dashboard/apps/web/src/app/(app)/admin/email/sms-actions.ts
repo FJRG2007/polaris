@@ -20,21 +20,33 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { smsChannelInputSchema } from "@polaris/core";
-import { deleteSmsSender, saveSmsSender, type SmsSenderView } from "@/lib/notifications/sms-service";
+import {
+    deleteSmsSender,
+    saveSmsSender,
+    type SmsSenderView
+} from "@/lib/notifications/sms-service";
 import { deliveryText } from "@/lib/notifications/delivery-words";
 
 export async function saveSmsSenderAction(
     input: unknown
 ): Promise<{ sender?: SmsSenderView; error?: string }> {
     const user = await requirePermission("inbox.manage");
-    const parsed = smsChannelInputSchema.extend({ id: z.string().uuid().optional() }).safeParse(input);
+    const parsed = smsChannelInputSchema
+        .extend({ id: z.string().uuid().optional() })
+        .safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("inboxChannels.errors.checkForm") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("admin"))("inboxChannels.errors.checkForm")
+        };
     }
     const result = await saveSmsSender(user.id, parsed.data);
     if (!result.error) revalidatePath("/admin/email");
     // The sender answers in English; the reader gets their own words.
-    return result.error ? { ...result, error: deliveryText(await getTranslations("components"), result.error) } : result;
+    return result.error
+        ? { ...result, error: deliveryText(await getTranslations("components"), result.error) }
+        : result;
 }
 
 export async function deleteSmsSenderAction(id: unknown): Promise<void> {

@@ -109,7 +109,11 @@ export function AppNav({
             ...app,
             label: label(english),
             description: guest
-                ? describe(app.id, otherwise ? "otherwiseDescription" : "guestDescription", guest.description)
+                ? describe(
+                      app.id,
+                      otherwise ? "otherwiseDescription" : "guestDescription",
+                      guest.description
+                  )
                 : describe(app.id, "description", app.description),
             // A guest reaches the app through a subject rather than through the
             // app, so their entry leads to that subject and never to a

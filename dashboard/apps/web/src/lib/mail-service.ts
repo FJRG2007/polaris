@@ -57,7 +57,10 @@ function parseStored(config: string): StoredConfig {
 /** Settings as strings, for a form that only ever renders text inputs. */
 function displaySettings(settings: Record<string, unknown>): Record<string, string> {
     return Object.fromEntries(
-        Object.entries(settings).map(([key, value]) => [key, value === undefined || value === null ? "" : String(value)])
+        Object.entries(settings).map(([key, value]) => [
+            key,
+            value === undefined || value === null ? "" : String(value)
+        ])
     );
 }
 
@@ -116,7 +119,10 @@ async function loadAccount(channelId: string): Promise<MailAccount | null> {
 
 /** Record how a channel last behaved, so the card can say so. */
 async function recordOutcome(channelId: string, error: string | null): Promise<void> {
-    const row = await prisma.channel.findUnique({ where: { id: channelId }, select: { config: true } });
+    const row = await prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { config: true }
+    });
     if (!row) return;
     const stored = parseStored(row.config);
     await prisma.channel.update({
@@ -169,7 +175,9 @@ export async function createEmailChannel(
         }
     });
     const view = toView(row);
-    return view ? { channel: view } : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
+    return view
+        ? { channel: view }
+        : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
 }
 
 /** Verify credentials, returning the reason they failed or null when they work. */
@@ -215,12 +223,18 @@ export async function updateEmailChannel(
             status: failure ? "error" : "connected",
             config: JSON.stringify({ settings: parsed.value.settings, error: failure }),
             ...(blob
-                ? { encryptedSecret: blob.ciphertext, secretNonce: blob.nonce, secretKeyId: blob.keyId }
+                ? {
+                      encryptedSecret: blob.ciphertext,
+                      secretNonce: blob.nonce,
+                      secretKeyId: blob.keyId
+                  }
                 : {})
         }
     });
     const view = toView(row);
-    return view ? { channel: view } : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
+    return view
+        ? { channel: view }
+        : { error: (await readerWords("api"))("refusals.mailChannels.storeFailed") };
 }
 
 /** Remove an email channel. */
@@ -248,7 +262,8 @@ export async function sendThroughChannel(
         await recordOutcome(channelId, null);
         return {};
     } catch (caught) {
-        const error = caught instanceof Error ? caught.message : "The provider refused the message.";
+        const error =
+            caught instanceof Error ? caught.message : "The provider refused the message.";
         await recordOutcome(channelId, error);
         return { error };
     }
@@ -257,7 +272,8 @@ export async function sendThroughChannel(
 /** Re-check a channel's credentials and update its status. */
 export async function recheckEmailChannel(channelId: string): Promise<{ error?: string }> {
     const account = await loadAccount(channelId);
-    if (!account) return { error: (await readerWords("api"))("refusals.mailChannels.notConfigured") };
+    if (!account)
+        return { error: (await readerWords("api"))("refusals.mailChannels.notConfigured") };
     const failure = await checkAccount(account);
     await recordOutcome(channelId, failure);
     return failure ? { error: failure } : {};

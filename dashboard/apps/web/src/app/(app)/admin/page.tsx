@@ -61,7 +61,10 @@ const SECTIONS = [
 
 export default async function ManagementPage() {
     await requireAdmin();
-    const [t, bridge] = await Promise.all([getTranslations("admin"), isAppInstalled("messaging-bridge")]);
+    const [t, bridge] = await Promise.all([
+        getTranslations("admin"),
+        isAppInstalled("messaging-bridge")
+    ]);
     const sections = SECTIONS.filter((section) => section.key !== "inbox" || bridge);
 
     return (

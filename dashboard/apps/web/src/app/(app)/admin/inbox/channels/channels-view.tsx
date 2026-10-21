@@ -19,13 +19,7 @@ import { useEffect, useState, useTransition } from "react";
 import * as polls from "../inbox-polls";
 import { CHANNEL_STATUS_TONE, PLATFORM_LOGO, platformLabel } from "../platform-meta";
 import { deleteChannelAction, reconnectChannelAction, updateChannelAction } from "../actions";
-import {
-    Loader2,
-    MessagesSquare,
-    Plus,
-    QrCode,
-    RefreshCw
-} from "lucide-react";
+import { Loader2, MessagesSquare, Plus, QrCode, RefreshCw } from "lucide-react";
 import {
     Button,
     Card,

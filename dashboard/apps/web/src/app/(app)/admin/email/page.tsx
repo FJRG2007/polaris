@@ -34,7 +34,9 @@ export default async function EmailPage() {
             <PageHeader title={t("email.title")} description={t("email.description")} />
             <EmailSendersView initialSenders={senders} canManage={canManage} />
             <SmsSenderCard senders={smsSenders} canManage={canManage} />
-            {status ? <AccountMailView channels={everyChannel} selectedId={status.channelId} /> : null}
+            {status ? (
+                <AccountMailView channels={everyChannel} selectedId={status.channelId} />
+            ) : null}
         </div>
     );
 }

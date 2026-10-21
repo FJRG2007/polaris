@@ -116,6 +116,8 @@ describe.each(Object.keys(PREVIOUS))("the %s rail", (rail) => {
 
 describe("the Management rail", () => {
     it("opens on its areas rather than every screen", () => {
-        expect((APP_SECTIONS.admin ?? []).filter((entry) => !entry.hidden).length).toBeLessThanOrEqual(10);
+        expect(
+            (APP_SECTIONS.admin ?? []).filter((entry) => !entry.hidden).length
+        ).toBeLessThanOrEqual(10);
     });
 });

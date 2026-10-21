@@ -98,7 +98,12 @@ export async function reachableApps({
                     isInstalled &&
                     !(await isInstalled(app.guest.requiresApp));
                 const door = missing && app.guest.otherwise ? app.guest.otherwise : app.guest;
-                return { ...app, label: door.label, description: door.description, href: door.href };
+                return {
+                    ...app,
+                    label: door.label,
+                    description: door.description,
+                    href: door.href
+                };
             }
             if (app.permission && !(await can(app.permission))) {
                 // Nothing in the registry says which apps can be lent an item at

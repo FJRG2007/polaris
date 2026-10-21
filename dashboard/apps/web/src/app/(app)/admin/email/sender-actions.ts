@@ -59,7 +59,11 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
     const user = await requirePermission("inbox.manage");
     const parsed = channelInputSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("inboxChannels.errors.checkForm") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("admin"))("inboxChannels.errors.checkForm")
+        };
     }
     const result = await createEmailChannel(user.id, parsed.data);
     if (result.channel) {
@@ -75,13 +79,17 @@ export async function createEmailChannelAction(input: unknown): Promise<ChannelR
     return result;
 }
 
-export async function updateEmailChannelAction(channelId: unknown, input: unknown): Promise<ChannelResult> {
+export async function updateEmailChannelAction(
+    channelId: unknown,
+    input: unknown
+): Promise<ChannelResult> {
     const user = await requirePermission("inbox.manage");
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const parsed = channelInputSchema.safeParse(input);
     if (!id.success || !parsed.success) return { error: t("inboxChannels.errors.checkForm") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     const result = await updateEmailChannel(id.data, parsed.data);
     if (result.channel) {
         await recordAudit({
@@ -100,7 +108,8 @@ export async function deleteEmailChannelAction(channelId: unknown): Promise<{ er
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     await deleteEmailChannel(id.data);
     await recordAudit({
         actorId: user.id,
@@ -118,7 +127,8 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
     const result = await recheckEmailChannel(id.data);
     revalidatePath("/admin/email");
     return result;
@@ -130,19 +140,25 @@ export async function recheckEmailChannelAction(channelId: unknown): Promise<{ e
  * the reason mail does not arrive is almost always that the provider has not
  * been told the From address belongs to you.
  */
-export async function sendTestEmailAction(channelId: unknown, to: unknown): Promise<{ error?: string }> {
+export async function sendTestEmailAction(
+    channelId: unknown,
+    to: unknown
+): Promise<{ error?: string }> {
     const user = await requirePermission("inbox.manage");
     const t = await getTranslations("admin");
     const id = channelIdSchema.safeParse(channelId);
     const address = emailField.safeParse(to);
     if (!id.success) return { error: t("inboxChannels.errors.unknown") };
     if (!address.success) return { error: t("inboxChannels.errors.testAddress") };
-    if (!(await requireOwnedChannel(user.id, id.data))) return { error: t("inboxChannels.errors.gone") };
+    if (!(await requireOwnedChannel(user.id, id.data)))
+        return { error: t("inboxChannels.errors.gone") };
 
     const throttle = await rateLimit(`email-test:${user.id}`, TEST_LIMIT, TEST_WINDOW_MS);
     if (!throttle.ok) {
         return {
-            error: t("inboxChannels.errors.tooManyTests", { minutes: Math.ceil(throttle.retryAfterMs / 60000) })
+            error: t("inboxChannels.errors.tooManyTests", {
+                minutes: Math.ceil(throttle.retryAfterMs / 60000)
+            })
         };
     }
 

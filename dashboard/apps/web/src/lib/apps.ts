@@ -1060,7 +1060,6 @@ function areaEntry(area: AppSubapp): AppSection {
     };
 }
 
-
 export const APP_SECTIONS: Record<string, AppSection[]> = {
     drive: [
         {

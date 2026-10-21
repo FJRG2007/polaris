@@ -79,7 +79,7 @@ async function fromInstall(): Promise<BridgeEndpoint | null> {
     const dialHost =
         application.target.kind === "local"
             ? await getPublicIp()
-            : application.target.host?.address?.trim() ?? null;
+            : (application.target.host?.address?.trim() ?? null);
     if (!dialHost) return null;
 
     let secrets: BridgeSecrets;

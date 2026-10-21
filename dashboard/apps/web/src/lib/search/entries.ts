@@ -30,13 +30,7 @@ import {
 import type { SearchField } from "@polaris/core/search-text";
 
 export type SearchResourceKind =
-    | "project"
-    | "service"
-    | "database"
-    | "server"
-    | "runner"
-    | "installed"
-    | "snippet";
+    "project" | "service" | "database" | "server" | "runner" | "installed" | "snippet";
 
 /** A named thing the user owns, as the search endpoint returns it. */
 export interface SearchResource {

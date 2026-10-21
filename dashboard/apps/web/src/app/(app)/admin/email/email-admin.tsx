@@ -67,14 +67,16 @@ export function AccountMailView({
             <Card>
                 <CardBody className="flex flex-col gap-3">
                     {channels.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            {t("email.empty")}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("email.empty")}</p>
                     ) : (
                         <>
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">{t("email.sendThrough")}</span>
-                                <Select value={choice} onValueChange={setChoice} options={options} />
+                                <Select
+                                    value={choice}
+                                    onValueChange={setChoice}
+                                    options={options}
+                                />
                             </label>
                             <p className="text-xs text-muted-foreground">{t("email.hint")}</p>
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
