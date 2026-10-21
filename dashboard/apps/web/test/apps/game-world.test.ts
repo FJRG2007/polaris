@@ -60,9 +60,10 @@ describe("archive names", () => {
 describe("an archive tar finished while files moved", () => {
     it("keeps a copy whose only complaint is the world folder or a player file being replaced", () => {
         // What failed a backup of a real server: level.dat renamed over itself.
-        expect(world.onlyMovedUnderTar(1, "tar: world: file changed as we read it\n")).toBe(true);
+        expect(world.onlyMovedUnderTar("java", 1, "tar: world: file changed as we read it\n")).toBe(true);
         expect(
             world.onlyMovedUnderTar(
+                "java",
                 1,
                 [
                     "tar: world/playerdata/2c1e.dat: file changed as we read it",
@@ -75,6 +76,7 @@ describe("an archive tar finished while files moved", () => {
     it("refuses one where a region file moved, because saving did not hold", () => {
         expect(
             world.onlyMovedUnderTar(
+                "java",
                 1,
                 "tar: world: file changed as we read it\ntar: world/region/r.0.0.mca: file changed as we read it"
             )
@@ -82,12 +84,17 @@ describe("an archive tar finished while files moved", () => {
     });
 
     it("refuses anything else tar said, and every other exit", () => {
-        expect(world.onlyMovedUnderTar(1, "")).toBe(false);
+        expect(world.onlyMovedUnderTar("java", 1, "")).toBe(false);
         expect(
-            world.onlyMovedUnderTar(1, "tar: world/region/r.1.1.mca: file shrank by 4096 bytes; padding with zeros")
+            world.onlyMovedUnderTar("java", 1, "tar: world/region/r.1.1.mca: file shrank by 4096 bytes; padding with zeros")
         ).toBe(false);
-        expect(world.onlyMovedUnderTar(2, "tar: world: file changed as we read it")).toBe(false);
-        expect(world.onlyMovedUnderTar(2, "gzip: stdout: No space left on device")).toBe(false);
+        expect(world.onlyMovedUnderTar("java", 2, "tar: world: file changed as we read it")).toBe(false);
+        expect(world.onlyMovedUnderTar("java", 2, "gzip: stdout: No space left on device")).toBe(false);
+    });
+
+    it("refuses any file moving on Bedrock, whose LevelDB a fixed wait does not prove is still", () => {
+        expect(world.onlyMovedUnderTar("bedrock", 1, "tar: worlds/x/db/000123.log: file changed as we read it")).toBe(false);
+        expect(world.onlyMovedUnderTar("bedrock", 1, "tar: worlds/x: file changed as we read it")).toBe(false);
     });
 });
 

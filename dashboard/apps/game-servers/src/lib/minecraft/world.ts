@@ -217,10 +217,11 @@ export function backupName(at: Date): string {
  * sound: `tar: world: file changed as we read it` failed sound backups.
  *
  * A region file moving is different: it means saving did not hold, and that
- * chunk may be half old and half new. Pure.
+ * chunk may be half old and half new. So is anything on Bedrock, whose world is
+ * a LevelDB that a fixed wait after `save hold` does not prove has stopped. Pure.
  */
-export function onlyMovedUnderTar(code: number, output: string): boolean {
-    if (code !== 1) return false;
+export function onlyMovedUnderTar(edition: MinecraftEdition, code: number, output: string): boolean {
+    if (edition !== "java" || code !== 1) return false;
     const lines = output
         .split("\n")
         .map((line) => line.trim())

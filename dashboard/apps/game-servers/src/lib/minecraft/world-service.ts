@@ -506,7 +506,10 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     const partial = `${world.BACKUP_DIR}/${name}${STAGING_SUFFIX}`;
     try {
         const archived = await server.run(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs]);
-        if (archived.code !== 0 && !world.onlyMovedUnderTar(archived.code, archived.output)) {
+        if (
+            archived.code !== 0 &&
+            !world.onlyMovedUnderTar(server.edition, archived.code, archived.output)
+        ) {
             throw new Error(
                 containerFailure(archived.output, gameMessage("games", "lib.run.writeBackup"))
             );
