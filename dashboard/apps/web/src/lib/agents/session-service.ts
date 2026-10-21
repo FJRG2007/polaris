@@ -208,6 +208,8 @@ function toView(record: SessionRecord): SessionView {
     };
 }
 
+const SESSIONS_LISTED = 200;
+
 /**
  * Every session this account reaches, newest first.
  *
@@ -219,7 +221,7 @@ function toView(record: SessionRecord): SessionView {
  */
 export async function listSessions(
     ownerId: string,
-    options: { repoId?: string; live?: boolean } = {}
+    options: { repoId?: string; live?: boolean; limit?: number } = {}
 ): Promise<SessionView[]> {
     const records = await prisma.agentSession.findMany({
         where: {
@@ -228,7 +230,7 @@ export async function listSessions(
             ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {})
         },
         orderBy: { createdAt: "desc" },
-        take: 200,
+        take: Math.min(options.limit ?? SESSIONS_LISTED, SESSIONS_LISTED),
         select: VIEW_SELECT
     });
     return (records as unknown as SessionRecord[]).map(toView);

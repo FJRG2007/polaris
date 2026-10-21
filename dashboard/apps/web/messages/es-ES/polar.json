@@ -90,6 +90,7 @@
     "actions": {
         "new": "Nuevo chat",
         "openPage": "Abrir como página",
+        "more": "Más acciones",
         "close": "Cerrar Polar",
         "stop": "Parar",
         "send": "Enviar (Intro)",
@@ -670,5 +671,37 @@
             "diagram": "Diagrama",
             "calculator": "Calculadora"
         }
+    },
+    "code": {
+        "switchLabel": "Chat o código",
+        "chat": "Chat",
+        "code": "Código",
+        "noAccess": "Código funciona como una sesión de Agentes y tu cuenta no puede abrir Agentes. Pide acceso a un administrador.",
+        "recents": "Sesiones recientes",
+        "newTask": "Nueva tarea",
+        "empty": "Aún no hay sesiones. Describe una tarea arriba para empezar.",
+        "workspace": "Sin repositorio",
+        "heading": "¿En qué debe trabajar el agente?",
+        "readOnly": "Aquí puedes seguir sesiones. Para iniciar o responder necesitas gestionar Agentes.",
+        "promptLabel": "Tarea para el agente",
+        "placeholder": "Describe el cambio, el fallo o la revisión",
+        "start": "Lanzar sesión",
+        "repository": "Repositorio",
+        "branch": "Rama",
+        "branchPlaceholder": "Rama principal",
+        "agent": "Agente",
+        "signIn": "{agent} aún no tiene sesión iniciada en esta cuenta.",
+        "openSettings": "Conectarlo",
+        "noRepos": "No hay repositorio conectado, así que la sesión abre un espacio vacío.",
+        "connectRepo": "Conectar uno",
+        "back": "Ver sesiones",
+        "openSession": "Abrir la sesión completa",
+        "gone": "Esta sesión ya no está disponible para ti.",
+        "unreachable": "No se pudo cargar esta sesión.",
+        "retry": "Reintentar",
+        "quiet": "Aún nada. El agente está preparando su máquina.",
+        "ended": "Esta sesión terminó. Abre la sesión completa para ver todo lo que hizo.",
+        "reply": "Responder al agente",
+        "send": "Enviar"
     }
 }

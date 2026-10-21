@@ -50,7 +50,11 @@ function keyOf(id: string): string {
 }
 
 /** What one id of a group is called, in the reader's words. */
-export function agentWord(t: NamespaceTranslator<"agents">, group: AgentWordGroup, id: string): string {
+export function agentWord(
+    t: NamespaceTranslator<"agents">,
+    group: AgentWordGroup,
+    id: string
+): string {
     const english: Readonly<Record<string, string>> = AGENT_WORD_GROUPS[group];
     if (!Object.hasOwn(english, id)) return id;
     return t(`labels.${group}.${keyOf(id)}` as NamespaceKey<"agents">);
@@ -84,13 +88,15 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Canceled from Polaris.": "text.cancelled",
     // The spelling runs finished before the catalogs moved to US English were stored with.
     "Cancelled from Polaris.": "text.cancelled",
-    "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.": "text.stoppedReporting",
+    "The run stopped reporting and was closed out. Its logs, if any, are on the job it ran as.":
+        "text.stoppedReporting",
     "Could not write the workflow file": "text.workflowWrite",
     "GitHub has not registered the workflow file yet. It was just written, so try again in a moment.":
         "text.workflowUnregistered",
     "GitHub could not find the agent workflow in this repository.": "text.workflowMissing",
     "Polaris could not start this session. Nothing was left running.": "text.sessionFailed",
-    "Polaris could not read the stored credentials just now. Try again in a moment.": "text.credentialsUnread",
+    "Polaris could not read the stored credentials just now. Try again in a moment.":
+        "text.credentialsUnread",
     "The server refused to start the session.": "text.serverRefused",
     "This Polaris is running as many agent sessions as it is set to allow. Try again when one finishes, or ask an administrator to raise the limit.":
         "text.instanceFull",
@@ -108,14 +114,21 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Installing the agent": "boot.agent",
     "The agent is already here": "boot.agentHere",
     "Starting the agent": "boot.start",
-    "A GitHub-hosted runner has to reach this Polaris instance, and it has no public address yet.": "advice.noPublicAddress",
-    "This Polaris instance cannot start containers, so it cannot run an agent itself.": "advice.noContainers",
+    "A GitHub-hosted runner has to reach this Polaris instance, and it has no public address yet.":
+        "advice.noPublicAddress",
+    "This Polaris instance cannot start containers, so it cannot run an agent itself.":
+        "advice.noContainers",
     "No runner pool covers this repository yet. Add one under Apps > Runners.": "advice.noPool",
-    "This repository is public, so GitHub-hosted runners are free and nothing runs on your hardware.": "advice.public",
-    "A runner pool already covers this repository, so it runs on your own machine instead of a hosted one.": "advice.pool",
-    "This repository is private, and running it here spends no GitHub Actions minutes.": "advice.private",
-    "This instance has no public address, so the run happens here rather than on a hosted machine.": "advice.noAddress",
-    "Nothing here can run it, so it falls to GitHub-hosted runners. A private repository is billed per minute.": "advice.hostedPrivate",
+    "This repository is public, so GitHub-hosted runners are free and nothing runs on your hardware.":
+        "advice.public",
+    "A runner pool already covers this repository, so it runs on your own machine instead of a hosted one.":
+        "advice.pool",
+    "This repository is private, and running it here spends no GitHub Actions minutes.":
+        "advice.private",
+    "This instance has no public address, so the run happens here rather than on a hosted machine.":
+        "advice.noAddress",
+    "Nothing here can run it, so it falls to GitHub-hosted runners. A private repository is billed per minute.":
+        "advice.hostedPrivate",
     "GitHub-hosted runners are free for this repository.": "advice.hostedFree",
     "Nothing can run this repository yet. Fix one of the reasons below.": "advice.nothing"
 };
@@ -149,13 +162,21 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
     [/^Polaris no longer knows an agent called (.+)\.$/, "text.unknownAgent", ["cli"]],
     [/^GitHub returned (\d+) starting the workflow$/, "text.githubStart", ["status"]],
     [/^GitHub returned (\d+) reading the repository$/, "text.githubRead", ["status"]],
-    [/^The workflow finished as (.+)\. Its log is on the run in GitHub Actions\.$/, "text.workflowFinished", ["conclusion"]]
+    [
+        /^The workflow finished as (.+)\. Its log is on the run in GitHub Actions\.$/,
+        "text.workflowFinished",
+        ["conclusion"]
+    ]
 ];
 
 /** The usage-limit refusal, which names whose limit, what and over what window. */
 const LIMIT =
     /^(This repository|This account|Repositories under (.+)) has used (\d+) of the (\d+) (runs|tokens) allowed in (1 day|1 week|30 days)\. An administrator sets these under Admin > Agents\.$/;
-const PERIODS: Readonly<Record<string, string>> = { "1 day": "day", "1 week": "week", "30 days": "month" };
+const PERIODS: Readonly<Record<string, string>> = {
+    "1 day": "day",
+    "1 week": "week",
+    "30 days": "month"
+};
 
 /** The sentence in the reader's words, or null when it is not one of these. */
 export function knownAgentText(t: NamespaceTranslator<"agents">, message: string): string | null {
@@ -172,14 +193,22 @@ export function knownAgentText(t: NamespaceTranslator<"agents">, message: string
         return t(key, params);
     }
     // The first prompt that never arrived, with why - which may be one of these too.
-    const prompt = /^Polaris could not send the first prompt: (.+)\. Send it again from the box below\.$/s.exec(message);
+    const prompt =
+        /^Polaris could not send the first prompt: (.+)\. Send it again from the box below\.$/s.exec(
+            message
+        );
     if (prompt?.[1]) {
         const reason = prompt[1] === "unknown" ? t("text.unknownReason") : agentText(t, prompt[1]);
         return t("text.firstPrompt", { reason });
     }
     const limit = LIMIT.exec(message);
     if (limit) {
-        const whose = limit[1] === "This repository" ? "repo" : limit[1] === "This account" ? "account" : "org";
+        const whose =
+            limit[1] === "This repository"
+                ? "repo"
+                : limit[1] === "This account"
+                  ? "account"
+                  : "org";
         return t("text.limit", {
             whose,
             org: limit[2] ?? "",
@@ -205,3 +234,23 @@ export function sessionStateWord(
 ): string {
     return agentWord(t, "sessionState", state === "idle" && !hasReported ? "starting" : state);
 }
+
+/** How each event reads on a session's activity strip - its own page and Polar's
+ *  Code view. Written as what happened rather than as the event's own name,
+ *  because nobody outside this codebase knows what `tool.start` is and everybody
+ *  knows what "ran" means. */
+export const SESSION_EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>> = {
+    "session.start": "session.events.sessionStart",
+    prompt: "session.events.prompt",
+    "tool.start": "session.events.toolStart",
+    "tool.end": "session.events.toolEnd",
+    "tool.failed": "session.events.toolFailed",
+    permission: "session.events.permission",
+    question: "session.events.question",
+    "subagent.start": "session.events.subagentStart",
+    "subagent.end": "session.events.subagentEnd",
+    compact: "session.events.compact",
+    "turn.end": "session.events.turnEnd",
+    "session.end": "session.events.sessionEnd",
+    error: "session.events.error"
+};

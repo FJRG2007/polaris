@@ -28,8 +28,7 @@ import {
     stopSessionAction
 } from "../actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceKey } from "@/lib/i18n/types";
-import { agentText, sessionStateWord } from "@/lib/agents/words";
+import { agentText, SESSION_EVENT_KEYS as EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 
 /** Fast while something is happening. A session that has finished polls nothing. */
 const REFRESH_MS = 3000;
@@ -41,25 +40,6 @@ const TONE: Record<core.AgentSessionState, string> = {
     idle: "text-foreground",
     stopped: "text-muted-foreground",
     failed: "text-danger"
-};
-
-/** How each event reads on the strip. Written as what happened rather than as the
- *  event's own name, because nobody outside this codebase knows what `tool.start`
- *  is and everybody knows what "ran" means. */
-const EVENT_KEYS: Readonly<Record<string, NamespaceKey<"agents">>> = {
-    "session.start": "session.events.sessionStart",
-    prompt: "session.events.prompt",
-    "tool.start": "session.events.toolStart",
-    "tool.end": "session.events.toolEnd",
-    "tool.failed": "session.events.toolFailed",
-    permission: "session.events.permission",
-    question: "session.events.question",
-    "subagent.start": "session.events.subagentStart",
-    "subagent.end": "session.events.subagentEnd",
-    compact: "session.events.compact",
-    "turn.end": "session.events.turnEnd",
-    "session.end": "session.events.sessionEnd",
-    error: "session.events.error"
 };
 
 interface Props {

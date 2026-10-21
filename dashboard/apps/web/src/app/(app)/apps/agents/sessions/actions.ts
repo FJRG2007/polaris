@@ -10,6 +10,7 @@
  * itself may have ended.
  */
 
+import { z } from "zod";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -70,9 +71,10 @@ export async function sessionChoicesAction(): Promise<{
     };
 }
 
-export async function listSessionsAction(): Promise<sessions.SessionView[]> {
+export async function listSessionsAction(limit?: number): Promise<sessions.SessionView[]> {
     const user = await requirePermission("agents.read");
-    return sessions.listSessions(user.id);
+    const take = z.number().int().positive().optional().safeParse(limit);
+    return sessions.listSessions(user.id, { limit: take.success ? take.data : undefined });
 }
 
 export async function sessionDetailAction(sessionId: string): Promise<{
@@ -103,7 +105,9 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     const t = await getTranslations("agents");
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message;
-        return { error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm") };
+        return {
+            error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
+        };
     }
     const value = parsed.data;
 
@@ -176,7 +180,9 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
                   (agent) => agent.id === value.cli && agent.readiness === "missing"
               );
     if (blocked) {
-        const ways = blocked.missing.map((credential) => credential.label).join(` ${t("sessions.errors.or")} `);
+        const ways = blocked.missing
+            .map((credential) => credential.label)
+            .join(` ${t("sessions.errors.or")} `);
         return {
             error:
                 value.place === "host"
@@ -225,7 +231,10 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
         await runtime.startSession(session, token);
     } catch (error) {
         revalidatePath(SESSIONS_PATH);
-        return { id: session.id, error: agentText(t, sessions.readableFailure(error, `starting ${session.id}`)) };
+        return {
+            id: session.id,
+            error: agentText(t, sessions.readableFailure(error, `starting ${session.id}`))
+        };
     }
 
     if (value.prompt) {
@@ -286,7 +295,10 @@ export async function promptSessionAction(input: unknown): Promise<{ error?: str
     const t = await getTranslations("agents");
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message;
-        return { error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.saySomething") };
+        return {
+            error:
+                (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.saySomething")
+        };
     }
 
     const session = await sessions.getSession(parsed.data.sessionId, user.id);
@@ -311,7 +323,9 @@ export async function interruptSessionAction(sessionId: string): Promise<{ error
     try {
         await runtime.interruptSession(sessionId);
     } catch (error) {
-        return { error: agentText(t, sessions.readableFailure(error, `interrupting ${sessionId}`)) };
+        return {
+            error: agentText(t, sessions.readableFailure(error, `interrupting ${sessionId}`))
+        };
     }
     revalidatePath(`${SESSIONS_PATH}/${sessionId}`);
     return {};

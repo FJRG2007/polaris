@@ -90,6 +90,7 @@
     "actions": {
         "new": "New chat",
         "openPage": "Open as a page",
+        "more": "More actions",
         "close": "Close Polar",
         "stop": "Stop",
         "send": "Send (Enter)",
@@ -670,5 +671,37 @@
             "diagram": "Diagram",
             "calculator": "Calculator"
         }
+    },
+    "code": {
+        "switchLabel": "Chat or code",
+        "chat": "Chat",
+        "code": "Code",
+        "noAccess": "Code runs as an Agents session, and your account cannot open Agents. Ask an administrator for access.",
+        "recents": "Recent sessions",
+        "newTask": "New task",
+        "empty": "No sessions yet. Describe a task above to start one.",
+        "workspace": "No repository",
+        "heading": "What should the agent work on?",
+        "readOnly": "You can follow sessions here. Starting one or replying needs permission to manage Agents.",
+        "promptLabel": "Task for the agent",
+        "placeholder": "Describe the change, the bug or the review",
+        "start": "Start session",
+        "repository": "Repository",
+        "branch": "Branch",
+        "branchPlaceholder": "Default branch",
+        "agent": "Agent",
+        "signIn": "{agent} is not signed in on this account yet.",
+        "openSettings": "Sign it in",
+        "noRepos": "No repository is connected, so a session opens as an empty workspace.",
+        "connectRepo": "Connect one",
+        "back": "All sessions",
+        "openSession": "Open the full session",
+        "gone": "This session is no longer available to you.",
+        "unreachable": "Couldn't load this session.",
+        "retry": "Try again",
+        "quiet": "Nothing yet. The agent is getting its machine ready.",
+        "ended": "This session has ended. Open the full session to read everything it did.",
+        "reply": "Reply to the agent",
+        "send": "Send"
     }
 }
