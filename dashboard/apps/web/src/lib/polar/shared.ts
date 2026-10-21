@@ -83,7 +83,7 @@ export function cleanSiteText(value: string, most: number): string {
     return value
         .replace(/\r\n?/g, "\n")
         .replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, " ")
-        .replace(/`{3,}|<\/?page_context>/gi, "")
+        .replace(/`{3,}|<\/?(?:page_context|screen)>/gi, "")
         .replace(/[ \t]+/g, " ")
         .replace(/ *\n */g, "\n")
         .replace(/\n{3,}/g, "\n\n")
@@ -116,7 +116,9 @@ export const siteContextSchema = z.object({
         .string()
         .max(SITE_TEXT_MOST * 2)
         .transform((value) => cleanSiteText(value, SITE_TEXT_MOST))
-        .optional()
+        .optional(),
+    /** Kept on a stored question in place of the selection itself. */
+    selected: z.boolean().optional()
 });
 export type SiteContext = z.infer<typeof siteContextSchema>;
 
@@ -273,6 +275,20 @@ export function fenceScreen(context: PageContext | null | undefined): string {
     return ["<screen>", ...lines, "</screen>"].join("\n");
 }
 
+/**
+ * The screen as a question stores it: a page outside Polaris keeps its address
+ * and title only, so its words never outlive the turn that read them.
+ */
+export function storedScreen(context: PageContext | null | undefined): PageContext | undefined {
+    if (!context) return undefined;
+    if (!context.site) return context;
+    const { url, title, selection, selected } = context.site;
+    return {
+        ...context,
+        site: { url, title, selected: selected || Boolean(selection) || undefined }
+    };
+}
+
 /** The screen a stored message was asked on, or null for an older one. */
 export function screenOf(metadata: unknown): PageContext | null {
     const screen = (metadata as { screen?: unknown } | null | undefined)?.screen;
@@ -306,7 +322,7 @@ export function withScreenNotes<
 function fenceSiteScreen(site: SiteContext): string {
     const lines = ["a web page outside Polaris, in the person's browser", `url: ${site.url}`];
     if (site.title) lines.push(`title: ${site.title}`);
-    if (site.selection) lines.push("they have text selected on it");
+    if (site.selection || site.selected) lines.push("they have text selected on it");
     lines.push("read_current_view reads its text");
     return ["<screen>", ...lines, "</screen>"].join("\n");
 }

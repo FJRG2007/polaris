@@ -74,6 +74,7 @@ import {
 import {
     modelChoiceSchema,
     pageContextSchema,
+    storedScreen,
     withScreenNotes,
     type ModelChoice
 } from "@/lib/polar/shared";
@@ -220,7 +221,7 @@ export async function POST(request: Request): Promise<Response> {
                   ...message,
                   metadata: {
                       ...((message.metadata as object | undefined) ?? {}),
-                      screen: body.data.context ?? undefined
+                      screen: storedScreen(body.data.context)
                   }
               }
             : message

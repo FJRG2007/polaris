@@ -2097,6 +2097,8 @@
         "web/src/components/polar/polar-threads.tsx",
         "web/src/components/polar/use-polar-sidebar.ts",
         "web/src/components/polar/polar-panel.tsx",
+        "web/src/app/(embed)/polar/embed/page.tsx",
+        "web/src/app/(embed)/polar/embed/polar-embed.tsx",
         "web/src/components/polar/motion/polar-avatar.tsx",
         "web/src/components/polar/motion/thinking-orb.tsx",
         "web/src/components/polar/motion/border-beam.tsx",

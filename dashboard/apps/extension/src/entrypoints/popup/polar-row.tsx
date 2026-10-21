@@ -78,7 +78,12 @@ export function PolarRow(): React.JSX.Element {
             <button className="section" onClick={open}>
                 <span className="section-mark" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
-                        <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z" />
+                        <path d="M3 6.75A3.75 3.75 0 0 1 6.75 3h10.5A3.75 3.75 0 0 1 21 6.75v7.5A3.75 3.75 0 0 1 17.25 18h-6l-4.5 3.4V18A3.75 3.75 0 0 1 3 14.25z" />
+                        <path
+                            d="M12 6.4q0 4.1 4.1 4.1q-4.1 0-4.1 4.1q0-4.1-4.1-4.1q4.1 0 4.1-4.1z"
+                            fill="currentColor"
+                            strokeWidth={1}
+                        />
                     </svg>
                 </span>
                 <span className="section-text">
@@ -88,7 +93,11 @@ export function PolarRow(): React.JSX.Element {
             </button>
             <div className="row">
                 <span className="muted small grow">
-                    {keys ? t("polar.shortcut", { keys }) : keys === "" ? t("polar.noShortcut") : ""}
+                    {keys
+                        ? t("polar.shortcut", { keys })
+                        : keys === ""
+                          ? t("polar.noShortcut")
+                          : ""}
                 </span>
                 {capturing ? (
                     <input
