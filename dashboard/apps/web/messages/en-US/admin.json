@@ -1496,7 +1496,8 @@
             "intro": "Pick what to connect. Add as many as you like and handle them all from one inbox.",
             "messaging": "Messaging",
             "messagingHint": "Two-way chat in the Inbox, and where Watch sends its alerts.",
-            "setUp": "Set up"
+            "setUp": "Set up",
+            "bridgeStopped": "The messaging bridge is not running. <link>Open it</link> to start it."
         },
         "email": {
             "saveFailed": "Could not save the channel.",

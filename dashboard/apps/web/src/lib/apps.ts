@@ -160,8 +160,19 @@ export interface AppEntry {
      * lose the door to it the moment Inbox stopped being an app of its own. So an
      * account holding the permission sees the app under this name and lands here;
      * every administration screen behind it stays shut by its own guard.
+     *
+     * Inbox only exists once the messaging bridge is installed, so the door names
+     * that app in `requiresApp` and the subject to open instead without it in
+     * `otherwise` - for Management, the member's own email and SMS senders.
      */
-    guest?: { permission: Permission; href: string; label: string; description: string };
+    guest?: {
+        permission: Permission;
+        href: string;
+        label: string;
+        description: string;
+        requiresApp?: string;
+        otherwise?: { href: string; label: string; description: string };
+    };
     /** Kept out of the switcher list: a personal section reached from the account
      *  menu, which still owns its paths so the rail and the header follow it. */
     hidden?: boolean;
@@ -466,7 +477,13 @@ export const POLARIS_APPS: AppEntry[] = [
             permission: "inbox.read",
             href: "/admin/inbox",
             label: "Inbox", // i18n-ignore
-            description: "Customer conversations across every channel" // i18n-ignore
+            description: "Customer conversations across every channel", // i18n-ignore
+            requiresApp: "messaging-bridge",
+            otherwise: {
+                href: "/admin/email",
+                label: "Email & SMS", // i18n-ignore
+                description: "The senders your mail and texts go out through" // i18n-ignore
+            }
         }
     },
     {

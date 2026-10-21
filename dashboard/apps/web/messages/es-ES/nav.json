@@ -151,7 +151,8 @@
         },
         "admin": {
             "description": "Usuarios, acceso, dominios y versiones",
-            "guestDescription": "Conversaciones con clientes de todos los canales"
+            "guestDescription": "Conversaciones con clientes de todos los canales",
+            "otherwiseDescription": "Los remitentes por los que sale tu correo y SMS"
         },
         "account": {
             "description": "Perfil, seguridad y claves de API"

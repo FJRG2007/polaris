@@ -404,6 +404,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                                     guestAppIds={
                                                                                                         apps.guestIds
                                                                                                     }
+                                                                                                    otherwiseAppIds={
+                                                                                                        apps.otherwiseIds
+                                                                                                    }
                                                                                                     marketplace={apps.ids.includes(
                                                                                                         "apps"
                                                                                                     )}

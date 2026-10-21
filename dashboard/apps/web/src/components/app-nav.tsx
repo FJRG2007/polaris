@@ -9,6 +9,8 @@
  *  the app carries rather than through the app itself - a member reaching Inbox
  *  inside Management - which are drawn under that subject's name and lead to it.
  *  Calling it Management would offer them a page that turns them away.
+ *  `otherwiseAppIds` are guests whose subject's app is not installed, drawn as
+ *  the subject's `otherwise` instead.
  *
  *  Chat carries a count of what is waiting, and the trigger a dot when it does.
  *  On a phone the trigger is the whole of the navigation, so without the dot a
@@ -56,10 +58,12 @@ const FOOTER_ICON =
 export function AppNav({
     appIds,
     guestAppIds = [],
+    otherwiseAppIds = [],
     marketplace = false
 }: {
     appIds: string[];
     guestAppIds?: string[];
+    otherwiseAppIds?: string[];
     /** Whether this account can open the marketplace, for the way to more apps
      *  at the foot of the menu - Google's "More from Google", Slack's directory. */
     marketplace?: boolean;
@@ -70,12 +74,17 @@ export function AppNav({
     // The description an app is listed with, by its id. Every app in the
     // catalogue has one in the `nav` namespace - the catalog test says so - and
     // the catalogue's own English is the answer for one that does not yet.
-    const describe = (id: string, key: "description" | "guestDescription", english: string) => {
+    const describe = (
+        id: string,
+        key: "description" | "guestDescription" | "otherwiseDescription",
+        english: string
+    ) => {
         const path = `apps.${id}.${key}`;
         return t.has(path) ? t(path as NamespaceKey<"nav">) : english;
     };
     const allowed = new Set(appIds);
     const asGuest = new Set(guestAppIds);
+    const asOtherwise = new Set(otherwiseAppIds);
     const waiting = useAppUnread();
     const places = useLastPlaces(nav.POLARIS_APPS);
     const [usage, setUsage] = useState<{ usage: AppUsage; at: number }>({ usage: {}, at: 0 });
@@ -93,13 +102,14 @@ export function AppNav({
 
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
         const category = CATEGORY_LABEL.get(app.category) ?? "";
-        const guest = asGuest.has(app.id) && app.guest ? app.guest : null;
+        const otherwise = asOtherwise.has(app.id) ? (app.guest?.otherwise ?? null) : null;
+        const guest = otherwise ?? (asGuest.has(app.id) && app.guest ? app.guest : null);
         const english = guest ? guest.label : app.label;
         const entry = {
             ...app,
             label: label(english),
             description: guest
-                ? describe(app.id, "guestDescription", guest.description)
+                ? describe(app.id, otherwise ? "otherwiseDescription" : "guestDescription", guest.description)
                 : describe(app.id, "description", app.description),
             // A guest reaches the app through a subject rather than through the
             // app, so their entry leads to that subject and never to a

@@ -1496,7 +1496,8 @@
             "intro": "Elige qué conectar. Añade todos los que quieras y gestiónalos desde una sola bandeja.",
             "messaging": "Mensajería",
             "messagingHint": "Chat en ambos sentidos en la Bandeja de entrada, y donde Watch envía sus alertas.",
-            "setUp": "Preparar"
+            "setUp": "Preparar",
+            "bridgeStopped": "El puente de mensajería no está activo. <link>Ábrelo</link> para iniciarlo."
         },
         "email": {
             "saveFailed": "No se pudo guardar el canal.",

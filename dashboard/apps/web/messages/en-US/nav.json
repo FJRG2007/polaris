@@ -151,7 +151,8 @@
         },
         "admin": {
             "description": "Users, access, domains & updates",
-            "guestDescription": "Customer conversations across every channel"
+            "guestDescription": "Customer conversations across every channel",
+            "otherwiseDescription": "The senders your mail and texts go out through"
         },
         "account": {
             "description": "Profile, security & API keys"

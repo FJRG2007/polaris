@@ -92,12 +92,13 @@ export async function reachableApps({
                 return null;
             if (app.adminOnly && !isAdmin) {
                 if (!app.guest || !(await can(app.guest.permission))) return null;
-                return {
-                    ...app,
-                    label: app.guest.label,
-                    description: app.guest.description,
-                    href: app.guest.href
-                };
+                // A subject whose app is not installed opens its `otherwise`.
+                const missing =
+                    app.guest.requiresApp &&
+                    isInstalled &&
+                    !(await isInstalled(app.guest.requiresApp));
+                const door = missing && app.guest.otherwise ? app.guest.otherwise : app.guest;
+                return { ...app, label: door.label, description: door.description, href: door.href };
             }
             if (app.permission && !(await can(app.permission))) {
                 // Nothing in the registry says which apps can be lent an item at
@@ -115,7 +116,7 @@ export async function reachableApps({
 
 /**
  * What the switcher needs: the ids this account may open, and which of those it
- * is only reaching through a guest subject.
+ * is only reaching through a guest subject (or that subject's `otherwise`).
  *
  * The second list exists because the switcher is a client component that holds
  * the registry itself - the icons are components and do not cross the boundary -
@@ -124,12 +125,16 @@ export async function reachableApps({
  */
 export async function reachableAppNav(
     input: AppAccessInput
-): Promise<{ ids: string[]; guestIds: string[] }> {
+): Promise<{ ids: string[]; guestIds: string[]; otherwiseIds: string[] }> {
     const apps = await reachableApps(input);
     return {
         ids: apps.map((app) => app.id),
         guestIds: apps
             .filter((app) => app.guest && app.href === app.guest.href)
+            .map((app) => app.id),
+        // Reached through the guest's `otherwise`, because its app is missing.
+        otherwiseIds: apps
+            .filter((app) => app.guest?.otherwise && app.href === app.guest.otherwise.href)
             .map((app) => app.id)
     };
 }

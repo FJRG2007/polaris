@@ -15,7 +15,14 @@ import { Badge, Button, Card, CardBody } from "@polaris/ui";
 import { ConnectChannelDialog } from "@/app/(app)/admin/inbox/connect-channel-dialog";
 import { channelCatalog, type ChannelKind } from "@/app/(app)/admin/inbox/channel-catalog";
 
-export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
+export function ConnectChannelView({
+    bridgeReady,
+    bridgeHref
+}: {
+    bridgeReady: boolean;
+    /** The installed bridge's own page, where it is started, when it is stopped. */
+    bridgeHref?: string;
+}) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [kind, setKind] = useState<ChannelKind | null>(null);
@@ -51,6 +58,17 @@ export function ConnectChannelView({ bridgeReady }: { bridgeReady: boolean }) {
                     <p className="text-xs text-muted-foreground">
                         {t("inboxChannels.connectPage.messagingHint")}
                     </p>
+                    {!bridgeReady && bridgeHref ? (
+                        <p className="mt-1 text-xs text-warning">
+                            {t.rich("inboxChannels.connectPage.bridgeStopped", {
+                                link: (chunks) => (
+                                    <Link key="link" href={bridgeHref} className="underline">
+                                        {chunks}
+                                    </Link>
+                                )
+                            })}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channelCatalog(t).map((entry) => (
