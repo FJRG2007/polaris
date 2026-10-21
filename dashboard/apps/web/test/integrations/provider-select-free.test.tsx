@@ -79,7 +79,7 @@ describe("the provider list", () => {
         render(<Harness />, { wrapper: MessagesWrapper });
         const field = await open(user);
 
-        await user.type(field, "hugging");
-        expect(screen.getByRole("option", { name: /Hugging Face/ }).textContent).toContain("HF");
+        await user.type(field, "venice");
+        expect(screen.getByRole("option", { name: /Venice AI/ }).textContent).toContain("VA");
     });
 });
