@@ -604,7 +604,11 @@ function AddConnector({
                         <Button type="button" variant="ghost" disabled={pending} onClick={close}>
                             {t("polarConnectors.cancel")}
                         </Button>
-                        <Button type="submit" aria-disabled={!complete || pending} disabled={pending}>
+                        <Button
+                            type="submit"
+                            aria-disabled={!complete || pending}
+                            disabled={pending}
+                        >
                             {auth === "oauth"
                                 ? t("polarConnectors.addAndSignIn")
                                 : t("polarConnectors.save")}
