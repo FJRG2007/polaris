@@ -221,15 +221,29 @@ const SESSIONS_LISTED = 200;
  */
 export async function listSessions(
     ownerId: string,
-    options: { repoId?: string; live?: boolean; limit?: number } = {}
+    options: {
+        repoId?: string;
+        live?: boolean;
+        limit?: number;
+        /** Only the sessions this account started itself, not every session on
+         *  a repository it owns. */
+        mine?: boolean;
+        /** The id of the last session of the previous page: the list goes on
+         *  after it. */
+        after?: string;
+    } = {}
 ): Promise<SessionView[]> {
     const records = await prisma.agentSession.findMany({
         where: {
             OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }],
+            ...(options.mine ? { startedById: ownerId } : {}),
             ...(options.repoId ? { repoId: options.repoId } : {}),
             ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {})
         },
-        orderBy: { createdAt: "desc" },
+        // The id breaks a tie on the time, so a page boundary never repeats or
+        // skips a session started in the same millisecond.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        ...(options.after ? { cursor: { id: options.after }, skip: 1 } : {}),
         take: Math.min(options.limit ?? SESSIONS_LISTED, SESSIONS_LISTED),
         select: VIEW_SELECT
     });

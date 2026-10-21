@@ -71,10 +71,23 @@ export async function sessionChoicesAction(): Promise<{
     };
 }
 
-export async function listSessionsAction(limit?: number): Promise<sessions.SessionView[]> {
+const listPage = z
+    .object({ mine: z.boolean().optional(), after: z.string().trim().uuid().optional() })
+    .strict();
+
+export async function listSessionsAction(
+    limit?: number,
+    page?: { mine?: boolean; after?: string }
+): Promise<sessions.SessionView[]> {
     const user = await requirePermission("agents.read");
     const take = z.number().int().positive().optional().safeParse(limit);
-    return sessions.listSessions(user.id, { limit: take.success ? take.data : undefined });
+    const where = listPage.safeParse(page ?? {});
+    // A page that does not parse lists nothing rather than everything.
+    if (!where.success) return [];
+    return sessions.listSessions(user.id, {
+        limit: take.success ? take.data : undefined,
+        ...where.data
+    });
 }
 
 export async function sessionDetailAction(sessionId: string): Promise<{

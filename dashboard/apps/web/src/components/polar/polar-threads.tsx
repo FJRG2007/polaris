@@ -35,7 +35,9 @@ import {
     Search,
     Share2,
     SquarePen,
-    Trash2
+    Trash2,
+    Code2,
+    ExternalLink
 } from "lucide-react";
 import {
     Button,
@@ -69,6 +71,18 @@ import {
     SharedWithYou
 } from "@/components/polar/polar-sharing";
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
+import { StateDot, type PolarCodeHistory } from "@/components/polar/polar-code";
+
+/** The Code sessions listed beside the chats, for somebody who can open Agents. */
+export interface PolarThreadsCode {
+    readonly history: PolarCodeHistory;
+    /** The session on screen, or null when Code is not. */
+    readonly activeId: string | null;
+    readonly onOpen: (id: string) => void;
+    /** Whether Code is on screen: its sessions lead the list, and say when
+     *  there are none. */
+    readonly first: boolean;
+}
 
 export type ThreadRow = PolarThreadRow;
 
@@ -108,7 +122,9 @@ export function PolarThreads({
     activeId,
     onOpen,
     onNew,
-    hide
+    hide,
+    code,
+    newLabel
 }: {
     sidebar: PolarSidebar;
     activeId: string;
@@ -117,6 +133,10 @@ export function PolarThreads({
     onNew: (projectId: string | null) => void;
     /** The button beside the search that puts the list away. */
     hide: { label: string; icon: ComponentType<{ className?: string }>; onClick: () => void };
+    /** The person's Code sessions, when Code is open to them. */
+    code?: PolarThreadsCode | null;
+    /** The first row's words, when it starts something other than a chat. */
+    newLabel?: string;
 }) {
     const t = useTranslations("polar");
     const [deleting, setDeleting] = useState<PolarThreadRow | null>(null);
@@ -150,6 +170,7 @@ export function PolarThreads({
     const item = (row: PolarThreadRow) => (
         <ThreadItem key={row.id} row={row} active={row.id === activeId} actions={actions} />
     );
+    const codeSection = code ? <CodeSection code={code} /> : null;
 
     return (
         <nav aria-label={t("history.title")} className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -166,7 +187,7 @@ export function PolarThreads({
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
                 <NavRow icon={SquarePen} onClick={() => onNew(null)}>
-                    {t("actions.new")}
+                    {newLabel ?? t("actions.new")}
                 </NavRow>
                 <NavRow icon={Link2} onClick={() => setManagingShares(true)}>
                     {t("sharing.links")}
@@ -182,12 +203,14 @@ export function PolarThreads({
                     </div>
                 ) : (
                     <>
+                        {code?.first ? codeSection : null}
                         {sections.pinned.length > 0 ? (
                             <Section id="polar-pinned" label={t("history.pinned")}>
                                 {sections.pinned.map(item)}
                                 <MoreButton sidebar={sidebar} list="pinned" />
                             </Section>
                         ) : null}
+                        {code && !code.first ? codeSection : null}
                         <Section id="polar-projects" label={t("history.projects")}>
                             <NavRow
                                 icon={FolderPlus}
@@ -403,6 +426,70 @@ function Section({ id, label, children }: { id: string; label: string; children:
             </p>
             {children}
         </div>
+    );
+}
+
+/** The person's Code sessions, in the rows chats are drawn in, each marked as
+ *  code. Hidden beside the chats until there is one; with Code on screen it
+ *  says when there are none. */
+function CodeSection({ code }: { code: PolarThreadsCode }) {
+    const t = useTranslations("polar");
+    const { rows, more, loadingMore, loadMore } = code.history;
+    if (rows === null) return null;
+    if (rows.length === 0 && !code.first) return null;
+    return (
+        <Section id="polar-code" label={t("code.history")}>
+            {rows.length === 0 ? (
+                <p className="px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground">
+                    {t("code.empty")}
+                </p>
+            ) : (
+                rows.map((row) => {
+                    const active = row.id === code.activeId;
+                    return (
+                        <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => code.onOpen(row.id)}
+                            aria-current={active ? "page" : undefined}
+                            title={`${row.title} (${row.stateLabel}, ${row.repo || t("code.workspace")})`}
+                            className={cn(
+                                "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                active
+                                    ? "bg-primary/15 font-medium text-foreground"
+                                    : "hover:bg-card-hover"
+                            )}
+                        >
+                            <Code2
+                                className="size-3.5 shrink-0 text-foreground-subtle"
+                                aria-hidden
+                            />
+                            <span className="sr-only">{t("code.session")}</span>
+                            <span className="min-w-0 flex-1 truncate">{row.title}</span>
+                            <StateDot state={row.state} />
+                            <span className="sr-only">{row.stateLabel}</span>
+                        </button>
+                    );
+                })
+            )}
+            {more ? (
+                <button
+                    type="button"
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="mt-1 w-full rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+                >
+                    {t("history.more")}
+                </button>
+            ) : null}
+            <a
+                href="/apps/agents/sessions"
+                className="mt-1 flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[0.8125rem] leading-5 text-muted-foreground hover:bg-card-hover hover:text-foreground"
+            >
+                <ExternalLink className="size-3.5 shrink-0 text-foreground-subtle" />
+                <span className="min-w-0 truncate">{t("code.allSessions")}</span>
+            </a>
+        </Section>
     );
 }
 

@@ -686,9 +686,8 @@
         "chat": "Chat",
         "code": "Código",
         "noAccess": "Código funciona como una sesión de Agentes y tu cuenta no puede abrir Agentes. Pide acceso a un administrador.",
-        "recents": "Sesiones recientes",
         "newTask": "Nueva tarea",
-        "empty": "Aún no hay sesiones. Describe una tarea arriba para empezar.",
+        "empty": "Aún no hay sesiones.",
         "workspace": "Sin repositorio",
         "heading": "¿En qué debe trabajar el agente?",
         "readOnly": "Aquí puedes seguir sesiones. Para iniciar o responder necesitas gestionar Agentes.",
@@ -703,7 +702,6 @@
         "openSettings": "Conectarlo",
         "noRepos": "No hay repositorio conectado, así que la sesión abre un espacio vacío.",
         "connectRepo": "Conectar uno",
-        "back": "Ver sesiones",
         "openSession": "Abrir la sesión completa",
         "gone": "Esta sesión ya no está disponible para ti.",
         "unreachable": "No se pudo cargar esta sesión.",
@@ -711,6 +709,10 @@
         "quiet": "Aún nada. El agente está preparando su máquina.",
         "ended": "Esta sesión terminó. Abre la sesión completa para ver todo lo que hizo.",
         "reply": "Responder al agente",
-        "send": "Enviar"
+        "send": "Enviar",
+        "history": "Código",
+        "session": "Sesión de código",
+        "allSessions": "Ver sesiones",
+        "steps": "{count, plural, one {# paso} other {# pasos}}"
     }
 }

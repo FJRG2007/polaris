@@ -16,6 +16,7 @@ import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
+import { dedupeCodeRows, POLAR_CODE_PAGE } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
 import {
     listSessionsAction,
@@ -43,7 +44,10 @@ export interface PolarCodeRow {
 
 export interface PolarCodeOverview {
     readonly access: PolarCodeAccess;
+    /** A page of the person's own sessions, newest first, each task once. */
     readonly sessions: readonly PolarCodeRow[];
+    /** Where the next page starts, or null on the last one. */
+    readonly next: string | null;
 }
 
 export interface PolarCodeEntry {
@@ -60,10 +64,6 @@ export interface PolarCodeThread {
     readonly entries: readonly PolarCodeEntry[];
     readonly error: string | null;
 }
-
-/** As many sessions as a sidebar has room to be useful with; the full list is
- *  one click away on the Agents page. */
-const LISTED = 50;
 
 /** As many lines of activity as the thread shows; the session's own page keeps
  *  the rest. */
@@ -99,12 +99,30 @@ function rowOf(
     };
 }
 
-/** Whether Code is open to this account, and its sessions when it is. */
-export async function polarCodeOverview(user: SessionUser): Promise<PolarCodeOverview> {
+/**
+ * Whether Code is open to this account, and a page of its history when it is:
+ * the sessions this person started, never every session on the repositories
+ * they own. `after` is the `next` of the page before.
+ */
+export async function polarCodeOverview(
+    user: SessionUser,
+    after: string | null = null
+): Promise<PolarCodeOverview> {
     const access = await accessOf(user);
-    if (access === "none") return { access, sessions: [] };
-    const [list, t] = await Promise.all([listSessionsAction(LISTED), getTranslations("agents")]);
-    return { access, sessions: list.map((session) => rowOf(t, session)) };
+    if (access === "none") return { access, sessions: [], next: null };
+    // One more than a page, to know whether there is another.
+    const [list, t] = await Promise.all([
+        listSessionsAction(POLAR_CODE_PAGE + 1, { mine: true, ...(after ? { after } : {}) }),
+        getTranslations("agents")
+    ]);
+    const page = list.slice(0, POLAR_CODE_PAGE);
+    return {
+        access,
+        sessions: dedupeCodeRows(page.map((session) => rowOf(t, session))),
+        // The last session read, not the last one listed: a repeat dropped from
+        // the page must not be read again on the next.
+        next: list.length > POLAR_CODE_PAGE ? (page.at(-1)?.id ?? null) : null
+    };
 }
 
 /** One session as the thread shows it, or null when it is not this account's. */

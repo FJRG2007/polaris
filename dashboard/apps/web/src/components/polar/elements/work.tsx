@@ -46,6 +46,7 @@ export function Work({
     tools,
     failed,
     seconds,
+    summary: said,
     children,
     className
 }: {
@@ -60,6 +61,8 @@ export function Work({
     failed: number;
     /** How long the turn worked, when the server measured it. */
     seconds: number | null;
+    /** The folded line in the caller's words, for work that is not tool calls. */
+    summary?: string;
     children: ReactNode;
     className?: string;
 }) {
@@ -71,13 +74,14 @@ export function Work({
         setOpen(!open);
     };
     const summary =
-        seconds !== null
+        said ??
+        (seconds !== null
             ? tools > 0
                 ? t("work.done", { seconds, tools })
                 : t("elements.thoughtFor", { seconds })
             : tools > 0
               ? t("work.used", { tools })
-              : t("reasoning");
+              : t("reasoning"));
     return (
         <div className={cn("w-full text-xs text-muted-foreground", className)}>
             <button
