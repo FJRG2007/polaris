@@ -38,7 +38,7 @@ import {
     activeToolNames,
     currentViewTool,
     findToolsTool,
-    foundInSteps,
+    nextStep,
     usedInMessages
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
@@ -389,11 +389,9 @@ export async function POST(request: Request): Promise<Response> {
         messages: await convertToModelMessages(withScreenNotes(withoutFailures(sendable))),
         tools,
         activeTools: activeFor(new Set()),
-        // A tool find_tools turned up is sent from the next step on.
-        prepareStep: ({ steps }) => {
-            const found = foundInSteps(steps as never);
-            return found.size > 0 ? { activeTools: activeFor(found) } : undefined;
-        },
+        // A tool find_tools turned up is sent from the next step on, and the
+        // last step has to answer.
+        prepareStep: ({ stepNumber, steps }) => nextStep(stepNumber, STEP_MAX, steps as never, activeFor),
         toolApproval: {
             ...toolset.approval,
             ...(body.data.connectors ? connectorSet.approval : {}),

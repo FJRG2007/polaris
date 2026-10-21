@@ -127,6 +127,7 @@ import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activi
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
+import { answeredNothing } from "@/lib/polar/unanswered";
 import { repoStepOf } from "@/lib/polar/code-host";
 import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
@@ -2743,6 +2744,7 @@ function MessageView({
         return step.detail ? t("web.searching", { query: step.detail }) : t("web.searched");
     };
     const sources = mine ? [] : sourcesOf(message.parts as never);
+    const unanswered = !mine && !streaming && answeredNothing(message.parts as never);
     // A repository read refused over the GitHub App carries the step that fixes
     // it; the answer relays the reason and this draws the button.
     const gaps = mine
@@ -2937,6 +2939,18 @@ function MessageView({
                     onCheckAgain={!streaming && last && !busy ? () => onRegenerate({}) : undefined}
                 />
             ))}
+            {/* A turn that ended on its steps with nothing said is named, so
+                the empty space under them never reads as an answer. */}
+            {unanswered ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-foreground-muted">
+                    <span>{t("errors.unanswered")}</span>
+                    {last && !busy ? (
+                        <Button size="sm" variant="outline" onClick={() => onRegenerate({})}>
+                            {t("errors.provider.retry")}
+                        </Button>
+                    ) : null}
+                </div>
+            ) : null}
             {!mine && typeof meta.model === "string" ? (
                 <p className="text-xs text-foreground-subtle">
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {
