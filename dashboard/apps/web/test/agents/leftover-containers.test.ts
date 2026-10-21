@@ -99,7 +99,13 @@ describe("reaping a session that ended on its own", () => {
 
     it("saves its work first instead of taking the container down blind", async () => {
         state.sessions = [
-            { id: ID, state: "stopped", finishedAt: ago(86_400_000), workState: null, containerId: `${PREFIX}${ID}` }
+            {
+                id: ID,
+                state: "stopped",
+                finishedAt: ago(86_400_000),
+                workState: null,
+                containerId: `${PREFIX}${ID}`
+            }
         ];
         expect(await reapLeftoverContainers(NOW)).toBe(1);
         expect(state.endContainerSession).toHaveBeenCalledWith(ID);
@@ -108,16 +114,32 @@ describe("reaping a session that ended on its own", () => {
 
     it("does not count one whose work had to be kept", async () => {
         state.sessions = [
-            { id: ID, state: "failed", finishedAt: ago(86_400_000), workState: null, containerId: `${PREFIX}${ID}` }
+            {
+                id: ID,
+                state: "failed",
+                finishedAt: ago(86_400_000),
+                workState: null,
+                containerId: `${PREFIX}${ID}`
+            }
         ];
-        state.endContainerSession.mockResolvedValueOnce({ kind: "kept", commits: 2, branch: "polaris/x" } as never);
+        state.endContainerSession.mockResolvedValueOnce({
+            kind: "kept",
+            commits: 2,
+            branch: "polaris/x"
+        } as never);
         expect(await reapLeftoverContainers(NOW)).toBe(0);
         expect(state.composeDown).not.toHaveBeenCalled();
     });
 
     it("takes down one whose work was already pushed without asking again", async () => {
         state.sessions = [
-            { id: ID, state: "stopped", finishedAt: ago(86_400_000), workState: "pushed", containerId: `${PREFIX}${ID}` }
+            {
+                id: ID,
+                state: "stopped",
+                finishedAt: ago(86_400_000),
+                workState: "pushed",
+                containerId: `${PREFIX}${ID}`
+            }
         ];
         expect(await reapLeftoverContainers(NOW)).toBe(1);
         expect(state.endContainerSession).not.toHaveBeenCalled();

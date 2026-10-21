@@ -17,7 +17,8 @@ vi.mock("@/lib/github-service", () => ({}));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: vi.fn() }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: vi.fn() }));
 
-const { parseSaveWork, pushFailureReason, saveWorkScript } = await import("@/lib/agents/session-work");
+const { parseSaveWork, pushFailureReason, saveWorkScript } =
+    await import("@/lib/agents/session-work");
 
 // Real git processes, a dozen per test, and slow to spawn on some machines.
 vi.setConfig({ testTimeout: 180_000 });
@@ -64,7 +65,13 @@ function run(
 ): ReturnType<typeof parseSaveWork> {
     const authFile = auth ? posix(join(root, "auth")) : "";
     if (auth) writeFileSync(join(root, "auth"), "X-Fixture: yes");
-    const script = saveWorkScript({ workdir: posix(work), branch, defaultBranch: "main", policy, authFile });
+    const script = saveWorkScript({
+        workdir: posix(work),
+        branch,
+        defaultBranch: "main",
+        policy,
+        authFile
+    });
     const output = execFileSync("sh", ["-c", script], { encoding: "utf8" });
     return parseSaveWork(output);
 }
@@ -72,7 +79,11 @@ function run(
 describe("the save-work script", () => {
     it("reports a clean checkout and pushes nothing", () => {
         const { root, work } = checkout();
-        expect(run(work, root)).toMatchObject({ status: "clean", commits: 0, branch: "polaris/fix" });
+        expect(run(work, root)).toMatchObject({
+            status: "clean",
+            commits: 0,
+            branch: "polaris/fix"
+        });
     });
 
     it("commits what is dirty and pushes it with the commits before it", () => {
@@ -82,7 +93,11 @@ describe("the save-work script", () => {
         git(work, "commit", "-q", "-m", "agent commit");
         writeFileSync(join(work, "b.txt"), "left over\n");
 
-        expect(run(work, root)).toMatchObject({ status: "pushed", commits: 2, branch: "polaris/fix" });
+        expect(run(work, root)).toMatchObject({
+            status: "pushed",
+            commits: 2,
+            branch: "polaris/fix"
+        });
         expect(git(remote, "log", "--format=%s", "polaris/fix")).toContain("WIP:");
         expect(git(work, "status", "--porcelain")).toBe("");
     });
@@ -91,7 +106,11 @@ describe("the save-work script", () => {
         const { root, work, remote } = checkout();
         git(work, "checkout", "-q", "main");
         writeFileSync(join(work, "c.txt"), "c\n");
-        expect(run(work, root, "enabled")).toMatchObject({ status: "pushed", commits: 1, branch: "polaris/fix" });
+        expect(run(work, root, "enabled")).toMatchObject({
+            status: "pushed",
+            commits: 1,
+            branch: "polaris/fix"
+        });
         expect(git(remote, "log", "--format=%s", "polaris/fix")).toContain("WIP:");
         expect(git(remote, "log", "--format=%s", "main")).not.toContain("WIP:");
     });
@@ -100,7 +119,11 @@ describe("the save-work script", () => {
         for (const policy of ["restricted", "enabled"]) {
             const { root, work, remote } = checkout();
             writeFileSync(join(work, "c.txt"), "c\n");
-            expect(run(work, root, policy, true, "main")).toMatchObject({ status: "refused", commits: 1, branch: "main" });
+            expect(run(work, root, policy, true, "main")).toMatchObject({
+                status: "refused",
+                commits: 1,
+                branch: "main"
+            });
             expect(git(remote, "log", "--format=%s", "main")).not.toContain("WIP:");
             expect(existsSync(join(root, "auth"))).toBe(false);
         }
@@ -118,7 +141,10 @@ describe("the save-work script", () => {
         git(work, "config", "user.name", "Fixture");
         expect(() => git(work, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")).toThrow();
         writeFileSync(join(work, "h.txt"), "h\n");
-        expect(run(work, root, "enabled", true, "main")).toMatchObject({ status: "refused", branch: "main" });
+        expect(run(work, root, "enabled", true, "main")).toMatchObject({
+            status: "refused",
+            branch: "main"
+        });
     });
 
     it("pushes nothing at all when the repository is read-only for agents", () => {

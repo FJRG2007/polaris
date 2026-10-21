@@ -887,7 +887,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "agent.waiting",
         group: "agents",
         label: "An agent needs you",
-        description: "A session stopped on a question or a permission prompt and is waiting for an answer.",
+        description:
+            "A session stopped on a question or a permission prompt and is waiting for an answer.",
         level: "warning",
         // On the bell and not in the mail: running an agent in the background is
         // the whole reason to want this, and a question asked twice in an hour
@@ -906,7 +907,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "agent.ended",
         group: "agents",
         label: "A session ended on its own",
-        description: "A session failed, stopped reporting, or its agent exited without anybody pressing Stop.",
+        description:
+            "A session failed, stopped reporting, or its agent exited without anybody pressing Stop.",
         level: "warning",
         defaults: { inapp: true, email: false }
     },
@@ -914,7 +916,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "agent.work",
         group: "agents",
         label: "A session's work could not be pushed",
-        description: "A session ended with commits or changes Polaris could not push, so it kept them for you.",
+        description:
+            "A session ended with commits or changes Polaris could not push, so it kept them for you.",
         level: "danger",
         // Mailed: until somebody pushes or discards it, that work exists in one
         // container and nowhere else.

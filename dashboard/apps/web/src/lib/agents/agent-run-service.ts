@@ -103,7 +103,10 @@ export interface ListRunsInput {
     limit?: number | undefined;
 }
 
-export async function listAgentRuns(ownerId: string, input: ListRunsInput = {}): Promise<AgentRunView[]> {
+export async function listAgentRuns(
+    ownerId: string,
+    input: ListRunsInput = {}
+): Promise<AgentRunView[]> {
     const rows = await prisma.agentRun.findMany({
         where: {
             repo: { ownerId, ...(input.repoFullName ? { repoFullName: input.repoFullName } : {}) },
@@ -149,7 +152,9 @@ export interface CreateRunInput {
  * whatever is about to run and never store it; what survives is the hash, so a
  * database dump cannot be replayed as a live run credential.
  */
-export async function createAgentRun(input: CreateRunInput): Promise<{ id: string; token: string }> {
+export async function createAgentRun(
+    input: CreateRunInput
+): Promise<{ id: string; token: string }> {
     const token = generateToken();
     const row = await prisma.agentRun.create({
         data: {
@@ -193,7 +198,10 @@ export async function issueRunToken(runId: string): Promise<string> {
 }
 
 /** Note that the run actually started, and where. */
-export async function markRunStarted(runId: string, where: { githubRunId?: string; containerId?: string }): Promise<void> {
+export async function markRunStarted(
+    runId: string,
+    where: { githubRunId?: string; containerId?: string }
+): Promise<void> {
     await prisma.agentRun.updateMany({
         where: { id: runId, state: "queued" },
         data: {

@@ -764,7 +764,10 @@ export async function sweepSilentSessions(maxSilentMs = 6 * 60 * 60 * 1000): Pro
         // and a container whose work could not be pushed stays.
         if (session.place !== "host" && session.containerId)
             await endContainerSession(session.id).catch((error) => {
-                console.error(`polaris: could not end the container of session ${session.id}:`, error);
+                console.error(
+                    `polaris: could not end the container of session ${session.id}:`,
+                    error
+                );
             });
     }
     return stale.length;

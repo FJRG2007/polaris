@@ -543,7 +543,12 @@ function WorkOutcome({
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {t("session.work.retry")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void discard()} disabled={busy}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void discard()}
+                        disabled={busy}
+                    >
                         {t("session.work.discard")}
                     </Button>
                 </div>

@@ -35,7 +35,10 @@ export default async function AgentSessionPage({
                 // header describing something that is not there.
                 description={
                     session.repoFullName
-                        ? t("pages.sessionOn", { repo: session.repoFullName, branch: session.branch })
+                        ? t("pages.sessionOn", {
+                              repo: session.repoFullName,
+                              branch: session.branch
+                          })
                         : t("pages.sessionWorkspace")
                 }
             />

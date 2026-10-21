@@ -42,7 +42,8 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
             if (have !== null && have !== undefined) return false;
         } else if (typeof want === "object" && want !== null && !(want instanceof Date)) {
             const rule = want as { not?: unknown; in?: unknown[]; notIn?: unknown[] };
-            if ("not" in rule && rule.not === null && (have === null || have === undefined)) return false;
+            if ("not" in rule && rule.not === null && (have === null || have === undefined))
+                return false;
             if (rule.in && !rule.in.includes(have)) return false;
             if (rule.notIn && rule.notIn.includes(have)) return false;
         } else if (have !== want) return false;
@@ -57,12 +58,24 @@ vi.mock("@polaris/db", () => {
             const { OR: _or, createdAt: _created, ...rest } = where;
             return [...rows.values()].filter((row) => matches(row, rest));
         },
-        update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        update: async ({
+            where,
+            data
+        }: {
+            where: { id: string };
+            data: Record<string, unknown>;
+        }) => {
             const row = rows.get(where.id)!;
             Object.assign(row, data);
             return row;
         },
-        updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        updateMany: async ({
+            where,
+            data
+        }: {
+            where: Record<string, unknown>;
+            data: Record<string, unknown>;
+        }) => {
             let count = 0;
             for (const row of rows.values()) {
                 if (!matches(row, where)) continue;
@@ -78,7 +91,13 @@ vi.mock("@polaris/db", () => {
             agentRun: table(db.runs),
             agentSessionEvent: { createMany: async () => ({ count: 0 }) },
             notification: {
-                updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+                updateMany: async ({
+                    where,
+                    data
+                }: {
+                    where: Record<string, unknown>;
+                    data: Record<string, unknown>;
+                }) => {
                     let count = 0;
                     for (const row of db.notifications) {
                         if (row.type !== where.type || row.href !== where.href) continue;
@@ -129,7 +148,10 @@ vi.mock("@/lib/connection-pool", () => ({ borrowSsh: vi.fn() }));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/host-service", () => ({ getHostConnectionUnscoped: vi.fn() }));
 vi.mock("@/lib/agents/agent-readiness", () => ({ credentialsForAgent: () => ({}) }));
-vi.mock("@/lib/agents/model-keys", () => ({ secretForAccount: vi.fn(), sessionSecretsFor: vi.fn() }));
+vi.mock("@/lib/agents/model-keys", () => ({
+    secretForAccount: vi.fn(),
+    sessionSecretsFor: vi.fn()
+}));
 vi.mock("@/lib/agents/agent-defaults-service", () => ({
     GENERAL_SCOPE: "general",
     getPlatformAgentDefaults: vi.fn(),
@@ -208,7 +230,9 @@ describe("an agent that needs you", () => {
         expect(db.sessions.get("s1")!.waitingNotifiedAt).toBeNull();
 
         await service.recordSessionEvents("s1", [ask]);
-        expect(notify.mock.calls.filter(([input]) => input.event === "agent.waiting")).toHaveLength(2);
+        expect(notify.mock.calls.filter(([input]) => input.event === "agent.waiting")).toHaveLength(
+            2
+        );
     });
 
     it("marks the notice read when the page is opened, without a second notice", async () => {
@@ -304,7 +328,9 @@ describe("stopping a session never loses its work", () => {
 
     it("keeps the container and tells the owner when the push fails", async () => {
         session();
-        said("! [rejected] HEAD -> polaris/fix-login (fetch first)\npolaris-work: rejected 2 polaris/fix-login");
+        said(
+            "! [rejected] HEAD -> polaris/fix-login (fetch first)\npolaris-work: rejected 2 polaris/fix-login"
+        );
         const outcome = await runtime.stopSession("s1");
 
         expect(outcome).toMatchObject({ kind: "kept", commits: 2, reason: "rejected" });
@@ -312,7 +338,10 @@ describe("stopping a session never loses its work", () => {
         expect(db.sessions.get("s1")).toMatchObject({ workState: "kept", workError: "rejected" });
         const kept = notify.mock.calls.filter(([input]) => input.event === "agent.work");
         expect(kept).toHaveLength(1);
-        expect(kept[0]![0]).toMatchObject({ actionRequired: true, href: "/apps/agents/sessions/s1" });
+        expect(kept[0]![0]).toMatchObject({
+            actionRequired: true,
+            href: "/apps/agents/sessions/s1"
+        });
     });
 
     it("keeps the container when the machine cannot be asked at all", async () => {
@@ -362,7 +391,11 @@ describe("the sweep of silent sessions", () => {
         expect(daemon.composeDown).toHaveBeenCalledTimes(1);
         expect(daemon.composeDown).toHaveBeenCalledWith("polaris-session-s1");
         expect(db.sessions.get("s1")).toMatchObject({ state: "failed", workState: "pushed" });
-        expect(db.sessions.get("s2")).toMatchObject({ state: "failed", workState: "kept", workError: "auth" });
+        expect(db.sessions.get("s2")).toMatchObject({
+            state: "failed",
+            workState: "kept",
+            workError: "auth"
+        });
         const events = notify.mock.calls.map(([input]) => input.event);
         expect(events.filter((event) => event === "agent.ended")).toHaveLength(2);
         expect(events.filter((event) => event === "agent.work")).toHaveLength(1);

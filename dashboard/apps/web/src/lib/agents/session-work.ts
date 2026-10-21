@@ -22,7 +22,11 @@ import * as commands from "./session-commands";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import type { SessionWorkReason } from "./session-service";
 import { clearWorkKept, noticeWorkKept } from "./agent-notices";
-import { cloneAuthHeader, resolveGithubRepo, githubAppInstallationToken } from "@/lib/github-service";
+import {
+    cloneAuthHeader,
+    resolveGithubRepo,
+    githubAppInstallationToken
+} from "@/lib/github-service";
 
 /** Where a checkout lives inside a session's container when the row has none. */
 const DEFAULT_WORKDIR = "/session/repo";
@@ -159,9 +163,14 @@ export function parseSaveWork(output: string): ParsedSave | null {
 
 /** Why a push that ran did not land, from what git printed. */
 export function pushFailureReason(said: string): SessionWorkReason {
-    if (/authentication failed|could not read username|permission to .* denied|\b403\b|\b401\b/i.test(said))
+    if (
+        /authentication failed|could not read username|permission to .* denied|\b403\b|\b401\b/i.test(
+            said
+        )
+    )
         return "auth";
-    if (/rejected|protected branch|non-fast-forward|fetch first|declined/i.test(said)) return "rejected";
+    if (/rejected|protected branch|non-fast-forward|fetch first|declined/i.test(said))
+        return "rejected";
     return "other";
 }
 
@@ -213,7 +222,10 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
                 await ports.writeFile(row.containerId, path, Readable.from([bytes]), bytes.length);
                 authFile = path;
             } catch (error) {
-                console.error(`polaris: could not hand session ${sessionId} its push credential:`, error);
+                console.error(
+                    `polaris: could not hand session ${sessionId} its push credential:`,
+                    error
+                );
                 return kept("unreachable");
             }
         }
@@ -289,14 +301,18 @@ export async function endContainerSession(sessionId: string): Promise<SaveOutcom
     });
     const outcome = await saveSessionWork(sessionId);
     await recordOutcome(sessionId, outcome).catch((error) => {
-        console.error(`polaris: could not record what became of session ${sessionId}'s work:`, error);
+        console.error(
+            `polaris: could not record what became of session ${sessionId}'s work:`,
+            error
+        );
     });
     if (outcome.kind === "kept") {
         await noticeWorkKept(sessionId, outcome.branch);
         return outcome;
     }
     await clearWorkKept(sessionId);
-    if (row?.containerId) await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId)
+        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
     return outcome;
 }
 
@@ -311,5 +327,6 @@ export async function discardSessionWork(sessionId: string): Promise<void> {
         data: { workState: "discarded", workError: null }
     });
     await clearWorkKept(sessionId);
-    if (row?.containerId) await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
+    if (row?.containerId)
+        await new HostdPorts().composeDown(row.containerId).catch(() => undefined);
 }
