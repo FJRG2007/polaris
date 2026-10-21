@@ -214,7 +214,9 @@ export function backupName(at: Date): string {
  * server goes on replacing `level.dat` - a fresh copy renamed over it, which also
  * changes the world folder itself - and a player leaving writes their own files
  * the same way. A rename never tears what tar already opened, so those copies are
- * sound: `tar: world: file changed as we read it` failed sound backups.
+ * sound: `tar: world: file changed as we read it` failed sound backups. A file
+ * gone before tar opened it is only sound when it was the save's scratch copy -
+ * a `level.dat` caught mid-rename is missing from the archive altogether.
  *
  * A region file moving is different: it means saving did not hold, and that
  * chunk may be half old and half new. So is anything on Bedrock, whose world is
@@ -228,10 +230,16 @@ export function onlyMovedUnderTar(edition: MinecraftEdition, code: number, outpu
         .filter(Boolean);
     if (lines.length === 0) return false;
     return lines.every((line) => {
-        const moved =
-            /^tar: (.+): (?:file changed as we read it|File removed before we read it)$/.exec(line);
-        return moved !== null && !moved[1]!.endsWith(".mca");
+        const moved = /^tar: (.+): (file changed as we read it|File removed before we read it)$/.exec(line);
+        if (moved === null || moved[1]!.endsWith(".mca")) return false;
+        return moved[2] === "file changed as we read it" || isScratchSave(moved[1]!);
     });
+}
+
+/** A copy the game writes only to rename over, or keeps as the previous one: never the file itself. */
+function isScratchSave(path: string): boolean {
+    const name = path.slice(path.lastIndexOf("/") + 1);
+    return /^(?:level|[0-9a-f-]{36}-)-?\d+\.dat$|\.dat_(?:old|new)$|\.dat\.tmp$/.test(name);
 }
 
 /** When a backup was taken, from its name. Null for anything else in the folder. */

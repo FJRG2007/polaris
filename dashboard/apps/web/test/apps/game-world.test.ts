@@ -73,6 +73,33 @@ describe("an archive tar finished while files moved", () => {
         ).toBe(true);
     });
 
+    it("refuses one where the world's own file vanished before tar opened it", () => {
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world: file changed as we read it\ntar: world/level.dat: File removed before we read it"
+            )
+        ).toBe(false);
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world/playerdata/2c1e9d4a-0b6f-4a1e-9c3d-5e7f8a9b0c1d.dat: File removed before we read it"
+            )
+        ).toBe(false);
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                [
+                    "tar: world/level.dat_old: File removed before we read it",
+                    "tar: world/playerdata/2c1e9d4a-0b6f-4a1e-9c3d-5e7f8a9b0c1d-8123456789.dat: File removed before we read it"
+                ].join("\n")
+            )
+        ).toBe(true);
+    });
+
     it("refuses one where a region file moved, because saving did not hold", () => {
         expect(
             world.onlyMovedUnderTar(
