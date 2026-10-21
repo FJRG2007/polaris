@@ -16,7 +16,7 @@ import { HostdClient } from "@polaris/hostd-client";
 import { getCapabilities, loadEnv } from "@polaris/config";
 import { ContainerDriver } from "@/lib/deploy/container-driver";
 import { linkedAccountToken } from "@/lib/connections/storage-token";
-import { fetchUnasMetrics, type UnasMetrics } from "@/lib/unifi-unas";
+import { fetchUnasMetrics, type UnasMetrics, type UnasTarget } from "@/lib/unifi-unas";
 import { deleteMetricsForSubject } from "@/lib/metrics-history-service";
 import { grantedConnectionIds, grantedRootPath } from "@/lib/drive-acl-service";
 import type { StorageConfig, StorageCredentials, StorageProviderKind } from "@polaris/core";
@@ -687,8 +687,8 @@ async function localDriveDisk(): Promise<StorageDriver> {
     return driver;
 }
 
-/** Native UniFi UNAS metrics for a connection (via the UniFi OS console API). */
-export async function getUnasMetrics(connectionId: string, ownerId: string): Promise<UnasMetrics> {
+/** The console account of a UniFi UNAS connection, decrypted for one sign-in. */
+export async function getUnasTarget(connectionId: string, ownerId: string): Promise<UnasTarget> {
     const row = await loadConnection(connectionId, ownerId);
     if (row.kind !== "unifi-unas") throw new Error("Not a UniFi UNAS connection");
     // The console sign-in carries the password too.
@@ -706,13 +706,18 @@ export async function getUnasMetrics(connectionId: string, ownerId: string): Pro
                   env.POLARIS_MASTER_KEY
               )
             : {};
-    return fetchUnasMetrics({
+    return {
         host: config.host,
         port: config.port,
         username: config.username,
         password: credentials.password ?? "",
         secure: config.secure
-    });
+    };
+}
+
+/** Native UniFi UNAS metrics for a connection (via the UniFi OS console API). */
+export async function getUnasMetrics(connectionId: string, ownerId: string): Promise<UnasMetrics> {
+    return fetchUnasMetrics(await getUnasTarget(connectionId, ownerId));
 }
 
 /** The non-secret columns of a connection the Drive UI needs. `credentialKeyId`

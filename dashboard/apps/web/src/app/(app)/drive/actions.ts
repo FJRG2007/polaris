@@ -12,7 +12,9 @@ import { AddressRefused } from "@/lib/storage-whereabouts/follow";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
+import { z } from "zod";
 import { fetchUnasMetrics } from "@/lib/unifi-unas";
+import { runBackupTask, writeFanProfile } from "@/lib/unifi-unas-control";
 import { listLocks } from "@/lib/access-lock-service";
 import { listConnections } from "@/lib/connections/store";
 import { requirePermission, requireUser } from "@/lib/session";
@@ -67,6 +69,7 @@ import {
     createConnection,
     discoverUnasShares,
     getDriverForConnection,
+    getUnasTarget,
     setUnasSmbShare,
     updateConnection
 } from "@/lib/storage-service";
@@ -320,6 +323,70 @@ export async function setUnasShareAction(
         };
     }
     revalidatePath("/drive");
+    return {};
+}
+
+const unasFanSchema = z.object({
+    connectionId: z.string().trim().min(1),
+    profile: z.enum(["quiet", "balanced", "cooling"])
+});
+
+/** Set a UNAS console's native fan profile. */
+export async function setUnasFanProfileAction(
+    connectionId: string,
+    profile: string
+): Promise<{ error?: string }> {
+    const user = await requirePermission("connections.manage");
+    const t = await getTranslations("drive");
+    const input = unasFanSchema.safeParse({ connectionId, profile });
+    if (!input.success) return { error: t("unasControl.fanFailed") };
+    try {
+        await writeFanProfile(
+            await getUnasTarget(input.data.connectionId, user.id),
+            input.data.profile
+        );
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : t("unasControl.fanFailed") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "connection.unas.fan",
+        targetType: "connection",
+        targetId: input.data.connectionId,
+        metadata: { profile: input.data.profile }
+    });
+    return {};
+}
+
+const unasBackupSchema = z.object({
+    connectionId: z.string().trim().min(1),
+    taskId: z.string().trim().min(1).max(200)
+});
+
+/** Start one of a UNAS console's backup tasks now. */
+export async function runUnasBackupAction(
+    connectionId: string,
+    taskId: string
+): Promise<{ error?: string }> {
+    const user = await requirePermission("connections.manage");
+    const t = await getTranslations("drive");
+    const input = unasBackupSchema.safeParse({ connectionId, taskId });
+    if (!input.success) return { error: t("unasControl.runFailed") };
+    try {
+        await runBackupTask(
+            await getUnasTarget(input.data.connectionId, user.id),
+            input.data.taskId
+        );
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : t("unasControl.runFailed") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "connection.unas.backup",
+        targetType: "connection",
+        targetId: input.data.connectionId,
+        metadata: { taskId: input.data.taskId }
+    });
     return {};
 }
 

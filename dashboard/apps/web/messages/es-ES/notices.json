@@ -307,6 +307,20 @@
         "movedBody": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para el dispositivo {mac} en los ajustes DHCP del router.",
         "movedBodyNoMac": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para él en los ajustes DHCP del router."
     },
+    "unas": {
+        "poolUnprotectedTitle": "{name}: el grupo {subject} no está protegido",
+        "poolUnprotectedBody": "El grupo de almacenamiento {subject} de {name} ya no tiene redundancia, así que otro disco que falle pierde datos. Revisa sus bahías en Drive.",
+        "poolUsageTitle": "{name}: el grupo {subject} está al {value} %",
+        "poolUsageBody": "El grupo de almacenamiento {subject} de {name} está al {value} %. Libera espacio o añade un disco antes de que se llene.",
+        "diskUnhealthyTitle": "{name}: el disco de la bahía {subject} tiene un problema",
+        "diskUnhealthyBody": "El disco de la bahía {subject} de {name} indica que no está sano. Cámbialo antes de que el grupo pierda su protección.",
+        "diskTemperatureTitle": "{name}: el disco de la bahía {subject} se calienta",
+        "diskTemperatureBody": "El disco de la bahía {subject} de {name} está a {value} °C. Revisa la ventilación del NAS o pon sus ventiladores en Refrigeración desde Drive.",
+        "backupFailedTitle": "{name}: la copia {subject} falló",
+        "backupFailedBody": "La última ejecución de la copia {subject} de {name} terminó con errores. Vuelve a lanzarla desde Drive o revisa su destino en la consola.",
+        "backupOverdueTitle": "{name}: la copia {subject} no se hizo",
+        "backupOverdueBody": "La copia {subject} de {name} está programada pero no se hizo en su última hora. Lánzala ahora desde Drive."
+    },
     "volume": {
         "downTitle": "{service} no puede leer sus volúmenes NAS",
         "unreachableBody": "Polaris no llega a {storage}, donde están los volúmenes de {service} ({volumes}). El servicio sigue en marcha, pero no puede leer ni escribir esos archivos. Comprueba que el dispositivo está encendido y conectado: Polaris lo reconecta solo en cuanto responda.",

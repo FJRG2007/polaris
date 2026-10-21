@@ -143,6 +143,14 @@ class UNASMQTTClient:
                 self._store_value("unas_smb_connections", payload)
             elif item == "clients":
                 self._store_attributes("unas_smb_connections", payload)
+            elif item == "time_machine":
+                self._store_value("unas_smb_time_machine", payload)
+            elif item == "time_machine_shares":
+                self._store_attributes("unas_smb_time_machine", payload)
+
+        # unas/network/<leaf>
+        elif category == "network":
+            self._store_value(f"unas_net_{item}", payload)
         
         # unas/nfs/mounts or unas/nfs/clients
         elif category == "nfs":
@@ -162,6 +170,10 @@ class UNASMQTTClient:
         if category in ("hdd", "nvme"):
             self._store_value(f"unas_{category}_{identifier}_{metric}", payload)
         
+        # unas/scrub/<md>/<metric>
+        elif category == "scrub":
+            self._store_value(f"unas_scrub_{identifier}_{metric}", payload)
+
         # unas/pool/<num>/<metric>
         elif category == "pool":
             self._store_value(f"unas_pool{identifier}_{metric}", payload)

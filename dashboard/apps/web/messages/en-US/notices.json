@@ -307,6 +307,20 @@
         "movedBody": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for the device {mac} in your router's DHCP settings.",
         "movedBodyNoMac": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for it in your router's DHCP settings."
     },
+    "unas": {
+        "poolUnprotectedTitle": "{name}: pool {subject} is not protected",
+        "poolUnprotectedBody": "The storage pool {subject} on {name} has no redundancy left, so one more failing disk loses data. Check its bays in Drive.",
+        "poolUsageTitle": "{name}: pool {subject} is {value}% full",
+        "poolUsageBody": "The storage pool {subject} on {name} is {value}% full. Free up space or add a disk before it runs out.",
+        "diskUnhealthyTitle": "{name}: the disk in bay {subject} has a problem",
+        "diskUnhealthyBody": "The disk in bay {subject} of {name} reports it is not healthy. Replace it before the pool loses its protection.",
+        "diskTemperatureTitle": "{name}: the disk in bay {subject} is running hot",
+        "diskTemperatureBody": "The disk in bay {subject} of {name} is at {value} °C. Check the airflow around the NAS, or set its fans to Cooling in Drive.",
+        "backupFailedTitle": "{name}: backup {subject} failed",
+        "backupFailedBody": "The last run of the backup {subject} on {name} ended with errors. Run it again from Drive, or check its destination on the console.",
+        "backupOverdueTitle": "{name}: backup {subject} did not run",
+        "backupOverdueBody": "The backup {subject} on {name} is scheduled but missed its last run. Run it now from Drive."
+    },
     "volume": {
         "downTitle": "{service} cannot read its NAS volumes",
         "unreachableBody": "Polaris cannot reach {storage}, where the volumes of {service} live ({volumes}). The service is still running, but cannot read or write those files. Check that the device is on and connected: Polaris reconnects it on its own as soon as it answers.",

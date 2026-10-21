@@ -8,6 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import UNASDataUpdateCoordinator
+from .console import console_binary_sensors
 from .const import DOMAIN, get_device_info
 
 
@@ -22,7 +23,9 @@ async def async_setup_entry(
         UNASScriptsInstalledSensor(coordinator),
         UNASMonitorRunningSensor(coordinator),
         UNASFanControlRunningSensor(coordinator),
+        *console_binary_sensors(coordinator),
     ])
+    coordinator.binary_sensor_add_entities = async_add_entities
 
 
 class UNASScriptsInstalledSensor(CoordinatorEntity, BinarySensorEntity):

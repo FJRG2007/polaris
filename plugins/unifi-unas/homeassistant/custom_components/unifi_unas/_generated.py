@@ -28,4 +28,18 @@ def get_mqtt_topics(entry_id: str) -> dict:
         "smb": f"{root}/smb",
         "nfs": f"{root}/nfs",
         "share": f"{root}/share",
+        "network": f"{root}/network",
+        "scrub": f"{root}/scrub",
     }
+
+CONTROL_TOPICS = {
+    "fan_profile": "fan/profile",
+    "scrub_run": "scrub/run",
+}
+
+# Native console fan profiles: option -> value the Drive API takes.
+FAN_PROFILES = {
+    "quiet": "quiet",
+    "balanced": "default",
+    "cooling": "cooling",
+}

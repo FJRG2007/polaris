@@ -38,6 +38,11 @@ const { dnsInsights, engineMetrics, lookupName, rollUpHistory, tailQueries } =
     await import("@/lib/dns-blocker/insights");
 const { queryFilterSchema } = await import("@/lib/dns-blocker/query-log");
 
+// Midday: the last 24 hours reach into yesterday's file. In the last hour of a
+// UTC day they end on midnight and touch today's file only.
+vi.useFakeTimers({ toFake: ["Date"] });
+vi.setSystemTime(new Date("2026-06-15T12:30:00Z"));
+
 const LINE = [
     new Date(Date.now() - 60_000).toISOString().slice(0, 19).replace("T", " "),
     "10.0.0.2",

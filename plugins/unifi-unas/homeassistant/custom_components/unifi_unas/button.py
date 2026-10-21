@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from . import UNASDataUpdateCoordinator
+from .console import ScrubRunButton
 from .const import DOMAIN, get_backup_device_info, get_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ async def async_setup_entry(
         UNASReinstallScriptsButton(coordinator),
         UNASRebootButton(coordinator),
         UNASShutdownButton(coordinator),
+        ScrubRunButton(coordinator),
     ])
 
     coordinator.button_add_entities = async_add_entities

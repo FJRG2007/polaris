@@ -30,6 +30,7 @@ Assistant entities are unchanged.
 
 On-device agent:
 - [x] System metrics: uptime, OS/drive/protect version, CPU usage/temp, memory, disk I/O, fan PWM/percent, machine-id
+- [x] Console parity (2026-10-20): bay presence, All Disks summary, uplink (IP, speed, rates), md scrub state + Run Now, Time Machine (read), native fan profile (Quiet/Balanced/Cooling) - sources and the items that cannot be sourced in `docs/data-sources.md`
 - [x] HDD SMART: model, serial, firmware, status, temp, rpm, power-on-hours, bad sectors, size
 - [x] NVMe SMART: temp, wear %, spare, media errors, unsafe shutdowns, size
 - [x] Storage pools via local Drive API with `df` fallback
@@ -45,7 +46,11 @@ On-device agent:
 Home Assistant glue (phase 5):
 - [x] config_flow, entities (sensor/binary_sensor/button/number/select/switch) - reused, MQTT contract identical
 - [x] Deploy single binary + env file + systemd unit over SSH (replaces script upload + apt/pip installs)
-- [x] Backup task API (buttons/switches) - unchanged
+- [x] Backup task API (buttons/switches) - unchanged; plus failed/overdue problem sensors
+- [x] Console entities: online, Time Machine, per-bay present/problem, pool no-protection, scrub, fan profile select, scrub button, SMB sign-in event entity
+- [x] Alert blueprints (offline, storage/backup problem, disk temperature, pool usage, unexpected sign-in)
+- [ ] Snapshot inventory/settings (sourced, not implemented)
+- [ ] Release `unifi-unas-v0.2.0` (tag push) and an on-device run of the new readers
 - [x] Clean removal restores stock fan control (no packages to uninstall now)
 
 Packaging / release (phases 6-7):

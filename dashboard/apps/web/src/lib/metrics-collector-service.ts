@@ -16,6 +16,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { publishMetricTick } from "./metrics-live";
 import type { DockerDriver } from "@polaris/docker";
 import { recordMachineCores } from "./machine-cores";
+import { watchUnasAlerts } from "./unas-alerts";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { getServerMetrics } from "./server-metrics-service";
@@ -618,6 +619,7 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
                     diskUsedBytes: bigBytes(metrics.usedBytes),
                     diskTotalBytes: bigBytes(metrics.totalBytes)
                 });
+                await watchUnasAlerts({ id: conn.id, ownerId: conn.ownerId }, metrics);
                 continue;
             }
             const driver = await getDriverForConnection(conn.id);
