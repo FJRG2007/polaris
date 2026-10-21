@@ -35,6 +35,7 @@ export function DnsReputationCard() {
     const [flagged, setFlagged] = useState<FlaggedDomain[] | null>(null);
     const [search, setSearch] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [version, setVersion] = useState(0);
 
     useEffect(() => {
@@ -42,8 +43,9 @@ export function DnsReputationCard() {
         const timer = setTimeout(() => {
             void dnsReputationAction({ search }).then((result) => {
                 if (!live) return;
-                if (result.error !== undefined) setError(result.error);
+                if (result.error !== undefined) setLoadError(result.error);
                 else {
+                    setLoadError(null);
                     setOff(result.off);
                     setFlagged(result.flagged);
                 }
@@ -120,7 +122,22 @@ export function DnsReputationCard() {
                         onChange={(event) => setSearch(event.target.value)}
                     />
                 </div>
-                {flagged === null ? (
+                {loadError ? (
+                    <div role="alert" className="flex min-w-0 items-center gap-2 text-sm">
+                        <span className="min-w-0 flex-1 text-danger">{loadError}</span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0"
+                            onClick={() => {
+                                setLoadError(null);
+                                setVersion((value) => value + 1);
+                            }}
+                        >
+                            {t("actions.retry")}
+                        </Button>
+                    </div>
+                ) : flagged === null ? (
                     <Skeleton className="h-16 w-full" />
                 ) : flagged.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("reputation.none")}</p>
@@ -136,7 +153,11 @@ export function DnsReputationCard() {
                                 </code>
                                 {DNS_REPUTATION_CATEGORIES.filter((category) => row[category]).map(
                                     (category) => (
-                                        <Badge key={category} variant="neutral" className="shrink-0">
+                                        <Badge
+                                            key={category}
+                                            variant="neutral"
+                                            className="shrink-0"
+                                        >
                                             {t("reputation.logLabel", {
                                                 category: t(`reputation.category.${category}`)
                                             })}

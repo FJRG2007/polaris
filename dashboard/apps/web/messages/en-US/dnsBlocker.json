@@ -518,7 +518,8 @@
             "integrationOff": "Dymo is not connected, so nothing is blocked by reputation.",
             "noKey": "Dymo has no API key yet, so nothing is blocked by reputation.",
             "noCategory": "Turn on a category above and save first.",
-            "budget": "The lookups for now are spent. Try again in a minute."
+            "budget": "The lookups for now are spent. Try again in a minute.",
+            "failed": "Dymo did not answer. Try again in a minute."
         },
         "search": "Search flagged domains",
         "none": "No domain has been flagged yet.",

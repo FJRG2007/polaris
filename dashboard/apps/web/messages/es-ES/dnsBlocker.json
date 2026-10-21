@@ -518,7 +518,8 @@
             "integrationOff": "Dymo no está conectado, así que no se bloquea nada por reputación.",
             "noKey": "Dymo aún no tiene clave de API, así que no se bloquea nada por reputación.",
             "noCategory": "Activa antes una categoría arriba y guarda.",
-            "budget": "Ya se han gastado las consultas de ahora. Prueba dentro de un minuto."
+            "budget": "Ya se han gastado las consultas de ahora. Prueba dentro de un minuto.",
+            "failed": "Dymo no ha respondido. Prueba dentro de un minuto."
         },
         "search": "Buscar dominios señalados",
         "none": "Aún no se ha señalado ningún dominio.",

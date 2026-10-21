@@ -244,10 +244,6 @@ async function ensureLogVolume(engine: EngineRow): Promise<void> {
     });
 }
 
-/** Write the configuration onto the engine and deploy it again, its ports bound
- *  to this machine's current address when there is one. A failed deploy is
- *  logged and marked on the engine, where the status reads it as `portHeld`,
- *  and refused so the press that asked for it is not answered with success. */
 /** Put the rules' files in the DNS server. Never the reason a save fails: the
  *  next save or pass writes them again. */
 async function syncRules(settings: DnsSettings): Promise<void> {
@@ -256,6 +252,10 @@ async function syncRules(settings: DnsSettings): Promise<void> {
     );
 }
 
+/** Write the configuration onto the engine and deploy it again, its ports bound
+ *  to this machine's current address when there is one. A failed deploy is
+ *  logged and marked on the engine, where the status reads it as `portHeld`,
+ *  and refused so the press that asked for it is not answered with success. */
 async function apply(
     engine: EngineRow,
     encoded: string,
@@ -305,9 +305,36 @@ async function serviceNamesOrRefuse(
     return resolved.names;
 }
 
+/** The settings' writes, one after another: an edit reads what the previous
+ *  one stored rather than what both read before either wrote. */
+let settingsQueue: Promise<unknown> = Promise.resolve();
+
+function serialized<T>(task: () => Promise<T>): Promise<T> {
+    const run = settingsQueue.then(task, task);
+    settingsQueue = run.catch(() => undefined);
+    return run;
+}
+
 /** Store new settings, and apply them at once when the blocker is on. Refused
  *  with `notApplied` when they were stored but the DNS server did not take them. */
-export async function saveSettings(input: unknown, actorId: string): Promise<DnsSettings> {
+export function saveSettings(input: unknown, actorId: string): Promise<DnsSettings> {
+    return serialized(() => storeSettings(input, actorId));
+}
+
+/** Change the stored settings from what they are now, saved like
+ *  `saveSettings`. A string from `change` is a refusal, returned and nothing
+ *  saved. */
+export function editSettings<R extends string = never>(
+    change: (current: DnsSettings) => DnsSettings | R,
+    actorId: string
+): Promise<DnsSettings | R> {
+    return serialized(async () => {
+        const next = change(await readSettings());
+        return typeof next === "string" ? next : storeSettings(next, actorId);
+    });
+}
+
+async function storeSettings(input: unknown, actorId: string): Promise<DnsSettings> {
     const row = await requireApp();
     // The services' names are this path's to write, never the screen's.
     const parsed = readDnsSettings({
@@ -407,6 +434,10 @@ export async function turnOn(actorId: string): Promise<void> {
         if (isPortTaken(messageOf(error))) throw new DnsBlockerRefusal("portBusy");
         throw error;
     }
+    // The rules are files the configuration only names: a new server has none.
+    if ((await engineRow())?.status !== "running") return;
+    forgetEngineFiles();
+    await syncRules(settings);
 }
 
 /** Stop and remove the DNS server. The settings stay on the app. */

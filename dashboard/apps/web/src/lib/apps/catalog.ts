@@ -444,7 +444,9 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
             // configuration Polaris renders (BLOCKY_CONFIG_BASE64).
             image: "ghcr.io/fjrg2007/polaris-dashboard:latest-service-dns-blocker",
             build: "dashboard/services/dns-blocker",
-            ports: [{ container: 53, protocol: "udp", host: 53, label: "DNS" }] // i18n-ignore
+            ports: [{ container: 53, protocol: "udp", host: 53, label: "DNS" }], // i18n-ignore
+            // The query log and the lists Polaris writes, kept across redeploys.
+            volumes: [{ name: "query-log", mountPath: "/logs", label: "Query log" }] // i18n-ignore
         }
     },
     {

@@ -39,6 +39,10 @@ const BUDGET_SHARE = 0.5;
 /** How long past its expiry a verdict is kept before it is deleted. */
 const verdictAge = 24 * 60 * 60 * 1000;
 
+/** Lookups in a row Dymo may fail before a pass takes it for Dymo being down,
+ *  rather than one name it refuses, and leaves those names for the next pass. */
+const FAILURES_IN_ROW = 3;
+
 /** One flagged domain as the screen lists it. */
 export interface FlaggedDomain {
     readonly domain: string;
@@ -65,10 +69,15 @@ export async function reputationOff(): Promise<ReputationOff | null> {
     return access.off;
 }
 
-/** Ask about one domain and keep the answer. False when the budget is spent
- *  or Dymo did not answer, which leaves the domain unasked. */
-async function check(apiKey: string, settings: DnsSettings, domain: string): Promise<boolean> {
-    if (!takeLookup("dymo", BUDGET_SHARE)) return false;
+/** Ask about one domain and keep the answer. `budget` when the budget is
+ *  spent and `failed` when Dymo did not answer, both leaving the domain
+ *  unasked. */
+async function check(
+    apiKey: string,
+    settings: DnsSettings,
+    domain: string
+): Promise<"checked" | "budget" | "failed"> {
+    if (!takeLookup("dymo", BUDGET_SHARE)) return "budget";
     try {
         const verdict = await domainReputation(apiKey, domain, settings.reputation.adult);
         const flagged = verdict.fraud || verdict.adult;
@@ -84,10 +93,10 @@ async function check(apiKey: string, settings: DnsSettings, domain: string): Pro
             create: { domain, ...data },
             update: data
         });
-        return true;
+        return "checked";
     } catch (error) {
         console.error("polaris: network filter reputation lookup failed:", error);
-        return false;
+        return "failed";
     }
 }
 
@@ -182,12 +191,24 @@ export async function runReputationPass(): Promise<{ checked: number; skipped?: 
             break;
         }
         const handled = await alreadyKnown(slice.entries.map((entry) => entry.domain));
+        // A name Dymo refuses is passed over, so it cannot hold up every name
+        // after it; a run of them is Dymo down, and is asked again next pass.
+        const failedRun: string[] = [];
         for (const { domain } of slice.entries) {
             if (handled.has(domain)) continue;
             if (checked >= LOOKUPS_PER_PASS) break;
-            if (!(await check(access.apiKey, settings, domain))) break;
+            const outcome = await check(access.apiKey, settings, domain);
+            if (outcome === "budget") break;
             handled.add(domain);
             checked += 1;
+            if (outcome === "checked") {
+                failedRun.length = 0;
+                continue;
+            }
+            failedRun.push(domain);
+            if (failedRun.length < FAILURES_IN_ROW) continue;
+            for (const name of failedRun) handled.delete(name);
+            break;
         }
         const offset = cursorAfter(slice.entries, handled, slice.end);
         await saveLogCursor({ file: step.file, offset });
@@ -208,6 +229,7 @@ export async function flaggedDomains(search: string): Promise<FlaggedDomain[]> {
     const rows = await prisma.dnsReputation.findMany({
         where: {
             flagged: true,
+            expiresAt: { gt: new Date() },
             ...(search ? { domain: { contains: search.toLowerCase() } } : {})
         },
         select: { domain: true, fraud: true, adult: true, checkedAt: true },
@@ -218,12 +240,15 @@ export async function flaggedDomains(search: string): Promise<FlaggedDomain[]> {
 }
 
 /** Ask about one domain again now, and publish what that changed. Refused in
- *  words when lookups are off or the budget is spent. */
-export async function recheckDomain(domain: string): Promise<"checked" | ReputationOff | "budget"> {
+ *  words when lookups are off, the budget is spent or Dymo did not answer. */
+export async function recheckDomain(
+    domain: string
+): Promise<"checked" | ReputationOff | "budget" | "failed"> {
     const settings = await readSettings();
     const access = await lookupAccess(settings);
     if (access.off) return access.off;
-    if (!(await check(access.apiKey, settings, domain))) return "budget";
+    const outcome = await check(access.apiKey, settings, domain);
+    if (outcome !== "checked") return outcome;
     await publish(settings, true);
     return "checked";
 }

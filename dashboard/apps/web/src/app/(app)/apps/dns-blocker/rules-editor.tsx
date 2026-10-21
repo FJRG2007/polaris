@@ -6,7 +6,16 @@
  * change is saved on its own, shown at once and put back if the save fails.
  */
 
-import { useMemo, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+    Fragment,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
     Badge,
@@ -23,7 +32,8 @@ import {
     DialogTitle,
     EmptyState,
     Input,
-    Select
+    Select,
+    shellScroller
 } from "@polaris/ui";
 import { editDnsRuleAction } from "./actions";
 import * as rules from "@/lib/dns-blocker/rules";
@@ -32,6 +42,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 
 type Rules = { allow: string[]; deny: string[] };
 type Filter = "all" | rules.DnsRuleAction;
+type Row = ReturnType<typeof rules.ruleRows>[number];
 
 /** The dialog's state: adding, or editing the rule it was opened on. */
 type Editing = { from: { action: rules.DnsRuleAction; rule: string } | null } | null;
@@ -122,10 +133,13 @@ export function DnsRulesEditor() {
                 ) : rows.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("rules.noMatch")}</p>
                 ) : (
-                    <ul className="flex flex-col divide-y divide-border" aria-label={t("rules.title")}>
-                        {rows.map((row) => (
+                    <RuleList
+                        rows={rows}
+                        label={t("rules.title")}
+                        renderRow={(row, ref, index) => (
                             <li
-                                key={`${row.action}:${row.rule}`}
+                                ref={ref}
+                                data-index={index}
                                 className="flex min-w-0 items-center gap-2 py-2"
                             >
                                 <Badge variant="neutral" className="shrink-0">
@@ -170,8 +184,8 @@ export function DnsRulesEditor() {
                                     <Trash2 className="size-4 shrink-0" aria-hidden />
                                 </Button>
                             </li>
-                        ))}
-                    </ul>
+                        )}
+                    />
                 )}
             </CardBody>
             {editing ? (
@@ -188,6 +202,64 @@ export function DnsRulesEditor() {
                 />
             ) : null}
         </Card>
+    );
+}
+
+/** useLayoutEffect, without the warning a server render gives for it. */
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** The rules, drawing only the ones on screen: windowed against the shell's
+ *  content area, offset by where the list starts inside it, with the room of
+ *  the rows not drawn kept above and below. */
+function RuleList({
+    rows,
+    label,
+    renderRow
+}: {
+    rows: readonly Row[];
+    label: string;
+    renderRow: (row: Row, ref: (node: Element | null) => void, index: number) => ReactNode;
+}) {
+    const list = useRef<HTMLUListElement>(null);
+    const [margin, setMargin] = useState(0);
+
+    useIsomorphicLayoutEffect(() => {
+        const measure = () => {
+            const element = list.current;
+            const scroller = element ? shellScroller(element) : null;
+            if (!element || !scroller) return;
+            const top = element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+            setMargin(top + scroller.scrollTop);
+        };
+        measure();
+        window.addEventListener("resize", measure);
+        return () => window.removeEventListener("resize", measure);
+    }, []);
+
+    const virtualizer = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => (list.current ? shellScroller(list.current) : null),
+        estimateSize: () => 45,
+        overscan: 8,
+        scrollMargin: margin,
+        getItemKey: (index) => `${rows[index]!.action}:${rows[index]!.rule}`,
+        initialRect: { width: 1280, height: 1000 }
+    });
+    const drawn = virtualizer.getVirtualItems();
+    const last = drawn[drawn.length - 1];
+    const above = drawn[0] ? drawn[0].start - margin : 0;
+    const below = last ? virtualizer.getTotalSize() - (last.end - margin) : 0;
+
+    return (
+        <ul ref={list} className="flex flex-col divide-y divide-border" aria-label={label}>
+            {above > 0 ? <li aria-hidden="true" style={{ height: above }} /> : null}
+            {drawn.map((item) => (
+                <Fragment key={item.key}>
+                    {renderRow(rows[item.index]!, virtualizer.measureElement, item.index)}
+                </Fragment>
+            ))}
+            {below > 0 ? <li aria-hidden="true" style={{ height: below }} /> : null}
+        </ul>
     );
 }
 
@@ -264,7 +336,9 @@ export function RuleDialog({
                             }}
                         />
                         {invalid ? (
-                            <span className="text-xs text-danger">{t("validation.invalidRule")}</span>
+                            <span className="text-xs text-danger">
+                                {t("validation.invalidRule")}
+                            </span>
                         ) : parsed.success ? (
                             <span className="text-xs text-muted-foreground">
                                 {t("rules.detected", {
