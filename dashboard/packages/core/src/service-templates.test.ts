@@ -25,7 +25,9 @@ const VARIABLE_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 function containers(): { id: string; service: TemplateService }[] {
     return SERVICE_TEMPLATES.flatMap((template) => [
         { id: template.id, service: template },
-        ...(template.companion ? [{ id: `${template.id} companion`, service: template.companion }] : [])
+        ...(template.companion
+            ? [{ id: `${template.id} companion`, service: template.companion }]
+            : [])
     ]);
 }
 
@@ -36,7 +38,8 @@ describe("the template list", () => {
         for (const { service } of containers()) {
             expect(service.image).toMatch(/^[a-z0-9./_-]+(:[\w.-]+)?$/);
             expect(service.port).toBeGreaterThan(0);
-            for (const volume of service.volumes) expect(volume.mountPath.startsWith("/")).toBe(true);
+            for (const volume of service.volumes)
+                expect(volume.mountPath.startsWith("/")).toBe(true);
             // A secret is generated, never also written as a plain value.
             for (const key of service.secrets) expect(service.env[key]).toBeUndefined();
         }
@@ -53,7 +56,9 @@ describe("the template list", () => {
     it("asks for database versions Polaris offers", () => {
         for (const template of SERVICE_TEMPLATES) {
             if (!template.database) continue;
-            expect(DB_ENGINE_INFO[template.database.engine].versions).toContain(template.database.version);
+            expect(DB_ENGINE_INFO[template.database.engine].versions).toContain(
+                template.database.version
+            );
         }
     });
 
@@ -74,20 +79,27 @@ describe("the template list", () => {
             const slugs = {
                 self: template.id,
                 ...(template.database ? { database: `${template.id}-db` } : {}),
-                ...(template.companion ? { companion: `${template.id}-${template.companion.suffix}` } : {})
+                ...(template.companion
+                    ? { companion: `${template.id}-${template.companion.suffix}` }
+                    : {})
             };
             const vars = [
                 ...templateVariables(template, slugs, () => "x"),
-                ...(template.companion ? templateVariables(template.companion, { self: slugs.companion! }, () => "x") : [])
+                ...(template.companion
+                    ? templateVariables(template.companion, { self: slugs.companion! }, () => "x")
+                    : [])
             ];
             // Nothing is left in the template's own notation: every `{{` is the
             // start of a `${{...}}` reference.
-            for (const entry of vars) expect(entry.value, `${template.id}: ${entry.key}`).not.toMatch(/(^|[^$])\{\{/);
+            for (const entry of vars)
+                expect(entry.value, `${template.id}: ${entry.key}`).not.toMatch(/(^|[^$])\{\{/);
         }
     });
 
     it("marks the apps other sites frame, and only those", () => {
-        const embedded = SERVICE_TEMPLATES.filter((template) => template.embedded).map((template) => template.id);
+        const embedded = SERVICE_TEMPLATES.filter((template) => template.embedded).map(
+            (template) => template.id
+        );
         expect(embedded.sort()).toEqual(["grafana", "metabase", "n8n", "uptime-kuma"]);
     });
 });
@@ -95,7 +107,11 @@ describe("the template list", () => {
 describe("the templates added with a database, a companion or setup", () => {
     it("transcribes Ghost with a MySQL database it reaches by reference", () => {
         const ghost = serviceTemplate("ghost")!;
-        expect(ghost).toMatchObject({ image: "ghost:5-alpine", port: 2368, database: { engine: "mysql" } });
+        expect(ghost).toMatchObject({
+            image: "ghost:5-alpine",
+            port: 2368,
+            database: { engine: "mysql" }
+        });
         expect(ghost.volumes).toEqual([{ name: "content", mountPath: "/var/lib/ghost/content" }]);
         expect(templateNeedsSetup(ghost)).toBe(true);
     });
@@ -122,20 +138,30 @@ describe("the templates added with a database, a companion or setup", () => {
 
         const freshrss = serviceTemplate("freshrss")!;
         expect(freshrss).toMatchObject({ image: "freshrss/freshrss:latest", port: 80 });
-        expect(freshrss.prepare?.[0]?.readiness).toEqual({ test: "test -d /var/www/FreshRSS/cli", intervalMs: 3000, retries: 30 });
+        expect(freshrss.prepare?.[0]?.readiness).toEqual({
+            test: "test -d /var/www/FreshRSS/cli",
+            intervalMs: 3000,
+            retries: 30
+        });
 
         // Retired to the database flow, but its setup still runs on the services made from it.
         const minio = serviceTemplateOfService("minio")!;
         expect(minio).toMatchObject({ image: "minio/minio:latest", port: 9001 });
         expect(minio.command).toEqual(["server", "/data", "--console-address", ":9001"]);
         expect(minio.prepare?.[0]?.readiness).toMatchObject({ intervalMs: 1000, retries: 30 });
-        expect(minio.prepare?.[0]?.command).toContain('mc mb --ignore-existing "local/$OPENSHIP_BUCKET"');
+        expect(minio.prepare?.[0]?.command).toContain(
+            'mc mb --ignore-existing "local/$OPENSHIP_BUCKET"'
+        );
     });
 
     it("transcribes Open WebUI as its interface and an Ollama companion", () => {
         const webui = serviceTemplate("open-webui")!;
         expect(webui).toMatchObject({ image: "ghcr.io/open-webui/open-webui:v0.6.30", port: 8080 });
-        expect(webui.companion).toMatchObject({ suffix: "ollama", image: "ollama/ollama:0.40.4", port: 11434 });
+        expect(webui.companion).toMatchObject({
+            suffix: "ollama",
+            image: "ollama/ollama:0.40.4",
+            port: 11434
+        });
         expect(webui.companion?.volumes).toEqual([{ name: "models", mountPath: "/root/.ollama" }]);
     });
 
@@ -155,12 +181,19 @@ describe("templateVariables", () => {
         const webhook = vars.find((entry) => entry.key === "WEBHOOK_URL");
         expect(webhook?.value).toBe("${{automations.POLARIS_PUBLIC_URL}}");
         expect(hasReferences(webhook?.value ?? "")).toBe(true);
-        expect(referencesIn(webhook?.value ?? "")[0]).toMatchObject({ name: "automations", key: "POLARIS_PUBLIC_URL" });
+        expect(referencesIn(webhook?.value ?? "")[0]).toMatchObject({
+            name: "automations",
+            key: "POLARIS_PUBLIC_URL"
+        });
     });
 
     it("generates each secret and marks it secret", () => {
         let n = 0;
-        const vars = templateVariables(serviceTemplate("vaultwarden")!, { self: "vault" }, () => `secret-${++n}`);
+        const vars = templateVariables(
+            serviceTemplate("vaultwarden")!,
+            { self: "vault" },
+            () => `secret-${++n}`
+        );
         expect(vars.find((entry) => entry.key === "ADMIN_TOKEN")).toEqual({
             key: "ADMIN_TOKEN",
             value: "secret-1",
@@ -171,10 +204,14 @@ describe("templateVariables", () => {
 
     it("points a service at its database by reference and copies nothing secret", () => {
         const generated: string[] = [];
-        const vars = templateVariables(serviceTemplate("ghost")!, { self: "blog", database: "blog-db" }, () => {
-            generated.push("g");
-            return "g";
-        });
+        const vars = templateVariables(
+            serviceTemplate("ghost")!,
+            { self: "blog", database: "blog-db" },
+            () => {
+                generated.push("g");
+                return "g";
+            }
+        );
         const value = (key: string) => vars.find((entry) => entry.key === key)?.value;
 
         expect(value("database__connection__host")).toBe("${{blog-db.HOST}}");
@@ -187,8 +224,14 @@ describe("templateVariables", () => {
         expect(generated).toEqual([]);
         expect(vars.every((entry) => !entry.isSecret)).toBe(true);
 
-        const umami = templateVariables(serviceTemplate("umami")!, { self: "stats", database: "stats-db" }, () => "s");
-        expect(umami.find((entry) => entry.key === "DATABASE_URL")?.value).toBe("${{stats-db.DATABASE_URL}}");
+        const umami = templateVariables(
+            serviceTemplate("umami")!,
+            { self: "stats", database: "stats-db" },
+            () => "s"
+        );
+        expect(umami.find((entry) => entry.key === "DATABASE_URL")?.value).toBe(
+            "${{stats-db.DATABASE_URL}}"
+        );
     });
 
     it("points a console at its companion, and the companion at itself", () => {
@@ -197,7 +240,10 @@ describe("templateVariables", () => {
         expect(ui.find((entry) => entry.key === "OLLAMA_BASE_URL")?.value).toBe(
             "http://${{chat-ollama.POLARIS_PRIVATE_DOMAIN}}:11434"
         );
-        const companion = { ...webui.companion!, env: { OLLAMA_HOST: "{{self.POLARIS_PRIVATE_DOMAIN}}:11434" } };
+        const companion = {
+            ...webui.companion!,
+            env: { OLLAMA_HOST: "{{self.POLARIS_PRIVATE_DOMAIN}}:11434" }
+        };
         const ollama = templateVariables(companion, { self: "chat-ollama" }, () => "p");
         expect(ollama.find((entry) => entry.key === "OLLAMA_HOST")?.value).toBe(
             "${{chat-ollama.POLARIS_PRIVATE_DOMAIN}}:11434"
@@ -205,7 +251,9 @@ describe("templateVariables", () => {
     });
 
     it("refuses a placeholder for something the caller did not create", () => {
-        expect(() => templateVariables(serviceTemplate("ghost")!, { self: "blog" }, () => "x")).toThrow(/database/);
+        expect(() =>
+            templateVariables(serviceTemplate("ghost")!, { self: "blog" }, () => "x")
+        ).toThrow(/database/);
     });
 });
 
@@ -260,7 +308,12 @@ describe("runPrepareSteps", () => {
         // No wait after the last check: there is nothing left to wait for.
         expect(run.waits).toHaveLength(3);
         expect(outcomes).toEqual([
-            { ok: false, title: "Create the admin", reason: "It was not ready after 4 checks 3 seconds apart.", output: "" }
+            {
+                ok: false,
+                title: "Create the admin",
+                reason: "It was not ready after 4 checks 3 seconds apart.",
+                output: ""
+            }
         ]);
     });
 
@@ -269,7 +322,12 @@ describe("runPrepareSteps", () => {
         const outcomes = await runPrepareSteps([step()], run.exec, run.sleep);
 
         expect(outcomes).toEqual([
-            { ok: false, title: "Create the admin", reason: "It exited with code 2.", output: "no such bucket" }
+            {
+                ok: false,
+                title: "Create the admin",
+                reason: "It exited with code 2.",
+                output: "no such bucket"
+            }
         ]);
     });
 

@@ -46,13 +46,21 @@ describe("self-hosted containers", () => {
         );
         const service = spec.services[0]!;
         expect(service.ports).toEqual([{ host: 17700, container: 7700 }]);
-        expect(service.healthcheck?.test).toEqual(["CMD", "curl", "-fs", "http://127.0.0.1:7700/health"]);
+        expect(service.healthcheck?.test).toEqual([
+            "CMD",
+            "curl",
+            "-fs",
+            "http://127.0.0.1:7700/health"
+        ]);
     });
 });
 
 describe("reference keys", () => {
     it("names MinIO the way S3 clients read it", () => {
-        const keys = core.dataEngineReferenceKeys("minio", core.selfHostedEndpoint("minio", "files", creds));
+        const keys = core.dataEngineReferenceKeys(
+            "minio",
+            core.selfHostedEndpoint("minio", "files", creds)
+        );
         expect(keys).toMatchObject({
             S3_ENDPOINT: "http://files:9000",
             S3_ACCESS_KEY_ID: "admin",
@@ -63,13 +71,19 @@ describe("reference keys", () => {
     });
 
     it("escapes credentials in a URL", () => {
-        const keys = core.dataEngineReferenceKeys("rabbitmq", core.selfHostedEndpoint("rabbitmq", "mq", creds));
+        const keys = core.dataEngineReferenceKeys(
+            "rabbitmq",
+            core.selfHostedEndpoint("rabbitmq", "mq", creds)
+        );
         expect(keys.AMQP_URL).toBe("amqp://admin:s3cret%2Fpw@mq:5672");
         expect(keys.RABBITMQ_MANAGEMENT_URL).toBe("http://mq:15672");
     });
 
     it("answers the same keys from a cloud as from a server", () => {
-        const self = core.dataEngineReferenceKeys("meilisearch", core.selfHostedEndpoint("meilisearch", "s", creds));
+        const self = core.dataEngineReferenceKeys(
+            "meilisearch",
+            core.selfHostedEndpoint("meilisearch", "s", creds)
+        );
         const input = core.cloudConnectSchema.parse({
             environmentId: "00000000-0000-4000-8000-000000000001",
             name: "search",
@@ -121,14 +135,23 @@ describe("connecting an existing instance", () => {
         });
         expect(ok.url).toBe("pkc-1.eu-west-1.aws.confluent.cloud:9092,b2.example.com:9092");
         expect(
-            core.cloudConnectSchema.safeParse({ ...base, engine: "kafka", provider: "confluent-cloud", url: "http://x" }).success
+            core.cloudConnectSchema.safeParse({
+                ...base,
+                engine: "kafka",
+                provider: "confluent-cloud",
+                url: "http://x"
+            }).success
         ).toBe(false);
     });
 
     it("requires each engine's own fields, and keeps credentials out of an http address", () => {
         expect(
-            core.cloudConnectSchema.safeParse({ ...base, engine: "influxdb", provider: "influxdb-cloud", url: "https://a.b" })
-                .success
+            core.cloudConnectSchema.safeParse({
+                ...base,
+                engine: "influxdb",
+                provider: "influxdb-cloud",
+                url: "https://a.b"
+            }).success
         ).toBe(false);
         expect(
             core.cloudConnectSchema.safeParse({
@@ -143,7 +166,12 @@ describe("connecting an existing instance", () => {
     });
 
     it("gives every issue as a key the form translates", () => {
-        const result = core.cloudConnectSchema.safeParse({ ...base, engine: "couchdb", provider: "other", url: "ftp://a.b" });
+        const result = core.cloudConnectSchema.safeParse({
+            ...base,
+            engine: "couchdb",
+            provider: "other",
+            url: "ftp://a.b"
+        });
         expect(result.success).toBe(false);
         for (const issue of result.success ? [] : result.error.issues) {
             expect(issue.message).toMatch(/^view\.database\.cloud\.issues\.[A-Za-z]+$/);
@@ -153,13 +181,21 @@ describe("connecting an existing instance", () => {
     it("reaches Kafka at another provider over TLS unless told it is plaintext", () => {
         const kafka = (provider: string, extra: Record<string, unknown>) =>
             core.cloudEndpoint(
-                core.cloudConnectSchema.parse({ ...base, engine: "kafka", provider, url: "broker.example.com:9092", ...extra })
+                core.cloudConnectSchema.parse({
+                    ...base,
+                    engine: "kafka",
+                    provider,
+                    url: "broker.example.com:9092",
+                    ...extra
+                })
             ).securityProtocol;
         expect(kafka("other", {})).toBe("SSL");
         expect(kafka("other", { tls: false })).toBe("PLAINTEXT");
         expect(kafka("other", { tls: false, username: "u", password: "p" })).toBe("SASL_PLAINTEXT");
         // A listed provider requires TLS whatever the form sent.
-        expect(kafka("confluent-cloud", { tls: false, username: "u", password: "p" })).toBe("SASL_SSL");
+        expect(kafka("confluent-cloud", { tls: false, username: "u", password: "p" })).toBe(
+            "SASL_SSL"
+        );
     });
 
     it("checks a plaintext Kafka broker without TLS", async () => {
@@ -198,7 +234,9 @@ describe("connecting an existing instance", () => {
             url: "https://xyz.a1.typesense.net",
             token: "k"
         });
-        await expect(testCloudConnection(input, request)).rejects.toMatchObject({ key: "keyRefused" });
+        await expect(testCloudConnection(input, request)).rejects.toMatchObject({
+            key: "keyRefused"
+        });
         expect(request).toHaveBeenCalledWith("https://xyz.a1.typesense.net/collections", {
             headers: { "x-typesense-api-key": "k" }
         });
@@ -212,7 +250,9 @@ describe("CloudAMQP", () => {
         const request = vi
             .fn()
             .mockResolvedValueOnce(new Response("[]", { status: 200 }))
-            .mockResolvedValueOnce(new Response(JSON.stringify({ id: 42, url: "", ready: false }), { status: 200 }));
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ id: 42, url: "", ready: false }), { status: 200 })
+            );
         const created = await cloudamqp.createCloudAmqpInstance(request, "key-123", {
             name: "queue",
             plan: "lemur",
@@ -234,7 +274,11 @@ describe("CloudAMQP", () => {
     it("does not create a second instance with the same name", async () => {
         const request = vi
             .fn()
-            .mockResolvedValueOnce(new Response(JSON.stringify([{ id: 7, name: "queue", ready: true, url: "amqps://a" }])));
+            .mockResolvedValueOnce(
+                new Response(
+                    JSON.stringify([{ id: 7, name: "queue", ready: true, url: "amqps://a" }])
+                )
+            );
         const found = await cloudamqp.createCloudAmqpInstance(request, "key-123", {
             name: "queue",
             plan: "lemur",
@@ -255,9 +299,11 @@ describe("CloudAMQP", () => {
 
     it("says the key was refused without echoing it", async () => {
         const request = vi.fn(async () => new Response("", { status: 401 }));
-        await expect(cloudamqp.getCloudAmqpInstance(request, "key-123", "1")).rejects.toMatchObject({
-            key: "amqpKeyRefused"
-        });
+        await expect(cloudamqp.getCloudAmqpInstance(request, "key-123", "1")).rejects.toMatchObject(
+            {
+                key: "amqpKeyRefused"
+            }
+        );
     });
 });
 

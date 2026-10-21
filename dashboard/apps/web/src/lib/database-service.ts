@@ -199,7 +199,8 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
                 image: core.DATA_ENGINE_INFO[engine].image,
                 env: (creds: DbCredentials, host?: string) =>
                     core.dataEngineContainer(engine, creds, host ?? "").env,
-                command: (creds: DbCredentials) => core.dataEngineContainer(engine, creds, "").command
+                command: (creds: DbCredentials) =>
+                    core.dataEngineContainer(engine, creds, "").command
             }
         ])
     ) as Record<core.DataEngine, EngineSpec>)
@@ -227,7 +228,11 @@ export function dataEngineCredentials(engine: core.DataEngine, slug: string): Db
                 token: randomBytes(32).toString("base64url")
             };
         case "clickhouse":
-            return { username: "polaris", password: generatePassword(), database: toIdentifier(slug) };
+            return {
+                username: "polaris",
+                password: generatePassword(),
+                database: toIdentifier(slug)
+            };
         default:
             return { username: "polaris", password: generatePassword(), database: "" };
     }
@@ -369,16 +374,16 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
         : core.isDataEngine(parsed.engine)
           ? dataEngineCredentials(parsed.engine, slug)
           : {
-              username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
-              password: parsed.password ?? generatePassword(),
-              database: parsed.databaseName ?? toIdentifier(slug),
-              // 384 random bytes as hex: see `isClusterKey`.
-              ...(topology.kind === "replicaSet" || topology.kind === "sharded"
-                  ? { clusterKey: randomBytes(384).toString("hex") }
-                  : {}),
-              // 32 characters, the most `SOURCE_PASSWORD` takes.
-              ...(topology.kind === "replicas" ? { replicationPassword: generatePassword() } : {})
-          };
+                username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
+                password: parsed.password ?? generatePassword(),
+                database: parsed.databaseName ?? toIdentifier(slug),
+                // 384 random bytes as hex: see `isClusterKey`.
+                ...(topology.kind === "replicaSet" || topology.kind === "sharded"
+                    ? { clusterKey: randomBytes(384).toString("hex") }
+                    : {}),
+                // 32 characters, the most `SOURCE_PASSWORD` takes.
+                ...(topology.kind === "replicas" ? { replicationPassword: generatePassword() } : {})
+            };
     const blob = encryptCredentials(creds, loadEnv().POLARIS_MASTER_KEY);
 
     return prisma.managedDatabase.create({
@@ -539,10 +544,7 @@ function dataConnection(slug: string, endpoint: core.DataEndpoint): DatabaseConn
 }
 
 /** An instance in a cloud is reached where its stored endpoint says. */
-function cloudConnection(
-    row: { readonly slug: string },
-    creds: DbCredentials
-): DatabaseConnection {
+function cloudConnection(row: { readonly slug: string }, creds: DbCredentials): DatabaseConnection {
     if (!creds.cloud?.endpoint.url) throw new CloudError("notReady");
     return dataConnection(row.slug, creds.cloud.endpoint);
 }
@@ -742,7 +744,8 @@ export async function deployDatabase(
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!db) throw new Error("Database not found");
-    if (db.provider) throw new Error("This instance runs in a cloud, so there is nothing to deploy");
+    if (db.provider)
+        throw new Error("This instance runs in a cloud, so there is nothing to deploy");
 
     // A database inside another instance has no container to bring up; it is
     // provisioned by statements, which is fast enough to do inline instead of

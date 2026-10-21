@@ -1951,11 +1951,20 @@ export async function connectCloudDatabaseAction(
     const parsed = cloudConnectSchema.safeParse(input);
     if (!parsed.success) return { error: await firstIssue(parsed.error, "databases.invalid") };
     try {
-        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "databases.manage");
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "databases.manage"
+        );
         const target = await getOrCreateLocalTarget(access.ownerId);
         const { connectCloudDatabase } = await import("@/lib/data-cloud/service");
         const database = await connectCloudDatabase(access.ownerId, input, target.id);
-        await recordDeployAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.db.create",
+            targetType: "database",
+            targetId: database.id
+        });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -1971,11 +1980,20 @@ export async function createCloudAmqpDatabaseAction(
     const parsed = cloudAmqpCreateSchema.safeParse(input);
     if (!parsed.success) return { error: await firstIssue(parsed.error, "databases.invalid") };
     try {
-        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "databases.manage");
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "databases.manage"
+        );
         const target = await getOrCreateLocalTarget(access.ownerId);
         const { createCloudAmqpDatabase } = await import("@/lib/data-cloud/service");
         const database = await createCloudAmqpDatabase(access.ownerId, input, target.id);
-        await recordDeployAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.db.create",
+            targetType: "database",
+            targetId: database.id
+        });
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {

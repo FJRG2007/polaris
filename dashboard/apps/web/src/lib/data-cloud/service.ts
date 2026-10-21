@@ -63,11 +63,16 @@ async function socketOpens(host: string, port: number, tls: boolean): Promise<vo
         ? [{ address: host }]
         : await resolveName(host).catch(() => []);
     if (addresses.length === 0) throw new CloudError("noResolve");
-    if (addresses.some((one) => core.isPrivateIp(one.address))) throw new CloudError("privateAddress");
+    if (addresses.some((one) => core.isPrivateIp(one.address)))
+        throw new CloudError("privateAddress");
     const address = addresses[0]!.address;
     await new Promise<void>((resolve, reject) => {
         const socket = tls
-            ? tlsConnect({ host: address, port, servername: core.isIpAddress(host) ? undefined : host })
+            ? tlsConnect({
+                  host: address,
+                  port,
+                  servername: core.isIpAddress(host) ? undefined : host
+              })
             : tcpConnect({ host: address, port });
         const done = (error?: Error) => {
             socket.destroy();
@@ -97,26 +102,51 @@ export async function testCloudConnection(
             const url = new URL(e.url);
             const path = `/${encodeURIComponent(e.database)}`;
             const signed = signAwsRequest({
-                credentials: { accessKeyId: e.username, secretAccessKey: e.password, region: e.region },
+                credentials: {
+                    accessKeyId: e.username,
+                    secretAccessKey: e.password,
+                    region: e.region
+                },
                 service: "s3",
                 host: url.host,
                 method: "HEAD",
                 path
             });
-            await answered(request, `${e.url}${path}`, { method: "HEAD", headers: signed.headers }, "keysRefused");
+            await answered(
+                request,
+                `${e.url}${path}`,
+                { method: "HEAD", headers: signed.headers },
+                "keysRefused"
+            );
             return;
         }
         case "meilisearch":
-            await answered(request, `${e.url}/version`, { headers: { authorization: `Bearer ${e.token}` } }, "keyRefused");
+            await answered(
+                request,
+                `${e.url}/version`,
+                { headers: { authorization: `Bearer ${e.token}` } },
+                "keyRefused"
+            );
             return;
         case "typesense":
-            await answered(request, `${e.url}/collections`, { headers: { "x-typesense-api-key": e.token } }, "keyRefused");
+            await answered(
+                request,
+                `${e.url}/collections`,
+                { headers: { "x-typesense-api-key": e.token } },
+                "keyRefused"
+            );
             return;
         case "clickhouse":
             await answered(
                 request,
                 `${e.url}/?query=${encodeURIComponent("SELECT 1")}`,
-                { headers: { "x-clickhouse-user": e.username, "x-clickhouse-key": e.password, "x-clickhouse-database": e.database } },
+                {
+                    headers: {
+                        "x-clickhouse-user": e.username,
+                        "x-clickhouse-key": e.password,
+                        "x-clickhouse-database": e.database
+                    }
+                },
                 "userRefused"
             );
             return;
@@ -133,13 +163,23 @@ export async function testCloudConnection(
         }
         case "couchdb": {
             const basic = Buffer.from(`${e.username}:${e.password}`).toString("base64");
-            await answered(request, `${e.url}/_session`, { headers: { authorization: `Basic ${basic}` } }, "userRefused");
+            await answered(
+                request,
+                `${e.url}/_session`,
+                { headers: { authorization: `Basic ${basic}` } },
+                "userRefused"
+            );
             return;
         }
         case "rabbitmq":
             if (e.managementUrl) {
                 const basic = Buffer.from(`${e.username}:${e.password}`).toString("base64");
-                await answered(request, `${e.managementUrl}/api/whoami`, { headers: { authorization: `Basic ${basic}` } }, "userRefused");
+                await answered(
+                    request,
+                    `${e.managementUrl}/api/whoami`,
+                    { headers: { authorization: `Basic ${basic}` } },
+                    "userRefused"
+                );
             } else {
                 await openSocket(e.host, e.port, new URL(e.url).protocol === "amqps:");
             }
@@ -173,8 +213,26 @@ function sealed(creds: DbCredentials) {
 }
 
 /** The columns every cloud row shares: no image, no container, no volume. */
-function cloudRow(environmentId: string, targetId: string, name: string, slug: string, engine: string, provider: string) {
-    return { environmentId, targetId, name, slug, engine, provider, image: "", version: "", volumeName: "", containerName: "" };
+function cloudRow(
+    environmentId: string,
+    targetId: string,
+    name: string,
+    slug: string,
+    engine: string,
+    provider: string
+) {
+    return {
+        environmentId,
+        targetId,
+        name,
+        slug,
+        engine,
+        provider,
+        image: "",
+        version: "",
+        volumeName: "",
+        containerName: ""
+    };
 }
 
 /**
@@ -199,9 +257,21 @@ export async function connectCloudDatabase(
     const endpoint = core.cloudEndpoint(input);
     return prisma.managedDatabase.create({
         data: {
-            ...cloudRow(input.environmentId, targetId, input.name, slug, input.engine, input.provider),
+            ...cloudRow(
+                input.environmentId,
+                targetId,
+                input.name,
+                slug,
+                input.engine,
+                input.provider
+            ),
             status: "running",
-            ...sealed({ username: endpoint.username, password: endpoint.password, database: endpoint.database, cloud: { endpoint } })
+            ...sealed({
+                username: endpoint.username,
+                password: endpoint.password,
+                database: endpoint.database,
+                cloud: { endpoint }
+            })
         }
     });
 }
@@ -335,7 +405,11 @@ export async function advanceCloudProvision(
         let instance: cloudamqp.CloudAmqpInstance;
         try {
             if (row.providerResourceId) {
-                instance = await cloudamqp.getCloudAmqpInstance(request, cloud.apiKey, row.providerResourceId);
+                instance = await cloudamqp.getCloudAmqpInstance(
+                    request,
+                    cloud.apiKey,
+                    row.providerResourceId
+                );
             } else {
                 instance = await cloudamqp.createCloudAmqpInstance(request, cloud.apiKey, {
                     name: cloud.remoteName,
@@ -395,7 +469,8 @@ export async function resumeCloudProvisions(
         orderBy: { createdAt: "asc" },
         take: 50
     });
-    for (const row of rows) await advanceCloudProvision(row.id, request, now).catch(() => undefined);
+    for (const row of rows)
+        await advanceCloudProvision(row.id, request, now).catch(() => undefined);
 }
 
 let watching = false;
@@ -441,7 +516,8 @@ export async function removeCloudInstance(
         const id =
             row.providerResourceId ??
             (cloud.remoteName
-                ? (await cloudamqp.findCloudAmqpInstance(request, cloud.apiKey, cloud.remoteName))?.id
+                ? (await cloudamqp.findCloudAmqpInstance(request, cloud.apiKey, cloud.remoteName))
+                      ?.id
                 : null);
         if (id) await cloudamqp.deleteCloudAmqpInstance(request, cloud.apiKey, id);
     } catch (error) {

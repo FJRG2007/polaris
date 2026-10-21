@@ -103,7 +103,8 @@ import {
 // analytics, object storage, messaging.
 const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(
     [...MANAGED_ENGINES].sort(
-        (left, right) => ENGINE_GROUPS.indexOf(engineGroup(left)) - ENGINE_GROUPS.indexOf(engineGroup(right))
+        (left, right) =>
+            ENGINE_GROUPS.indexOf(engineGroup(left)) - ENGINE_GROUPS.indexOf(engineGroup(right))
     )
 );
 
@@ -1618,12 +1619,22 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     // too, so a form that cannot be sent says why instead of failing on submit.
     const access = databaseFormAccess(true, can);
     if (!access.allowed) {
-        return <p className="text-sm text-muted-foreground">{t(`view.database.cloud.denied_${access.reason}`)}</p>;
+        return (
+            <p className="text-sm text-muted-foreground">
+                {t(`view.database.cloud.denied_${access.reason}`)}
+            </p>
+        );
     }
     return <NewDatabaseFields environmentId={environmentId} onDone={onDone} />;
 }
 
-function NewDatabaseFields({ environmentId, onDone }: { environmentId: string; onDone: () => void }) {
+function NewDatabaseFields({
+    environmentId,
+    onDone
+}: {
+    environmentId: string;
+    onDone: () => void;
+}) {
     const t = useTranslations("deploy");
     const [name, setName] = useState("");
     const [engine, setEngine] = useState<ManagedEngine>("postgres");

@@ -270,7 +270,8 @@ export function dataEngineContainer(
                     KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093",
                     KAFKA_ADVERTISED_LISTENERS: `PLAINTEXT://${host}:9092`,
                     KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER",
-                    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
+                    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:
+                        "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
                     KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT",
                     KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9093",
                     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1",
@@ -391,7 +392,12 @@ export function selfHostedEndpoint(
                 nativeUrl: `clickhouse://${user}:${secret}@${host}:9000/${creds.database}`
             };
         case "influxdb":
-            return { ...base, url: `http://${host}:8086`, token: creds.token ?? "", org: INFLUX_ORG };
+            return {
+                ...base,
+                url: `http://${host}:8086`,
+                token: creds.token ?? "",
+                org: INFLUX_ORG
+            };
         case "couchdb":
             return { ...base, url: `http://${user}:${secret}@${host}:5984` };
         case "kafka":
@@ -534,20 +540,92 @@ export interface DataCloudProvider {
 }
 
 export const DATA_CLOUD_PROVIDERS: readonly DataCloudProvider[] = [
-    { id: "aws-s3", label: "Amazon S3", engines: ["minio"], consoleUrl: "https://console.aws.amazon.com/s3/", create: false },
-    { id: "cloudflare-r2", label: "Cloudflare R2", engines: ["minio"], consoleUrl: "https://dash.cloudflare.com/?to=/:account/r2", create: false },
-    { id: "backblaze-b2", label: "Backblaze B2", engines: ["minio"], consoleUrl: "https://secure.backblaze.com/b2_buckets.htm", create: false },
-    { id: "meilisearch-cloud", label: "Meilisearch Cloud", engines: ["meilisearch"], consoleUrl: "https://cloud.meilisearch.com", create: false },
-    { id: "typesense-cloud", label: "Typesense Cloud", engines: ["typesense"], consoleUrl: "https://cloud.typesense.org", create: false },
-    { id: "clickhouse-cloud", label: "ClickHouse Cloud", engines: ["clickhouse"], consoleUrl: "https://console.clickhouse.cloud", create: false },
-    { id: "influxdb-cloud", label: "InfluxDB Cloud", engines: ["influxdb"], consoleUrl: "https://cloud2.influxdata.com", create: false },
-    { id: "cloudant", label: "IBM Cloudant", engines: ["couchdb"], consoleUrl: "https://cloud.ibm.com/catalog/services/cloudant", create: false },
-    { id: "confluent-cloud", label: "Confluent Cloud", engines: ["kafka"], consoleUrl: "https://confluent.cloud", create: false },
-    { id: "aiven", label: "Aiven", engines: ["kafka", "clickhouse"], consoleUrl: "https://console.aiven.io", create: false },
+    {
+        id: "aws-s3",
+        label: "Amazon S3",
+        engines: ["minio"],
+        consoleUrl: "https://console.aws.amazon.com/s3/",
+        create: false
+    },
+    {
+        id: "cloudflare-r2",
+        label: "Cloudflare R2",
+        engines: ["minio"],
+        consoleUrl: "https://dash.cloudflare.com/?to=/:account/r2",
+        create: false
+    },
+    {
+        id: "backblaze-b2",
+        label: "Backblaze B2",
+        engines: ["minio"],
+        consoleUrl: "https://secure.backblaze.com/b2_buckets.htm",
+        create: false
+    },
+    {
+        id: "meilisearch-cloud",
+        label: "Meilisearch Cloud",
+        engines: ["meilisearch"],
+        consoleUrl: "https://cloud.meilisearch.com",
+        create: false
+    },
+    {
+        id: "typesense-cloud",
+        label: "Typesense Cloud",
+        engines: ["typesense"],
+        consoleUrl: "https://cloud.typesense.org",
+        create: false
+    },
+    {
+        id: "clickhouse-cloud",
+        label: "ClickHouse Cloud",
+        engines: ["clickhouse"],
+        consoleUrl: "https://console.clickhouse.cloud",
+        create: false
+    },
+    {
+        id: "influxdb-cloud",
+        label: "InfluxDB Cloud",
+        engines: ["influxdb"],
+        consoleUrl: "https://cloud2.influxdata.com",
+        create: false
+    },
+    {
+        id: "cloudant",
+        label: "IBM Cloudant",
+        engines: ["couchdb"],
+        consoleUrl: "https://cloud.ibm.com/catalog/services/cloudant",
+        create: false
+    },
+    {
+        id: "confluent-cloud",
+        label: "Confluent Cloud",
+        engines: ["kafka"],
+        consoleUrl: "https://confluent.cloud",
+        create: false
+    },
+    {
+        id: "aiven",
+        label: "Aiven",
+        engines: ["kafka", "clickhouse"],
+        consoleUrl: "https://console.aiven.io",
+        create: false
+    },
     // https://docs.cloudamqp.com/cloudamqp_api.html - POST /api/instances with the
     // account's API key; see `lib/data-cloud/cloudamqp.ts`.
-    { id: "cloudamqp", label: "CloudAMQP", engines: ["rabbitmq"], consoleUrl: "https://customer.cloudamqp.com", create: true },
-    { id: "other", label: "Another provider", engines: [...DATA_ENGINES], consoleUrl: "", create: false }
+    {
+        id: "cloudamqp",
+        label: "CloudAMQP",
+        engines: ["rabbitmq"],
+        consoleUrl: "https://customer.cloudamqp.com",
+        create: true
+    },
+    {
+        id: "other",
+        label: "Another provider",
+        engines: [...DATA_ENGINES],
+        consoleUrl: "",
+        create: false
+    }
 ];
 
 /** The providers an engine can be placed with. */
@@ -762,7 +840,12 @@ export function cloudEndpoint(input: CloudConnect): DataEndpoint {
         };
     }
     const url = new URL(input.url);
-    const defaultPort: Record<string, number> = { "https:": 443, "http:": 80, "amqps:": 5671, "amqp:": 5672 };
+    const defaultPort: Record<string, number> = {
+        "https:": 443,
+        "http:": 80,
+        "amqps:": 5671,
+        "amqp:": 5672
+    };
     const endpoint: DataEndpoint = {
         ...EMPTY_ENDPOINT,
         url: input.url,

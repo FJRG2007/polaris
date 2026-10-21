@@ -21,7 +21,10 @@ export async function reply(key: ReplyKey, params?: MessageParams): Promise<stri
  * one its form's keys in `deploy`, and they are translated; a shared schema's
  * own words pass through as they are.
  */
-export async function firstIssue(error: { issues: readonly { message: string }[] }, fallback: ReplyKey): Promise<string> {
+export async function firstIssue(
+    error: { issues: readonly { message: string }[] },
+    fallback: ReplyKey
+): Promise<string> {
     const t = await getTranslations("deployServer");
     const message = error.issues[0]?.message;
     if (!message) return t(fallback);

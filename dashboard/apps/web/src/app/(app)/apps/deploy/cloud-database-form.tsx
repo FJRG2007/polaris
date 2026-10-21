@@ -42,21 +42,37 @@ export function CloudDatabaseForm({
     const [mode, setMode] = useState<"connect" | "create">("connect");
     const [values, setValues] = useState<Partial<Record<CloudField, string>>>({});
     const [tls, setTls] = useState(true);
-    const [create, setCreate] = useState({ apiKey: "", plan: "lemur", region: "amazon-web-services::us-east-1" });
+    const [create, setCreate] = useState({
+        apiKey: "",
+        plan: "lemur",
+        region: "amazon-web-services::us-east-1"
+    });
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     if (!chosen) return null;
 
     // The schema checks every field; the select only offers its own mechanisms.
-    const connectDraft = { environmentId, name: name.trim(), engine, provider, tls, ...values } as CloudConnectInput;
+    const connectDraft = {
+        environmentId,
+        name: name.trim(),
+        engine,
+        provider,
+        tls,
+        ...values
+    } as CloudConnectInput;
     const createDraft = { environmentId, name: name.trim(), ...create };
     const parsed =
-        mode === "create" ? cloudAmqpCreateSchema.safeParse(createDraft) : cloudConnectSchema.safeParse(connectDraft);
+        mode === "create"
+            ? cloudAmqpCreateSchema.safeParse(createDraft)
+            : cloudConnectSchema.safeParse(connectDraft);
     const issues = parsed.success ? [] : parsed.error.issues;
     const issueFor = (field: string) => {
         const found = issues.find((one) => one.path[0] === field);
         // An empty field is incomplete, not wrong: it is marked required instead.
-        const typed = field in values ? values[field as CloudField] : (create as Record<string, string>)[field];
+        const typed =
+            field in values
+                ? values[field as CloudField]
+                : (create as Record<string, string>)[field];
         if (!found || !typed) return undefined;
         return t.has(found.message) ? t(found.message) : found.message;
     };
@@ -89,7 +105,12 @@ export function CloudDatabaseForm({
             )}
             {mode === "connect" && !chosen.create && chosen.consoleUrl && (
                 <p className="text-sm text-muted-foreground">
-                    <a className="underline" href={chosen.consoleUrl} target="_blank" rel="noreferrer noopener">
+                    <a
+                        className="underline"
+                        href={chosen.consoleUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                    >
                         {chosen.label}
                     </a>
                     {" - "}
@@ -106,14 +127,21 @@ export function CloudDatabaseForm({
                         {field === "saslMechanism" ? (
                             <Select
                                 value={values.saslMechanism ?? "PLAIN"}
-                                onValueChange={(value) => setValues({ ...values, saslMechanism: value })}
-                                options={KAFKA_SASL_MECHANISMS.map((one) => ({ value: one, label: one }))}
+                                onValueChange={(value) =>
+                                    setValues({ ...values, saslMechanism: value })
+                                }
+                                options={KAFKA_SASL_MECHANISMS.map((one) => ({
+                                    value: one,
+                                    label: one
+                                }))}
                             />
                         ) : (
                             <Input
                                 type={SECRET_FIELDS.includes(field) ? "password" : "text"}
                                 value={values[field] ?? ""}
-                                onChange={(event) => setValues({ ...values, [field]: event.target.value })}
+                                onChange={(event) =>
+                                    setValues({ ...values, [field]: event.target.value })
+                                }
                                 autoComplete="off"
                             />
                         )}
@@ -133,25 +161,47 @@ export function CloudDatabaseForm({
             )}
             {mode === "create" && (
                 <>
-                    <Field label={`${t("view.database.cloud.apiKey")} *`} error={issueFor("apiKey")}>
+                    <Field
+                        label={`${t("view.database.cloud.apiKey")} *`}
+                        error={issueFor("apiKey")}
+                    >
                         <Input
                             type="password"
                             value={create.apiKey}
-                            onChange={(event) => setCreate({ ...create, apiKey: event.target.value })}
+                            onChange={(event) =>
+                                setCreate({ ...create, apiKey: event.target.value })
+                            }
                             autoComplete="off"
                         />
                     </Field>
                     <Field label={`${t("view.database.cloud.plan")} *`} error={issueFor("plan")}>
-                        <Input value={create.plan} onChange={(event) => setCreate({ ...create, plan: event.target.value })} />
+                        <Input
+                            value={create.plan}
+                            onChange={(event) => setCreate({ ...create, plan: event.target.value })}
+                        />
                     </Field>
-                    <Field label={`${t("view.database.cloud.region")} *`} error={issueFor("region")}>
-                        <Input value={create.region} onChange={(event) => setCreate({ ...create, region: event.target.value })} />
+                    <Field
+                        label={`${t("view.database.cloud.region")} *`}
+                        error={issueFor("region")}
+                    >
+                        <Input
+                            value={create.region}
+                            onChange={(event) =>
+                                setCreate({ ...create, region: event.target.value })
+                            }
+                        />
                     </Field>
                 </>
             )}
             {error && <p className="text-sm text-danger">{error}</p>}
-            <Button onClick={submit} disabled={pending || !parsed.success} aria-disabled={!parsed.success}>
-                {mode === "create" ? t("view.database.cloud.createSubmit") : t("view.database.cloud.connectSubmit")}
+            <Button
+                onClick={submit}
+                disabled={pending || !parsed.success}
+                aria-disabled={!parsed.success}
+            >
+                {mode === "create"
+                    ? t("view.database.cloud.createSubmit")
+                    : t("view.database.cloud.connectSubmit")}
             </Button>
         </div>
     );

@@ -65,11 +65,19 @@ const PROVIDER_BRANDS: Readonly<Record<string, EngineBrand>> = {
  *  to the reader - storage, not a product - and an engine this build does not
  *  know as a generic database, so a row still renders. */
 export function DbEngineIcon({ engine, className }: { engine: string; className?: string }) {
-    return <BrandChip brand={BRANDS[engine]} storage={isStorageEngine(engine)} className={className} />;
+    return (
+        <BrandChip brand={BRANDS[engine]} storage={isStorageEngine(engine)} className={className} />
+    );
 }
 
 /** Where a data engine lives: a cloud provider's mark on the same chip. */
-export function CloudProviderIcon({ provider, className }: { provider: string; className?: string }) {
+export function CloudProviderIcon({
+    provider,
+    className
+}: {
+    provider: string;
+    className?: string;
+}) {
     return <BrandChip brand={PROVIDER_BRANDS[provider]} storage={false} className={className} />;
 }
 

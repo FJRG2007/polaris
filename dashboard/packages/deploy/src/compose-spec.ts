@@ -538,7 +538,12 @@ export function serviceNetworkLines(
 export function dbComposeSpec(plan: DbDeployPlan, network: string): ComposeSpec {
     const ports: ComposeSpecPort[] =
         plan.exposePort !== undefined
-            ? [{ host: plan.exposePort, container: plan.containerPort ?? defaultDbPort(plan.image) }]
+            ? [
+                  {
+                      host: plan.exposePort,
+                      container: plan.containerPort ?? defaultDbPort(plan.image)
+                  }
+              ]
             : [];
     const networks = joinedNetworks(plan.networks, network);
     // Its private names go on the container that carries the database's own name.

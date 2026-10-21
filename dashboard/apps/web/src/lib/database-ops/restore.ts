@@ -89,7 +89,9 @@ export async function restoreDumpInto(
             }
             // No dump of a data engine is taken, so there is none to load.
             if (isDataEngine(engine)) {
-                throw new DatabaseOperationError(`Polaris cannot restore a ${engine} instance from a dump`);
+                throw new DatabaseOperationError(
+                    `Polaris cannot restore a ${engine} instance from a dump`
+                );
             }
             const steps = restoreCommands({
                 engine,
