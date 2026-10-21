@@ -56,7 +56,7 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-const GH = "https://api.github.com/repos/bytehide/Backend";
+const GH = "https://api.github.com/repos/acme/backend";
 const GL = "https://gitlab.com/api/v4/projects/group%2Fsub%2Fproject";
 const OPTIONS = { toolCallId: "call-1", messages: [] };
 
@@ -81,7 +81,7 @@ describe("a GitHub repository", () => {
                 GH,
                 {
                     body: {
-                        full_name: "bytehide/Backend",
+                        full_name: "acme/backend",
                         default_branch: "master",
                         description: "API",
                         stargazers_count: 3,
@@ -102,7 +102,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_overview", {
-            repository: "https://github.com/bytehide/Backend/tree/master"
+            repository: "https://github.com/acme/backend/tree/master"
         });
         expect(result.ok).toBe(true);
         expect(result.text).toContain("default branch: master");
@@ -110,7 +110,7 @@ describe("a GitHub repository", () => {
         expect(result.text).toContain("app/\ncomposer.json");
         expect(result.text).toContain("Runs on Laravel.");
         expect(result.text).toMatch(
-            /^<untrusted_web_content source="https:\/\/github.com\/bytehide\/Backend\/tree\/master">/
+            /^<untrusted_web_content source="https:\/\/github.com\/acme\/backend\/tree\/master">/
         );
         expect(seen.every((call) => call.auth === null)).toBe(true);
     });
@@ -131,13 +131,13 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "composer.json"
         });
         expect(result.ok).toBe(true);
         expect(result.text).toContain('"php": "^8.2"');
         expect(result.text).toContain("composer.json at the default branch: 5 lines.");
-        expect(result.url).toBe("https://github.com/bytehide/Backend/blob/HEAD/composer.json");
+        expect(result.url).toBe("https://github.com/acme/backend/blob/HEAD/composer.json");
     });
 
     it("works out a ref holding a slash from a link into it", async () => {
@@ -158,7 +158,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "https://github.com/bytehide/Backend/blob/release/2.x/composer.json"
+            repository: "https://github.com/acme/backend/blob/release/2.x/composer.json"
         });
         expect(result).toMatchObject({ ok: true, ref: "release/2.x", path: "composer.json" });
         expect(result.text).toContain("hello");
@@ -182,7 +182,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "Dockerfile"
         });
         expect(result.text).toContain("FROM php:8.2-fpm");
@@ -206,7 +206,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "README.md"
         });
         expect(result.ok).toBe(true);
@@ -214,7 +214,7 @@ describe("a GitHub repository", () => {
     });
 
     it("says how to read a private repository when one is not found without an account", async () => {
-        const result = await run("repo_overview", { repository: "bytehide/Secret" });
+        const result = await run("repo_overview", { repository: "acme/Secret" });
         expect(result.ok).toBe(false);
         expect(result.text).toContain("If the repository is private");
         expect(result.text).toContain("Connected accounts (/account/connections)");
@@ -222,7 +222,7 @@ describe("a GitHub repository", () => {
 
     it("says the linked account cannot see it when signed in", async () => {
         state.token = "tok";
-        const result = await run("repo_overview", { repository: "bytehide/Secret" });
+        const result = await run("repo_overview", { repository: "acme/Secret" });
         expect(result.text).toContain("linked GitHub account cannot see it");
         expect(result.text).not.toContain("/account/connections");
     });
@@ -238,7 +238,7 @@ describe("a GitHub repository", () => {
                 }
             ]
         ];
-        const result = await run("repo_overview", { repository: "bytehide/Backend" });
+        const result = await run("repo_overview", { repository: "acme/backend" });
         expect(result.ok).toBe(false);
         expect(result.text).toContain("60 an hour");
         expect(result.text).toContain("00:00 UTC");
@@ -248,7 +248,7 @@ describe("a GitHub repository", () => {
     it("names the linked account's limit on a 429", async () => {
         state.token = "tok";
         routes = [[() => true, { status: 429, body: {}, headers: { "retry-after": "30" } }]];
-        const result = await run("repo_list_files", { repository: "bytehide/Backend" });
+        const result = await run("repo_list_files", { repository: "acme/backend" });
         expect(result.text).toContain("linked account is used up");
         expect(result.text).toContain("30 seconds");
     });
@@ -269,7 +269,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "dump.sql"
         });
         expect(result).toMatchObject({ ok: false });
@@ -293,7 +293,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "logo.png"
         });
         expect(result.text).toContain("is a binary file");
@@ -319,14 +319,14 @@ describe("a GitHub repository", () => {
             ]
         ];
         const first = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "big.txt"
         });
         expect(first.truncated).toBe(true);
         const next = /fromLine (\d+)/.exec(first.text)?.[1];
         expect(next).toBeTruthy();
         const second = await run("repo_read_file", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "big.txt",
             fromLine: Number(next)
         });
@@ -347,11 +347,11 @@ describe("a GitHub repository", () => {
             ]
         ];
         const listed = await run("repo_list_files", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             path: "/app/"
         });
         expect(listed.text).toContain("Http/\nhelpers.php");
-        const read = await run("repo_read_file", { repository: "bytehide/Backend", path: "app" });
+        const read = await run("repo_read_file", { repository: "acme/backend", path: "app" });
         expect(read.text).toBe("app is a folder: list it with repo_list_files.");
     });
 
@@ -376,7 +376,7 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_search", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             query: "*.json",
             inContents: true
         });
@@ -409,15 +409,81 @@ describe("a GitHub repository", () => {
             ]
         ];
         const result = await run("repo_search", {
-            repository: "bytehide/Backend",
+            repository: "acme/backend",
             query: "php",
             inContents: true
         });
         expect(result.text).toContain("config/app.php");
         expect(result.text).toContain("'php' => '8.2'");
         expect(seen.find((call) => call.url.includes("/search/code"))?.url).toContain(
-            encodeURIComponent("php repo:bytehide/Backend")
+            encodeURIComponent("php repo:acme/backend")
         );
+    });
+
+    it("still searches inside files when the tree is too big to read", async () => {
+        state.token = "tok";
+        routes = [
+            [
+                `${GH}/commits?per_page=1`,
+                { body: [{ sha: "c1", commit: { message: "m", tree: { sha: "t1" } } }] }
+            ],
+            [
+                `${GH}/git/trees/t1?recursive=1`,
+                { body: {}, headers: { "content-length": String(64 * 1024 * 1024) } }
+            ],
+            [
+                (url) => url.startsWith("https://api.github.com/search/code?"),
+                { body: { total_count: 1, items: [{ path: "src/a.ts", text_matches: [] }] } }
+            ]
+        ];
+        const result = await run("repo_search", {
+            repository: "acme/backend",
+            query: "a",
+            inContents: true
+        });
+        expect(result.ok).toBe(true);
+        expect(result.truncated).toBe(true);
+        expect(result.text).toContain("too big to list whole");
+        expect(result.text).toContain("src/a.ts");
+    });
+
+    it("keeps the path of the address when a ref is also given", async () => {
+        routes = [
+            [
+                `${GH}/contents/src/a.ts?ref=main`,
+                {
+                    body: {
+                        type: "file",
+                        path: "src/a.ts",
+                        size: 4,
+                        encoding: "base64",
+                        content: b64("x=1\n")
+                    }
+                }
+            ]
+        ];
+        const result = await run("repo_read_file", {
+            repository: "https://github.com/acme/backend/blob/main/src/a.ts",
+            ref: "main"
+        });
+        expect(result.ok).toBe(true);
+        expect(result.text).toContain("x=1");
+    });
+
+    it("says an empty repository is empty instead of a missing branch", async () => {
+        routes = [
+            [GH, { body: { full_name: "acme/backend", default_branch: "main" } }],
+            [
+                (url) => url.startsWith(`${GH}/contents`),
+                { status: 404, body: { message: "This repository is empty." } }
+            ]
+        ];
+        const overview = await run("repo_overview", { repository: "acme/backend" });
+        expect(overview.ok).toBe(true);
+        expect(overview.text).toContain("top level at main:\n(empty)");
+        const list = await run("repo_list_files", { repository: "acme/backend" });
+        expect(list.ok).toBe(false);
+        expect(list.text).toBe("That repository is empty.");
     });
 
     it("lists the latest commits", async () => {
@@ -437,7 +503,7 @@ describe("a GitHub repository", () => {
                 }
             ]
         ];
-        const result = await run("repo_commits", { repository: "bytehide/Backend", limit: 2 });
+        const result = await run("repo_commits", { repository: "acme/backend", limit: 2 });
         expect(result.text).toContain("abcdef1 2026-10-01 Ann: Bump PHP");
     });
 

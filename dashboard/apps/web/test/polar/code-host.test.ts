@@ -16,12 +16,12 @@ import { fenceScreen } from "@/lib/polar/shared";
 
 describe("reading a repository address", () => {
     it.each([
-        ["https://github.com/bytehide/Backend", "github", "bytehide", "Backend", null, []],
+        ["https://github.com/acme/backend", "github", "acme", "backend", null, []],
         [
-            "https://github.com/bytehide/Backend/tree/master",
+            "https://github.com/acme/backend/tree/master",
             "github",
-            "bytehide",
-            "Backend",
+            "acme",
+            "backend",
             "tree",
             ["master"]
         ],
@@ -79,7 +79,7 @@ describe("reading a repository address", () => {
 
     it.each([
         "https://github.com/settings/profile",
-        "https://github.com/bytehide",
+        "https://github.com/acme",
         "https://github.com/search?q=x",
         "https://gitlab.com/explore/projects",
         "https://gitlab.com/justauser",
@@ -93,10 +93,10 @@ describe("reading a repository address", () => {
     });
 
     it("takes GitHub's owner/repo shorthand from a tool, but not a bare host", () => {
-        expect(parseRepoInput("bytehide/Backend")).toMatchObject({
+        expect(parseRepoInput("acme/backend")).toMatchObject({
             host: "github",
-            owner: "bytehide",
-            name: "Backend"
+            owner: "acme",
+            name: "backend"
         });
         expect(parseRepoInput("example.org/x")).toBeNull();
         expect(parseRepoInput("https://gitlab.com/g/s/p")).toMatchObject({
@@ -123,7 +123,7 @@ describe("when a turn is about a repository", () => {
     const asked = (text: string) => [{ role: "user", parts: [{ type: "text", text }] }];
 
     it("is when the page shared is one", () => {
-        expect(aboutRepository("https://github.com/bytehide/Backend/tree/master", [])).toBe(true);
+        expect(aboutRepository("https://github.com/acme/backend/tree/master", [])).toBe(true);
         expect(aboutRepository("https://news.example.com/", asked("what php version?"))).toBe(
             false
         );
@@ -155,9 +155,9 @@ describe("when a turn is about a repository", () => {
     it("tells the model on the screen note which repository the page is", () => {
         const note = fenceScreen({
             route: "",
-            site: { url: "https://github.com/bytehide/Backend/tree/master", title: "Backend" }
+            site: { url: "https://github.com/acme/backend/tree/master", title: "backend" }
         } as never);
-        expect(note).toContain("GitHub repository bytehide/Backend");
+        expect(note).toContain("GitHub repository acme/backend");
         const plain = fenceScreen({
             route: "",
             site: { url: "https://example.com/", title: "Example" }

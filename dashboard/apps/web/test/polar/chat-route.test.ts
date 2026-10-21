@@ -616,14 +616,20 @@ describe("Polar on the web", () => {
         expect(names.filter((name) => /web|page/.test(name))).toEqual([]);
     });
 
-    const REPO_TOOLS = ["repo_commits", "repo_list_files", "repo_overview", "repo_read_file", "repo_search"];
+    const REPO_TOOLS = [
+        "repo_commits",
+        "repo_list_files",
+        "repo_overview",
+        "repo_read_file",
+        "repo_search"
+    ];
 
     it("offers the repository tools when the page shared is a repository", async () => {
         const names = await offered(
             body({
                 context: {
                     route: "/",
-                    site: { url: "https://github.com/bytehide/Backend/tree/master", title: "Backend" }
+                    site: { url: "https://github.com/acme/backend/tree/master", title: "backend" }
                 }
             })
         );
@@ -637,7 +643,9 @@ describe("Polar on the web", () => {
                     {
                         id: "u1",
                         role: "user",
-                        parts: [{ type: "text", text: "Which PHP does https://gitlab.com/g/s/p use?" }]
+                        parts: [
+                            { type: "text", text: "Which PHP does https://gitlab.com/g/s/p use?" }
+                        ]
                     }
                 ]
             })
@@ -647,7 +655,9 @@ describe("Polar on the web", () => {
 
     it("does not send the repository tools on a turn about no repository", async () => {
         const names = await offered(
-            body({ context: { route: "/", site: { url: "https://example.com/post", title: "Post" } } })
+            body({
+                context: { route: "/", site: { url: "https://example.com/post", title: "Post" } }
+            })
         );
         expect(names.filter((name) => name.startsWith("repo_"))).toEqual([]);
     });

@@ -48,6 +48,12 @@ const README_CHARS = 3_000;
 /** Most entries one listing or search shows. */
 const LIST_MOST = 200;
 const SEARCH_MOST = 60;
+/**
+ * Biggest recursive tree read from GitHub. GitHub truncates a tree at 100,000
+ * entries, and each entry in the JSON carries its sha and API url, so this is
+ * room for a whole one.
+ */
+const TREE_BYTES = 32 * 1024 * 1024;
 /** Most pages of a GitLab tree walked for a path search. */
 const GITLAB_TREE_PAGES = 10;
 
@@ -120,6 +126,13 @@ function json(reply: HostReply): unknown {
     }
 }
 
+/** Whether GitHub answered that the repository holds no commits yet. */
+function githubEmpty(reply: HostReply): boolean {
+    if (reply.status !== 404) return false;
+    const parsed = z.object({ message: z.string() }).safeParse(json(reply));
+    return parsed.success && /repository is empty/i.test(parsed.data.message);
+}
+
 /** A refusal worded for the model, which relays it to the person. */
 class RepoFailure extends Error {}
 
@@ -190,6 +203,7 @@ class GithubClient {
                 );
             }
         }
+        if (githubEmpty(reply)) throw new RepoFailure("That repository is empty.");
         if (reply.status === 404) {
             throw new RepoFailure(
                 signed
@@ -332,7 +346,14 @@ export async function locate(
         gitlab: repo.host === "gitlab" ? new GitlabClient() : null
     };
     const explicitPath = input.path === undefined ? undefined : cleanPath(input.path);
-    if (input.ref) return { ...clients, ref: input.ref.trim(), path: explicitPath ?? "" };
+    if (input.ref) {
+        const ref = input.ref.trim();
+        const refParts = ref.split("/");
+        const fromAddress = refParts.every((part, index) => repo.rest[index] === part)
+            ? repo.rest.slice(refParts.length).join("/")
+            : "";
+        return { ...clients, ref, path: explicitPath ?? cleanPath(fromAddress) };
+    }
     const candidates = refCandidates(repo.rest);
     if (candidates.length === 0) return { ...clients, ref: null, path: explicitPath ?? "" };
     let chosen = candidates[0]!;
@@ -528,7 +549,7 @@ async function overview(located: Located): Promise<RepoToolResult> {
             client.get(`${base}/readme${refQuery}`, "application/vnd.github.raw", 256 * 1024),
             client.get(`${base}/contents${refQuery}`)
         ]);
-        await client.check(rootReply, `The branch ${ref}`);
+        if (!githubEmpty(rootReply)) await client.check(rootReply, `The branch ${ref}`);
         root = z.array(githubEntry).catch([]).parse(json(rootReply));
         if (readmeReply.status === 200 && readmeReply.bytes)
             readme = textOf(readmeReply.bytes) ?? "";
@@ -833,13 +854,25 @@ async function search(
         );
         const treeSha = head[0]?.commit.tree?.sha;
         if (!treeSha) return { ok: false, repository: label, text: "That repository is empty." };
-        const tree = await client.read(
+        const treeReply = await client.get(
             `${base}/git/trees/${treeSha}?recursive=1`,
-            githubTree,
-            "its file tree"
+            "application/vnd.github+json",
+            TREE_BYTES
         );
-        truncated = tree.truncated;
-        paths = tree.tree.filter((entry) => entry.type === "blob").map((entry) => entry.path);
+        await client.check(treeReply, "its file tree");
+        if (treeReply.tooBig) {
+            truncated = true;
+        } else {
+            const tree = githubTree.safeParse(json(treeReply));
+            if (!tree.success)
+                throw new RepoFailure(
+                    "GitHub sent an answer for its file tree that could not be read."
+                );
+            truncated = tree.data.truncated;
+            paths = tree.data.tree
+                .filter((entry) => entry.type === "blob")
+                .map((entry) => entry.path);
+        }
         if (inContents) {
             if (!(await client.signedIn())) {
                 sections.push(
