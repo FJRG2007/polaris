@@ -12,10 +12,15 @@ let throttled = false;
 const buckets: string[] = [];
 const runs: unknown[] = [];
 const opened: unknown[] = [];
+const revoked: { userId: string; id: string }[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: { user: { findUnique: async () => ({ isAdmin: false }) } }
 }));
+vi.mock("@polaris/auth", () => ({
+    revokeApiKey: async (userId: string, id: string) => void revoked.push({ userId, id })
+}));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/api-key-auth", () => ({ authenticateApiKey: async () => principal }));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => "en-US" }));
 vi.mock("@/lib/rate-limit-service", () => ({
@@ -65,6 +70,7 @@ const actions = await import("@/app/api/deck/actions/route");
 const run = await import("@/app/api/deck/run/route");
 const state = await import("@/app/api/deck/state/route");
 const authorize = await import("@/app/api/deck/authorize/route");
+const session = await import("@/app/api/deck/session/route");
 
 const DECK = { keyId: "k1", userId: "u1", kind: "streamdeck", scopes: ["chat.use"] };
 
@@ -88,6 +94,7 @@ beforeEach(() => {
     buckets.length = 0;
     runs.length = 0;
     opened.length = 0;
+    revoked.length = 0;
 });
 
 describe("deck routes", () => {
@@ -181,5 +188,18 @@ describe("deck routes", () => {
             post("/api/deck/authorize", { deviceName: "studio-pc", scopes: ["vault.use"] })
         );
         expect(refused.status).toBe(400);
+    });
+
+    it("let a deck revoke its own key, and only a deck's key", async () => {
+        const del = () =>
+            new Request("https://polaris.example/api/deck/session", {
+                method: "DELETE",
+                headers: { authorization: "Bearer plk_x" }
+            });
+        expect((await session.DELETE(del())).status).toBe(204);
+        expect(revoked).toEqual([{ userId: "u1", id: "k1" }]);
+        principal = { ...DECK, kind: "key" };
+        expect((await session.DELETE(del())).status).toBe(401);
+        expect(revoked).toHaveLength(1);
     });
 });

@@ -6,15 +6,16 @@
  * plugin draws its picker from this and nothing else.
  */
 
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { deckCatalogue } from "@/lib/deck/deck-service";
 import { deckCaller, deckWords } from "@/lib/deck/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await deckCaller(request, "call");
     if (caller instanceof Response) return caller;
     const actions = await deckCatalogue(caller, deckWords(caller));
     return Response.json({ actions }, { headers: { "cache-control": "no-store" } });
-}
+});

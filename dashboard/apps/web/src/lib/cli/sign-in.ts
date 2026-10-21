@@ -115,11 +115,12 @@ function storedKind(raw: unknown): SignInKind {
 
 /**
  * The OS a CLI's user-agent names. The CLI sends
- * `polaris-cli/<version> (<platform>; <arch>; node <version>)`, which no browser
+ * `polaris-cli/<version> (<platform>; <arch>; node <version>)` - the Stream Deck
+ * plugin says the same as `polaris-streamdeck/` - which no browser
  * parser recognises, so it is read here; anything else goes to the shared parser.
  */
 export function cliOs(userAgent: string | null): string {
-    const platform = /^polaris-cli\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
+    const platform = /^polaris-(?:cli|streamdeck)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
         userAgent ?? ""
     )?.[1];
     if (platform === "win32") return "Windows";

@@ -6,6 +6,7 @@
  * `deckStateStream` for what it sends and when.
  */
 
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { deckCaller, deckWords } from "@/lib/deck/auth";
 import { readWatch } from "@/lib/deck/deck-service";
 import { deckStateStream } from "@/lib/deck/state-stream";
@@ -13,7 +14,7 @@ import { deckStateStream } from "@/lib/deck/state-stream";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request): Promise<Response> {
+export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await deckCaller(request, "stream");
     if (caller instanceof Response) return caller;
     const words = deckWords(caller);
@@ -29,4 +30,4 @@ export async function GET(request: Request): Promise<Response> {
             "x-accel-buffering": "no"
         }
     });
-}
+});

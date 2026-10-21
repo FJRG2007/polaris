@@ -6,13 +6,14 @@
  * the inspector; what the action itself refuses comes back the same way.
  */
 
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { deckCaller, deckWords } from "@/lib/deck/auth";
 import { deckRunSchema, runDeckAction } from "@/lib/deck/deck-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await deckCaller(request, "call");
     if (caller instanceof Response) return caller;
     const words = deckWords(caller);
@@ -31,4 +32,4 @@ export async function POST(request: Request): Promise<Response> {
         status: result.ok ? 200 : 422,
         headers: { "cache-control": "no-store" }
     });
-}
+});
