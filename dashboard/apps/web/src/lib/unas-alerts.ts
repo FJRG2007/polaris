@@ -33,7 +33,7 @@ import {
 const NOTICE_TYPE = "storage.nasAlert";
 
 /** Where the owner sees the NAS the notice is about. */
-const OVERVIEW_HREF = "/drive/overview";
+const NAS_HREF = "/places/nas/";
 
 /** The bell's notices about one NAS, newest first, read to sweep them. */
 const SWEEP_MOST = 200;
@@ -160,7 +160,7 @@ async function raise(
                 event: NOTICE_TYPE,
                 title: t(TITLE[kind], words),
                 body: t(BODY[kind], words),
-                href: OVERVIEW_HREF,
+                href: `${NAS_HREF}${connection.id}`,
                 level: "warning",
                 metadata: { connectionId: connection.id, alert: alert.key }
             });

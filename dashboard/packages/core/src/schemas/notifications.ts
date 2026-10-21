@@ -675,7 +675,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.onBattery",
-        group: "deploy",
+        group: "places",
         label: "The power went out",
         description: "A UPS is running on its battery.",
         level: "danger",
@@ -683,7 +683,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.online",
-        group: "deploy",
+        group: "places",
         label: "The power is back",
         description: "A UPS that was on battery runs from the mains again.",
         level: "success",
@@ -691,7 +691,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.lowBattery",
-        group: "deploy",
+        group: "places",
         label: "A UPS battery is nearly empty",
         description:
             "A UPS on battery is about to run out, and the machines it protects may be shut down.",
@@ -700,7 +700,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.test",
-        group: "deploy",
+        group: "places",
         label: "A UPS battery test finished",
         description: "The result of a battery self-test.",
         level: "info",
@@ -708,7 +708,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.replaceBattery",
-        group: "deploy",
+        group: "places",
         label: "A UPS battery needs replacing",
         description: "A UPS reports that its battery is worn out.",
         level: "warning",
@@ -716,7 +716,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.shutdownFailed",
-        group: "deploy",
+        group: "places",
         label: "A machine did not shut down",
         description: "A UPS ran low and Polaris could not power off a machine it protects.",
         level: "danger",
@@ -724,7 +724,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.shutdown",
-        group: "deploy",
+        group: "places",
         label: "A UPS is shutting machines down",
         description: "The battery ran low and the protected machines are being shut down.",
         level: "danger",
@@ -732,7 +732,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.overload",
-        group: "deploy",
+        group: "places",
         label: "A UPS is overloaded",
         description: "A UPS is asked for more power than it can give.",
         level: "danger",
@@ -740,7 +740,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.commLost",
-        group: "deploy",
+        group: "places",
         label: "A UPS stopped answering",
         description: "Polaris cannot read a UPS any more.",
         level: "warning",
@@ -748,7 +748,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.commRestored",
-        group: "deploy",
+        group: "places",
         label: "A UPS answers again",
         description: "A UPS that had stopped answering can be read again.",
         level: "success",
@@ -756,7 +756,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.powerIssue",
-        group: "deploy",
+        group: "places",
         label: "A UPS corrected the power",
         description: "A UPS is trimming or boosting the voltage, on bypass, calibrating or off.",
         level: "warning",
@@ -764,7 +764,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "ups.report",
-        group: "deploy",
+        group: "places",
         label: "A UPS report is ready",
         description: "A scheduled UPS report was saved to your drive.",
         level: "info",
@@ -884,7 +884,7 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
     },
     {
         id: "storage.nasAlert",
-        group: "system",
+        group: "places",
         label: "A UniFi NAS needs attention",
         description:
             "A storage pool lost its protection or is nearly full, a disk is failing or running hot, or a backup failed or did not run.",

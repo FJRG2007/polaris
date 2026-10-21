@@ -30,6 +30,14 @@ describe("what a camera can reach somebody with", () => {
         for (const id of RAISED) expect(notificationEvent(id)?.group).toBe("places");
     });
 
+    it("lists the UPS and NAS events under Places, where those screens moved", () => {
+        const moved = NOTIFICATION_EVENTS.filter(
+            (entry) => entry.id.startsWith("ups.") || entry.id === "storage.nasAlert"
+        );
+        expect(moved.length).toBeGreaterThan(1);
+        for (const entry of moved) expect(entry.group).toBe("places");
+    });
+
     it("leaves a sighting off the bell until it is asked for", () => {
         expect(resolveRule({}, "places.sighting")).toEqual({
             inapp: false,
