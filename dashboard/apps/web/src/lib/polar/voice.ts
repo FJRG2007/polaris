@@ -4,9 +4,12 @@
  *
  * Hearing: any model in `transcription.ts` a key is held for, the one the
  * person picked (`PolarPreference.transcriptionModel`) or the fastest one.
- * Speaking: only providers whose speech models the AI SDK names, with the
- * model ids its types list (`@ai-sdk/openai`, `@ai-sdk/google`): OpenAI first,
- * then Google. The keys are the ones every other call spends
+ * Speaking: only providers whose speech models an installed AI SDK package
+ * names, with the model ids and voices its docs list: OpenAI, ElevenLabs,
+ * Google, Mistral, then the English-only Deepgram and Groq. A voice that only
+ * speaks English is skipped for an answer in another language, and with none
+ * left the browser says the answer itself (`browser-voice.ts`). The keys are
+ * the ones every other call spends
  * (`model-keys.ts`): the person's own first, then the deployment's when it
  * shares them, or only the one the person picked to pay for the chat.
  *
@@ -42,34 +45,96 @@ import {
     type PolarAccess
 } from "@/lib/polar/access";
 
-interface VoiceProvider {
+export interface VoiceProvider {
     slug: string;
-    transcription: string;
-    speech: string;
     voice: string;
     format: "mp3" | "wav";
     mediaType: string;
+    /** The languages its voice speaks (primary subtags), or every one. */
+    languages: "any" | readonly string[];
+    model: (apiKey: string) => SpeechModel;
 }
 
-/** Best first. */
-const VOICE_PROVIDERS: readonly VoiceProvider[] = [
+/** Groq's OpenAI-compatible speech endpoint and its English model
+ *  (console.groq.com/docs/text-to-speech); `@ai-sdk/groq` has no speech model. */
+const GROQ_OPENAI_BASE = "https://api.groq.com/openai/v1";
+
+/** Best first: natural multilingual voices, then the English-only ones. */
+export const VOICE_PROVIDERS: readonly VoiceProvider[] = [
     {
         slug: "openai",
-        transcription: "gpt-4o-mini-transcribe",
-        speech: "gpt-4o-mini-tts",
         voice: "alloy",
         format: "mp3",
-        mediaType: "audio/mpeg"
+        mediaType: "audio/mpeg",
+        languages: "any",
+        model: (apiKey) => createOpenAI({ apiKey }).speech("gpt-4o-mini-tts")
+    },
+    {
+        slug: "elevenlabs",
+        // The voice the AI SDK's ElevenLabs docs use ("Rachel").
+        voice: "21m00Tcm4TlvDq8ikWAM",
+        format: "mp3",
+        mediaType: "audio/mpeg",
+        languages: "any",
+        model: (apiKey) => createElevenLabs({ apiKey }).speech("eleven_multilingual_v2")
     },
     {
         slug: "google-ai",
-        transcription: "gemini-3.5-transcribe",
-        speech: "gemini-3.8-flash-tts",
         voice: "Kore",
         format: "wav",
-        mediaType: "audio/wav"
+        mediaType: "audio/wav",
+        languages: "any",
+        model: (apiKey) => createGoogle({ apiKey }).speech("gemini-3.8-flash-tts")
+    },
+    {
+        // Voxtral infers the language from the text (AI SDK Mistral docs).
+        slug: "mistral",
+        voice: "en_paul_neutral",
+        format: "mp3",
+        mediaType: "audio/mpeg",
+        languages: "any",
+        model: (apiKey) => createMistral({ apiKey }).speech("voxtral-mini-tts-2603")
+    },
+    {
+        slug: "deepgram",
+        voice: "thalia",
+        format: "mp3",
+        mediaType: "audio/mpeg",
+        languages: ["en"],
+        model: (apiKey) => createDeepgram({ apiKey }).speech("aura-2")
+    },
+    {
+        slug: "groq",
+        voice: "troy",
+        format: "wav",
+        mediaType: "audio/wav",
+        languages: ["en"],
+        model: (apiKey) =>
+            createOpenAI({ apiKey, baseURL: GROQ_OPENAI_BASE }).speech(
+                "canopylabs/orpheus-v1-english"
+            )
     }
 ];
+
+/** The primary subtag of a language tag ("es-ES" -> "es"), or null. */
+function primaryLanguage(lang: string | null | undefined): string | null {
+    const primary = (lang ?? "").split("-")[0]?.trim().toLowerCase() ?? "";
+    return /^[a-z]{2,3}$/.test(primary) ? primary : null;
+}
+
+/** The speech providers a key is held for that can say something in `lang`,
+ *  best first. Without a language, every one held. */
+export function speechCandidates(
+    held: { has: (slug: string) => boolean },
+    lang?: string | null
+): VoiceProvider[] {
+    const primary = primaryLanguage(lang);
+    return VOICE_PROVIDERS.filter(
+        (provider) =>
+            held.has(provider.slug) &&
+            (provider.languages === "any" || !primary || provider.languages.includes(primary))
+    );
+}
 
 type FoundVoice = { provider: VoiceProvider; credential: ChatCredential };
 
@@ -81,16 +146,19 @@ const found = new Map<string, { at: number; value: FoundVoice }>();
 
 /** The first voice provider this person holds a key for, spending only the
  *  payer's key when they picked who pays. */
-async function voiceProviderFor(userId: string, payer: Payer | null): Promise<FoundVoice | null> {
-    const key = `${userId}:${payer ?? ""}`;
+async function voiceProviderFor(
+    userId: string,
+    payer: Payer | null,
+    lang: string | null
+): Promise<FoundVoice | null> {
+    const key = `${userId}:${payer ?? ""}:${primaryLanguage(lang) ?? ""}`;
     const now = Date.now();
     const cached = found.get(key);
     if (cached && now - cached.at < FOUND_TTL_MS) return cached.value;
     found.delete(key);
     const access = await polarAccessFor(userId);
     const sources = await polarKeySources(userId, access);
-    for (const provider of VOICE_PROVIDERS) {
-        if (!sources.has(provider.slug)) continue;
+    for (const provider of speechCandidates(sources, lang)) {
         const credential = await polarCredentialFor(userId, provider.slug, payer, access);
         if (!credential) continue;
         const value = { provider, credential };
@@ -129,7 +197,7 @@ export async function polarVoiceAvailability(
         const transcribers = transcriptionOptions(sources);
         return {
             dictation: transcribers.length > 0,
-            speech: VOICE_PROVIDERS.some((provider) => sources.has(provider.slug)),
+            speech: speechCandidates(sources).length > 0,
             transcribers,
             transcriber: pickTranscription(transcribers, chosen)?.id ?? null
         };
@@ -225,18 +293,20 @@ export interface PolarSpeaker {
     mediaType: string;
 }
 
-/** The speech model for this person, or null without a provider. */
+/** The speech model for this person that can say something in `lang`, or
+ *  null without one: the browser speaks instead. */
 export async function polarSpeaker(
     userId: string,
-    payer: Payer | null = null
+    payer: Payer | null = null,
+    lang: string | null = null
 ): Promise<PolarSpeaker | null> {
-    const voice = await voiceProviderFor(userId, payer);
+    const voice = await voiceProviderFor(userId, payer, lang);
     if (!voice) return null;
-    const apiKey = voice.credential.secret;
     const { provider } = voice;
-    const model =
-        provider.slug === "openai"
-            ? createOpenAI({ apiKey }).speech(provider.speech)
-            : createGoogle({ apiKey }).speech(provider.speech);
-    return { model, voice: provider.voice, format: provider.format, mediaType: provider.mediaType };
+    return {
+        model: provider.model(voice.credential.secret),
+        voice: provider.voice,
+        format: provider.format,
+        mediaType: provider.mediaType
+    };
 }

@@ -54,7 +54,15 @@ export const transcribeQuerySchema = z.object({
 /** The body of a speech request. */
 export const speakBodySchema = z.object({
     text: z.string().trim().min(1).max(SPEAK_TEXT_MAX),
-    payer: z.enum(PAYERS).nullable().default(null)
+    payer: z.enum(PAYERS).nullable().default(null),
+    /** The language to say it in (a BCP 47 tag such as `es-ES`); a voice that
+     *  cannot speak it is skipped. Absent from an older page: any voice. */
+    lang: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/)
+        .nullable()
+        .default(null)
 });
 
 /** What this person can do with their voice, carried on `/api/polar/models`. */
