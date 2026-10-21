@@ -47,7 +47,9 @@ const ERRORS = [
     "no_registration",
     "insecure",
     "token_refused",
-    "invalid_answer"
+    "invalid_answer",
+    "refused",
+    "unreachable"
 ] as const;
 type ErrorCode = (typeof ERRORS)[number];
 const isErrorCode = (code: unknown): code is ErrorCode =>
@@ -226,6 +228,11 @@ export function PolarConnectors({
                                 onChange={(enabled) => void patch(row, { ...row, enabled }, { enabled })}
                             />
                         </div>
+                        {row.status === "error" ? (
+                            <p role="status" className="text-xs text-danger">
+                                {t(`polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`)}
+                            </p>
+                        ) : null}
                         <div className="flex flex-wrap items-center gap-2">
                             {row.auth === "oauth" && (!row.signedIn || row.status === "sign_in") ? (
                                 <Button
@@ -414,7 +421,7 @@ function AddConnector({
                             inputMode="url"
                             aria-invalid={urlBad || undefined}
                             onChange={(event) => setUrl(event.target.value)}
-                            placeholder="https://mcp.example.com/mcp"
+                            placeholder={t("polarConnectors.urlPlaceholder")}
                         />
                         {urlBad ? (
                             <span className="text-xs text-danger">{t("polarConnectors.urlInvalid")}</span>

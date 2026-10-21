@@ -1361,6 +1361,7 @@
         "name": "Name",
         "namePlaceholder": "e.g. Linear",
         "url": "Server URL",
+        "urlPlaceholder": "https://mcp.example.com/mcp",
         "urlInvalid": "Enter the full address, starting with https://",
         "auth": "Sign-in",
         "authKind": {
@@ -1384,7 +1385,7 @@
             "failed": "That didn't work. Try again.",
             "invalid": "Check the name and address and try again.",
             "limit": "You have the most connectors allowed. Remove one first.",
-            "duplicate": "You already have a connector with that name.",
+            "duplicate": "You already have a connector with that name or one very like it.",
             "address": "That address can't be a server here. Use https://.",
             "host": "Your administrator doesn't allow servers on that host.",
             "rate_limited": "Too many changes at once. Wait a minute.",
@@ -1395,6 +1396,8 @@
             "insecure": "The server signs in over plain http, which Polar refuses.",
             "token_refused": "The server refused the sign-in. Try again.",
             "invalid_answer": "The server answered something Polar can't read.",
+            "refused": "That server is on a private address your administrator doesn't allow.",
+            "unreachable": "The server didn't answer. Check the address or try again later.",
             "signInFailed": "Sign-in didn't finish. Try Sign in again."
         }
     }

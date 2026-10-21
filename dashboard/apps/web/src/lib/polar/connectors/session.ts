@@ -76,14 +76,41 @@ async function bearerFor(
     }
     if (!secret?.tokens || !secret.client) throw new ConnectorError("sign_in");
     if (!oauth.tokenExpiring(secret.tokens)) return secret.tokens.accessToken;
-    if (!secret.tokens.refreshToken) throw new ConnectorError("sign_in");
+    return refreshOnce(row, policy);
+}
+
+/** Refreshes in flight, by connector: one refresh token is spent once. */
+const refreshing = new Map<string, Promise<string>>();
+
+function refreshOnce(row: store.ConnectorRow, policy: PolarConnectorPolicy): Promise<string> {
+    const running = refreshing.get(row.id);
+    if (running) return running;
+    const started = refresh(row, policy).finally(() => refreshing.delete(row.id));
+    refreshing.set(row.id, started);
+    return started;
+}
+
+async function refresh(row: store.ConnectorRow, policy: PolarConnectorPolicy): Promise<string> {
+    // Read again: another call may have refreshed since this one read it.
+    const secret = (await store.ownConnector(row.ownerId, row.id))?.secret;
+    if (!secret?.tokens || !secret.client) throw new ConnectorError("sign_in");
+    if (!oauth.tokenExpiring(secret.tokens)) return secret.tokens.accessToken;
+    const spent = secret.tokens.refreshToken;
+    if (!spent) throw new ConnectorError("sign_in");
+    let tokens: oauth.ConnectorTokens;
     try {
-        const tokens = await oauth.refreshTokens(fetchFor(policy, "auth"), secret.client, secret.tokens.refreshToken);
-        await store.saveSecret(row.ownerId, row.id, { ...secret, tokens });
-        return tokens.accessToken;
+        tokens = await oauth.refreshTokens(fetchFor(policy, "auth"), secret.client, spent);
     } catch {
         throw new ConnectorError("sign_in");
     }
+    // Stored on top of what is there now; a sign-in that finished meanwhile wins.
+    const stored = await store.updateSecret(row.ownerId, row.id, (current) =>
+        current?.tokens?.refreshToken === spent
+            ? { secret: { ...current, tokens }, result: tokens.accessToken }
+            : { secret: current, result: current?.tokens?.accessToken ?? null }
+    );
+    if (!stored) throw new ConnectorError("sign_in");
+    return stored;
 }
 
 /** Opens the connector, runs `use`, and always closes it again. */
@@ -184,7 +211,10 @@ export async function startSignIn(ownerId: string, id: string): Promise<{ url: s
             redirectUri: await callbackUrl(),
             registered: found.secret?.registered ?? null
         });
-        await store.saveSecret(ownerId, id, { ...(found.secret ?? {}), pending: begun.pending });
+        await store.updateSecret(ownerId, id, (current) => ({
+            secret: { ...(current ?? {}), pending: begun.pending },
+            result: true
+        }));
         return { url: begun.authorizationUrl };
     } catch (error) {
         if (error instanceof oauth.ConnectorAuthError) return error.code;
@@ -201,9 +231,12 @@ export async function finishSignIn(ownerId: string, state: string, code: string)
     const pending = found?.secret?.pending;
     if (!found || !pending) return null;
     const policy = await store.connectorPolicy();
+    const spend = (current: store.ConnectorSecret | null) => {
+        const { pending: _spent, ...rest } = current ?? {};
+        return rest;
+    };
     try {
         const tokens = await oauth.finishAuthorization(fetchFor(policy, "auth"), pending, { state, code });
-        const { pending: _spent, ...rest } = found.secret ?? {};
         const client = {
             clientId: pending.clientId,
             clientSecret: pending.clientSecret,
@@ -211,11 +244,15 @@ export async function finishSignIn(ownerId: string, state: string, code: string)
             authMethod: pending.authMethod,
             resource: pending.resource
         };
-        await store.saveSecret(ownerId, id, { ...rest, client, tokens });
+        await store.updateSecret(ownerId, id, (current) => ({
+            secret: { ...spend(current), client, tokens },
+            result: true
+        }));
     } catch {
         // A refused code leaves the pending authorization spent either way.
-        const { pending: _spent, ...rest } = found.secret ?? {};
-        await store.saveSecret(ownerId, id, rest);
+        await store.updateSecret(ownerId, id, (current) =>
+            current?.pending?.stateHash === pending.stateHash ? { secret: spend(current), result: true } : null
+        );
         return null;
     }
     await checkConnector(ownerId, id);

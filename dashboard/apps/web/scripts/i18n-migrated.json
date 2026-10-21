@@ -2101,6 +2101,7 @@
         "web/src/components/polar/elements/confirmation.tsx",
         "web/src/app/(app)/account/polar-tools/page.tsx",
         "web/src/app/(app)/account/polar-tools/polar-tool-grants.tsx",
+        "web/src/app/(app)/account/polar-tools/polar-connectors.tsx",
         "web/src/components/polar/elements/work.tsx",
         "web/src/components/polar/polar-voice.tsx",
         "web/src/components/polar/polar-settings.tsx",

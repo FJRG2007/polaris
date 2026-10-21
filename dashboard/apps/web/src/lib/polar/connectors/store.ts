@@ -238,13 +238,15 @@ export async function createConnector(
     const url = rules.canonicalServerUrl(input.url, policy.privateNetwork);
     if (!url) return "address";
     if (!hostAllowed(url, policy.hosts)) return "host";
-    const held = await prisma.polarConnector.count({ where: { ownerId } });
-    if (held >= rules.CONNECTOR_LIMIT) return "limit";
-    const taken = await prisma.polarConnector.findFirst({
-        where: { ownerId, name: { equals: input.name, mode: "insensitive" } },
-        select: { id: true }
+    // Two names with one slug would give their tools the same names in a chat.
+    const slug = rules.connectorSlug(input.name);
+    const held = await prisma.polarConnector.findMany({
+        where: { ownerId },
+        select: { name: true },
+        take: rules.CONNECTOR_LIMIT
     });
-    if (taken) return "duplicate";
+    if (held.length >= rules.CONNECTOR_LIMIT) return "limit";
+    if (held.some((entry) => rules.connectorSlug(entry.name) === slug)) return "duplicate";
     const secret: ConnectorSecret | null =
         input.auth === "bearer"
             ? { token: input.token }
@@ -265,8 +267,61 @@ export async function createConnector(
     return toRow(created);
 }
 
-export async function saveSecret(ownerId: string, id: string, secret: ConnectorSecret | null): Promise<void> {
-    await prisma.polarConnector.updateMany({ where: { id, ownerId }, data: encrypt(secret) });
+const uuidSchema = z.string().uuid();
+
+/**
+ * Reads one connector under a row lock and writes what `change` answers, so
+ * two writers of the same row - a refresh and a sign-in, two tool answers -
+ * each build on what the other stored. `change` answering null writes nothing.
+ */
+async function changeLocked<T>(
+    ownerId: string,
+    id: string,
+    change: (found: { row: ConnectorRow; secret: ConnectorSecret | null }) => {
+        data: { secret?: ConnectorSecret | null; toolPolicies?: Record<string, rules.ToolPolicy> };
+        result: T;
+    } | null
+): Promise<T | null> {
+    if (!uuidSchema.safeParse(id).success) return null;
+    return prisma.$transaction(async (tx) => {
+        // Postgres only - the local SQLite database has one writer at a time
+        // and no row locks to ask for.
+        if (loadEnv().POLARIS_DB_PROVIDER === "postgresql") {
+            await tx.$queryRaw`SELECT "id" FROM "PolarConnector" WHERE "id" = ${id}::uuid AND "ownerId" = ${ownerId}::uuid FOR UPDATE`;
+        }
+        const row = (await tx.polarConnector.findFirst({
+            where: { id, ownerId },
+            select: SELECT
+        })) as Selected | null;
+        if (!row) return null;
+        const next = change({ row: toRow(row), secret: decrypt(row) });
+        if (!next) return null;
+        const { secret, toolPolicies } = next.data;
+        await tx.polarConnector.update({
+            where: { id },
+            data: {
+                ...(secret !== undefined ? encrypt(secret) : {}),
+                ...(toolPolicies ? { toolPolicies } : {})
+            }
+        });
+        return next.result;
+    });
+}
+
+/**
+ * Changes the stored secret from what is stored now, never from a copy read
+ * before a slow request. Null when there is no such connector or `change`
+ * answers null.
+ */
+export async function updateSecret<T>(
+    ownerId: string,
+    id: string,
+    change: (secret: ConnectorSecret | null) => { secret: ConnectorSecret | null; result: T } | null
+): Promise<T | null> {
+    return changeLocked(ownerId, id, ({ secret }) => {
+        const next = change(secret);
+        return next ? { data: { secret: next.secret }, result: next.result } : null;
+    });
 }
 
 /** What a check found: the tool list, and whether it could be read. */
@@ -287,7 +342,10 @@ export async function recordCheck(
 }
 
 export async function setEnabled(ownerId: string, id: string, enabled: boolean): Promise<boolean> {
-    const { count } = await prisma.polarConnector.updateMany({ where: { id, ownerId }, data: { enabled } });
+    const { count } = await prisma.polarConnector.updateMany({
+        where: { id, ownerId },
+        data: { enabled }
+    });
     return count > 0;
 }
 
@@ -298,14 +356,12 @@ export async function setToolPolicy(
     tool: string,
     policy: rules.ToolPolicy
 ): Promise<boolean> {
-    const found = await ownConnector(ownerId, id);
-    if (!found || !found.row.tools.some((entry) => entry.name === tool)) return false;
-    const policies = { ...found.row.policies, [tool]: policy };
-    await prisma.polarConnector.updateMany({
-        where: { id, ownerId },
-        data: { toolPolicies: policies }
-    });
-    return true;
+    const saved = await changeLocked(ownerId, id, ({ row }) =>
+        row.tools.some((entry) => entry.name === tool)
+            ? { data: { toolPolicies: { ...row.policies, [tool]: policy } }, result: true }
+            : null
+    );
+    return saved === true;
 }
 
 export async function deleteConnector(ownerId: string, id: string): Promise<boolean> {

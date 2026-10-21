@@ -55,7 +55,7 @@ export function connectorFetch(options: ConnectorFetchOptions): ConnectorFetch {
             return new Response(null, { status: 405 });
         }
         const response = await configuredRequest(
-            address,
+            String(address),
             { ...init, timeoutMs: options.timeoutMs ?? 30_000 },
             { allowPrivate: options.allowPrivate }
         );

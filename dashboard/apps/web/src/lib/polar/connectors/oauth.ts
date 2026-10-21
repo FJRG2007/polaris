@@ -28,7 +28,7 @@
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 
-export type ConnectorFetch = (url: string, init?: RequestInit) => Promise<Response>;
+export type ConnectorFetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
 /** Any metadata or token answer past this is not one. */
 const JSON_MAX = 256 * 1024;

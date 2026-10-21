@@ -1361,6 +1361,7 @@
         "name": "Nombre",
         "namePlaceholder": "p. ej. Linear",
         "url": "URL",
+        "urlPlaceholder": "https://mcp.example.com/mcp",
         "urlInvalid": "Pon la dirección completa, empezando por https://",
         "auth": "Acceso",
         "authKind": {
@@ -1384,7 +1385,7 @@
             "failed": "No ha funcionado. Reinténtalo.",
             "invalid": "Revisa el nombre y la dirección y reinténtalo.",
             "limit": "Tienes el máximo de conectores. Quita uno antes.",
-            "duplicate": "Ya tienes un conector con ese nombre.",
+            "duplicate": "Ya tienes un conector con ese nombre o uno muy parecido.",
             "address": "Esa dirección no sirve como servidor. Usa https://.",
             "host": "Tu administrador no permite servidores en ese host.",
             "rate_limited": "Demasiados cambios seguidos. Espera un minuto.",
@@ -1395,6 +1396,8 @@
             "insecure": "El servidor usa http sin cifrar para entrar y Polar lo rechaza.",
             "token_refused": "El servidor rechazó el acceso. Reinténtalo.",
             "invalid_answer": "El servidor respondió algo que Polar no entiende.",
+            "refused": "Ese servidor está en una dirección privada que tu administrador no permite.",
+            "unreachable": "El servidor no respondió. Revisa la dirección o reinténtalo más tarde.",
             "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
         }
     }
