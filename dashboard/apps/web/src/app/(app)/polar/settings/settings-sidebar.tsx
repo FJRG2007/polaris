@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Polar's conversation list beside its settings, the same one /polar shows:
- * settings are a page of Polar, not a place that leaves it. Opening a chat or
- * starting one goes to /polar with it; putting the list away is the same
+ * Polar's conversation list beside its settings, the same one /polar shows,
+ * Code sessions included: settings are a page of Polar, not a place that
+ * leaves it. Opening a chat or a session, or starting one, goes to /polar
+ * with it; putting the list away is the same
  * choice the chat page remembers. On a narrow screen it opens as a drawer, as
  * on /polar.
  */
@@ -13,6 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useWide } from "@/components/polar/use-wide";
 import { PolarThreads } from "@/components/polar/polar-threads";
+import { usePolarCode } from "@/components/polar/polar-code";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
@@ -26,6 +28,8 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
     const wide = useWide();
     useEffect(() => setHidden(readStored(SIDEBAR_KEY) === "hidden"), []);
     const sidebar = usePolarSidebar({ enabled: !hidden || drawer, onRemoved: () => undefined });
+    const code = usePolarCode();
+    const codeMode = code.mode === "code";
     const hide = (next: boolean) => {
         setHidden(next);
         writeStored(SIDEBAR_KEY, next ? "hidden" : "shown");
@@ -36,12 +40,27 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
             activeId=""
             onOpen={(id) => router.push(`/polar?thread=${encodeURIComponent(id)}`)}
             onNew={(projectId) => {
+                if (projectId === null && codeMode) {
+                    router.push("/polar?session=new");
+                    return;
+                }
                 writeStored(THREAD_KEY, "");
                 router.push(
                     projectId ? `/polar?new=${encodeURIComponent(projectId)}` : "/polar?new=1"
                 );
             }}
             hide={close}
+            newLabel={codeMode ? t("code.newTask") : undefined}
+            code={
+                code.access === null || code.access === "none"
+                    ? null
+                    : {
+                          history: code.history,
+                          activeId: null,
+                          first: codeMode,
+                          onOpen: (id) => router.push(`/polar?session=${encodeURIComponent(id)}`)
+                      }
+            }
         />
     );
     return (

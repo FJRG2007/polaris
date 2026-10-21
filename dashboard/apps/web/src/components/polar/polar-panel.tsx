@@ -1275,12 +1275,19 @@ export function PolarChat({
     };
     // A chat named in the page's address (a shared chat just continued, a
     // chat picked beside the settings) opens once, and the address goes back
-    // to plain /polar; `new` starts one, in the project it names if any.
+    // to plain /polar; `new` starts one, in the project it names if any, and
+    // `session` opens a Code session (`new` for a new task).
     // Otherwise the chat that was open before a reload opens again.
     useEffect(() => {
         const params = fullPage ? new URLSearchParams(window.location.search) : null;
         const named = params?.get("thread") ?? null;
         const fresh = params?.get("new") ?? null;
+        const session = params?.get("session") ?? null;
+        if (session) {
+            window.history.replaceState(null, "", window.location.pathname);
+            code.open(session === "new" ? null : session);
+            return;
+        }
         if (named || fresh) {
             window.history.replaceState(null, "", window.location.pathname);
             code.setMode("chat");
