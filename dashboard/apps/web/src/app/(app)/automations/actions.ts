@@ -20,7 +20,10 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
-import type { MessagingChannelChoice, ProjectWebhookChoice } from "@/lib/automations/notice-targets";
+import type {
+    MessagingChannelChoice,
+    ProjectWebhookChoice
+} from "@/lib/automations/notice-targets";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 

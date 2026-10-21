@@ -29,12 +29,7 @@ export interface AutomationNotice {
 }
 
 export type NoticeChannel =
-    | "bell"
-    | "email"
-    | "destination"
-    | "chat"
-    | "projectWebhook"
-    | "messaging";
+    "bell" | "email" | "destination" | "chat" | "projectWebhook" | "messaging";
 
 export interface NoticeMiss {
     readonly channel: NoticeChannel;

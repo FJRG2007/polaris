@@ -420,9 +420,7 @@ export function NoticeDeliveryFields({
                             </p>
                         ) : null}
                         {messagingGone && (
-                            <p className="text-xs text-danger-ink">
-                                {t("delivery.messagingGone")}
-                            </p>
+                            <p className="text-xs text-danger-ink">{t("delivery.messagingGone")}</p>
                         )}
                     </Row>
                 </>

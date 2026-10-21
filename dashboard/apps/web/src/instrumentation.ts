@@ -61,9 +61,8 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import(
-        "./lib/deploy-service"
-    );
+    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } =
+        await import("./lib/deploy-service");
     const { guardVacantReachable } = await import("./lib/deploy/router");
     //
     // Published at once - the routes are read from the database, so both dashboards

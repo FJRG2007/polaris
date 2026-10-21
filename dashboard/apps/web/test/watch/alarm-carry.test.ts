@@ -77,14 +77,24 @@ vi.mock("@polaris/db", () => ({
                 const state = store.triggers.get(where.automationId);
                 return state ? { id: where.automationId, state } : null;
             },
-            updateMany: async ({ where, data }: { where: { id: string }; data: { state: Record<string, unknown> } }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: { state: Record<string, unknown> };
+            }) => {
                 store.triggers.set(where.id, data.state);
             }
         }
     }
 }));
 vi.mock("@/lib/automations/app-bridge", () => ({
-    importAutomation: async (given: { legacyRef: string; graph: unknown; origin: string | null }) => {
+    importAutomation: async (given: {
+        legacyRef: string;
+        graph: unknown;
+        origin: string | null;
+    }) => {
         store.imports.push(given);
         const known = store.automations.get(given.legacyRef);
         if (known) return known;
@@ -95,8 +105,10 @@ vi.mock("@/lib/automations/app-bridge", () => ({
     }
 }));
 vi.mock("@/lib/notifications/notice-words", () => ({
-    wordsFor: async () => (key: string, params: Record<string, string> = {}) =>
-        `${key}(${Object.values(params).join("|")})`
+    wordsFor:
+        async () =>
+        (key: string, params: Record<string, string> = {}) =>
+            `${key}(${Object.values(params).join("|")})`
 }));
 vi.mock("@/lib/notifications/preferences", () => ({
     ruleFor: async (_user: string, event: string) =>
@@ -131,7 +143,12 @@ function alarm(overrides: Partial<Row> = {}): Row {
     };
 }
 
-const WORDS = { alarmTitle: "Alarm", alarmBody: "b", recoveredTitle: "Recovered", recoveredBody: "b" };
+const WORDS = {
+    alarmTitle: "Alarm",
+    alarmBody: "b",
+    recoveredTitle: "Recovered",
+    recoveredBody: "b"
+};
 const DELIVERY = { alarm: core.DEFAULT_NOTICE_DELIVERY, recovered: core.DEFAULT_NOTICE_DELIVERY };
 
 beforeEach(() => {
@@ -145,7 +162,11 @@ beforeEach(() => {
 
 describe("the automation an alarm becomes", () => {
     it("is a threshold on the same reading that can be published as it is", () => {
-        const result = carry.watchAlarmGraph(alarm({ operator: "lt", forPeriods: 4 }), WORDS, DELIVERY);
+        const result = carry.watchAlarmGraph(
+            alarm({ operator: "lt", forPeriods: 4 }),
+            WORDS,
+            DELIVERY
+        );
         if (!result.ok) throw new Error(result.reason);
         expect(core.graphProblems(result.graph, { forPublish: true })).toEqual([]);
         const trigger = result.graph.nodes.find((node) => node.type === "core.threshold");
@@ -164,17 +185,25 @@ describe("the automation an alarm becomes", () => {
     });
 
     it("leaves reachability alarms on Watch", () => {
-        expect(carry.watchAlarmGraph(alarm({ metric: "http", targetType: "domain" }), WORDS, DELIVERY)).toEqual({
+        expect(
+            carry.watchAlarmGraph(alarm({ metric: "http", targetType: "domain" }), WORDS, DELIVERY)
+        ).toEqual({
             ok: false,
             reason: "reachability"
         });
         expect(
-            carry.watchAlarmGraph(alarm({ metric: "service", targetType: "application" }), WORDS, DELIVERY)
+            carry.watchAlarmGraph(
+                alarm({ metric: "service", targetType: "application" }),
+                WORDS,
+                DELIVERY
+            )
         ).toEqual({ ok: false, reason: "reachability" });
     });
 
     it("keeps Watch's bell when the owner's rule sends the event nowhere", () => {
-        expect(carry.deliveryFromRule({ inapp: false, email: false, destinations: [] }, null).bell).toBe(true);
+        expect(
+            carry.deliveryFromRule({ inapp: false, email: false, destinations: [] }, null).bell
+        ).toBe(true);
     });
 });
 
@@ -185,7 +214,10 @@ describe("carrying on boot", () => {
         expect(await carry.carryWatchAlarms()).toBe(0);
         expect(store.automations.size).toBe(1);
         expect(store.imports).toHaveLength(1);
-        expect(store.imports[0]).toMatchObject({ legacyRef: `watch-alarm:${alarm().id}`, origin: null });
+        expect(store.imports[0]).toMatchObject({
+            legacyRef: `watch-alarm:${alarm().id}`,
+            origin: null
+        });
         expect(store.rows[0]!.carriedToId).toBe([...store.automations.values()][0]);
     });
 
@@ -242,7 +274,11 @@ describe("carrying on boot", () => {
             episode: { startedAt: at.toISOString(), startValue: 97, peak: 97 }
         });
         const { stepAlarm } = await import("../../src/lib/alarm-state");
-        const still = stepAlarm(memory as { state: string; streak: number }, { breach: true, insufficient: false }, 2);
+        const still = stepAlarm(
+            memory as { state: string; streak: number },
+            { breach: true, insufficient: false },
+            2
+        );
         expect(still.transition).toBeNull();
     });
 
@@ -264,7 +300,10 @@ describe("carrying on boot", () => {
 
 describe("Watch after the carry", () => {
     it("no longer evaluates a carried alarm", async () => {
-        const source = await readFile(new URL("../../src/lib/watch/alarm-evaluator.ts", import.meta.url), "utf8");
+        const source = await readFile(
+            new URL("../../src/lib/watch/alarm-evaluator.ts", import.meta.url),
+            "utf8"
+        );
         expect(source).toContain("where: { enabled: true, carriedToId: null }");
     });
 });

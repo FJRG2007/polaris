@@ -149,7 +149,11 @@ export function watchAlarmGraph(
 
 /** Where the owner's rule for an event sent it, as a notify step's delivery. */
 export function deliveryFromRule(
-    rule: { readonly inapp: boolean; readonly email: boolean; readonly destinations: readonly string[] },
+    rule: {
+        readonly inapp: boolean;
+        readonly email: boolean;
+        readonly destinations: readonly string[];
+    },
     messaging: core.NoticeDelivery["messaging"]
 ): core.NoticeDelivery {
     const destinations = rule.destinations.slice(0, 10);
@@ -243,7 +247,11 @@ async function holdOpenAlarm(alarm: StoredAlarm, automationId: string): Promise<
                 checkedAt: null,
                 episode:
                     opened && value !== null
-                        ? { startedAt: opened.createdAt.toISOString(), startValue: value, peak: value }
+                        ? {
+                              startedAt: opened.createdAt.toISOString(),
+                              startValue: value,
+                              peak: value
+                          }
                         : null
             }
         }
@@ -317,7 +325,10 @@ export async function carryWatchAlarms(): Promise<number> {
             } catch (error) {
                 if (!reported.has(alarm.id)) {
                     reported.add(alarm.id);
-                    console.error(`polaris: Watch alarm ${alarm.id} stays on Watch for now:`, error);
+                    console.error(
+                        `polaris: Watch alarm ${alarm.id} stays on Watch for now:`,
+                        error
+                    );
                 }
             }
         }

@@ -152,7 +152,9 @@ describe("the targets Watch alarms used", () => {
             delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
         });
         expect(deploy.sendToProjectWebhook).not.toHaveBeenCalled();
-        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookForbidden" }]);
+        expect(result.missed).toEqual([
+            { channel: "projectWebhook", reason: "projectWebhookForbidden" }
+        ]);
     });
 
     it("says a deleted project webhook is gone", async () => {
@@ -162,7 +164,9 @@ describe("the targets Watch alarms used", () => {
             ...BASE,
             delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
         });
-        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookGone" }]);
+        expect(result.missed).toEqual([
+            { channel: "projectWebhook", reason: "projectWebhookGone" }
+        ]);
     });
 
     it("says a switched-off project webhook is off, not deleted", async () => {

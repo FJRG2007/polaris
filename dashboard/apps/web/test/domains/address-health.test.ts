@@ -128,9 +128,8 @@ vi.mock("@/lib/connectivity/outage-tracker", () => ({
 // Settling the public tunnel is its own concern (share-tunnel.test.ts).
 vi.mock("@/lib/public-reach", () => ({ settleShareTunnel: async () => "unchanged" }));
 
-const { checkConnectivityNow, checkedAddresses, sweepAddresses } = await import(
-    "../../src/lib/address-health"
-);
+const { checkConnectivityNow, checkedAddresses, sweepAddresses } =
+    await import("../../src/lib/address-health");
 
 /** A sweep, with the retry's wait fast-forwarded rather than waited out. */
 async function sweep(): Promise<void> {
