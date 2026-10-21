@@ -52,6 +52,26 @@ export type Link = "unset" | "connecting" | "online" | "offline" | "unauthorized
 /** A request Polaris answered 401: the key no longer opens anything. */
 export class Unauthorized extends Error {}
 
+/** A request Polaris answered 429: the key works, and has to wait `retryMs`. */
+export class Throttled extends Error {
+    constructor(
+        message: string,
+        readonly retryMs: number
+    ) {
+        super(message);
+    }
+}
+
+/** What a 429 says: how long to wait, from its `retry-after`, and why. */
+async function throttled(response: Response): Promise<Throttled> {
+    const seconds = Number(response.headers.get("retry-after"));
+    const body = (await response.json().catch(() => null)) as { error?: unknown } | null;
+    return new Throttled(
+        typeof body?.error === "string" ? body.error : `Polaris answered ${response.status}`,
+        Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 3600) * 1000 : 60_000
+    );
+}
+
 /** What a deck stores about its connection, in the plugin's global settings. */
 export interface Credentials {
     readonly address: string;
@@ -116,6 +136,7 @@ export class PolarisClient {
 
     async #json<T>(response: Response): Promise<T> {
         if (response.status === 401) throw new Unauthorized();
+        if (response.status === 429) throw await throttled(response);
         const body = (await response.json().catch(() => null)) as T | { error?: string } | null;
         if (!response.ok && response.status !== 422) {
             const message = (body as { error?: string } | null)?.error;
@@ -182,7 +203,8 @@ export class PolarisClient {
 
     /**
      * Hold the state stream open, calling `onReadings` for every frame, until
-     * it ends or `signal` aborts. Throws `Unauthorized` on a 401.
+     * it ends or `signal` aborts. Throws `Unauthorized` on a 401 and
+     * `Throttled` on a 429.
      */
     async stream(
         credentials: Credentials,
@@ -199,6 +221,7 @@ export class PolarisClient {
             }
         );
         if (response.status === 401) throw new Unauthorized();
+        if (response.status === 429) throw await throttled(response);
         if (!response.ok || !response.body) throw new Error(`Polaris answered ${response.status}`);
         const reader = new SseReader();
         const decoder = new TextDecoder();

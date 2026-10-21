@@ -6,7 +6,7 @@
 import { wordsFor } from "../src/words";
 import { describe, expect, it } from "vitest";
 import type { DeckAction } from "../src/polaris";
-import { faceFor, runOptions, turnLevel } from "../src/face";
+import { faceFor, runOptions, turnLevel, watchOptions } from "../src/face";
 import { clip, escapeXml, keyImage, renderKey } from "../src/render";
 
 const words = wordsFor("en");
@@ -100,6 +100,13 @@ describe("runOptions and turnLevel", () => {
         expect(turnLevel(98, 3)).toBe(100);
         expect(turnLevel(3, -5)).toBe(1);
         expect(turnLevel("nonsense", 0)).toBe(50);
+    });
+
+    it("watches a dial without the level it is turned to, so turning it keeps the stream", () => {
+        const settings = { options: { deviceId: "d1", level: 70 } };
+        expect(watchOptions(settings, "dial")).toEqual({ deviceId: "d1" });
+        expect(watchOptions(settings, "key")).toEqual({ deviceId: "d1", level: 70 });
+        expect(runOptions(settings)).toEqual({ deviceId: "d1", level: 70 });
     });
 });
 

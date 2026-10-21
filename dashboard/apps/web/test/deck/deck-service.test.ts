@@ -13,6 +13,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppDeckAction, DeckCaller } from "@/lib/deck/types";
 
 const calls: { name: string; input: unknown; scopes: readonly string[] }[] = [];
+const buckets: string[] = [];
+const audits: { action: string; actorId: string; metadata: Record<string, unknown> }[] = [];
+let throttledBucket: string | null = null;
 let appActions: AppDeckAction[] = [];
 let presence = "auto";
 const presenceWrites: string[] = [];
@@ -36,16 +39,44 @@ vi.mock("@/lib/presence-service", () => ({
     }
 }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appDeckActions: async () => appActions }));
+vi.mock("@/lib/rate-limit-service", () => ({
+    rateLimit: async (bucket: string) => {
+        buckets.push(bucket);
+        return bucket === throttledBucket
+            ? { ok: false, retryAfterMs: 30_000 }
+            : { ok: true, retryAfterMs: 0 };
+    }
+}));
+vi.mock("@/lib/deploy/api/http", () => ({
+    throttleDeployKey: async (keyId: string, changes: boolean) => {
+        buckets.push(`deploy-api${changes ? "-change" : ""}:${keyId}`);
+        return null;
+    }
+}));
+vi.mock("@/lib/mcp/tools/deploy", () => ({
+    DEPLOY_TOOLS: [{ name: "deploy_restart" }, { name: "deploy_deployments" }]
+}));
+vi.mock("@/lib/audit-service", () => ({
+    recordAudit: async (event: {
+        action: string;
+        actorId: string;
+        metadata: Record<string, unknown>;
+    }) => {
+        audits.push({ action: event.action, actorId: event.actorId, metadata: event.metadata });
+    }
+}));
 vi.mock("@/lib/mcp/catalog", () => {
     const tool = (
         name: string,
         scope: string,
         input: z.ZodTypeAny,
-        structured: unknown = null
+        structured: unknown = null,
+        readOnly = structured !== null
     ) => ({
         name,
         scope,
         input,
+        readOnly,
         run: async (args: unknown, caller: { scopes: readonly string[] }) => {
             calls.push({ name, input: args, scopes: caller.scopes });
             return { text: "", structured };
@@ -62,6 +93,8 @@ vi.mock("@/lib/mcp/catalog", () => {
                 conversations: [{ id: "c1", name: "general" }]
             }),
             tool("deploy_restart", "deploy.manage", z.object({ service: z.string() })),
+            tool("places_camera_snapshot", "places.cameras", z.object({}), { image: "x" }),
+            tool("databases_query", "databases.read", z.object({}), { rows: [] }),
             tool("places_device_control", "places.control", z.object({}).passthrough()),
             tool("places_devices", "places.read", z.object({}).passthrough(), {
                 devices: [
@@ -81,6 +114,7 @@ vi.mock("@/lib/mcp/catalog", () => {
 
 const service = await import("@/lib/deck/deck-service");
 const core = await import("@/lib/deck/core-actions");
+const tools = await import("@/lib/deck/tool-call");
 
 const words = (key: string) => key;
 const CONVERSATION = "11111111-1111-4111-8111-111111111111";
@@ -117,6 +151,9 @@ const lamp: AppDeckAction = {
 
 beforeEach(() => {
     calls.length = 0;
+    buckets.length = 0;
+    audits.length = 0;
+    throttledBucket = null;
     presenceWrites.length = 0;
     presence = "auto";
     appActions = [];
@@ -269,11 +306,80 @@ describe("readDeckStates", () => {
 });
 
 describe("deploymentState", () => {
-    it("colours a deployment by how it went and keeps Deploy's word for it", () => {
-        expect(core.deploymentState("running")).toEqual({ tone: "ok", detail: "running" });
-        expect(core.deploymentState("failed")).toEqual({ tone: "bad", detail: "failed" });
-        expect(core.deploymentState("building")).toEqual({ tone: "warn", detail: "building" });
-        expect(core.deploymentState("cancelled")).toEqual({ tone: "idle", detail: "cancelled" });
+    it("colours a deployment by how it went and names it in the reader's language", () => {
+        expect(core.deploymentState("running", "en-US")).toEqual({ tone: "ok", detail: "Running" });
+        expect(core.deploymentState("failed", "es-ES")).toEqual({ tone: "bad", detail: "Fallido" });
+        expect(core.deploymentState("building", "en-US")).toEqual({
+            tone: "warn",
+            detail: "Building"
+        });
+        expect(core.deploymentState("cancelled", "es-ES")).toEqual({
+            tone: "idle",
+            detail: "Cancelado"
+        });
+    });
+
+    it("shows only the colour for a status it has no word for", () => {
+        expect(core.deploymentState("something-new", "en-US")).toEqual({ tone: "idle" });
+    });
+});
+
+describe("callTool", () => {
+    it("spends the key's change and Deploy budgets and audits a change as the deck", async () => {
+        const outcome = await tools.callTool(caller(["deploy.manage"]), "deploy_restart", {
+            service: "web/api"
+        });
+        expect(outcome).toEqual({ ok: true, structured: null });
+        expect(buckets).toEqual(["mcp-call:k1", "mcp-change:k1", "deploy-api-change:k1"]);
+        expect(audits).toEqual([
+            {
+                action: "mcp.tool.called",
+                actorId: "u1",
+                metadata: { tool: "deploy_restart", via: "streamdeck", keyId: "k1" }
+            }
+        ]);
+    });
+
+    it("leaves a read to the deck's own budget and out of the activity", async () => {
+        const outcome = await tools.callTool(caller(["chat.use"]), "chat_conversations", {});
+        expect(outcome.ok).toBe(true);
+        expect(buckets).toEqual([]);
+        expect(audits).toEqual([]);
+    });
+
+    it("refuses a change over budget in the reader's words, without running it", async () => {
+        throttledBucket = "mcp-change:k1";
+        const outcome = await tools.callTool(
+            { ...caller(["deploy.manage"]), locale: "es-ES" },
+            "deploy_restart",
+            { service: "web/api" }
+        );
+        expect(outcome).toEqual({
+            ok: false,
+            message: "Demasiadas pulsaciones desde este deck. Espera un momento."
+        });
+        expect(calls).toHaveLength(0);
+        expect(audits).toEqual([]);
+    });
+
+    it("grants only the finer scopes a deck's actions use", async () => {
+        const mcp = tools.mcpCallerFor(
+            caller(["home.read", "home.control", "home.manage", "deploy.read"])
+        );
+        expect(mcp.scopes).toEqual(
+            expect.arrayContaining(["places.read", "places.control", "places.routines"])
+        );
+        expect(mcp.scopes).not.toContain("places.cameras");
+        expect(mcp.scopes).not.toContain("databases.read");
+        expect(mcp.scopes).not.toContain("databases.write");
+        expect(await tools.callTool(caller(["home.read"]), "places_camera_snapshot", {})).toEqual({
+            ok: false,
+            message: null
+        });
+        expect(await tools.callTool(caller(["deploy.read"]), "databases_query", {})).toEqual({
+            ok: false,
+            message: null
+        });
     });
 });
 

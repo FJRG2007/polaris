@@ -58,6 +58,18 @@ export function runOptions(settings: KeySettings): Record<string, unknown> {
     return options && typeof options === "object" && !Array.isArray(options) ? { ...options } : {};
 }
 
+/** The settings a key's state is read with: its run's, but for a dial the
+ *  level it last landed on, which is where it is turned to rather than what
+ *  it shows - so turning it does not reopen the state stream. */
+export function watchOptions(
+    settings: KeySettings,
+    surface: "key" | "dial"
+): Record<string, unknown> {
+    const options = runOptions(settings);
+    if (surface === "dial") delete options.level;
+    return options;
+}
+
 /** One dial turn, five points a tick, held between 1 and 100. */
 export function turnLevel(level: unknown, ticks: number): number {
     const from = typeof level === "number" && Number.isFinite(level) ? level : 50;

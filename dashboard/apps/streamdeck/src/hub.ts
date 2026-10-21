@@ -6,20 +6,21 @@
  * of those change; and runs the connect flow the settings screen starts.
  *
  * The stream is held while any key with live state is on screen, restarted
- * (debounced) when the set of keys changes, and reconnected with backoff when
+ * (debounced) when what it watches changes, and reconnected with backoff when
  * it drops. A 401 anywhere stops all of it and draws "Sign in" until the deck
- * is connected again.
+ * is connected again; a 429 waits as long as Polaris asked, still online.
  */
 
 import { wordsFor } from "./words";
 import { keyImage } from "./render";
 import { backoffMs } from "./backoff";
 import { joinPath, normalizeAddress } from "./address";
-import { faceFor, runOptions, type KeySettings } from "./face";
+import { faceFor, runOptions, watchOptions, type KeySettings } from "./face";
 import streamDeck, { type DialAction, type KeyAction } from "@elgato/streamdeck";
 import {
     PolarisClient,
     readCredentials,
+    Throttled,
     Unauthorized,
     type Credentials,
     type DeckAction,
@@ -60,6 +61,8 @@ class Hub {
     readonly #states = new Map<string, DeckState>();
     #stream: AbortController | null = null;
     #restart: ReturnType<typeof setTimeout> | null = null;
+    /** What the stream last opened watched, to tell a change from a redraw. */
+    #streamed: string | null = null;
     #failures = 0;
     #connectAbort: AbortController | null = null;
     /** Called when the settings screen should be told something changed. */
@@ -88,13 +91,13 @@ class Hub {
         this.#instances.set(instance.action.id, instance);
         void this.#maybeRefresh();
         this.redraw(instance.action.id);
-        this.#scheduleRestart();
+        this.#watchChanged();
     }
 
     detach(id: string): void {
         this.#instances.delete(id);
         this.#states.delete(id);
-        this.#scheduleRestart();
+        this.#watchChanged();
     }
 
     update(id: string, settings: KeySettings): void {
@@ -103,7 +106,7 @@ class Hub {
         instance.settings = settings;
         this.#states.delete(id);
         this.redraw(id);
-        this.#scheduleRestart();
+        this.#watchChanged();
     }
 
     setState(id: string, state: DeckState): void {
@@ -153,12 +156,16 @@ class Hub {
             this.#failed(caught);
         }
         this.#redrawAll();
+        this.#watchChanged();
     }
 
     #failed(caught: unknown): void {
         if (caught instanceof Unauthorized) {
             this.link = "unauthorized";
             this.#stopStream();
+        } else if (caught instanceof Throttled) {
+            this.link = "online";
+            streamDeck.logger.info(`Polaris asked to wait ${caught.retryMs}ms: ${caught.message}`);
         } else {
             this.link = "offline";
             streamDeck.logger.warn(`Polaris could not be reached: ${String(caught)}`);
@@ -190,7 +197,7 @@ class Hub {
         } catch (caught) {
             this.#failed(caught);
             this.#redrawAll();
-            return null;
+            return caught instanceof Throttled ? { ok: false, message: caught.message } : null;
         }
     }
 
@@ -209,9 +216,18 @@ class Hub {
         for (const [id, instance] of this.#instances) {
             const entry = this.entry(instance.settings);
             if (entry?.live)
-                watched.push({ key: id, action: entry.id, options: runOptions(instance.settings) });
+                watched.push({
+                    key: id,
+                    action: entry.id,
+                    options: watchOptions(instance.settings, instance.surface)
+                });
         }
         return watched.slice(0, 64);
+    }
+
+    /** Restart the stream only when what it would watch is not what it does. */
+    #watchChanged(): void {
+        if (JSON.stringify(this.#watched()) !== this.#streamed) this.#scheduleRestart();
     }
 
     #scheduleRestart(delay = RESTART_DEBOUNCE_MS): void {
@@ -231,6 +247,7 @@ class Hub {
         this.#stopStream();
         const credentials = this.credentials;
         const watched = this.#watched();
+        this.#streamed = JSON.stringify(watched);
         if (!credentials || watched.length === 0 || this.link === "unauthorized") return;
         const controller = new AbortController();
         this.#stream = controller;
@@ -255,7 +272,8 @@ class Hub {
             this.#failed(caught);
             this.#redrawAll();
             // Read again: #failed may just have changed it.
-            if ((this.link as Link) !== "unauthorized") {
+            if (caught instanceof Throttled) this.#scheduleRestart(caught.retryMs);
+            else if ((this.link as Link) !== "unauthorized") {
                 this.#failures += 1;
                 this.#scheduleRestart(backoffMs(this.#failures));
             }

@@ -11,9 +11,15 @@
  */
 
 import { z } from "zod";
+import type { Locale } from "@polaris/core";
 import type { AppHostTypes } from "@polaris/app-host";
 
 type AppDeckAction = AppHostTypes["AppDeckAction"];
+
+const OFFLINE: Readonly<Record<Locale, string>> = {
+    "en-US": "Offline",
+    "es-ES": "Sin conexión"
+};
 
 const deviceRows = z.object({
     devices: z.array(
@@ -46,11 +52,11 @@ function devicesTaking(action: string) {
 }
 
 /** One device's state as a key draws it. */
-function deviceState(structured: unknown) {
+function deviceState(structured: unknown, locale: Locale) {
     const parsed = deviceRows.safeParse(structured);
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" as const };
-    if (!device.online) return { tone: "bad" as const, detail: "offline" };
+    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
     const on = device.state === "on";
     return { tone: on ? ("ok" as const) : ("idle" as const), on };
 }

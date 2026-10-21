@@ -124,10 +124,11 @@ export interface AppDeckAction {
             press: { readonly step?: number; readonly current?: DeckState }
         ) => unknown;
     };
-    /** The tool that reads its state, for a live action. */
+    /** The tool that reads its state, for a live action. `locale` is the
+     *  reader's, for any words the state carries. */
     readonly read?: {
         readonly tool: string;
         readonly input: (options: Record<string, unknown>) => unknown;
-        readonly pick: (structured: unknown) => DeckState;
+        readonly pick: (structured: unknown, locale: Locale) => DeckState;
     };
 }

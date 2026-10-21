@@ -21,6 +21,11 @@ export const DECK_SCOPES = [
 
 export type DeckScope = (typeof DECK_SCOPES)[number];
 
+/** The finer MCP scopes a deck's tools ask for, each held only while the key
+ *  holds the permission it stands on. A closed list too: the cameras and the
+ *  databases stand on the same permissions and are nothing a key can show. */
+export const DECK_FINER_SCOPES = ["places.read", "places.control", "places.routines"] as const;
+
 /** Whether a string is one of the scopes the plugin may ask for. */
 export function isDeckScope(value: string): value is DeckScope {
     return (DECK_SCOPES as readonly string[]).includes(value);

@@ -193,7 +193,7 @@ async function readApp(
     const outcome = await callTool(caller, read.tool, read.input(options));
     if (!outcome.ok) return { tone: "idle" };
     try {
-        return read.pick(outcome.structured);
+        return read.pick(outcome.structured, caller.locale);
     } catch {
         return { tone: "idle" };
     }

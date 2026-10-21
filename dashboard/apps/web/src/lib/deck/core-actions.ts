@@ -13,7 +13,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { callTool } from "./tool-call";
 import { unreadTotal } from "@/lib/chat/chat-service";
-import { PRESENCE_CHOICES, type Permission } from "@polaris/core";
+import { translatorFor } from "@/lib/i18n/translate";
+import { PRESENCE_CHOICES, type Locale, type Permission } from "@polaris/core";
 import { presenceChoiceOf, setPresenceChoice } from "@/lib/presence-service";
 import type {
     DeckActionKind,
@@ -100,9 +101,28 @@ const deploymentList = z.object({
     deployments: z.array(z.object({ status: z.string() }).passthrough())
 });
 
-/** A deployment's status as a key draws it: the status itself, in Deploy's
- *  own words, under a colour for how it went. */
-export function deploymentState(status: string): DeckState {
+/** The statuses a deployment row takes that a key names. */
+const NAMED_STATUSES = [
+    "queued",
+    "building",
+    "deploying",
+    "running",
+    "success",
+    "failed",
+    "cancelled",
+    "rolled_back",
+    "stopped",
+    "removed"
+] as const;
+
+function isNamedStatus(status: string): status is (typeof NAMED_STATUSES)[number] {
+    return (NAMED_STATUSES as readonly string[]).includes(status);
+}
+
+/** A deployment's status as a key draws it: the status in its reader's
+ *  language, under a colour for how it went. One nobody here names shows the
+ *  colour alone. */
+export function deploymentState(status: string, locale: Locale): DeckState {
     const tone =
         status === "running"
             ? "ok"
@@ -111,7 +131,8 @@ export function deploymentState(status: string): DeckState {
               : status === "queued" || status === "building" || status === "deploying"
                 ? "warn"
                 : "idle";
-    return { tone, detail: status };
+    if (!isNamedStatus(status)) return { tone };
+    return { tone, detail: translatorFor(locale, "api")(`deck.status.${status}`) };
 }
 
 /** A service as Deploy's tools take it: an id, project/service or
@@ -238,7 +259,7 @@ export function coreDeckActions(refused: string): readonly CoreDeckAction[] {
                 if (!outcome.ok) return { tone: "idle" };
                 const parsed = deploymentList.safeParse(outcome.structured);
                 const newest = parsed.success ? parsed.data.deployments[0] : undefined;
-                return newest ? deploymentState(newest.status) : { tone: "idle" };
+                return newest ? deploymentState(newest.status, caller.locale) : { tone: "idle" };
             },
             wakes: "clock"
         },

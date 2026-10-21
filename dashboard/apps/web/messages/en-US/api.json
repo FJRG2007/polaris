@@ -270,6 +270,18 @@
             "polaris_notifications": "Notifications",
             "polaris_open": "Open a Polaris page",
             "deploy_status": "Last deployment"
+        },
+        "status": {
+            "queued": "Queued",
+            "building": "Building",
+            "deploying": "Deploying",
+            "running": "Running",
+            "success": "Done",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "rolled_back": "Rolled back",
+            "stopped": "Stopped",
+            "removed": "Removed"
         }
     }
 }

@@ -8,7 +8,7 @@ import { SseReader } from "../src/sse";
 import { backoffMs } from "../src/backoff";
 import { describe, expect, it, vi } from "vitest";
 import { joinPath, normalizeAddress } from "../src/address";
-import { PolarisClient, readCredentials, Unauthorized, userAgent } from "../src/polaris";
+import { PolarisClient, readCredentials, Throttled, Unauthorized, userAgent } from "../src/polaris";
 
 describe("normalizeAddress", () => {
     it("takes a bare host as https and keeps only scheme, host and port", () => {
@@ -99,6 +99,27 @@ describe("PolarisClient", () => {
     it("reports a 401 as the key no longer working", async () => {
         const { client } = stub([new Response(null, { status: 401 })]);
         await expect(client.catalogue(credentials)).rejects.toBeInstanceOf(Unauthorized);
+    });
+
+    it("reports a 429 as waiting, for as long as Polaris asked, not as unreachable", async () => {
+        const { client } = stub([
+            Response.json(
+                { error: "Too many presses from this deck. Wait a moment." },
+                { status: 429, headers: { "retry-after": "12" } }
+            ),
+            new Response(null, { status: 429 })
+        ]);
+        const first = await client.catalogue(credentials).catch((caught: unknown) => caught);
+        expect(first).toBeInstanceOf(Throttled);
+        expect((first as Throttled).retryMs).toBe(12_000);
+        expect((first as Throttled).message).toBe(
+            "Too many presses from this deck. Wait a moment."
+        );
+        const second = await client
+            .stream(credentials, [], () => undefined, new AbortController().signal)
+            .catch((caught: unknown) => caught);
+        expect(second).toBeInstanceOf(Throttled);
+        expect((second as Throttled).retryMs).toBe(60_000);
     });
 
     it("hands a refusal back as Polaris worded it", async () => {
