@@ -129,6 +129,17 @@ describe("the save-work script", () => {
         }
     });
 
+    it("removes the credential on every early exit, a missing checkout or a failed commit included", () => {
+        const { root, work } = checkout();
+        expect(run(posix(join(root, "nowhere")), root)).toMatchObject({ status: "none" });
+        expect(existsSync(join(root, "auth"))).toBe(false);
+
+        writeFileSync(join(work, "d.txt"), "d\n");
+        writeFileSync(join(work, ".git", "index.lock"), "");
+        expect(run(work, root)).toMatchObject({ status: "failed" });
+        expect(existsSync(join(root, "auth"))).toBe(false);
+    });
+
     it("knows the default branch from GitHub when a single-branch clone has no origin/HEAD", () => {
         const { root, remote } = checkout();
         const seed = join(root, "seed");

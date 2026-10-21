@@ -126,6 +126,20 @@ export function shellQuote(value: string): string {
     return "'" + value.replace(/'/g, "'\\''") + "'";
 }
 
+/**
+ * A directory as the shell should see it.
+ *
+ * A container checkout is an absolute path, but a server's is stored as
+ * `$HOME/.polaris/...` - the one place a session's directory is relative to
+ * whoever it runs as - and quoting the whole of that would hand `cd` a directory
+ * literally named `$HOME`.
+ */
+export function shellPath(path: string): string {
+    if (path === "$HOME") return '"$HOME"';
+    if (path.startsWith("$HOME/")) return `"$HOME"/${shellQuote(path.slice("$HOME/".length))}`;
+    return shellQuote(path);
+}
+
 // ---------------------------------------------------------------------------
 // Reading what arrived
 // ---------------------------------------------------------------------------

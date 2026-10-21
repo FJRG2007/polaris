@@ -8563,6 +8563,11 @@ model AgentSession {
     workBranch  String?
     // Why it could not be pushed, as a reason code the page words itself.
     workError   String?
+    // The pull request opened from the session's branch, once one was: its
+    // number and link on GitHub. Its state is read from GitHub when the page
+    // shows it, never stored, so a merge made there is never shown as open.
+    prNumber    Int?
+    prUrl       String?
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 

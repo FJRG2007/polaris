@@ -534,7 +534,7 @@ async function startOnHost(session: SessionView, boot: Bootstrap): Promise<void>
 // ---------------------------------------------------------------------------
 
 /** Run one of the built commands wherever the session lives. */
-async function runInSession(
+export async function runInSession(
     sessionId: string,
     command: string,
     /** Whether to reach a session Polaris has already written off. Only the

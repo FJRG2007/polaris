@@ -1549,6 +1549,151 @@ export async function pullRequestIsOpen(
     }
 }
 
+// --- A branch's pull request ------------------------------------------------
+//
+// What an agent session ships through: the one pull request its branch has, or
+// a new one. Every call answers null or a reason rather than throwing, so the
+// session's page can say what GitHub did instead of a stack trace.
+
+export type PullRequestState = "open" | "closed" | "merged";
+
+export interface BranchPullRequest {
+    readonly number: number;
+    readonly url: string;
+    readonly title: string;
+    readonly state: PullRequestState;
+    readonly draft: boolean;
+}
+
+interface RawPull {
+    number?: number;
+    html_url?: string;
+    title?: string;
+    state?: string;
+    draft?: boolean;
+    merged_at?: string | null;
+    merged?: boolean;
+}
+
+function readPull(raw: RawPull): BranchPullRequest | null {
+    if (typeof raw.number !== "number" || typeof raw.html_url !== "string") return null;
+    const merged = Boolean(raw.merged_at) || raw.merged === true;
+    return {
+        number: raw.number,
+        url: raw.html_url,
+        title: raw.title ?? "",
+        state: merged ? "merged" : raw.state === "open" ? "open" : "closed",
+        draft: raw.draft === true
+    };
+}
+
+function repoPath(owner: string, repo: string): string {
+    return `${API}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+}
+
+/** The pull requests opened from `branch` in the repository itself, newest
+ *  first, or null when GitHub would not say. */
+export async function pullRequestsForBranch(
+    owner: string,
+    repo: string,
+    branch: string,
+    token: string | null
+): Promise<BranchPullRequest[] | null> {
+    try {
+        const head = encodeURIComponent(`${owner}:${branch}`);
+        const res = await fetch(
+            `${repoPath(owner, repo)}/pulls?state=all&head=${head}&sort=created&direction=desc&per_page=10`,
+            { headers: optionalAuthHeaders(token), cache: "no-store" }
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as RawPull[];
+        if (!Array.isArray(data)) return null;
+        return data.map(readPull).filter((pull): pull is BranchPullRequest => pull !== null);
+    } catch {
+        return null;
+    }
+}
+
+/** One pull request as it stands now, or null when GitHub would not say. */
+export async function readPullRequest(
+    owner: string,
+    repo: string,
+    number: number,
+    token: string | null
+): Promise<BranchPullRequest | null> {
+    try {
+        const res = await fetch(`${repoPath(owner, repo)}/pulls/${number}`, {
+            headers: optionalAuthHeaders(token),
+            cache: "no-store"
+        });
+        if (!res.ok) return null;
+        return readPull((await res.json()) as RawPull);
+    } catch {
+        return null;
+    }
+}
+
+/** The branch a repository's pull requests go to by default, or null. */
+export async function repoDefaultBranch(
+    owner: string,
+    repo: string,
+    token: string | null
+): Promise<string | null> {
+    try {
+        const res = await fetch(repoPath(owner, repo), {
+            headers: optionalAuthHeaders(token),
+            cache: "no-store"
+        });
+        if (!res.ok) return null;
+        const data = (await res.json()) as { default_branch?: string };
+        return typeof data.default_branch === "string" && data.default_branch
+            ? data.default_branch
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export type CreatePullResult =
+    | { ok: true; pull: BranchPullRequest }
+    /** `exists`: the branch already has an open one. `noChanges`: nothing on it
+     *  differs from the base. `missing`: the branch is not on GitHub. */
+    | { ok: false; reason: "exists" | "noChanges" | "missing" | "refused" };
+
+/** Why GitHub turned a new pull request down, from the 422 it answered with. */
+export function createPullFailure(message: string): "exists" | "noChanges" | "missing" | "refused" {
+    if (/already exists/i.test(message)) return "exists";
+    if (/no commits between/i.test(message)) return "noChanges";
+    if (/\bhead\b.*\binvalid\b|field.*head/i.test(message)) return "missing";
+    return "refused";
+}
+
+export async function createPullRequest(
+    owner: string,
+    repo: string,
+    input: { head: string; base: string; title: string; body: string },
+    token: string
+): Promise<CreatePullResult> {
+    try {
+        const res = await fetch(`${repoPath(owner, repo)}/pulls`, {
+            method: "POST",
+            headers: { ...apiHeaders(token), "Content-Type": "application/json" },
+            body: JSON.stringify(input),
+            cache: "no-store"
+        });
+        if (res.ok) {
+            const pull = readPull((await res.json()) as RawPull);
+            return pull ? { ok: true, pull } : { ok: false, reason: "refused" };
+        }
+        // GitHub explains a 422 in `message` and in `errors[]`, and the useful
+        // sentence is sometimes only in the second.
+        const text = await res.text().catch(() => "");
+        return { ok: false, reason: res.status === 422 ? createPullFailure(text) : "refused" };
+    } catch {
+        return { ok: false, reason: "refused" };
+    }
+}
+
 // --- Deployments -----------------------------------------------------------
 //
 // The deployment box GitHub renders on a commit and on a pull request, with a

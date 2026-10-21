@@ -284,6 +284,69 @@
             "discardDescription": "The machine and every change that was not pushed are deleted. This cannot be undone.",
             "discarded": "Work discarded",
             "retryFailed": "Still could not push. The work is kept."
+        },
+        "views": {
+            "label": "What to show",
+            "session": "Session",
+            "changes": "Changes"
+        },
+        "changes": {
+            "summary": "{count, plural, one {# file changed} other {# files changed}}",
+            "refresh": "Refresh",
+            "empty": "No changes yet",
+            "emptyMore": "Nothing differs from where the branch started.",
+            "pick": "Pick a file to see its diff.",
+            "more": "Show more files",
+            "binary": "Binary file, so there is no diff to show.",
+            "binaryCount": "binary",
+            "large": "This diff is too large to show here. Open the pull request on GitHub to read it.",
+            "gone": "This file no longer differs. Refresh the list.",
+            "failed": "Could not read this diff. Try again.",
+            "retry": "Try again",
+            "diffOf": "Diff of {path}",
+            "unreachable": "Polaris could not reach the session's machine. Check that it is on, then refresh.",
+            "nocheckout": "The session's checkout is missing from its machine.",
+            "nobase": "Polaris could not find where this branch started, so there is nothing to compare it with.",
+            "unavailable": {
+                "workspace": "This session has no repository, so there are no changes to compare.",
+                "ended": "This session has ended and its machine is gone. What it pushed is on the branch {branch}.",
+                "starting": "The checkout is not ready yet. Changes show up once the session has started."
+            },
+            "errors": {
+                "invalid": "That request could not be read. Refresh the page."
+            }
+        },
+        "ship": {
+            "open": "Open a pull request",
+            "dialogTitle": "Open a pull request",
+            "dialogDescription": "Pushes {branch} to GitHub and opens a pull request for it. Anything not committed yet is committed first.",
+            "title": "Title",
+            "body": "Description",
+            "submit": "Open pull request",
+            "opening": "Opening",
+            "opened": "Pull request #{number} opened",
+            "existing": "This branch already had pull request #{number}, so it is linked instead.",
+            "view": "Pull request #{number}",
+            "states": {
+                "open": "Open",
+                "closed": "Closed",
+                "merged": "Merged"
+            },
+            "refusals": {
+                "workspace": "Only a session on a GitHub repository can open a pull request.",
+                "readOnly": "This repository's settings do not let agents push this branch, so a pull request cannot be opened from here.",
+                "noAuth": "Polaris has no GitHub App access to this repository. Connect it under Agents settings.",
+                "push": "The branch could not be pushed.",
+                "noChanges": "There is nothing to propose: the branch has no changes against its base.",
+                "missing": "The branch is not on GitHub and the session's machine is gone, so there is nothing to push.",
+                "github": "GitHub did not open the pull request. Try again in a moment."
+            },
+            "errors": {
+                "invalid": "Give the pull request a title."
+            },
+            "draftTitle": "Changes from an agent session",
+            "draftAsked": "What the agent was asked:",
+            "draftFrom": "Opened from the agent session in Polaris: {url}"
         }
     },
     "rules": {
