@@ -22,6 +22,8 @@
                 "This deck's key no longer works: it was disconnected, revoked or expired. Connect again.",
             waiting: "Approve this code in the browser that just opened:",
             openAgain: "Open the page again",
+            update: "Version {version} of this plugin is out. It does not install itself: download it from your Polaris and open the file.",
+            getUpdate: "Open Downloads",
             failedAddress: "That is not an address Polaris can be reached at.",
             failedDenied: "The request was turned away in Polaris.",
             failedExpired: "The code expired before it was approved. Connect again for a new one.",
@@ -64,6 +66,8 @@
                 "La clave de este deck ya no funciona: se desconectó, se revocó o caducó. Vuelve a conectar.",
             waiting: "Aprueba este código en el navegador que se acaba de abrir:",
             openAgain: "Abrir la página otra vez",
+            update: "Ya está la versión {version} de este plugin. No se instala sola: descárgala desde tu Polaris y abre el archivo.",
+            getUpdate: "Abrir Descargas",
             failedAddress: "Esa no es una dirección en la que se pueda contactar con Polaris.",
             failedDenied: "La solicitud se rechazó en Polaris.",
             failedExpired:
