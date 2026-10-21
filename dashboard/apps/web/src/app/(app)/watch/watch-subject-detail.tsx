@@ -25,7 +25,7 @@ import {
     breakdownTitle,
     MetricBreakdownDialog,
     type OpenBreakdown
-} from "@/app/(app)/watch/watch-metric-breakdown";
+} from "@/components/metrics/metric-breakdown";
 
 export function WatchSubjectDetail({
     kind,
@@ -63,10 +63,14 @@ export function WatchSubjectDetail({
     // A server's series is keyed by host id under a subject of its own; a service
     // reuses the endpoint the Deploy panel already reads.
     const endpoint =
-        kind === "server" ? `/api/watch/hosts/${id}/metrics/history` : `/api/deploy/apps/${id}/metrics/history`;
+        kind === "server"
+            ? `/api/watch/hosts/${id}/metrics/history`
+            : `/api/deploy/apps/${id}/metrics/history`;
     // The collector's word that there is something new to draw.
     const live =
-        kind === "server" ? `/api/watch/hosts/${id}/metrics/stream` : `/api/deploy/apps/${id}/metrics/stream`;
+        kind === "server"
+            ? `/api/watch/hosts/${id}/metrics/stream`
+            : `/api/deploy/apps/${id}/metrics/stream`;
 
     // The same four charts every consumption screen draws, with a way in under
     // the ones that have something behind them. The window comes from the chart
@@ -98,10 +102,16 @@ export function WatchSubjectDetail({
                     >
                         <ArrowLeft className="size-3" /> {t("overview.title")}
                     </Link>
-                    <h1 title={name} className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={name}
+                        className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {name}
                     </h1>
-                    <p title={watchText(t, detail)} className="truncate text-sm text-muted-foreground">
+                    <p
+                        title={watchText(t, detail)}
+                        className="truncate text-sm text-muted-foreground"
+                    >
                         {watchText(t, detail)}
                     </p>
                 </div>
@@ -164,11 +174,19 @@ export function WatchSubjectDetail({
                                         <p className="truncate text-xs text-muted-foreground">
                                             {t("alarms.line", {
                                                 target:
-                                                    alarm.threshold != null && alarmUnit(alarm.metric, alarm.targetType)
-                                                        ? thresholdWords(t, { ...alarm, threshold: alarm.threshold })
+                                                    alarm.threshold != null &&
+                                                    alarmUnit(alarm.metric, alarm.targetType)
+                                                        ? thresholdWords(t, {
+                                                              ...alarm,
+                                                              threshold: alarm.threshold
+                                                          })
                                                         : metricWord(t, alarm.metric),
                                                 summary: alarm.lastEvaluatedAt
-                                                    ? t("subject.checked", { time: display.dateTime(alarm.lastEvaluatedAt) })
+                                                    ? t("subject.checked", {
+                                                          time: display.dateTime(
+                                                              alarm.lastEvaluatedAt
+                                                          )
+                                                      })
                                                     : t("subject.notEvaluated")
                                             })}
                                         </p>

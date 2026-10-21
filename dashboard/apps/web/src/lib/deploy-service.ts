@@ -41,6 +41,7 @@ import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
 import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
+import { dropGrantsOfGoneDomains } from "@/lib/access/grants";
 import { speaksHttp } from "@/lib/deploy/portless";
 import { removeHostVolume } from "@/lib/deploy/host-volumes";
 import { appDataVolumeNames, noteAppDeleted } from "@/lib/deploy/host-resources";
@@ -572,6 +573,7 @@ export async function deleteEnvironment(environmentId: string, ownerId: string) 
     if (environment.isDefault) throw new Error("The default environment cannot be deleted");
     await tearDownEnvironment(environmentId, ownerId);
     await prisma.environment.delete({ where: { id: environmentId } });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
 }
 
 /**
@@ -624,6 +626,7 @@ export async function deleteProject(projectId: string, ownerId: string) {
     if (!project) throw new Error("Only the project's owner can delete it");
     await tearDownProject(projectId, ownerId);
     await prisma.project.delete({ where: { id: projectId } });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
 }
 
 export interface CreateApplicationInput {
@@ -2012,6 +2015,7 @@ export async function removeApplicationDomain(domainId: string, ownerId: string)
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
     await syncAppRoutes().catch(() => undefined);
 }
 
@@ -2599,6 +2603,7 @@ export async function removeApplicationDeployment(
         await ports.dispose();
     }
     await prisma.domain.deleteMany({ where: { applicationId, kind: "release" } });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
     // Tear down the app's quick tunnel alongside its deployment: the cloudflared sidecar
     // now forwards to a container that is gone, so leaving it up leaks a live public URL
     // and an orphan liveness record the boot reconcile keeps revisiting. Only apps with a
@@ -2730,6 +2735,7 @@ export async function deleteApplication(
         });
     }
     await prisma.application.delete({ where: { id: applicationId } });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
     // The folder it was built from, when it was uploaded rather than cloned.
     await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);
     await releaseInstallsOf(applicationId, options?.keepInstalls ?? []);
@@ -4625,6 +4631,7 @@ export async function setApplicationServer(
             await ports.dispose();
         }
         await prisma.domain.deleteMany({ where: { applicationId, kind: "release" } });
+        await dropGrantsOfGoneDomains().catch(() => undefined);
         await prisma.deployment.updateMany({
             where: {
                 deployableType: "application",
@@ -4722,6 +4729,7 @@ async function releaseCurrentOnly(applicationId: string, ownerId: string): Promi
             deploymentId: { in: superseded.map((release) => release.id) }
         }
     });
+    await dropGrantsOfGoneDomains().catch(() => undefined);
     await prisma.deployment.updateMany({
         where: { id: { in: superseded.map((release) => release.id) } },
         data: { status: "removed", finishedAt: new Date() }
@@ -5179,7 +5187,9 @@ async function closeOutAbandoned(own: readonly string[]): Promise<void> {
  */
 async function dropReleaseDomain(deploymentId: string): Promise<void> {
     const removed = await prisma.domain.deleteMany({ where: { deploymentId, kind: "release" } });
-    if (removed.count > 0) await syncAppRoutes().catch(() => undefined);
+    if (removed.count === 0) return;
+    await dropGrantsOfGoneDomains().catch(() => undefined);
+    await syncAppRoutes().catch(() => undefined);
 }
 
 /**
@@ -5874,6 +5884,7 @@ async function retireOldReleases(applicationId: string): Promise<void> {
                 )
                 .catch(() => undefined);
             await prisma.domain.deleteMany({ where: { applicationId, deploymentId: release.id } });
+            await dropGrantsOfGoneDomains().catch(() => undefined);
             await prisma.deployment.update({
                 where: { id: release.id },
                 data: { status: "removed", finishedAt: new Date() }

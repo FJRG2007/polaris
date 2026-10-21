@@ -238,6 +238,7 @@ export default async function DeployProjectPage({
                 project={summary}
                 canManage={canManage}
                 capabilities={access.capabilities}
+                isOwner={access.isOwner}
                 localReady={localReady}
                 activeEnvironmentId={pick(query.env)}
                 openService={pick(query.service)}

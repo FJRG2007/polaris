@@ -10,12 +10,13 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Container, Rocket, Server } from "lucide-react";
 import { cn, Select, Skeleton } from "@polaris/ui";
 import type { WatchCard, WatchSubjectKind } from "@/lib/watch-overview-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { watchText } from "@/lib/watch/words";
+import * as cardOrder from "@/lib/watch/card-order";
 import { sortByConsumption, type ConsumptionOrder } from "@/lib/watch/card-order";
 
 const KIND_ICON: Record<WatchSubjectKind, typeof Server> = {
@@ -80,7 +81,12 @@ function Sparkline({ points, tone }: { points: { t: number; v: number | null }[]
     if (current.length > 1) runs.push(current.join(" "));
 
     return (
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-10 w-full" aria-hidden="true">
+        <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="h-10 w-full"
+            aria-hidden="true"
+        >
             {runs.map((path, index) => (
                 <path
                     key={index}
@@ -131,8 +137,8 @@ export function WatchCardGridSkeleton({ count = 6 }: { count?: number }) {
 }
 
 /** The orders a list of these offers, busiest first because that is what somebody
- *  opens Watch to find. */
-const ORDERS: ConsumptionOrder[] = ["cpu", "memory", "name", "state"];
+ *  opens the list to find. */
+const ORDERS = cardOrder.CONSUMPTION_ORDERS;
 
 /**
  * A whole list of cards, with the control that decides what comes first.
@@ -153,6 +159,25 @@ export function WatchCardList({
 }) {
     const t = useTranslations("watch");
     const [order, setOrder] = useState<ConsumptionOrder>("cpu");
+    // The order last picked on this browser, in Watch or in Places: read after the
+    // first paint so the server's render and the browser's agree.
+    useEffect(() => {
+        try {
+            setOrder(
+                cardOrder.storedOrder(window.localStorage.getItem(cardOrder.ORDER_STORAGE_KEY))
+            );
+        } catch {
+            // Storage refused (a private window): busiest first, as before.
+        }
+    }, []);
+    const choose = (value: ConsumptionOrder) => {
+        setOrder(value);
+        try {
+            window.localStorage.setItem(cardOrder.ORDER_STORAGE_KEY, value);
+        } catch {
+            // Remembered for this visit only.
+        }
+    };
     const sorted = useMemo(() => sortByConsumption(cards, order), [cards, order]);
 
     return (
@@ -162,10 +187,13 @@ export function WatchCardList({
                     <span className="text-xs text-muted-foreground">{t("cards.sortBy")}</span>
                     <Select
                         value={order}
-                        onValueChange={(value) => setOrder(value as ConsumptionOrder)}
+                        onValueChange={(value) => choose(cardOrder.storedOrder(value))}
                         aria-label={t("cards.sortLabel", { label })}
                         className="w-32"
-                        options={ORDERS.map((option) => ({ value: option, label: t(`cards.order.${option}`) }))}
+                        options={ORDERS.map((option) => ({
+                            value: option,
+                            label: t(`cards.order.${option}`)
+                        }))}
                     />
                 </div>
             ) : null}
@@ -194,9 +222,16 @@ export function WatchCardGrid({ cards, empty }: { cards: WatchCard[]; empty: str
 function WatchSubjectCard({ card }: { card: WatchCard }) {
     const t = useTranslations("watch");
     const Icon = KIND_ICON[card.kind];
-    const dot = card.state === "up" ? "bg-success" : card.state === "down" ? "bg-danger" : "bg-muted-foreground";
+    const dot =
+        card.state === "up"
+            ? "bg-success"
+            : card.state === "down"
+              ? "bg-danger"
+              : "bg-muted-foreground";
     const memShare =
-        card.memUsedBytes != null && card.memTotalBytes ? (card.memUsedBytes / card.memTotalBytes) * 100 : null;
+        card.memUsedBytes != null && card.memTotalBytes
+            ? (card.memUsedBytes / card.memTotalBytes) * 100
+            : null;
 
     return (
         <Link
@@ -209,8 +244,12 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
                         <Icon className="size-3.5" />
                     </span>
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-medium group-hover:text-primary">{card.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{watchText(t, card.detail)}</p>
+                        <p className="truncate text-sm font-medium group-hover:text-primary">
+                            {card.name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                            {watchText(t, card.detail)}
+                        </p>
                     </div>
                 </div>
                 {card.alarms > 0 && (
@@ -224,9 +263,16 @@ function WatchSubjectCard({ card }: { card: WatchCard }) {
 
             <div className="flex items-end justify-between gap-2">
                 <div className="min-w-0">
-                    <p className={cn("text-lg font-medium tabular-nums", loadTone(card.cpuPercent))}>
+                    <p
+                        className={cn(
+                            "text-lg font-medium tabular-nums",
+                            loadTone(card.cpuPercent)
+                        )}
+                    >
                         {card.cpuPercent == null ? "-" : `${card.cpuPercent}%`}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">{t("labels.metric.cpu")}</span>
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            {t("labels.metric.cpu")}
+                        </span>
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
                         {formatBytes(card.memUsedBytes)}

@@ -103,6 +103,13 @@ describe("what a visitor reaches", () => {
         expect(await sharing.reachesPlaces("u9")).toBe(true);
     });
 
+    it("puts it there for a lent server, domain or NAS too", async () => {
+        for (const subject of ["place.server", "place.domain", "place.nas"]) {
+            lent = { [key(subject, "one")]: [{ id: "g1", capability: "view", counted: false }] };
+            expect(await sharing.reachesPlaces("u9")).toBe(true);
+        }
+    });
+
     it("does not, for somebody lent nothing", async () => {
         expect(await sharing.reachesPlaces("u9")).toBe(false);
     });

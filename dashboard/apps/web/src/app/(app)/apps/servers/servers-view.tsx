@@ -20,6 +20,7 @@ import Link from "next/link";
 import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { machineHref } from "@/lib/machines/machine-links";
 import { renameServerAction } from "./actions";
 import { useEffect, useRef, useState } from "react";
 import { QuickEnroll } from "./quick-enroll";
@@ -35,6 +36,7 @@ import { EnvironmentDialog, type EnvironmentTarget } from "./environment-dialog"
 import {
     Copy,
     FolderOpen,
+    House,
     MapPin,
     Pencil,
     Server,
@@ -465,6 +467,17 @@ export function ServersView({
                                                             {t("list.enable")}
                                                         </Button>
                                                     ) : null}
+                                                    <Button size="icon" variant="ghost" asChild>
+                                                        <Link
+                                                            href={machineHref("server", server.id)}
+                                                            aria-label={t("list.placesOn", {
+                                                                name: server.name
+                                                            })}
+                                                            title={t("machines.openPlaces")}
+                                                        >
+                                                            <House className="size-4" />
+                                                        </Link>
+                                                    </Button>
                                                     <Button size="icon" variant="ghost" asChild>
                                                         <Link
                                                             href={`/apps/servers/${server.id}`}

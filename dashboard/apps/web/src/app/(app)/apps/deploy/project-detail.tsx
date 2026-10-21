@@ -28,6 +28,7 @@ export function ProjectDetail({
     project,
     canManage,
     capabilities,
+    isOwner = true,
     localReady,
     activeEnvironmentId,
     openService
@@ -36,6 +37,8 @@ export function ProjectDetail({
     canManage: boolean;
     /** What this reader may do in this project, resolved on the server. */
     capabilities: readonly ProjectCapability[];
+    /** Whether the reader owns the project, not only holds a part in it. */
+    isOwner?: boolean;
     localReady: boolean;
     /** Which environment the shell has selected, resolved from the URL. */
     activeEnvironmentId: string | null;
@@ -111,7 +114,7 @@ export function ProjectDetail({
     const can = (capability: ProjectCapability): boolean => capabilities.includes(capability);
 
     return (
-        <ProjectAccessProvider capabilities={capabilities}>
+        <ProjectAccessProvider capabilities={capabilities} isOwner={isOwner}>
             <div className="flex w-full flex-col gap-4">
                 {!localReady && canManage && (
                     <div className="rounded-lg border border-warning-edge bg-warning-soft px-4 py-3 text-sm text-muted-foreground">

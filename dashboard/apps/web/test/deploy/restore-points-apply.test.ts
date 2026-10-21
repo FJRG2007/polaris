@@ -61,6 +61,7 @@ const zone = {
     deleteZoneRecord: vi.fn(async () => undefined)
 };
 const saveServiceCron = vi.fn(async () => undefined);
+const dropGrantsOfGoneDomains = vi.fn(async () => undefined);
 
 vi.mock("@polaris/db", () => ({ prisma }));
 vi.mock("@/lib/dns/zone-records", () => zone);
@@ -68,6 +69,7 @@ vi.mock("@/lib/deploy/service-cron", () => ({ saveServiceCron }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => ["polaris.example.test"] }));
 vi.mock("@/lib/deploy-service", () => ({ syncAppRoutes: async () => undefined }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
+vi.mock("@/lib/access/grants", () => ({ dropGrantsOfGoneDomains }));
 
 const restorePoints = await import("@/lib/restore-points/service");
 
@@ -84,6 +86,7 @@ beforeEach(() => {
     zone.saveZoneRecord.mockClear();
     zone.deleteZoneRecord.mockClear();
     saveServiceCron.mockClear();
+    dropGrantsOfGoneDomains.mockClear();
 });
 
 describe("restoring a point", () => {
@@ -140,5 +143,6 @@ describe("restoring a point", () => {
             .filter((call) => call.name === "domain.create")
             .map((call) => (call.args as { data: { hostname: string } }).data.hostname);
         expect(hostnames).toEqual(["app.example.test"]);
+        expect(dropGrantsOfGoneDomains).toHaveBeenCalledOnce();
     });
 });

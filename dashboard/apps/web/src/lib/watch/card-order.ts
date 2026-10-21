@@ -71,3 +71,18 @@ export function sortByConsumption<T extends ConsumptionRow>(
         return ranked !== 0 ? ranked : left.name.localeCompare(right.name);
     });
 }
+
+/** The orders a list offers, in the order the control lists them. */
+export const CONSUMPTION_ORDERS: readonly ConsumptionOrder[] = ["cpu", "memory", "name", "state"];
+
+/** Where the reader's choice is remembered, on this browser. One key for every
+ *  list of machines, so the order picked in Watch is the one Places opens with. */
+export const ORDER_STORAGE_KEY = "polaris.machines.order";
+
+/** A remembered order, or busiest first for anything else - nothing saved, a
+ *  value from a build that offered other orders, or storage that would not answer. */
+export function storedOrder(value: string | null | undefined): ConsumptionOrder {
+    return CONSUMPTION_ORDERS.includes(value as ConsumptionOrder)
+        ? (value as ConsumptionOrder)
+        : "cpu";
+}

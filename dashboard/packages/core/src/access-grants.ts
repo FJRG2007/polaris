@@ -73,7 +73,9 @@ export const GRANT_SUBJECTS = [
     "place.device",
     "place.camera",
     "place.ups",
-    "place.nas"
+    "place.nas",
+    "place.server",
+    "place.domain"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -131,7 +133,12 @@ export const GRANT_CAPABILITIES = {
     // A NAS: its status, storage and history, or also its fan profile and
     // running its backup tasks. Its connection, shares and settings stay with
     // whoever connected it.
-    "place.nas": ["view", "control"]
+    "place.nas": ["view", "control"],
+    // A server or a domain, as a device in Places: its load, its answers and
+    // its alarm history. Watching only - its shell, files, containers and
+    // settings stay with whoever owns it.
+    "place.server": ["view"],
+    "place.domain": ["view"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -152,7 +159,8 @@ export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
  * - a camera: `watch`;
  * - a UPS: `watch` (status, history) and `control` (commands, variables, test);
  * - a NAS: `watch` (status, storage, history), `fan` (its fan profile) and
- *   `backup` (running one of its backup tasks).
+ *   `backup` (running one of its backup tasks);
+ * - a server or a domain: `watch` (load, answers, alarm history).
  *
  * `watch` is what `view` reaches; every other action needs `control`.
  */
@@ -166,7 +174,9 @@ export const GRANT_ACTIONS = {
     "place.device": ["open", "close", "operate"],
     "place.camera": ["watch"],
     "place.ups": ["watch", "control"],
-    "place.nas": ["watch", "fan", "backup"]
+    "place.nas": ["watch", "fan", "backup"],
+    "place.server": ["watch"],
+    "place.domain": ["watch"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

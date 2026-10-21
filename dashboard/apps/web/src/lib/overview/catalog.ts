@@ -112,7 +112,9 @@ export const OVERVIEW_WIDGETS: readonly OverviewWidgetEntry[] = [
         description: "CPU and memory on the machines you run things on.", // i18n-ignore
         icon: ChartColumn,
         permission: "deploy.read",
-        href: "/watch/servers",
+        // Its machines are devices in Places now; the card keeps its id, so every
+        // saved layout keeps it where it was.
+        href: "/places/machines",
         sizes: ALL_SIZES
     },
     {

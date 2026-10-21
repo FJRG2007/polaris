@@ -852,6 +852,31 @@ export async function removeGrant(
     });
 }
 
+/**
+ * Lending grants for domains that no longer exist, dropped. A domain goes with
+ * its app, environment and project too, by cascade, so the grants are matched
+ * against what is left rather than against one id.
+ */
+export async function dropGrantsOfGoneDomains(): Promise<void> {
+    const lent = await prisma.accessGrant.findMany({
+        where: { subjectType: "place.domain" },
+        select: { subjectId: true },
+        distinct: ["subjectId"]
+    });
+    if (lent.length === 0) return;
+    const ids = lent.map((grant) => grant.subjectId);
+    const present = await prisma.domain.findMany({
+        where: { id: { in: ids } },
+        select: { id: true }
+    });
+    const kept = new Set(present.map((domain) => domain.id));
+    const gone = ids.filter((id) => !kept.has(id));
+    if (gone.length > 0)
+        await prisma.accessGrant.deleteMany({
+            where: { subjectType: "place.domain", subjectId: { in: gone } }
+        });
+}
+
 /** Everything one subject hands out, gone - what deleting the subject itself
  *  has to do, since nothing here is a foreign key. */
 export async function dropGrantsFor(subject: core.GrantSubject, subjectId: string): Promise<void> {

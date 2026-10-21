@@ -67,7 +67,8 @@
         "console": "Console",
         "restart": "Restart",
         "stop": "Stop",
-        "start": "Start"
+        "start": "Start",
+        "places": "Open in Places"
     },
     "overview": {
         "containers": "Containers",

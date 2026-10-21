@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { dropGrantsOfGoneDomains } from "@/lib/access/grants";
 import * as core from "@/lib/restore-points/core";
 
 type Body = core.SnapshotBody;
@@ -71,8 +72,7 @@ const env: Adapter = {
             });
             for (const [key, item] of Object.entries(body.items)) {
                 const envelope = item[core.SECRET_FIELD] as
-                    | { c?: string; n?: string; k?: string }
-                    | undefined;
+                    { c?: string; n?: string; k?: string } | undefined;
                 const data =
                     item.secret === true
                         ? {
@@ -171,6 +171,7 @@ const routes: Adapter = {
         await prisma.domain.deleteMany({
             where: { applicationId, kind: { not: "release" }, hostname: { notIn: hostnames } }
         });
+        await dropGrantsOfGoneDomains().catch(() => undefined);
         const { dashboardHosts } = await import("@/lib/domain-edge");
         const [dashboard, pages] = await Promise.all([
             dashboardHosts(),
