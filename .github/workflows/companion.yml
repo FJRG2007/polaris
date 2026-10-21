@@ -67,6 +67,8 @@ jobs:
 
       - run: npm ci --prefer-offline
 
+      - run: npm test --workspace @polaris/companion
+
       - run: npm run build --workspace @polaris/companion
 
       - uses: actions/upload-artifact@v4
