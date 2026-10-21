@@ -16,7 +16,7 @@
  */
 
 import { findApp } from "@/lib/apps/catalog";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { MarketplaceView } from "./marketplace-view";
 import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { adoptAppInstalls } from "@/lib/app-extensions/registry";
@@ -44,19 +44,26 @@ export default async function MarketplacePage({
     const installed = await listInstalledApps(user.id, await instanceWideInstallIds());
     const { app } = await searchParams;
     const focus = typeof app === "string" ? findApp(app) : undefined;
-    // Somebody else's install is cut to what this reader may be sent; whether
-    // they may uninstall it is asked only for those, since an own row is whole.
-    const shown = await Promise.all(
-        installed
-            .filter((item) => gameForCatalogId(item.catalogId) === undefined)
-            .map(async (item) =>
-                installForReader(
-                    item,
-                    user.id,
-                    item.ownerId !== user.id &&
-                        (await uninstallAccess(user, item.id).catch(() => null)) !== null
-                )
-            )
+    // Somebody else's install is cut to what this reader may be sent. Whether
+    // they may uninstall each one is the uninstall action's own check, so the
+    // grid offers Uninstall exactly where it would work.
+    const [canInstall, shown] = await Promise.all([
+        sessionCan(user, "deploy.manage"),
+        Promise.all(
+            installed
+                .filter((item) => gameForCatalogId(item.catalogId) === undefined)
+                .map(async (item) => {
+                    const canUninstall =
+                        (await uninstallAccess(user, item.id).catch(() => null)) !== null;
+                    return { ...installForReader(item, user.id, canUninstall), canUninstall };
+                })
+        )
+    ]);
+    return (
+        <MarketplaceView
+            installed={shown}
+            initialQuery={focus?.name ?? ""}
+            canInstall={canInstall}
+        />
     );
-    return <MarketplaceView installed={shown} initialQuery={focus?.name ?? ""} />;
 }

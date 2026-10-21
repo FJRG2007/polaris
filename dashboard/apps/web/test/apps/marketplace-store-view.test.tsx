@@ -1,0 +1,125 @@
+// @vitest-environment jsdom
+
+/**
+ * The store listing as drawn: a real capture or the designed placeholder on
+ * each card, the category chips, and the one action a card leads with for a
+ * reader who may install and for one who may not.
+ */
+
+import { MessagesWrapper } from "../setup/i18n";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppDetail } from "@/app/(app)/apps/marketplace/[appId]/app-detail";
+import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
+    installAppAction: vi.fn(),
+    listInstallTargetsAction: vi.fn(async () => []),
+    listStorageConnectionsAction: vi.fn(async () => [])
+}));
+vi.mock("@/app/(app)/apps/installed/[id]/actions", () => ({
+    uninstallInstalledAppAction: vi.fn()
+}));
+
+afterEach(cleanup);
+
+/** The card whose name links to this app's page. */
+function cardOf(name: string): HTMLElement {
+    const shelf = screen.getByRole("region", { name: "Polaris apps" });
+    return within(shelf).getByRole("link", { name }).closest("article") as HTMLElement;
+}
+
+describe("the store listing", () => {
+    it("shows a real capture where one exists and the placeholder where none does", () => {
+        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        const calendar = cardOf("Calendar");
+        expect(calendar.querySelector('img[src="/marketplace/calendar-dark-en-desktop.webp"]')).not.toBeNull();
+        expect(calendar.querySelector('[data-preview="placeholder"]')).toBeNull();
+        const crm = cardOf("CRM");
+        expect(crm.querySelector("img")).toBeNull();
+        expect(crm.querySelector('[data-preview="placeholder"]')).not.toBeNull();
+    });
+
+    it("features only apps with a capture", () => {
+        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        const featured = screen.getByRole("region", { name: "Featured" });
+        expect(within(featured).getByRole("link", { name: "Calendar" })).toBeTruthy();
+        expect(within(featured).queryByRole("link", { name: "CRM" })).toBeNull();
+    });
+
+    it("filters by the category chip pressed, and hides the featured row while filtered", () => {
+        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        const chips = screen.getByRole("group", { name: "Categories" });
+        const games = within(chips).getByRole("button", { name: "Game servers" });
+        fireEvent.click(games);
+        expect(games.getAttribute("aria-pressed")).toBe("true");
+        expect(screen.queryByRole("region", { name: "Featured" })).toBeNull();
+        expect(screen.queryByRole("link", { name: "Calendar" })).toBeNull();
+        expect(screen.getAllByRole("link", { name: "Game servers" }).length).toBeGreaterThan(0);
+    });
+
+    it("leads with Install for a reader who may, and says why for one who may not", () => {
+        const { unmount } = render(<MarketplaceView installed={[]} canInstall />, {
+            wrapper: MessagesWrapper
+        });
+        expect(within(cardOf("CRM")).getByRole("button", { name: "Install" })).toBeTruthy();
+        unmount();
+        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        const crm = cardOf("CRM");
+        expect(within(crm).queryByRole("button", { name: "Install" })).toBeNull();
+        const locked = within(crm).getByRole("button", { name: /Needs permission/ });
+        expect((locked as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("leads with Open for an app this Polaris already has", () => {
+        render(
+            <MarketplaceView
+                installed={[
+                    {
+                        id: "install-1",
+                        catalogId: "crm",
+                        name: "CRM",
+                        status: "stopped",
+                        applicationId: null,
+                        createdAt: new Date("2026-01-01").toISOString()
+                    }
+                ]}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        const open = within(cardOf("CRM")).getByRole("link", { name: "Open" });
+        expect(open.getAttribute("href")).toBe("/crm");
+        expect(within(cardOf("CRM")).getByText("Installed")).toBeTruthy();
+    });
+});
+
+describe("an app's page without captures", () => {
+    it("shows the designed preview and no screenshot gallery", () => {
+        render(
+            <AppDetail appId="crm">
+                <div />
+            </AppDetail>,
+            { wrapper: MessagesWrapper }
+        );
+        expect(document.querySelector('[data-preview="placeholder"]')).not.toBeNull();
+        expect(screen.queryByRole("group", { name: "Screenshots" })).toBeNull();
+        expect(screen.getByText(/needs permission to manage apps/)).toBeTruthy();
+    });
+
+    it("pages the gallery with the arrow keys", () => {
+        render(
+            <AppDetail appId="game-servers">
+                <div />
+            </AppDetail>,
+            { wrapper: MessagesWrapper }
+        );
+        const strip = screen.getByRole("group", { name: "Screenshots" });
+        expect(screen.getByText("1 of 5")).toBeTruthy();
+        fireEvent.keyDown(strip, { key: "ArrowRight" });
+        expect(screen.getByText("2 of 5")).toBeTruthy();
+        fireEvent.keyDown(strip, { key: "ArrowLeft" });
+        fireEvent.keyDown(strip, { key: "ArrowLeft" });
+        expect(screen.getByText("1 of 5")).toBeTruthy();
+    });
+});

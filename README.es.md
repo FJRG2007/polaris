@@ -77,6 +77,17 @@ página con todas sus funciones. Las versiones para móvil están en
       <br><sub><a href="docs/features/calls.es.md"><b>Llamada de grupo</b></a>: cámaras, una pantalla compartida y una grabación</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.es.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-es-desktop.webp">
+        <img src="docs/assets/media/soundboard-dark-es-desktop.webp" alt="La botonera en una llamada: los sonidos de Polaris y los del espacio">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.es.md"><b>Botonera</b></a>: los sonidos de Polaris y los del espacio, en la llamada</sub>
+    </td>
+  </tr>
 </table>
 
 ### Trabajo
@@ -216,13 +227,6 @@ página con todas sus funciones. Las versiones para móvil están en
     </td>
   </tr>
   <tr>
-    <td width="50%" valign="top">
-      <picture>
-        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-es-desktop.webp">
-        <img src="docs/assets/media/soundboard-dark-es-desktop.webp" alt="La botonera en una llamada: los sonidos de Polaris y los del espacio">
-      </picture>
-      <br><sub>La botonera en una llamada: los sonidos de Polaris y los del espacio</sub>
-    </td>
     <td width="50%" valign="top">
       <a href="docs/features/settings.es.md">
       <picture>
