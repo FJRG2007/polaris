@@ -137,6 +137,13 @@ describe("the /polar sidebar", () => {
         expect(screen.queryAllByText("Conversations")).toHaveLength(0);
     });
 
+    it("does not offer Polar's own page as context for the chat", async () => {
+        mountPage();
+        await screen.findByText("Fresh one");
+        expect(screen.queryByText("/polar")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Stop sharing this page" })).toBeNull();
+    });
+
     it("groups conversations by their last update", async () => {
         mountPage();
         await screen.findByText("Fresh one");
