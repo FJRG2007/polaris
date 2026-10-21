@@ -74,7 +74,10 @@ vi.mock("@/lib/app-extensions/registry", () => ({
 const other = { id: "grace", isAdmin: false };
 const self = { id: "ada", isAdmin: false };
 
-function settings(patch: { call?: Partial<core.AutoPresence["call"]>; meeting?: Partial<core.AutoPresence["meeting"]> }) {
+function settings(patch: {
+    call?: Partial<core.AutoPresence["call"]>;
+    meeting?: Partial<core.AutoPresence["meeting"]>;
+}) {
     return JSON.stringify({
         call: { ...core.DEFAULT_AUTO_PRESENCE.call, ...patch.call },
         meeting: { ...core.DEFAULT_AUTO_PRESENCE.meeting, ...patch.meeting }
@@ -124,7 +127,9 @@ describe("the stored setting", () => {
 });
 
 describe("which wins", () => {
-    const on = core.parseAutoPresence(settings({ call: { effect: "busy" }, meeting: { enabled: true } }));
+    const on = core.parseAutoPresence(
+        settings({ call: { effect: "busy" }, meeting: { enabled: true } })
+    );
     const meeting = { endsAt: minutes(30), title: "Weekly sync" };
 
     it("a chosen status, always", () => {
@@ -192,7 +197,9 @@ describe("a busy window", () => {
     it("leaves all-day events out unless asked", () => {
         const holiday = [event(-720, 720, "Holiday", true)];
         expect(core.meetingAt(holiday, base, NOW).current).toBeNull();
-        expect(core.meetingAt(holiday, { ...base, allDay: true }, NOW).current?.title).toBe("Holiday");
+        expect(core.meetingAt(holiday, { ...base, allDay: true }, NOW).current?.title).toBe(
+            "Holiday"
+        );
     });
 });
 

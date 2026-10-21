@@ -89,9 +89,12 @@ export function NotificationFavicon() {
         };
     }, [style, waiting, quiet]);
 
-    useEffect(() => () => {
-        if (plain.current) applyFavicon(plain.current);
-    }, []);
+    useEffect(
+        () => () => {
+            if (plain.current) applyFavicon(plain.current);
+        },
+        []
+    );
 
     return null;
 }

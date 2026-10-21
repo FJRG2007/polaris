@@ -28,7 +28,9 @@ export async function createScheduleAction(input: unknown): Promise<{ error?: st
     const parsed = presenceScheduleSchema.safeParse(input);
     if (!parsed.success) {
         return {
-            error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("schedule.notSaved")
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountPrivacy"))("schedule.notSaved")
         };
     }
     const result = await createSchedule(user.id, parsed.data);
@@ -44,7 +46,9 @@ export async function updateScheduleAction(
     const parsed = presenceScheduleSchema.safeParse(input);
     if (!parsed.success) {
         return {
-            error: parsed.error.issues[0]?.message ?? (await getTranslations("accountPrivacy"))("schedule.notSaved")
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountPrivacy"))("schedule.notSaved")
         };
     }
     const result = await updateSchedule(user.id, String(id), parsed.data);

@@ -41,7 +41,8 @@ afterEach(() => {
 describe("the tab's title", () => {
     async function favicon() {
         vi.doMock("@/components/do-not-disturb", () => ({ useDoNotDisturb: () => quiet }));
-        return (await import("@/components/notifications/notification-favicon")).NotificationFavicon;
+        return (await import("@/components/notifications/notification-favicon"))
+            .NotificationFavicon;
     }
 
     it("carries the count normally", async () => {
