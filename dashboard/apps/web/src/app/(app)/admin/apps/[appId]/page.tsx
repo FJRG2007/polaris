@@ -8,8 +8,8 @@ import { Suspense } from "react";
 import { requireAdmin } from "@/lib/session";
 import { notFound, redirect } from "next/navigation";
 import { isNativeApp } from "@/lib/apps/native-apps";
-import { listingHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 import { AppInstallState } from "@/app/(app)/apps/marketplace/store-installs";
+import { listingHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 import {
     AppDetail,
     AppInstallPanelSkeleton

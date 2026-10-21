@@ -9,11 +9,11 @@
 
 import { APP_SECTIONS } from "@/lib/apps";
 import { MessagesWrapper } from "../setup/i18n";
+import { SERVICE_TEMPLATES } from "@polaris/core";
 import { appsByCategory } from "@/lib/apps/catalog";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SERVICE_TEMPLATES } from "@polaris/core";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import {
     builtInApps,
     findStoreApp,
@@ -131,6 +131,22 @@ describe("the user marketplace", () => {
         ).toEqual({ kind: "comingSoon" });
         expect(storeScope(findStoreApp("hermes")!)).toBe("deployable");
         expect(listingHref(findStoreApp("template-n8n")!)).toBe("/apps/marketplace/template-n8n");
+    });
+
+    it("says so when it has nothing, and points an admin to Polaris apps", () => {
+        render(<MarketplaceView installed={[]} canBrowsePolaris />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Open Polaris apps" }).getAttribute("href")).toBe(
+            "/admin/apps"
+        );
+        // Nothing to search through, so no search box.
+        expect(screen.queryByRole("textbox", { name: "Search apps" })).toBeNull();
+    });
+
+    it("offers no link to the admin screen to anybody else", () => {
+        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "Open Polaris apps" })).toBeNull();
     });
 });
 

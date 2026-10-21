@@ -11,12 +11,12 @@
  */
 
 import { Suspense } from "react";
-import { notFound, redirect } from "next/navigation";
-import { isNativeApp } from "@/lib/apps/native-apps";
 import { requirePermission } from "@/lib/session";
 import { AppInstallState } from "../store-installs";
-import { listingHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
+import { notFound, redirect } from "next/navigation";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { AppDetail, AppInstallPanelSkeleton } from "./app-detail";
+import { listingHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 
 export const dynamic = "force-dynamic";
 
