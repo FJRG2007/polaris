@@ -12,6 +12,8 @@ const state = {
     held: new Set<string>(),
     listed: 0,
     limit: undefined as number | undefined,
+    page: undefined as unknown,
+    rows: null as unknown[] | null,
     detailed: 0
 };
 
@@ -35,10 +37,23 @@ vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
 }));
 vi.mock("@/app/(app)/apps/agents/sessions/actions", () => ({
-    listSessionsAction: async (limit?: number) => {
+    listSessionsAction: async (limit?: number, page?: unknown) => {
         state.listed += 1;
         state.limit = limit;
-        return [session, { ...session, id: "s2", state: "stopped", repoFullName: "" }];
+        state.page = page;
+        return (
+            state.rows ?? [
+                session,
+                {
+                    ...session,
+                    id: "s2",
+                    title: "Review the API",
+                    state: "stopped",
+                    repoFullName: "",
+                    createdAt: "2026-10-19T10:00:00.000Z"
+                }
+            ]
+        );
     },
     sessionChoicesAction: async () => ({
         agents: [],
@@ -70,11 +85,29 @@ beforeEach(() => {
     state.held = new Set();
     state.listed = 0;
     state.detailed = 0;
+    state.rows = null;
+    state.page = undefined;
 });
+
+/** A finished session `minutes` after the first, on the same repository. */
+function at(index: number, title = `Task ${index}`) {
+    const minute = String(index).padStart(2, "0");
+    return {
+        ...session,
+        id: `00000000-0000-4000-8000-0000000000${minute}`,
+        title,
+        state: "stopped",
+        createdAt: `2026-10-20T10:${minute}:00.000Z`
+    };
+}
 
 describe("polarCodeOverview", () => {
     it("answers none and asks Agents nothing for an account without it", async () => {
-        expect(await polarCodeOverview(USER)).toEqual({ access: "none", sessions: [] });
+        expect(await polarCodeOverview(USER)).toEqual({
+            access: "none",
+            sessions: [],
+            next: null
+        });
         expect(state.listed).toBe(0);
     });
 
@@ -90,7 +123,35 @@ describe("polarCodeOverview", () => {
             stateLabel: "t:labels.sessionState.working"
         });
         expect(overview.sessions[1]).toMatchObject({ live: false, repo: "" });
-        expect(state.limit).toBe(50);
+        expect(overview.next).toBeNull();
+    });
+
+    it("asks for this person's own sessions only, a page and one more", async () => {
+        state.held.add("agents.read");
+        await polarCodeOverview(USER);
+        expect(state.page).toEqual({ mine: true });
+        expect(state.limit).toBe(21);
+    });
+
+    it("lists a task started again once, by its newest session", async () => {
+        state.held.add("agents.read");
+        // Newest first, as the Agents list answers.
+        state.rows = [at(3, "Fix the login form"), at(2, "Other"), at(1, " fix the  login form ")];
+        const overview = await polarCodeOverview(USER);
+        expect(overview.sessions.map((row) => row.id)).toEqual([at(3).id, at(2).id]);
+    });
+
+    it("says where the next page starts, from the last session read", async () => {
+        state.held.add("agents.read");
+        // 21 rows: a full page and one more. The page's last two are the same task.
+        state.rows = Array.from({ length: 21 }, (_, index) =>
+            at(40 - index, index >= 18 ? "Same task" : `Task ${index}`)
+        );
+        const first = await polarCodeOverview(USER);
+        expect(first.sessions).toHaveLength(19);
+        expect(first.next).toBe(`${at(21).createdAt}_${at(21).id}`);
+        await polarCodeOverview(USER, first.next);
+        expect(state.page).toEqual({ mine: true, after: first.next });
     });
 
     it("says manage for somebody who can start sessions", async () => {

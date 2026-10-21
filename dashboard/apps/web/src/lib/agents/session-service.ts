@@ -14,6 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { generateToken, hashToken } from "@polaris/core/tokens";
+import { readSessionCursor } from "./session-cursor";
 import { GENERAL_SCOPE, getPlatformAgentDefaults, scopeOf } from "./agent-defaults-service";
 
 /**
@@ -221,15 +222,42 @@ const SESSIONS_LISTED = 200;
  */
 export async function listSessions(
     ownerId: string,
-    options: { repoId?: string; live?: boolean; limit?: number } = {}
+    options: {
+        repoId?: string;
+        live?: boolean;
+        limit?: number;
+        /** Only the sessions this account started itself, not every session on
+         *  a repository it owns. */
+        mine?: boolean;
+        /** `sessionCursor` of the last session of the previous page: the list
+         *  goes on after it, even once that session is gone. */
+        after?: string;
+    } = {}
 ): Promise<SessionView[]> {
+    const after = options.after === undefined ? null : readSessionCursor(options.after);
+    if (options.after !== undefined && !after) return [];
     const records = await prisma.agentSession.findMany({
         where: {
             OR: [{ repo: { ownerId } }, { repoId: null, startedById: ownerId }],
+            ...(options.mine ? { startedById: ownerId } : {}),
             ...(options.repoId ? { repoId: options.repoId } : {}),
-            ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {})
+            ...(options.live ? { state: { notIn: ["stopped", "failed"] } } : {}),
+            ...(after
+                ? {
+                      AND: [
+                          {
+                              OR: [
+                                  { createdAt: { lt: after.at } },
+                                  { createdAt: after.at, id: { lt: after.id } }
+                              ]
+                          }
+                      ]
+                  }
+                : {})
         },
-        orderBy: { createdAt: "desc" },
+        // The id breaks a tie on the time, so a page boundary never repeats or
+        // skips a session started in the same millisecond.
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: Math.min(options.limit ?? SESSIONS_LISTED, SESSIONS_LISTED),
         select: VIEW_SELECT
     });

@@ -2,7 +2,8 @@
 /**
  * The Chat / Code switch: Code is switched off, with the reason, for an account
  * that cannot open Agents; a reader follows sessions without starting one; and
- * sending a task starts it through Polar's Code start route.
+ * sending a task starts it through Polar's Code start route, from Chat's own
+ * composer, and opens it as a thread.
  */
 
 import type { ReactNode } from "react";
@@ -45,18 +46,32 @@ vi.mock("next/link", () => ({
     )
 }));
 
-const { PolarCode, PolarModeSwitch, titleFromPrompt, usePolarCode } =
+const { codeBlocks, PolarCodeView, PolarModeSwitch, titleFromPrompt, usePolarCode } =
     await import("@/components/polar/polar-code");
 
 let access: "none" | "read" | "manage" = "none";
 let thread: unknown = null;
 
+/** The switch, the history's rows as the sidebar offers them, and the side on screen. */
 function Harness() {
     const code = usePolarCode();
     return (
         <>
             <PolarModeSwitch code={code} />
-            {code.mode === "code" ? <PolarCode code={code} split={false} /> : <p>chat-view</p>}
+            <ul>
+                {(code.history.rows ?? []).map((row) => (
+                    <li key={row.id}>
+                        <button type="button" onClick={() => code.open(row.id)}>
+                            {row.title}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            {code.mode === "code" ? (
+                <PolarCodeView code={code} fullPage={false} avatar={null} />
+            ) : (
+                <p>chat-view</p>
+            )}
         </>
     );
 }
@@ -86,7 +101,7 @@ beforeEach(() => {
                 return answer({ id: "33333333-3333-4333-8333-333333333333" });
             }
             if (url.startsWith("/api/polar/code/prompt")) return answer({});
-            return answer({ access, sessions: [] });
+            return answer({ access, sessions: [], next: null });
         })
     );
 });
@@ -124,8 +139,8 @@ describe("the Chat / Code switch", () => {
         const box = await screen.findByRole("textbox", { name: "Task for the agent" });
         await screen.findByRole("combobox", { name: "Repository" });
         fireEvent.change(box, { target: { value: "Fix the login form\nwith tests" } });
-        const send = screen.getByRole("button", { name: "Start session" });
-        await waitFor(() => expect(send.getAttribute("aria-disabled")).toBe("false"));
+        const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
         fireEvent.click(send);
         await waitFor(() => expect(started).toHaveLength(1));
         expect(started[0]).toMatchObject({
@@ -135,8 +150,11 @@ describe("the Chat / Code switch", () => {
             prompt: "Fix the login form\nwith tests",
             enigma: { enabled: true }
         });
-        // The new session opens in the thread.
-        expect(await screen.findByRole("button", { name: "All sessions" })).toBeTruthy();
+        // The new session opens in the thread, a click from its full page.
+        const full = await screen.findByRole("link", { name: "Open the full session" });
+        expect(full.getAttribute("href")).toBe(
+            "/apps/agents/sessions/33333333-3333-4333-8333-333333333333"
+        );
     });
 
     it("lets a reader follow sessions but not start one", async () => {
@@ -166,7 +184,7 @@ describe("the Chat / Code switch", () => {
         vi.mocked(fetch).mockImplementation(async (url) => {
             if (String(url).startsWith("/api/polar/code/thread")) return answer(thread);
             if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
-            return answer({ access, sessions: [row] });
+            return answer({ access, sessions: [row], next: null });
         });
         window.localStorage.setItem("polar.mode", "code");
         render(<Harness />, { wrapper: MessagesWrapper });
@@ -194,7 +212,7 @@ describe("the Chat / Code switch", () => {
                     ? new Response("", { status: 500 })
                     : answer({ session: row, entries: [], error: null });
             if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
-            return answer({ access, sessions: [row] });
+            return answer({ access, sessions: [row], next: null });
         });
         window.localStorage.setItem("polar.mode", "code");
         render(<Harness />, { wrapper: MessagesWrapper });
@@ -212,5 +230,69 @@ describe("the Chat / Code switch", () => {
         render(<Harness />, { wrapper: MessagesWrapper });
         expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
         expect(screen.queryByText(/needs permission to manage Agents/)).toBeNull();
+    });
+});
+
+describe("codeBlocks", () => {
+    const entry = (type: "message" | "event", text: string) => ({
+        at: "2026-10-20T10:00:00.000Z",
+        type,
+        role: type === "message" ? "user" : "tool.start",
+        text,
+        detail: ""
+    });
+
+    it("keeps each message apart and folds the steps between two of them", () => {
+        const blocks = codeBlocks([
+            entry("event", "Started"),
+            entry("message", "Fix it"),
+            entry("event", "Edit"),
+            entry("event", "Bash"),
+            entry("message", "Done")
+        ]);
+        expect(blocks.map((block) => block.kind)).toEqual(["work", "message", "work", "message"]);
+        expect(blocks[2]).toMatchObject({ entries: [{ text: "Edit" }, { text: "Bash" }] });
+    });
+
+    it("is empty for a thread with nothing in it", () => {
+        expect(codeBlocks([])).toEqual([]);
+    });
+});
+
+describe("the Code thread", () => {
+    it("draws the session as a chat: bubbles, and its steps folded", async () => {
+        access = "manage";
+        const row = {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Fix the login form",
+            repo: "acme/web",
+            branch: "polaris/fix",
+            state: "idle",
+            stateLabel: "Idle",
+            live: true,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        };
+        thread = {
+            session: row,
+            entries: [
+                { at: "1", type: "message", role: "user", text: "Fix it", detail: "" },
+                { at: "2", type: "event", role: "tool.start", text: "Tool", detail: "Edit" },
+                { at: "3", type: "message", role: "agent", text: "**Done**", detail: "" }
+            ],
+            error: null
+        };
+        vi.mocked(fetch).mockImplementation(async (url) => {
+            if (String(url).startsWith("/api/polar/code/thread")) return answer(thread);
+            if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            return answer({ access, sessions: [row], next: null });
+        });
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Fix the login form/ }));
+        expect(await screen.findByText("Fix it")).toBeTruthy();
+        // The agent's words are Markdown, as an answer in Chat is.
+        expect((await screen.findByText("Done")).tagName).toBe("STRONG");
+        expect(screen.getByRole("button", { name: "1 step" })).toBeTruthy();
+        expect(screen.getByRole("textbox", { name: "Reply to the agent" })).toBeTruthy();
     });
 });

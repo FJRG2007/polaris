@@ -8565,6 +8565,9 @@ model AgentSession {
     // every session starts, and counting live rows by scanning the state index
     // alone means reading every session anybody ever started.
     @@index([startedById, state])
+    // Polar's Code history: one person's own sessions, newest first, a page at
+    // a time.
+    @@index([startedById, createdAt])
     // The silence sweep, which asks for live sessions ordered by when they last
     // said anything. Without this it is the same full scan on a timer.
     @@index([state, lastEventAt])

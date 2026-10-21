@@ -86,7 +86,7 @@ import {
 } from "lucide-react";
 import { PolarThreads } from "@/components/polar/polar-threads";
 import * as toolPrefs from "@/components/polar/tool-prefs";
-import { PolarCode, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
+import { PolarCodeView, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
 import * as polarShared from "@/lib/polar/shared";
 import * as settingsPath from "@/lib/polar/settings-path";
 import { readStored, writeStored } from "@/lib/polar/stored";
@@ -136,11 +136,8 @@ import {
     ModelSelector,
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
-import {
-    Conversation,
-    ConversationContent,
-    ConversationEmptyState
-} from "@/components/polar/elements/conversation";
+import { ConversationEmptyState } from "@/components/polar/elements/conversation";
+import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
 import {
     affectedBy,
     Confirmation,
@@ -1844,17 +1841,47 @@ export function PolarChat({
             ))}
         </Suggestions>
     );
+    const chatMode = code.mode === "chat";
+    /** A new conversation on the side on screen: a chat, or a Code task. */
+    const startNewHere = () => (chatMode ? startNew() : code.open(null));
+    // One history for both sides: the chats, and the Code sessions beside them.
     const threadList = (hide: Parameters<typeof PolarThreads>[0]["hide"]) => (
         <PolarThreads
             sidebar={sidebar}
-            activeId={threadId}
-            onOpen={(id) => void openThread(id)}
-            onNew={startNew}
+            activeId={chatMode ? threadId : ""}
+            onOpen={(id) => {
+                code.setMode("chat");
+                void openThread(id);
+            }}
+            onNew={(projectId) => {
+                if (projectId === null && !chatMode) {
+                    code.open(null);
+                    setDrawer(false);
+                    setShowHistory(false);
+                    return;
+                }
+                code.setMode("chat");
+                startNew(projectId);
+            }}
             hide={hide}
+            newLabel={chatMode ? undefined : t("code.newTask")}
+            code={
+                code.access === null || code.access === "none"
+                    ? null
+                    : {
+                          history: code.history,
+                          activeId: chatMode ? null : code.selected,
+                          first: !chatMode,
+                          onOpen: (id) => {
+                              code.open(id);
+                              setDrawer(false);
+                              setShowHistory(false);
+                          }
+                      }
+            }
         />
     );
-    const chatMode = code.mode === "chat";
-    const sidebarShown = fullPage && wide && !collapsed && chatMode;
+    const sidebarShown = fullPage && wide && !collapsed;
 
     const queueView =
         queue.length > 0 ? (
@@ -2187,23 +2214,13 @@ export function PolarChat({
                 </div>
             ) : null}
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-                {code.mode === "code" ? (
-                    <div
-                        className={cn(
-                            "absolute inset-x-0 bottom-0 top-11 z-20 flex flex-col",
-                            fullPage ? "bg-background" : "bg-card"
-                        )}
-                    >
-                        <PolarCode code={code} split={fullPage && wide} />
-                    </div>
-                ) : null}
                 <div
                     className={cn(
                         "polar-head flex h-11 shrink-0 items-center gap-2 px-3",
                         !fullPage && "border-b border-border"
                     )}
                 >
-                    {fullPage && (!wide || collapsed) && chatMode ? (
+                    {fullPage && (!wide || collapsed) ? (
                         <MessageAction
                             ref={drawerButton}
                             label={t("history.show")}
@@ -2298,29 +2315,28 @@ export function PolarChat({
                         </>
                     ) : null}
                     {fullPage ? (
-                        chatMode && (!wide || collapsed) ? (
-                            <MessageAction label={t("actions.new")} onClick={() => startNew()}>
+                        !wide || collapsed ? (
+                            <MessageAction
+                                label={chatMode ? t("actions.new") : t("code.newTask")}
+                                onClick={startNewHere}
+                            >
                                 <SquarePen />
                             </MessageAction>
                         ) : null
                     ) : (
                         <>
-                            {chatMode ? (
-                                <>
-                                    <MessageAction
-                                        label={t("actions.new")}
-                                        onClick={() => startNew()}
-                                    >
-                                        <Plus />
-                                    </MessageAction>
-                                    <MessageAction
-                                        label={t("history.title")}
-                                        onClick={() => setShowHistory(true)}
-                                    >
-                                        <History />
-                                    </MessageAction>
-                                </>
-                            ) : null}
+                            <MessageAction
+                                label={chatMode ? t("actions.new") : t("code.newTask")}
+                                onClick={startNewHere}
+                            >
+                                <Plus />
+                            </MessageAction>
+                            <MessageAction
+                                label={t("history.title")}
+                                onClick={() => setShowHistory(true)}
+                            >
+                                <History />
+                            </MessageAction>
                             <Link
                                 href="/polar"
                                 aria-label={t("actions.openPage")}
@@ -2336,214 +2352,197 @@ export function PolarChat({
                     )}
                 </div>
 
+                {/* Chat stays mounted under Code, so a draft or an answer on its
+                    way is still there when the switch goes back. */}
+                {chatMode ? null : (
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                        <PolarCodeView
+                            code={code}
+                            fullPage={fullPage}
+                            avatar={<PolarAvatar state={avatarState} size={64} />}
+                        />
+                    </div>
+                )}
                 <div
-                    className="flex min-h-0 min-w-0 flex-1 flex-col"
-                    inert={code.mode === "code" ? true : undefined}
+                    className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !chatMode && "hidden")}
+                    inert={chatMode ? undefined : true}
                 >
                     {welcome ? (
-                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overscroll-contain px-4 py-6">
-                            <div className="flex w-full max-w-3xl flex-col gap-4">
-                                <div className="flex flex-col items-center gap-3 text-center">
-                                    <PolarAvatar state={avatarState} size={64} />
-                                    <h1 className="text-xl font-semibold text-foreground">
-                                        {temporary ? t("temporary.title") : t("welcome")}
-                                    </h1>
-                                    {temporary ? (
-                                        <p className="max-w-md text-sm text-muted-foreground">
-                                            {t("temporary.body")}
-                                        </p>
-                                    ) : null}
-                                </div>
-                                {queueView}
-                                {composer}
-                                {suggestions}
-                            </div>
-                        </div>
+                        <PolarWelcome
+                            avatar={<PolarAvatar state={avatarState} size={64} />}
+                            title={temporary ? t("temporary.title") : t("welcome")}
+                            description={temporary ? t("temporary.body") : undefined}
+                        >
+                            {queueView}
+                            {composer}
+                            {suggestions}
+                        </PolarWelcome>
                     ) : (
-                        <>
-                            <Conversation>
-                                <ConversationContent
-                                    className={
-                                        fullPage ? "mx-auto w-full max-w-3xl px-4 py-6" : undefined
-                                    }
-                                >
-                                    {temporary ? (
-                                        <p className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                                            <Ghost className="size-3.5 shrink-0" />
-                                            <span className="min-w-0">{t("temporary.banner")}</span>
-                                        </p>
-                                    ) : null}
-                                    {noKeys ? (
-                                        <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
-                                            <p className="text-foreground">{t("noKeys.title")}</p>
-                                            <p className="mt-1">
-                                                {t(
-                                                    spendsDeployment
-                                                        ? "noKeys.body"
-                                                        : "noKeys.ownOnly"
-                                                )}
-                                            </p>
-                                            <div className="mt-2 flex flex-wrap gap-3">
-                                                <Link
-                                                    href="/account/ai-keys"
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    {t("noKeys.own")}
-                                                </Link>
-                                                {isAdmin ? (
-                                                    <Link
-                                                        href="/admin/integrations/models"
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {t("noKeys.admin")}
-                                                    </Link>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    ) : chat.messages.length === 0 ? (
-                                        <ConversationEmptyState
-                                            icon={<PolarAvatar state={avatarState} size={64} />}
-                                            description={t("empty")}
+                        <PolarThreadFrame
+                            fullPage={fullPage}
+                            dock={
+                                <>
+                                    {queueView}
+                                    <ContextBar
+                                        used={contextUsed(chat.messages)}
+                                        draft={estimateTokens(input)}
+                                        window={windowOf(providers, choice)}
+                                        canCompact={canCompact}
+                                        onCompact={() => void compact(null, false)}
+                                    />
+                                    {composer}
+                                </>
+                            }
+                        >
+                            {temporary ? (
+                                <p className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                                    <Ghost className="size-3.5 shrink-0" />
+                                    <span className="min-w-0">{t("temporary.banner")}</span>
+                                </p>
+                            ) : null}
+                            {noKeys ? (
+                                <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
+                                    <p className="text-foreground">{t("noKeys.title")}</p>
+                                    <p className="mt-1">
+                                        {t(spendsDeployment ? "noKeys.body" : "noKeys.ownOnly")}
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap gap-3">
+                                        <Link
+                                            href="/account/ai-keys"
+                                            className="text-primary hover:underline"
                                         >
-                                            {suggestions}
-                                        </ConversationEmptyState>
-                                    ) : null}
-                                    {chat.messages.map((message, index) => {
-                                        const marker = compactionOf(message);
-                                        if (marker) {
-                                            return (
-                                                <CompactionDivider
-                                                    key={message.id}
-                                                    summary={summaryOf(message)}
-                                                    auto={marker.auto}
-                                                />
-                                            );
+                                            {t("noKeys.own")}
+                                        </Link>
+                                        {isAdmin ? (
+                                            <Link
+                                                href="/admin/integrations/models"
+                                                className="text-primary hover:underline"
+                                            >
+                                                {t("noKeys.admin")}
+                                            </Link>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : chat.messages.length === 0 ? (
+                                <ConversationEmptyState
+                                    icon={<PolarAvatar state={avatarState} size={64} />}
+                                    description={t("empty")}
+                                >
+                                    {suggestions}
+                                </ConversationEmptyState>
+                            ) : null}
+                            {chat.messages.map((message, index) => {
+                                const marker = compactionOf(message);
+                                if (marker) {
+                                    return (
+                                        <CompactionDivider
+                                            key={message.id}
+                                            summary={summaryOf(message)}
+                                            auto={marker.auto}
+                                        />
+                                    );
+                                }
+                                const versions = versionsOf(tree.current, message.id);
+                                const at = versions.indexOf(message.id);
+                                return (
+                                    <MessageView
+                                        key={message.id}
+                                        message={message}
+                                        tools={tools}
+                                        last={index === chat.messages.length - 1}
+                                        busy={busy}
+                                        version={{
+                                            current: at + 1,
+                                            total: versions.length
+                                        }}
+                                        onVersion={(step) => {
+                                            const target = versions[at + step];
+                                            if (target) switchVersion(index, target);
+                                        }}
+                                        onApprove={(id, approved) => {
+                                            setLastApproved(approved);
+                                            void chat.addToolApprovalResponse({
+                                                id,
+                                                approved
+                                            });
+                                        }}
+                                        onEdit={() => {
+                                            setEditing(message.id);
+                                            setInput(textOf(message));
+                                            textarea.current?.focus();
+                                        }}
+                                        onQuote={() => setQuote(textOf(message).slice(0, 200))}
+                                        onSaveCommand={() =>
+                                            setCommandDraft({
+                                                prompt: textOf(message).slice(
+                                                    0,
+                                                    polarShared.POLAR_COMMAND_PROMPT_MAX
+                                                )
+                                            })
                                         }
-                                        const versions = versionsOf(tree.current, message.id);
-                                        const at = versions.indexOf(message.id);
-                                        return (
-                                            <MessageView
-                                                key={message.id}
-                                                message={message}
-                                                tools={tools}
-                                                last={index === chat.messages.length - 1}
-                                                busy={busy}
-                                                version={{
-                                                    current: at + 1,
-                                                    total: versions.length
-                                                }}
-                                                onVersion={(step) => {
-                                                    const target = versions[at + step];
-                                                    if (target) switchVersion(index, target);
-                                                }}
-                                                onApprove={(id, approved) => {
-                                                    setLastApproved(approved);
-                                                    void chat.addToolApprovalResponse({
-                                                        id,
-                                                        approved
-                                                    });
-                                                }}
-                                                onEdit={() => {
-                                                    setEditing(message.id);
-                                                    setInput(textOf(message));
-                                                    textarea.current?.focus();
-                                                }}
-                                                onQuote={() =>
-                                                    setQuote(textOf(message).slice(0, 200))
-                                                }
-                                                onSaveCommand={() =>
-                                                    setCommandDraft({
-                                                        prompt: textOf(message).slice(
-                                                            0,
-                                                            polarShared.POLAR_COMMAND_PROMPT_MAX
-                                                        )
-                                                    })
-                                                }
-                                                onRegenerate={regenerateWith}
+                                        onRegenerate={regenerateWith}
+                                        providers={providers ?? []}
+                                        mark={marks[message.id] ?? null}
+                                        onMark={(change) => markAnswer(message.id, change)}
+                                        speech={voice.speech}
+                                        payer={choice?.payer ?? null}
+                                        onShare={
+                                            temporary ? undefined : () => setSharingFrom(message.id)
+                                        }
+                                        renderFailure={(failure) => (
+                                            <PolarFailureNotice
+                                                failure={failure}
+                                                isAdmin={isAdmin}
                                                 providers={providers ?? []}
-                                                mark={marks[message.id] ?? null}
-                                                onMark={(change) => markAnswer(message.id, change)}
-                                                speech={voice.speech}
-                                                payer={choice?.payer ?? null}
-                                                onShare={
-                                                    temporary
-                                                        ? undefined
-                                                        : () => setSharingFrom(message.id)
+                                                failedModel={choice?.model ?? null}
+                                                // Only the newest answer offers to
+                                                // try again; older ones say what
+                                                // happened.
+                                                onRetry={
+                                                    index === chat.messages.length - 1
+                                                        ? () => void chat.regenerate()
+                                                        : undefined
                                                 }
-                                                renderFailure={(failure) => (
-                                                    <PolarFailureNotice
-                                                        failure={failure}
-                                                        isAdmin={isAdmin}
-                                                        providers={providers ?? []}
-                                                        failedModel={choice?.model ?? null}
-                                                        // Only the newest answer offers to
-                                                        // try again; older ones say what
-                                                        // happened.
-                                                        onRetry={
-                                                            index === chat.messages.length - 1
-                                                                ? () => void chat.regenerate()
-                                                                : undefined
-                                                        }
-                                                        onTryWith={
-                                                            index === chat.messages.length - 1
-                                                                ? tryWith
-                                                                : undefined
-                                                        }
-                                                    />
-                                                )}
-                                                onBranch={
-                                                    temporary
-                                                        ? undefined
-                                                        : () => void branchFrom(message.id)
+                                                onTryWith={
+                                                    index === chat.messages.length - 1
+                                                        ? tryWith
+                                                        : undefined
                                                 }
                                             />
-                                        );
-                                    })}
-                                    {compacting ? (
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <ThinkingOrb state="breathing" size={20} decorative />
-                                            <Shimmer>{t("compact.working")}</Shimmer>
-                                        </div>
-                                    ) : null}
-                                    {chat.status === "submitted" ? (
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <ThinkingOrb state="breathing" size={20} decorative />
-                                            <Shimmer>
-                                                <BusyVerb />
-                                            </Shimmer>
-                                        </div>
-                                    ) : null}
-                                    {looseError ? (
-                                        <PolarFailureNotice
-                                            failure={polarFailure.decodePolarFailure(
-                                                looseError.message
-                                            )}
-                                            isAdmin={isAdmin}
-                                            providers={providers ?? []}
-                                            failedModel={choice?.model ?? null}
-                                            onRetry={() => void chat.regenerate()}
-                                            onTryWith={tryWith}
-                                        />
-                                    ) : null}
-                                </ConversationContent>
-                            </Conversation>
-                            <div
-                                className={cn(
-                                    "shrink-0",
-                                    fullPage ? "mx-auto w-full max-w-3xl px-4 pb-3" : "p-3"
-                                )}
-                            >
-                                {queueView}
-                                <ContextBar
-                                    used={contextUsed(chat.messages)}
-                                    draft={estimateTokens(input)}
-                                    window={windowOf(providers, choice)}
-                                    canCompact={canCompact}
-                                    onCompact={() => void compact(null, false)}
+                                        )}
+                                        onBranch={
+                                            temporary
+                                                ? undefined
+                                                : () => void branchFrom(message.id)
+                                        }
+                                    />
+                                );
+                            })}
+                            {compacting ? (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <ThinkingOrb state="breathing" size={20} decorative />
+                                    <Shimmer>{t("compact.working")}</Shimmer>
+                                </div>
+                            ) : null}
+                            {chat.status === "submitted" ? (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <ThinkingOrb state="breathing" size={20} decorative />
+                                    <Shimmer>
+                                        <BusyVerb />
+                                    </Shimmer>
+                                </div>
+                            ) : null}
+                            {looseError ? (
+                                <PolarFailureNotice
+                                    failure={polarFailure.decodePolarFailure(looseError.message)}
+                                    isAdmin={isAdmin}
+                                    providers={providers ?? []}
+                                    failedModel={choice?.model ?? null}
+                                    onRetry={() => void chat.regenerate()}
+                                    onTryWith={tryWith}
                                 />
-                                {composer}
-                            </div>
-                        </>
+                            ) : null}
+                        </PolarThreadFrame>
                     )}
                 </div>
             </div>
