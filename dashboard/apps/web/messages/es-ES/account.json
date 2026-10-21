@@ -1275,14 +1275,25 @@
             "download": "Descargar {version}",
             "downloadNone": "Descargar",
             "notReleased": "Todavía no se ha publicado ninguna versión.",
-            "connectHint": "Abre el archivo para instalarlo en la app de Stream Deck, pulsa Conectar en los ajustes de cualquier tecla de Polaris y aprueba aquí el código.",
             "connected": "Decks conectados",
             "noneConnected": "No hay ningún Stream Deck conectado a esta cuenta.",
             "lastUsed": "Último uso <time></time>",
             "notUsedYet": "Sin usar aún",
             "disconnect": "Desconectar",
             "disconnectTitle": "¿Desconectar {name}?",
-            "disconnectHint": "Sus teclas dejan de funcionar al momento. Volver a conectarlo pide un código nuevo."
+            "disconnectHint": "Sus teclas dejan de funcionar al momento. Volver a conectarlo pide un código nuevo.",
+            "install": {
+                "where": "Dónde lo instalas",
+                "downloadPlugin": "Descarga el plugin.",
+                "openFile": "Abre el archivo descargado y confirma la instalación en la app de Stream Deck.",
+                "connectKey": "Arrastra una tecla de Polaris al deck, pulsa <press>Conectar</press> en sus ajustes y aprueba el código que se abre en tu navegador.",
+                "node": "Instala Node.js 20 o posterior en este equipo, desde <link>nodejs.org</link> o la tienda de software de tu sistema. OpenDeck ejecuta el plugin con él y solo vale una instalación nativa: el Flatpak de Node.js no se usa.",
+                "fromFile": "En OpenDeck, abre <press>Plugins</press>, pulsa <press>Install from file</press> y elige el archivo descargado.",
+                "downloadModule": "Descarga el módulo. Necesita Companion 5.0 o posterior.",
+                "importModule": "En Companion, abre <press>Modules</press>, pulsa <press>Import module package</press> y elige el archivo descargado.",
+                "addConnection": "Abre <press>Connections</press>, busca Polaris en la lista, añádelo y escribe esta dirección en sus ajustes:",
+                "approveCode": "El estado de la conexión muestra entonces un código y la página donde aprobarlo. Abre esa página, inicia sesión y aprueba el código."
+            }
         }
     },
     "cli": {

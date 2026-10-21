@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Stream Deck on the downloads screen: the installer, what it does, and the
+ * The Stream Deck on the downloads screen: how to install it, what it does, and the
  * decks connected to this account with the button that disconnects each.
  *
  * A connected deck is an API key of kind "streamdeck", so disconnecting is the
@@ -27,10 +27,12 @@ export interface ConnectedDeck {
     readonly lastUsedAt: string | null;
 }
 
-/** The installer, or the fact that none has been published. */
-export function StreamDeckFile({ download }: { download: AppDownload | null }) {
+/** A release's file ending in `suffix`, or the fact that none has been
+ *  published: the plugin's `.streamDeckPlugin` and the Companion module's `.tgz`
+ *  share it. */
+export function DeckFile({ download, suffix }: { download: AppDownload | null; suffix: string }) {
     const t = useTranslations("account");
-    const file = download?.files.find((entry) => entry.name.endsWith(".streamDeckPlugin"));
+    const file = download?.files.find((entry) => entry.name.endsWith(suffix));
     if (download && file) {
         return (
             <div>
@@ -58,11 +60,11 @@ export function StreamDeckFile({ download }: { download: AppDownload | null }) {
 
 export function StreamDeckSection({
     decks,
-    file
+    install
 }: {
     decks: readonly ConnectedDeck[];
-    /** The installer row; waits on GitHub, so it comes in its own boundary. */
-    file: React.ReactNode;
+    /** The install steps, whose downloads wait on GitHub in their own boundaries. */
+    install: React.ReactNode;
 }) {
     const t = useTranslations("account");
     const [list, setList] = useState(decks);
@@ -101,10 +103,7 @@ export function StreamDeckSection({
             </CardHeader>
             <CardBody className="flex flex-col gap-4 text-sm">
                 <p className="text-muted-foreground">{t("downloads.streamdeck.description")}</p>
-                {file}
-                <p className="text-xs text-muted-foreground">
-                    {t("downloads.streamdeck.connectHint")}
-                </p>
+                {install}
 
                 <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
                     <p className="font-medium">{t("downloads.streamdeck.connected")}</p>
