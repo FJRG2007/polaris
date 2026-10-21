@@ -6,7 +6,8 @@
  *
  * Every change is optimistic and put back when the server refuses it. The
  * server answers a connector without its secret (`ConnectorView`), so nothing
- * typed into the token fields ever comes back to the page.
+ * typed into the token fields ever comes back to the page. A new one is added
+ * from a dialog, as ChatGPT and Claude do, rather than a form on the page.
  */
 
 import Link from "next/link";
@@ -18,6 +19,12 @@ import {
     Card,
     CardBody,
     ConfirmDeleteDialog,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     Input,
     SegmentedControl,
     Switch,
@@ -85,7 +92,7 @@ export function PolarConnectors({
 }) {
     const t = useTranslations("account");
     const [rows, setRows] = useState(initial);
-    const [adding, setAdding] = useState(initial.length === 0);
+    const [adding, setAdding] = useState(false);
     const [error, setError] = useState<string | null>(
         returned === "failed" ? t("polarConnectors.errors.signInFailed") : null
     );
@@ -159,11 +166,12 @@ export function PolarConnectors({
                         </Link>
                     </p>
                 </div>
-                {!adding ? (
+                {rows.length > 0 ? (
                     <Button
                         type="button"
                         size="sm"
                         variant="outline"
+                        className="shrink-0"
                         onClick={() => setAdding(true)}
                     >
                         <Plug className="h-3.5 w-3.5 shrink-0" />
@@ -181,25 +189,32 @@ export function PolarConnectors({
                     {error}
                 </p>
             ) : null}
-            {adding ? (
-                <AddConnector
-                    cancellable={rows.length > 0}
-                    onCancel={() => setAdding(false)}
-                    onAdded={(view) => {
-                        setRows((current) => [...current, view]);
-                        setAdding(false);
-                        setOpen(view.id);
-                        if (view.auth === "oauth" && !view.signedIn) void signIn(view);
-                    }}
-                    onError={say}
-                />
-            ) : null}
-            {rows.length === 0 && !adding ? (
+            <AddConnector
+                open={adding}
+                onOpenChange={setAdding}
+                onAdded={(view) => {
+                    setError(null);
+                    setRows((current) => [...current, view]);
+                    setAdding(false);
+                    setOpen(view.id);
+                    if (view.auth === "oauth" && !view.signedIn) void signIn(view);
+                }}
+            />
+            {rows.length === 0 ? (
                 <Card>
-                    <CardBody>
-                        <p className="text-sm text-muted-foreground">
+                    <CardBody className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
                             {t("polarConnectors.empty")}
                         </p>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => setAdding(true)}
+                        >
+                            <Plug className="h-3.5 w-3.5 shrink-0" />
+                            {t("polarConnectors.add")}
+                        </Button>
                     </CardBody>
                 </Card>
             ) : null}
@@ -390,15 +405,13 @@ function StatusBadge({ row }: { row: ConnectorView }) {
 }
 
 function AddConnector({
-    cancellable,
-    onCancel,
-    onAdded,
-    onError
+    open,
+    onOpenChange,
+    onAdded
 }: {
-    cancellable: boolean;
-    onCancel: () => void;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     onAdded: (view: ConnectorView) => void;
-    onError: (code: unknown) => void;
 }) {
     const t = useTranslations("account");
     const [name, setName] = useState("");
@@ -408,16 +421,39 @@ function AddConnector({
     const [token, setToken] = useState("");
     const [clientId, setClientId] = useState("");
     const [clientSecret, setClientSecret] = useState("");
+    const [advanced, setAdvanced] = useState(false);
     const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const urlBad = url.trim() !== "" && !looksLikeServer(url);
     const complete =
         name.trim() !== "" && looksLikeServer(url) && (auth !== "bearer" || token.trim() !== "");
 
+    // Closing starts over: a secret typed into a dialog that was put away does
+    // not wait in the page for the next one.
+    function reset() {
+        setName("");
+        setUrl("");
+        setAuth("none");
+        setTransport("http");
+        setToken("");
+        setClientId("");
+        setClientSecret("");
+        setAdvanced(false);
+        setError(null);
+    }
+
+    function close() {
+        if (pending) return;
+        reset();
+        onOpenChange(false);
+    }
+
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!complete || pending) return;
         setPending(true);
+        setError(null);
         const answer = await send("/api/polar/connectors", {
             method: "POST",
             body: JSON.stringify({
@@ -432,19 +468,29 @@ function AddConnector({
             })
         });
         setPending(false);
-        if (answer.ok) onAdded(answer.body.connector);
-        else onError(answer.body.error);
+        if (answer.ok) {
+            reset();
+            onAdded(answer.body.connector);
+            return;
+        }
+        const code: unknown = answer.body.error;
+        setError(t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`));
     }
 
     return (
-        <Card>
-            <CardBody>
+        <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{t("polarConnectors.dialogTitle")}</DialogTitle>
+                    <DialogDescription>{t("polarConnectors.dialogBody")}</DialogDescription>
+                </DialogHeader>
                 <form className="flex flex-col gap-3" onSubmit={(event) => void submit(event)}>
                     <label className="flex flex-col gap-1 text-sm">
                         <span>{t("polarConnectors.name")} *</span>
                         <Input
                             value={name}
                             maxLength={40}
+                            autoFocus
                             onChange={(event) => setName(event.target.value)}
                             placeholder={t("polarConnectors.namePlaceholder")}
                         />
@@ -491,20 +537,38 @@ function AddConnector({
                         </label>
                     ) : null}
                     {auth === "oauth" ? (
-                        <>
-                            <p className="text-xs text-muted-foreground">
-                                {t("polarConnectors.oauthHint")}
-                            </p>
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span>{t("polarConnectors.clientId")}</span>
-                                <Input
-                                    value={clientId}
-                                    maxLength={512}
-                                    autoComplete="off"
-                                    onChange={(event) => setClientId(event.target.value)}
-                                />
-                            </label>
-                            {clientId.trim() ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("polarConnectors.oauthHint")}
+                        </p>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="flex items-center gap-1 self-start text-xs text-muted-foreground hover:text-foreground"
+                        aria-expanded={advanced}
+                        onClick={() => setAdvanced(!advanced)}
+                    >
+                        <ChevronDown
+                            className={cn(
+                                "h-3.5 w-3.5 shrink-0 transition-transform",
+                                advanced ? "" : "-rotate-90"
+                            )}
+                        />
+                        {t("polarConnectors.advanced")}
+                    </button>
+                    {advanced ? (
+                        <div className="flex flex-col gap-3">
+                            {auth === "oauth" ? (
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span>{t("polarConnectors.clientId")}</span>
+                                    <Input
+                                        value={clientId}
+                                        maxLength={512}
+                                        autoComplete="off"
+                                        onChange={(event) => setClientId(event.target.value)}
+                                    />
+                                </label>
+                            ) : null}
+                            {auth === "oauth" && clientId.trim() ? (
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span>{t("polarConnectors.clientSecret")}</span>
                                     <Input
@@ -516,30 +580,32 @@ function AddConnector({
                                     />
                                 </label>
                             ) : null}
-                        </>
+                            <div className="flex flex-col gap-1 text-sm">
+                                <span>{t("polarConnectors.transport")}</span>
+                                <SegmentedControl<Transport>
+                                    size="sm"
+                                    value={transport}
+                                    aria-label={t("polarConnectors.transport")}
+                                    options={TRANSPORTS.map((value) => ({
+                                        value,
+                                        label: t(`polarConnectors.transportKind.${value}`)
+                                    }))}
+                                    onValueChange={setTransport}
+                                />
+                            </div>
+                        </div>
                     ) : null}
-                    <div className="flex flex-col gap-1 text-sm">
-                        <span>{t("polarConnectors.transport")}</span>
-                        <SegmentedControl<Transport>
-                            size="sm"
-                            value={transport}
-                            aria-label={t("polarConnectors.transport")}
-                            options={TRANSPORTS.map((value) => ({
-                                value,
-                                label: t(`polarConnectors.transportKind.${value}`)
-                            }))}
-                            onValueChange={setTransport}
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        {cancellable ? (
-                            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-                                {t("polarConnectors.cancel")}
-                            </Button>
-                        ) : null}
+                    {error ? (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
+                    ) : null}
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" disabled={pending} onClick={close}>
+                            {t("polarConnectors.cancel")}
+                        </Button>
                         <Button
                             type="submit"
-                            size="sm"
                             aria-disabled={!complete || pending}
                             disabled={pending}
                         >
@@ -547,9 +613,9 @@ function AddConnector({
                                 ? t("polarConnectors.addAndSignIn")
                                 : t("polarConnectors.save")}
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </form>
-            </CardBody>
-        </Card>
+            </DialogContent>
+        </Dialog>
     );
 }

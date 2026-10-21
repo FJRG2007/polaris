@@ -1234,11 +1234,6 @@
             "mobile": "Android and iOS",
             "mobileHint": "No app yet. Installing Polaris as an app above puts it on your home screen from the browser, which is most of the way there."
         },
-        "command": {
-            "title": "One line, and it keeps itself up to date",
-            "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. The first time, press Load unpacked and choose the folder it names. After that it checks for a new version every few hours and the extension restarts into it by itself. Firefox is not covered: its temporary add-on is gone when Firefox closes, so there is nothing for a script to keep current."
-        },
         "steps": {
             "yourBrowser": "Your browser",
             "whichBrowser": "Which browser you are loading it into",
@@ -1332,6 +1327,9 @@
     },
     "polarConnectors": {
         "title": "Connectors",
+        "dialogTitle": "Add an MCP server",
+        "dialogBody": "Polar connects to it and reads its tools before saving it.",
+        "advanced": "Advanced settings",
         "intro": "MCP servers you connect to Polar. Their tools are yours only and follow the setting you pick for each one.",
         "reverse": "Want ChatGPT or Claude to use Polaris instead?",
         "reverseLink": "Connect an assistant",

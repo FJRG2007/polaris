@@ -29,7 +29,6 @@ import { publicAppUrl } from "@/lib/domain-service";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { getTranslations } from "@/lib/i18n/request";
-import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
 import { Puzzle, Smartphone } from "lucide-react";
 import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
@@ -99,13 +98,6 @@ export default async function DownloadsPage() {
 
                     <div className="flex flex-col gap-4 border-t border-border/60 pt-4">
                         <p className="font-medium">{t("downloads.extension.loadYourself")}</p>
-                        {/* First, because it is the only way on this screen that
-                            keeps itself current afterward - the line sets up a
-                            job that swaps in new releases and the extension
-                            restarts into them on its own. The zip and the steps
-                            stay under it for anybody who would rather do it by
-                            hand, with nothing keeping that copy current. */}
-                        <ExtensionCommand repo={repo} />
                         <Suspense fallback={<FilesSkeleton />}>
                             <ExtensionFiles repo={repo} />
                         </Suspense>
