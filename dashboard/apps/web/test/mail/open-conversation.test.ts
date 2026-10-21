@@ -93,7 +93,7 @@ describe("the address stops naming what was moved", () => {
     it("closes the pane from the conversation's own header", async () => {
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
         expect(thread).toContain("const leaving = leavesTheView(action);");
-        expect(thread).toContain("const answered = leaving ? onGone?.() : undefined;");
+        expect(thread).toContain("const answered = leaving ? onGone?.() : onChange?.(action);");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // And the list is what it is told to do, or the pane calls into nothing.
         // Which of the two it does is the reader's own answer - back to the list,
@@ -120,7 +120,7 @@ describe("the address stops naming what was moved", () => {
         // watching nothing happen.
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
         const act = thread.slice(thread.indexOf("const act = useCallback"));
-        const leaves = act.indexOf("const answered = leaving ? onGone?.() : undefined;");
+        const leaves = act.indexOf("const answered = leaving ? onGone?.() : onChange?.(action);");
         const asks = act.indexOf("startBusy(");
         expect(leaves, "the pane closes inside the action").toBeGreaterThan(0);
         expect(leaves, "the pane closes before the server is asked").toBeLessThan(asks);

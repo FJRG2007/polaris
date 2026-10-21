@@ -30,7 +30,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AddressChip } from "./address-chip";
 import { forwardSeed, replySeed } from "./answering";
 import { leavesTheView, scopeOf } from "./mail-actions";
-import { missingFolderRole, refusalOf } from "./refusal";
+import { missingFolderRole, refusalOf, refusalOrFailure } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import { isViewable } from "@/app/(app)/drive/viewer/kind";
 import { saveFile } from "@/components/transfers/move-file";
@@ -62,6 +62,7 @@ import { EmojiPicker } from "@/app/(app)/chat/emoji-picker";
 import type { MailViewContext } from "./mail-view";
 import { keptMessage, peekMessage } from "./message-store";
 import type { MailAction } from "@/lib/mailbox/messages";
+import type { ThreadPatch } from "./optimistic";
 import type { ReadableMessage } from "@/lib/mailbox/reading";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -119,6 +120,7 @@ export function ThreadView({
     onRead,
     onGone,
     onStayed,
+    onChange,
     onBlock
 }: {
     thread: MailThreadView;
@@ -150,6 +152,10 @@ export function ThreadView({
     /** Put the reader back, for a filing the server refused after this pane had
      *  already stepped out of the way. */
     onStayed?: () => void;
+    /** Told the moment an action here changes how the conversation looks - a
+     *  star, unread, a pin, a label - so the list and this header both show it
+     *  before the server answers. Answered with what to call once it has. */
+    onChange?: (change: MailAction | ThreadPatch) => ((accepted: boolean) => void) | void;
     /** Stop somebody writing, from the header of one of their messages. The
      *  list's own menu offers the same thing on a row. */
     onBlock?: (accountId: string, address: string) => void;
@@ -231,9 +237,24 @@ export function ThreadView({
             // the reader sat inside a message they had just deleted, watching
             // nothing happen. If it is refused, they are put back and told.
             const leaving = leavesTheView(action);
-            const answered = leaving ? onGone?.() : undefined;
+            // Everything else shows now as well: a star that lit only once a
+            // mail server had answered read as the press having missed.
+            const answered = leaving ? onGone?.() : onChange?.(action);
             startBusy(async () => {
-                const outcome = await actOnAction({ messageIds, action, scope: scopeOf(action) });
+                const outcome = await actOnAction({
+                    messageIds,
+                    action,
+                    scope: scopeOf(action)
+                }).catch((caught: unknown) => {
+                    console.error("polaris: a mail action failed:", caught);
+                    return null;
+                });
+                if (!outcome) {
+                    answered?.(false);
+                    if (leaving) onStayed?.();
+                    toast.show({ title: t("list.changeFailed") });
+                    return;
+                }
                 const missing = missingFolderRole(outcome);
                 if (missing) {
                     // Back where they were, so the question is answered with the
@@ -271,7 +292,7 @@ export function ThreadView({
                 refreshMailbox();
             });
         },
-        [askFolderRole, messages, onGone, onStayed, refreshMailbox, reloadLists, toast]
+        [askFolderRole, messages, onChange, onGone, onStayed, refreshMailbox, reloadLists, t, toast]
     );
 
     /**
@@ -570,7 +591,11 @@ export function ThreadView({
                             <Archive className="size-4 shrink-0" aria-hidden />
                         </Button>
                     ) : null}
-                    <LabelMenu messageIds={messages.map((message) => message.id)} />
+                    <LabelMenu
+                        thread={thread}
+                        messageIds={messages.map((message) => message.id)}
+                        onChange={onChange}
+                    />
                     {context.restorable ? (
                         <Button
                             variant="ghost"
@@ -599,6 +624,7 @@ export function ThreadView({
                         thread={thread}
                         messageIds={messages.map((message) => message.id)}
                         sender={messages[0]?.from[0]?.address ?? ""}
+                        onChange={onChange}
                     />
                 </div>
             </header>
@@ -704,20 +730,27 @@ export function filterLikeHref(accountId: string, sender: string, subject: strin
 function ConversationMenu({
     thread,
     messageIds,
-    sender
+    sender,
+    onChange
 }: {
     thread: MailThreadView;
     messageIds: string[];
     /** Who started it, for the filter written from it. */
     sender: string;
+    onChange?: (change: ThreadPatch) => ((accepted: boolean) => void) | void;
 }) {
     const { refreshMailbox } = useMail();
     const toast = useToast();
     const t = useTranslations("mail");
     const change = (state: { pinned?: boolean; muted?: boolean }, announce: string) => {
+        // Pinned or muted now, and put back if the write is refused.
+        const answered = onChange?.(state);
         void (async () => {
-            const outcome = await setConversationStateAction({ messageIds, ...state });
-            const said = refusalOf(outcome);
+            const said = await refusalOrFailure(
+                setConversationStateAction({ messageIds, ...state }),
+                t("list.changeFailed")
+            );
+            answered?.(!said);
             if (said) {
                 toast.show({ title: said });
                 return;
@@ -797,7 +830,15 @@ function ConversationMenu({
  * The menu says where to make a label when there are none, rather than being an
  * empty menu that reads as broken.
  */
-function LabelMenu({ messageIds }: { messageIds: string[] }) {
+function LabelMenu({
+    thread,
+    messageIds,
+    onChange
+}: {
+    thread: MailThreadView;
+    messageIds: string[];
+    onChange?: (change: ThreadPatch) => ((accepted: boolean) => void) | void;
+}) {
     const { labels, refreshMailbox } = useMail();
     const toast = useToast();
     const t = useTranslations("mail");
@@ -824,12 +865,22 @@ function LabelMenu({ messageIds }: { messageIds: string[] }) {
                             key={label.id}
                             onSelect={() =>
                                 void (async () => {
-                                    const answer = await applyLabelAction({
-                                        labelId: label.id,
-                                        messageIds,
-                                        applied: true
-                                    });
-                                    const said = refusalOf(answer);
+                                    // On the conversation now, beside the ones
+                                    // it already has, and off again on a refusal.
+                                    const answered = thread.labels.some(
+                                        (one) => one.id === label.id
+                                    )
+                                        ? undefined
+                                        : onChange?.({ labels: [...thread.labels, label] });
+                                    const said = await refusalOrFailure(
+                                        applyLabelAction({
+                                            labelId: label.id,
+                                            messageIds,
+                                            applied: true
+                                        }),
+                                        t("list.changeFailed")
+                                    );
+                                    answered?.(!said);
                                     if (said) {
                                         toast.show({ title: said });
                                         return;

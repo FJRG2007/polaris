@@ -967,6 +967,7 @@
         "web/src/app/(app)/mail/compose/page.tsx",
         "web/src/app/(app)/mail/composer.tsx",
         "web/src/app/(app)/mail/connect-dialog.tsx",
+        "web/src/app/(app)/mail/contact-suggestions.tsx",
         "web/src/app/(app)/mail/default-sender.ts",
         "web/src/app/(app)/mail/delivery-note.tsx",
         "web/src/app/(app)/mail/draft-saves.ts",

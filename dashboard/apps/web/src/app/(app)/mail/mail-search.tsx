@@ -24,6 +24,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import {
+    ContactSuggestionList,
+    SUGGESTIONS_SELECTOR,
+    useContactSuggestions
+} from "./contact-suggestions";
 
 /** How long typing settles before the address changes. Long enough that a
  *  sentence is one navigation, short enough that it feels immediate. */
@@ -162,13 +167,17 @@ function SearchFilters({
             // The button that opened it toggles on its own click; closing here
             // as well would reopen it.
             if ((event.target as HTMLElement).closest("[data-search-options]")) return;
+            // Nor is a contact picked from an address field's suggestions, which
+            // are drawn outside the panel so the panel cannot clip them.
+            if ((event.target as HTMLElement).closest(SUGGESTIONS_SELECTOR)) return;
             onClose();
         }
         document.addEventListener("mousedown", onDown);
         return () => document.removeEventListener("mousedown", onDown);
     }, [onClose]);
 
-    const set = (change: Partial<core.MailSearchTerms>) => setTerms((held) => ({ ...held, ...change }));
+    const set = (change: Partial<core.MailSearchTerms>) =>
+        setTerms((held) => ({ ...held, ...change }));
     /** A field that holds a list, edited as the one value people actually type
      *  into it. Two `from:` in one search is possible and rare; the box is where
      *  somebody writes that. */
@@ -181,9 +190,21 @@ function SearchFilters({
             className="absolute left-0 right-0 top-full z-30 mt-1 rounded-md border border-border bg-surface p-3 shadow-lg"
         >
             <div className="grid grid-cols-2 gap-2">
-                <Field label={t("searchBox.from")} value={one(terms.from)} onChange={(value) => set({ from: asList(value) })} />
-                <Field label={t("searchBox.to")} value={one(terms.to)} onChange={(value) => set({ to: asList(value) })} />
-                <Field label={t("print.cc")} value={one(terms.cc)} onChange={(value) => set({ cc: asList(value) })} />
+                <AddressField
+                    label={t("searchBox.from")}
+                    value={one(terms.from)}
+                    onChange={(value) => set({ from: asList(value) })}
+                />
+                <AddressField
+                    label={t("searchBox.to")}
+                    value={one(terms.to)}
+                    onChange={(value) => set({ to: asList(value) })}
+                />
+                <AddressField
+                    label={t("print.cc")}
+                    value={one(terms.cc)}
+                    onChange={(value) => set({ cc: asList(value) })}
+                />
                 <Field
                     label={t("print.subject")}
                     value={one(terms.subject)}
@@ -226,7 +247,11 @@ function SearchFilters({
                     checked={terms.hasAttachment}
                     onChange={(next) => set({ hasAttachment: next })}
                 />
-                <Tick label={t("searchBox.link")} checked={terms.hasLink} onChange={(next) => set({ hasLink: next })} />
+                <Tick
+                    label={t("searchBox.link")}
+                    checked={terms.hasLink}
+                    onChange={(next) => set({ hasLink: next })}
+                />
                 <Tick
                     label={t("labels.filter.unread")}
                     checked={terms.unread === true}
@@ -285,6 +310,83 @@ function Field({
                 value={value}
                 className="h-8 text-[13px]"
                 onChange={(event) => onChange(event.target.value)}
+            />
+        </label>
+    );
+}
+
+/**
+ * A field that names a person: the same contacts the composer offers, so
+ * searching for mail from somebody does not mean remembering how their address
+ * is spelled. A search matches part of an address as well, so what is typed
+ * stays as typed until a suggestion is chosen.
+ */
+function AddressField({
+    label,
+    value,
+    onChange
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const field = useRef<HTMLInputElement | null>(null);
+    // Asked about only while somebody is typing in it, not for a value the box
+    // filled in when the panel opened.
+    const [typing, setTyping] = useState(false);
+    const offered = useContactSuggestions(typing ? value : "");
+    const { suggestions, highlight } = offered;
+
+    function choose(address: string): void {
+        onChange(address);
+        setTyping(false);
+        offered.clear();
+    }
+
+    return (
+        <label className="block">
+            <span className="mb-1 block text-[12px] text-muted-foreground">{label}</span>
+            <Input
+                ref={field}
+                value={value}
+                autoComplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={suggestions.length > 0}
+                className="h-8 text-[13px]"
+                onChange={(event) => {
+                    setTyping(true);
+                    onChange(event.target.value);
+                }}
+                onBlur={() => {
+                    setTyping(false);
+                    offered.clear();
+                }}
+                onKeyDown={(event) => {
+                    if (suggestions.length === 0) return;
+                    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                        event.preventDefault();
+                        offered.move(event.key === "ArrowDown" ? 1 : -1);
+                    } else if (event.key === "Enter") {
+                        const chosen = suggestions[highlight];
+                        if (!chosen) return;
+                        event.preventDefault();
+                        choose(chosen.address);
+                    } else if (event.key === "Escape") {
+                        // The list first; a second Escape is the panel's.
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setTyping(false);
+                        offered.clear();
+                    }
+                }}
+            />
+            <ContactSuggestionList
+                anchor={field}
+                suggestions={suggestions}
+                highlight={highlight}
+                onHighlight={offered.setHighlight}
+                onChoose={(entry) => choose(entry.address)}
             />
         </label>
     );

@@ -753,6 +753,8 @@
         "flagged": "{subject} is flagged by security engines"
     },
     "list": {
+        "picked": "{count} picked",
+        "changeFailed": "Your mail could not be changed, so it is back as it was. Try again.",
         "blockTitle": "Block {address}?",
         "blockQuestion": "Send everything from {address} to the trash?",
         "blockBody": "What they have already sent goes to the trash too. Mail cannot be refused before it arrives - only your provider can do that - so it will still reach your mailbox; you simply will not see it.",

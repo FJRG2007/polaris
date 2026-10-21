@@ -20,9 +20,25 @@ export function refusalOf(outcome: unknown): string {
  * telling somebody their archive failed.
  */
 export function missingFolderRole(outcome: unknown): { role: string; accountId: string } | null {
-    if (typeof outcome !== "object" || outcome === null || !("needsFolderRole" in outcome)) return null;
+    if (typeof outcome !== "object" || outcome === null || !("needsFolderRole" in outcome))
+        return null;
     const held = (outcome as { needsFolderRole?: unknown }).needsFolderRole;
     if (typeof held !== "object" || held === null) return null;
     const { role, accountId } = held as { role?: unknown; accountId?: unknown };
     return typeof role === "string" && typeof accountId === "string" ? { role, accountId } : null;
+}
+
+/**
+ * What to tell somebody about an action that has already been drawn as done:
+ * the server's sentence when it refused, `failed` when nothing answered at all,
+ * or nothing when it held. A request that throws is as much a "no" as a refusal,
+ * and the screen has to take its change back and say so either way.
+ */
+export async function refusalOrFailure(asked: Promise<unknown>, failed: string): Promise<string> {
+    try {
+        return refusalOf(await asked);
+    } catch (caught) {
+        console.error("polaris: a mail request failed:", caught);
+        return failed;
+    }
 }

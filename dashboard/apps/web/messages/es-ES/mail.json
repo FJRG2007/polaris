@@ -753,6 +753,8 @@
         "flagged": "Los motores de seguridad marcan {subject}"
     },
     "list": {
+        "picked": "{count, plural, one {# elegida} other {# elegidas}}",
+        "changeFailed": "No se pudo cambiar el correo, así que vuelve a estar como antes. Reinténtalo.",
         "blockTitle": "¿Bloquear a {address}?",
         "blockQuestion": "¿Enviar todo lo de {address} a la papelera?",
         "blockBody": "Lo que ya ha enviado también va a la papelera. El correo no se puede rechazar antes de que llegue (solo tu proveedor puede hacerlo), así que seguirá llegando a tu buzón; simplemente no lo verás.",

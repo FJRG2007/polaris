@@ -598,8 +598,21 @@ export async function fileDraftOnServerAction(draftId: string) {
     return {};
 }
 
+/** What a suggestion lookup may be asked: a fragment of a name or an address
+ *  somebody is typing, never a paragraph. */
+const contactLookupSchema = z.object({
+    query: z.string().trim().min(1).max(320),
+    shelf: z.string().trim().max(64).optional()
+});
+
 /** Who to offer as somebody types a recipient. */
-export async function suggestContactsAction(query: string, shelf?: string) {
+export async function suggestContactsAction(query: unknown, shelf?: unknown) {
+    const parsed = contactLookupSchema.safeParse({ query, shelf });
+    if (!parsed.success) return { suggestions: [] };
+    return suggestContacts(parsed.data.query, parsed.data.shelf);
+}
+
+async function suggestContacts(query: string, shelf: string | undefined) {
     const userId = await actorId();
     // The people this shelf writes to. A company address suggesting a personal
     // contact is the wrong recipient offered on the wrong letterhead.
