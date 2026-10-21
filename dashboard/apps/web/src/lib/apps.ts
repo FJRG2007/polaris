@@ -1168,6 +1168,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["nas", "unas", "unifi", "disks", "drives", "raid", "backup", "fan"]
         },
         {
+            // Servers, their containers and the domains that answer for them, as
+            // devices: load, what is behind it, and the days an alarm fired.
+            label: "Machines", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/machines",
+            icon: Server,
+            needs: "deploy.read",
+            keywords: ["server", "container", "domain", "cpu", "memory", "uptime", "outage", "watch"]
+        },
+        {
             label: "Automations", // i18n-ignore
             group: DEVICES_GROUP,
             href: "/places/devices/automations",
