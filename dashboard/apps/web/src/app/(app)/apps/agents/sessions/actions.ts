@@ -21,6 +21,9 @@ import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as work from "@/lib/agents/session-work";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
+import * as review from "@/lib/agents/session-review";
+import { appBaseUrl } from "@/lib/domain-service";
+import { safeChangePath } from "@/lib/agents/session-changes";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import {
@@ -402,4 +405,134 @@ export async function sessionScreenAction(
     } catch {
         return { error: t("sessions.errors.noAnswer") };
     }
+}
+
+// ---------------------------------------------------------------------------
+// Changes and pull requests
+//
+// Reading a session's checkout runs commands on its machine, and shipping pushes
+// from it, so both are for whoever may steer the session - the same
+// `agents.manage` and the same ownership check every other control here uses.
+// ---------------------------------------------------------------------------
+
+const sessionIdSchema = z.string().trim().uuid();
+
+const changesInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    offset: z.number().int().min(0).max(1_000_000).default(0)
+});
+
+const fileDiffInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    path: z.string().min(1).max(4096).refine(safeChangePath)
+});
+
+const openPullInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    title: z.string().trim().min(1).max(256),
+    body: z.string().trim().max(60_000)
+});
+
+/** The session, when this account may steer it. */
+async function controlledSession(sessionId: string): Promise<sessions.SessionView | null> {
+    const user = await requirePermission("agents.manage");
+    return sessions.getSession(sessionId, user.id);
+}
+
+export async function sessionChangesAction(
+    input: unknown
+): Promise<{ answer?: review.ChangesAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = changesInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await review.listSessionChanges(session, parsed.data.offset) };
+}
+
+export async function sessionFileDiffAction(
+    input: unknown
+): Promise<{ answer?: review.DiffAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = fileDiffInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await review.sessionFileDiff(session, parsed.data.path) };
+}
+
+export interface SessionShipView {
+    /** Why the button is not offered, or null when it is. */
+    blocked: review.ShipRefusal | null;
+    draft: { title: string; body: string };
+    /** The linked pull request as GitHub has it now; `state` is null when
+     *  GitHub would not say. */
+    pull: { number: number; url: string; title: string; state: "open" | "closed" | "merged" | null } | null;
+}
+
+/** What the ship button needs: whether it may be offered, the draft it opens
+ *  with, and the pull request the session already links. */
+export async function sessionShipAction(input: unknown): Promise<{ view?: SessionShipView; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const [push, live, first, base] = await Promise.all([
+        review.sessionPushSetting(session.id),
+        review.linkedPullRequest(session).catch(() => null),
+        prisma.agentSessionMessage.findFirst({
+            where: { sessionId: session.id, role: "user" },
+            orderBy: { createdAt: "asc" },
+            select: { body: true }
+        }),
+        appBaseUrl()
+    ]);
+    const linked = session.pullRequest;
+    return {
+        view: {
+            blocked: review.shipBlocked(session, push),
+            draft: review.pullRequestDraft({
+                title: session.title,
+                prompt: first?.body ?? null,
+                sessionUrl: `${base.replace(/\/+$/, "")}${SESSIONS_PATH}/${session.id}`,
+                words: {
+                    fallbackTitle: t("session.ship.draftTitle"),
+                    asked: t("session.ship.draftAsked"),
+                    openedFrom: (url) => t("session.ship.draftFrom", { url })
+                }
+            }),
+            pull: linked
+                ? {
+                      number: linked.number,
+                      url: live?.url ?? linked.url,
+                      title: live?.title ?? "",
+                      state: live?.state ?? null
+                  }
+                : null
+        }
+    };
+}
+
+/** Push the branch and open its pull request, or link the one it already has. */
+export async function openSessionPullRequestAction(
+    input: unknown
+): Promise<{ pull?: { number: number; url: string; existing: boolean }; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = openPullInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.ship.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const result = await review.openSessionPullRequest(
+        session,
+        await review.sessionPushSetting(session.id),
+        { title: parsed.data.title, body: parsed.data.body }
+    );
+    revalidatePath(`${SESSIONS_PATH}/${session.id}`);
+    if (result.kind === "refused") {
+        if (result.reason === "push")
+            return { error: t(`session.work.reasons.${result.pushReason ?? "other"}`) };
+        return { error: t(`session.ship.refusals.${result.reason}`) };
+    }
+    return { pull: { number: result.pull.number, url: result.pull.url, existing: result.kind === "existing" } };
 }

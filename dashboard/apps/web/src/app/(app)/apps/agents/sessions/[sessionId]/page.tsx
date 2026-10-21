@@ -1,7 +1,7 @@
 import { PageHeader } from "@polaris/ui";
 import { notFound } from "next/navigation";
 import { SessionDetail } from "./session-detail";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { getSession, sessionEvents, sessionMessages } from "@/lib/agents/session-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { readSessionWaiting } from "@/lib/agents/agent-notices";
@@ -20,10 +20,11 @@ export default async function AgentSessionPage({
     const t = await getTranslations("agents");
 
     // Opening the session is reading what the bell said about it.
-    const [events, messages] = await Promise.all([
+    const [events, messages, , canControl] = await Promise.all([
         sessionEvents(sessionId),
         sessionMessages(sessionId),
-        readSessionWaiting(sessionId, user.id)
+        readSessionWaiting(sessionId, user.id),
+        sessionCan(user, "agents.manage")
     ]);
 
     return (
@@ -42,7 +43,7 @@ export default async function AgentSessionPage({
                         : t("pages.sessionWorkspace")
                 }
             />
-            <SessionDetail session={session} events={events} messages={messages} />
+            <SessionDetail session={session} events={events} messages={messages} canControl={canControl} />
         </>
     );
 }

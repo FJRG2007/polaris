@@ -282,6 +282,69 @@
             "discardDescription": "Se borran la máquina y todo cambio sin subir. No se puede deshacer.",
             "discarded": "Trabajo descartado",
             "retryFailed": "Sigue sin subirse. El trabajo se guarda."
+        },
+        "views": {
+            "label": "Qué mostrar",
+            "session": "Sesión",
+            "changes": "Cambios"
+        },
+        "changes": {
+            "summary": "{count, plural, one {# archivo cambiado} other {# archivos cambiados}}",
+            "refresh": "Actualizar",
+            "empty": "Aún no hay cambios",
+            "emptyMore": "Nada difiere de donde empezó la rama.",
+            "pick": "Elige un archivo para ver su diff.",
+            "more": "Ver más archivos",
+            "binary": "Archivo binario, así que no hay diff que mostrar.",
+            "binaryCount": "binario",
+            "large": "Este diff es demasiado grande para mostrarlo aquí. Abre la pull request en GitHub para leerlo.",
+            "gone": "Este archivo ya no difiere. Actualiza la lista.",
+            "failed": "No se pudo leer este diff. Inténtalo de nuevo.",
+            "retry": "Reintentar",
+            "diffOf": "Diff de {path}",
+            "unreachable": "Polaris no pudo llegar a la máquina de la sesión. Comprueba que está encendida y actualiza.",
+            "nocheckout": "Falta la copia del repositorio en la máquina de la sesión.",
+            "nobase": "Polaris no encontró dónde empezó esta rama, así que no hay con qué compararla.",
+            "unavailable": {
+                "workspace": "Esta sesión no tiene repositorio, así que no hay cambios que comparar.",
+                "ended": "Esta sesión ha terminado y su máquina ya no existe. Lo que subió está en la rama {branch}.",
+                "starting": "La copia del repositorio aún no está lista. Los cambios aparecen cuando la sesión haya arrancado."
+            },
+            "errors": {
+                "invalid": "No se pudo leer esa petición. Recarga la página."
+            }
+        },
+        "ship": {
+            "open": "Abrir una pull request",
+            "dialogTitle": "Abrir una pull request",
+            "dialogDescription": "Sube {branch} a GitHub y abre una pull request para ella. Lo que aún no esté en un commit se confirma antes.",
+            "title": "Título",
+            "body": "Descripción",
+            "submit": "Abrir pull request",
+            "opening": "Abriendo",
+            "opened": "Pull request #{number} abierta",
+            "existing": "Esta rama ya tenía la pull request #{number}, así que se enlaza esa.",
+            "view": "Pull request #{number}",
+            "states": {
+                "open": "Abierta",
+                "closed": "Cerrada",
+                "merged": "Fusionada"
+            },
+            "refusals": {
+                "workspace": "Solo una sesión sobre un repositorio de GitHub puede abrir una pull request.",
+                "readOnly": "La configuración de este repositorio no deja a los agentes subir esta rama, así que no se puede abrir una pull request desde aquí.",
+                "noAuth": "Polaris no tiene acceso de la GitHub App a este repositorio. Conéctalo en los ajustes de Agentes.",
+                "push": "No se pudo subir la rama.",
+                "noChanges": "No hay nada que proponer: la rama no tiene cambios respecto a su base.",
+                "missing": "La rama no está en GitHub y la máquina de la sesión ya no existe, así que no hay nada que subir.",
+                "github": "GitHub no abrió la pull request. Inténtalo de nuevo en un momento."
+            },
+            "errors": {
+                "invalid": "Ponle un título a la pull request."
+            },
+            "draftTitle": "Cambios de una sesión de agente",
+            "draftAsked": "Lo que se le pidió al agente:",
+            "draftFrom": "Abierta desde la sesión de agente en Polaris: {url}"
         }
     },
     "rules": {

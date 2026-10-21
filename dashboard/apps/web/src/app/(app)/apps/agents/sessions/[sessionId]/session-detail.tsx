@@ -21,7 +21,17 @@ import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import { bootProgress, type BootStep } from "@/lib/agents/boot-progress";
 import { Check, CircleDot, GitBranch, Loader2, Send, Square, TriangleAlert } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Textarea } from "@polaris/ui";
+import { SessionChanges, ShipPullRequest } from "./session-changes";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    SegmentedControl,
+    Textarea
+} from "@polaris/ui";
 import {
     interruptSessionAction,
     promptSessionAction,
@@ -49,10 +59,15 @@ interface Props {
     session: SessionView;
     events: { kind: string; detail: string; subject: string; at: string }[];
     messages: { role: string; body: string; authorId: string | null; at: string }[];
+    /** Whether this account may steer the session: read its checkout and ship
+     *  from it. The actions check the same thing again. */
+    canControl?: boolean;
 }
 
-export function SessionDetail({ session, events, messages }: Props) {
+export function SessionDetail({ session, events, messages, canControl = false }: Props) {
     const t = useTranslations("agents");
+    const [view, setView] = useState<"session" | "changes">("session");
+    const reviewable = canControl && Boolean(session.repoFullName);
     const [text, setText] = useState("");
     /**
      * What has been typed and not yet come back from the server.
@@ -254,231 +269,251 @@ export function SessionDetail({ session, events, messages }: Props) {
                         </Button>
                     </>
                 )}
+                {canControl ? <ShipPullRequest session={session} /> : null}
             </div>
 
-            {boot ? (
-                <Card>
-                    <CardBody className="space-y-3">
-                        <div className="flex items-center gap-2">
-                            <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
-                            <p className="text-sm">{t("session.gettingReady")}</p>
-                        </div>
-                        {/* The bar and the list say different things, and both
-                            are wanted: the bar is "how much longer", the list is
-                            "what is it doing", and the second is what makes a
-                            stuck step legible instead of a bar that stopped. */}
-                        <div className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full">
-                            <div
-                                className="bg-primary h-full rounded-full transition-all duration-500"
-                                style={{
-                                    width: `${Math.round(
-                                        (boot.filter((step) => step.state === "done").length /
-                                            boot.length) *
-                                            100
-                                    )}%`
-                                }}
-                            />
-                        </div>
-                        <ul className="space-y-1">
-                            {boot.map((step) => (
-                                <li key={step.key} className="flex items-center gap-2 text-xs">
-                                    {step.state === "done" ? (
-                                        <Check className="size-3.5 shrink-0 text-success" />
-                                    ) : step.state === "doing" ? (
-                                        <Loader2 className="text-primary size-3.5 shrink-0 animate-spin" />
-                                    ) : (
-                                        <span className="bg-border size-1.5 shrink-0 rounded-full" />
-                                    )}
-                                    <span
-                                        className={
-                                            step.state === "waiting"
-                                                ? "text-muted-foreground"
-                                                : undefined
-                                        }
-                                    >
-                                        {agentText(t, step.label)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                        {/* Said here rather than only in the terminal, because
-                            this is the screen somebody is on while they wonder
-                            whether it is always going to be this slow. */}
-                        <p className="text-muted-foreground text-xs">{t("session.installsOnce")}</p>
-                    </CardBody>
-                </Card>
+            {reviewable ? (
+                <SegmentedControl
+                    size="sm"
+                    aria-label={t("session.views.label")}
+                    value={view}
+                    onValueChange={setView}
+                    options={[
+                        { value: "session", label: t("session.views.session") },
+                        { value: "changes", label: t("session.views.changes") }
+                    ]}
+                />
             ) : null}
+            {reviewable && view === "changes" ? <SessionChanges session={session} /> : null}
 
-            {session.error ? (
-                <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                    <span>{agentText(t, session.error)}</span>
-                </div>
-            ) : null}
-            {session.work ? <WorkOutcome session={session} setError={setError} /> : null}
-            {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {/* Kept mounted while the changes are shown, so an open terminal
+                and what was typed survive a look at the diff. */}
+            <div className={view === "changes" ? "hidden" : "space-y-4"}>
 
-            {attached ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("session.terminal")}</CardTitle>
-                    </CardHeader>
-                    <CardBody>
-                        {/* Attached, not a second shell beside it: this is the same
-                            terminal the agent is running in, so what is typed here
-                            goes to the agent and detaching leaves it working. */}
-                        <TerminalPanel
-                            target={{ kind: "agent", sessionId: session.id }}
-                            label={session.title}
-                        />
-                        {/* Said here because this is where somebody meets it. An
-                            agent with no account linked comes up on its own login
-                            prompt, and being asked to sign in on a machine you
-                            cannot see, with no word on whether it will ask again,
-                            is the reason this looked broken. It will not: the
-                            home this runs in is kept between sessions. */}
-                        <p className="text-muted-foreground mt-3 text-xs">
-                            {t("session.signInHere")}
-                        </p>
-                    </CardBody>
-                </Card>
-            ) : null}
-
-            {screen !== null ? (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("session.screen")}</CardTitle>
-                    </CardHeader>
-                    <CardBody>
-                        <pre
-                            ref={screenRef}
-                            className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
-                        >
-                            {screen || t("session.screenEmpty")}
-                        </pre>
-                    </CardBody>
-                </Card>
-            ) : null}
-
-            <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("session.conversation")}</CardTitle>
-                    </CardHeader>
-                    <CardBody className="space-y-3">
-                        {messages.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                {t("session.nothingSaid")}
-                            </p>
-                        ) : (
-                            messages.map((message, index) => (
-                                <div key={`${message.at}-${index}`} className="space-y-1">
-                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                        {
-                                            message.role === "user"
-                                                ? t("session.you")
-                                                : message.role === "agent"
-                                                  ? t("sessions.form.agent")
-                                                  : "Polaris" /* i18n-ignore the product's name */
-                                        }
-                                    </p>
-                                    <p className="whitespace-pre-wrap break-words text-sm">
-                                        {/* Only Polaris's own lines are its words to translate;
-                                            what a person or the agent said stays as said. */}
-                                        {message.role === "system"
-                                            ? agentText(t, message.body)
-                                            : message.body}
-                                    </p>
-                                </div>
-                            ))
-                        )}
-
-                        {/* Sent, not yet echoed back. Dimmed rather than marked
-                            as failing: nothing has gone wrong, the server has
-                            simply not been re-read yet. */}
-                        {pending.map((one) => (
-                            <div key={one.key} className="space-y-1 opacity-60">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                    {t("session.you")}
-                                </p>
-                                <p className="whitespace-pre-wrap break-words text-sm">
-                                    {one.body}
-                                </p>
+                {boot ? (
+                    <Card>
+                        <CardBody className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="text-muted-foreground size-4 shrink-0 animate-spin" />
+                                <p className="text-sm">{t("session.gettingReady")}</p>
                             </div>
-                        ))}
-                        <div ref={bottom} />
-                    </CardBody>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("session.activity")}</CardTitle>
-                    </CardHeader>
-                    <CardBody>
-                        {events.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("session.noEvents")}</p>
-                        ) : (
-                            <ul className="space-y-1.5">
-                                {events.slice(-40).map((event, index) => (
-                                    <li key={`${event.at}-${index}`} className="text-xs">
-                                        <span className="text-muted-foreground">
-                                            {EVENT_KEYS[event.kind]
-                                                ? t(EVENT_KEYS[event.kind]!)
-                                                : event.kind}
+                            {/* The bar and the list say different things, and both
+                                are wanted: the bar is "how much longer", the list is
+                                "what is it doing", and the second is what makes a
+                                stuck step legible instead of a bar that stopped. */}
+                            <div className="bg-surface-sunken h-1.5 w-full overflow-hidden rounded-full">
+                                <div
+                                    className="bg-primary h-full rounded-full transition-all duration-500"
+                                    style={{
+                                        width: `${Math.round(
+                                            (boot.filter((step) => step.state === "done").length /
+                                                boot.length) *
+                                                100
+                                        )}%`
+                                    }}
+                                />
+                            </div>
+                            <ul className="space-y-1">
+                                {boot.map((step) => (
+                                    <li key={step.key} className="flex items-center gap-2 text-xs">
+                                        {step.state === "done" ? (
+                                            <Check className="size-3.5 shrink-0 text-success" />
+                                        ) : step.state === "doing" ? (
+                                            <Loader2 className="text-primary size-3.5 shrink-0 animate-spin" />
+                                        ) : (
+                                            <span className="bg-border size-1.5 shrink-0 rounded-full" />
+                                        )}
+                                        <span
+                                            className={
+                                                step.state === "waiting"
+                                                    ? "text-muted-foreground"
+                                                    : undefined
+                                            }
+                                        >
+                                            {agentText(t, step.label)}
                                         </span>
-                                        {event.detail ? (
-                                            <span className="ml-1.5">
-                                                {agentText(t, event.detail)}
-                                            </span>
-                                        ) : null}
                                     </li>
                                 ))}
                             </ul>
-                        )}
-                    </CardBody>
-                </Card>
-            </div>
+                            {/* Said here rather than only in the terminal, because
+                                this is the screen somebody is on while they wonder
+                                whether it is always going to be this slow. */}
+                            <p className="text-muted-foreground text-xs">{t("session.installsOnce")}</p>
+                        </CardBody>
+                    </Card>
+                ) : null}
 
-            {over ? (
-                <p className="text-sm text-muted-foreground">
-                    {t("session.ended", { branch: session.branch })}
-                </p>
-            ) : (
-                <div className="space-y-2">
-                    <Textarea
-                        value={text}
-                        onChange={(event) => setText(event.target.value)}
-                        rows={3}
-                        placeholder={
-                            session.state === "waiting"
-                                ? t("session.answerHere")
-                                : t("session.sendNext")
-                        }
-                        onKeyDown={(event) => {
-                            // Enter sends, Shift+Enter is a newline - the shape every
-                            // message box has, and the one people will try first.
-                            if (event.key === "Enter" && !event.shiftKey) {
-                                event.preventDefault();
-                                send();
-                            }
-                        }}
-                    />
-                    <div className="flex justify-end">
-                        {/* Not held by `busy`: that is the terminal or a stop
-                            in flight, and neither is a reason somebody cannot
-                            type the next thing. Sending is its own path and
-                            queues on the screen. */}
-                        <Button size="sm" onClick={send} disabled={!text.trim()}>
-                            {busy ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" />
-                            ) : (
-                                <Send className="size-4 shrink-0" />
-                            )}
-                            {t("session.send")}
-                        </Button>
+                {session.error ? (
+                    <div className="flex items-start gap-2 rounded-md border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                        <span>{agentText(t, session.error)}</span>
                     </div>
+                ) : null}
+                {session.work ? <WorkOutcome session={session} setError={setError} /> : null}
+                {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                {attached ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("session.terminal")}</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            {/* Attached, not a second shell beside it: this is the same
+                                terminal the agent is running in, so what is typed here
+                                goes to the agent and detaching leaves it working. */}
+                            <TerminalPanel
+                                target={{ kind: "agent", sessionId: session.id }}
+                                label={session.title}
+                            />
+                            {/* Said here because this is where somebody meets it. An
+                                agent with no account linked comes up on its own login
+                                prompt, and being asked to sign in on a machine you
+                                cannot see, with no word on whether it will ask again,
+                                is the reason this looked broken. It will not: the
+                                home this runs in is kept between sessions. */}
+                            <p className="text-muted-foreground mt-3 text-xs">
+                                {t("session.signInHere")}
+                            </p>
+                        </CardBody>
+                    </Card>
+                ) : null}
+
+                {screen !== null ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("session.screen")}</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            <pre
+                                ref={screenRef}
+                                className="max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-surface-sunken p-3 text-xs leading-relaxed"
+                            >
+                                {screen || t("session.screenEmpty")}
+                            </pre>
+                        </CardBody>
+                    </Card>
+                ) : null}
+
+                <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("session.conversation")}</CardTitle>
+                        </CardHeader>
+                        <CardBody className="space-y-3">
+                            {messages.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("session.nothingSaid")}
+                                </p>
+                            ) : (
+                                messages.map((message, index) => (
+                                    <div key={`${message.at}-${index}`} className="space-y-1">
+                                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                            {
+                                                message.role === "user"
+                                                    ? t("session.you")
+                                                    : message.role === "agent"
+                                                      ? t("sessions.form.agent")
+                                                      : "Polaris" /* i18n-ignore the product's name */
+                                            }
+                                        </p>
+                                        <p className="whitespace-pre-wrap break-words text-sm">
+                                            {/* Only Polaris's own lines are its words to translate;
+                                                what a person or the agent said stays as said. */}
+                                            {message.role === "system"
+                                                ? agentText(t, message.body)
+                                                : message.body}
+                                        </p>
+                                    </div>
+                                ))
+                            )}
+
+                            {/* Sent, not yet echoed back. Dimmed rather than marked
+                                as failing: nothing has gone wrong, the server has
+                                simply not been re-read yet. */}
+                            {pending.map((one) => (
+                                <div key={one.key} className="space-y-1 opacity-60">
+                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                        {t("session.you")}
+                                    </p>
+                                    <p className="whitespace-pre-wrap break-words text-sm">
+                                        {one.body}
+                                    </p>
+                                </div>
+                            ))}
+                            <div ref={bottom} />
+                        </CardBody>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t("session.activity")}</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            {events.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">{t("session.noEvents")}</p>
+                            ) : (
+                                <ul className="space-y-1.5">
+                                    {events.slice(-40).map((event, index) => (
+                                        <li key={`${event.at}-${index}`} className="text-xs">
+                                            <span className="text-muted-foreground">
+                                                {EVENT_KEYS[event.kind]
+                                                    ? t(EVENT_KEYS[event.kind]!)
+                                                    : event.kind}
+                                            </span>
+                                            {event.detail ? (
+                                                <span className="ml-1.5">
+                                                    {agentText(t, event.detail)}
+                                                </span>
+                                            ) : null}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </CardBody>
+                    </Card>
                 </div>
-            )}
+
+                {over ? (
+                    <p className="text-sm text-muted-foreground">
+                        {t("session.ended", { branch: session.branch })}
+                    </p>
+                ) : (
+                    <div className="space-y-2">
+                        <Textarea
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            rows={3}
+                            placeholder={
+                                session.state === "waiting"
+                                    ? t("session.answerHere")
+                                    : t("session.sendNext")
+                            }
+                            onKeyDown={(event) => {
+                                // Enter sends, Shift+Enter is a newline - the shape every
+                                // message box has, and the one people will try first.
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                    event.preventDefault();
+                                    send();
+                                }
+                            }}
+                        />
+                        <div className="flex justify-end">
+                            {/* Not held by `busy`: that is the terminal or a stop
+                                in flight, and neither is a reason somebody cannot
+                                type the next thing. Sending is its own path and
+                                queues on the screen. */}
+                            <Button size="sm" onClick={send} disabled={!text.trim()}>
+                                {busy ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : (
+                                    <Send className="size-4 shrink-0" />
+                                )}
+                                {t("session.send")}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

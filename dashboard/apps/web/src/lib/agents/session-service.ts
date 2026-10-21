@@ -117,6 +117,9 @@ export interface SessionView {
     /** What became of the work in its container when it ended, or null for a
      *  session still running or one that ended before this was recorded. */
     readonly work: SessionWork | null;
+    /** The pull request opened from its branch, or null for none yet. Only the
+     *  number and the link: whether it is open is GitHub's to say. */
+    readonly pullRequest: { readonly number: number; readonly url: string } | null;
 }
 
 /** The outcome of saving a session's work when it ended. */
@@ -186,6 +189,8 @@ const VIEW_SELECT = {
     workCommits: true,
     workBranch: true,
     workError: true,
+    prNumber: true,
+    prUrl: true,
     repo: { select: { repoFullName: true } },
     host: { select: { name: true } }
 } as const;
@@ -219,6 +224,8 @@ type SessionRecord = {
     workCommits: number | null;
     workBranch: string | null;
     workError: string | null;
+    prNumber: number | null;
+    prUrl: string | null;
     repo: { repoFullName: string } | null;
     host: { name: string } | null;
 };
@@ -258,7 +265,11 @@ function toView(record: SessionRecord): SessionView {
         startedAt: record.startedAt?.toISOString() ?? null,
         finishedAt: record.finishedAt?.toISOString() ?? null,
         createdAt: record.createdAt.toISOString(),
-        work: readWork(record)
+        work: readWork(record),
+        pullRequest:
+            record.prNumber !== null && record.prUrl
+                ? { number: record.prNumber, url: record.prUrl }
+                : null
     };
 }
 

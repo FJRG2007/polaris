@@ -17,7 +17,7 @@
 import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
-import { shellQuote } from "./session-hooks";
+import { shellPath, shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
 import type { SessionWorkReason } from "./session-service";
@@ -53,6 +53,9 @@ export interface SaveWorkInput {
     /** Where in the container the push credential was written, or empty for
      *  none. The script reads it and deletes it. */
     authFile: string;
+    /** The commit message for what is dirty. The work-in-progress one when
+     *  omitted, which is what a session that stopped leaves behind. */
+    message?: string;
 }
 
 /**
@@ -70,7 +73,7 @@ export interface SaveWorkInput {
 export function saveWorkScript(input: SaveWorkInput): string {
     return [
         "export GIT_TERMINAL_PROMPT=0",
-        `cd ${shellQuote(input.workdir)} 2>/dev/null || { echo "${MARK} none 0 -"; exit 0; }`,
+        `cd ${shellPath(input.workdir)} 2>/dev/null || { echo "${MARK} none 0 -"; exit 0; }`,
         // Whoever the daemon runs this as, the checkout may belong to the agent's
         // own account, and git refuses a repository owned by somebody else.
         "g() { git -c safe.directory='*' \"$@\"; }",
@@ -91,7 +94,7 @@ export function saveWorkScript(input: SaveWorkInput): string {
         "    export GIT_AUTHOR_NAME=Polaris GIT_COMMITTER_NAME=Polaris",
         "    export GIT_AUTHOR_EMAIL=agent@polaris.invalid GIT_COMMITTER_EMAIL=agent@polaris.invalid",
         "  fi",
-        `  g add -A >/dev/null 2>&1 && g commit -q --no-verify -m ${shellQuote(WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
+        `  g add -A >/dev/null 2>&1 && g commit -q --no-verify -m ${shellQuote(input.message ?? WIP_MESSAGE)} >/dev/null 2>&1 || { echo "${MARK} failed $(ahead) $branch"; exit 0; }`,
         "fi",
         "count=$(ahead)",
         `policy=${shellQuote(input.policy)}`,
@@ -181,10 +184,28 @@ export type SaveOutcome =
     | { kind: "pushed"; commits: number; branch: string }
     | { kind: "kept"; commits: number; branch: string; reason: SessionWorkReason };
 
-/** Commit and push whatever a `local` session's container holds. Never throws:
- *  anything that goes wrong is a kept outcome, because the one thing this may
- *  not do is report "nothing to save" about work it could not look at. */
-export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
+/** Runs a script on the server a `host` session lives on, through its stdin. */
+export type HostScriptRunner = (script: string) => Promise<{ output: string }>;
+
+export interface SaveWorkOptions {
+    /** The commit message for what is dirty; the work-in-progress one by default. */
+    message?: string;
+    /** Refuse the repository's default branch even where its push setting would
+     *  allow it. What shipping asks for: a pull request is never opened from it. */
+    neverDefault?: boolean;
+    /** How to reach a session on a server. Without it a server session is left
+     *  alone, which is what ending one wants: its worktree stays there. */
+    host?: HostScriptRunner;
+}
+
+/** Commit and push whatever a session's checkout holds - a `local` session's
+ *  container, or a server's worktree when `host` says how to reach it. Never
+ *  throws: anything that goes wrong is a kept outcome, because the one thing
+ *  this may not do is report "nothing to save" about work it could not look at. */
+export async function saveSessionWork(
+    sessionId: string,
+    options: SaveWorkOptions = {}
+): Promise<SaveOutcome> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
         select: {
@@ -195,8 +216,10 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
             repo: { select: { repoFullName: true, push: true } }
         }
     });
-    if (!row || row.place === "host" || !row.containerId || !row.repo?.repoFullName)
-        return { kind: "none" };
+    if (!row || !row.repo?.repoFullName) return { kind: "none" };
+    const onHost = row.place === "host";
+    if (onHost ? !options.host : !row.containerId) return { kind: "none" };
+    const policy = options.neverDefault && row.repo.push === "enabled" ? "restricted" : row.repo.push;
 
     const ports = new HostdPorts();
     const kept = (reason: SessionWorkReason, commits = 0, branch = row.branch): SaveOutcome => ({
@@ -208,7 +231,11 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
 
     let authFile = "";
     let defaultBranch = "";
-    if (row.repo.push !== "disabled") {
+    // On a server the script travels through sshd's stdin, never a command line,
+    // so the credential can be written by the script itself; a container is
+    // reached through an argv the daemon can see, so it gets a file first.
+    let prelude = "";
+    if (policy !== "disabled") {
         const [owner = "", name = ""] = row.repo.repoFullName.split("/");
         const token = await githubAppInstallationToken(owner).catch(() => null);
         const repo = token ? await resolveGithubRepo(owner, name, token).catch(() => null) : null;
@@ -217,16 +244,21 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
         const header = cloneAuthHeader(token);
         if (header) {
             const path = `/tmp/polaris-push-${randomUUID()}`;
-            const bytes = Buffer.from(header, "utf8");
-            try {
-                await ports.writeFile(row.containerId, path, Readable.from([bytes]), bytes.length);
+            if (onHost) {
+                prelude = `(umask 077; printf '%s' ${shellQuote(header)} > ${shellQuote(path)})\n`;
                 authFile = path;
-            } catch (error) {
-                console.error(
-                    `polaris: could not hand session ${sessionId} its push credential:`,
-                    error
-                );
-                return kept("unreachable");
+            } else {
+                const bytes = Buffer.from(header, "utf8");
+                try {
+                    await ports.writeFile(row.containerId!, path, Readable.from([bytes]), bytes.length);
+                    authFile = path;
+                } catch (error) {
+                    console.error(
+                        `polaris: could not hand session ${sessionId} its push credential:`,
+                        error
+                    );
+                    return kept("unreachable");
+                }
             }
         }
     }
@@ -237,10 +269,13 @@ export async function saveSessionWork(sessionId: string): Promise<SaveOutcome> {
             workdir: row.workdir || DEFAULT_WORKDIR,
             branch: row.branch,
             defaultBranch,
-            policy: row.repo.push,
-            authFile
+            policy,
+            authFile,
+            message: options.message
         });
-        const result = await ports.runIn(row.containerId, commands.shellArgv(script));
+        const result = onHost
+            ? await options.host!(prelude + script)
+            : await ports.runIn(row.containerId!, commands.shellArgv(script));
         output = result.output;
     } catch (error) {
         console.error(`polaris: could not reach session ${sessionId} to save its work:`, error);
