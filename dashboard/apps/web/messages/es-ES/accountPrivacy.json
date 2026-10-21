@@ -263,6 +263,8 @@
         "allCalendars": "Todos mis calendarios",
         "noCalendars": "Aún no tienes calendarios propios.",
         "noCalendarApp": "Instala la app Calendario para usar tus eventos.",
+        "noCalendarAppMember": "Calendario no está instalado aquí. Tus administradores pueden añadirlo.",
+        "calendarLimit": "Hasta {count} calendarios.",
         "allDay": "Contar eventos de todo el día",
         "before": "Minutos antes",
         "after": "Minutos después",

@@ -24,6 +24,9 @@ const MOST_OBJECTS = 500;
 /** Occurrences of one series taken into account per window. */
 const MAX_PER_SERIES = 50;
 
+/** People read at once, so a crowded page cannot take the connection pool. */
+const PEOPLE_AT_ONCE = 4;
+
 export interface PresenceBusyAsk {
     readonly userId: string;
     /** The calendars that count, or null for every one the person owns. */
@@ -68,13 +71,15 @@ export async function presenceBusy(
         select: { id: true, email: true }
     });
     const emailOf = new Map(people.map((person) => [person.id, person.email]));
-    await Promise.all(
-        asks.map(async (ask) => {
-            const email = emailOf.get(ask.userId);
-            if (email === undefined) return;
-            found.set(ask.userId, await personEvents(ask, email, window));
-        })
-    );
+    for (let start = 0; start < asks.length; start += PEOPLE_AT_ONCE) {
+        await Promise.all(
+            asks.slice(start, start + PEOPLE_AT_ONCE).map(async (ask) => {
+                const email = emailOf.get(ask.userId);
+                if (email === undefined) return;
+                found.set(ask.userId, await personEvents(ask, email, window));
+            })
+        );
+    }
     return found;
 }
 

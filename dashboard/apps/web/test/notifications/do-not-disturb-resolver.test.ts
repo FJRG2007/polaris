@@ -42,8 +42,28 @@ vi.mock("@/lib/presence-schedule-service", () => ({
     scheduleZoneOf: async () => "auto"
 }));
 vi.mock("@/lib/display-prefs-service", () => ({ getPlatformDisplayPreferences: async () => ({}) }));
+let meetingAsks = 0;
+vi.mock("@/lib/presence-auto-service", () => ({
+    meetingsNow: async (people: { id: string }[]) => {
+        meetingAsks += 1;
+        const now = Date.now();
+        return new Map(
+            people.map((person) => [
+                person.id,
+                {
+                    current: {
+                        title: "Standup",
+                        endsAt: new Date(now + 600_000)
+                    },
+                    nextStartAt: null
+                }
+            ])
+        );
+    }
+}));
 
 beforeEach(() => {
+    meetingAsks = 0;
     seats = [];
     row = {
         id: "ada",
@@ -89,5 +109,19 @@ describe("do not disturb, worked out on the server", () => {
         const { doNotDisturbOf } = await import("@/lib/presence-service");
         seats = [{ userId: "ada", meeting: { channelId: "room" } }];
         expect((await doNotDisturbOf("ada")).on).toBe(false);
+    });
+
+    it("is on in a busy meeting that turns it on", async () => {
+        const { doNotDisturbOf } = await import("@/lib/presence-service");
+        row.autoPresence = JSON.stringify({ meeting: { enabled: true, effect: "busy" } });
+        expect(await doNotDisturbOf("ada")).toMatchObject({ on: true, reason: "meeting" });
+        expect(meetingAsks).toBe(1);
+    });
+
+    it("does not read the calendar when a meeting could not turn it on", async () => {
+        const { doNotDisturbOf } = await import("@/lib/presence-service");
+        row.autoPresence = JSON.stringify({ meeting: { enabled: true, effect: "status" } });
+        expect((await doNotDisturbOf("ada")).on).toBe(false);
+        expect(meetingAsks).toBe(0);
     });
 });

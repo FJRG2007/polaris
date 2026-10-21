@@ -263,6 +263,8 @@
         "allCalendars": "Every calendar I own",
         "noCalendars": "You have no calendars of your own yet.",
         "noCalendarApp": "Install the Calendar app to use your events.",
+        "noCalendarAppMember": "Calendar isn't installed here. Your administrators can add it.",
+        "calendarLimit": "Up to {count} calendars.",
         "allDay": "Count events that last all day",
         "before": "Minutes before",
         "after": "Minutes after",

@@ -30,7 +30,9 @@ export default async function StatusSchedulePage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("schedule.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("schedule.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("schedule.page.intro")}</p>
             </div>
             <ScheduleView
@@ -38,7 +40,7 @@ export default async function StatusSchedulePage() {
                 timeZone={settings.timeZone}
                 pinned={settings.pinned}
             />
-            <AutoStatusCard initial={automatic} calendars={calendars} />
+            <AutoStatusCard initial={automatic} calendars={calendars} isAdmin={session.isAdmin} />
         </div>
     );
 }
