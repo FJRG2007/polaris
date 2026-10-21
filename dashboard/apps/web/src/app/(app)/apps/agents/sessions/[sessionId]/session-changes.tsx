@@ -236,7 +236,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
                     />
                 ) : listing ? (
                     <div className="grid gap-3 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-                        <ul className="max-h-[70vh] min-w-0 space-y-0.5 overflow-y-auto">
+                        <ul className="max-h-[70vh] min-w-0 space-y-0.5 overflow-y-auto overscroll-contain">
                             {listing.files.map((file) => (
                                 <li key={file.path}>
                                     <button
