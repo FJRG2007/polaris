@@ -33,7 +33,7 @@
 import { z } from "zod";
 import { githubAppInstallUrl } from "@/lib/github-service";
 import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
-import { githubCredentialsForUser, type GithubCredential } from "@/lib/github-access";
+import { credentialFor, githubCredentialsForUser, type GithubCredential } from "@/lib/github-access";
 
 const API = "https://api.github.com";
 const CALL_TIMEOUT_MS = 10_000;
@@ -91,8 +91,8 @@ function remember(key: string, value: unknown): void {
     cache.set(key, { at: Date.now(), value });
 }
 
-async function getJson(path: string, token: string): Promise<unknown> {
-    const response = await fetch(`${API}${path}`, {
+function ask(path: string, token: string): Promise<Response> {
+    return fetch(`${API}${path}`, {
         headers: {
             Accept: "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -102,6 +102,10 @@ async function getJson(path: string, token: string): Promise<unknown> {
         cache: "no-store",
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS)
     });
+}
+
+async function getJson(path: string, token: string): Promise<unknown> {
+    const response = await ask(path, token);
     if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
     return response.json();
 }
@@ -140,6 +144,12 @@ async function installationHolds(
     return false;
 }
 
+/** Whether GitHub knows an account called `owner`. Only a 404 says it does not. */
+async function accountExists(credential: GithubCredential, owner: string): Promise<boolean> {
+    const response = await ask(`/users/${encodeURIComponent(owner)}`, credential.token);
+    return response.status !== 404;
+}
+
 /** Only GitHub's own pages are linked to. */
 function githubPage(url: string | null | undefined): string | null {
     if (!url) return null;
@@ -151,12 +161,6 @@ function githubPage(url: string | null | undefined): string | null {
     } catch {
         return null;
     }
-}
-
-/** The account a call about `owner` is made as, the way `github-access` picks it. */
-function pick(credentials: GithubCredential[], owner: string): GithubCredential | null {
-    const wanted = owner.toLowerCase();
-    return credentials.find((entry) => entry.login.toLowerCase() === wanted) ?? credentials[0] ?? null;
 }
 
 /**
@@ -171,7 +175,7 @@ export async function githubAppGap(
 ): Promise<GithubAppGap | null> {
     const credentials = await githubCredentialsForUser(userId).catch(() => null);
     if (credentials === null) return null;
-    const credential = pick(credentials, owner);
+    const credential = credentialFor(credentials, owner);
     if (!credential) return { kind: "no-account", owner, url: CONNECTIONS_HUB };
     // A personal access token is not held to an installation.
     if (credential.method !== "oauth") return null;
@@ -204,7 +208,10 @@ async function askGithub(
     const installation = installations.find(
         (entry) => entry.account?.login.toLowerCase() === wanted
     );
-    if (!installation) return { kind: "app-missing", owner, url: await githubAppInstallUrl() };
+    if (!installation) {
+        if (!(await accountExists(credential, owner))) return null;
+        return { kind: "app-missing", owner, url: await githubAppInstallUrl() };
+    }
     if (!fullName || installation.repository_selection === "all") return null;
     if (await installationHolds(credential, installation.id, fullName)) return null;
     return {
@@ -238,4 +245,21 @@ export function installGapKey(
     gap: GithubInstallGap
 ): "errors.githubAppMissing" | "errors.githubRepoNotSelected" {
     return gap.kind === "app-missing" ? "errors.githubAppMissing" : "errors.githubRepoNotSelected";
+}
+
+/** The `agents` catalog key and its values for an App gap on `repoFullName`. */
+export function installGapMessage(
+    gap: GithubInstallGap,
+    repoFullName: string
+): {
+    key: ReturnType<typeof installGapKey>;
+    values: { owner: string; repository: string };
+} {
+    return {
+        key: installGapKey(gap),
+        values: {
+            owner: gap.owner,
+            repository: gap.kind === "repo-not-selected" ? gap.repository : repoFullName
+        }
+    };
 }

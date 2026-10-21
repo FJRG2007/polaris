@@ -69,14 +69,20 @@ export async function githubTokenForUser(userId: string, owner?: string): Promis
 }
 
 /** The linked account a call about `owner` is made as: theirs for that owner if
- *  they have one, otherwise the first they linked. */
-async function credentialForUser(userId: string, owner?: string): Promise<GithubCredential | null> {
-    const credentials = await githubCredentialsForUser(userId);
+ *  they have one, otherwise the first they linked. Pure. */
+export function credentialFor(
+    credentials: readonly GithubCredential[],
+    owner?: string
+): GithubCredential | null {
     const wanted = owner?.toLowerCase();
     const match = wanted
         ? credentials.find((entry) => entry.login.toLowerCase() === wanted)
         : undefined;
     return match ?? credentials[0] ?? null;
+}
+
+async function credentialForUser(userId: string, owner?: string): Promise<GithubCredential | null> {
+    return credentialFor(await githubCredentialsForUser(userId), owner);
 }
 
 /** Repositories this person can deploy: everything their linked accounts reach. */

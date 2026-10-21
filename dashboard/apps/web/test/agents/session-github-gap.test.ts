@@ -28,8 +28,11 @@ vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string, values?: Record<string, string>) =>
         `${key} ${JSON.stringify(values ?? {})}`
 }));
-// What the real reach module imports, so its own `installGapKey` is the one used.
-vi.mock("@/lib/github-access", () => ({ githubCredentialsForUser: async () => [] }));
+// What the real reach module imports, so its own `installGapMessage` is the one used.
+vi.mock("@/lib/github-access", () => ({
+    credentialFor: () => null,
+    githubCredentialsForUser: async () => []
+}));
 vi.mock("@/lib/github-service", () => ({ githubAppInstallUrl: async () => null }));
 vi.mock("@/lib/github-app-reach", async (original) => ({
     ...(await original<object>()),

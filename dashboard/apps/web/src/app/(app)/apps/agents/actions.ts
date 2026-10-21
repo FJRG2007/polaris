@@ -18,7 +18,7 @@ import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
 import {
     githubInstallGapForRepo,
-    installGapKey,
+    installGapMessage,
     type GithubInstallGap
 } from "@/lib/github-app-reach";
 import { providersFor } from "@/lib/agents/model-keys";
@@ -207,13 +207,8 @@ async function installGap(
 ): Promise<{ error: string; githubGap: GithubInstallGap } | null> {
     const gap = await githubInstallGapForRepo(userId, repoFullName);
     if (!gap) return null;
-    return {
-        error: await say(installGapKey(gap), {
-            owner: gap.owner,
-            repository: gap.kind === "repo-not-selected" ? gap.repository : repoFullName
-        }),
-        githubGap: gap
-    };
+    const message = installGapMessage(gap, repoFullName);
+    return { error: await say(message.key, message.values), githubGap: gap };
 }
 
 export async function enableRepoAction(

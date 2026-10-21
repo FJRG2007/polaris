@@ -6,10 +6,11 @@
  * installation, or connect an account at all. Drawn under a Polar answer and in
  * the Agents dialogs, wherever `github-app-reach.ts` found the gap.
  *
- * The step happens on github.com, in a new tab, so "Check again" is offered
- * beside it to ask once the person is back.
+ * A step on github.com opens in a new tab, so "Check again" is offered beside
+ * it to ask once the person is back; connecting an account stays in Polaris.
  */
 
+import Link from "next/link";
 import { Button } from "@polaris/ui";
 import type { GithubAppGap } from "@/lib/github-app-reach";
 import { ExternalLink, Github, RefreshCw } from "lucide-react";
@@ -56,10 +57,16 @@ export function GithubAppGapNotice({
             <div className="flex flex-wrap gap-2">
                 {gap.url ? (
                     <Button asChild size="sm">
-                        <a href={gap.url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="size-4 shrink-0" />
-                            <span className="min-w-0 truncate" title={action}>{action}</span>
-                        </a>
+                        {gap.url.startsWith("/") ? (
+                            <Link href={gap.url}>
+                                <span className="min-w-0 truncate" title={action}>{action}</span>
+                            </Link>
+                        ) : (
+                            <a href={gap.url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="size-4 shrink-0" />
+                                <span className="min-w-0 truncate" title={action}>{action}</span>
+                            </a>
+                        )}
                     </Button>
                 ) : null}
                 {onCheckAgain ? (
@@ -84,16 +91,20 @@ export function GithubAppGapNotice({
     );
 }
 
+/** One gap's identity: the same step on the same owner and repository. Pure. */
+export function gapIdentity(gap: GithubAppGap): string {
+    return `${gap.kind}:${gap.owner.toLowerCase()}:${
+        gap.kind === "repo-not-selected" ? gap.repository.toLowerCase() : ""
+    }`;
+}
+
 /** Gaps found by a turn's repository reads, each owner and repository once. Pure. */
 export function gapsOf(outputs: readonly unknown[]): GithubAppGap[] {
     const found = new Map<string, GithubAppGap>();
     for (const output of outputs) {
         const access = (output as { access?: unknown } | null)?.access;
         if (!isGap(access)) continue;
-        const key = `${access.kind}:${access.owner.toLowerCase()}:${
-            access.kind === "repo-not-selected" ? access.repository.toLowerCase() : ""
-        }`;
-        found.set(key, access);
+        found.set(gapIdentity(access), access);
     }
     return [...found.values()];
 }

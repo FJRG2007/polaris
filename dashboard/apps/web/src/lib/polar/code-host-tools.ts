@@ -179,10 +179,21 @@ class GithubClient {
         private readonly name: string
     ) {}
 
-    /** Whether the App is why this repository is out of reach. Asked once. */
+    /** Whether the App is why this repository is out of reach. Asked once, and
+     *  only when the repository itself is: a missing path or ref inside one this
+     *  account can read is not the App's doing. */
     private appGap(): Promise<GithubAppGap | null> {
-        this.gap ??= githubAppGap(this.asker.userId, this.owner, this.name).catch(() => null);
+        this.gap ??= this.repositoryReadable()
+            .then((readable) =>
+                readable ? null : githubAppGap(this.asker.userId, this.owner, this.name)
+            )
+            .catch(() => null);
         return this.gap;
+    }
+
+    private async repositoryReadable(): Promise<boolean> {
+        const reply = await this.get(`/repos/${this.owner}/${this.name}`);
+        return reply.status >= 200 && reply.status < 300;
     }
 
     async signedIn(): Promise<boolean> {

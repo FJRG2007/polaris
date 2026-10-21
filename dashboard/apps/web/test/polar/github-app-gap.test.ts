@@ -14,6 +14,10 @@ const state = {
 };
 
 vi.mock("@/lib/github-access", () => ({
+    credentialFor: (credentials: typeof state.credentials, owner: string) =>
+        credentials.find((entry) => entry.login.toLowerCase() === owner.toLowerCase()) ??
+        credentials[0] ??
+        null,
     githubTokenForUser: async () => state.credentials[0]?.token ?? null,
     githubCredentialsForUser: async () => state.credentials
 }));
@@ -34,7 +38,7 @@ beforeEach(() => {
         { connectionId: "c1", login: "FJRG2007", method: "oauth", token: "user-token" }
     ];
     seen = [];
-    routes = {};
+    routes = { [USER]: { body: { login: "bytehide" } } };
     vi.stubGlobal(
         "fetch",
         vi.fn(async (input: string) => {
@@ -51,6 +55,7 @@ afterEach(() => {
 });
 
 const INSTALLS = "https://api.github.com/user/installations?per_page=100&page=1";
+const USER = "https://api.github.com/users/bytehide";
 const OPTIONS = { toolCallId: "call-1", messages: [] };
 
 function installation(login: string, id: number, selection: "all" | "selected") {
@@ -90,6 +95,28 @@ describe("a repository whose owner lacks the App", () => {
             owner: "bytehide",
             url: INSTALL
         });
+    });
+});
+
+describe("a refusal the App does not explain", () => {
+    it("is a missing path, not an install, when the repository itself reads", async () => {
+        routes[INSTALLS] = { body: { installations: [] } };
+        routes["https://api.github.com/repos/facebook/react"] = {
+            body: { full_name: "facebook/react", default_branch: "main", private: false }
+        };
+        const result = await read("facebook/react");
+        expect(result.ok).toBe(false);
+        expect(result.access).toBeUndefined();
+        expect(result.text).not.toContain("not installed");
+        expect(seen.some((url) => url.includes("/user/installations"))).toBe(false);
+    });
+
+    it("is not an install step for an owner GitHub does not know", async () => {
+        routes[INSTALLS] = { body: { installations: [] } };
+        delete routes[USER];
+        expect(await githubInstallGapForRepo("user-1", "bytehide/Backend")).toBeNull();
+        const result = await read("bytehide/Backend");
+        expect(result.access).toBeUndefined();
     });
 });
 

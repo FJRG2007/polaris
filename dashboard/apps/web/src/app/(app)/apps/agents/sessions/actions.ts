@@ -34,7 +34,7 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { agentText, knownAgentText } from "@/lib/agents/words";
 import {
     githubInstallGapForRepo,
-    installGapKey,
+    installGapMessage,
     type GithubInstallGap
 } from "@/lib/github-app-reach";
 
@@ -146,13 +146,8 @@ export async function startSessionAction(
         // than as a failed clone on a session row.
         const gap = await githubInstallGapForRepo(user.id, repo.repoFullName);
         if (gap) {
-            return {
-                error: t(installGapKey(gap), {
-                    owner: gap.owner,
-                    repository: gap.kind === "repo-not-selected" ? gap.repository : repo.repoFullName
-                }),
-                githubGap: gap
-            };
+            const message = installGapMessage(gap, repo.repoFullName);
+            return { error: t(message.key, message.values), githubGap: gap };
         }
     }
 

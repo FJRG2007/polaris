@@ -128,7 +128,7 @@ import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion"
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { repoStepOf } from "@/lib/polar/code-host";
-import { GithubAppGapNotice, gapsOf } from "@/components/github-app-gap";
+import { GithubAppGapNotice, gapIdentity, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
 import { sendFile } from "@/components/transfers/move-file";
@@ -2942,7 +2942,7 @@ function MessageView({
             ) : null}
             {gaps.map((gap) => (
                 <GithubAppGapNotice
-                    key={`${gap.kind}:${gap.owner}:${gap.kind === "repo-not-selected" ? gap.repository : ""}`}
+                    key={gapIdentity(gap)}
                     gap={gap}
                     onCheckAgain={!streaming && last && !busy ? () => onRegenerate({}) : undefined}
                 />

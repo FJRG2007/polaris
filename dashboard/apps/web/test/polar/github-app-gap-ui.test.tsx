@@ -56,6 +56,19 @@ describe("the install notice", () => {
         expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
     });
 
+    it("keeps Connect GitHub in this tab, since it is a Polaris page", () => {
+        render(
+            <MessagesWrapper>
+                <GithubAppGapNotice
+                    gap={{ kind: "no-account", owner: "bytehide", url: "/account/connections" }}
+                />
+            </MessagesWrapper>
+        );
+        const link = screen.getByRole("link", { name: "Connect GitHub" });
+        expect(link.getAttribute("href")).toBe("/account/connections");
+        expect(link.getAttribute("target")).toBeNull();
+    });
+
     it("draws one notice per owner from a turn's results, ignoring anything else", () => {
         const gap = { kind: "app-missing", owner: "bytehide", url: INSTALL };
         expect(
