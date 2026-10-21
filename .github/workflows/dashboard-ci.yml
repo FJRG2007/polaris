@@ -276,10 +276,15 @@ jobs:
       # out of memory" on the next. The runner has 16 GB, so the build gets room
       # instead of a coin toss.
       #
+      # Not more than 6 GB, though: Next type-checks in a child process that
+      # inherits NODE_OPTIONS while the compiler's heap is still held, so the cap
+      # applies twice. At 8 GB each the pair outgrew the runner and the job was
+      # killed mid type check with only "The operation was canceled" to show.
+      #
       # The checks job runs ESLint over the same sources in this same run, so the
       # build skips its own copy (next.config.mjs). It keeps its type check, which
       # alone sees the route types Next generates during the build.
       - run: npm run build -w @polaris/web
         env:
-          NODE_OPTIONS: --max-old-space-size=8192
+          NODE_OPTIONS: --max-old-space-size=6144
           POLARIS_BUILD_SKIP_LINT: "1"
