@@ -144,7 +144,7 @@ export interface PolarCodeState {
 }
 
 /** The switch's state and the Code side's data, owned by Polar's chat. */
-export function usePolarCode(): PolarCodeState {
+export function usePolarCode({ enabled = true }: { enabled?: boolean } = {}): PolarCodeState {
     const [picked, setPicked] = useState<PolarMode>("chat");
     const [access, setAccess] = useState<PolarCodeAccess | null>(null);
     const [rows, setRows] = useState<readonly PolarCodeRow[] | null>(null);
@@ -182,7 +182,9 @@ export function usePolarCode(): PolarCodeState {
             .catch(() => undefined);
     }, [signal, took]);
 
-    useEffect(() => refresh(), [refresh]);
+    useEffect(() => {
+        if (enabled) refresh();
+    }, [enabled, refresh]);
 
     const loadMore = useCallback(() => {
         if (!next || loadingMore) return;
@@ -200,12 +202,12 @@ export function usePolarCode(): PolarCodeState {
     const mode: PolarMode = picked === "code" && access !== "none" ? "code" : "chat";
 
     useEffect(() => {
-        if (mode !== "code") return;
+        if (!enabled || mode !== "code") return;
         const timer = setInterval(() => {
             if (document.visibilityState === "visible") refresh();
         }, LIST_MS);
         return () => clearInterval(timer);
-    }, [mode, refresh]);
+    }, [enabled, mode, refresh]);
 
     const setMode = useCallback((value: PolarMode) => {
         setPicked(value);

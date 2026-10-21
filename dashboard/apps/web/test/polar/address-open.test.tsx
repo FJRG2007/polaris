@@ -2,14 +2,15 @@
 /**
  * /polar opens what its address names, as the settings page's list sends it:
  * `?thread=` opens that chat and `?new=` starts one, both in Chat even when
- * Code was the side last on screen, and the address goes back to plain /polar.
+ * Code was the side last on screen; `?session=new` starts a Code task even when
+ * Chat was. Either way the address goes back to plain /polar.
  */
 
 import type { ReactNode } from "react";
 import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 type Message = { id: string; role: string; parts: Array<{ type: string; text?: string }> };
 
@@ -125,8 +126,8 @@ function Wrapper({ children }: { children: ReactNode }) {
     );
 }
 
-async function mountAt(address: string) {
-    stored.set("polar.mode", "code");
+async function mountAt(address: string, mode: "chat" | "code" = "code") {
+    stored.set("polar.mode", mode);
     window.history.replaceState(null, "", address);
     render(<PolarChat fullPage />, { wrapper: Wrapper });
     const codeOption = await screen.findByRole("radio", { name: /code/i });
@@ -157,5 +158,20 @@ describe("an address that names what /polar opens", () => {
         expect(
             vi.mocked(fetch).mock.calls.some(([url]) => url === "/api/polar/threads/t-old")
         ).toBe(false);
+    });
+
+    it("starts a new Code task when Chat was last on screen", async () => {
+        await mountAt("/polar?session=new", "chat");
+        expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
+        expect(stored.get("polar.mode")).toBe("code");
+        expect(window.location.search).toBe("");
+    });
+
+    it("keeps the last chat behind a Code session opened from the address", async () => {
+        stored.set("polar.thread", "t-old");
+        await mountAt("/polar?session=new", "chat");
+        expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("radio", { name: /chat/i }));
+        expect(await screen.findByText("What was said before")).toBeTruthy();
     });
 });

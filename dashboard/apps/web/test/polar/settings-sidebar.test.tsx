@@ -2,8 +2,8 @@
 
 /**
  * Polar's settings keep Polar's conversation list beside them, as /polar does:
- * a chat picked there opens on /polar, a new one starts there, and putting the
- * list away is the choice the chat page remembers.
+ * a chat or a Code session picked there opens on /polar, a new one starts
+ * there, and putting the list away is the choice the chat page remembers.
  */
 
 import { MessagesWrapper } from "../setup/i18n";
@@ -13,6 +13,8 @@ import { SettingsWithSidebar } from "@/app/(app)/polar/settings/settings-sidebar
 
 const pushed: string[] = [];
 const kept = new Map<string, string>();
+const codeState = { mode: "chat" as "chat" | "code", access: "manage" as string | null };
+const codeEnabled: boolean[] = [];
 
 vi.mock("next/navigation", () => ({
     usePathname: () => "/polar/settings",
@@ -52,7 +54,42 @@ vi.mock("@/components/polar/use-polar-sidebar", () => ({
     })
 }));
 
+vi.mock("@/components/polar/polar-code", () => ({
+    StateDot: () => null,
+    usePolarCode: ({ enabled }: { enabled: boolean }) => {
+        codeEnabled.push(enabled);
+        return {
+            mode: codeState.mode,
+            setMode: () => undefined,
+            access: codeState.access,
+            history: {
+                rows: [
+                    {
+                        id: "s1",
+                        title: "Fix the login page",
+                        repo: "acme/web",
+                        branch: "main",
+                        state: "running",
+                        stateLabel: "Running",
+                        live: true,
+                        createdAt: new Date().toISOString()
+                    }
+                ],
+                more: false,
+                loadingMore: false,
+                loadMore: () => undefined
+            },
+            selected: null,
+            open: () => undefined,
+            refresh: () => undefined
+        };
+    }
+}));
+
 beforeEach(() => {
+    codeState.mode = "chat";
+    codeState.access = "manage";
+    codeEnabled.length = 0;
     pushed.length = 0;
     kept.clear();
     const storage = {
@@ -100,6 +137,25 @@ describe("the settings page's conversation list", () => {
         expect(kept.get("polar.thread")).toBe("");
     });
 
+    it("lists the Code sessions and opens one on Polar's page", () => {
+        draw();
+        fireEvent.click(screen.getByText("Fix the login page"));
+        expect(pushed).toEqual(["/polar?session=s1"]);
+    });
+
+    it("leaves Code sessions out for an account Code is closed to", () => {
+        codeState.access = "none";
+        draw();
+        expect(screen.queryByText("Fix the login page")).toBeNull();
+    });
+
+    it("starts a Code task when Code was last on screen", () => {
+        codeState.mode = "code";
+        draw();
+        fireEvent.click(screen.getByText("New task"));
+        expect(pushed).toEqual(["/polar?session=new"]);
+    });
+
     it("puts the list away and back, remembered like the chat page", () => {
         draw();
         fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
@@ -108,6 +164,14 @@ describe("the settings page's conversation list", () => {
         fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
         expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
         expect(kept.get("polar.sidebar")).toBe("shown");
+    });
+
+    it("reads no Code sessions while the list is put away", () => {
+        kept.set("polar.sidebar", "hidden");
+        draw();
+        expect(codeEnabled.at(-1)).toBe(false);
+        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
+        expect(codeEnabled.at(-1)).toBe(true);
     });
 
     it("opens the list as a drawer on a narrow screen", async () => {
