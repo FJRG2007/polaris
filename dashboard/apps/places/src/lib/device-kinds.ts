@@ -926,7 +926,8 @@ export function describeEvent(
         how,
         hasHow: how ? "yes" : "no"
     });
-    if (event.outcome === "ok") return line;
+    if (event.outcome === "ok")
+        return event.note ? t("devices.withNote", { line, note: note(event.note) }) : line;
     return event.note
         ? t("devices.failedBecause", { line, note: note(event.note) })
         : t("devices.failed", { line });

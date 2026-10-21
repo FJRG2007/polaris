@@ -111,7 +111,7 @@ export const litterSchema = z.object({
     uses: z.array(litterUseSchema).max(MAX_LITTER_USES),
     /** What the box says is wrong, in its own words, or null. */
     fault: z.string().max(300).nullable(),
-    options: z.partialRecord(z.enum(LITTER_OPTIONS), z.boolean()),
+    options: z.record(z.enum(LITTER_OPTIONS), z.boolean()),
     /** Whether its counter can be reset from here (`deodorantReset`). */
     deodorizerResettable: z.boolean()
 });

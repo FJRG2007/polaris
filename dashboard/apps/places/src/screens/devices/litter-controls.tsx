@@ -127,7 +127,9 @@ export function LitterControls({
                 label: t("devicePanel.litter.litter"),
                 value: view.litterLow
                     ? t("devices.litter.litterLow")
-                    : t("devices.litter.litterLevel", { percent: view.litterPercent ?? 0 }),
+                    : view.litterPercent !== null
+                      ? t("devices.litter.litterLevel", { percent: view.litterPercent })
+                      : t("devicePanel.litter.litterOk"),
                 tone: view.litterLow ? "warning" : undefined
             });
         if (view.binFull !== null)

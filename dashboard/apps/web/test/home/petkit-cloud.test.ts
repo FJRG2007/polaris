@@ -311,6 +311,31 @@ describe("litter box events", () => {
         expect(kinds.actionsFor("litter")).toEqual(["clean", "pause", "resume", "dump", "reset-deodorizer", "set-option"]);
         expect(kinds.grantActionFor("dump")).toBe("operate");
     });
+
+    it("keeps the box's own words on a fault in the history", () => {
+        const event = {
+            id: "e1", deviceId: "d1", deviceName: "Box", action: "fault", actor: "", via: "device",
+            outcome: "ok", note: "jam", at: new Date(0).toISOString()
+        };
+        expect(kinds.describeEvent(event)).toContain("jam");
+        expect(kinds.describeEvent({ ...event, note: "" })).not.toContain(" - ");
+    });
+});
+
+describe("PETKIT day boundary", () => {
+    it("reads today in the zone the box reports, not the server's", () => {
+        const at = new Date("2026-03-10T23:30:00Z");
+        const zone = petkit.deviceZone({ locale: "Europe/Madrid" }, "UTC");
+        expect(zone).toBe("Europe/Madrid");
+        expect(petkit.dayStamp(zone, at)).toBe("20260311");
+        expect(petkit.dayStamp("UTC", at)).toBe("20260310");
+    });
+
+    it("falls back when the box names no zone it knows", () => {
+        expect(petkit.deviceZone({}, "UTC")).toBe("UTC");
+        expect(petkit.deviceZone({ locale: "en_US" }, "UTC")).toBe("UTC");
+        expect(petkit.deviceZone({ locale: "Nowhere/Atlantis" }, "UTC")).toBe("UTC");
+    });
 });
 
 describe("PETKIT connection and words", () => {

@@ -372,7 +372,11 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
         "refusals.apkAmbiguous"
     ],
     ["That step took too long and has run out. Start connecting again.", "refusals.pairingRanOut"],
-    ["Upload the Philips Air+ app file to go on", "refusals.uploadToGoOn"]
+    ["Upload the Philips Air+ app file to go on", "refusals.uploadToGoOn"],
+    ["Too many commands to PETKIT in a minute; try again shortly", "refusals.petkitTooMany"],
+    ["There is nothing running on it to pause or resume", "refusals.litterNothingRunning"],
+    ["This box's deodorizer cannot be reset from here", "refusals.litterNoDeodorizerReset"],
+    ["That device is not on this account", "refusals.notOnAccount"]
 ]);
 
 /** The words `devices.actOnDevice` builds its refusal from, back to their ids. */

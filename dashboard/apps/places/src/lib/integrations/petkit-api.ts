@@ -362,6 +362,18 @@ export async function deviceDetail(
     return record;
 }
 
+/** The zone a box keeps its own day in (`locale` on its detail, an IANA name
+ *  such as `Europe/Madrid`), or `fallback` when it names none this runtime knows. */
+export function deviceZone(detail: Record<string, unknown>, fallback: string): string {
+    const locale = typeof detail.locale === "string" ? detail.locale.trim() : "";
+    if (!locale.includes("/")) return fallback;
+    try {
+        return new Intl.DateTimeFormat("en-US", { timeZone: locale }).resolvedOptions().timeZone;
+    } catch {
+        return fallback;
+    }
+}
+
 /** YYYYMMDD in the zone the account reads its day in. */
 export function dayStamp(timezone: string, at: Date = new Date()): string {
     try {

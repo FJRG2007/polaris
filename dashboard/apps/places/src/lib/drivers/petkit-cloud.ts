@@ -270,7 +270,12 @@ async function readAll(credentials: Credentials): Promise<DeviceSnapshot[]> {
             let uses = held && Date.now() - held.at < RECORDS_TTL_MS ? held.uses : null;
             if (!uses) {
                 try {
-                    uses = await petkit.deviceRecords(fetcher, session, account.timezone, device);
+                    uses = await petkit.deviceRecords(
+                        fetcher,
+                        session,
+                        petkit.deviceZone(detail, account.timezone),
+                        device
+                    );
                     records.set(key, { at: Date.now(), uses });
                 } catch (caught) {
                     // The visits are the extra; the box's own state still draws.
