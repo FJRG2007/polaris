@@ -156,7 +156,6 @@ describe("the admin marketplace", () => {
         expect(rows.length).toBe(builtInApps().length);
         for (const row of rows) {
             expect(within(row as HTMLElement).queryAllByRole("button")).toEqual([]);
-            expect(within(row as HTMLElement).getAllByText("Built in").length).toBeGreaterThan(0);
             expect(within(row as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
         }
         expect(within(section).queryByText(/uninstall/i)).toBeNull();

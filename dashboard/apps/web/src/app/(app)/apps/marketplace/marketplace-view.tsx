@@ -505,15 +505,6 @@ function BuiltInSection({ query }: { query: string }) {
                                 >
                                     {app.label}
                                 </Link>
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                    <Badge>{t("polaris.builtInBadge")}</Badge>
-                                    <span
-                                        className="truncate text-xs text-muted-foreground"
-                                        title={t("polaris.builtInHint")}
-                                    >
-                                        {t("polaris.builtInHint")}
-                                    </span>
-                                </div>
                                 <ReplacesRow appId={app.id} compact className="mt-1.5" />
                             </div>
                             <Button asChild size="sm" variant="secondary">

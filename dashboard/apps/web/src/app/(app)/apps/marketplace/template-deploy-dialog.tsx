@@ -10,8 +10,8 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import { NewTemplateForm } from "../deploy/service-form";
+import { useEffect, useState } from "react";
+import { Field, NewTemplateForm } from "../deploy/service-form";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { listTemplateTargetsAction, type TemplateTarget } from "../deploy/actions";
 import {
@@ -140,14 +140,5 @@ export function TemplateDeployDialog({
                 )}
             </DialogContent>
         </Dialog>
-    );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">{label}</span>
-            {children}
-        </div>
     );
 }

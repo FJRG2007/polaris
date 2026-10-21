@@ -226,10 +226,17 @@ export function NewTemplateForm({
                 {picked.prepare?.length ? t("view.template.setup") : ""}
             </p>
             {error && <p className="text-sm text-danger">{error}</p>}
-            <div className="flex justify-between gap-2">
-                <Button variant="ghost" onClick={() => setPicked(null)} disabled={pending}>
-                    {t("view.template.other")}
-                </Button>
+            <div className="flex justify-end gap-2">
+                {!initial && (
+                    <Button
+                        variant="ghost"
+                        className="mr-auto"
+                        onClick={() => setPicked(null)}
+                        disabled={pending}
+                    >
+                        {t("view.template.other")}
+                    </Button>
+                )}
                 <Button onClick={submit} disabled={pending}>
                     {pending && <Loader2 className="size-4 animate-spin" />} {t("view.deploy")}
                 </Button>

@@ -61,6 +61,8 @@ describe("deploying a template from the marketplace", () => {
         // Deploy's own form, already on the template, with the name it suggests.
         const name = await within(dialog).findByDisplayValue("n8n");
         expect(name).toBeTruthy();
+        // The heading names this template, so the form offers no way to swap it.
+        expect(within(dialog).queryByRole("button", { name: "Other templates" })).toBeNull();
         await waitFor(() => expect(deploy.listDeployServersAction).toHaveBeenCalledWith("env-1"));
         fireEvent.click(within(dialog).getByRole("button", { name: /^\s*Deploy\s*$/ }));
 

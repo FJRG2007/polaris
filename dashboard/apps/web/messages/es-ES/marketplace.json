@@ -150,8 +150,6 @@
     "polaris": {
         "title": "Apps de Polaris",
         "description": "Activa para todos las apps propias de Polaris.",
-        "builtIn": "Incluidas",
-        "builtInBadge": "Incluida",
-        "builtInHint": "Viene con Polaris"
+        "builtIn": "Incluidas"
     }
 }

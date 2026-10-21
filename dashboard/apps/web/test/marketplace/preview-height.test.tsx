@@ -39,4 +39,15 @@ describe("the store card preview", () => {
         const frame = box.firstElementChild as HTMLElement;
         for (const token of PREVIEW_HEIGHT.split(" ")) expect(frame.classList).toContain(token);
     });
+
+    it("sizes the container itself when a caller narrows the preview", () => {
+        const { container } = render(
+            <AppPreview app={calendar} shot={null} className="max-w-2xl rounded-lg" />,
+            { wrapper: MessagesWrapper }
+        );
+        const box = container.firstElementChild as HTMLElement;
+        expect(box.classList).toContain("max-w-2xl");
+        expect(box.classList).toContain("rounded-lg");
+        expect((box.firstElementChild as HTMLElement).classList).not.toContain("max-w-2xl");
+    });
 });

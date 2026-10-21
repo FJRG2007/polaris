@@ -58,10 +58,11 @@ export function AppPreview({
     eager?: boolean;
 }) {
     const t = useTranslations("marketplace");
-    const frame = cn("relative w-full overflow-hidden bg-surface", PREVIEW_HEIGHT, className);
+    const box = cn("overflow-hidden [container-type:inline-size]", className);
+    const frame = cn("relative w-full overflow-hidden bg-surface", PREVIEW_HEIGHT);
     if (shot) {
         return (
-            <div className="[container-type:inline-size]">
+            <div className={box}>
                 <div className={frame}>
                     {(["dark", "light"] as const).map((theme) => (
                         <picture key={theme} className={styles[theme]}>
@@ -81,7 +82,7 @@ export function AppPreview({
     }
     const tint = tintFor(app.id);
     return (
-        <div className="[container-type:inline-size]">
+        <div className={box}>
             <div
                 className={cn(
                     frame,
