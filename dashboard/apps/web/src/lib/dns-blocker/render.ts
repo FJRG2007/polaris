@@ -13,11 +13,13 @@
 import { QUERY_LOG_DIR } from "./query-log";
 import { engineSchedules } from "./schedules";
 import { safeSearchAliases } from "./safe-search";
+import { reputationList, reputationListPath } from "./reputation";
 import {
     DNS_CATEGORIES,
     DNS_CHECK_NAME,
     DNS_LIST_SOURCES,
     DNS_UPSTREAM_PRESETS,
+    dnsReputationOn,
     dnsServiceList,
     dnsServicesInUse,
     type DnsCategory,
@@ -76,10 +78,18 @@ export function blockyConfig(
     const servicesOf = (ids: readonly string[]) =>
         ids.map(dnsServiceList).filter((list) => denylists[list]);
     denylists[OWN_GROUP] = [inline([DNS_CHECK_NAME, ...settings.deny])];
+    // The domains Dymo flagged, one file per category on the engine's own
+    // volume, written by Polaris and loaded again when it changes. They block
+    // for every device, like the operator's own names.
+    const reputation = dnsReputationOn(settings.reputation).map((category) => {
+        denylists[reputationList(category)] = [reputationListPath(category)];
+        return reputationList(category);
+    });
 
     const groups = [
         ...DNS_CATEGORIES.filter((category) => denylists[category]),
         ...servicesOf(settings.services),
+        ...reputation,
         OWN_GROUP
     ];
     const clientGroupsBlock: Record<string, string[]> = { default: groups };
@@ -92,6 +102,7 @@ export function blockyConfig(
                 (category) => denylists[category] && group.categories.includes(category)
             ),
             ...servicesOf(group.services ?? []),
+            ...reputation,
             OWN_GROUP
         ];
         for (const client of group.clients) clientGroupsBlock[client] ??= blocks;
@@ -106,7 +117,11 @@ export function blockyConfig(
     const scheduled = engineSchedules(
         settings.schedules,
         settings.timeZone,
-        new Set(Object.keys(denylists).filter((group) => group !== OWN_GROUP)),
+        new Set(
+            Object.keys(denylists).filter(
+                (group) => group !== OWN_GROUP && !reputation.includes(group)
+            )
+        ),
         now
     );
 

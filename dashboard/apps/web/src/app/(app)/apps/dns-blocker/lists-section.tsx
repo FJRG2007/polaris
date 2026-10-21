@@ -22,7 +22,9 @@ import {
 import * as dns from "@/lib/dns-blocker/settings";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { RuleField, timeZones } from "./fields";
+import { timeZones } from "./fields";
+import { DnsRulesEditor } from "./rules-editor";
+import { DnsReputationCard } from "./reputation-card";
 import { useDnsBlocker, useField } from "./dns-blocker-context";
 import { DnsSaveBar } from "./save-bar";
 import { DnsLookupCard } from "./lookup-card";
@@ -32,8 +34,6 @@ export function DnsListsSection() {
     const t = useTranslations("dnsBlocker");
     const [sources, setSources] = useField("sources");
     const [customLists, setCustomLists] = useField("customLists");
-    const [allowText, setAllowText] = useField("allowText");
-    const [denyText, setDenyText] = useField("denyText");
     const [services, setServices] = useField("services");
     const { clientGroups } = useDnsBlocker().form;
     const [schedules, setSchedules] = useField("schedules");
@@ -180,33 +180,16 @@ export function DnsListsSection() {
                 </CardBody>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>{t("rules.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{t("rules.intro")}</p>
-                </CardHeader>
-                <CardBody className="grid gap-4 md:grid-cols-2">
-                    <RuleField
-                        label={t("rules.allow")}
-                        value={allowText}
-                        onChange={setAllowText}
-                        bad={badAllow}
-                        badText={t("validation.invalidRule")}
-                    />
-                    <RuleField
-                        label={t("rules.deny")}
-                        value={denyText}
-                        onChange={setDenyText}
-                        bad={badDeny}
-                        badText={t("validation.invalidRule")}
-                    />
-                    {tooMany ? (
-                        <p className="text-xs text-danger md:col-span-2">
-                            {t("validation.tooMany", { max: dns.DNS_LIMITS.rules })}
-                        </p>
-                    ) : null}
-                </CardBody>
-            </Card>
+<DnsRulesEditor />
+            {badAllow.length > 0 || badDeny.length > 0 || tooMany ? (
+                <p className="text-xs text-danger">
+                    {tooMany
+                        ? t("validation.tooMany", { max: dns.DNS_LIMITS.rules })
+                        : `${t("validation.invalidRule")} ${[...badAllow, ...badDeny].slice(0, 3).join(", ")}`}
+                </p>
+            ) : null}
+
+            <DnsReputationCard />
 
             <Card>
                 <CardHeader>

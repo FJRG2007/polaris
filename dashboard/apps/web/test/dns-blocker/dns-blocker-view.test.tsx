@@ -44,7 +44,10 @@ vi.mock("../../src/app/(app)/apps/dns-blocker/actions", () => ({
     dnsTailAction: async () => ({ rows: [] }),
     refreshDnsListsAction: async () => ({}),
     ruleFromLogAction: async () => ({}),
-    resumeDnsBlockingAction: async () => ({})
+    resumeDnsBlockingAction: async () => ({}),
+    dnsReputationAction: async () => ({ off: "integrationOff", flagged: [] }),
+    recheckDnsReputationAction: async () => ({}),
+    editDnsRuleAction: async () => ({ error: "x" })
 }));
 
 function insights(logOff = false, domain = "example.com") {

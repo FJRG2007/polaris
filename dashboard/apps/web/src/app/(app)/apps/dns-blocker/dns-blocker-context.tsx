@@ -66,6 +66,7 @@ export interface DnsForm {
     engine: dns.DnsEngine;
     cacheMinText: string;
     cacheMaxText: string;
+    reputation: dns.DnsReputation;
 }
 
 export function formFrom(settings: dns.DnsSettings): DnsForm {
@@ -91,7 +92,8 @@ export function formFrom(settings: dns.DnsSettings): DnsForm {
         timeZone: settings.timeZone || "UTC",
         engine: settings.engine,
         cacheMinText: String(settings.engine.cacheMinMinutes),
-        cacheMaxText: String(settings.engine.cacheMaxMinutes)
+        cacheMaxText: String(settings.engine.cacheMaxMinutes),
+        reputation: settings.reputation
     };
 }
 
@@ -292,7 +294,8 @@ export function DnsBlockerProvider({
                 ...form.engine,
                 cacheMinMinutes: Number(form.cacheMinText),
                 cacheMaxMinutes: Number(form.cacheMaxText)
-            }
+            },
+            reputation: form.reputation
         }),
         [form, saved.serviceDomains, saved.timeZone]
     );

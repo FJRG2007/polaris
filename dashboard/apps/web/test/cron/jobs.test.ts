@@ -124,6 +124,8 @@ describe("the work Polaris runs on a schedule", () => {
             "dns-blocker-clock",
             // Two passes would each read the same days of log from the DNS server.
             "dns-blocker-history",
+            // Two passes would each spend the lookup budget on the same names.
+            "dns-blocker-reputation",
             // A cutover's steps each claim their phase first, so a second pass does
             // nothing; it would only ask the public resolvers twice.
             "dns-cutovers",

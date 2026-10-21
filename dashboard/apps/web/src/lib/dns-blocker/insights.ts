@@ -79,6 +79,12 @@ interface LogRead {
 
 const logReads = new Map<string, { readonly at: number; readonly read: Promise<LogRead> }>();
 
+/** The DNS server's container and the runtime that reaches it, for the other
+ *  modules that ask it something. */
+export function engineTarget(): Promise<Engine> {
+    return engine();
+}
+
 async function engine(): Promise<Engine> {
     const row = await engineRow();
     if (!row?.applicationId) throw new DnsBlockerRefusal("notRunning");

@@ -96,9 +96,41 @@
     },
     "rules": {
         "title": "Your rules",
-        "intro": "One per line: a name, *.name for everything under it, or /regex/. Allowed names win over every list.",
+        "intro": "Names you always allow or always block. Allowed names win over every list.",
         "allow": "Always allowed",
-        "deny": "Always blocked"
+        "deny": "Always blocked",
+        "add": "Add rule",
+        "addTitle": "Add a rule",
+        "editTitle": "Edit rule",
+        "syntax": "A name, *.name for everything under it, or /regex/ between slashes.",
+        "actionLabel": "Action",
+        "value": "Name or pattern",
+        "detected": "Read as: {kind}",
+        "cancel": "Cancel",
+        "addRule": "Add rule",
+        "saveRule": "Save rule",
+        "search": "Search rules",
+        "filter": "Show",
+        "filterAll": "All rules",
+        "noMatch": "No rule matches that search.",
+        "empty": "No rules yet",
+        "emptyHint": "Add a name to always allow it, or one to always block it.",
+        "edit": "Edit {rule}",
+        "remove": "Remove {rule}",
+        "action": {
+            "allow": "Allow",
+            "deny": "Block"
+        },
+        "kind": {
+            "exact": "Exact",
+            "wildcard": "Wildcard",
+            "regex": "Regex"
+        },
+        "refusal": {
+            "duplicate": "That rule is already in the list.",
+            "tooMany": "That is as many rules as one list holds.",
+            "missing": "That rule changed meanwhile. Reload the page and try again."
+        }
     },
     "upstream": {
         "title": "Resolver",
@@ -471,5 +503,27 @@
             "namesFrom": "Names source",
             "engine": "Engine"
         }
+    },
+    "reputation": {
+        "title": "Reputation lookups",
+        "intro": "Block domains Dymo reports, on top of your lists. Each new domain is looked up once and remembered.",
+        "category": {
+            "fraud": "Fraud and scams",
+            "adult": "Adult content"
+        },
+        "logLabel": "{category} (Dymo)",
+        "firstVisit": "A domain is checked shortly after its first visit, so that first visit goes through. Blocking starts within a few minutes.",
+        "connect": "Open Integrations",
+        "off": {
+            "integrationOff": "Dymo is not connected, so nothing is blocked by reputation.",
+            "noKey": "Dymo has no API key yet, so nothing is blocked by reputation.",
+            "noCategory": "Turn on a category above and save first.",
+            "budget": "The lookups for now are spent. Try again in a minute."
+        },
+        "search": "Search flagged domains",
+        "none": "No domain has been flagged yet.",
+        "allowed": "Allowed",
+        "allow": "Always allow {domain}",
+        "recheck": "Check {domain} again"
     }
 }

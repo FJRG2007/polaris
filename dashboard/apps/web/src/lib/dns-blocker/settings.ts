@@ -535,6 +535,24 @@ export const DEFAULT_DNS_ENGINE: DnsEngine = {
     dnssec: false
 };
 
+/** What the reputation lookups block, one switch per category Dymo answers for
+ *  a domain: `fraud` is its fraud verdict, `adult` its NSFW plugin. */
+export const DNS_REPUTATION_CATEGORIES = ["fraud", "adult"] as const;
+export type DnsReputationCategory = (typeof DNS_REPUTATION_CATEGORIES)[number];
+
+export const dnsReputationSchema = z.object({
+    fraud: z.boolean(),
+    adult: z.boolean()
+});
+export type DnsReputation = z.infer<typeof dnsReputationSchema>;
+
+export const DEFAULT_DNS_REPUTATION: DnsReputation = { fraud: false, adult: false };
+
+/** The categories switched on, in their order. */
+export function dnsReputationOn(reputation: DnsReputation): DnsReputationCategory[] {
+    return DNS_REPUTATION_CATEGORIES.filter((category) => reputation[category]);
+}
+
 export const dnsSettingsSchema = z.object({
     /** Ids from `DNS_LIST_SOURCES` that are on. Unknown ids are dropped on read. */
     sources: z.array(z.string().max(64)).max(DNS_LIST_SOURCES.length),
@@ -584,7 +602,10 @@ export const dnsSettingsSchema = z.object({
         .string()
         .trim()
         .refine((value) => value === "" || IPV4.test(value), "invalidAddress"),
-    engine: dnsEngineSchema
+    engine: dnsEngineSchema,
+    /** Domains blocked by what Dymo says about them, per category. Off until
+     *  chosen, and only acted on while the Dymo integration has a key. */
+    reputation: dnsReputationSchema
 });
 
 export type DnsSettings = z.infer<typeof dnsSettingsSchema>;
@@ -617,7 +638,8 @@ export const DEFAULT_DNS_SETTINGS: DnsSettings = {
     services: [],
     serviceDomains: {},
     namesFrom: "",
-    engine: DEFAULT_DNS_ENGINE
+    engine: DEFAULT_DNS_ENGINE,
+    reputation: DEFAULT_DNS_REPUTATION
 };
 
 /** The categories that have a list on, in category order: the only ones the
@@ -699,6 +721,7 @@ export function readDnsSettings(raw: unknown): DnsSettings {
                 ])
         ),
         namesFrom: field("namesFrom"),
-        engine: field("engine")
+        engine: field("engine"),
+        reputation: field("reputation")
     };
 }

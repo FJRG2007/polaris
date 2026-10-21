@@ -100,3 +100,35 @@ export async function verifyUrl(apiKey: string, url: string): Promise<{ fraud: b
     const result = await client.isValidDataRaw({ url });
     return { fraud: result.url?.fraud === true };
 }
+
+/** The domain analysis with the NSFW plugin's answer, of which only the two
+ *  verdicts are read. Loose for the same reason as `DOMAIN_ANALYSIS`. */
+const DOMAIN_REPUTATION = z.object({
+    domain: z
+        .object({
+            fraud: z.boolean().optional(),
+            plugins: z.object({ nsfw: z.boolean().optional() }).partial().optional()
+        })
+        .optional()
+});
+
+/**
+ * What Dymo says about a domain, for the network filter: its fraud verdict and,
+ * when `adult` is asked for, the NSFW plugin's. The plugin is asked only when
+ * the operator blocks adult domains, because each plugin is a further check the
+ * account is billed for.
+ */
+export async function domainReputation(
+    apiKey: string,
+    domain: string,
+    adult: boolean
+): Promise<{ fraud: boolean; adult: boolean }> {
+    const client = new DymoAPI({ apiKey });
+    const answer = DOMAIN_REPUTATION.parse(
+        await client.isValidDataRaw({ domain, ...(adult ? { plugins: ["nsfw"] } : {}) })
+    );
+    return {
+        fraud: answer.domain?.fraud === true,
+        adult: adult && answer.domain?.plugins?.nsfw === true
+    };
+}

@@ -96,9 +96,41 @@
     },
     "rules": {
         "title": "Tus reglas",
-        "intro": "Una por línea: un nombre, *.nombre para todo lo que cuelga de él, o /regex/. Los nombres permitidos ganan a cualquier lista.",
+        "intro": "Nombres que siempre permites o siempre bloqueas. Los permitidos ganan a cualquier lista.",
         "allow": "Permitir siempre",
-        "deny": "Bloquear siempre"
+        "deny": "Bloquear siempre",
+        "add": "Nueva regla",
+        "addTitle": "Añadir regla",
+        "editTitle": "Editar regla",
+        "syntax": "Un nombre, *.nombre para todo lo que cuelga de él, o /regex/ entre barras.",
+        "actionLabel": "Acción",
+        "value": "Nombre o patrón",
+        "detected": "Se lee como: {kind}",
+        "cancel": "Cancelar",
+        "addRule": "Añadir",
+        "saveRule": "Guardar",
+        "search": "Buscar reglas",
+        "filter": "Mostrar",
+        "filterAll": "Todas",
+        "noMatch": "Ninguna regla coincide con la búsqueda.",
+        "empty": "Sin reglas aún",
+        "emptyHint": "Añade un nombre para permitirlo siempre, o para bloquearlo siempre.",
+        "edit": "Editar {rule}",
+        "remove": "Quitar {rule}",
+        "action": {
+            "allow": "Permitir",
+            "deny": "Bloquear"
+        },
+        "kind": {
+            "exact": "Exacta",
+            "wildcard": "Comodín",
+            "regex": "Regex"
+        },
+        "refusal": {
+            "duplicate": "Esa regla ya está en la lista.",
+            "tooMany": "La lista ya tiene todas las reglas que admite.",
+            "missing": "Esa regla ha cambiado entretanto. Recarga la página y vuelve a intentarlo."
+        }
     },
     "upstream": {
         "title": "Resolutor",
@@ -471,5 +503,27 @@
             "namesFrom": "Origen nombres",
             "engine": "Motor"
         }
+    },
+    "reputation": {
+        "title": "Reputación",
+        "intro": "Bloquea los dominios que Dymo señala, además de tus listas. Cada dominio nuevo se consulta una vez y se recuerda.",
+        "category": {
+            "fraud": "Fraude y estafas",
+            "adult": "Contenido adulto"
+        },
+        "logLabel": "{category} (Dymo)",
+        "firstVisit": "Un dominio se comprueba poco después de su primera visita, así que esa primera visita pasa. El bloqueo empieza en pocos minutos.",
+        "connect": "Abrir Integraciones",
+        "off": {
+            "integrationOff": "Dymo no está conectado, así que no se bloquea nada por reputación.",
+            "noKey": "Dymo aún no tiene clave de API, así que no se bloquea nada por reputación.",
+            "noCategory": "Activa antes una categoría arriba y guarda.",
+            "budget": "Ya se han gastado las consultas de ahora. Prueba dentro de un minuto."
+        },
+        "search": "Buscar dominios señalados",
+        "none": "Aún no se ha señalado ningún dominio.",
+        "allowed": "Permitido",
+        "allow": "Permitir siempre {domain}",
+        "recheck": "Volver a comprobar {domain}"
     }
 }

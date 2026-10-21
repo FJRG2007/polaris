@@ -22,6 +22,9 @@ import { DNS_BLOCKER_APP, type DnsSettings } from "@/lib/dns-blocker/settings";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { networkDevices, type NetworkDevice } from "@/lib/dns-blocker/devices";
 import { dnsHistoryInputSchema, type DnsHistory } from "@/lib/dns-blocker/history";
+import * as reputation from "@/lib/dns-blocker/reputation-service";
+import { applyRuleEdit, dnsRuleEditSchema } from "@/lib/dns-blocker/rules";
+import { reputationDomainSchema, type ReputationOff } from "@/lib/dns-blocker/reputation";
 
 type Result<T = object> = { error: string } | ({ error?: undefined } & T);
 
@@ -96,6 +99,9 @@ export async function saveDnsSettingsAction(input: unknown): Promise<Result> {
             targetType: "installedApp",
             targetId: DNS_BLOCKER_APP
         });
+        // Which categories are on may have changed what the DNS server's
+        // reputation files should hold.
+        await reputation.republishReputation();
         refresh();
         return notApplied ? failed(notApplied) : {};
     } catch (error) {
@@ -316,6 +322,73 @@ export async function resumeDnsBlockingAction(): Promise<Result> {
         await insights.resumeBlocking();
         await recordAudit({ actorId: user.id, action: "dnsBlocker.resume" });
         return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Whether reputation lookups run, and the domains they flagged. */
+export async function dnsReputationAction(
+    input: unknown
+): Promise<Result<{ off: ReputationOff | null; flagged: reputation.FlaggedDomain[] }>> {
+    await requireAdmin();
+    try {
+        const search = z.object({ search: z.string().trim().max(253) }).parse(input).search;
+        const [off, flagged] = await Promise.all([
+            reputation.reputationOff(),
+            reputation.flaggedDomains(search)
+        ]);
+        return { off, flagged };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Ask Dymo about one flagged domain again now. */
+export async function recheckDnsReputationAction(input: unknown): Promise<Result> {
+    await requireAdmin();
+    try {
+        const { domain } = reputationDomainSchema.parse(input);
+        const outcome = await reputation.recheckDomain(domain);
+        if (outcome === "checked") return {};
+        const t = await getTranslations("dnsBlocker");
+        return { error: t(`reputation.off.${outcome}`) };
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+/** Add, change or remove one of the operator's own rules, saved on its own. */
+export async function editDnsRuleAction(
+    input: unknown
+): Promise<Result<{ settings: DnsSettings }>> {
+    const user = await requireAdmin();
+    try {
+        const edit = dnsRuleEditSchema.parse(input);
+        const current = await blocker.readSettings();
+        const rules = applyRuleEdit(current, edit);
+        if (typeof rules === "string") {
+            const t = await getTranslations("dnsBlocker");
+            return { error: t(`rules.refusal.${rules}`) };
+        }
+        const next: DnsSettings = { ...current, ...rules };
+        const notApplied = await blocker.saveSettings(next, user.id).then(
+            () => null,
+            (error: unknown) => {
+                if (error instanceof blocker.DnsBlockerRefusal && error.code === "notApplied")
+                    return error;
+                throw error;
+            }
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "dnsBlocker.settings",
+            targetType: "installedApp",
+            targetId: DNS_BLOCKER_APP,
+            metadata: { rule: edit.op }
+        });
+        refresh();
+        return notApplied ? failed(notApplied) : { settings: next };
     } catch (error) {
         return failed(error);
     }

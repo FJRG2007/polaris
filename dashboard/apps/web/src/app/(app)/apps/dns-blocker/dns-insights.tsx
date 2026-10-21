@@ -45,6 +45,7 @@ import {
 import type { NamespaceKey } from "@/lib/i18n/types";
 import type { DnsInsights } from "@/lib/dns-blocker/insights";
 import type { DnsSettings } from "@/lib/dns-blocker/settings";
+import { reputationCategoryOf } from "@/lib/dns-blocker/reputation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     DNS_RANGE_IDS,
@@ -133,6 +134,9 @@ function viaLabel(t: Translate, via: string): string {
 export function listLabel(t: Translate, list: string): string {
     if (list === "polaris") return t("insights.ownList");
     if (list.startsWith("service-")) return serviceName(list.slice("service-".length));
+    const flagged = reputationCategoryOf(list);
+    if (flagged)
+        return t("reputation.logLabel", { category: t(`reputation.category.${flagged}`) });
     const key = `categories.${list}` as NamespaceKey<"dnsBlocker">;
     return t.has(key) ? t(key) : list;
 }
@@ -1052,9 +1056,7 @@ function QueryRows({
                                     title={row.reason}
                                 >
                                     {blocked && row.list
-                                        ? row.list === "polaris"
-                                            ? t("insights.ownList")
-                                            : row.list
+                                        ? listLabel(t, row.list)
                                         : row.via === "blocked"
                                           ? row.reason
                                           : row.via === "cache" ||
