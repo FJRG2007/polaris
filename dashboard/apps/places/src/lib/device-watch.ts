@@ -71,7 +71,9 @@ export const DISCOVER_MS = 5 * 60 * SECOND;
 /** Accounts whose quota is too small for the cloud cadence. SwitchBot allows
  *  10,000 calls a day per account, across every device on it. */
 const SLOW_CONNECTIONS: Readonly<Record<string, number>> = {
-    "switchbot-cloud": 60 * SECOND
+    "switchbot-cloud": 60 * SECOND,
+    // PETKIT's cloud is not a published API; a box is read once a minute.
+    "petkit-cloud": 60 * SECOND
 };
 
 /** Units that wedge when they are asked too often are read at the cloud

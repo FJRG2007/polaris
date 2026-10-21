@@ -92,6 +92,23 @@ export function VirusTotalLogo({ className = "size-6", brand }: LogoProps) {
 }
 
 /**
+ * PETKIT's own icon, as their site serves it (petkit.com, `PETKIT_Icon_Logo.png`),
+ * re-encoded as lossless WebP. Not in any vector registry. It is a black mark on
+ * nothing, which vanishes on the dark surface, so the file is used as a mask and
+ * filled with `currentColor` like every vector mark beside it.
+ */
+function PetkitMark({ className }: { className?: string }) {
+    const mask = "url(/logos/petkit.webp) center / contain no-repeat";
+    return (
+        <span
+            aria-hidden="true"
+            style={{ mask, WebkitMask: mask }}
+            className={cn("inline-block shrink-0 bg-current", className)}
+        />
+    );
+}
+
+/**
  * Every service that has a mark, by the slug the integration is registered under.
  *
  * A map rather than a run of comparisons: the ones that were missing from that run
@@ -120,6 +137,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     ikea: brand.IkeaMark,
     homeassistant: brand.HomeAssistantMark,
     mqtt: brand.MqttMark,
+    petkit: PetkitMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
     aws: brand.AwsMark

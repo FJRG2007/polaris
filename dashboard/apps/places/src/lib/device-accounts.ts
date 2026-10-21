@@ -27,6 +27,7 @@ import { TUYA_APP, tuyaAppDriver } from "./drivers/tuya-app";
 import { TUYA_CLOUD, tuyaCloudDriver } from "./drivers/tuya-cloud";
 import { MQTT_DISCOVERY, mqttDiscoveryDriver } from "./drivers/mqtt-discovery";
 import { SWITCHBOT_CLOUD, switchBotCloudDriver } from "./drivers/switchbot-cloud";
+import { PETKIT_CLOUD, petkitCloudDriver } from "./drivers/petkit-cloud";
 import { HOME_ASSISTANT, homeAssistantDriver } from "./drivers/home-assistant";
 import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
 import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
@@ -60,6 +61,7 @@ const BUILT: Readonly<Record<string, DeviceDriver>> = {
     [MQTT_DISCOVERY]: mqttDiscoveryDriver,
     [TAPO_LOCAL]: tapoLocalDriver,
     [KASA_LOCAL]: kasaLocalDriver,
+    [PETKIT_CLOUD]: petkitCloudDriver,
     [SHELLY_LOCAL]: shellyLocalDriver,
     [HUE_BRIDGE]: hueBridgeDriver,
     [DIRIGERA_HUB]: dirigeraHubDriver,

@@ -328,7 +328,15 @@ const ACTION_WORDS: Readonly<Record<DeviceAction, { name: string; hint: string }
     "set-brightness": { name: "set-brightness", hint: "with level, 1 to 100" },
     "set-color-temp": { name: "set-color-temp", hint: "with kelvin" },
     "set-color": { name: "set-color", hint: "with hue and saturation" },
-    stop: { name: "stop", hint: "stops a moving device" }
+    stop: { name: "stop", hint: "stops a moving device" },
+    clean: { name: "clean", hint: "runs a litter box's cleaning cycle now" },
+    pause: { name: "pause", hint: "pauses the cycle a litter box is running" },
+    resume: { name: "resume", hint: "resumes a paused litter box cycle" },
+    dump: { name: "dump", hint: "empties ALL the litter out of a litter box" },
+    "reset-deodorizer": {
+        name: "reset-deodorizer",
+        hint: "resets a litter box's deodorizer counter after a refill"
+    }
 };
 
 const BY_WORD = new Map<string, DeviceAction>(

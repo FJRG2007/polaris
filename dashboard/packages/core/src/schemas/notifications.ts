@@ -608,6 +608,31 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "places.litter-bin",
+        group: "places",
+        label: "A litter box bin is full",
+        description: "A litter box filled its waste bin and needs emptying.",
+        level: "warning",
+        // On: a full bin stops the box cleaning, and nothing else says so.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "places.litter-low",
+        group: "places",
+        label: "A litter box is low on litter",
+        description: "A litter box is running out of litter.",
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "places.litter-fault",
+        group: "places",
+        label: "A litter box stopped on a fault",
+        description: "A litter box reported an error and may have stopped working.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "places.automation",
         group: "places",
         label: "An automation told you something",
