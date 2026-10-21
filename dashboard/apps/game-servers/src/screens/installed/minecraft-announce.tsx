@@ -74,7 +74,8 @@ import {
     Input,
     Select,
     Switch,
-    cn
+    cn,
+    isDirty
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -370,6 +371,17 @@ export function MinecraftAnnounce({
             setNote(t("announce.templateSaved"));
         });
     }
+
+    // Overwriting a template with the name and the announcement it already holds
+    // would store exactly what is there.
+    const overwritten = naming?.id ? templates.find((one) => one.id === naming.id) : undefined;
+    const unchangedTemplate =
+        naming !== null &&
+        overwritten !== undefined &&
+        !isDirty(
+            { name: overwritten.name, announcement: overwritten.announcement },
+            { name: naming.name, announcement: draft }
+        );
 
     async function forget(template: AnnouncementTemplate): Promise<void> {
         const agreed = await confirm({
@@ -860,7 +872,12 @@ export function MinecraftAnnounce({
                                     setNaming({ ...naming, name: event.target.value })
                                 }
                                 onKeyDown={(event) => {
-                                    if (event.key === "Enter" && naming.name.trim()) keep();
+                                    if (
+                                        event.key === "Enter" &&
+                                        naming.name.trim() &&
+                                        !unchangedTemplate
+                                    )
+                                        keep();
                                 }}
                             />
                         </label>
@@ -879,7 +896,10 @@ export function MinecraftAnnounce({
                                 </Button>
                             )}
                             <Button
-                                disabled={pending || naming.name.trim().length === 0}
+                                disabled={
+                                    pending || naming.name.trim().length === 0 || unchangedTemplate
+                                }
+                                title={unchangedTemplate ? t("settings.nothingToSave") : undefined}
                                 onClick={keep}
                             >
                                 {naming.id ? t("announce.save") : t("announce.saveTemplate")}

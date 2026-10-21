@@ -90,7 +90,9 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                                 {t("phone.remove")}
                             </Button>
                         ) : null}
-                        <Button onClick={() => setDialog("set")}>{phone ? t("phone.change") : t("phone.add")}</Button>
+                        <Button onClick={() => setDialog("set")}>
+                            {phone ? t("phone.change") : t("phone.add")}
+                        </Button>
                     </div>
                 </div>
 
@@ -99,9 +101,13 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                         <Phone className="size-4 shrink-0 text-muted-foreground" />
                         <span className="truncate text-sm">{phone.phone}</span>
                         {phone.verified ? (
-                            <Badge className="border-success-edge text-success">{t("phone.confirmed")}</Badge>
+                            <Badge className="border-success-edge text-success">
+                                {t("phone.confirmed")}
+                            </Badge>
                         ) : (
-                            <Badge className="border-warning-edge text-warning">{t("phone.unconfirmed")}</Badge>
+                            <Badge className="border-warning-edge text-warning">
+                                {t("phone.unconfirmed")}
+                            </Badge>
                         )}
                     </div>
                 ) : null}
@@ -121,11 +127,7 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                                 type="button"
                                 variant="outline"
                                 disabled={busy || !canSend}
-                                title={
-                                    canSend
-                                        ? undefined
-                                        : ts("errors.connectWhatsAppFirst")
-                                }
+                                title={canSend ? undefined : ts("errors.connectWhatsAppFirst")}
                                 onClick={() => void run(sendPhoneCodeAction, t("phone.codeSent"))}
                             >
                                 {t("phone.sendCode")}
@@ -179,6 +181,8 @@ function SetPhoneDialog({
     const [error, setError] = useState<string | null>(null);
 
     const candidate = phoneField.safeParse(phone);
+    // The number already on the account, typed again, is nothing to change.
+    const unchanged = candidate.success && candidate.data === phoneField.safeParse(current).data;
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -203,7 +207,9 @@ function SetPhoneDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>{current ? t("phone.changeTitle") : t("phone.addTitle")}</DialogTitle>
+                    <DialogTitle>
+                        {current ? t("phone.changeTitle") : t("phone.addTitle")}
+                    </DialogTitle>
                     <DialogDescription>{t("phone.setDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
@@ -223,14 +229,19 @@ function SetPhoneDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         {t("emails.currentPassword")}
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="submit" disabled={busy || !candidate.success}>
+                        <Button type="submit" disabled={busy || !candidate.success || unchanged}>
                             {busy ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
@@ -278,7 +289,12 @@ function RemovePhoneDialog({
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         {t("emails.currentPassword")}
-                        <Input name="password" type="password" required autoComplete="current-password" />
+                        <Input
+                            name="password"
+                            type="password"
+                            required
+                            autoComplete="current-password"
+                        />
                     </label>
                     <Feedback error={error} />
                     <div className="flex justify-end gap-2">

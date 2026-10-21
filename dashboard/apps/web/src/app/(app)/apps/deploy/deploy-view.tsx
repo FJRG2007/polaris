@@ -54,6 +54,7 @@ import {
     Select,
     Switch,
     Textarea,
+    isDirty,
     type SelectOption
 } from "@polaris/ui";
 import {
@@ -1893,6 +1894,16 @@ function AutoDeployDialog({
     const [watchPaths, setWatchPaths] = useState(app.watchPaths ?? "");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    // Compared with what the service holds now, so a saved edit is the new baseline.
+    const unchanged = !isDirty(
+        {
+            enabled: app.autoDeploy,
+            branch: app.deployBranch,
+            filter: app.commitFilter,
+            watchPaths: app.watchPaths
+        },
+        { enabled, branch, filter, watchPaths }
+    );
 
     function submit() {
         setError(null);
@@ -1976,7 +1987,7 @@ function AutoDeployDialog({
                         <Button variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("view.cancel")}
                         </Button>
-                        <Button onClick={submit} disabled={pending}>
+                        <Button onClick={submit} disabled={pending || unchanged}>
                             {pending && <Loader2 className="size-4 animate-spin" />}{" "}
                             {t("view.save")}
                         </Button>

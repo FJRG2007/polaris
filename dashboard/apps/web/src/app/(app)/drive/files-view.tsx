@@ -89,6 +89,7 @@ import {
     ContextMenuSeparator,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
+    isDirty,
     ShortcutHint,
     shortcutBindings,
     shortcutPressed,
@@ -3491,7 +3492,12 @@ export function FilesView({
                             >
                                 {t("filesView.note.remove")}
                             </Button>
-                            <Button type="submit" size="sm">
+                            <Button
+                                type="submit"
+                                size="sm"
+                                // The note it already has: nothing to save.
+                                disabled={!noteTarget || !isDirty(noteTarget.note ?? "", noteValue)}
+                            >
                                 {tc("actions.save")}
                             </Button>
                         </div>

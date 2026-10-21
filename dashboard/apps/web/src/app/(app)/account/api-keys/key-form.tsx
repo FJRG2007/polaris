@@ -28,7 +28,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
 import type { AccessGroupView, ApiKeyView } from "@polaris/auth";
 import { createApiKeyAction, updateApiKeyAction } from "./actions";
-import { Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
+import { Button, Card, CardBody, Input, Select, Textarea, isDirty } from "@polaris/ui";
 import { ClientRulesEditor, EMPTY_CLIENT_RULES } from "@/components/client-rules-editor";
 import {
     AccessRulesEditor,
@@ -74,15 +74,7 @@ function earliestExpiryDate(): string {
 
 /** One titled block of the form. The sections are what a page buys over a
  *  dialog: each decision gets a heading and a sentence saying what it is for. */
-function Section({
-    title,
-    hint,
-    children
-}: {
-    title: string;
-    hint: string;
-    children: ReactNode;
-}) {
+function Section({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -164,6 +156,18 @@ export function KeyForm({
     const keeping = expiry === KEEP_EXPIRY;
     const chosenDate = custom ? endOfDay(expiryDate) : null;
     const dateReady = !custom || (chosenDate !== null && chosenDate.getTime() > Date.now());
+    const values = {
+        name,
+        description,
+        environment,
+        scopes: new Set(scopes),
+        keeping,
+        rules,
+        clients
+    };
+    // What the key held when this page opened: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = editing !== null && !isDirty(loaded, values);
 
     async function submit() {
         setBusy(true);
@@ -308,17 +312,16 @@ export function KeyForm({
                 <p className="text-xs text-muted-foreground">{t("apiKeys.form.environmentHint")}</p>
             </Section>
 
-            <Section
-                title={t("apiKeys.list.expiryLabel")}
-                hint={t("apiKeys.form.expiryHint")}
-            >
+            <Section title={t("apiKeys.list.expiryLabel")} hint={t("apiKeys.form.expiryHint")}>
                 <div className="flex flex-col gap-2 sm:max-w-sm">
                     <Select
                         value={expiry}
                         onValueChange={setExpiry}
                         aria-label={t("apiKeys.list.expiryLabel")}
                         options={[
-                            ...(editing ? [{ value: KEEP_EXPIRY, label: t("apiKeys.form.keepExpiry") }] : []),
+                            ...(editing
+                                ? [{ value: KEEP_EXPIRY, label: t("apiKeys.form.keepExpiry") }]
+                                : []),
                             ...API_KEY_EXPIRY_CHOICES.map((days) => ({
                                 value: String(days),
                                 label: expiryLabel(days, t)
@@ -328,7 +331,9 @@ export function KeyForm({
                     />
                     {custom ? (
                         <label className="flex flex-col gap-1 text-sm">
-                            <span className="text-xs text-muted-foreground">{t("apiKeys.form.endOfDay")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("apiKeys.form.endOfDay")}
+                            </span>
                             <Input
                                 type="date"
                                 value={expiryDate}
@@ -347,17 +352,11 @@ export function KeyForm({
                 <ScopePicker available={availableScopes} selected={scopes} onChange={setScopes} />
             </Section>
 
-            <Section
-                title={t("apiKeys.form.where.title")}
-                hint={t("apiKeys.form.where.hint")}
-            >
+            <Section title={t("apiKeys.form.where.title")} hint={t("apiKeys.form.where.hint")}>
                 <AccessRulesEditor value={rules} groups={groups} onChange={setRules} />
             </Section>
 
-            <Section
-                title={t("apiKeys.form.clients.title")}
-                hint={t("apiKeys.form.clients.hint")}
-            >
+            <Section title={t("apiKeys.form.clients.title")} hint={t("apiKeys.form.clients.hint")}>
                 <ClientRulesEditor value={clients} onChange={setClients} />
             </Section>
 
@@ -373,7 +372,9 @@ export function KeyForm({
                 </Button>
                 <Button
                     onClick={() => void submit()}
-                    disabled={busy || name.trim() === "" || scopes.length === 0 || !dateReady}
+                    disabled={
+                        busy || unchanged || name.trim() === "" || scopes.length === 0 || !dateReady
+                    }
                 >
                     <KeyRound className="size-4" />
                     {busy

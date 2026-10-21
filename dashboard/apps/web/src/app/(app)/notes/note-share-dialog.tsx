@@ -29,6 +29,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Switch
 } from "@polaris/ui";
 
@@ -91,6 +92,30 @@ export function NoteShareDialog({
             alive = false;
         };
     }, [open, noteId]);
+
+    // The link as it is already published: a new password is the one thing that
+    // cannot be read back, so typing one is always a change.
+    const unchanged =
+        share !== null &&
+        !password &&
+        !isDirty(
+            {
+                includeChildren: share.includeChildren,
+                maxViews: share.maxViews,
+                expires: asDateField(share.expiresAt),
+                allowedCidrs: share.allowedCidrs,
+                allowedCountries: share.allowedCountries,
+                allowedContinents: share.allowedContinents
+            },
+            {
+                includeChildren,
+                maxViews,
+                expires,
+                allowedCidrs: rules.allowedCidrs,
+                allowedCountries: rules.allowedCountries,
+                allowedContinents: rules.allowedContinents
+            }
+        );
 
     async function save(): Promise<void> {
         setBusy(true);
@@ -182,7 +207,9 @@ export function NoteShareDialog({
                                 <div className="flex flex-col gap-1">
                                     <span className="text-xs text-muted-foreground">
                                         <Lock className="mr-1 inline size-3" />
-                                        {share.hasPassword ? t("share.replacePassword") : t("share.password")}
+                                        {share.hasPassword
+                                            ? t("share.replacePassword")
+                                            : t("share.password")}
                                     </span>
                                     {/* enigma:allow-no-breach-check enigma:allow-identity-password -
                                         this is the link's own passphrase, not a credential: it
@@ -192,13 +219,19 @@ export function NoteShareDialog({
                                     <Input
                                         type="password"
                                         value={password}
-                                        placeholder={share.hasPassword ? t("share.passwordSet") : t("share.passwordNone")}
+                                        placeholder={
+                                            share.hasPassword
+                                                ? t("share.passwordSet")
+                                                : t("share.passwordNone")
+                                        }
                                         autoComplete="new-password"
                                         onChange={(event) => setPassword(event.target.value)}
                                     />
                                 </div>
                                 <div className="flex flex-col gap-1">
-                                    <span className="text-xs text-muted-foreground">{t("share.expires")}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("share.expires")}
+                                    </span>
                                     <Input
                                         type="date"
                                         value={expires}
@@ -219,15 +252,24 @@ export function NoteShareDialog({
                                 </div>
                             </div>
 
-                            <AccessRulesEditor value={rules} groups={[]} showGroups={false} onChange={setRules} />
+                            <AccessRulesEditor
+                                value={rules}
+                                groups={[]}
+                                showGroups={false}
+                                onChange={setRules}
+                            />
 
                             {error && <p className="text-sm text-danger">{error}</p>}
 
                             <div className="flex items-center justify-between gap-2">
-                                <Button variant="ghost" disabled={busy} onClick={() => void unpublish()}>
+                                <Button
+                                    variant="ghost"
+                                    disabled={busy}
+                                    onClick={() => void unpublish()}
+                                >
                                     {t("share.stop")}
                                 </Button>
-                                <Button disabled={busy} onClick={() => void save()}>
+                                <Button disabled={busy || unchanged} onClick={() => void save()}>
                                     {t("share.save")}
                                 </Button>
                             </div>

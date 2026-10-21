@@ -124,7 +124,10 @@ export function CallServerView() {
         setSaving(true);
         setSaved(false);
         setError(null);
-        const result = await runAction(() => actions.setCallServerAction(url, key, secret), setError);
+        const result = await runAction(
+            () => actions.setCallServerAction(url, key, secret),
+            setError
+        );
         setSaving(false);
         if (result?.error) {
             setError(result.error);
@@ -146,7 +149,9 @@ export function CallServerView() {
     return (
         <section className="flex flex-col gap-3">
             <div>
-                <h2 className="text-[0.8125rem] font-semibold text-foreground">{t("chat.calls.title")}</h2>
+                <h2 className="text-[0.8125rem] font-semibold text-foreground">
+                    {t("chat.calls.title")}
+                </h2>
                 <p className="mt-0.5 text-[0.75rem] leading-relaxed text-muted-foreground">
                     {t("chat.calls.intro")}
                 </p>
@@ -160,7 +165,10 @@ export function CallServerView() {
                         <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                             {settings.answering ? (
                                 <CircleCheck className="size-3.5 shrink-0 text-success" />
-                            ) : waited || missing || !settings.ready || settings.container === "stopped" ? (
+                            ) : waited ||
+                              missing ||
+                              !settings.ready ||
+                              settings.container === "stopped" ? (
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
                             ) : (
                                 <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
@@ -178,38 +186,48 @@ export function CallServerView() {
                                         : t("chat.calls.status.starting", { where })}
                         </p>
                         <p className="text-[0.6875rem] text-foreground-subtle">
-                            {!settings.ready ? (
-                                t("chat.calls.detail.unprepared")
-                            ) : missing ? (
-                                t.rich("chat.calls.detail.missing", {
-                                    link: (chunks) => (
-                                        <Link key="link" href="/admin/settings" className="text-primary hover:underline">
-                                            {chunks}
-                                        </Link>
-                                    )
-                                })
-                            ) : settings.container === "stopped" ? (
-                                t.rich("chat.calls.detail.stopped", {
-                                    container: "polaris-livekit-1",
-                                    link: (chunks) => (
-                                        <Link key="link" href="/apps/containers" className="text-primary hover:underline">
-                                            {chunks}
-                                        </Link>
-                                    )
-                                })
-                            ) : settings.answering ? (
-                                      t.rich("chat.calls.detail.running", {
+                            {!settings.ready
+                                ? t("chat.calls.detail.unprepared")
+                                : missing
+                                  ? t.rich("chat.calls.detail.missing", {
+                                        link: (chunks) => (
+                                            <Link
+                                                key="link"
+                                                href="/admin/settings"
+                                                className="text-primary hover:underline"
+                                            >
+                                                {chunks}
+                                            </Link>
+                                        )
+                                    })
+                                  : settings.container === "stopped"
+                                    ? t.rich("chat.calls.detail.stopped", {
+                                          container: "polaris-livekit-1",
                                           link: (chunks) => (
-                                              <Link key="link" href="/admin/domains" className="text-primary hover:underline">
+                                              <Link
+                                                  key="link"
+                                                  href="/apps/containers"
+                                                  className="text-primary hover:underline"
+                                              >
                                                   {chunks}
                                               </Link>
                                           )
                                       })
-                                  ) : waited ? (
-                                      t("chat.calls.detail.waited")
-                                  ) : (
-                                      t("chat.calls.detail.starting")
-                                  )}
+                                    : settings.answering
+                                      ? t.rich("chat.calls.detail.running", {
+                                            link: (chunks) => (
+                                                <Link
+                                                    key="link"
+                                                    href="/admin/domains"
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {chunks}
+                                                </Link>
+                                            )
+                                        })
+                                      : waited
+                                        ? t("chat.calls.detail.waited")
+                                        : t("chat.calls.detail.starting")}
                         </p>
                         {waited ? (
                             <Button
@@ -289,11 +307,26 @@ export function CallServerView() {
                                     type="password"
                                     autoComplete="off"
                                     aria-label={t("chat.calls.fields.secretLabel")}
-                                    placeholder={settings.hasSecret ? t("chat.calls.fields.secretStored") : t("chat.calls.fields.secretPaste")}
+                                    placeholder={
+                                        settings.hasSecret
+                                            ? t("chat.calls.fields.secretStored")
+                                            : t("chat.calls.fields.secretPaste")
+                                    }
                                 />
                             </label>
-                            <Button variant="secondary" onClick={save} disabled={saving}>
-                                {saving ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                            <Button
+                                variant="secondary"
+                                onClick={save}
+                                disabled={
+                                    saving ||
+                                    (url.trim() === (settings?.url ?? "") &&
+                                        key.trim() === (settings?.key ?? "") &&
+                                        !secret.trim())
+                                }
+                            >
+                                {saving ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                                ) : null}
                                 {tc("actions.save")}
                             </Button>
                             {saved ? (

@@ -33,6 +33,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
@@ -78,6 +79,10 @@ export function PlaceDialog({
     }, [latitude, longitude]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const values = { name, kind, address, latitude, longitude };
+    // What the dialog opened with: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = place !== null && !isDirty(loaded, values);
 
     const save = async () => {
         setBusy(true);
@@ -192,7 +197,10 @@ export function PlaceDialog({
                     <Button variant="ghost" onClick={onClose} disabled={busy}>
                         {t("common.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={busy || !name.trim() || !location.ok}>
+                    <Button
+                        onClick={save}
+                        disabled={busy || unchanged || !name.trim() || !location.ok}
+                    >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                         {place ? t("common.save") : t("placeDialog.add")}
                     </Button>

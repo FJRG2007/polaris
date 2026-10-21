@@ -67,6 +67,7 @@ import {
     Select,
     Textarea,
     cn,
+    isDirty,
     useDeferredFocus
 } from "@polaris/ui";
 
@@ -98,6 +99,24 @@ const PROBLEM_KEYS: Record<string, NamespaceKey<"vault">> = {
 
 /** The folder picker's own entry for making one, rather than picking one. */
 const NEW_FOLDER = "__new-folder__";
+
+/** What the dialog holds the moment it opens on a stored item. */
+function openedAs(item: VaultItem) {
+    return {
+        // An API key is edited as its own kind and stored as the note it is.
+        draft: itemKind(item) === ITEM_API_KEY ? { ...item, type: ITEM_API_KEY } : item,
+        // The one-box expiry and the bank are drawn from what was stored: two
+        // fields the cipher model has, and one custom field it does not.
+        expiry:
+            item.card.expMonth || item.card.expYear
+                ? core.writeCardExpiry({ month: item.card.expMonth, year: item.card.expYear })
+                : "",
+        bank: core.fieldValue(item.fields, core.BANK_FIELD),
+        codes: core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD),
+        email: core.fieldValue(item.fields, core.EMAIL_FIELD),
+        apiKey: core.readApiKey(item.fields)
+    };
+}
 
 export function ItemDialog({
     item,
@@ -170,26 +189,28 @@ export function ItemDialog({
 
     useEffect(() => {
         if (!item) return;
-        // An API key is edited as its own kind and stored as the note it is.
-        setDraft(itemKind(item) === ITEM_API_KEY ? { ...item, type: ITEM_API_KEY } : item);
+        const opened = openedAs(item);
+        setDraft(opened.draft);
         setGenerator(false);
         setScanning(false);
         setNewFolder(null);
         setError(null);
         setAccountEmails([]);
         setFromAccount("idle");
-        // The one-box expiry and the bank are drawn from what was stored: two
-        // fields the cipher model has, and one custom field it does not.
-        setExpiry(
-            item.card.expMonth || item.card.expYear
-                ? core.writeCardExpiry({ month: item.card.expMonth, year: item.card.expYear })
-                : ""
-        );
-        setBank(core.fieldValue(item.fields, core.BANK_FIELD));
-        setCodes(core.fieldValue(item.fields, core.RECOVERY_CODES_FIELD));
-        setEmail(core.fieldValue(item.fields, core.EMAIL_FIELD));
-        setApiKey(core.readApiKey(item.fields));
+        setExpiry(opened.expiry);
+        setBank(opened.bank);
+        setCodes(opened.codes);
+        setEmail(opened.email);
+        setApiKey(opened.apiKey);
     }, [item]);
+    // An item that exists, edited back to what it holds, has nothing to save.
+    // Compared exactly: a space in a password is part of the password.
+    const unchanged =
+        item !== null &&
+        Boolean(item.id) &&
+        !isDirty(openedAs(item), { draft, expiry, bank, codes, email, apiKey }, (value) =>
+            JSON.stringify(value)
+        );
 
     /**
      * What to say about the expiry, or nothing.
@@ -1266,7 +1287,11 @@ export function ItemDialog({
                     <Button type="button" variant="secondary" onClick={onClose}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button type="button" onClick={onSubmit} disabled={pending || emailInvalid}>
+                    <Button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={pending || emailInvalid || unchanged}
+                    >
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                         {tc("actions.save")}
                     </Button>

@@ -23,6 +23,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select,
     Switch
 } from "@polaris/ui";
@@ -32,7 +33,16 @@ import { usePlacesT } from "../use-places-t";
 const { runAction } = hostUi.runAction;
 
 /** What an alert can fire on, each read as `alerts.kinds.<value>`. */
-const KINDS = ["person", "face", "vehicle", "animal", "package", "motion", "tamper", "offline"] as const;
+const KINDS = [
+    "person",
+    "face",
+    "vehicle",
+    "animal",
+    "package",
+    "motion",
+    "tamper",
+    "offline"
+] as const;
 
 export function AlertDialog({
     rule,
@@ -68,6 +78,19 @@ export function AlertDialog({
     const [notify, setNotify] = useState(rule?.notify ?? false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const values = {
+        name,
+        kinds: new Set(kinds),
+        cameraId,
+        label,
+        zones: new Set(zones),
+        hours: hoursOn ? { from, to } : null,
+        recipients: new Set(recipients),
+        notify
+    };
+    // What the dialog opened with: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = rule !== null && !isDirty(loaded, values);
 
     const save = async () => {
         setBusy(true);
@@ -106,15 +129,14 @@ export function AlertDialog({
             <DialogContent className="max-w-xl">
                 <DialogHeader>
                     <DialogTitle>{rule ? rule.name : t("alerts.addTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("alerts.intro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("alerts.intro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            {t("placeDialog.name")}<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
@@ -205,9 +227,7 @@ export function AlertDialog({
                                 ))}
                             </div>
                             <p className="text-[0.75rem] text-foreground-subtle">
-                                {zones.length === 0
-                                    ? t("alerts.anywhere")
-                                    : t("alerts.undrawn")}
+                                {zones.length === 0 ? t("alerts.anywhere") : t("alerts.undrawn")}
                             </p>
                         </div>
                     ) : null}
@@ -228,7 +248,9 @@ export function AlertDialog({
                                     inputMode="numeric"
                                     aria-label={t("dialog.fromHour")}
                                 />
-                                <span className="text-[0.75rem] text-muted-foreground">{t("dialog.to")}</span>
+                                <span className="text-[0.75rem] text-muted-foreground">
+                                    {t("dialog.to")}
+                                </span>
                                 <Input
                                     value={to}
                                     onChange={(event) => setTo(event.target.value)}
@@ -245,7 +267,8 @@ export function AlertDialog({
 
                     <div className="flex flex-col gap-2">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            {t("alerts.tell")}<span className="text-danger"> *</span>
+                            {t("alerts.tell")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <div className="flex max-h-40 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                             {people.map((person) => (
@@ -275,9 +298,7 @@ export function AlertDialog({
                             <Switch checked={notify} onChange={setNotify} />
                         </label>
                         <p className="text-[0.75rem] text-foreground-subtle">
-                            {notify
-                                ? t("alerts.notifyOn")
-                                : t("alerts.notifyOff")}
+                            {notify ? t("alerts.notifyOn") : t("alerts.notifyOff")}
                         </p>
                     </div>
                 </div>
@@ -291,7 +312,11 @@ export function AlertDialog({
                     <Button
                         onClick={save}
                         disabled={
-                            busy || !name.trim() || kinds.length === 0 || recipients.length === 0
+                            busy ||
+                            unchanged ||
+                            !name.trim() ||
+                            kinds.length === 0 ||
+                            recipients.length === 0
                         }
                     >
                         {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}

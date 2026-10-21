@@ -22,6 +22,7 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    isDirty,
     Skeleton
 } from "@polaris/ui";
 
@@ -140,7 +141,14 @@ export function AppWidgetSetup({
                     <Button variant="ghost" onClick={onCancel}>
                         {t("appCards.cancel")}
                     </Button>
-                    <Button disabled={chosen.length === 0} onClick={() => onSave(chosen)}>
+                    <Button
+                        // The card already shows exactly these: nothing to save.
+                        disabled={
+                            chosen.length === 0 ||
+                            (subject !== null && !isDirty(subject.targets, chosen))
+                        }
+                        onClick={() => onSave(chosen)}
+                    >
                         {t("appCards.save")}
                     </Button>
                 </DialogFooter>

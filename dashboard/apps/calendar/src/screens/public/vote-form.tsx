@@ -9,7 +9,7 @@ import { useState } from "react";
 import { browserZone } from "../time";
 import { useCalendarT } from "../i18n";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, SegmentedControl } from "@polaris/ui";
+import { Button, SegmentedControl, isDirty } from "@polaris/ui";
 import type { Vote } from "../../lib/scheduling-schemas";
 import * as proposalActions from "../../actions/proposals";
 import { formatRange, PublicFrame, StatusNote } from "./kit";
@@ -24,7 +24,7 @@ export function VoteForm({ token, view }: { token: string; view: VotePageView })
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
     const [done, setDone] = useState(false);
-    const dirty = JSON.stringify(votes) !== JSON.stringify(saved);
+    const dirty = isDirty(saved, votes);
     const closed = view.status === "closed";
 
     const submit = async () => {

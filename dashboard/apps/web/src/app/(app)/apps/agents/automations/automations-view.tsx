@@ -24,7 +24,8 @@ import {
     Input,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    isDirty
 } from "@polaris/ui";
 
 interface Rule {
@@ -221,6 +222,27 @@ function RuleDialog({
             .split(",")
             .map((entry) => entry.trim())
             .filter(Boolean);
+    // An edit that ends where it started saves nothing.
+    const unchanged =
+        rule !== null &&
+        !isDirty(
+            {
+                repoId: rule.repoId,
+                trigger: rule.trigger,
+                labels: existing.labels,
+                branches: existing.branches,
+                instructions: rule.instructions,
+                enabled: rule.enabled
+            },
+            {
+                repoId,
+                trigger,
+                labels: list(labels),
+                branches: list(branches),
+                instructions,
+                enabled
+            }
+        );
 
     const save = () => {
         startTransition(() => {
@@ -258,7 +280,9 @@ function RuleDialog({
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
+                        <label className="text-sm font-medium">
+                            {t("sessions.form.repository")}
+                        </label>
                         <Select
                             value={repoId}
                             onValueChange={setRepoId}
@@ -275,7 +299,9 @@ function RuleDialog({
                                 (value) => value !== "manual" && value !== "mention"
                             ).map((value) => ({ value, label: agentWord(t, "trigger", value) }))}
                         />
-                        <p className="text-xs text-muted-foreground">{agentWord(t, "triggerNote", trigger)}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {agentWord(t, "triggerNote", trigger)}
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -306,11 +332,17 @@ function RuleDialog({
                             onChange={(event) => setInstructions(event.target.value)}
                             placeholder={t("rules.instructionsPlaceholder")}
                         />
-                        <p className="text-xs text-muted-foreground">{t("rules.instructionsHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("rules.instructionsHint")}
+                        </p>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Switch checked={enabled} onChange={setEnabled} aria-label={t("rules.isOn")} />
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={t("rules.isOn")}
+                        />
                         <span className="text-sm">{t("rules.on")}</span>
                     </div>
 
@@ -320,7 +352,7 @@ function RuleDialog({
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={!repoId || pending}>
+                    <Button onClick={save} disabled={!repoId || pending || unchanged}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>

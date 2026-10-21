@@ -26,7 +26,7 @@ import { CODE_LANGUAGES, languageForFile } from "@/lib/code-language";
 import { generateSealKey, seal, withSealKey } from "@/lib/browser-seal";
 import { MAX_SNIPPET_FILES, MAX_SNIPPET_TOTAL_CHARS } from "@polaris/core";
 import { createSnippetAction, updateSnippetAction } from "./snippet-actions";
-import { Button, Card, CardBody, Input, Select, Textarea } from "@polaris/ui";
+import { Button, Card, CardBody, Input, isDirty, Select, Textarea } from "@polaris/ui";
 
 export interface EditorFile {
     name: string;
@@ -68,7 +68,11 @@ const VISIBILITY_OPTIONS = [
 ] as const satisfies readonly { value: string; label: NamespaceKey<"drive"> }[];
 
 function emptyFile(index: number): EditorFile {
-    return { name: index === 0 ? "snippet.txt" : `file-${index + 1}.txt`, language: AUTO, body: "" };
+    return {
+        name: index === 0 ? "snippet.txt" : `file-${index + 1}.txt`,
+        language: AUTO,
+        body: ""
+    };
 }
 
 /** The grammar a file ends up in: what was picked, or what its name says. */
@@ -89,6 +93,15 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     const [sealed, setSealed] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // An edit put back to the snippet as it is saves nothing. The files are
+    // compared exactly: whitespace inside code is part of the code.
+    const unchanged =
+        snippet !== undefined &&
+        !isDirty(
+            { title: snippet.title, description: snippet.description, files: snippet.files },
+            { title, description, files },
+            (value) => ({ ...value, files: JSON.stringify(value.files) })
+        );
     const [link, setLink] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
@@ -133,7 +146,12 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
     const languageOptions = useMemo(() => {
         const detected = languageForFile(current.name);
         return [
-            { value: AUTO, label: detected ? t("snippetEditor.autoNamed", { language: detected.label }) : t("snippetEditor.autoPlainText") },
+            {
+                value: AUTO,
+                label: detected
+                    ? t("snippetEditor.autoNamed", { language: detected.label })
+                    : t("snippetEditor.autoPlainText")
+            },
             { value: PLAIN, label: t("snippetEditor.plainText") },
             ...GRAMMARS
         ];
@@ -165,11 +183,11 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                       body: await seal(file.body, key)
                   }))
               )
-            // What was worked out is what is stored, so the snippet is painted
-            // the same way for everybody who opens it - and so re-opening it
-            // shows the language rather than guessing again from a name that may
-            // have been changed since.
-            : files.map((file) => ({ ...file, language: resolvedLanguage(file) }));
+            : // What was worked out is what is stored, so the snippet is painted
+              // the same way for everybody who opens it - and so re-opening it
+              // shows the language rather than guessing again from a name that may
+              // have been changed since.
+              files.map((file) => ({ ...file, language: resolvedLanguage(file) }));
 
         if (editing) {
             const result = await updateSnippetAction(snippet.id, {
@@ -292,7 +310,9 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                                         size="icon"
                                         variant="ghost"
                                         title={t("snippetEditor.removeThisFile")}
-                                        aria-label={t("snippetEditor.removeNamed", { name: file.name })}
+                                        aria-label={t("snippetEditor.removeNamed", {
+                                            name: file.name
+                                        })}
                                         onClick={() => removeFile(index)}
                                     >
                                         <X className="size-3" />
@@ -354,7 +374,10 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                             <Select
                                 value={visibility}
                                 onValueChange={setVisibility}
-                                options={VISIBILITY_OPTIONS.map((one) => ({ value: one.value, label: t(one.label) }))}
+                                options={VISIBILITY_OPTIONS.map((one) => ({
+                                    value: one.value,
+                                    label: t(one.label)
+                                }))}
                                 aria-label={t("snippetEditor.whoCanOpenIt")}
                             />
                             <span className="text-xs text-muted-foreground">
@@ -387,7 +410,7 @@ export function SnippetEditor({ snippet }: { snippet?: EditorSnippet }) {
                 <Button asChild variant="secondary" type="button">
                     <Link href="/drive/snippets">{t("snippetEditor.cancel")}</Link>
                 </Button>
-                <Button type="submit" disabled={pending}>
+                <Button type="submit" disabled={pending || unchanged}>
                     {pending ? (
                         <Loader2 className="size-4 animate-spin" />
                     ) : (

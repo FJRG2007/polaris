@@ -71,7 +71,8 @@
         "reading": "Reading the server...",
         "nobodyAtAll": "Nobody is playing, and nobody has been added yet.",
         "notAnswering": "The server is not answering.",
-        "savedRestart": "Saved. Restart the server to run on it."
+        "savedRestart": "Saved. Restart the server to run on it.",
+        "passwordChanged": "Changed."
     },
     "resources": {
         "whatThisServerRunsA": "What this server runs. A resource that has just been added has to be started before it does anything.",

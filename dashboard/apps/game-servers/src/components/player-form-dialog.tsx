@@ -35,6 +35,7 @@ export function PlayerFormDialog({
     onConfirm,
     confirmLabel,
     ready,
+    unchanged = false,
     pending,
     error,
     danger
@@ -47,6 +48,9 @@ export function PlayerFormDialog({
     confirmLabel: string;
     /** Whether the form may be submitted at all. */
     ready: boolean;
+    /** An edit that would save what is already stored: the confirm stays off and
+     *  says so, the same as one that is not ready. */
+    unchanged?: boolean;
     pending: boolean;
     /** What the server refused it with, shown above the buttons rather than in a
      *  toast that outlives the dialog. */
@@ -65,7 +69,7 @@ export function PlayerFormDialog({
                     className="flex flex-col gap-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (ready && !pending) onConfirm();
+                        if (ready && !unchanged && !pending) onConfirm();
                     }}
                 >
                     {children}
@@ -77,7 +81,8 @@ export function PlayerFormDialog({
                         <Button
                             type="submit"
                             variant={danger ? "danger" : "primary"}
-                            disabled={!ready || pending}
+                            disabled={!ready || unchanged || pending}
+                            title={unchanged ? t("errors.nothingToSave") : undefined}
                         >
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {confirmLabel}

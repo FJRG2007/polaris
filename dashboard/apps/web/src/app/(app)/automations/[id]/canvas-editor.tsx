@@ -64,6 +64,7 @@ import {
     ShortcutHint,
     Switch,
     Textarea,
+    isDirty,
     shortcutPressed,
     useToast
 } from "@polaris/ui";
@@ -884,6 +885,12 @@ function NodePanel({
     })();
     const pinTooLarge =
         pinText !== null && core.byteLength(pinText) > core.AUTOMATION_LIMITS.pinBytes;
+    // A pin edited back to the data it already holds is nothing to save; compared as
+    // JSON, since an empty string and a null are different data here.
+    const pinUnchanged =
+        node.pinned !== undefined &&
+        pinJson !== undefined &&
+        !isDirty(node.pinned, pinJson, (value) => JSON.stringify(value));
 
     return (
         <>
@@ -1055,7 +1062,7 @@ function NodePanel({
                                 </Button>
                                 <Button
                                     size="sm"
-                                    disabled={pinJson === undefined || pinTooLarge}
+                                    disabled={pinJson === undefined || pinTooLarge || pinUnchanged}
                                     onClick={() => {
                                         set({ pinned: pinJson });
                                         setPinText(null);

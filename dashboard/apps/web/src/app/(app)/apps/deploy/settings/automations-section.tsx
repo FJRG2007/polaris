@@ -48,7 +48,8 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    isDirty
 } from "@polaris/ui";
 import {
     Clock,
@@ -756,6 +757,8 @@ export function AutomationEditor({
     const t = useTranslations("deploySettings");
     const display = useDisplayFormat();
     const [draft, setDraft] = useState(initial);
+    // An edit that ends where it started saves nothing.
+    const unchanged = initial.id !== undefined && !isDirty(initial, draft);
     const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
     const [attempted, setAttempted] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
@@ -1224,8 +1227,8 @@ export function AutomationEditor({
                             </Button>
                             <Button
                                 size="sm"
-                                aria-disabled={!parsed.success || pending}
-                                onClick={() => !pending && save()}
+                                aria-disabled={!parsed.success || pending || unchanged}
+                                onClick={() => !pending && !unchanged && save()}
                             >
                                 {pending && <Loader2 className="size-4 shrink-0 animate-spin" />}
                                 {t("automations.save")}

@@ -29,7 +29,8 @@ import {
     DialogContent,
     DialogTitle,
     Input,
-    Select
+    Select,
+    isDirty
 } from "@polaris/ui";
 import {
     listProjectMembersAction,
@@ -174,6 +175,15 @@ function draftFrom(entry: ProjectMemberView): Draft {
     };
 }
 
+/** A draft as it would be saved: which capabilities and environments, in no order. */
+function settledDraft(draft: Draft) {
+    return {
+        ...draft,
+        capabilities: new Set(draft.capabilities),
+        environmentIds: new Set(draft.environmentIds)
+    };
+}
+
 /** The date an expiry choice lands on, or null for one that never lapses. */
 function expiresAt(choice: string, existing: string | null): string | null {
     if (choice === "keep") return existing;
@@ -277,21 +287,24 @@ export function MembersSection({ projectId }: { projectId: string }) {
                 : PROJECT_ROLE_LABELS[entry.role]
         );
         if (entry.environmentIds) {
-            const names = entry.environmentIds.map((id) => byId.get(id) ?? t("members.removedEnvironment"));
+            const names = entry.environmentIds.map(
+                (id) => byId.get(id) ?? t("members.removedEnvironment")
+            );
             parts.push(names.length > 0 ? names.join(", ") : t("members.noEnvironment"));
         }
         if (entry.expiresAt) {
-            parts.push(entry.expired ? t("members.expiredLower") : t("members.until", { date: display.date(entry.expiresAt) }));
+            parts.push(
+                entry.expired
+                    ? t("members.expiredLower")
+                    : t("members.until", { date: display.date(entry.expiresAt) })
+            );
         }
         return parts.join(" - ");
     }
 
     return (
         <div className="flex flex-col gap-4">
-            <SettingsCard
-                title={t("members.title")}
-                description={t("members.description")}
-            >
+            <SettingsCard title={t("members.title")} description={t("members.description")}>
                 {error && <p className="text-sm text-danger">{error}</p>}
 
                 <div className="overflow-hidden rounded-md border border-border/60">
@@ -313,12 +326,14 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                                 {entry.name}
                                                 {entry.isOwner && (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-muted-foreground">
-                                                        <Crown className="size-3" /> {t("members.owner")}
+                                                        <Crown className="size-3" />{" "}
+                                                        {t("members.owner")}
                                                     </span>
                                                 )}
                                                 {entry.expired && (
                                                     <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[0.625rem] text-warning">
-                                                        <Clock className="size-3" /> {t("members.expired")}
+                                                        <Clock className="size-3" />{" "}
+                                                        {t("members.expired")}
                                                     </span>
                                                 )}
                                             </p>
@@ -332,7 +347,9 @@ export function MembersSection({ projectId }: { projectId: string }) {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                aria-label={t("members.changeNamed", { name: entry.name })}
+                                                aria-label={t("members.changeNamed", {
+                                                    name: entry.name
+                                                })}
                                                 title={t("members.edit")}
                                                 onClick={() => {
                                                     setFormError(null);
@@ -385,6 +402,7 @@ export function MembersSection({ projectId }: { projectId: string }) {
 
             {draft && (
                 <AccessDialog
+                    key={draft.entryId ?? "new"}
                     draft={draft}
                     environments={environments.filter(
                         (environment) =>
@@ -488,6 +506,9 @@ function AccessDialog({
         Boolean(draft.principalId) ||
         (draft.principal === "user" && draft.identifier.trim().length > 0);
     const ready = named && (everyEnvironment || draft.environmentIds.length > 0);
+    // The entry as it was opened: a change put back gives nothing to save.
+    const [loaded] = useState(() => draft);
+    const unchanged = draft.entryId !== null && !isDirty(loaded, draft, settledDraft);
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -496,7 +517,9 @@ function AccessDialog({
                 <div className="flex flex-col gap-4 pt-2">
                     {!draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">{t("members.for")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("members.for")}
+                            </span>
                             <Select
                                 value={draft.principal}
                                 onValueChange={(value) =>
@@ -532,7 +555,9 @@ function AccessDialog({
 
                     {draft.principal === "team" && !draft.entryId && (
                         <label className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground">{t("members.team")}</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {t("members.team")}
+                            </span>
                             {teamOptions.length > 0 ? (
                                 <Select
                                     value={draft.principalId}
@@ -569,13 +594,13 @@ function AccessDialog({
                     )}
 
                     {draft.principal === "everyone" && !draft.entryId && (
-                        <p className="text-xs text-muted-foreground">
-                            {t("members.everyone")}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{t("members.everyone")}</p>
                     )}
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("members.theyMay")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("members.theyMay")}
+                        </span>
                         <Select
                             value={draft.role}
                             onValueChange={pickRole}
@@ -664,7 +689,9 @@ function AccessDialog({
                     </div>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("members.expires")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("members.expires")}
+                        </span>
                         <Select
                             value={draft.expiry}
                             onValueChange={(value) => patch({ expiry: value })}
@@ -686,7 +713,7 @@ function AccessDialog({
                         <Button variant="ghost" onClick={onClose}>
                             {t("members.cancel")}
                         </Button>
-                        <Button onClick={onSave} disabled={pending || !ready}>
+                        <Button onClick={onSave} disabled={pending || !ready || unchanged}>
                             {pending && <Loader2 className="size-4 animate-spin" />}
                             {draft.entryId ? t("members.save") : t("members.give")}
                         </Button>

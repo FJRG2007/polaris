@@ -33,7 +33,8 @@ import {
     Input,
     Select,
     Skeleton,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 
 export function PlansPanel({
@@ -72,10 +73,12 @@ export function PlansPanel({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                    {t("plans.intro")}
-                </p>
-                <Button size="sm" onClick={() => setEditing("new")} disabled={destinations.length === 0}>
+                <p className="text-xs text-muted-foreground">{t("plans.intro")}</p>
+                <Button
+                    size="sm"
+                    onClick={() => setEditing("new")}
+                    disabled={destinations.length === 0}
+                >
                     <Plus className="size-4" />
                     {t("plans.new")}
                 </Button>
@@ -102,13 +105,19 @@ export function PlansPanel({
                             <CardBody className="flex flex-col gap-2">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <p className="truncate font-medium" title={plan.name}>{plan.name}</p>
+                                        <p className="truncate font-medium" title={plan.name}>
+                                            {plan.name}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
                                             {everyLabel(t, plan.every)}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                        <Button size="sm" variant="ghost" onClick={() => setEditing(plan)}>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setEditing(plan)}
+                                        >
                                             {t("plans.edit")}
                                         </Button>
                                         <Button
@@ -127,7 +136,10 @@ export function PlansPanel({
                                         copies: plan.keepLast,
                                         days: plan.keepDays,
                                         capped: plan.maxBytes > 0 ? "yes" : "no",
-                                        size: plan.maxBytes > 0 ? formatBytes(BigInt(plan.maxBytes)) : ""
+                                        size:
+                                            plan.maxBytes > 0
+                                                ? formatBytes(BigInt(plan.maxBytes))
+                                                : ""
                                     })}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-1">
@@ -209,11 +221,29 @@ function PlanDialog({
     const problems: string[] = [];
     if (!name.trim()) problems.push(t("plans.problems.name"));
     if (chosen.length === 0) problems.push(t("plans.problems.destination"));
-    if (Number(keepLast) < 0 || Number(keepLast) > MAX_KEEP_LAST) problems.push(t("plans.problems.copies"));
-    if (Number(keepDays) < 0 || Number(keepDays) > MAX_KEEP_DAYS) problems.push(t("plans.problems.days"));
+    if (Number(keepLast) < 0 || Number(keepLast) > MAX_KEEP_LAST)
+        problems.push(t("plans.problems.copies"));
+    if (Number(keepDays) < 0 || Number(keepDays) > MAX_KEEP_DAYS)
+        problems.push(t("plans.problems.days"));
     if (every !== "off" && Number(keepLast) === 0 && Number(keepDays) === 0 && !maxGb) {
         problems.push(t("plans.problems.limit"));
     }
+
+    // An edit put back to how the plan was saves nothing; which destinations, in no order.
+    const unchanged =
+        plan !== null &&
+        !isDirty(
+            {
+                name: plan.name,
+                every: plan.every,
+                keepLast: plan.keepLast,
+                keepDays: plan.keepDays,
+                maxGb: toGigabytes(plan.maxBytes),
+                notify: plan.notifyOnFailure,
+                chosen: new Set(plan.destinationIds)
+            },
+            { name, every, keepLast, keepDays, maxGb, notify, chosen: new Set(chosen) }
+        );
 
     async function onSave() {
         setPending(true);
@@ -248,7 +278,9 @@ function PlanDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{plan ? t("plans.editNamed", { name: plan.name }) : t("plans.new")}</DialogTitle>
+                    <DialogTitle>
+                        {plan ? t("plans.editNamed", { name: plan.name }) : t("plans.new")}
+                    </DialogTitle>
                     <DialogDescription>{t("plans.dialogIntro")}</DialogDescription>
                 </DialogHeader>
 
@@ -284,7 +316,9 @@ function PlanDialog({
                                 value={keepLast}
                                 onChange={(event) => setKeepLast(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">{t("plans.keepHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("plans.keepHint")}
+                            </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">{t("plans.for")}</span>
@@ -294,7 +328,9 @@ function PlanDialog({
                                 value={keepDays}
                                 onChange={(event) => setKeepDays(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">{t("plans.forHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("plans.forHint")}
+                            </span>
                         </label>
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">{t("plans.under")}</span>
@@ -305,7 +341,9 @@ function PlanDialog({
                                 value={maxGb}
                                 onChange={(event) => setMaxGb(event.target.value)}
                             />
-                            <span className="text-xs text-muted-foreground">{t("plans.underHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("plans.underHint")}
+                            </span>
                         </label>
                     </div>
 
@@ -321,7 +359,9 @@ function PlanDialog({
                                         setChosen((current) =>
                                             event.target.checked
                                                 ? [...current, destination.id]
-                                                : current.filter((entry) => entry !== destination.id)
+                                                : current.filter(
+                                                      (entry) => entry !== destination.id
+                                                  )
                                         )
                                     }
                                 />
@@ -335,7 +375,11 @@ function PlanDialog({
 
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>{t("plans.notify")}</span>
-                        <Switch checked={notify} onChange={setNotify} aria-label={t("plans.notifyLabel")} />
+                        <Switch
+                            checked={notify}
+                            onChange={setNotify}
+                            aria-label={t("plans.notifyLabel")}
+                        />
                     </div>
 
                     {problems.length > 0 ? (
@@ -347,7 +391,10 @@ function PlanDialog({
                         <DialogClose asChild>
                             <Button variant="ghost">{tcommon("actions.cancel")}</Button>
                         </DialogClose>
-                        <Button onClick={() => void onSave()} disabled={pending || problems.length > 0}>
+                        <Button
+                            onClick={() => void onSave()}
+                            disabled={pending || problems.length > 0 || unchanged}
+                        >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                             {plan ? t("plans.saveChanges") : t("plans.create")}
                         </Button>

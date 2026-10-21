@@ -44,7 +44,8 @@ import {
     Input,
     Select,
     Switch,
-    Textarea
+    Textarea,
+    isDirty
 } from "@polaris/ui";
 
 export function SettingsView({
@@ -96,7 +97,10 @@ export function SettingsView({
     return (
         <div className="flex flex-col gap-4">
             {error && (
-                <p role="alert" className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm">
+                <p
+                    role="alert"
+                    className="bg-danger-soft text-danger-ink rounded-md px-3 py-2 text-sm"
+                >
                     {error}
                 </p>
             )}
@@ -114,9 +118,7 @@ export function SettingsView({
                     {/* Under the handle because it is the one setting here that
                         changes what people see rather than what the
                         organization is called. */}
-                    {chatOffered && (
-                        <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />
-                    )}
+                    {chatOffered && <ChatCard orgId={org.id} isolated={chatIsolated} onRun={run} />}
                 </>
             )}
 
@@ -143,15 +145,7 @@ export function SettingsView({
  * messages can be, reached from the shelf switch in the header. Turning it back
  * off does not lose any of them.
  */
-function ChatCard({
-    orgId,
-    isolated,
-    onRun
-}: {
-    orgId: string;
-    isolated: boolean;
-    onRun: Runner;
-}) {
+function ChatCard({ orgId, isolated, onRun }: { orgId: string; isolated: boolean; onRun: Runner }) {
     const t = useTranslations("accountOrgs");
     const [on, setOn] = useState(isolated);
     const [saving, setSaving] = useState(false);
@@ -202,7 +196,10 @@ function ProfileCard({ org, onRun }: { org: OrgDetail; onRun: Runner }) {
     const parsed = core.organizationProfileSchema.safeParse({ name, description });
     // Dirty means the values differ from what was loaded, not that a field was
     // touched: something edited and put back leaves Save disabled.
-    const changed = name !== org.name || description !== org.description;
+    const changed = isDirty(
+        { name: org.name, description: org.description },
+        { name, description }
+    );
 
     return (
         <Card>
@@ -408,7 +405,8 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
             <CardBody className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
                     {t("settings.danger.body", counts)}
-                    {impact.projects > 0 && ` ${t("settings.danger.projects", { count: impact.projects })}`}
+                    {impact.projects > 0 &&
+                        ` ${t("settings.danger.projects", { count: impact.projects })}`}
                     {drive}
                 </p>
                 <Button

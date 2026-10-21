@@ -27,6 +27,7 @@ import {
     Input,
     Select,
     Skeleton,
+    isDirty,
     useToast
 } from "@polaris/ui";
 
@@ -125,8 +126,7 @@ export function TodoEditor({
         () =>
             form !== null &&
             initial !== null &&
-            JSON.stringify({ ...form, due: dueOf(form, zone) }) !==
-                JSON.stringify({ ...initial, due: dueOf(initial, zone) }),
+            isDirty({ ...initial, due: dueOf(initial, zone) }, { ...form, due: dueOf(form, zone) }),
         [form, initial, zone]
     );
     const blocked = !dirty ? t("editor.noChanges") : incomplete ? t("editor.incomplete") : null;

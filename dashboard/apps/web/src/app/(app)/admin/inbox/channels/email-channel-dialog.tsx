@@ -32,7 +32,8 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    isDirty
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -114,6 +115,10 @@ export function EmailChannelDialog({
         if (!editing && !secret.trim()) return true;
         return info.fields.some((field) => !field.optional && !settings[field.name]?.trim());
     }, [editing, info.fields, name, secret, settings]);
+    const values = { provider, name, secret, settings };
+    // What the channel held when the dialog opened: an edit that ends where it started saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = editing && !isDirty(loaded, values);
 
     function save() {
         setError(null);
@@ -246,7 +251,9 @@ export function EmailChannelDialog({
 
                     {editing && (
                         <div className="flex flex-col gap-1 rounded-md border border-border p-3">
-                            <span className="text-sm font-medium">{t("inboxChannels.email.testTitle")}</span>
+                            <span className="text-sm font-medium">
+                                {t("inboxChannels.email.testTitle")}
+                            </span>
                             <div className="flex items-start gap-2">
                                 <Input
                                     type="email"
@@ -285,7 +292,9 @@ export function EmailChannelDialog({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label={t("inboxChannels.email.removeNamed", { name: channel.name })}
+                            aria-label={t("inboxChannels.email.removeNamed", {
+                                name: channel.name
+                            })}
                             title={t("inboxChannels.manage.remove")}
                             onClick={() => void remove()}
                             disabled={busy}
@@ -299,7 +308,11 @@ export function EmailChannelDialog({
                         <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
                             {editing ? t("inbox.connect.close") : tc("actions.cancel")}
                         </Button>
-                        <Button type="button" onClick={save} disabled={busy || missing}>
+                        <Button
+                            type="button"
+                            onClick={save}
+                            disabled={busy || missing || unchanged}
+                        >
                             {saving && <Loader2 className="size-4 animate-spin" />}
                             {editing ? tc("actions.save") : t("inboxChannels.email.add")}
                         </Button>
@@ -326,7 +339,10 @@ function SettingField({
             <span className="font-medium">
                 {field.label}
                 {field.optional ? (
-                    <span className="text-muted-foreground"> {t("inboxChannels.email.optional")}</span>
+                    <span className="text-muted-foreground">
+                        {" "}
+                        {t("inboxChannels.email.optional")}
+                    </span>
                 ) : null}
             </span>
             <Input

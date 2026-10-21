@@ -23,7 +23,7 @@ import Link from "next/link";
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
 import { CircleAlert, CircleCheck, Loader2, ScanFace } from "lucide-react";
-import { Button, Input, Select, Skeleton, Switch } from "@polaris/ui";
+import { Button, Input, isDirty, Select, Skeleton, Switch } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
 import type { PlacesTranslator } from "../../lib/i18n";
@@ -79,6 +79,8 @@ export function HomeSettingsView({
     const t = usePlacesT();
     const [settings, setSettings] = useState<Settings | null>(null);
     const [defaults, setDefaults] = useState<Defaults | null>(null);
+    /** The tuning as last read or saved, so Save waits for a real change. */
+    const [storedDefaults, setStoredDefaults] = useState<Defaults | null>(null);
     const [savingDefaults, setSavingDefaults] = useState(false);
     const [savedDefaults, setSavedDefaults] = useState(false);
     const [url, setUrl] = useState("");
@@ -118,6 +120,7 @@ export function HomeSettingsView({
             // seeing it; everybody else is offered the button and nothing else.
             setManual(Boolean(value.faceApiUrl));
             setDefaults(tuning.defaults ?? null);
+            setStoredDefaults(tuning.defaults ?? null);
             setServers(machines.servers ?? []);
         })();
         return () => {
@@ -217,6 +220,7 @@ export function HomeSettingsView({
             setError(result.error);
             return;
         }
+        setStoredDefaults(defaults);
         setSavedDefaults(true);
     };
 
@@ -352,7 +356,7 @@ export function HomeSettingsView({
                             <Button
                                 variant="secondary"
                                 onClick={saveDefaults}
-                                disabled={savingDefaults}
+                                disabled={savingDefaults || !isDirty(storedDefaults, defaults)}
                             >
                                 {savingDefaults ? (
                                     <Loader2 className="size-4 shrink-0 animate-spin" />
@@ -404,7 +408,9 @@ export function HomeSettingsView({
                         <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-surface px-3 py-2">
                             <p className="flex items-center gap-1.5 text-[0.75rem] text-foreground">
                                 <CircleAlert className="size-3.5 shrink-0 text-warning" />
-                                {t("settings.offButRunning", { server: serverWords(settings.installedOn, t) })}
+                                {t("settings.offButRunning", {
+                                    server: serverWords(settings.installedOn, t)
+                                })}
                             </p>
                             <p className="text-[0.6875rem] text-foreground-subtle">
                                 {t("settings.offButRunningHint")}
@@ -440,10 +446,16 @@ export function HomeSettingsView({
                                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                                     )}
                                     {settings.answering
-                                        ? t("settings.runningOn", { server: serverWords(settings.installedOn, t) })
+                                        ? t("settings.runningOn", {
+                                              server: serverWords(settings.installedOn, t)
+                                          })
                                         : waited
-                                          ? t("settings.notAnsweringOn", { server: serverWords(settings.installedOn, t) })
-                                          : t("settings.startingOn", { server: serverWords(settings.installedOn, t) })}
+                                          ? t("settings.notAnsweringOn", {
+                                                server: serverWords(settings.installedOn, t)
+                                            })
+                                          : t("settings.startingOn", {
+                                                server: serverWords(settings.installedOn, t)
+                                            })}
                                 </p>
                                 <p className="text-[0.6875rem] text-foreground-subtle">
                                     {settings.answering
@@ -536,7 +548,10 @@ export function HomeSettingsView({
                                 <Button
                                     variant="secondary"
                                     onClick={saveRecognizer}
-                                    disabled={saving}
+                                    disabled={
+                                        saving ||
+                                        (url.trim() === (settings?.faceApiUrl ?? "") && !key.trim())
+                                    }
                                 >
                                     {saving ? (
                                         <Loader2 className="size-4 shrink-0 animate-spin" />

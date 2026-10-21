@@ -27,7 +27,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 export function FolderDialog({
@@ -56,6 +57,9 @@ export function FolderDialog({
     async function save(folderId: string | null, name: string): Promise<void> {
         const trimmed = name.trim();
         if (!trimmed) return;
+        // Renamed to the name it already has: nothing to write.
+        const named = folders.find((folder) => folder.id === folderId);
+        if (named && !isDirty(named.name, trimmed)) return setEditingId(null);
         setPending(true);
         setError(null);
         // Encrypted here, like every other name in a vault - the server stores a
@@ -99,9 +103,7 @@ export function FolderDialog({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("app.folders")}</DialogTitle>
-                        <DialogDescription>
-                            {t("folders.intro")}
-                        </DialogDescription>
+                        <DialogDescription>{t("folders.intro")}</DialogDescription>
                     </DialogHeader>
 
                     <div className="flex flex-col gap-2">
@@ -152,14 +154,19 @@ export function FolderDialog({
                                                         if (event.key === "Escape")
                                                             setEditingId(null);
                                                     }}
-                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.renameNamed", {
+                                                        name: folder.name
+                                                    })}
                                                 />
                                                 <Button
                                                     size="icon"
                                                     variant="ghost"
                                                     title={tc("actions.save")}
                                                     aria-label={t("folders.saveName")}
-                                                    disabled={pending}
+                                                    disabled={
+                                                        pending ||
+                                                        !isDirty(folder.name, editingName)
+                                                    }
                                                     onClick={() =>
                                                         void save(folder.id, editingName)
                                                     }
@@ -185,7 +192,9 @@ export function FolderDialog({
                                                     size="icon"
                                                     variant="ghost"
                                                     title={t("vaults.rename")}
-                                                    aria-label={t("vaults.renameNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.renameNamed", {
+                                                        name: folder.name
+                                                    })}
                                                     onClick={() => {
                                                         setEditingId(folder.id);
                                                         setEditingName(folder.name);
@@ -197,7 +206,9 @@ export function FolderDialog({
                                                     size="icon"
                                                     variant="ghost"
                                                     title={t("vaults.delete")}
-                                                    aria-label={t("vaults.deleteNamed", { name: folder.name })}
+                                                    aria-label={t("vaults.deleteNamed", {
+                                                        name: folder.name
+                                                    })}
                                                     disabled={pending}
                                                     onClick={() => void remove(folder)}
                                                 >

@@ -22,7 +22,8 @@ import {
     Input,
     SegmentedControl,
     Textarea,
-    cn
+    cn,
+    isDirty
 } from "@polaris/ui";
 
 interface Draft {
@@ -69,9 +70,9 @@ export function RoomDialog({
     const [feature, setFeature] = useState("");
     const [busy, setBusy] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
-    const initial = JSON.stringify(draftOf(room));
+    const initial = draftOf(room);
     const parsed = roomInputSchema.safeParse(inputOf(draft));
-    const dirty = JSON.stringify(draft) !== initial;
+    const dirty = isDirty(initial, draft);
     const issueFor = (field: string) => {
         if (parsed.success) return null;
         const issues = parsed.error.issues.filter((issue) => issue.path[0] === field);

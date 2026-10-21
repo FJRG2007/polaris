@@ -38,7 +38,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 /** The list being edited, or the empty one being made. */
@@ -91,7 +92,10 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                 className="flex flex-wrap items-center gap-2 px-3 py-2"
                             >
                                 <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[0.8125rem]" title={list.name}>
+                                    <span
+                                        className="block truncate text-[0.8125rem]"
+                                        title={list.name}
+                                    >
                                         {list.name}
                                     </span>
                                     <span className="block text-[0.6875rem] text-foreground-subtle">
@@ -104,7 +108,9 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                             {t("lists.usedBy", {
                                                 fields: list.usedBy
                                                     .map((field) =>
-                                                        t(`fields.${field}.label` as const).toLocaleLowerCase(t.locale)
+                                                        t(
+                                                            `fields.${field}.label` as const
+                                                        ).toLocaleLowerCase(t.locale)
                                                     )
                                                     .join(", ")
                                             })}
@@ -130,7 +136,9 @@ export function ListsCard({ lists }: { lists: readonly PrivacyListView[] }) {
                                 <button
                                     type="button"
                                     title={
-                                        list.usedBy.length > 0 ? t("lists.inUse") : t("lists.deleteThis")
+                                        list.usedBy.length > 0
+                                            ? t("lists.inUse")
+                                            : t("lists.deleteThis")
                                     }
                                     aria-label={t("lists.deleteNamed", { name: list.name })}
                                     disabled={busy || list.usedBy.length > 0}
@@ -200,6 +208,13 @@ function ListDialog({
     const t = useTranslations("accountPrivacy");
     const tc = useTranslations("common");
     const named = core.privacyListSchema.shape.name.safeParse(editing.name).success;
+    const shape = (list: Editing) => ({
+        name: list.name,
+        members: new Set(list.members.map((person) => person.id))
+    });
+    // What the dialog opened with: a list edited back to it saves nothing.
+    const [opened] = useState(() => shape(editing));
+    const unchanged = editing.id !== null && !isDirty(opened, shape(editing));
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -234,7 +249,7 @@ function ListDialog({
                     </Button>
                     <Button
                         size="sm"
-                        disabled={!named || busy}
+                        disabled={!named || busy || unchanged}
                         onClick={() => void onSave(editing)}
                     >
                         {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}

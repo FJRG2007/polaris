@@ -64,6 +64,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input,
+    isDirty,
     Select,
     useToast
 } from "@polaris/ui";
@@ -319,6 +320,16 @@ export function AccountMenu({
         clearsAt !== null && !badMoment
             ? { until: new Date(clearsAt).toISOString() }
             : { minutes: clears };
+    // The line and the moment it clears exactly as the dialog opened on them.
+    // A length picked from the list is always a change: it counts from now.
+    const statusUnchanged = !isDirty(
+        {
+            line: shownStatus,
+            clears: null as number | null,
+            clearsAt: shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null
+        },
+        { line, clears, clearsAt }
+    );
 
     /** Store the line, or take it off. An empty one is the same request as
      *  pressing Clear, which is why there is only one path out of here. */
@@ -683,7 +694,7 @@ export function AccountMenu({
                             placeholder={t("account.status.placeholder")}
                             onChange={(event) => setLine(event.target.value)}
                             onKeyDown={(event) => {
-                                if (event.key === "Enter" && !badMoment) {
+                                if (event.key === "Enter" && !badMoment && !statusUnchanged) {
                                     void saveStatus(line, statusWindow);
                                 }
                             }}
@@ -738,7 +749,7 @@ export function AccountMenu({
                             </Button>
                         )}
                         <Button
-                            disabled={saving}
+                            disabled={saving || statusUnchanged}
                             aria-disabled={Boolean(badMoment)}
                             onClick={() => !badMoment && void saveStatus(line, statusWindow)}
                         >

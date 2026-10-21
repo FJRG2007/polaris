@@ -74,6 +74,18 @@ describe("a device's room", () => {
         );
     }
 
+    it("keeps Save off until a value differs from the device, reverts included", async () => {
+        open();
+        await painted();
+        const save = () => screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+        expect(save().disabled).toBe(true);
+        const name = screen.getByDisplayValue("Fixture lamp");
+        fireEvent.change(name, { target: { value: "Fixture lamp 2" } });
+        expect(save().disabled).toBe(false);
+        fireEvent.change(name, { target: { value: "Fixture lamp " } });
+        expect(save().disabled).toBe(true);
+    });
+
     it("is picked from the place's rooms and saved with the device", async () => {
         open();
         await painted();

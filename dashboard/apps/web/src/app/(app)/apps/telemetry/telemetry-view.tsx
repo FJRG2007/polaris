@@ -44,7 +44,8 @@ import {
     Input,
     ScrollRow,
     SegmentedControl,
-    Skeleton
+    Skeleton,
+    sameValue
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -364,7 +365,9 @@ function SectionNav({ open, onOpen }: { open: string; onOpen: (key: string) => v
                         <li key={section.key} className="shrink-0 lg:shrink">
                             <button
                                 type="button"
-                                title={t(`sections.${section.key}.hint` as NamespaceKey<"telemetry">)}
+                                title={t(
+                                    `sections.${section.key}.hint` as NamespaceKey<"telemetry">
+                                )}
                                 aria-current={active ? "page" : undefined}
                                 onClick={() => onOpen(section.key)}
                                 className={cn(
@@ -420,7 +423,7 @@ function ProjectSettings({
                 <span className="text-xs text-muted-foreground">{t("settings.days")}</span>
                 <Button
                     size="sm"
-                    disabled={saving || days === String(project.retentionDays)}
+                    disabled={saving || sameValue(days, project.retentionDays)}
                     onClick={async () => {
                         setSaving(true);
                         await runAction(
@@ -525,7 +528,9 @@ function ProjectAddress({
     return (
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">{t("client.reportTo")}</span>
+                <span className="text-xs font-medium text-muted-foreground">
+                    {t("client.reportTo")}
+                </span>
                 <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 font-mono text-xs">
                     {dsn}
                 </code>
@@ -558,7 +563,9 @@ function ProjectAddress({
                     </button>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground">{t("client.hint", { days: project.retentionDays })}</p>
+            <p className="text-xs text-muted-foreground">
+                {t("client.hint", { days: project.retentionDays })}
+            </p>
             {error && <p className="text-xs text-danger">{error}</p>}
 
             <ConfirmDeleteDialog
@@ -737,7 +744,9 @@ function IssuePanel({
                 <Fact label={t("issue.lastSeen")} value={<RelativeTime iso={issue.lastSeen} />} />
                 <Fact
                     label={t("issue.where")}
-                    value={issue.environments.join(", ") || issue.lastRelease || t("issue.notStated")}
+                    value={
+                        issue.environments.join(", ") || issue.lastRelease || t("issue.notStated")
+                    }
                 />
             </dl>
 

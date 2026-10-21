@@ -349,8 +349,7 @@ export function MinecraftChallenges({
         return () => clearTimeout(timer);
     }, [note]);
 
-    const dirty =
-        view !== null && draft !== null && JSON.stringify(draft) !== JSON.stringify(view.settings);
+    const dirty = view !== null && draft !== null && ui.isDirty(view.settings, draft);
     const checked = useMemo(
         () => (draft ? settingsModule.settingsSchema.safeParse(draft) : null),
         [draft]
@@ -1277,14 +1276,7 @@ function NumberField({
 
 /** The groups the settings are read under. */
 type SettingsGroup =
-    | "schedule"
-    | "layers"
-    | "difficulty"
-    | "who"
-    | "shown"
-    | "cheats"
-    | "season"
-    | "shared";
+    "schedule" | "layers" | "difficulty" | "who" | "shown" | "cheats" | "season" | "shared";
 
 function SettingsFields({
     settings,

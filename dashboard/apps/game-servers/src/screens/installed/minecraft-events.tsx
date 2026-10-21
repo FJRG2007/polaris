@@ -763,8 +763,7 @@ export function MinecraftEvents({
         [installedAppId]
     );
 
-    const dirty =
-        view !== null && draft !== null && JSON.stringify(draft) !== JSON.stringify(view.config);
+    const dirty = view !== null && draft !== null && ui.isDirty(view.config, draft);
 
     // Read on open and again on a beat: quickly while something is on, so the
     // clock and the standings move; slowly otherwise, so an event that starts

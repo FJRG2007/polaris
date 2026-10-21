@@ -75,7 +75,8 @@ import {
     DialogContent,
     Skeleton,
     SegmentedControl,
-    DialogDescription
+    DialogDescription,
+    isDirty
 } from "@polaris/ui";
 import { categoryWords, dymoRule } from "@/lib/integrations/registry-words";
 
@@ -1026,6 +1027,10 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
     const [deny, setDeny] = useState<Set<string>>(new Set(card.deny));
     const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { enabled, deny, apiKey };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
     const [saving, startSave] = useTransition();
 
     function toggleRule(value: string) {
@@ -1128,7 +1133,7 @@ function CriminalIpDialog({ card, onClose }: IntegrationDialogProps) {
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="button" onClick={onSave} disabled={saving}>
+                        <Button type="button" onClick={onSave} disabled={saving || unchanged}>
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
@@ -1158,6 +1163,10 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
     const [moduleUrl, setModuleUrl] = useState(card.filterModuleUrl ?? "");
     const [token, setToken] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { enabled, moduleUrl, token };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
     const [saving, startSave] = useTransition();
 
     function onSave() {
@@ -1247,7 +1256,7 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="button" onClick={onSave} disabled={saving}>
+                        <Button type="button" onClick={onSave} disabled={saving || unchanged}>
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
@@ -1275,6 +1284,10 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
     const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
     const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { enabled, apiKey };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
     const [saving, startSave] = useTransition();
     const switchLabel =
         card.slug === "lastfm" ? t("integrations.lastfm.switch") : t("integrations.tenor.search");
@@ -1344,7 +1357,7 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="button" onClick={onSave} disabled={saving}>
+                        <Button type="button" onClick={onSave} disabled={saving || unchanged}>
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
@@ -1418,6 +1431,10 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
     const [clientId, setClientId] = useState(card.oauthClientId ?? "");
     const [clientSecret, setClientSecret] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { enabled, clientId, clientSecret };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
     const [pending, startTransition] = useTransition();
 
     const canSave =
@@ -1539,7 +1556,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button onClick={onSave} disabled={pending || !canSave}>
+                        <Button onClick={onSave} disabled={pending || !canSave || unchanged}>
                             {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>
@@ -1564,6 +1581,10 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
     const [enabled, setEnabled] = useState(card.enabled || !card.hasSecret);
     const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const values = { enabled, apiKey };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
     const [pending, startTransition] = useTransition();
 
     function onSave() {
@@ -1640,7 +1661,7 @@ function SteamDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button onClick={onSave} disabled={pending}>
+                        <Button onClick={onSave} disabled={pending || unchanged}>
                             {pending ? tc("actions.saving") : tc("actions.save")}
                         </Button>
                     </div>

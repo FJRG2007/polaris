@@ -33,6 +33,7 @@ import {
     ConfirmDeleteDialog,
     EmptyState,
     Input,
+    isDirty,
     Select,
     cn
 } from "@polaris/ui";
@@ -83,7 +84,9 @@ function visibilityLine(
     props: Pick<SpaceScreenProps, "visibility" | "orgName">
 ): string {
     if (!props.orgName) {
-        return props.visibility === "internal" ? t("space.visibility.instance") : t("space.visibility.private");
+        return props.visibility === "internal"
+            ? t("space.visibility.instance")
+            : t("space.visibility.private");
     }
     return props.visibility === "internal"
         ? t("space.visibility.org", { org: props.orgName })
@@ -140,7 +143,10 @@ export function SpaceScreen(props: SpaceScreenProps) {
             </nav>
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -222,7 +228,10 @@ function OverviewTab({ lists }: { lists: readonly ListSummary[] }) {
                                 </Link>
                                 <ProgressBar percent={percent} />
                                 <p className="text-xs text-muted-foreground">
-                                    {t("space.overview.openOf", { open: list.openCount, total: list.totalCount })}
+                                    {t("space.overview.openOf", {
+                                        open: list.openCount,
+                                        total: list.totalCount
+                                    })}
                                 </p>
                             </CardBody>
                         </Card>
@@ -318,9 +327,7 @@ function StatusesTab({
 
     return (
         <section className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-                {t("space.statuses.hint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("space.statuses.hint")}</p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {ordered.map((status, index) =>
@@ -362,7 +369,18 @@ function StatusesTab({
                             />
                             <Button
                                 size="sm"
-                                disabled={!draft.name.trim() || saving}
+                                disabled={
+                                    !draft.name.trim() ||
+                                    saving ||
+                                    !isDirty(
+                                        {
+                                            name: status.name,
+                                            type: status.type,
+                                            color: status.color
+                                        },
+                                        draft
+                                    )
+                                }
                                 onClick={() => void save()}
                             >
                                 {saving ? t("space.saving") : tc("actions.save")}
@@ -547,13 +565,13 @@ function FieldsTab({
 
     return (
         <section className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-                {t("space.fields.hint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("space.fields.hint")}</p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {fields.length === 0 && (
-                    <li className="px-3 py-4 text-xs text-muted-foreground">{t("space.fields.empty")}</li>
+                    <li className="px-3 py-4 text-xs text-muted-foreground">
+                        {t("space.fields.empty")}
+                    </li>
                 )}
                 {fields.map((field) => (
                     <li key={field.id} className="flex items-center gap-3 px-3 py-2">
@@ -684,13 +702,13 @@ function TagsTab({
 
     return (
         <section className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-                {t("space.tags.hint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("space.tags.hint")}</p>
 
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {tags.length === 0 && (
-                    <li className="px-3 py-2 text-xs text-muted-foreground">{t("space.tags.empty")}</li>
+                    <li className="px-3 py-2 text-xs text-muted-foreground">
+                        {t("space.tags.empty")}
+                    </li>
                 )}
                 {tags.map((tag) =>
                     editing?.id === tag.id && draft ? (
@@ -699,21 +717,33 @@ function TagsTab({
                                 type="color"
                                 value={draft.color}
                                 aria-label={t("space.tags.color")}
-                                onChange={(event) => setDraft({ ...draft, color: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, color: event.target.value })
+                                }
                                 className="h-8 w-12 shrink-0 rounded border border-border bg-field"
                             />
                             <Input
                                 autoFocus
                                 value={draft.name}
                                 aria-label={t("space.tags.name")}
-                                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                                onChange={(event) =>
+                                    setDraft({ ...draft, name: event.target.value })
+                                }
                                 onKeyDown={(event) => {
                                     if (event.key === "Escape") setEditing(null);
                                     if (event.key === "Enter") void save();
                                 }}
                                 className="h-8 min-w-32 flex-1 text-sm"
                             />
-                            <Button size="sm" disabled={!draft.name.trim() || saving} onClick={() => void save()}>
+                            <Button
+                                size="sm"
+                                disabled={
+                                    !draft.name.trim() ||
+                                    saving ||
+                                    !isDirty({ name: tag.name, color: tag.color }, draft)
+                                }
+                                onClick={() => void save()}
+                            >
                                 {saving ? t("space.saving") : tc("actions.save")}
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
@@ -806,7 +836,11 @@ function TagsTab({
                 title={t("space.tags.deleteTitle")}
                 question={t.rich("deleteTask.question", {
                     name: removing?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={t("space.tags.removeDescription")}
                 confirmLabel={t("space.tags.remove")}
@@ -841,9 +875,7 @@ function PeopleTab({
 
     return (
         <section className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-                {t("space.people.hint")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("space.people.hint")}</p>
             <ul className="divide-y divide-border rounded-lg border border-border">
                 {members.map((member) => (
                     <PersonRow
@@ -864,7 +896,9 @@ function PeopleTab({
                             </p>
                         </div>
                         {member.role === "owner" ? (
-                            <span className="text-xs text-muted-foreground">{t("access.owner")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("access.owner")}
+                            </span>
                         ) : canManage ? (
                             <>
                                 <Select

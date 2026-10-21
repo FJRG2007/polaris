@@ -42,6 +42,7 @@ import {
     Skeleton,
     Switch,
     Textarea,
+    isDirty,
     useToast,
     type SelectOption
 } from "@polaris/ui";
@@ -859,7 +860,10 @@ function VersionsDialog({
                                                 size="icon-sm"
                                                 aria-label={t("versions.saveName")}
                                                 title={t("versions.saveName")}
-                                                disabled={nameCheck !== null && !nameCheck.success}
+                                                disabled={
+                                                    (nameCheck !== null && !nameCheck.success) ||
+                                                    !isDirty(row.name, renaming.value)
+                                                }
                                                 onClick={() => void rename(row, renaming.value)}
                                             >
                                                 <Check aria-hidden="true" />
@@ -979,15 +983,16 @@ function Settings({ detail, onSaved }: { detail: AutomationDetail; onSaved: () =
         rateLimit: detail.rateLimit
     });
     const parsed = core.automationSettingsSchema.safeParse(form);
-    const changed =
-        JSON.stringify(form) !==
-        JSON.stringify({
+    const changed = isDirty(
+        {
             name: detail.name,
             description: detail.description,
             mode: detail.mode,
             maxRuns: detail.maxRuns,
             rateLimit: detail.rateLimit
-        });
+        },
+        form
+    );
     const [pending, start] = useTransition();
     const modes: SelectOption[] = core.AUTOMATION_MODES.map((mode) => ({
         value: mode,

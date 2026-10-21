@@ -102,7 +102,8 @@ import {
     Input,
     ScrollRow,
     Skeleton,
-    Switch
+    Switch,
+    isDirty
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import type { AppHostTypes } from "@polaris/app-host";
@@ -1404,7 +1405,13 @@ function ConsolePasswordCard({
                         </label>
                         <Button
                             size="sm"
-                            disabled={pending || !isConsolePassword(draft) || !running}
+                            disabled={
+                                pending ||
+                                !isConsolePassword(draft) ||
+                                !running ||
+                                // The one already shown, typed again, changes nothing.
+                                (shown !== null && !isDirty(shown, draft))
+                            }
                             onClick={() =>
                                 startTransition(async () => {
                                     setError(null);
@@ -1419,7 +1426,7 @@ function ConsolePasswordCard({
                                     }
                                     setShown(draft);
                                     setDraft("");
-                                    setNote("Changed.");
+                                    setNote(t("panel.passwordChanged"));
                                 })
                             }
                         >

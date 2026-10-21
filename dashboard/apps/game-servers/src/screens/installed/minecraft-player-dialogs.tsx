@@ -834,6 +834,14 @@ export function PlayerAccessDialog({
     // What the addresses have to be for the form to be complete: nothing when
     // they will follow sign-ins, otherwise a new one or one already registered.
     const addressesReady = isAddressRule(rule) || (rule.length === 0 && editing && hasAddresses);
+    // An edit that adds an address they already have and leaves the note as it
+    // was would save exactly what is stored.
+    const unchanged =
+        editing &&
+        !following &&
+        !linking &&
+        !noteChanged &&
+        (rule.length === 0 || player.addresses.includes(rule));
     const ready = following
         ? true
         : linking
@@ -916,6 +924,7 @@ export function PlayerAccessDialog({
                         : t("players.addPlayer")
             }
             ready={ready || invited !== null}
+            unchanged={unchanged && invited === null}
             pending={pending || inviting}
             error={error}
             onClose={onClose}

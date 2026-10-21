@@ -69,6 +69,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    isDirty,
     Select
 } from "@polaris/ui";
 
@@ -104,10 +105,10 @@ export function VaultsView() {
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("vaults.title")}</h1>
-                    <p className="text-sm text-muted-foreground">
-                        {t("vaults.intro")}
-                    </p>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("vaults.title")}
+                    </h1>
+                    <p className="text-sm text-muted-foreground">{t("vaults.intro")}</p>
                 </div>
                 <Button size="sm" onClick={() => setCreating(true)}>
                     <Plus className="size-4" />
@@ -128,7 +129,9 @@ export function VaultsView() {
                     aria-label={t("vaults.picker")}
                     options={vaults.map((vault) => ({
                         value: pickerValue(vault),
-                        label: vault.organizationId ? t("vaults.orgOption", { name: vault.name }) : vault.name
+                        label: vault.organizationId
+                            ? t("vaults.orgOption", { name: vault.name })
+                            : vault.name
                     }))}
                 />
             )}
@@ -244,9 +247,7 @@ function NewVaultDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{t("vaults.newVault")}</DialogTitle>
-                    <DialogDescription>
-                        {t("vaults.newIntro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("vaults.newIntro")}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-2"
@@ -302,12 +303,8 @@ function AccountVaultPanel() {
                 <CardTitle>{t("vaults.ownTitle")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3 text-[0.8125rem] text-muted-foreground">
-                <p>
-                    {t("vaults.ownBody")}
-                </p>
-                <p>
-                    {t("vaults.ownShare")}
-                </p>
+                <p>{t("vaults.ownBody")}</p>
+                <p>{t("vaults.ownShare")}</p>
                 <Button asChild variant="outline" size="sm" className="self-start">
                     <Link href="/vault">{t("vaults.open")}</Link>
                 </Button>
@@ -380,9 +377,7 @@ function CreateOrganizationVault({
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-sm text-muted-foreground">
-                    {t("vaults.setUpIntro")}
-                </p>
+                <p className="text-sm text-muted-foreground">{t("vaults.setUpIntro")}</p>
                 <div className="flex justify-end">
                     <Button onClick={onCreate} disabled={pending}>
                         {pending ? (
@@ -480,12 +475,7 @@ function VaultPanel({
                 vaultCrypto.symmetricKeyBytes(vaultKey),
                 theirKey.publicKey
             );
-            const result = await share.confirmVaultMemberAction(
-                vaultId,
-                member.id,
-                wrapped,
-                scope
-            );
+            const result = await share.confirmVaultMemberAction(vaultId, member.id, wrapped, scope);
             if (result.error) {
                 onError(result.error);
                 return;
@@ -670,7 +660,9 @@ function VaultPanel({
                             </form>
                         ) : null}
                         {collections.length === 0 ? (
-                            <p className="py-2 text-sm text-muted-foreground">{t("vaults.noCollections")}</p>
+                            <p className="py-2 text-sm text-muted-foreground">
+                                {t("vaults.noCollections")}
+                            </p>
                         ) : (
                             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                                 {collections.map((collection) => (
@@ -686,7 +678,9 @@ function VaultPanel({
                                                 size="icon"
                                                 variant="ghost"
                                                 title={t("vaults.delete")}
-                                                aria-label={t("vaults.deleteNamed", { name: collection.name })}
+                                                aria-label={t("vaults.deleteNamed", {
+                                                    name: collection.name
+                                                })}
                                                 onClick={() => void onDeleteCollection(collection)}
                                             >
                                                 <Trash2 className="size-4" />
@@ -706,9 +700,7 @@ function VaultPanel({
                         <CardTitle>{t("vaults.members")}</CardTitle>
                     </CardHeader>
                     <CardBody className="flex flex-col gap-2">
-                        <p className="text-sm text-muted-foreground">
-                            {t("vaults.membersIntro")}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("vaults.membersIntro")}</p>
                         <div className="flex items-center gap-2">
                             {vault.organizationId ? (
                                 <Select
@@ -756,14 +748,18 @@ function VaultPanel({
                                             <Badge variant="neutral">
                                                 {member.accessAll
                                                     ? t("vaults.wholeVault")
-                                                    : t("vaults.collectionCount", { count: member.collections.length })}
+                                                    : t("vaults.collectionCount", {
+                                                          count: member.collections.length
+                                                      })}
                                             </Badge>
                                             <Badge variant="success">{t("vaults.holdsKey")}</Badge>
                                             <Button
                                                 size="icon"
                                                 variant="ghost"
                                                 title={t("vaults.changeScope")}
-                                                aria-label={t("vaults.changeScopeNamed", { email: member.email })}
+                                                aria-label={t("vaults.changeScopeNamed", {
+                                                    email: member.email
+                                                })}
                                                 onClick={() => setAccess(member)}
                                             >
                                                 <Pencil className="size-4" />
@@ -776,7 +772,9 @@ function VaultPanel({
                                                 size="icon"
                                                 variant="ghost"
                                                 title={t("vaults.letIn")}
-                                                aria-label={t("vaults.letInNamed", { email: member.email })}
+                                                aria-label={t("vaults.letInNamed", {
+                                                    email: member.email
+                                                })}
                                                 disabled={pending || !vaultKey}
                                                 onClick={() => setAccess(member)}
                                             >
@@ -792,7 +790,9 @@ function VaultPanel({
                                         size="icon"
                                         variant="ghost"
                                         title={t("vaults.remove")}
-                                        aria-label={t("vaults.removeNamed", { email: member.email })}
+                                        aria-label={t("vaults.removeNamed", {
+                                            email: member.email
+                                        })}
                                         onClick={() => void onRemove(member)}
                                     >
                                         <X className="size-4" />
@@ -812,7 +812,9 @@ function VaultPanel({
                     <CardBody className="flex flex-col gap-3">
                         {renaming === null ? (
                             <div className="flex items-center gap-2">
-                                <p className="min-w-0 flex-1 truncate text-sm" title={vault.name}>{vault.name}</p>
+                                <p className="min-w-0 flex-1 truncate text-sm" title={vault.name}>
+                                    {vault.name}
+                                </p>
                                 <Button
                                     size="icon"
                                     variant="ghost"
@@ -838,7 +840,15 @@ function VaultPanel({
                                     maxLength={core.VAULT_NAME_MAX}
                                     autoFocus
                                 />
-                                <Button type="submit" size="sm" disabled={pending}>
+                                <Button
+                                    type="submit"
+                                    size="sm"
+                                    disabled={
+                                        pending ||
+                                        !renaming.trim() ||
+                                        !isDirty(vault.name, renaming)
+                                    }
+                                >
                                     {tc("actions.save")}
                                 </Button>
                                 <Button
@@ -922,9 +932,7 @@ function AccessDialog({
         if (!member) return;
         setWhole(member.accessAll);
         setPicked(
-            new Map(
-                member.collections.map((entry) => [entry.id, { readOnly: entry.readOnly }])
-            )
+            new Map(member.collections.map((entry) => [entry.id, { readOnly: entry.readOnly }]))
         );
     }, [member]);
 
@@ -966,6 +974,19 @@ function AccessDialog({
     }
 
     const firstTime = member !== null && member.status !== core.ORG_USER_CONFIRMED;
+    // The access this member already has: nothing to save. Letting someone in
+    // for the first time always is.
+    const unchanged =
+        member !== null &&
+        !firstTime &&
+        !isDirty(
+            {
+                whole: member.accessAll,
+                picked: member.collections.map((entry) => [entry.id, entry.readOnly])
+            },
+            { whole, picked: [...picked.entries()].map(([id, options]) => [id, options.readOnly]) },
+            (value) => ({ whole: value.whole, picked: value.whole ? [] : [...value.picked].sort() })
+        );
     return (
         <Dialog open={member !== null} onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
@@ -975,9 +996,7 @@ function AccessDialog({
                             ? t("vaults.letInNamed", { email: member?.email ?? "" })
                             : t("vaults.scopeOf", { email: member?.email ?? "" })}
                     </DialogTitle>
-                    <DialogDescription>
-                        {t("vaults.scopeIntro")}
-                    </DialogDescription>
+                    <DialogDescription>{t("vaults.scopeIntro")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-2">
@@ -990,9 +1009,7 @@ function AccessDialog({
                         {t("vaults.theWholeVault")}
                     </label>
                     {whole ? null : collections.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                            {t("vaults.nothingToPick")}
-                        </p>
+                        <p className="text-sm text-muted-foreground">{t("vaults.nothingToPick")}</p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                             {collections.map((collection) => {
@@ -1020,7 +1037,9 @@ function AccessDialog({
                                                             event.target.checked
                                                         )
                                                     }
-                                                    aria-label={t("vaults.readOnlyIn", { name: collection.name })}
+                                                    aria-label={t("vaults.readOnlyIn", {
+                                                        name: collection.name
+                                                    })}
                                                 />
                                                 {t("vaults.readOnly")}
                                             </label>
@@ -1039,7 +1058,7 @@ function AccessDialog({
                     <Button
                         type="button"
                         onClick={onConfirm}
-                        disabled={pending || (!whole && picked.size === 0)}
+                        disabled={pending || (!whole && picked.size === 0) || unchanged}
                     >
                         {pending ? (
                             <Loader2 className="size-4 animate-spin" />

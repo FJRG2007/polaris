@@ -181,7 +181,8 @@ describe("the connection form", () => {
     it("asks for the secret again when the SSH login switches to a key", async () => {
         tunnelled(MANUAL_TUNNEL);
         const save = screen.getByRole("button", { name: /Save/ });
-        expect(save.hasAttribute("disabled")).toBe(false);
+        // Opened as saved: nothing to save yet.
+        expect(save.hasAttribute("disabled")).toBe(true);
 
         await userEvent.click(screen.getByRole("radio", { name: "Private key" }));
 

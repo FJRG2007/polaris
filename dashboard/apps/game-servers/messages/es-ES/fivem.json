@@ -71,7 +71,8 @@
         "reading": "Leyendo el servidor...",
         "nobodyAtAll": "No hay nadie jugando, y aún no se ha añadido a nadie.",
         "notAnswering": "El servidor no responde.",
-        "savedRestart": "Guardado. Reinicia el servidor para que lo use."
+        "savedRestart": "Guardado. Reinicia el servidor para que lo use.",
+        "passwordChanged": "Cambiada."
     },
     "resources": {
         "whatThisServerRunsA": "Lo que ejecuta este servidor. Un recurso recién añadido tiene que iniciarse antes de hacer nada.",

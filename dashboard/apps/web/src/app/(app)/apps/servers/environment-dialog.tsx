@@ -10,7 +10,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import type { ServerEnvironment } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    isDirty
+} from "@polaris/ui";
 import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -77,7 +86,9 @@ export function EnvironmentDialog({
         >
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t("environment.title", { name: target?.name ?? "" })}</DialogTitle>
+                    <DialogTitle>
+                        {t("environment.title", { name: target?.name ?? "" })}
+                    </DialogTitle>
                     <DialogDescription>{t("environment.intro")}</DialogDescription>
                 </DialogHeader>
                 {suggestion ? (
@@ -117,13 +128,17 @@ export function EnvironmentDialog({
                                         </span>
                                     ) : null}
                                 </span>
-                                <span className="text-xs text-muted-foreground">{meta.summary}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {meta.summary}
+                                </span>
                                 <span className="text-xs text-foreground/70">{meta.routing}</span>
                             </button>
                         );
                     })}
                 </div>
-                {target?.hostId ? <ServerWildcard hostId={target.hostId} current={target.wildcardDomain} /> : null}
+                {target?.hostId ? (
+                    <ServerWildcard hostId={target.hostId} current={target.wildcardDomain} />
+                ) : null}
                 {error ? <p className="mt-2 text-sm text-danger">{error}</p> : null}
             </DialogContent>
         </Dialog>
@@ -173,7 +188,15 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                         placeholder="apps.example.com" // i18n-ignore example domain
                         autoComplete="off"
                     />
-                    <Button size="sm" variant="secondary" onClick={save} disabled={saving || value === current}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={save}
+                        disabled={
+                            saving ||
+                            !isDirty(current, value, (domain) => domain.trim().toLowerCase())
+                        }
+                    >
                         {saving ? tcommon("actions.saving") : tcommon("actions.save")}
                     </Button>
                 </div>

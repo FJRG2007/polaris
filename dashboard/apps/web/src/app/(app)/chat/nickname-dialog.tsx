@@ -25,7 +25,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    isDirty
 } from "@polaris/ui";
 
 /** The longest a nickname may be, matching what the action will accept. A box
@@ -73,9 +74,7 @@ export function NicknameDialog({
                     placeholder={t("nickname.leaveItEmptyToUse")}
                     onChange={(event) => setNickname(event.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                    {t("nickname.onlyYouSeeThisThey")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("nickname.onlyYouSeeThisThey")}</p>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <DialogFooter>
                     <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
@@ -83,6 +82,8 @@ export function NicknameDialog({
                     </Button>
                     <Button
                         size="sm"
+                        // What they are already called is nothing to save.
+                        disabled={!person || !isDirty(person.name, nickname)}
                         onClick={async () => {
                             if (!person) return;
                             const result = await runAction(

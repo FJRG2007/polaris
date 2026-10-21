@@ -85,7 +85,8 @@ import {
     Skeleton,
     Switch,
     Textarea,
-    cn
+    cn,
+    isDirty
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 
@@ -297,6 +298,9 @@ export function ConnectionDialog({
         ]
     );
 
+    // The connection as it was opened: an edit that ends where it started saves nothing.
+    const loaded = useRef(draft).current;
+
     // The same schema the action parses. A field with nothing in it yet is
     // incomplete rather than wrong, so its message is held back until something
     // has been typed into it - see `shown`.
@@ -371,6 +375,9 @@ export function ConnectionDialog({
     // unanswered: a connection quietly becoming a direct one is nobody's choice.
     const jumpGone = saved?.mode === "manual" && saved.jumpMissing;
     const jumpUnpicked = ssh?.mode === "manual" && jumpGone && jumpId === JUMP_UNPICKED;
+    // A removed jump server is the exception: answering its picker repairs a
+    // reference the draft cannot show, even when the draft reads the same.
+    const unchanged = connection !== null && !jumpGone && !isDirty(loaded, draft);
 
     // The same for a tunnel through a registered server that was removed.
     const serverGone = saved?.mode === "server" && saved.hostId === null;
@@ -1075,7 +1082,7 @@ export function ConnectionDialog({
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={() => void save()} disabled={!complete || saving}>
+                    <Button onClick={() => void save()} disabled={!complete || saving || unchanged}>
                         {saving && <Loader2 className="size-4 animate-spin" />}
                         <Plug className="size-4" />
                         {connection ? tcommon("actions.save") : t("dialog.add")}
