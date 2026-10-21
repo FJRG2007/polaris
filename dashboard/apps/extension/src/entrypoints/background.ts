@@ -2630,8 +2630,7 @@ async function fillTab(
                     : [login.username, login.password, code, submit, login.email]
         });
         const filled = outcome?.result as
-            | { user?: boolean; pass?: boolean; code?: boolean }
-            | undefined;
+            { user?: boolean; pass?: boolean; code?: boolean } | undefined;
         if (!filled?.user && !filled?.pass && !filled?.code) {
             return { ok: false, error: await say("errors.noLoginForm") };
         }

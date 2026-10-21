@@ -36,7 +36,8 @@ const NO_FRONT: Front = { tabId: null, site: null, known: true };
 /** Reads the page inside the tab, the way each browser lets an extension. */
 async function readTab(tabId: number): Promise<polar.SharedPage | null> {
     try {
-        const scripting = (browser as unknown as { scripting?: typeof browser.scripting }).scripting;
+        const scripting = (browser as unknown as { scripting?: typeof browser.scripting })
+            .scripting;
         if (scripting?.executeScript) {
             const [first] = await scripting.executeScript({
                 target: { tabId },

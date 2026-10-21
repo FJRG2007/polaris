@@ -60,9 +60,13 @@ describe("the frame", () => {
         const frame = {};
         const data = { source: polar.FROM_EMBED, kind: "refresh" };
         expect(polar.isRefresh({ data, origin: SERVER, source: frame }, frame, SERVER)).toBe(true);
-        expect(polar.isRefresh({ data, origin: "https://evil.example", source: frame }, frame, SERVER)).toBe(false);
+        expect(
+            polar.isRefresh({ data, origin: "https://evil.example", source: frame }, frame, SERVER)
+        ).toBe(false);
         expect(polar.isRefresh({ data, origin: SERVER, source: {} }, frame, SERVER)).toBe(false);
-        expect(polar.isRefresh({ data: "refresh", origin: SERVER, source: frame }, frame, SERVER)).toBe(false);
+        expect(
+            polar.isRefresh({ data: "refresh", origin: SERVER, source: frame }, frame, SERVER)
+        ).toBe(false);
     });
 
     it("adds nothing a web page may ask the worker for", () => {
@@ -73,10 +77,9 @@ describe("the frame", () => {
 
 describe("the shortcut", () => {
     it("is Alt+P on Chromium, as a command the worker answers", () => {
-        const commands = manifestFor({ browser: "chrome", manifestVersion: 3 })["commands"] as Record<
-            string,
-            { suggested_key: { default: string }; description: string }
-        >;
+        const commands = manifestFor({ browser: "chrome", manifestVersion: 3 })[
+            "commands"
+        ] as Record<string, { suggested_key: { default: string }; description: string }>;
         expect(commands[polar.OPEN_POLAR]?.suggested_key.default).toBe(polar.DEFAULT_SHORTCUT);
         expect(commands[polar.OPEN_POLAR]?.description).toBe("__MSG_commandOpenPolar__");
         expect(commands[polar.FIREFOX_SIDEBAR]).toBeUndefined();
@@ -86,16 +89,18 @@ describe("the shortcut", () => {
     });
 
     it("is Firefox's own sidebar command there", () => {
-        const commands = manifestFor({ browser: "firefox", manifestVersion: 2 })["commands"] as Record<
-            string,
-            { suggested_key: { default: string } }
-        >;
+        const commands = manifestFor({ browser: "firefox", manifestVersion: 2 })[
+            "commands"
+        ] as Record<string, { suggested_key: { default: string } }>;
         expect(commands[polar.FIREFOX_SIDEBAR]?.suggested_key.default).toBe(polar.DEFAULT_SHORTCUT);
         expect(commands[polar.OPEN_POLAR]).toBeUndefined();
     });
 
     it("is read from a key press the way Firefox takes one", () => {
-        const press = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
+        const press = (
+            code: string,
+            mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}
+        ) => ({
             code,
             ctrlKey: false,
             altKey: false,
@@ -104,7 +109,9 @@ describe("the shortcut", () => {
             ...mods
         });
         expect(polar.shortcutFrom(press("KeyP", { altKey: true }), false)).toBe("Alt+P");
-        expect(polar.shortcutFrom(press("KeyK", { ctrlKey: true, shiftKey: true }), false)).toBe("Ctrl+Shift+K");
+        expect(polar.shortcutFrom(press("KeyK", { ctrlKey: true, shiftKey: true }), false)).toBe(
+            "Ctrl+Shift+K"
+        );
         expect(polar.shortcutFrom(press("KeyK", { metaKey: true }), true)).toBe("Command+K");
         expect(polar.shortcutFrom(press("Digit4", { altKey: true }), false)).toBe("Alt+4");
         expect(polar.shortcutFrom(press("F7"), false)).toBe("F7");
