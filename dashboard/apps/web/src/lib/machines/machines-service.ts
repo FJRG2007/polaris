@@ -5,10 +5,13 @@
  * health probe already writes, and the history from Watch's alarm events.
  *
  * Owner-scoped, as Watch is: a server, a container and a domain are the
- * account's own. Server-only.
+ * account's own - except a server or a domain lent to them to watch
+ * (machine-access), which is read as its owner's and nothing more. Server-only.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
+import { grantedSubjects } from "@/lib/access/grants";
+import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import type { AlarmEventPoint } from "@/lib/machines/alarm-episodes";
 import { inPlaces } from "@/lib/machines/machine-links";
 import { getWatchContainers, getWatchServers, type WatchCard } from "@/lib/watch-overview-service";
@@ -43,9 +46,56 @@ export async function machineContainers(ownerId: string): Promise<WatchCard[]> {
     return (await getWatchContainers(ownerId)).map(inPlaces);
 }
 
+/**
+ * The servers lent to this account to watch, as cards: each owner's own cards,
+ * cut to the lent ones, with where the server lives left out. The machine
+ * Polaris runs on never appears here, whatever a row says.
+ */
+export async function lentMachineServers(userId: string, lentLabel: string): Promise<WatchCard[]> {
+    const lent = [...(await grantedSubjects(userId, "place.server")).keys()];
+    if (lent.length === 0) return [];
+    const [hosts, identity] = await Promise.all([
+        prisma.host.findMany({
+            where: { id: { in: lent }, ownerId: { not: userId } },
+            select: { id: true, ownerId: true, address: true, dockerId: true },
+            take: MAX_DOMAINS
+        }),
+        localMachineIdentity()
+    ]);
+    const byOwner = new Map<string, Set<string>>();
+    for (const host of hosts) {
+        if (isLocalMachine(host, identity)) continue;
+        byOwner.set(host.ownerId, (byOwner.get(host.ownerId) ?? new Set()).add(host.id));
+    }
+    const perOwner = await Promise.all(
+        [...byOwner].map(async ([ownerId, ids]) =>
+            (await getWatchServers(ownerId)).filter((card) => ids.has(card.id))
+        )
+    );
+    return perOwner.flat().map((card) => ({ ...inPlaces(card), detail: lentLabel }));
+}
+
+/** The domains lent to this account to watch, with the service behind each
+ *  left out. */
+export async function lentMachineDomains(userId: string, id?: string): Promise<DomainDevice[]> {
+    const lent = [...(await grantedSubjects(userId, "place.domain")).keys()].filter(
+        (entry) => !id || entry === id
+    );
+    if (lent.length === 0) return [];
+    const rows = await readDomains({
+        id: { in: lent },
+        application: { environment: { project: { ownerId: { not: userId } } } }
+    });
+    return rows.map((row) => ({ ...row, service: "", serviceId: "", projectId: "" }));
+}
+
 export async function machineDomains(ownerId: string, id?: string): Promise<DomainDevice[]> {
+    return readDomains({ ...(id ? { id } : {}), application: { environment: { project: { ownerId } } } });
+}
+
+async function readDomains(where: Prisma.DomainWhereInput): Promise<DomainDevice[]> {
     const rows = await prisma.domain.findMany({
-        where: { ...(id ? { id } : {}), application: { environment: { project: { ownerId } } } },
+        where,
         select: {
             id: true,
             hostname: true,

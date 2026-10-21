@@ -26,6 +26,7 @@ import { requireSpace as requireNoteSpace } from "@/lib/notes/access";
 import { requireShareable as requireOfficeShareable } from "@/lib/office/documents";
 import { requireSpace as requireChatSpace, requireChannel } from "@/lib/chat/access";
 import { requireSpace as requireTaskSpace, requireFolder } from "@/lib/tasks/access";
+import { domainOwner, lendableServer } from "@/lib/machines/machine-access";
 
 /**
  * Refuse unless this account may hand this thing to somebody else.
@@ -90,6 +91,21 @@ export async function requireMayShare(
                 select: { id: true }
             });
             if (!nas) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "place.server": {
+            // A registered server is lent by whoever registered it. The machine
+            // Polaris runs on is never lent from here: whether anybody outside
+            // may watch it is the operator's call, so it is refused rather than
+            // owned.
+            const host = await lendableServer(subjectId);
+            if (!host || host.ownerId !== user.id) throw new GrantError("You cannot share that");
+            return;
+        }
+        case "place.domain": {
+            // A domain is lent by whoever owns the project it answers for.
+            const domain = await domainOwner(subjectId);
+            if (!domain || domain.ownerId !== user.id) throw new GrantError("You cannot share that");
             return;
         }
     }
@@ -278,7 +294,9 @@ export function shareIsBounded(subject: core.GrantSubject): boolean {
         subject === "place.device" ||
         subject === "place.camera" ||
         subject === "place.ups" ||
-        subject === "place.nas"
+        subject === "place.nas" ||
+        subject === "place.server" ||
+        subject === "place.domain"
     );
 }
 

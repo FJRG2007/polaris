@@ -14,7 +14,8 @@ import Link from "next/link";
 import { Button } from "@polaris/ui";
 import { useMemo, useState } from "react";
 import { formatBytes } from "@polaris/core";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Share2 } from "lucide-react";
+import { ShareDialog } from "@/components/access/share-dialog";
 import type { WatchCard } from "@/lib/watch-overview-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -34,6 +35,8 @@ export function MachineDetailView({
     id,
     name,
     detail,
+    lent = false,
+    shareable = false,
     breakdowns = [],
     history,
     container,
@@ -43,6 +46,10 @@ export function MachineDetailView({
     id: string;
     name: string;
     detail: string | null;
+    /** Lent to the reader to watch: nothing that leads into the owner's apps. */
+    lent?: boolean;
+    /** The owner may lend it. The machine Polaris runs on never is. */
+    shareable?: boolean;
     breakdowns?: BreakdownMetric[];
     history?: { since: number; events: AlarmEventPoint[] };
     container?: WatchCard;
@@ -51,6 +58,8 @@ export function MachineDetailView({
     const t = useTranslations("servers");
     const tw = useTranslations("watch");
     const [opened, setOpened] = useState<OpenBreakdown | null>(null);
+    const [sharing, setSharing] = useState(false);
+    const shareSubject = kind === "server" ? "place.server" : kind === "domain" ? "place.domain" : null;
 
     const metrics = useMemo(
         () =>
@@ -68,8 +77,9 @@ export function MachineDetailView({
         [breakdowns, tw]
     );
 
-    const elsewhere =
-        kind === "server"
+    const elsewhere = lent
+        ? null
+        : kind === "server"
             ? { href: "/apps/servers", label: t("machines.openServers") }
             : kind === "container"
               ? { href: container?.href.startsWith("/apps/") ? container.href : "/apps/containers", label: t("machines.openContainers") }
@@ -96,14 +106,24 @@ export function MachineDetailView({
                         </p>
                     ) : null}
                 </div>
-                {elsewhere ? (
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href={elsewhere.href}>
-                            <ExternalLink className="size-4 shrink-0" /> {elsewhere.label}
-                        </Link>
-                    </Button>
-                ) : null}
+                <div className="flex flex-wrap items-center gap-1">
+                    {elsewhere ? (
+                        <Button asChild variant="ghost" size="sm">
+                            <Link href={elsewhere.href}>
+                                <ExternalLink className="size-4 shrink-0" /> {elsewhere.label}
+                            </Link>
+                        </Button>
+                    ) : null}
+                    {shareSubject && shareable ? (
+                        <Button variant="ghost" size="sm" onClick={() => setSharing(true)}>
+                            <Share2 className="size-4 shrink-0" aria-hidden /> {t("machines.share")}
+                        </Button>
+                    ) : null}
+                </div>
             </div>
+            {kind === "server" && !lent && !shareable ? (
+                <p className="-mt-3 text-xs text-muted-foreground">{t("machines.localNotLent")}</p>
+            ) : null}
 
             {kind === "server" ? (
                 <section className="flex flex-col gap-2">
@@ -120,6 +140,17 @@ export function MachineDetailView({
             {container ? <ContainerNow card={container} /> : null}
             {domain ? <DomainNow domain={domain} /> : null}
             {history ? <AlarmHistory history={history} /> : null}
+
+            {shareSubject && shareable ? (
+                <ShareDialog
+                    open={sharing}
+                    onOpenChange={setSharing}
+                    subject={shareSubject}
+                    subjectId={id}
+                    name={name}
+                    bounded
+                />
+            ) : null}
         </div>
     );
 }
