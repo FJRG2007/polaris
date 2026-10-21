@@ -569,6 +569,8 @@
         "dialsPort": "Traffic to this address goes to port {port} of the service.",
         "edit": "Edit domain",
         "editOn": "Edit {hostname}",
+        "places": "Open in Places",
+        "placesOn": "Watch {hostname} in Places",
         "editTitle": "Edit domain",
         "subdomain": "Subdomain",
         "checking": "Checking...",

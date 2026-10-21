@@ -19,6 +19,7 @@
         "shell": "Open a shell",
         "filesOn": "Browse the files on {name}",
         "files": "Browse its files",
+        "placesOn": "Watch {name} in Places",
         "enable": "Enable shell and files",
         "detailsHint": "Usage, load and connection details",
         "stopReaching": "Stop reaching {name} over SSH",

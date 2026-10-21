@@ -19,6 +19,7 @@
         "shell": "Abrir terminal",
         "filesOn": "Ver los archivos de {name}",
         "files": "Ver sus archivos",
+        "placesOn": "Ver {name} en Lugares",
         "enable": "Activar terminal y archivos",
         "detailsHint": "Uso, carga y datos de conexión",
         "stopReaching": "Dejar de acceder a {name} por SSH",

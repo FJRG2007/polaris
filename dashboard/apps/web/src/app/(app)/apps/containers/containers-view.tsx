@@ -22,6 +22,7 @@ import { formatAge, STALE_AFTER_MS } from "./freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PolarisFootprintCard } from "./polaris-footprint";
 import { containerStateLabel } from "./container-words";
+import { containerMachineId, machineHref } from "@/lib/machines/machine-links";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLiveResource } from "@/components/use-live-resource";
 import {
@@ -55,6 +56,7 @@ import {
     Boxes,
     Cpu,
     FileText,
+    House,
     MemoryStick,
     Play,
     RefreshCw,
@@ -277,6 +279,10 @@ export function ContainersView({
     /** A container's own page, on the host it was listed from. Named rather than
      *  identified: it is what Docker calls it, what every call here accepts in
      *  place of an id, and what makes the address worth sending to somebody. */
+    function placesId(container: ContainerRow): string | null {
+        return selected ? containerMachineId(selected, container.id) : null;
+    }
+
     function containerHref(container: ContainerRow, tab: ContainerTab): string {
         const base = `/apps/containers/${encodeURIComponent(container.name)}?c=${encodeURIComponent(connectionId!)}`;
         return tab === "details" ? base : `${base}&tab=${tab}`;
@@ -558,6 +564,17 @@ export function ContainersView({
                                                 />
                                                 <td className="px-3 py-2">
                                                     <div className="flex justify-end gap-1">
+                                                        {placesId(container) ? (
+                                                            <IconLink
+                                                                label={t("actions.places")}
+                                                                href={machineHref(
+                                                                    "container",
+                                                                    placesId(container)!
+                                                                )}
+                                                            >
+                                                                <House className="size-4" />
+                                                            </IconLink>
+                                                        ) : null}
                                                         <IconLink
                                                             label={t("actions.logs")}
                                                             href={containerHref(container, "logs")}

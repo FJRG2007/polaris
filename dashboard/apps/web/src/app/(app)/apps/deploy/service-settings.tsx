@@ -16,7 +16,7 @@ import { DomainCutoverButton } from "./domain-cutover";
 import { DomainPrivateButton } from "./domain-private";
 import { EdgeSettings } from "./edge-settings";
 import * as publicNet from "./public-networking";
-import { useProjectCan } from "./access-context";
+import { useProjectCan, useProjectIsOwner } from "./access-context";
 import { GpuCard } from "./gpu-card";
 import { ScalingSection } from "./scaling-section";
 import type { ProjectApp } from "./deploy-view";
@@ -34,6 +34,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { machineHref } from "@/lib/machines/machine-links";
 import { PrivateNetworkPanel, privateNetworkAnchor } from "./private-network-panel";
 import { Fragment, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { addTcpProxyAction, setDomainPortByHostnameAction } from "./public-networking-actions";
@@ -69,6 +70,7 @@ import {
     Gauge,
     GitBranch,
     Globe,
+    House,
     Loader2,
     MapPin,
     Network,
@@ -1228,6 +1230,7 @@ function SourceCards({
 function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () => void }) {
     const t = useTranslations("deployService");
     const can = useProjectCan();
+    const isOwner = useProjectIsOwner();
     // Each tunnel's live hostname, by kind. A domain row for the same name - one
     // added by hand before such names were refused - stays listed so it can still
     // be removed, marked as the tunnel's name; the tunnel's row has the true state.
@@ -1702,6 +1705,21 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                                 ports={ports}
                                                 onChanged={onChanged}
                                             />
+                                        )}
+                                        {isOwner && (
+                                            <Link
+                                                href={machineHref("domain", domain.id)}
+                                                aria-label={t("publicNet.placesOn", {
+                                                    hostname: domain.hostname
+                                                })}
+                                                title={t("publicNet.places")}
+                                                className={cn(
+                                                    "shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                                    revealOnHover
+                                                )}
+                                            >
+                                                <House className="size-3.5" />
+                                            </Link>
                                         )}
                                         <DomainCertificateButton
                                             domainId={domain.id}

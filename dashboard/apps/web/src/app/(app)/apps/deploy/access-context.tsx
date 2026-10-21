@@ -19,17 +19,22 @@ import { createContext, useContext, type ReactNode } from "react";
 import { ALL_PROJECT_CAPABILITIES, type ProjectCapability } from "@polaris/core";
 
 const ProjectAccessContext = createContext<readonly ProjectCapability[]>(ALL_PROJECT_CAPABILITIES);
+/** Whether the reader owns the project. Some screens elsewhere (Places) are the
+ *  owner's own, so a way into them is drawn only for the owner. */
+const ProjectOwnerContext = createContext(true);
 
 export function ProjectAccessProvider({
     capabilities,
+    isOwner = true,
     children
 }: {
     capabilities: readonly ProjectCapability[];
+    isOwner?: boolean;
     children: ReactNode;
 }) {
     return (
         <ProjectAccessContext.Provider value={capabilities}>
-            {children}
+            <ProjectOwnerContext.Provider value={isOwner}>{children}</ProjectOwnerContext.Provider>
         </ProjectAccessContext.Provider>
     );
 }
@@ -38,4 +43,9 @@ export function ProjectAccessProvider({
 export function useProjectCan(): (capability: ProjectCapability) => boolean {
     const held = useContext(ProjectAccessContext);
     return (capability) => held.includes(capability);
+}
+
+/** Whether the reader owns this project. */
+export function useProjectIsOwner(): boolean {
+    return useContext(ProjectOwnerContext);
 }

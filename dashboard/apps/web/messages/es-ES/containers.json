@@ -67,7 +67,8 @@
         "console": "Consola",
         "restart": "Reiniciar",
         "stop": "Detener",
-        "start": "Iniciar"
+        "start": "Iniciar",
+        "places": "Abrir en Lugares"
     },
     "overview": {
         "containers": "Contenedores",
