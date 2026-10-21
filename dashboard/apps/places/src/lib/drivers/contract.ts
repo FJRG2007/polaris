@@ -12,6 +12,7 @@
  */
 
 import type {
+    LitterView,
     AirSettings,
     LightSettings,
     ApplianceView,
@@ -78,6 +79,8 @@ export interface DeviceSnapshot {
     readonly light?: LightSettings | null;
     /** What a kitchen appliance is doing, as far as it says. */
     readonly appliance?: ApplianceView | null;
+    /** What a litter box is doing, how full it is and who used it. */
+    readonly litter?: LitterView | null;
 }
 
 /** One thing that happened, as the vendor's own record of it. */

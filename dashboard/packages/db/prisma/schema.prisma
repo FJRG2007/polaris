@@ -11316,6 +11316,10 @@ model PlaceDevice {
     /// machine) last reported doing - its status, programme, temperatures and
     /// time left - as `appliance-kinds` validates it. Null for every other kind.
     appliance      Json?
+    /// What a litter box last reported - its cycle, litter level, waste bin,
+    /// deodorizer, today's visits and settings - as `litter-kinds` validates it.
+    /// Null for every other kind.
+    litter         Json?
     /// open | closed | unknown | none - the door itself, when a sensor is paired.
     /// `none` is no sensor, which is not the same as not knowing.
     doorState      String    @default("none")

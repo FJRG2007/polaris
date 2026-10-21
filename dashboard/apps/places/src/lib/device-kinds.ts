@@ -29,6 +29,14 @@ import {
 
 import { applianceStatusText, type ApplianceView } from "./appliance-kinds";
 import {
+    applyLitter,
+    litterCommandIssue,
+    litterCommandSchema,
+    litterStatusText,
+    type LitterCommand,
+    type LitterView
+} from "./litter-kinds";
+import {
     applyLight,
     lightCommandIssue,
     lightCommandSchema,
@@ -38,6 +46,7 @@ import {
 
 export * from "./air-kinds";
 export * from "./appliance-kinds";
+export * from "./litter-kinds";
 export * from "./light-kinds";
 
 /** What a device does, which is what decides the buttons it gets. */
@@ -50,7 +59,8 @@ export const DEVICE_KINDS = [
     "outlet",
     "light",
     "sensor",
-    "appliance"
+    "appliance",
+    "litter"
 ] as const;
 
 export type DeviceKind = (typeof DEVICE_KINDS)[number];
@@ -64,7 +74,8 @@ export const DEVICE_KIND_LABELS: Readonly<Record<DeviceKind, string>> = {
     outlet: en("devices.kinds.outlet"),
     light: en("devices.kinds.light"),
     sensor: en("devices.kinds.sensor"),
-    appliance: en("devices.kinds.appliance")
+    appliance: en("devices.kinds.appliance"),
+    litter: en("devices.kinds.litter")
 };
 
 /** Devices of the same sort, listed together. A place has a handful of doors and
@@ -78,7 +89,8 @@ export const DEVICE_GROUP_LABELS: Readonly<Record<DeviceKind, string>> = {
     outlet: en("devices.groups.outlet"),
     light: en("devices.groups.light"),
     sensor: en("devices.groups.sensor"),
-    appliance: en("devices.groups.appliance")
+    appliance: en("devices.groups.appliance"),
+    litter: en("devices.groups.litter")
 };
 
 /** Whether a word off a device row is a kind this build knows. A device synced by
@@ -283,7 +295,12 @@ export const DEVICE_ACTIONS = [
     "set-brightness",
     "set-color-temp",
     "set-color",
-    "stop"
+    "stop",
+    "clean",
+    "pause",
+    "resume",
+    "dump",
+    "reset-deodorizer"
 ] as const;
 
 export type DeviceAction = (typeof DEVICE_ACTIONS)[number];
@@ -321,7 +338,12 @@ export const DEVICE_ACTION_LABELS: Readonly<Record<DeviceAction, string>> = {
     "set-brightness": en("devices.actions.set-brightness"),
     "set-color-temp": en("devices.actions.set-color-temp"),
     "set-color": en("devices.actions.set-color"),
-    stop: en("devices.actions.stop")
+    stop: en("devices.actions.stop"),
+    clean: en("devices.actions.clean"),
+    pause: en("devices.actions.pause"),
+    resume: en("devices.actions.resume"),
+    dump: en("devices.actions.dump"),
+    "reset-deodorizer": en("devices.actions.reset-deodorizer")
 };
 
 /** The same actions as something a sentence can be built out of. The label on a
@@ -341,7 +363,12 @@ export const DEVICE_ACTION_VERBS: Readonly<Record<DeviceAction, string>> = {
     "set-brightness": "change brightness",
     "set-color-temp": "change color temperature",
     "set-color": "change color",
-    stop: "stop"
+    stop: "stop",
+    clean: "clean",
+    pause: "pause",
+    resume: "resume",
+    dump: "empty out its litter",
+    "reset-deodorizer": "reset its deodorizer"
 };
 
 /**
@@ -374,7 +401,10 @@ const KIND_ACTIONS: Readonly<Record<DeviceKind, readonly DeviceAction[]>> = {
     // A kitchen appliance is watched, and may be stopped from here. Nothing that
     // starts it is offered: it would be heating with nobody there to see it.
     // Whether one can be stopped at all is the unit's (`stoppable`).
-    appliance: ["stop"]
+    appliance: ["stop"],
+    // A litter box runs its cycles when told, and is set the way its app sets
+    // it. Which settings a box has is the box's (`litterCommandIssue`).
+    litter: ["clean", "pause", "resume", "dump", "reset-deodorizer", "set-option"]
 };
 
 export function actionsFor(kind: string): readonly DeviceAction[] {
@@ -623,7 +653,7 @@ export function applyClimate(settings: ClimateSettings, command: ClimateCommand)
 
 /** One change to a device that takes a setting: an air conditioner's or a
  *  purifier's. The two share action words and differ in what they carry. */
-export type DeviceCommand = ClimateCommand | AirCommand | LightCommand;
+export type DeviceCommand = ClimateCommand | AirCommand | LightCommand | LitterCommand;
 
 /** The shape of a setting as it arrives from anywhere, either kind's. Which kind
  *  it has to be is the device's to decide: `commandIssue` checks it again
@@ -631,7 +661,8 @@ export type DeviceCommand = ClimateCommand | AirCommand | LightCommand;
 export const deviceCommandSchema = z.union([
     climateCommandSchema,
     airCommandSchema,
-    lightCommandSchema
+    lightCommandSchema,
+    litterCommandSchema
 ]);
 
 /** What a device holds that a command is checked against. */
@@ -641,6 +672,8 @@ export interface CommandTarget {
     readonly air: AirSettings | null;
     /** A light's; optional so a caller that never targets a light needs none. */
     readonly light?: LightSettings | null;
+    /** A litter box's; optional like a light's. */
+    readonly litter?: LitterView | null;
 }
 
 /** The command, read as the device's own kind's, or null when it is not one. */
@@ -651,6 +684,7 @@ export function commandFor(
     | { kind: "climate"; command: ClimateCommand }
     | { kind: "air"; command: AirCommand }
     | { kind: "light"; command: LightCommand }
+    | { kind: "litter"; command: LitterCommand }
     | null {
     const which = deviceKind(kind);
     if (which === "climate") {
@@ -664,6 +698,10 @@ export function commandFor(
     if (which === "light") {
         const parsed = lightCommandSchema.safeParse(command);
         return parsed.success ? { kind: "light", command: parsed.data } : null;
+    }
+    if (which === "litter") {
+        const parsed = litterCommandSchema.safeParse(command);
+        return parsed.success ? { kind: "litter", command: parsed.data } : null;
     }
     return null;
 }
@@ -692,6 +730,7 @@ export function commandIssue(device: CommandTarget, command: DeviceCommand): str
     const read = commandFor(device.kind, command);
     if (!read) return "That device cannot be told to do that";
     if (read.kind === "light") return lightCommandIssue(device.light ?? null, read.command);
+    if (read.kind === "litter") return litterCommandIssue(device.litter ?? null, read.command);
     return read.kind === "climate"
         ? climateCommandIssue(device.climate, read.command)
         : airCommandIssue(device.air, read.command);
@@ -702,11 +741,18 @@ export function commandIssue(device: CommandTarget, command: DeviceCommand): str
 export function applyCommand(
     device: CommandTarget,
     command: DeviceCommand
-): { climate: ClimateSettings } | { air: AirSettings } | { light: LightSettings } | null {
+):
+    | { climate: ClimateSettings }
+    | { air: AirSettings }
+    | { light: LightSettings }
+    | { litter: LitterView }
+    | null {
     const read = commandFor(device.kind, command);
     if (!read) return null;
     if (read.kind === "light")
         return device.light ? { light: applyLight(device.light, read.command) } : null;
+    if (read.kind === "litter")
+        return device.litter ? { litter: applyLitter(device.litter, read.command) } : null;
     if (read.kind === "climate")
         return device.climate ? { climate: applyClimate(device.climate, read.command) } : null;
     return device.air ? { air: applyAir(device.air, read.command) } : null;
@@ -751,6 +797,8 @@ export function badgeText(device: DeviceView, t: PlacesTranslator = en): string 
     if (kind === "appliance" && device.appliance?.status) {
         return applianceStatusText(device.appliance.status, t);
     }
+    // A litter box says what it is doing: "Cleaning" rather than "On".
+    if (kind === "litter" && device.litter) return litterStatusText(device.litter.status, t);
     if (kind === "climate" && device.state === "on" && device.climate?.mode) {
         return climateModeText(device.climate.mode, t);
     }
@@ -807,6 +855,8 @@ export interface DeviceView {
     readonly light?: LightSettings | null;
     /** What a kitchen appliance is doing. Null, or absent, for every other kind. */
     readonly appliance?: ApplianceView | null;
+    /** What a litter box is doing. Null, or absent, for every other kind. */
+    readonly litter?: LitterView | null;
     /** The account it is read through, for reading that account again. Null on a
      *  device connected to nothing; absent where a view was built without it. */
     readonly accountId?: string | null;

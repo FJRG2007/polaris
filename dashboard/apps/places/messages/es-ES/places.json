@@ -1115,7 +1115,29 @@
         "notAreas": "Escribe números de área del 1 al 255, separados por comas, hasta 64.",
         "macShort": "Una MAC tiene 12 dígitos.",
         "macReserved": "Esa no es la MAC de un dispositivo.",
-        "chooseFile": "Elegir archivo"
+        "chooseFile": "Elegir archivo",
+        "petkit-cloud": {
+            "label": "Cuenta de PETKIT",
+            "summary": "Areneros autolimpiables como el Pura Max de tu cuenta de PETKIT, accesibles desde cualquier sitio.",
+            "note": "PETKIT solo permite una sesión por cuenta a la vez, así que conectar aquí tu cuenta principal cierra la sesión del móvil. Crea una segunda cuenta de PETKIT, comparte con ella el arenero desde la app de PETKIT y conecta esa. Los comederos y las fuentes se quedan fuera por ahora.",
+            "steps": {
+                "s0": "En la app de PETKIT, crea una segunda cuenta o usa una con la que ya compartas dispositivos.",
+                "s1": "Desde tu cuenta principal, comparte con ella el arenero y después inicia sesión con ella aquí."
+            },
+            "fields": {
+                "country": {
+                    "label": "País",
+                    "hint": "El país que elegiste al crear la cuenta de PETKIT."
+                },
+                "email": {
+                    "label": "Correo",
+                    "placeholder": "El correo de la cuenta de PETKIT"
+                },
+                "password": {
+                    "label": "Contraseña"
+                }
+            }
+        }
     },
     "actions": {
         "defaultStorage": "Donde este Polaris guarde las grabaciones ({name})",
@@ -1374,7 +1396,8 @@
             "sensor": "Sensor",
             "climate": "Aire acondicionado",
             "air": "Purificador",
-            "appliance": "Electrodoméstico"
+            "appliance": "Electrodoméstico",
+            "litter": "Arenero"
         },
         "groups": {
             "lock": "Puertas",
@@ -1385,7 +1408,8 @@
             "sensor": "Sensores",
             "climate": "Clima",
             "air": "Aire",
-            "appliance": "Cocina"
+            "appliance": "Cocina",
+            "litter": "Gatos"
         },
         "states": {
             "locked": "Cerrada",
@@ -1426,7 +1450,12 @@
             "set-brightness": "Brillo",
             "set-color-temp": "Temperatura de color",
             "set-color": "Color",
-            "stop": "Parar"
+            "stop": "Parar",
+            "clean": "Limpiar",
+            "pause": "Pausar",
+            "resume": "Seguir",
+            "dump": "Vaciar arena",
+            "reset-deodorizer": "Ambientador nuevo"
         },
         "via": {
             "polaris": "desde Polaris",
@@ -1457,7 +1486,15 @@
             "set-brightness": "Brillo fijado",
             "set-color-temp": "Temperatura de color fijada",
             "set-color": "Color fijado",
-            "stop": "Parado"
+            "stop": "Parado",
+            "clean": "Limpiado",
+            "pause": "Pausado",
+            "resume": "Reanudado",
+            "dump": "Arena vaciada",
+            "reset-deodorizer": "Ambientador a cero",
+            "bin-full": "Cubo lleno",
+            "litter-low": "Queda poca arena",
+            "fault": "Parado por un fallo"
         },
         "event": "{what}{hasActor, select, yes { por {actor}} other {}}{hasHow, select, yes { {how}} other {}}",
         "failedBecause": "{line} - {note}",
@@ -1619,6 +1656,34 @@
                 "pairing": "Vinculando"
             },
             "left": "quedan {time}"
+        },
+        "litter": {
+            "statuses": {
+                "idle": "Listo",
+                "cleaning": "Limpiando",
+                "dumping": "Vaciando arena",
+                "deodorizing": "Ambientando",
+                "resetting": "Reiniciando",
+                "leveling": "Nivelando arena",
+                "calibrating": "Calibrando",
+                "maintenance": "Mantenimiento",
+                "working": "Trabajando"
+            },
+            "options": {
+                "auto-clean": "Limpiar tras cada visita",
+                "avoid-repeat": "Evitar limpiezas seguidas",
+                "periodic-clean": "Limpieza programada",
+                "kitten": "Modo gatito",
+                "deep-clean": "Limpieza a fondo",
+                "deep-deodorize": "Ambientado a fondo",
+                "auto-deodorize": "Ambientar tras limpiar",
+                "display": "Pantalla",
+                "child-lock": "Bloqueo"
+            },
+            "fault": "Necesita atención",
+            "binFull": "Cubo lleno",
+            "litterLow": "Poca arena",
+            "litterLevel": "Arena {percent}%"
         }
     },
     "devicesView": {
@@ -1719,6 +1784,30 @@
             "watchOnly": "Solo se vigila: Polaris no maneja este modelo.",
             "nothingToStop": "No hay nada en marcha",
             "stopName": "Parar {name}"
+        },
+        "litter": {
+            "status": "Estado",
+            "fault": "Fallo",
+            "litter": "Arena",
+            "bin": "Cubo",
+            "binOk": "Con sitio",
+            "deodorizer": "Ambientador",
+            "daysLeft": "{days, plural, one {Queda # día} other {Quedan # días}}",
+            "usesToday": "Visitas hoy",
+            "lastUse": "Última visita",
+            "recentUses": "Visitas de hoy",
+            "someCat": "Un gato",
+            "weight": "{kg} kg",
+            "settings": "Ajustes",
+            "unknown": "Todavía no ha dicho cómo está.",
+            "nothingRunning": "No hay nada en marcha",
+            "alreadyRunning": "Ya está haciendo un ciclo",
+            "noDeodorizerReset": "El ambientador de este modelo no se reinicia desde aquí",
+            "actionName": "{action} {name}",
+            "dumpTitle": "¿Vaciar toda la arena de {name}?",
+            "dumpBody": "El arenero vuelca toda la arena en su cubo de residuos. Tendrás que rellenarlo antes de que tu gato pueda volver a usarlo.",
+            "dumpConfirm": "Vaciar arena",
+            "cancel": "Cancelar"
         }
     },
     "roomsDialog": {
@@ -2572,5 +2661,19 @@
     "guest": {
         "until": "Funciona hasta el {when}.",
         "nearby": "Solo funciona a menos de {meters} m del lugar. El navegador te pedirá la ubicación al pulsar."
+    },
+    "litterAlerts": {
+        "bin-full": {
+            "title": "{name}: cubo de residuos lleno",
+            "body": "Vacía el cubo para que pueda seguir limpiando."
+        },
+        "litter-low": {
+            "title": "{name}: queda poca arena",
+            "body": "Rellena la arena pronto."
+        },
+        "fault": {
+            "title": "{name} se ha parado por un fallo",
+            "body": "Ha dicho: {fault}"
+        }
     }
 }

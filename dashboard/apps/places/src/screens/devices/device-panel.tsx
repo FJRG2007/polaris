@@ -36,6 +36,7 @@ import { AirControls, FilterChip } from "./air-controls";
 import { ClimateControls } from "./climate-controls";
 import { LightControls } from "./light-controls";
 import { ApplianceControls } from "./appliance-controls";
+import { LitterControls } from "./litter-controls";
 import {
     Badge,
     Button,
@@ -50,7 +51,13 @@ import {
 import {
     AirVent,
     BatteryLow,
+    Cat,
     CookingPot,
+    Pause,
+    Play,
+    RotateCcw,
+    Sparkles,
+    Trash2,
     DoorClosed,
     DoorOpen,
     Droplets,
@@ -95,7 +102,12 @@ const ACTION_ICONS: Record<DeviceAction, typeof Lock> = {
     "set-brightness": Sun,
     "set-color-temp": Thermometer,
     "set-color": Palette,
-    stop: Square
+    stop: Square,
+    clean: Sparkles,
+    pause: Pause,
+    resume: Play,
+    dump: Trash2,
+    "reset-deodorizer": RotateCcw
 };
 
 /** What each sort of device looks like in a list. A row of doors and a row of
@@ -110,7 +122,8 @@ const KIND_ICONS: Record<kinds.DeviceKind, typeof Lock> = {
     outlet: Plug,
     light: Lightbulb,
     sensor: Gauge,
-    appliance: CookingPot
+    appliance: CookingPot,
+    litter: Cat
 };
 
 /** The one button that gets the weight. Locking up is what people came to
@@ -206,6 +219,18 @@ export function DeviceControls({
     if (kinds.deviceKind(device.kind) === "air") {
         return (
             <AirControls
+                device={device}
+                canControl={canControl}
+                busy={busy}
+                onAct={onAct}
+                detailed={detailed}
+                className={className}
+            />
+        );
+    }
+    if (kinds.deviceKind(device.kind) === "litter") {
+        return (
+            <LitterControls
                 device={device}
                 canControl={canControl}
                 busy={busy}

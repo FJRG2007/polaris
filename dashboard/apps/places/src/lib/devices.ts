@@ -21,6 +21,7 @@ import * as kinds from "./device-kinds";
 import { HomeError } from "./home-error";
 import * as rooms from "./rooms";
 import * as accounts from "./device-accounts";
+import * as litterAlerts from "./litter-alerts";
 import { DriverError, type DeviceHistoryEntry } from "./drivers/contract";
 import { host } from "@polaris/app-host";
 
@@ -73,6 +74,7 @@ const DEVICE_FIELDS = {
     air: true,
     light: true,
     appliance: true,
+    litter: true,
     stateAt: true
 } as const;
 
@@ -99,6 +101,7 @@ type DeviceRow = {
     air: Prisma.JsonValue | null;
     light: Prisma.JsonValue | null;
     appliance: Prisma.JsonValue | null;
+    litter: Prisma.JsonValue | null;
     stateAt: Date | null;
 };
 
@@ -150,6 +153,18 @@ function applianceColumn(
 }
 
 /** An air conditioner's settings with its room temperature beside them. */
+/** What a litter box last reported, as stored. Null for every other kind. */
+function litterOf(row: Pick<DeviceRow, "kind" | "litter">): kinds.LitterView | null {
+    return kinds.deviceKind(row.kind) === "litter" ? kinds.litterView(row.litter) : null;
+}
+
+function litterColumn(
+    view: kinds.LitterView | null | undefined
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+    const parsed = view ? kinds.litterView(view) : null;
+    return parsed ? (parsed as Prisma.InputJsonValue) : Prisma.DbNull;
+}
+
 function climateOf(row: DeviceRow): kinds.ClimateView | null {
     if (kinds.deviceKind(row.kind) !== "climate") return null;
     const settings = kinds.climateSettings(row.climate);
@@ -181,6 +196,7 @@ function toView(row: DeviceRow): kinds.DeviceView {
         air: airOf(row),
         light: lightOf(row),
         appliance: applianceOf(row),
+        litter: litterOf(row),
         accountId: row.accountId
     };
 }
@@ -319,7 +335,8 @@ export async function actOnDevice(
         kind: device.kind,
         climate: kinds.climateSettings(device.climate),
         air: airOf(device),
-        light: lightOf(device)
+        light: lightOf(device),
+        litter: litterOf(device)
     };
     if (kinds.needsCommand(action)) {
         if (!command || command.action !== action) throw new HomeError("Say what to set it to");
@@ -385,9 +402,14 @@ export async function actOnDevice(
             ? { climate: climateColumn(applied.climate) }
             : "light" in applied
               ? { light: lightColumn(applied.light) }
-              : { air: airColumn(applied.air) }
-        : kinds.needsCommand(action) || action === "stop"
-          ? // A stopped appliance says where it ended up at the next read.
+              : "litter" in applied
+                ? { litter: litterColumn(applied.litter) }
+                : { air: airColumn(applied.air) }
+        : kinds.needsCommand(action) ||
+            action === "stop" ||
+            kinds.deviceKind(device.kind) === "litter"
+          ? // A stopped appliance, or a litter box told to run a cycle, says
+            // where it ended up at the next read.
             {}
           : { state: kinds.settledState(action) ?? "moving" };
     const row = await prisma.placeDevice.update({
@@ -502,6 +524,9 @@ async function syncAccount(
 
         const snapshots = await driver.list(credentials);
         const vendor = view.brand.toLowerCase();
+        // What each litter box said last time, so what has just started needing
+        // somebody (a full bin, a fault) is told once rather than every minute.
+        const litterBefore = await litterAlerts.previousLitter(accountId, snapshots);
         const read: DeviceRow[] = [];
         for (const snapshot of snapshots) {
             const reading = {
@@ -519,6 +544,7 @@ async function syncAccount(
                 air: airColumn(snapshot.air),
                 light: lightColumn(snapshot.light),
                 appliance: applianceColumn(snapshot.appliance),
+                litter: litterColumn(snapshot.litter),
                 stateAt: new Date()
             };
             const saved = await prisma.placeDevice.upsert({
@@ -539,6 +565,12 @@ async function syncAccount(
                 select: DEVICE_FIELDS
             });
             read.push(saved);
+            await litterAlerts.tellLitter(
+                installedAppId,
+                saved,
+                litterBefore.get(snapshot.externalId) ?? null,
+                litterOf(saved)
+            );
         }
 
         // Anything on our side the account no longer has. A device somebody sold

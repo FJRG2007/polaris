@@ -1115,7 +1115,29 @@
         "notAreas": "Type area numbers from 1 to 255, separated by commas, up to 64 of them.",
         "macShort": "A MAC address has 12 digits.",
         "macReserved": "That is not a device's MAC address.",
-        "chooseFile": "Choose file"
+        "chooseFile": "Choose file",
+        "petkit-cloud": {
+            "label": "PETKIT account",
+            "summary": "Self-cleaning litter boxes like the Pura Max on your PETKIT account, reachable from anywhere.",
+            "note": "PETKIT allows one sign-in per account at a time, so connecting your main account here signs your phone out. Make a second PETKIT account, share the litter box with it from the PETKIT app, and connect that one. Feeders and fountains are left out for now.",
+            "steps": {
+                "s0": "In the PETKIT app, create a second account, or use one you already share devices with.",
+                "s1": "From your main account, share the litter box with it, then sign in with it here."
+            },
+            "fields": {
+                "country": {
+                    "label": "Country",
+                    "hint": "The country you picked when you made the PETKIT account."
+                },
+                "email": {
+                    "label": "Email",
+                    "placeholder": "The PETKIT account's email"
+                },
+                "password": {
+                    "label": "Password"
+                }
+            }
+        }
     },
     "actions": {
         "defaultStorage": "Wherever this Polaris keeps footage ({name})",
@@ -1374,7 +1396,8 @@
             "sensor": "Sensor",
             "climate": "Air conditioner",
             "air": "Air purifier",
-            "appliance": "Kitchen appliance"
+            "appliance": "Kitchen appliance",
+            "litter": "Litter box"
         },
         "groups": {
             "lock": "Doors",
@@ -1385,7 +1408,8 @@
             "sensor": "Sensors",
             "climate": "Climate",
             "air": "Air",
-            "appliance": "Kitchen"
+            "appliance": "Kitchen",
+            "litter": "Cats"
         },
         "states": {
             "locked": "Locked",
@@ -1417,7 +1441,12 @@
             "set-brightness": "Brightness",
             "set-color-temp": "Color temperature",
             "set-color": "Color",
-            "stop": "Stop"
+            "stop": "Stop",
+            "clean": "Clean",
+            "pause": "Pause",
+            "resume": "Resume",
+            "dump": "Empty litter",
+            "reset-deodorizer": "Reset deodorizer"
         },
         "via": {
             "polaris": "from Polaris",
@@ -1448,7 +1477,15 @@
             "set-brightness": "Brightness set",
             "set-color-temp": "Color temperature set",
             "set-color": "Color set",
-            "stop": "Stopped"
+            "stop": "Stopped",
+            "clean": "Cleaned",
+            "pause": "Paused",
+            "resume": "Resumed",
+            "dump": "Litter emptied",
+            "reset-deodorizer": "Deodorizer reset",
+            "bin-full": "Waste bin full",
+            "litter-low": "Litter running low",
+            "fault": "Stopped on a fault"
         },
         "kindStates": {
             "lock": {
@@ -1619,6 +1656,34 @@
                 "pairing": "Pairing"
             },
             "left": "{time} left"
+        },
+        "litter": {
+            "statuses": {
+                "idle": "Ready",
+                "cleaning": "Cleaning",
+                "dumping": "Emptying litter",
+                "deodorizing": "Deodorizing",
+                "resetting": "Resetting",
+                "leveling": "Leveling litter",
+                "calibrating": "Calibrating",
+                "maintenance": "Maintenance",
+                "working": "Working"
+            },
+            "options": {
+                "auto-clean": "Clean after each visit",
+                "avoid-repeat": "Skip repeat cleanings",
+                "periodic-clean": "Scheduled cleaning",
+                "kitten": "Kitten mode",
+                "deep-clean": "Deep cleaning",
+                "deep-deodorize": "Deep deodorizing",
+                "auto-deodorize": "Deodorize after cleaning",
+                "display": "Display",
+                "child-lock": "Child lock"
+            },
+            "fault": "Needs attention",
+            "binFull": "Waste bin full",
+            "litterLow": "Litter low",
+            "litterLevel": "Litter {percent}%"
         }
     },
     "devicesView": {
@@ -1719,6 +1784,30 @@
             "watchOnly": "Watched only: Polaris does not drive this model.",
             "nothingToStop": "Nothing is running",
             "stopName": "Stop {name}"
+        },
+        "litter": {
+            "status": "Status",
+            "fault": "Fault",
+            "litter": "Litter",
+            "bin": "Waste bin",
+            "binOk": "Has room",
+            "deodorizer": "Deodorizer",
+            "daysLeft": "{days, plural, one {# day left} other {# days left}}",
+            "usesToday": "Visits today",
+            "lastUse": "Last visit",
+            "recentUses": "Today's visits",
+            "someCat": "A cat",
+            "weight": "{kg} kg",
+            "settings": "Settings",
+            "unknown": "It has not reported its state yet.",
+            "nothingRunning": "Nothing is running",
+            "alreadyRunning": "It is already running a cycle",
+            "noDeodorizerReset": "This model's deodorizer cannot be reset from here",
+            "actionName": "{action} {name}",
+            "dumpTitle": "Empty all the litter out of {name}?",
+            "dumpBody": "The box tips every bit of litter into its waste bin. You will need to refill it before your cat can use it again.",
+            "dumpConfirm": "Empty litter",
+            "cancel": "Cancel"
         }
     },
     "roomsDialog": {
@@ -2572,5 +2661,19 @@
     "guest": {
         "until": "Works until {when}.",
         "nearby": "Only works within {meters} m of the place. Your browser will ask for your location when you press."
+    },
+    "litterAlerts": {
+        "bin-full": {
+            "title": "{name}: waste bin full",
+            "body": "Empty the waste bin so it can keep cleaning."
+        },
+        "litter-low": {
+            "title": "{name}: litter running low",
+            "body": "Top up the litter soon."
+        },
+        "fault": {
+            "title": "{name} stopped on a fault",
+            "body": "It reported: {fault}"
+        }
     }
 }

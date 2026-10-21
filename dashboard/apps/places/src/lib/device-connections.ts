@@ -991,6 +991,66 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "whole house"
         ]
     },
+    // PETKIT: their cloud is the one way in - the boxes have no local API. The
+    // protocol is the community library's (`integrations/petkit-api.ts`), as
+    // the Home Assistant integration uses it. Their cloud keeps one sign-in per
+    // account, so the note says what their own guidance says: a second account
+    // the box is shared with.
+    {
+        id: "petkit-cloud",
+        brand: "PETKIT",
+        recommended: true,
+        logo: "petkit",
+        label: en("connections.petkit-cloud.label"),
+        reach: "anywhere",
+        summary: en("connections.petkit-cloud.summary"),
+        note: en("connections.petkit-cloud.note"),
+        steps: [
+            en("connections.petkit-cloud.steps.s0"),
+            en("connections.petkit-cloud.steps.s1")
+        ],
+        fields: [
+            {
+                key: "country",
+                label: en("connections.petkit-cloud.fields.country.label"),
+                hint: en("connections.petkit-cloud.fields.country.hint"),
+                countries: true,
+                choices: [
+                    ...philipsRegions.PHILIPS_COUNTRIES,
+                    ...(philipsRegions.PHILIPS_COUNTRIES.includes("CN") ? [] : ["CN"])
+                ].map((code) => ({
+                    value: code,
+                    label: philipsRegions.philipsCountryName(code, "en")
+                }))
+            },
+            {
+                key: "email",
+                label: en("connections.petkit-cloud.fields.email.label"),
+                placeholder: en("connections.petkit-cloud.fields.email.placeholder"),
+                format: "email",
+                maxLength: 254
+            },
+            {
+                key: "password",
+                label: en("connections.petkit-cloud.fields.password.label"),
+                secret: true,
+                minLength: 1,
+                maxLength: 200
+            }
+        ],
+        kinds: ["litter"],
+        search: [
+            "petkit",
+            "pet kit",
+            "pura max",
+            "pura max 2",
+            "pura x",
+            "purobot",
+            "litter box",
+            "cat litter",
+            "self-cleaning"
+        ]
+    },
     // SwitchBot: their cloud API is the one documented way in, and the most
     // convenient - a token and a secret from the app, and every device on the
     // account arrives, including the Bluetooth ones behind a hub.
