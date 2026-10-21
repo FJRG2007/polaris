@@ -455,9 +455,14 @@ thead th {
    its conversation, its pages each scroll inside themselves. The shell's content
    area must not scroll as well, whatever else lands on the page, or one wheel
    moves the whole screen and its panes together. */
-html:has(.page-bleed),
-[data-shell-scroll]:has(.page-bleed) {
+html:has(.page-bleed) {
     overflow: hidden;
+}
+
+@media screen {
+    [data-shell-scroll]:has(.page-bleed) {
+        overflow: hidden;
+    }
 }
 
 /* One focus ring for the whole application, on the token that names it, drawn

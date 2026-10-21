@@ -158,10 +158,27 @@ describe("the shell scrolls its content, not the window", () => {
 
     it("sends a scrolling key to the content when nothing has focus", () => {
         const main = renderShell();
-        expect(main.tabIndex).toBe(-1);
         expect(document.activeElement).toBe(document.body);
         fireEvent.keyDown(document.body, { key: "PageDown" });
         expect(document.activeElement).toBe(main);
+    });
+
+    it("hands focus back to the body on a click, so a click never focuses the content", () => {
+        const main = renderShell();
+        expect(main.hasAttribute("tabindex")).toBe(false);
+        fireEvent.keyDown(document.body, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(main);
+        fireEvent.pointerDown(main);
+        expect(document.activeElement).toBe(document.body);
+        expect(main.hasAttribute("tabindex")).toBe(false);
+    });
+
+    it("lets a printout run past the first page", () => {
+        const main = renderShell();
+        const root = main.closest(".h-dvh");
+        expect(root?.className).toContain("print:h-auto");
+        expect(root?.className).toContain("print:overflow-visible");
+        expect(main.className).toContain("print:overflow-visible");
     });
 
     it("leaves focus where it is when something already has it", () => {

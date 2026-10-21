@@ -43,7 +43,7 @@ export function AppShell({
         // document scrolled under a sticky header, the window's scrollbar ran
         // the full height of the screen - up beside the header, as if the bar
         // itself were part of what scrolls.
-        <div className="relative flex h-dvh flex-col overflow-hidden bg-background">
+        <div className="relative flex h-dvh flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
             <header className="z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
@@ -65,7 +65,7 @@ export function AppShell({
                 ) : null}
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">{account}</div>
             </header>
-            <div className="flex min-h-0 flex-1">
+            <div className="flex min-h-0 flex-1 print:block">
                 {sidebar ? (
                     // Scrolling on its own beside the content, so the rail stays
                     // reachable however far down the content the user is. An app
@@ -88,7 +88,7 @@ export function AppShell({
                     scroll padding matches the padding, so the router bringing a
                     new screen into view lands on its top rather than 20px into
                     it. */}
-                <ShellMain className="min-w-0 flex-1 scroll-pt-3 overflow-y-auto overscroll-contain p-3 [--page-inset:1.5rem] sm:scroll-pt-4 sm:p-4 sm:[--page-inset:2rem] md:scroll-pt-5 md:px-6 md:py-5 md:[--page-inset:2.5rem]">
+                <ShellMain className="min-w-0 flex-1 scroll-pt-3 overflow-y-auto overscroll-contain print:overflow-visible p-3 [--page-inset:1.5rem] sm:scroll-pt-4 sm:p-4 sm:[--page-inset:2rem] md:scroll-pt-5 md:px-6 md:py-5 md:[--page-inset:2.5rem]">
                     {children}
                 </ShellMain>
                 {aside}

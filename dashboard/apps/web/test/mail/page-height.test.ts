@@ -53,8 +53,9 @@ describe("the window under a screen like this", () => {
             ),
             "utf8"
         );
+        expect(tokens).toMatch(/html:has\(\.page-bleed\) \{\s*overflow: hidden;/);
         expect(tokens).toMatch(
-            /html:has\(\.page-bleed\),\s*\[data-shell-scroll\]:has\(\.page-bleed\) \{\s*overflow: hidden;/
+            /@media screen \{\s*\[data-shell-scroll\]:has\(\.page-bleed\) \{\s*overflow: hidden;/
         );
     });
 });
