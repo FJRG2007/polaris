@@ -760,6 +760,11 @@
             "webhookReset": "el webhook tiene un secreto nuevo",
             "webhookForbidden": "su dueño ya no lleva ese canal",
             "webhookLimited": "el webhook publicó mucho este minuto",
+            "projectWebhookGone": "el webhook del proyecto se borró",
+            "projectWebhookOff": "el webhook del proyecto está desactivado",
+            "projectWebhookForbidden": "ese webhook del proyecto ya no es tuyo",
+            "messagingGone": "el canal de mensajería se quitó o ya no es tuyo",
+            "messagingRefused": "el canal de mensajería rechazó el mensaje",
             "failed": "el envío falló"
         },
         "projectWebhooks": "Webhooks de mis proyectos",

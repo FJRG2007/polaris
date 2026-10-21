@@ -409,6 +409,11 @@ const NOTICE_REASONS = {
     webhookReset: "webhookReset",
     webhookForbidden: "webhookForbidden",
     webhookLimited: "webhookLimited",
+    projectWebhookGone: "projectWebhookGone",
+    projectWebhookOff: "projectWebhookOff",
+    projectWebhookForbidden: "projectWebhookForbidden",
+    messagingGone: "messagingGone",
+    messagingRefused: "messagingRefused",
     failed: "failed"
 } as const;
 

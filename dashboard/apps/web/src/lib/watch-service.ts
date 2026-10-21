@@ -7,6 +7,7 @@
 import { prisma } from "@polaris/db";
 import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 import type { AlarmInput } from "@/lib/watch/watch-schema";
+import { WATCH_ALARM_PREFIX } from "@/lib/watch/alarm-carry";
 import { isLocalMachine, localMachineIdentity } from "@/lib/local-machine";
 import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-server";
 
@@ -187,10 +188,27 @@ export async function setAlarmEnabled(
     });
 }
 
+/** Deleting a carried alarm deletes the automation it became, so its notices stop too. */
 export async function deleteAlarm(ownerId: string, id: string): Promise<void> {
-    const alarm = await prisma.alarm.findFirst({ where: { id, ownerId }, select: { id: true } });
+    const alarm = await prisma.alarm.findFirst({
+        where: { id, ownerId },
+        select: { id: true, carriedToId: true }
+    });
     if (!alarm) throw new Error("Alarm not found");
-    await prisma.alarm.delete({ where: { id: alarm.id } });
+    await prisma.$transaction([
+        ...(alarm.carriedToId
+            ? [
+                  prisma.automation.deleteMany({
+                      where: {
+                          id: alarm.carriedToId,
+                          userId: ownerId,
+                          legacyRef: `${WATCH_ALARM_PREFIX}${alarm.id}`
+                      }
+                  })
+              ]
+            : []),
+        prisma.alarm.delete({ where: { id: alarm.id } })
+    ]);
 }
 
 /** Recent alarm events across the owner's alarms, newest first. */

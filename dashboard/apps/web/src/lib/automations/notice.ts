@@ -184,7 +184,7 @@ async function postToProjectWebhook(
             where: { id: webhookId },
             select: { id: true }
         });
-        return exists ? "webhookForbidden" : "webhookGone";
+        return exists ? "projectWebhookForbidden" : "projectWebhookGone";
     }
     const { sendToProjectWebhook } = await import("@/lib/deploy-project-service");
     const reason = await sendToProjectWebhook(webhookId, {
@@ -193,7 +193,9 @@ async function postToProjectWebhook(
         body: notice.body,
         url: null
     });
-    return reason === "gone" ? "webhookGone" : reason;
+    if (reason === "gone") return "projectWebhookGone";
+    if (reason === "off") return "projectWebhookOff";
+    return reason;
 }
 
 /** Send through a messaging channel the account owns. Null when it went. */
@@ -203,7 +205,7 @@ async function sendToMessaging(
 ): Promise<string | null> {
     const targets = await import("./notice-targets");
     if (!(await targets.mayUseMessagingChannel(notice.userId, messaging.channelId)))
-        return "webhookGone";
+        return "messagingGone";
     const { bridgeSend } = await import("@/lib/messaging/bridge-client");
     const text = (notice.body ? `${notice.title}\n${notice.body}` : notice.title).slice(
         0,
@@ -214,6 +216,6 @@ async function sendToMessaging(
         return null;
     } catch (caught) {
         console.error("polaris: an automation notice could not use a messaging channel:", caught);
-        return "messageRefused";
+        return "messagingRefused";
     }
 }

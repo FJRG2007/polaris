@@ -771,12 +771,13 @@ export async function testProjectWebhook(
 export async function sendToProjectWebhook(
     id: string,
     message: { event: string; title: string; body: string | null; url: string | null }
-): Promise<"gone" | "failed" | null> {
+): Promise<"gone" | "off" | "failed" | null> {
     const hook = await prisma.projectWebhook.findUnique({
         where: { id },
         select: { enabled: true }
     });
-    if (!hook || !hook.enabled) return "gone";
+    if (!hook) return "gone";
+    if (!hook.enabled) return "off";
     const resolved = await webhookUrl(id);
     if (!resolved) {
         await recordWebhookResult(id, "The stored URL could not be read.");

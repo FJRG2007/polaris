@@ -452,9 +452,19 @@ export async function setLocalNetwork(actor: RunActor, id: string, allow: boolea
     });
 }
 
+/**
+ * A Watch alarm carried into this automation goes back to Watch switched off,
+ * so it neither points at nothing nor starts announcing again unasked.
+ */
 export async function deleteAutomation(actor: RunActor, id: string): Promise<void> {
     await load(actor, id, true);
-    await prisma.automation.delete({ where: { id } });
+    await prisma.$transaction([
+        prisma.alarm.updateMany({
+            where: { carriedToId: id },
+            data: { carriedToId: null, enabled: false }
+        }),
+        prisma.automation.delete({ where: { id } })
+    ]);
 }
 
 /** Run the published version by hand, through its first "Run by hand" trigger. */

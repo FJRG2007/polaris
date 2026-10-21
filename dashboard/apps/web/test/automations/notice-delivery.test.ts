@@ -24,7 +24,7 @@ const targets = vi.hoisted(() => ({
     mayUseMessagingChannel: vi.fn(async () => true)
 }));
 const deploy = vi.hoisted(() => ({
-    sendToProjectWebhook: vi.fn(async () => null as "gone" | "failed" | null)
+    sendToProjectWebhook: vi.fn(async () => null as "gone" | "off" | "failed" | null)
 }));
 const bridge = vi.hoisted(() => ({ bridgeSend: vi.fn(async () => ({})) }));
 const db = vi.hoisted(() => ({ hookExists: true }));
@@ -152,7 +152,7 @@ describe("the targets Watch alarms used", () => {
             delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
         });
         expect(deploy.sendToProjectWebhook).not.toHaveBeenCalled();
-        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "webhookForbidden" }]);
+        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookForbidden" }]);
     });
 
     it("says a deleted project webhook is gone", async () => {
@@ -162,7 +162,16 @@ describe("the targets Watch alarms used", () => {
             ...BASE,
             delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
         });
-        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "webhookGone" }]);
+        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookGone" }]);
+    });
+
+    it("says a switched-off project webhook is off, not deleted", async () => {
+        deploy.sendToProjectWebhook.mockResolvedValue("off");
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
+        });
+        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookOff" }]);
     });
 
     it("messages the peer on a channel the account owns", async () => {
@@ -192,7 +201,9 @@ describe("the targets Watch alarms used", () => {
                     messaging: { channelId: CHANNEL, peerId: "12345" }
                 }
             })
-        ).rejects.toBeInstanceOf(StepError);
+        ).rejects.toMatchObject({
+            output: { missed: [{ channel: "messaging", reason: "messagingGone" }] }
+        });
         expect(bridge.bridgeSend).not.toHaveBeenCalled();
     });
 
@@ -207,6 +218,6 @@ describe("the targets Watch alarms used", () => {
                 messaging: { channelId: CHANNEL, peerId: "12345" }
             }
         });
-        expect(result.missed).toEqual([{ channel: "messaging", reason: "messageRefused" }]);
+        expect(result.missed).toEqual([{ channel: "messaging", reason: "messagingRefused" }]);
     });
 });

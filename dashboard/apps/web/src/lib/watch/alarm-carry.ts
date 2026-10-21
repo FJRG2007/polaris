@@ -14,7 +14,8 @@
  * two dashboards booting together during an update race on that key, not on a
  * lease. Nothing is deleted: the alarm keeps its definition and history, and
  * from the moment `carriedToId` is set Watch stops evaluating it, so the same
- * crossing is never announced twice. An alarm this cannot express - reachability
+ * crossing is never announced twice - an alarm already firing hands its open
+ * state to the automation, which then only announces the recovery. An alarm this cannot express - reachability
  * (`http`, `service`), which has no threshold reading - stays on Watch.
  *
  * Server-only.
@@ -45,6 +46,12 @@ export interface CarriableAlarm {
     readonly forPeriods: number;
     readonly notifyChannelId: string | null;
     readonly notifyPeerId: string | null;
+}
+
+/** An alarm as stored, with where Watch's own evaluation of it stands. */
+interface StoredAlarm extends CarriableAlarm {
+    readonly state: string;
+    readonly breachStreak: number;
 }
 
 /** The step words, already in the owner's language; `{{...}}` is read at run time. */
@@ -204,8 +211,47 @@ async function carryInputs(alarm: CarriableAlarm) {
 /** Alarms this build could not carry, said once per process rather than every boot. */
 const reported = new Set<string>();
 
+/**
+ * An alarm Watch has already announced keeps its crossing open on the twin's
+ * trigger, so the automation does not announce it again. Only a trigger that
+ * has not judged a sample yet is seeded; once it has, its own memory stands.
+ */
+async function holdOpenAlarm(alarm: StoredAlarm, automationId: string): Promise<void> {
+    if (alarm.state !== "alarm") return;
+    const trigger = await prisma.automationTrigger.findFirst({
+        where: { automationId, nodeId: "reading", eventType: "core.threshold" },
+        select: { id: true, state: true }
+    });
+    const kept = trigger?.state as { config?: unknown; state?: unknown } | null | undefined;
+    if (!trigger || typeof kept?.config !== "string" || kept.state !== undefined) return;
+    const opened = await prisma.alarmEvent.findFirst({
+        where: { alarmId: alarm.id, kind: "triggered" },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true, value: true }
+    });
+    const value = typeof opened?.value === "number" ? opened.value : null;
+    await prisma.automationTrigger.updateMany({
+        where: { id: trigger.id },
+        data: {
+            state: {
+                config: kept.config,
+                state: "alarm",
+                streak: Math.max(1, alarm.breachStreak),
+                sampledAt: null,
+                value,
+                missing: null,
+                checkedAt: null,
+                episode:
+                    opened && value !== null
+                        ? { startedAt: opened.createdAt.toISOString(), startValue: value, peak: value }
+                        : null
+            }
+        }
+    });
+}
+
 /** Carry one alarm; the automation's id, or null when it stays on Watch. */
-async function carryOne(alarm: CarriableAlarm): Promise<string | null> {
+async function carryOne(alarm: StoredAlarm): Promise<string | null> {
     if (!carrySource(alarm) || alarm.threshold === null) return null;
     const { words, delivery } = await carryInputs(alarm);
     const converted = watchAlarmGraph(alarm, words, delivery);
@@ -222,6 +268,7 @@ async function carryOne(alarm: CarriableAlarm): Promise<string | null> {
         mode: "single",
         graph: converted.graph
     });
+    await holdOpenAlarm(alarm, automationId);
     await prisma.alarm.updateMany({
         where: { id: alarm.id, carriedToId: null },
         data: { carriedToId: automationId }
@@ -238,7 +285,7 @@ export async function carryWatchAlarms(): Promise<number> {
     let carried = 0;
     let after: string | null = null;
     for (;;) {
-        const rows: CarriableAlarm[] = await prisma.alarm.findMany({
+        const rows: StoredAlarm[] = await prisma.alarm.findMany({
             where: {
                 enabled: true,
                 carriedToId: null,
@@ -259,7 +306,9 @@ export async function carryWatchAlarms(): Promise<number> {
                 threshold: true,
                 forPeriods: true,
                 notifyChannelId: true,
-                notifyPeerId: true
+                notifyPeerId: true,
+                state: true,
+                breachStreak: true
             }
         });
         for (const alarm of rows) {

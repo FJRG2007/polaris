@@ -6216,6 +6216,7 @@ model Alarm {
     @@index([ownerId])
     @@index([enabled])
     @@index([targetType, targetId])
+    @@index([carriedToId])
 }
 
 // A state transition of an alarm - the event log Watch generates (fired/cleared).

@@ -760,6 +760,11 @@
             "webhookReset": "the chat webhook got a new secret",
             "webhookForbidden": "its owner no longer runs that channel",
             "webhookLimited": "the webhook posted too much this minute",
+            "projectWebhookGone": "the project webhook was deleted",
+            "projectWebhookOff": "the project webhook is switched off",
+            "projectWebhookForbidden": "that project webhook is no longer yours",
+            "messagingGone": "the messaging channel was removed or is no longer yours",
+            "messagingRefused": "the messaging channel refused the message",
             "failed": "sending failed"
         },
         "projectWebhooks": "Webhooks of my Deploy projects",

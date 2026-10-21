@@ -28,6 +28,8 @@ interface Row {
     notifyChannelId: string | null;
     notifyPeerId: string | null;
     carriedToId: string | null;
+    state: string;
+    breachStreak: number;
 }
 
 const store = vi.hoisted(() => ({
@@ -35,7 +37,10 @@ const store = vi.hoisted(() => ({
     /** legacyRef -> automation id, as the unique column keeps them. */
     automations: new Map<string, string>(),
     imports: [] as { legacyRef: string; graph: unknown; origin: string | null }[],
-    ownsChannel: true
+    ownsChannel: true,
+    /** automationId -> its threshold trigger's memory, as armVersion left it. */
+    triggers: new Map<string, Record<string, unknown>>(),
+    opened: null as { createdAt: Date; value: number | null } | null
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -63,6 +68,18 @@ vi.mock("@polaris/db", () => ({
                 const row = store.rows.find((entry) => entry.id === where.id);
                 if (row && row.carriedToId === null) row.carriedToId = data.carriedToId;
             }
+        },
+        alarmEvent: {
+            findFirst: async () => store.opened
+        },
+        automationTrigger: {
+            findFirst: async ({ where }: { where: { automationId: string } }) => {
+                const state = store.triggers.get(where.automationId);
+                return state ? { id: where.automationId, state } : null;
+            },
+            updateMany: async ({ where, data }: { where: { id: string }; data: { state: Record<string, unknown> } }) => {
+                store.triggers.set(where.id, data.state);
+            }
         }
     }
 }));
@@ -73,6 +90,7 @@ vi.mock("@/lib/automations/app-bridge", () => ({
         if (known) return known;
         const id = `00000000-0000-4000-8000-00000000a${String(store.automations.size).padStart(3, "0")}`;
         store.automations.set(given.legacyRef, id);
+        store.triggers.set(id, { config: "armed-config" });
         return id;
     }
 }));
@@ -107,6 +125,8 @@ function alarm(overrides: Partial<Row> = {}): Row {
         notifyChannelId: CHANNEL,
         notifyPeerId: "12345",
         carriedToId: null,
+        state: "ok",
+        breachStreak: 0,
         ...overrides
     };
 }
@@ -119,6 +139,8 @@ beforeEach(() => {
     store.automations.clear();
     store.imports = [];
     store.ownsChannel = true;
+    store.triggers.clear();
+    store.opened = null;
 });
 
 describe("the automation an alarm becomes", () => {
@@ -205,6 +227,29 @@ describe("carrying on boot", () => {
             delivery: core.NoticeDelivery;
         };
         expect(fired.delivery.messaging).toBeNull();
+    });
+
+    it("hands an alarm already firing to the automation, so it is not announced again", async () => {
+        const at = new Date("2026-10-01T10:00:00.000Z");
+        store.opened = { createdAt: at, value: 97 };
+        store.rows = [alarm({ state: "alarm", breachStreak: 3 })];
+        await carry.carryWatchAlarms();
+        const memory = store.triggers.get(store.rows[0]!.carriedToId!);
+        expect(memory).toMatchObject({
+            config: "armed-config",
+            state: "alarm",
+            streak: 3,
+            episode: { startedAt: at.toISOString(), startValue: 97, peak: 97 }
+        });
+        const { stepAlarm } = await import("../../src/lib/alarm-state");
+        const still = stepAlarm(memory as { state: string; streak: number }, { breach: true, insufficient: false }, 2);
+        expect(still.transition).toBeNull();
+    });
+
+    it("starts an alarm that is not firing from a fresh memory", async () => {
+        store.rows = [alarm()];
+        await carry.carryWatchAlarms();
+        expect(store.triggers.get(store.rows[0]!.carriedToId!)).toEqual({ config: "armed-config" });
     });
 
     it("leaves disabled and reachability alarms alone", async () => {
