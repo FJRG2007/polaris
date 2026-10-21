@@ -7,16 +7,16 @@
  * until a disk filled - so this is the screen that says how long each is worth
  * keeping, with what is actually in them beside it.
  *
- * The counts are read here and not by the form: a number that arrives with the
- * page is a number somebody can act on, and this is a screen whose whole point is
- * to say what a period is going to take away.
+ * The counts are not read here: an unfiltered count over the activity and audit
+ * tables is a scan, and the page drew nothing until it finished. The view asks
+ * `/api/admin/retention/totals` after the first paint and keeps the last answer,
+ * so a revisit shows the numbers at once.
  *
  * The mail body cache is the fourth thing that grows without a bound and the one
  * that grows fastest, so it is here too - as a count of messages rather than a
  * period, which is why it is its own card and not a fourth row of the table.
  *
- * Its count is the exception to the paragraph above: it is the only one the card
- * fetches for itself. The three tables are counted on an indexed timestamp; a
+ * Its count is fetched by the card for itself as well. The three tables are counted on an indexed timestamp; a
  * held body is `bodyText` or `bodyHtml` being set, which no index answers, over
  * the largest table in the product - so awaiting it here held the whole
  * navigation to /admin/retention for as long as that scan took. The card draws
@@ -30,28 +30,26 @@ import { getTranslations } from "@/lib/i18n/request";
 import { RetentionView } from "./retention-view";
 import { getSetting } from "@/lib/setting-store";
 import { MAIL_BODY_KEEP_KEY, mailBodyKeep } from "@polaris/core";
-import { retentionPolicy, retentionTotals } from "@/lib/retention-service";
+import { retentionPolicy } from "@/lib/retention-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function RetentionPage() {
     await requireAdmin();
-    const t = await getTranslations("admin");
-    const policy = await retentionPolicy();
-    const totals = await retentionTotals(policy);
-    // What the window is set to. What it is actually holding - the number that
-    // says whether the setting is doing anything - the card asks for itself.
-    const storedKeep = await getSetting(MAIL_BODY_KEEP_KEY);
+    // Two settings rows and the words; the counts are the view's to ask for. What
+    // the mail window is set to is read here, what it is holding the card asks for.
+    const [t, policy, storedKeep] = await Promise.all([
+        getTranslations("admin"),
+        retentionPolicy(),
+        getSetting(MAIL_BODY_KEEP_KEY)
+    ]);
 
     return (
         // Narrow: three settings and nothing wide, so the column is centred in
         // the content area rather than left against the rail.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("retention.title")}
-                description={t("retention.description")}
-            />
-            <RetentionView policy={policy} totals={totals} />
+            <PageHeader title={t("retention.title")} description={t("retention.description")} />
+            <RetentionView policy={policy} />
             <div className="mt-4">
                 <MailBodyForm kept={mailBodyKeep(storedKeep)} />
             </div>

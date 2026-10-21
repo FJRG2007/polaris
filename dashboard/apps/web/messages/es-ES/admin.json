@@ -461,7 +461,9 @@
         "errors": {
             "unsupportedChoice": "Opción no admitida.",
             "notABoolean": "Eso no es un sí o un no."
-        }
+        },
+        "loadFailed": "No se pudo leer el formato por defecto.",
+        "retry": "Reintentar"
     },
     "domains": {
         "page": {
@@ -2462,7 +2464,10 @@
         "counts": {
             "forever": "{total} {count, plural, one {registro guardado} other {registros guardados}}. Nunca se elimina nada.",
             "noneDue": "{total} {count, plural, one {registro guardado} other {registros guardados}}. Ninguno tiene más de {period}.",
-            "due": "{total} {count, plural, one {registro guardado} other {registros guardados}}. {due} con más de {period}, a la espera de la próxima pasada."
+            "due": "{total} {count, plural, one {registro guardado} other {registros guardados}}. {due} con más de {period}, a la espera de la próxima pasada.",
+            "loadFailed": "No se pudieron leer los recuentos.",
+            "stale": "Estos recuentos son de una lectura anterior; no se pudo leer la última.",
+            "retry": "Reintentar"
         },
         "sweep": {
             "nothingDue": "No había nada pendiente.",

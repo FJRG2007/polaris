@@ -47,10 +47,39 @@ import { hostUi } from "@polaris/app-host/client";
 import type { AppHostTypes } from "@polaris/app-host";
 
 const { useConfirm } = hostUi.confirmDialog;
+const { readSnapshot, writeSnapshot, dropSnapshots } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
+const { mergeUnchanged } = hostUi.structuralMerge;
 type InstalledAppSetting = AppHostTypes["InstalledAppSetting"];
 
 const DEPENDENCIES_KEY = "MODRINTH_DOWNLOAD_DEPENDENCIES";
 const SEARCH_DEBOUNCE_MS = 400;
+/** How old a kept reading of this screen may be and still be painted. */
+const KEPT_MODS_MS = 24 * 3_600_000;
+
+/** Everything the installed list is drawn from, as one kept reading. */
+interface ModListReading {
+    readonly projects: InstalledRow[];
+    readonly conflicts: modrinth.ModrinthConflict[];
+    readonly requires: modrinth.ModrinthRequirement[];
+    readonly refused: RefusedPlugin[];
+}
+
+/**
+ * Where the last reading of one list on one server is kept.
+ *
+ * The list itself is part of the key: a reading describes those entries and no
+ * others, so an edit asks a different question rather than overwriting an
+ * answer that is still true for the list it was taken for.
+ */
+export function modListKey(subject: string, entries: readonly string[]): string {
+    return `server-mods:${subject}:${entries.join(",")}`;
+}
+
+/** Where the last answer to one browse of the marketplace is kept. */
+export function modBrowseKey(subject: string, term: string, tag: string): string {
+    return `server-mods-browse:${subject}:${tag}:${term.trim()}`;
+}
 
 /** A version the browse can actually filter on. `LATEST` is the default and names
  *  no particular release, so nothing is filtered by it and nothing is claimed
@@ -142,6 +171,17 @@ export function MinecraftMods({
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
 
+    // What this server runs, which every kept reading below belongs to.
+    const subject = `${installedAppId}:${loader ?? ""}:${version}`;
+    // The last reading of this exact list paints before the request leaves; the
+    // answer this visit gets replaces only what moved.
+    useKeptSnapshot<ModListReading>(modListKey(subject, projects), KEPT_MODS_MS, (kept) => {
+        setOnList(kept.value.projects);
+        setConflicts(kept.value.conflicts);
+        setRequires(kept.value.requires);
+        setRefused(kept.value.refused);
+    });
+
     const categories = useMemo(
         () => (loader ? modrinth.categoriesForLoader(loader) : []),
         [loader]
@@ -195,9 +235,13 @@ export function MinecraftMods({
                     setError(data.error ?? t("mods.searchFailed"));
                     return;
                 }
-                setResults(data.projects ?? []);
+                const found = data.projects ?? [];
+                setResults((current) =>
+                    current === null ? found : mergeUnchanged(current, found)
+                );
                 setSearchFailed(false);
                 setError(null);
+                if (term.trim() === "") writeSnapshot(modBrowseKey(subject, term, tag), found);
             } catch {
                 // Superseded by a newer search, or the screen was left: neither
                 // is a failure to show.
@@ -212,7 +256,7 @@ export function MinecraftMods({
                 if (!signal?.aborted) setSearching(false);
             }
         },
-        [installedAppId, loader, serverQuery]
+        [installedAppId, loader, serverQuery, subject]
     );
 
     /**
@@ -246,15 +290,25 @@ export function MinecraftMods({
                     requires?: modrinth.ModrinthRequirement[];
                     refused?: RefusedPlugin[];
                 };
-                setOnList(data.projects ?? []);
-                setConflicts(data.conflicts ?? []);
-                setRequires(data.requires ?? []);
-                setRefused(data.refused ?? []);
+                const reading: ModListReading = {
+                    projects: data.projects ?? [],
+                    conflicts: data.conflicts ?? [],
+                    requires: data.requires ?? [],
+                    refused: data.refused ?? []
+                };
+                // Only what differs becomes a new reference, so a list that did not
+                // change since the kept reading does not redraw.
+                setOnList((current) => mergeUnchanged(current, reading.projects));
+                setConflicts((current) => mergeUnchanged(current, reading.conflicts));
+                setRequires((current) => mergeUnchanged(current, reading.requires));
+                setRefused((current) => mergeUnchanged(current, reading.refused));
+                dropSnapshots(`server-mods:${subject}:`);
+                writeSnapshot(modListKey(subject, entries), reading);
             } catch {
                 if (!signal.aborted) unread();
             }
         },
-        [installedAppId, loader, serverQuery]
+        [installedAppId, loader, serverQuery, subject]
     );
 
     // Browse as it is typed, but not on every keystroke. With nothing typed this
@@ -263,15 +317,25 @@ export function MinecraftMods({
     // overtaken, or whose screen was left, is cancelled rather than left running.
     useEffect(() => {
         const abort = new AbortController();
+        // The last answer to this same browse is shown at once, and the shelf a
+        // tab opens on is asked for without waiting out a debounce nobody typed.
+        const kept = readSnapshot<modrinth.ModrinthProject[]>(
+            modBrowseKey(subject, query, category),
+            KEPT_MODS_MS
+        );
+        if (kept) {
+            setResults(kept.value);
+            setSearchFailed(false);
+        }
         const timer = setTimeout(
             () => void browse(query, category, abort.signal),
-            SEARCH_DEBOUNCE_MS
+            query.trim() === "" ? 0 : SEARCH_DEBOUNCE_MS
         );
         return () => {
             clearTimeout(timer);
             abort.abort();
         };
-    }, [query, category, browse]);
+    }, [query, category, browse, subject]);
 
     useEffect(() => {
         const abort = new AbortController();

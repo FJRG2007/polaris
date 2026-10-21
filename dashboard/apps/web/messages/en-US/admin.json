@@ -461,7 +461,9 @@
         "errors": {
             "unsupportedChoice": "Unsupported choice.",
             "notABoolean": "That is not a yes or a no."
-        }
+        },
+        "loadFailed": "The display defaults could not be read.",
+        "retry": "Try again"
     },
     "domains": {
         "page": {
@@ -2462,7 +2464,10 @@
         "counts": {
             "forever": "{total} {count, plural, one {record} other {records}} kept. Nothing is ever removed.",
             "noneDue": "{total} {count, plural, one {record} other {records}} kept. None of them is older than {period}.",
-            "due": "{total} {count, plural, one {record} other {records}} kept. {due} older than {period}, waiting for the next pass."
+            "due": "{total} {count, plural, one {record} other {records}} kept. {due} older than {period}, waiting for the next pass.",
+            "loadFailed": "The record counts could not be read.",
+            "stale": "These counts are from an earlier reading; the latest could not be read.",
+            "retry": "Try again"
         },
         "sweep": {
             "nothingDue": "Nothing was due.",

@@ -20,7 +20,14 @@ import { setThemePolicyAction } from "./actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export function ThemePolicyCard({ allowed }: { allowed: boolean }) {
+export function ThemePolicyCard({
+    allowed,
+    onChanged
+}: {
+    allowed: boolean;
+    /** Told once a change is stored, so a kept reading of the screen follows it. */
+    onChanged?: (allowed: boolean) => void;
+}) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [on, setOn] = useState(allowed);
@@ -46,13 +53,16 @@ export function ThemePolicyCard({ allowed }: { allowed: boolean }) {
                         // switch that waits for a round trip reads as broken.
                         setOn(next);
                         setError("");
-                        void runAction(() => setThemePolicyAction(next), setError).then((result) => {
-                            if (!result || result.error) {
-                                setOn(!next);
-                                return;
+                        void runAction(() => setThemePolicyAction(next), setError).then(
+                            (result) => {
+                                if (!result || result.error) {
+                                    setOn(!next);
+                                    return;
+                                }
+                                onChanged?.(next);
+                                router.refresh();
                             }
-                            router.refresh();
-                        });
+                        );
                     }}
                 />
             </CardBody>
