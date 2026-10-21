@@ -129,6 +129,28 @@ describe("opening a session's pull request", () => {
         expect(created).toHaveLength(1);
     });
 
+    it("opens a new one for work that came after the branch's merged one", async () => {
+        const { value, created, recorded } = deps({ pullsForBranch: async () => [pull(4, "merged")] });
+        expect(await review.openSessionPullRequest(session, "enabled", draft, value)).toEqual({
+            kind: "opened",
+            pull: pull(7, "open")
+        });
+        expect(created).toHaveLength(1);
+        expect(recorded).toEqual([7]);
+    });
+
+    it("links the merged one when nothing came after it", async () => {
+        const { value, recorded } = deps({
+            pullsForBranch: async () => [pull(4, "merged")],
+            create: async () => ({ ok: false, reason: "noChanges" })
+        });
+        expect(await review.openSessionPullRequest(session, "enabled", draft, value)).toEqual({
+            kind: "existing",
+            pull: pull(4, "merged")
+        });
+        expect(recorded).toEqual([4]);
+    });
+
     it("links the one GitHub says already exists when it raced in between", async () => {
         let asked = 0;
         const { value, recorded } = deps({

@@ -251,12 +251,15 @@ export async function openSessionPullRequest(
         return { kind: "refused", reason: "push", pushReason: pushed.reason };
     }
 
+    // A merged one only stands for the branch while nothing came after it: work
+    // the agent did since is a new proposal.
     const found = await deps.pullsForBranch(owner, repo, session.branch, token);
-    const existing = found ? reusablePull(found) : null;
+    const existing = found?.find((pull) => pull.state === "open") ?? null;
     if (existing) {
         await deps.record(session.id, existing);
         return { kind: "existing", pull: existing };
     }
+    const merged = found ? reusablePull(found) : null;
 
     const base = session.baseRef || (await deps.defaultBranch(owner, repo, token));
     if (!base) return { kind: "refused", reason: "github" };
@@ -280,7 +283,13 @@ export async function openSessionPullRequest(
         }
         return { kind: "refused", reason: "github" };
     }
-    if (created.reason === "noChanges") return { kind: "refused", reason: "noChanges" };
+    if (created.reason === "noChanges") {
+        if (merged) {
+            await deps.record(session.id, merged);
+            return { kind: "existing", pull: merged };
+        }
+        return { kind: "refused", reason: "noChanges" };
+    }
     if (created.reason === "missing") return { kind: "refused", reason: "missing" };
     return { kind: "refused", reason: "github" };
 }

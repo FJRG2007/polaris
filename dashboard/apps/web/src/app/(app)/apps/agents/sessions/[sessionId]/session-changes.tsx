@@ -54,6 +54,11 @@ import {
 /** How often the list is read again while the agent is still working. */
 const REFRESH_MS = 15_000;
 
+interface ReadDiff {
+    generation: number;
+    diff: FileDiff | "unreachable";
+}
+
 interface Listing {
     total: number;
     files: ChangedFile[];
@@ -67,10 +72,14 @@ export function SessionChanges({ session }: { session: SessionView }) {
     const [loading, setLoading] = useState(true);
     const [more, setMore] = useState(false);
     const [selected, setSelected] = useState<string | null>(null);
-    const [diffs, setDiffs] = useState<Record<string, FileDiff | "unreachable">>({});
-    const [diffLoading, setDiffLoading] = useState(false);
+    const [diffs, setDiffs] = useState<Record<string, ReadDiff>>({});
+    const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+    // Bumped on every list read: a diff read before it is shown until the one
+    // read after it arrives, rather than blanking the pane.
+    const [generation, setGeneration] = useState(0);
     const over = core.isSessionOver(session.state);
     const reads = useRef(0);
+    const shown = useRef(0);
 
     /** The words for an answer that is not a list. */
     const wordsFor = useCallback(
@@ -107,12 +116,23 @@ export function SessionChanges({ session }: { session: SessionView }) {
             setProblem(t(`session.changes.${answer.listing.kind}`));
             return;
         }
+        let { total, next } = answer.listing;
+        const files = [...answer.listing.files];
+        // The pages somebody already opened stay open.
+        while (next && files.length < shown.current) {
+            const page = await sessionChangesAction({ sessionId: session.id, offset: next }).catch(
+                () => null
+            );
+            if (read !== reads.current) return;
+            if (page?.answer?.kind !== "listing" || page.answer.listing.kind !== "ok") break;
+            files.push(...page.answer.listing.files);
+            total = page.answer.listing.total;
+            next = page.answer.listing.next;
+        }
         setProblem(null);
-        const { total, files, next } = answer.listing;
+        shown.current = files.length;
         setListing({ total, files, next });
-        // What was read before is stale the moment the list is: the agent is
-        // what changes these files.
-        setDiffs({});
+        setGeneration(read);
     }, [session.id, t, wordsFor]);
 
     useEffect(() => {
@@ -126,49 +146,58 @@ export function SessionChanges({ session }: { session: SessionView }) {
 
     const loadMore = async () => {
         if (!listing?.next) return;
+        const read = reads.current;
         setMore(true);
         const result = await runAction(
             () => sessionChangesAction({ sessionId: session.id, offset: listing.next }),
             setProblem
         );
         setMore(false);
+        if (read !== reads.current) return;
         const answer = result?.answer;
         if (answer?.kind === "listing" && answer.listing.kind === "ok") {
             const page = answer.listing;
-            setListing((current) =>
-                current
-                    ? {
-                          total: page.total,
-                          files: [...current.files, ...page.files],
-                          next: page.next
-                      }
-                    : current
-            );
+            setListing((current) => {
+                if (!current) return current;
+                const files = [...current.files, ...page.files];
+                shown.current = files.length;
+                return { total: page.total, files, next: page.next };
+            });
         }
     };
 
     const open = useCallback(
         async (path: string) => {
+            const at = generation;
             setSelected(path);
-            setDiffLoading(true);
+            setPending((current) => new Set(current).add(path));
             const result = await runAction(
                 () => sessionFileDiffAction({ sessionId: session.id, path }),
                 setProblem
             );
-            setDiffLoading(false);
+            setPending((current) => {
+                const rest = new Set(current);
+                rest.delete(path);
+                return rest;
+            });
             const answer = result?.answer;
             setDiffs((current) => ({
                 ...current,
-                [path]: answer?.kind === "diff" ? answer.diff : "unreachable"
+                [path]: {
+                    generation: at,
+                    diff: answer?.kind === "diff" ? answer.diff : "unreachable"
+                }
             }));
         },
-        [session.id]
+        [generation, session.id]
     );
 
-    // The open file is read again after a refresh rather than going blank.
+    // The open file is read again after a refresh, its last diff on screen
+    // until the new one is in.
     useEffect(() => {
-        if (selected && !(selected in diffs) && !diffLoading && listing) void open(selected);
-    }, [diffs, diffLoading, listing, open, selected]);
+        if (!selected || pending.has(selected) || !listing) return;
+        if (diffs[selected]?.generation !== generation) void open(selected);
+    }, [diffs, generation, listing, open, pending, selected]);
 
     const refresh = () => {
         setLoading(true);
@@ -258,8 +287,8 @@ export function SessionChanges({ session }: { session: SessionView }) {
                         </ul>
                         <DiffPane
                             path={selected}
-                            diff={selected ? diffs[selected] : undefined}
-                            loading={diffLoading}
+                            diff={selected ? diffs[selected]?.diff : undefined}
+                            loading={selected ? pending.has(selected) : false}
                             retry={() => selected && void open(selected)}
                         />
                     </div>
@@ -304,7 +333,7 @@ function DiffPane({
                 <CopyButton value={path} />
             </div>
             <div className="flex max-h-[70vh] min-h-24 min-w-0 flex-col">
-                {loading || diff === undefined ? (
+                {diff === undefined || (loading && diff === "unreachable") ? (
                     <div className="space-y-2 p-4">
                         {[0, 1, 2, 3, 4].map((row) => (
                             <Skeleton key={row} className="h-4 w-full" />
@@ -368,45 +397,49 @@ export function ShipPullRequest({ session }: { session: SessionView }) {
     // pixels, and offering one that turns out to be refused is worse.
     if (!view) return null;
 
-    if (view.pull) {
-        return (
-            <span className="flex min-w-0 items-center gap-2">
-                <a
-                    href={view.pull.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex min-w-0 items-center gap-1 text-sm text-primary hover:underline"
-                    title={view.pull.title || undefined}
-                >
-                    <GitPullRequest className="size-4 shrink-0" />
-                    <span className="truncate">
-                        {t("session.ship.view", { number: view.pull.number })}
-                    </span>
-                    <ExternalLink className="size-3.5 shrink-0" />
-                </a>
-                {view.pull.state ? (
-                    <Badge variant={STATE_VARIANT[view.pull.state]} className="shrink-0">
-                        {t(`session.ship.states.${view.pull.state}`)}
-                    </Badge>
-                ) : null}
-                {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
-            </span>
-        );
-    }
+    // A closed or merged one does not stand for what the agent did after it:
+    // the button is offered again beside it.
+    const linked = view.pull ? (
+        <span className="flex min-w-0 items-center gap-2">
+            <a
+                href={view.pull.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex min-w-0 items-center gap-1 text-sm text-primary hover:underline"
+                title={view.pull.title || undefined}
+            >
+                <GitPullRequest className="size-4 shrink-0" />
+                <span className="truncate">
+                    {t("session.ship.view", { number: view.pull.number })}
+                </span>
+                <ExternalLink className="size-3.5 shrink-0" />
+            </a>
+            {view.pull.state ? (
+                <Badge variant={STATE_VARIANT[view.pull.state]} className="shrink-0">
+                    {t(`session.ship.states.${view.pull.state}`)}
+                </Badge>
+            ) : null}
+            {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
+        </span>
+    ) : null;
+    if (linked && view.pull?.state !== "closed" && view.pull?.state !== "merged") return linked;
 
     if (view.blocked) {
         const reason = t(`session.ship.refusals.${view.blocked}`);
         return (
-            <Button
-                size="sm"
-                variant="ghost"
-                disabled
-                title={reason}
-                aria-label={`${t("session.ship.open")}. ${reason}`}
-            >
-                <GitPullRequest className="size-4 shrink-0" />
-                {t("session.ship.open")}
-            </Button>
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+                {linked}
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled
+                    title={reason}
+                    aria-label={`${t("session.ship.open")}. ${reason}`}
+                >
+                    <GitPullRequest className="size-4 shrink-0" />
+                    {t("session.ship.open")}
+                </Button>
+            </span>
         );
     }
 
@@ -443,7 +476,8 @@ export function ShipPullRequest({ session }: { session: SessionView }) {
     };
 
     return (
-        <>
+        <span className="flex min-w-0 flex-wrap items-center gap-2">
+            {linked}
             <Button size="sm" variant="secondary" onClick={start}>
                 <GitPullRequest className="size-4 shrink-0" />
                 {t("session.ship.open")}
@@ -500,6 +534,6 @@ export function ShipPullRequest({ session }: { session: SessionView }) {
                     </DialogContent>
                 </Dialog>
             ) : null}
-        </>
+        </span>
     );
 }

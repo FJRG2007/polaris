@@ -30,6 +30,9 @@ export const DIFF_CHUNK_BYTES = 11_000;
  *  page says it is too large, rather than reading it in dozens of round trips. */
 export const MAX_DIFF_BYTES = 160_000;
 
+/** How many times a diff that changed mid-read is read again from the start. */
+const MAX_DIFF_ATTEMPTS = 3;
+
 /** Where a container checkout lives when the row has none recorded. */
 const DEFAULT_WORKDIR = "/session/repo";
 
@@ -86,9 +89,12 @@ export function listChangesScript(input: {
         '    else printf "%s\\t0\\t%s\\n" "$(wc -l < "$f" | tr -d " ")" "$f"; fi',
         "  done",
         "}",
-        'total=$(list | wc -l | tr -d " ")',
+        "tmp=$(mktemp 2>/dev/null || echo /tmp/polaris-changes-$$)",
+        "trap 'rm -f \"$tmp\"' EXIT",
+        'list > "$tmp"',
+        'total=$(wc -l < "$tmp" | tr -d " ")',
         `echo "${MARK} ok $base $total"`,
-        `list | tail -n +${offset + 1} | LC_ALL=C awk -v cap=${LIST_PAGE_BYTES} -v start=${offset} '{ size += length($0) + 1; if (size > cap) { print "${MARK} more " (start + NR - 1); exit } print }'`
+        `tail -n +${offset + 1} "$tmp" | LC_ALL=C awk -v cap=${LIST_PAGE_BYTES} -v start=${offset} '{ size += length($0) + 1; if (size > cap) { print "${MARK} more " (start + NR - 1); exit } print }'`
     ].join("\n");
 }
 
@@ -189,14 +195,15 @@ export function fileDiffScript(input: {
         "fi",
         "size=$(wc -c < \"$tmp\" | tr -d ' ')",
         `if [ "$size" -gt ${MAX_DIFF_BYTES} ]; then echo "${MARK} large $size"; exit 0; fi`,
-        `echo "${MARK} chunk $size"`,
+        "sum=$(cksum < \"$tmp\" | awk '{ print $1 }')",
+        `echo "${MARK} chunk $size $sum"`,
         `tail -c +${offset + 1} "$tmp" | head -c ${DIFF_CHUNK_BYTES} | base64 | tr -d '\\n'`,
         "echo"
     ].join("\n");
 }
 
 export type DiffChunk =
-    | { kind: "chunk"; size: number; bytes: Buffer }
+    | { kind: "chunk"; size: number; sum: string; bytes: Buffer }
     | { kind: "large"; size: number }
     | { kind: "gone" }
     | { kind: "nocheckout" }
@@ -206,7 +213,7 @@ export function parseDiffChunk(output: string): DiffChunk | null {
     const lines = output.split("\n");
     const start = lines.findIndex((line) => line.startsWith(MARK));
     if (start < 0) return null;
-    const [status, size] = lines[start]!.slice(MARK.length).trim().split(/\s+/);
+    const [status, size, sum = ""] = lines[start]!.slice(MARK.length).trim().split(/\s+/);
     const bytes = Math.max(0, Number.parseInt(size ?? "0", 10) || 0);
     switch (status) {
         case "nocheckout":
@@ -218,7 +225,7 @@ export function parseDiffChunk(output: string): DiffChunk | null {
         case "chunk": {
             const body = (lines[start + 1] ?? "").trim();
             if (!/^[A-Za-z0-9+/]*={0,2}$/.test(body)) return null;
-            return { kind: "chunk", size: bytes, bytes: Buffer.from(body, "base64") };
+            return { kind: "chunk", size: bytes, sum, bytes: Buffer.from(body, "base64") };
         }
         default:
             return null;
@@ -237,21 +244,34 @@ export type FileDiff =
 /**
  * Read a whole diff, chunk by chunk, through `run`.
  *
- * Stops at the size the first chunk reported, so a diff that grows while it is
- * read - the agent is still working - is shown as it was when reading began
- * rather than spliced from two versions. A chunk that comes back short of what it
- * should have held means the output was cut, and the read is a failure rather
- * than a diff with a hole in it.
+ * Every chunk carries the size and checksum of the diff it was cut from, so a
+ * diff that changes while it is read - the agent is still working - is read
+ * again from the start rather than spliced from two versions, and given up on
+ * when it keeps changing. A chunk that comes back short of what it should have
+ * held means the output was cut, and the read is a failure rather than a diff
+ * with a hole in it.
  */
 export async function readFileDiff(run: (offset: number) => Promise<string>): Promise<FileDiff> {
-    const parts: Buffer[] = [];
+    let parts: Buffer[] = [];
+    let version = "";
     let size = 0;
     let read = 0;
+    let attempts = 0;
     do {
         const chunk = parseDiffChunk(await run(read));
         if (!chunk) return { kind: "failed" };
         if (chunk.kind !== "chunk") return chunk;
-        if (read === 0) size = chunk.size;
+        const seen = `${chunk.size}:${chunk.sum}`;
+        if (read === 0) {
+            version = seen;
+            size = chunk.size;
+        } else if (seen !== version) {
+            attempts += 1;
+            if (attempts >= MAX_DIFF_ATTEMPTS) return { kind: "failed" };
+            parts = [];
+            read = 0;
+            continue;
+        }
         const want = Math.min(DIFF_CHUNK_BYTES, size - read);
         if (chunk.bytes.length < want) return { kind: "failed" };
         parts.push(chunk.bytes.subarray(0, want));

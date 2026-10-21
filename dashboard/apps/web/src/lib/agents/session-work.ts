@@ -73,6 +73,8 @@ export interface SaveWorkInput {
 export function saveWorkScript(input: SaveWorkInput): string {
     return [
         "export GIT_TERMINAL_PROMPT=0",
+        `authfile=${shellQuote(input.authFile)}`,
+        `[ -n "$authfile" ] && trap 'rm -f "$authfile"' EXIT`,
         `cd ${shellPath(input.workdir)} 2>/dev/null || { echo "${MARK} none 0 -"; exit 0; }`,
         // Whoever the daemon runs this as, the checkout may belong to the agent's
         // own account, and git refuses a repository owned by somebody else.

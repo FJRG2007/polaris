@@ -1482,6 +1482,7 @@
         "web/src/app/(app)/apps/agents/runs/page.tsx",
         "web/src/app/(app)/apps/agents/runs/runs-view.tsx",
         "web/src/app/(app)/apps/agents/sessions/[sessionId]/page.tsx",
+        "web/src/app/(app)/apps/agents/sessions/[sessionId]/session-changes.tsx",
         "web/src/app/(app)/apps/agents/sessions/[sessionId]/session-detail.tsx",
         "web/src/app/(app)/apps/agents/sessions/actions.ts",
         "web/src/app/(app)/apps/agents/sessions/page.tsx",

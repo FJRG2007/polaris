@@ -110,6 +110,28 @@ describe("reading a diff in chunks", () => {
         expect(diff).toEqual({ kind: "failed" });
     });
 
+    const versioned = (all: Buffer, sum: string, offset: number) =>
+        `polaris-changes: chunk ${all.length} ${sum}\n${all.subarray(offset, offset + DIFF_CHUNK_BYTES).toString("base64")}\n`;
+
+    it("reads again from the start when the diff changes between chunks", async () => {
+        const before = Buffer.alloc(DIFF_CHUNK_BYTES * 2, "a");
+        const after = Buffer.alloc(DIFF_CHUNK_BYTES * 2, "b");
+        const offsets: number[] = [];
+        const diff = await readFileDiff(async (offset) => {
+            offsets.push(offset);
+            return offsets.length === 1 ? versioned(before, "1", offset) : versioned(after, "2", offset);
+        });
+        expect(diff).toEqual({ kind: "diff", text: after.toString("utf8") });
+        expect(offsets).toEqual([0, DIFF_CHUNK_BYTES, 0, DIFF_CHUNK_BYTES]);
+    });
+
+    it("gives up on a diff that keeps changing rather than splicing it", async () => {
+        const all = Buffer.alloc(DIFF_CHUNK_BYTES * 2, "a");
+        let call = 0;
+        const diff = await readFileDiff(async (offset) => versioned(all, String(++call), offset));
+        expect(diff).toEqual({ kind: "failed" });
+    });
+
     it("passes on what the script said instead of a chunk", async () => {
         expect(await readFileDiff(async () => "polaris-changes: gone")).toEqual({ kind: "gone" });
         expect(await readFileDiff(async () => "")).toEqual({ kind: "failed" });
