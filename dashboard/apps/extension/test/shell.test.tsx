@@ -108,7 +108,9 @@ describe("the home screen", () => {
         expect(markup).not.toContain("Servers");
         expect(markup).not.toContain("Hosts");
         expect(markup).not.toContain("polaris.example");
-        expect(markup.match(/class="section"/g)).toHaveLength(1);
+        // The vault and Polar, nothing else.
+        expect(markup.match(/class="section"/g)).toHaveLength(2);
+        expect(markup).toContain("Open Polar beside the page");
     });
 });
 

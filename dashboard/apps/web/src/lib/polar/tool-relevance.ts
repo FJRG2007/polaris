@@ -16,7 +16,7 @@
 import { z } from "zod";
 import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import type { McpCategory } from "@/lib/mcp/scope-table";
-import { fenceScreen, type PageContext } from "@/lib/polar/shared";
+import { fenceSite, fenceScreen, type PageContext } from "@/lib/polar/shared";
 
 export const READ_CURRENT_VIEW = "read_current_view";
 export const FIND_TOOLS = "find_tools";
@@ -198,6 +198,8 @@ export function currentViewTool(context: PageContext | null, call: ToolCall): To
             async execute() {
                 const screen = fenceScreen(context);
                 if (!context) return { text: "The person is not sharing their screen." };
+                // A page outside Polaris: its own words, fenced as the site's.
+                if (context.site) return { text: `${screen}\n${fenceSite(context.site)}` };
                 const record = context.record;
                 const reader = record ? READERS[record.kind] : undefined;
                 if (!record || !reader || NEVER_READ.test(record.kind)) {

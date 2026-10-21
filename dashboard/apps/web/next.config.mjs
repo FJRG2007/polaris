@@ -11,9 +11,17 @@ import { PortableImportMetaUrl } from "./scripts/portable-import-meta.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** Every path except a published calendar's embed, in the matcher syntax Next uses
- *  for `headers()`. */
-const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/).*)";
+/** Every path except a published calendar's embed and Polar's embed, in the
+ *  matcher syntax Next uses for `headers()`. */
+const FRAMEABLE_EXCEPT_EMBEDS = "/:path((?!cal/embed/|polar/embed$).*)";
+
+/**
+ * The browser extension's own origin, as `lib/polar/embed-bridge.ts` spells it
+ * (a test holds the two together): Chromium's 32-letter id or Firefox's
+ * per-install UUID. Written out for the same reason as the players below.
+ */
+const EXTENSION_ORIGIN_PATTERN =
+    "chrome-extension://[a-p]{32}|moz-extension://[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
 /**
  * The only sites a Polaris page may put in a frame: the chat's players
@@ -266,6 +274,29 @@ const nextConfig = {
                     value: `frame-ancestors 'self'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
                 },
                 { key: "X-Frame-Options", value: "SAMEORIGIN" }
+            ]
+        },
+        // Polar for the browser extension's side panel. Framed by Polaris itself
+        // and, when the address names one with `?ext=`, by that extension's own
+        // origin - never by a website. No X-Frame-Options here: it has no way to
+        // name an extension, and a browser that reads both would refuse the panel.
+        {
+            source: "/polar/embed",
+            headers: [
+                {
+                    key: "Content-Security-Policy",
+                    value: `frame-ancestors 'self'; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
+                }
+            ]
+        },
+        {
+            source: "/polar/embed",
+            has: [{ type: "query", key: "ext", value: `(?<ext>${EXTENSION_ORIGIN_PATTERN})` }],
+            headers: [
+                {
+                    key: "Content-Security-Policy",
+                    value: `frame-ancestors 'self' :ext; frame-src 'self' ${PLAYER_ORIGINS.join(" ")}`
+                }
             ]
         },
         // The consent screen an AI assistant sends somebody to: not even Polaris

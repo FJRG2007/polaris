@@ -12,6 +12,7 @@ import { withNewPassword } from "@/lib/item";
 import { readIntendedLogin } from "@/lib/save";
 import { injectableOrigins } from "@/lib/injection";
 import { chromiumBrowser } from "@/lib/browser-name";
+import { OPEN_POLAR, openSidePanel } from "@/lib/polar-panel";
 import { decryptBytes } from "@polaris/vault-crypto";
 import type { SymmetricKey } from "@polaris/vault-crypto";
 import { ACCOUNT_LOCALE, words } from "@/lib/locale-store";
@@ -2629,8 +2630,7 @@ async function fillTab(
                     : [login.username, login.password, code, submit, login.email]
         });
         const filled = outcome?.result as
-            | { user?: boolean; pass?: boolean; code?: boolean }
-            | undefined;
+            { user?: boolean; pass?: boolean; code?: boolean } | undefined;
         if (!filled?.user && !filled?.pass && !filled?.code) {
             return { ok: false, error: await say("errors.noLoginForm") };
         }
@@ -4012,7 +4012,11 @@ export default defineBackground(() => {
     // the build with it. Inside this function it runs when the worker starts,
     // which is still synchronous registration - what manifest v3 requires of a
     // listener that has to survive the worker being recycled.
-    browser.commands.onCommand.addListener((command) => void fillFromKeyboard(command));
+    browser.commands.onCommand.addListener((command, tab) => {
+        // Nothing awaited first: a side panel opens only inside the gesture.
+        if (command === OPEN_POLAR) openSidePanel(browser, tab?.windowId);
+        else void fillFromKeyboard(command);
+    });
 
     // The right-click entries, registered here for the same reason as the
     // command above: the build's stand-in browser has no menu API.

@@ -86,7 +86,24 @@ export default defineConfig({
             "fill-login": {
                 suggested_key: { default: "Ctrl+Shift+L", mac: "Command+Shift+L" },
                 description: "__MSG_commandFillLogin__"
-            }
+            },
+            // Polar beside the page (`src/entrypoints/sidepanel`). Firefox opens
+            // its sidebar from its own reserved command; Chromium has none for a
+            // side panel, so the worker opens it from ours. Alt+P: no browser
+            // binds it, and the browser's shortcuts screen changes it.
+            ...(browser === "firefox"
+                ? {
+                      _execute_sidebar_action: {
+                          suggested_key: { default: "Alt+P" },
+                          description: "__MSG_commandOpenPolar__"
+                      }
+                  }
+                : {
+                      "open-polar": {
+                          suggested_key: { default: "Alt+P" },
+                          description: "__MSG_commandOpenPolar__"
+                      }
+                  })
         },
         // Every web page on version 3 (see the top of this file), and the
         // runtime request on version 2, under the name version 2 has for it:
