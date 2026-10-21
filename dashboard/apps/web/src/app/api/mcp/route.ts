@@ -29,14 +29,12 @@ import { prisma } from "@polaris/db";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { readCappedBody } from "@/lib/request-body";
 import type { McpScope } from "@/lib/mcp/scope-table";
-import { DEPLOY_TOOLS } from "@/lib/mcp/tools/deploy";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
-import { throttleDeployKey, tooManyCalls } from "@/lib/deploy/api/http";
+import { tooManyCalls } from "@/lib/deploy/api/http";
+import { auditToolChange, spendToolBudget, viaOf } from "@/lib/mcp/call-guard";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import { clientIp } from "@/lib/request-context";
-import { recordAudit } from "@/lib/audit-service";
-import { rateLimit } from "@/lib/rate-limit-service";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { originOf } from "@/lib/mcp/oauth/origin";
 import { serverIcons } from "@/lib/mcp/server-icons";
@@ -238,14 +236,9 @@ async function callerFor(
     return { userId: owner, isAdmin: false, scopes: SESSION_SCOPES, sessionId: session.id };
 }
 
-/**
- * Spend a deploy tool call against the key's Deploy API budgets, the same ones a
- * REST call spends. Counted per call rather than per request, so a batch of
- * twenty deploy_start calls costs what twenty deploys through the API cost and
- * is held back where they would be. Answers the reply for a call over budget,
- * or null for one that may run - including every message that is not a deploy
- * tool call, which the handler answers as it always has.
- */
+/** Spend a tool call's budgets (see `lib/mcp/call-guard`). Answers the reply
+ *  for a call over budget, or null for one that may run - including every
+ *  message that is not a tool call, which the handler answers as it always has. */
 async function overBudget(
     message: Record<string, unknown>,
     caller: McpCaller,
@@ -259,45 +252,11 @@ async function overBudget(
     const name = (message.params as { name?: unknown } | undefined)?.name;
     const tool = tools.find((candidate) => candidate.name === name);
     if (!tool) return null;
-
-    // Every tool, for every credential: a model in a loop is the ordinary way
-    // this gets called far too often, and each call reaches the database.
-    const credential =
-        caller.keyId ??
-        caller.grantId ??
-        (caller.sessionId ? `session:${caller.sessionId}` : `user:${caller.userId}`);
-    for (const [bucket, limit] of [
-        [`mcp-call:${credential}`, CALLS_PER_MINUTE],
-        ...(tool.readOnly ? [] : [[`mcp-change:${credential}`, CHANGES_PER_MINUTE] as const])
-    ] as const) {
-        const throttle = await rateLimit(bucket, limit, 60_000);
-        if (!throttle.ok)
-            return toolFailure(
-                id,
-                tooManyCalls(Math.max(1, Math.ceil(throttle.retryAfterMs / 1000)))
-            );
-    }
-
-    // And the deploy tools spend the Deploy API's own budgets on top, keyed the
-    // same way a REST call with this credential would be.
-    const deployKey = caller.keyId ?? caller.grantId;
-    if (!deployKey || !DEPLOY_TOOLS.some((candidate) => candidate.name === name)) return null;
-    const wait = await throttleDeployKey(deployKey, !tool.readOnly);
+    const wait = await spendToolBudget(tool, caller);
     return wait === null ? null : toolFailure(id, tooManyCalls(wait));
 }
 
-/** How many tool calls one credential may make a minute, and how many of them
- *  may change something. Generous for an assistant working a task, and well
- *  short of what a runaway loop would make. */
-const CALLS_PER_MINUTE = 120;
-const CHANGES_PER_MINUTE = 30;
-
-/**
- * Write a tool call that changed something to the person's activity, saying
- * which credential made it. Centrally rather than per tool, so a tool added
- * later cannot forget to - and only for calls that went through, since a
- * refusal changed nothing.
- */
+/** Audit a tool call that changed something and went through. */
 async function auditChange(
     message: Record<string, unknown>,
     reply: JsonRpcResponse | null,
@@ -307,19 +266,9 @@ async function auditChange(
     if (message.method !== "tools/call" || !reply || reply.error) return;
     const name = (message.params as { name?: unknown } | undefined)?.name;
     const tool = tools.find((candidate) => candidate.name === name);
-    if (!tool || tool.readOnly) return;
+    if (!tool) return;
     if ((reply.result as { isError?: boolean } | undefined)?.isError) return;
-    await recordAudit({
-        actorId: caller.userId,
-        action: "mcp.tool.called",
-        targetType: "mcpTool",
-        metadata: {
-            tool: tool.name,
-            via: caller.grantId ? "oauth" : caller.keyId ? "api-key" : "agent-session",
-            ...(caller.grantId ? { grantId: caller.grantId } : {}),
-            ...(caller.keyId ? { keyId: caller.keyId } : {})
-        }
-    });
+    await auditToolChange(tool, caller, viaOf(caller));
 }
 
 /** One message, answered after its budgets are spent, and audited if it
@@ -365,7 +314,7 @@ function logMcp(
     const result = (reply as { result?: { tools?: unknown[] } } | null)?.result;
     const line = {
         method,
-        via: caller.grantId ? "oauth" : caller.keyId ? "api-key" : "agent-session",
+        via: viaOf(caller),
         ...(caller.grantId ? { grantId: caller.grantId } : {}),
         ...(typeof params?.protocolVersion === "string"
             ? { protocol: params.protocolVersion.slice(0, 32) }

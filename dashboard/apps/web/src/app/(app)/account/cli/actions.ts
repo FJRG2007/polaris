@@ -18,14 +18,27 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { localized } from "../security/action-messages";
-import { answerCliSignIn, describeCliSignIn, type PendingCliSignIn } from "@/lib/cli/sign-in";
+import {
+    answerCliSignIn,
+    describeCliSignIn,
+    type PendingCliSignIn,
+    type SignInKind
+} from "@/lib/cli/sign-in";
 
 /** Guess-throttling for the short code, which is what stands between a
  *  stranger's request and somebody's account. */
 const LOOKUP_LIMIT = 20;
 const LOOKUP_WINDOW_MS = 10 * 60 * 1000;
 
-const answerSchema = z.object({ userCode: z.string().min(1).max(32), approve: z.boolean() });
+/** Which screen is asking: the CLI's or the Stream Deck's. Each finds only its
+ *  own kind of request. */
+const kindSchema = z.enum(["cli", "streamdeck"]).default("cli");
+
+const answerSchema = z.object({
+    userCode: z.string().min(1).max(32),
+    approve: z.boolean(),
+    kind: kindSchema
+});
 
 /**
  * The request behind a code, throttled. Every path that turns a typed code into
@@ -34,16 +47,18 @@ const answerSchema = z.object({ userCode: z.string().min(1).max(32), approve: z.
  */
 async function lookup(
     userId: string,
-    typed: unknown
+    typed: unknown,
+    kind: SignInKind
 ): Promise<{ code?: string; pending?: PendingCliSignIn; error?: string }> {
+    // One budget for both screens: they guess at the same codes.
     const throttle = await rateLimit(`cli-code:${userId}`, LOOKUP_LIMIT, LOOKUP_WINDOW_MS);
     const t = await getTranslations("account");
-    if (!throttle.ok) return { error: t("cli.errors.tooMany") };
+    if (!throttle.ok) return { error: t(`${kind}.errors.tooMany`) };
 
     const code = typeof typed === "string" ? readUserCode(typed) : null;
-    if (!code) return { error: t("cli.errors.notACode") };
-    const pending = await describeCliSignIn(code);
-    if (!pending) return { error: t("cli.errors.nothingWaiting") };
+    if (!code) return { error: t(`${kind}.errors.notACode`) };
+    const pending = await describeCliSignIn(code, new Date(), kind);
+    if (!pending) return { error: t(`${kind}.errors.nothingWaiting`) };
     return { code, pending };
 }
 
@@ -53,15 +68,17 @@ async function lookup(
  * able to do rather than what the CLI asked for.
  */
 export async function describeCliSignInAction(
-    typed: unknown
+    typed: unknown,
+    askedKind?: unknown
 ): Promise<{ pending?: PendingCliSignIn; error?: string }> {
     const user = await requireUser();
-    const found = await lookup(user.id, typed);
+    const kind = kindSchema.catch("cli").parse(askedKind);
+    const found = await lookup(user.id, typed, kind);
     if (found.error || !found.pending) return { error: found.error };
     const held = new Set<string>(await scopesAvailableTo(user.id, user.isAdmin));
     const scopes = found.pending.scopes.filter((scope) => held.has(scope));
     if (scopes.length === 0)
-        return { error: (await getTranslations("account"))("cli.errors.noScopes") };
+        return { error: (await getTranslations("account"))(`${kind}.errors.noScopes`) };
     return { pending: { ...found.pending, scopes } };
 }
 
@@ -79,23 +96,25 @@ export async function answerCliSignInAction(
     const t = await getTranslations("account");
     const parsed = answerSchema.safeParse(input);
     if (!parsed.success) return { error: t("cli.errors.cannotAnswer") };
+    const kind = parsed.data.kind;
 
-    const found = await lookup(user.id, parsed.data.userCode);
+    const found = await lookup(user.id, parsed.data.userCode, kind);
     if (found.error || !found.code || !found.pending)
-        return { error: found.error ?? t("cli.errors.cannotAnswer") };
+        return { error: found.error ?? t(`${kind}.errors.cannotAnswer`) };
     const { code, pending } = found;
 
     const answered = await answerCliSignIn({
         userId: user.id,
         userCode: code,
-        approve: parsed.data.approve
+        approve: parsed.data.approve,
+        kind
     });
-    if (!answered) return { error: t("cli.errors.nothingWaiting") };
+    if (!answered) return { error: t(`${kind}.errors.nothingWaiting`) };
 
     await recordAudit({
         actorId: user.id,
-        action: parsed.data.approve ? "account.cli.approved" : "account.cli.refused",
-        targetType: "cli",
+        action: `account.${kind}.${parsed.data.approve ? "approved" : "refused"}`,
+        targetType: kind,
         // The code rather than the name, which is the CLI's own unverified claim.
         targetId: code,
         metadata: {

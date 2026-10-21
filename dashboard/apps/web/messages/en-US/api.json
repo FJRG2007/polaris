@@ -94,7 +94,8 @@
         "notAnOrganization": "That is not an organization.",
         "fileOpenFailed": "That file could not be opened.",
         "rangeBackwards": "The start of the range is after its end.",
-        "fileLargerThan": "That file is larger than {megabytes} MB."
+        "fileLargerThan": "That file is larger than {megabytes} MB.",
+        "deckSignInAsk": "A device name is required, and only the scopes a Stream Deck uses can be asked for."
     },
     "refusals": {
         "session": {
@@ -235,5 +236,52 @@
     "words": {
         "theOwner": "The owner",
         "mintedToken": "Minted from this app's settings."
+    },
+    "deck": {
+        "errors": {
+            "throttled": "Too many presses from this deck. Wait a moment.",
+            "badRequest": "The plugin sent something Polaris could not read. Update the plugin.",
+            "unknownAction": "This key's action is not available any more. Pick another one.",
+            "notAllowed": "This deck cannot do that. Connect it again, or ask an administrator for access.",
+            "badOptions": "This key is not set up completely. Open its settings.",
+            "notRunnable": "This key only shows a value.",
+            "refused": "Polaris could not do that just now."
+        },
+        "fields": {
+            "conversationId": "Conversation",
+            "body": "Message",
+            "choice": "Status",
+            "service": "Service",
+            "path": "Page"
+        },
+        "choice": {
+            "busy": "Do not disturb",
+            "away": "Away",
+            "invisible": "Invisible"
+        },
+        "actions": {
+            "chat_send": "Send a message",
+            "chat_unread": "Unread messages",
+            "chat_open": "Open Chat",
+            "status_presence": "Set your status",
+            "watch_alarms": "Firing alarms",
+            "deploy_redeploy": "Deploy a service",
+            "deploy_restart": "Restart a service",
+            "polaris_notifications": "Notifications",
+            "polaris_open": "Open a Polaris page",
+            "deploy_status": "Last deployment"
+        },
+        "status": {
+            "queued": "Queued",
+            "building": "Building",
+            "deploying": "Deploying",
+            "running": "Running",
+            "success": "Done",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "rolled_back": "Rolled back",
+            "stopped": "Stopped",
+            "removed": "Removed"
+        }
     }
 }

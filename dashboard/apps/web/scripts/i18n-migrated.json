@@ -2187,6 +2187,23 @@
         "web/src/lib/machines/machine-access.ts",
         "web/src/lib/machines/machine-links.ts",
         "web/src/lib/machines/machines-service.ts",
-        "web/src/lib/watch/card-order.ts"
+        "web/src/lib/watch/card-order.ts",
+        "places/src/lib/deck-actions.ts",
+        "web/src/app/(app)/account/downloads/streamdeck-section.tsx",
+        "web/src/app/(app)/account/streamdeck/page.tsx",
+        "web/src/app/api/deck/actions/route.ts",
+        "web/src/app/api/deck/authorize/claim/route.ts",
+        "web/src/app/api/deck/authorize/route.ts",
+        "web/src/app/api/deck/run/route.ts",
+        "web/src/app/api/deck/session/route.ts",
+        "web/src/app/api/deck/state/route.ts",
+        "web/src/lib/deck/auth.ts",
+        "web/src/lib/deck/core-actions.ts",
+        "web/src/lib/deck/deck-service.ts",
+        "web/src/lib/deck/scopes.ts",
+        "web/src/lib/deck/state-stream.ts",
+        "web/src/lib/deck/tool-call.ts",
+        "web/src/lib/deck/types.ts",
+        "web/src/lib/mcp/call-guard.ts"
     ]
 }

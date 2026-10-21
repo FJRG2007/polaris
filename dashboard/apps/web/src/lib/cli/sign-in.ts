@@ -23,10 +23,22 @@
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
+import { DECK_TOKEN_DAYS, isDeckScope, type DeckScope } from "@/lib/deck/scopes";
 import { createApiKey, scopesAvailableTo } from "@polaris/auth";
 import { revokeCliSession } from "./sessions";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { createApiKeySchema, describeClient, parseStringList, stringifyList } from "@polaris/core";
+
+/**
+ * What is asking. The Stream Deck plugin connects through this same grant: the
+ * same short code, the same approval and the same kind of key, with its own
+ * closed list of scopes and its own approval screen. A request only ever turns
+ * up on the screen of its own kind.
+ */
+export type SignInKind = "cli" | "streamdeck";
+
+/** A scope either kind of client may ask for. */
+export type SignInScope = CliScope | DeckScope;
 
 /** What the CLI is handed when it asks. */
 export interface OpenedCliSignIn {
@@ -42,7 +54,9 @@ export interface OpenedCliSignIn {
 export interface CliSignInRequest {
     readonly deviceName: string;
     readonly clientVersion: string | null;
-    readonly scopes: readonly CliScope[];
+    readonly scopes: readonly SignInScope[];
+    /** "cli" when it does not say, which is every caller from before the deck. */
+    readonly kind?: SignInKind;
     readonly requestIp: string | null;
     readonly requestUserAgent: string | null;
     readonly requestHost: string | null;
@@ -56,7 +70,8 @@ export interface PendingCliSignIn {
     readonly clientVersion: string | null;
     /** The system its user-agent names, or "Unknown OS". */
     readonly os: string;
-    readonly scopes: readonly CliScope[];
+    readonly kind: SignInKind;
+    readonly scopes: readonly SignInScope[];
     readonly requestIp: string | null;
     readonly host: string | null;
     readonly requestedAt: string;
@@ -88,19 +103,27 @@ function isUniqueViolation(caught: unknown): boolean {
 /** The scopes a stored request asked for, with anything that is not a CLI scope
  *  dropped - the column is written only by `openCliSignIn`, but it is read back
  *  as data. */
-function storedScopes(raw: string): CliScope[] {
-    return parseStringList(raw).filter(isCliScope);
+function storedScopes(raw: string, kind: SignInKind = "cli"): SignInScope[] {
+    const list = parseStringList(raw);
+    return kind === "streamdeck" ? list.filter(isDeckScope) : list.filter(isCliScope);
+}
+
+/** The kind a stored row names. A row from before the column read as "cli". */
+function storedKind(raw: unknown): SignInKind {
+    return raw === "streamdeck" ? "streamdeck" : "cli";
 }
 
 /**
  * The OS a CLI's user-agent names. The CLI sends
- * `polaris-cli/<version> (<platform>; <arch>; node <version>)`, which no browser
+ * `polaris-cli/<version> (<platform>; <arch>; node <version>)` - the Stream Deck
+ * plugin says the same as `polaris-streamdeck/` - which no browser
  * parser recognises, so it is read here; anything else goes to the shared parser.
  */
 export function cliOs(userAgent: string | null): string {
-    const platform = /^polaris-cli\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
-        userAgent ?? ""
-    )?.[1];
+    const platform =
+        /^polaris-(?:cli|streamdeck)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
+            userAgent ?? ""
+        )?.[1];
     if (platform === "win32") return "Windows";
     if (platform === "darwin") return "macOS";
     if (platform === "linux") return "Linux";
@@ -136,6 +159,7 @@ export async function openCliSignIn(
                     deviceName: input.deviceName,
                     clientVersion: input.clientVersion,
                     scopes: stringifyList([...input.scopes]),
+                    kind: input.kind ?? "cli",
                     requestIp: input.requestIp,
                     requestUserAgent: input.requestUserAgent,
                     requestHost: input.requestHost,
@@ -155,16 +179,21 @@ export async function openCliSignIn(
  *  short enough to guess at. */
 export async function describeCliSignIn(
     userCode: string,
-    now = new Date()
+    now = new Date(),
+    kind: SignInKind = "cli"
 ): Promise<PendingCliSignIn | null> {
     const row = await prisma.cliAuthorization.findUnique({ where: { userCode } });
     if (!row || row.status !== "pending" || row.expiresAt <= now) return null;
+    // A deck's code typed on the CLI's screen, or the other way round, is the
+    // same "nothing waiting" as a code that was never issued.
+    if (storedKind(row.kind) !== kind) return null;
     return {
         userCode: row.userCode,
         device: row.deviceName,
         clientVersion: row.clientVersion,
         os: cliOs(row.requestUserAgent),
-        scopes: storedScopes(row.scopes),
+        kind,
+        scopes: storedScopes(row.scopes, kind),
         requestIp: row.requestIp,
         host: row.requestHost,
         requestedAt: row.createdAt.toISOString(),
@@ -178,9 +207,15 @@ export async function answerCliSignIn(input: {
     readonly userId: string;
     readonly userCode: string;
     readonly approve: boolean;
+    readonly kind?: SignInKind;
 }): Promise<boolean> {
     const answered = await prisma.cliAuthorization.updateMany({
-        where: { userCode: input.userCode, status: "pending", expiresAt: { gt: new Date() } },
+        where: {
+            userCode: input.userCode,
+            status: "pending",
+            expiresAt: { gt: new Date() },
+            kind: input.kind ?? "cli"
+        },
         data: { status: input.approve ? "approved" : "denied", userId: input.userId }
     });
     return answered.count > 0;
@@ -233,7 +268,8 @@ export async function claimCliSignIn(
     if (!account || account.bannedAt || account.disabledAt) return { status: "denied" };
 
     const held = new Set<string>(await scopesAvailableTo(account.id, account.isAdmin));
-    const scopes = storedScopes(row.scopes).filter((scope) => held.has(scope));
+    const kind = storedKind(row.kind);
+    const scopes = storedScopes(row.scopes, kind).filter((scope) => held.has(scope));
     if (scopes.length === 0) return { status: "denied" };
 
     // The schema supplies every default a key needs; the scopes are then put
@@ -243,18 +279,26 @@ export async function claimCliSignIn(
     // was not shown.
     const input = {
         ...createApiKeySchema.parse({
-            // i18n-ignore the name of a key, in the list its owner reads
-            name: `CLI - ${row.deviceName}`.slice(0, 60),
-            // i18n-ignore stored with the key; the list shows it as written
-            description: "Signed in with plr login.",
-            environment: "development",
+            name:
+                kind === "streamdeck"
+                    ? // i18n-ignore the name of a key, in the list its owner reads
+                      `Stream Deck - ${row.deviceName}`.slice(0, 60)
+                    : // i18n-ignore the name of a key, in the list its owner reads
+                      `CLI - ${row.deviceName}`.slice(0, 60),
+            description:
+                kind === "streamdeck"
+                    ? // i18n-ignore stored with the key; the list shows it as written
+                      "Connected from the Stream Deck plugin."
+                    : // i18n-ignore stored with the key; the list shows it as written
+                      "Signed in with plr login.",
+            environment: kind === "streamdeck" ? "production" : "development",
             scopes,
-            expiresInDays: CLI_TOKEN_DAYS
+            expiresInDays: kind === "streamdeck" ? DECK_TOKEN_DAYS : CLI_TOKEN_DAYS
         }),
         scopes
     };
     const created = await createApiKey(account.id, input, {
-        kind: "cli",
+        kind,
         // What the sessions screen shows for this sign-in.
         client: {
             name: row.deviceName,

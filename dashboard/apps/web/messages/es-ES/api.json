@@ -94,7 +94,8 @@
         "notAnOrganization": "Eso no es una organización.",
         "fileOpenFailed": "No se pudo abrir ese archivo.",
         "rangeBackwards": "El inicio del rango es posterior a su final.",
-        "fileLargerThan": "Ese archivo supera los {megabytes} MB."
+        "fileLargerThan": "Ese archivo supera los {megabytes} MB.",
+        "deckSignInAsk": "Hace falta el nombre del equipo, y solo se pueden pedir los permisos que usa un Stream Deck."
     },
     "refusals": {
         "session": {
@@ -235,5 +236,52 @@
     "words": {
         "theOwner": "El dueño",
         "mintedToken": "Creado desde los ajustes de esta app."
+    },
+    "deck": {
+        "errors": {
+            "throttled": "Demasiadas pulsaciones desde este deck. Espera un momento.",
+            "badRequest": "El plugin envió algo que Polaris no pudo leer. Actualiza el plugin.",
+            "unknownAction": "La acción de esta tecla ya no está disponible. Elige otra.",
+            "notAllowed": "Este deck no puede hacer eso. Vuelve a conectarlo o pide acceso a un administrador.",
+            "badOptions": "Esta tecla no está configurada del todo. Abre sus ajustes.",
+            "notRunnable": "Esta tecla solo muestra un valor.",
+            "refused": "Polaris no ha podido hacerlo ahora."
+        },
+        "fields": {
+            "conversationId": "Conversación",
+            "body": "Mensaje",
+            "choice": "Estado",
+            "service": "Servicio",
+            "path": "Página"
+        },
+        "choice": {
+            "busy": "No molestar",
+            "away": "Ausente",
+            "invisible": "Invisible"
+        },
+        "actions": {
+            "chat_send": "Enviar un mensaje",
+            "chat_unread": "Mensajes sin leer",
+            "chat_open": "Abrir Chat",
+            "status_presence": "Cambiar tu estado",
+            "watch_alarms": "Alarmas activas",
+            "deploy_redeploy": "Desplegar servicio",
+            "deploy_restart": "Reiniciar servicio",
+            "polaris_notifications": "Avisos",
+            "polaris_open": "Abrir una página",
+            "deploy_status": "Último despliegue"
+        },
+        "status": {
+            "queued": "En cola",
+            "building": "Compilando",
+            "deploying": "Desplegando",
+            "running": "En marcha",
+            "success": "Hecho",
+            "failed": "Fallido",
+            "cancelled": "Cancelado",
+            "rolled_back": "Revertido",
+            "stopped": "Parado",
+            "removed": "Eliminado"
+        }
     }
 }

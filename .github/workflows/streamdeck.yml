@@ -1,0 +1,107 @@
+name: Stream Deck plugin
+
+# Build the Stream Deck plugin and attach the package to a release.
+#
+# The plugin ships to the Stream Deck app rather than into an image, so it needs
+# somewhere for people to get it from: `streamdeck pack` writes one
+# `.streamDeckPlugin` file, a double click installs it, and the Downloads page
+# links the newest `streamdeck-v*` release these steps produce. The Elgato
+# Marketplace listing is uploaded by hand from that same file.
+#
+# A pull request that touches the plugin is built, validated against Elgato's
+# manifest schema and packed here, because nothing else checks those: its
+# typecheck and tests already run with every other workspace in `dashboard-ci`
+# and are not repeated. A release is tag-driven, like the extension and the CLI:
+# push `streamdeck-v<version>` matching `version` in
+# `dashboard/apps/streamdeck/package.json`. The build refuses a tag that does not
+# match, and refuses a manifest whose `Version` is not that version plus `.0`,
+# because the Stream Deck app reads the manifest and people quote the tag.
+
+on:
+  push:
+    tags:
+      - "streamdeck-v*"
+  pull_request:
+    paths:
+      - "dashboard/apps/streamdeck/**"
+      - ".github/workflows/streamdeck.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  # Install scripts one at a time, for the esbuild race dashboard-ci.yml explains.
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: The manifest carries the package's version
+        run: |
+          version="$(node -p "require('./apps/streamdeck/package.json').version")"
+          manifest="$(node -p "require('./apps/streamdeck/io.github.fjrg2007.polaris.sdPlugin/manifest.json').Version")"
+          if [ "$manifest" != "$version.0" ]; then
+            echo "manifest.json says $manifest but package.json says $version (expected $version.0)." >&2
+            exit 1
+          fi
+
+      - name: The tag has to match that version
+        if: startsWith(github.ref, 'refs/tags/streamdeck-v')
+        run: |
+          expected="streamdeck-v$(node -p "require('./apps/streamdeck/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
+            exit 1
+          fi
+
+      - run: npm ci --prefer-offline
+
+      - run: npm run build --workspace @polaris/streamdeck
+      - run: npm run validate --workspace @polaris/streamdeck
+      - run: npm run pack --workspace @polaris/streamdeck
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polaris-streamdeck
+          # Repo-relative: `defaults.run.working-directory` applies to `run` steps
+          # and to nothing else.
+          path: dashboard/apps/streamdeck/dist/*.streamDeckPlugin
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/streamdeck-v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polaris-streamdeck
+          path: package
+      - name: Attach to release
+        # v2.6.2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Polaris for Stream Deck ${{ github.ref_name }}
+          # This repository releases the dashboard too, and that is what "latest"
+          # should keep meaning.
+          make_latest: "false"
+          files: package/*.streamDeckPlugin

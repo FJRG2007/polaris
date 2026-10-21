@@ -49,6 +49,7 @@ const LOOKUP_TIMEOUT_MS = 6000;
  *  repository releases the dashboard as `dashboard-v*` as well. */
 export const DESKTOP_TAG_PREFIX = "desktop-v";
 export const EXTENSION_TAG_PREFIX = "extension-v";
+export const STREAMDECK_TAG_PREFIX = "streamdeck-v";
 
 /** One release, in the fields this module reads. Everything is `unknown` because
  *  it arrives from the network and is checked here rather than trusted. */
@@ -267,4 +268,9 @@ export async function desktopDownload(repo: string): Promise<AppDownload | null>
 /** The browser extension, as the packages `wxt zip` writes. */
 export async function extensionDownload(repo: string): Promise<AppDownload | null> {
     return appDownload(repo, EXTENSION_TAG_PREFIX);
+}
+
+/** The Stream Deck plugin, as the one `.streamDeckPlugin` installer. */
+export async function streamDeckDownload(repo: string): Promise<AppDownload | null> {
+    return appDownload(repo, STREAMDECK_TAG_PREFIX);
 }

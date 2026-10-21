@@ -13,6 +13,7 @@
 
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import type { McpTool } from "@/lib/mcp/protocol";
+import type { AppDeckAction } from "@/lib/deck/types";
 import type { McpSearchProvider } from "@/lib/mcp/search";
 import type { BusyEvent, Locale, PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
@@ -262,6 +263,13 @@ export interface AppExtension {
      */
     readonly mcpSearch?: () => Promise<readonly AppMcpSearchProvider[]>;
 
+    /**
+     * What it offers a Stream Deck: keys and dials bound to its own MCP tools
+     * (`AppDeckAction`), so a deck reaches exactly what an assistant does,
+     * through the same checks. Asked only while the app is installed.
+     */
+    readonly deckActions?: () => Promise<readonly AppDeckAction[]>;
+
     /** The ports the router has to forward for it. */
     readonly forwardedPorts?: () => Promise<readonly GamePortRow[]>;
 
@@ -368,6 +376,9 @@ export interface AppExtension {
 /** A tool an app offers over MCP, its input type already erased by
  *  `defineTool` (`host.mcp.defineTool`). */
 export type AppMcpTool = McpTool<never>;
+
+/** A key or dial an app offers a Stream Deck. */
+export type { AppDeckAction };
 
 /** A search provider an app offers `polaris_search`. */
 export type AppMcpSearchProvider = McpSearchProvider;

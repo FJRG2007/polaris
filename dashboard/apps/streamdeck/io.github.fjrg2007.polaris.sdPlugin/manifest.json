@@ -1,0 +1,90 @@
+{
+    "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+    "Name": "Polaris",
+    "Version": "0.1.0.0",
+    "Author": "Polaris",
+    "Description": "Keys and dials for your Polaris: send a message, set your status, see unread messages, alarms and deployments, and switch the devices in your places.",
+    "Icon": "imgs/plugin/marketplace",
+    "Category": "Polaris",
+    "CategoryIcon": "imgs/plugin/category-icon",
+    "CodePath": "bin/plugin.js",
+    "SDKVersion": 3,
+    "Software": {
+        "MinimumVersion": "7.1"
+    },
+    "OS": [
+        {
+            "Platform": "mac",
+            "MinimumVersion": "12"
+        },
+        {
+            "Platform": "windows",
+            "MinimumVersion": "10"
+        }
+    ],
+    "Nodejs": {
+        "Version": "24"
+    },
+    "UUID": "io.github.fjrg2007.polaris",
+    "Actions": [
+        {
+            "Name": "Polaris key",
+            "UUID": "io.github.fjrg2007.polaris.key",
+            "Icon": "imgs/actions/key/icon",
+            "Tooltip": "Runs a Polaris action or shows its live state.",
+            "PropertyInspectorPath": "ui/key.html",
+            "Controllers": ["Keypad"],
+            "States": [
+                {
+                    "Image": "imgs/actions/key/key",
+                    "ShowTitle": false
+                }
+            ]
+        },
+        {
+            "Name": "Polaris dial",
+            "UUID": "io.github.fjrg2007.polaris.dial",
+            "Icon": "imgs/actions/dial/icon",
+            "Tooltip": "Adjusts a Polaris device, such as a light's brightness.",
+            "PropertyInspectorPath": "ui/dial.html",
+            "Controllers": ["Encoder"],
+            "Encoder": {
+                "layout": "$B1",
+                "Icon": "imgs/actions/dial/encoder",
+                "TriggerDescription": {
+                    "Rotate": "Adjust",
+                    "Push": "Apply",
+                    "Touch": "Apply"
+                }
+            },
+            "States": [
+                {
+                    "Image": "imgs/actions/dial/key"
+                }
+            ]
+        },
+        {
+            "Name": "Timer",
+            "UUID": "io.github.fjrg2007.polaris.timer",
+            "Icon": "imgs/actions/timer/icon",
+            "Tooltip": "A countdown or stopwatch. Press to start or pause, hold to reset.",
+            "PropertyInspectorPath": "ui/timer.html",
+            "Controllers": ["Keypad", "Encoder"],
+            "Encoder": {
+                "layout": "$B1",
+                "Icon": "imgs/actions/timer/encoder",
+                "TriggerDescription": {
+                    "Rotate": "Set the minutes",
+                    "Push": "Start or pause",
+                    "Touch": "Reset"
+                }
+            },
+            "States": [
+                {
+                    "Image": "imgs/actions/timer/key",
+                    "ShowTitle": false
+                }
+            ]
+        }
+    ]
+}

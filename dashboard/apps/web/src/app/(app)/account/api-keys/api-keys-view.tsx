@@ -412,6 +412,16 @@ function KeyRow({
                         >
                             <Badge variant="neutral">{t("apiKeys.list.cli.badge")}</Badge>
                         </Link>
+                    ) : entry.kind === "streamdeck" ? (
+                        // Connected decks are listed, and disconnected, under
+                        // Downloads too, where the plugin is installed from.
+                        <Link
+                            href="/account/downloads"
+                            className="shrink-0 no-underline"
+                            title={t("apiKeys.list.streamdeck.title")}
+                        >
+                            <Badge variant="neutral">{t("apiKeys.list.streamdeck.badge")}</Badge>
+                        </Link>
                     ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of

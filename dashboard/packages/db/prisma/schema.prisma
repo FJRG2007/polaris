@@ -1478,7 +1478,8 @@ model ApiKey {
     // permissions. Null is an ordinary account key.
     projectId         String?   @db.Uuid
     // What issued it: "key" for one made on the API keys screen or a project's
-    // settings, "cli" for the credential `plr login` was handed. The same kind of
+    // settings, "cli" for the credential `plr login` was handed, "streamdeck" for
+    // a connected Stream Deck. The same kind of
     // bearer either way - listed, scoped, revocable and narrowed to its owner the
     // same way; this only lets the CLI end its own sign-in and the list say which
     // one a row is.
@@ -3571,6 +3572,10 @@ model CliAuthorization {
     // pending | approved | denied
     status    String
     userId    String?  @db.Uuid
+    // What is asking: "cli" for `plr login`, "streamdeck" for the Stream Deck
+    // plugin. The same grant either way; this picks the approval screen that
+    // finds it and the kind of key it becomes.
+    kind      String   @default("cli")
     expiresAt DateTime
     createdAt DateTime @default(now())
 
