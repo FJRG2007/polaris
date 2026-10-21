@@ -858,6 +858,8 @@ export function PolarChat({
     /** The page as it goes with the next turn: null with sharing off. */
     const sharedContext = () =>
         live.current.pageOn || pageOnce.current ? live.current.context : null;
+    /** The page the message just sent took with it, for its own request only. */
+    const pageTurn = useRef<ReturnType<typeof sharedContext>>(null);
 
     const transport = useMemo(
         () =>
@@ -867,8 +869,8 @@ export function PolarChat({
                     // Asked for one answer: the turns after it are plain.
                     const refining = live.current.refine.current;
                     live.current.refine.current = null;
-                    const context = sharedContext();
-                    pageOnce.current = false;
+                    const context = live.current.pageOn ? live.current.context : pageTurn.current;
+                    pageTurn.current = null;
                     return {
                         body: {
                             threadId: live.current.threadId,
@@ -1488,7 +1490,7 @@ export function PolarChat({
         setInput("");
         if (command === "new") return startNew();
         if (command === "page") {
-            if (!context) return;
+            if (!context) return void toast.show({ title: t("context.none") });
             pageOnce.current = true;
             return void toast.show({ title: t("context.attached") });
         }
@@ -1538,16 +1540,18 @@ export function PolarChat({
     /** Sends a turn, compacting the chat first when this turn would bring it
      *  near the model's window and the person has automatic compaction on. */
     /** The message with the screen it is asked on, kept for later turns. */
-    const withScreen = (message: Parameters<typeof chat.sendMessage>[0]) =>
-        message && "text" in message && sharedContext()
+    const withScreen = (message: Parameters<typeof chat.sendMessage>[0]) => {
+        if (!message || !("text" in message)) return message;
+        const screen = sharedContext();
+        pageOnce.current = false;
+        pageTurn.current = screen;
+        return screen
             ? {
                   ...message,
-                  metadata: {
-                      ...((message.metadata as object | undefined) ?? {}),
-                      screen: sharedContext()
-                  }
+                  metadata: { ...((message.metadata as object | undefined) ?? {}), screen }
               }
             : message;
+    };
     const sendWithRoom = (message: Parameters<typeof chat.sendMessage>[0]) =>
         compactBeforeSending({
             used: contextUsed(chat.messages),
@@ -1841,16 +1845,18 @@ export function PolarChat({
     const welcome = fullPage && !noKeys && chat.messages.length === 0;
     const suggestions = (
         <Suggestions>
-            {(["page", "summary", "tools"] as const).map((key) => (
-                <Suggestion
-                    key={key}
-                    suggestion={t(`suggestions.${key}`)}
-                    onClick={(text) => {
-                        setInput(text);
-                        textarea.current?.focus();
-                    }}
-                />
-            ))}
+            {(["page", "summary", "tools"] as const)
+                .filter((key) => key !== "page" || (pageOn && context))
+                .map((key) => (
+                    <Suggestion
+                        key={key}
+                        suggestion={t(`suggestions.${key}`)}
+                        onClick={(text) => {
+                            setInput(text);
+                            textarea.current?.focus();
+                        }}
+                    />
+                ))}
         </Suggestions>
     );
     const chatMode = code.mode === "chat";

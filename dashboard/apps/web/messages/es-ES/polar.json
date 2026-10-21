@@ -176,7 +176,8 @@
         }
     },
     "context": {
-        "attached": "Esta página va con tu próximo mensaje."
+        "attached": "Esta página va con tu próximo mensaje.",
+        "none": "Aquí no hay ninguna página que compartir."
     },
     "reply": {
         "to": "Respondiendo a:",
