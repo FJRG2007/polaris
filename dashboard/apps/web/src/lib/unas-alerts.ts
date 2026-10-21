@@ -4,12 +4,15 @@
  * The metrics collector reads every UNAS on its storage cadence; this takes that
  * reading plus the console's backup tasks, works out the alert conditions the
  * NAS is in (`unasAlerts`), and raises a notice only for the ones that were not
- * there on the previous reading (`newAlerts`), so a pool that stays full is one
+ * there on the previous reading (`noticePlan`), so a pool that stays full is one
  * notice rather than one per poll. A condition that clears and comes back is
  * news again.
  *
- * The previous set is kept in this process only: after a restart, a condition
- * still standing is said once more.
+ * The previous set is the one the NAS watcher stores on the connection
+ * (`nasAlertKeys`), so a restart - every Update is one - does not say a standing
+ * condition again. The bell keeps one notice per condition, and only while it
+ * stands: an older copy of the same notice, or one whose condition cleared, is
+ * deleted.
  */
 
 import { prisma } from "@polaris/db";
@@ -18,18 +21,22 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getUnasTarget } from "@/lib/storage-service";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import {
+    heldKeys,
     listBackupTasks,
-    newAlerts,
     unasAlerts,
     type UnasAlert,
     type UnasAlertKind,
     type UnasBackupTask
 } from "@/lib/unifi-unas-control";
 
+/** The bell category every NAS notice is written under. */
+const NOTICE_TYPE = "storage.nasAlert";
+
 /** Where the owner sees the NAS the notice is about. */
 const OVERVIEW_HREF = "/drive/overview";
 
-const previous = new Map<string, readonly UnasAlert[]>();
+/** The bell's notices about one NAS, newest first, read to sweep them. */
+const SWEEP_MOST = 200;
 
 /** The kinds unasAlerts raises; offline is the NAS page watcher's alone. */
 type NoticeKind = Exclude<UnasAlertKind, "offline">;
@@ -53,19 +60,52 @@ const BODY = {
 } as const satisfies Record<NoticeKind, string>;
 
 /**
- * The alerts the NAS is in now. When the backup tasks could not be read this
- * time, the backup alerts of the previous reading stand, so a console that
- * skipped one answer does not clear them and raise them again on the next.
+ * What one reading changes on the bell, given the keys the previous reading
+ * stored. `fresh` are the conditions that just started; `standing` every key
+ * still true, with the stored backup keys held when the backup tasks could not
+ * be read, so a console that skipped one answer neither clears them nor raises
+ * them again. Pure.
  */
-export function currentAlerts(
-    metrics: UnasMetrics,
-    tasks: readonly UnasBackupTask[] | null,
-    before: readonly UnasAlert[],
-    now: Date
-): UnasAlert[] {
-    const alerts = unasAlerts(metrics, tasks ?? [], now);
-    if (tasks !== null) return alerts;
-    return [...alerts, ...before.filter((alert) => alert.kind.startsWith("backup-"))];
+export function noticePlan(
+    storedKeys: readonly string[],
+    alerts: readonly UnasAlert[],
+    tasksRead: boolean
+): { fresh: UnasAlert[]; standing: Set<string> } {
+    const stored = new Set(storedKeys);
+    const standing = new Set([
+        ...alerts.map((alert) => alert.key),
+        ...heldKeys(storedKeys, tasksRead ? "full" : "no-tasks")
+    ]);
+    return { fresh: alerts.filter((alert) => !stored.has(alert.key)), standing };
+}
+
+/**
+ * The notices to delete: every one whose condition no longer stands, and every
+ * older copy of one that does. `notices` come newest first. Pure.
+ */
+export function staleNotices(
+    notices: readonly { id: string; metadata: string | null }[],
+    standing: ReadonlySet<string>
+): string[] {
+    const kept = new Set<string>();
+    const stale: string[] = [];
+    for (const notice of notices) {
+        const key = alertKeyOf(notice.metadata);
+        if (key !== null && standing.has(key) && !kept.has(key)) kept.add(key);
+        else stale.push(notice.id);
+    }
+    return stale;
+}
+
+function alertKeyOf(metadata: string | null): string | null {
+    if (!metadata) return null;
+    try {
+        const parsed: unknown = JSON.parse(metadata);
+        const alert = (parsed as { alert?: unknown } | null)?.alert;
+        return typeof alert === "string" ? alert : null;
+    } catch {
+        return null;
+    }
 }
 
 /** The console's backup tasks, or null when it did not answer them this time. */
@@ -88,35 +128,63 @@ export async function watchUnasAlerts(
     tasks: readonly UnasBackupTask[] | null
 ): Promise<void> {
     try {
-        const before = previous.get(connection.id) ?? [];
-        const now = currentAlerts(metrics, tasks, before, new Date());
-        previous.set(connection.id, now);
-        const fresh = newAlerts(before, now);
-        if (fresh.length === 0) return;
-
         const row = await prisma.storageConnection.findUnique({
             where: { id: connection.id },
-            select: { name: true }
+            select: { name: true, nasAlertKeys: true }
         });
-        const name = row?.name ?? metrics.system.name;
-        const t = await wordsFor(connection.ownerId, "notices");
-        await Promise.allSettled(
-            fresh.map((alert) => {
-                if (alert.kind === "offline") return Promise.resolve();
-                const kind: NoticeKind = alert.kind;
-                const words = { name, subject: alert.subject, value: alert.value ?? 0 };
-                return notify({
-                    userId: connection.ownerId,
-                    event: "storage.nasAlert",
-                    title: t(TITLE[kind], words),
-                    body: t(BODY[kind], words),
-                    href: OVERVIEW_HREF,
-                    level: "warning",
-                    metadata: { connectionId: connection.id, alert: alert.key }
-                });
-            })
+        const { fresh, standing } = noticePlan(
+            row?.nasAlertKeys ?? [],
+            unasAlerts(metrics, tasks ?? [], new Date()),
+            tasks !== null
         );
+        if (fresh.length > 0) await raise(connection, row?.name ?? metrics.system.name, fresh);
+        await sweep(connection, standing);
     } catch (error) {
         console.error("unas: could not check the NAS alert conditions:", error);
     }
+}
+
+async function raise(
+    connection: { id: string; ownerId: string },
+    name: string,
+    fresh: readonly UnasAlert[]
+): Promise<void> {
+    const t = await wordsFor(connection.ownerId, "notices");
+    await Promise.allSettled(
+        fresh.map((alert) => {
+            if (alert.kind === "offline") return Promise.resolve();
+            const kind: NoticeKind = alert.kind;
+            const words = { name, subject: alert.subject, value: alert.value ?? 0 };
+            return notify({
+                userId: connection.ownerId,
+                event: NOTICE_TYPE,
+                title: t(TITLE[kind], words),
+                body: t(BODY[kind], words),
+                href: OVERVIEW_HREF,
+                level: "warning",
+                metadata: { connectionId: connection.id, alert: alert.key }
+            });
+        })
+    );
+}
+
+/** Delete this NAS's notices that no longer stand, and older copies of those that do. */
+async function sweep(
+    connection: { id: string; ownerId: string },
+    standing: ReadonlySet<string>
+): Promise<void> {
+    const notices = await prisma.notification.findMany({
+        where: {
+            userId: connection.ownerId,
+            type: NOTICE_TYPE,
+            // Written as JSON.stringify({ connectionId, alert }), so the prefix
+            // names this NAS and no other.
+            metadata: { startsWith: `{"connectionId":${JSON.stringify(connection.id)},` }
+        },
+        orderBy: { createdAt: "desc" },
+        take: SWEEP_MOST,
+        select: { id: true, metadata: true }
+    });
+    const stale = staleNotices(notices, standing);
+    if (stale.length > 0) await prisma.notification.deleteMany({ where: { id: { in: stale } } });
 }

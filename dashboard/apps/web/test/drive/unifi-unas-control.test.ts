@@ -125,10 +125,15 @@ describe("unifi-unas-control", () => {
             "disk-unhealthy",
             "disk-temperature"
         ]);
-        const noRaid = metrics({ pools: [{ ...metrics().pools[0], raidLevel: null }] });
-        expect(control.unasAlerts(noRaid, [], NOW).map((a) => a.kind)).toEqual([
-            "pool-unprotected"
-        ]);
+    });
+
+    it("leaves a pool built without redundancy alone, and reports one that lost a member", () => {
+        for (const raidLevel of [null, "raid0", "none"]) {
+            const single = metrics({ pools: [{ ...metrics().pools[0], raidLevel }] });
+            expect(control.unasAlerts(single, [], NOW)).toEqual([]);
+        }
+        const lost = metrics({ pools: [{ ...metrics().pools[0], membersPresent: 3 }] });
+        expect(control.unasAlerts(lost, [], NOW).map((a) => a.kind)).toEqual(["pool-unprotected"]);
     });
 
     it("newAlerts returns only conditions that just started", () => {

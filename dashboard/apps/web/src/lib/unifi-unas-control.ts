@@ -124,9 +124,11 @@ export function unasAlerts(
 ): UnasAlert[] {
     const alerts: UnasAlert[] = [];
     for (const pool of metrics.pools) {
+        // Only a pool that lost a member is news. One built without redundancy
+        // (a single disk, RAID 0) is how its owner set it up, and saying so on
+        // every reading is noise nobody can act on.
         const degraded = pool.membersExpected > 0 && pool.membersPresent < pool.membersExpected;
-        const noRaid = !pool.raidLevel || pool.raidLevel === "raid0" || pool.raidLevel === "none";
-        if (degraded || noRaid || pool.raidState === "degraded") {
+        if (degraded || pool.raidState === "degraded") {
             alerts.push({
                 kind: "pool-unprotected",
                 key: `pool:${pool.device}`,
@@ -192,6 +194,28 @@ export function newAlerts(
 ): UnasAlert[] {
     const before = new Set(previous.map((alert) => alert.key));
     return current.filter((alert) => !before.has(alert.key));
+}
+
+/** The NAS answered nothing. Not one of unasAlerts': it needs no snapshot. */
+export const OFFLINE_KEY = "offline";
+/** The key prefixes of unasAlerts' backup conditions. */
+const BACKUP_KEY_PREFIXES = ["backup:", "overdue:"] as const;
+
+/**
+ * The stored keys this reading cannot speak to, kept as they were so they do
+ * not clear now and start again on the next reading. Offline keeps every
+ * condition the NAS was in; a reading without backup tasks keeps the backup
+ * ones. Pure.
+ */
+export function heldKeys(
+    previousKeys: readonly string[],
+    reading: "offline" | "no-tasks" | "full"
+): string[] {
+    if (reading === "full") return [];
+    if (reading === "offline") return previousKeys.filter((key) => key !== OFFLINE_KEY);
+    return previousKeys.filter((key) =>
+        BACKUP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+    );
 }
 
 /**
