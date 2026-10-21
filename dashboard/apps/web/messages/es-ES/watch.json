@@ -92,7 +92,9 @@
         "updateFailed": "No se pudo actualizar la alarma",
         "deleteFailed": "No se pudo eliminar la alarma",
         "routeInApp": "En la app",
-        "routeEmail": "Correo"
+        "routeEmail": "Correo",
+        "carried": "Movida a Automatizaciones, que te avisa ahora.",
+        "carriedOpen": "Abrirla"
     },
     "notices": {
         "alarm": "Alarma: {name}",

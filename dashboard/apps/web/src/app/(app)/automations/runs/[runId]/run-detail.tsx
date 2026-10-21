@@ -388,7 +388,14 @@ export function DataBlock({ title, value }: { title: string; value: unknown }) {
 
 /** The nodes whose output is an automation notice's report (`lib/automations/notice.ts`). */
 const NOTICE_NODES = new Set(["core.notify", "home.action.notify"]);
-const NOTICE_CHANNELS = ["bell", "email", "destination", "chat"] as const;
+const NOTICE_CHANNELS = [
+    "bell",
+    "email",
+    "destination",
+    "chat",
+    "projectWebhook",
+    "messaging"
+] as const;
 const NOTICE_REASONS = {
     "bell.read": "bellRead",
     "bell.off": "bellOff",
@@ -402,6 +409,11 @@ const NOTICE_REASONS = {
     webhookReset: "webhookReset",
     webhookForbidden: "webhookForbidden",
     webhookLimited: "webhookLimited",
+    projectWebhookGone: "projectWebhookGone",
+    projectWebhookOff: "projectWebhookOff",
+    projectWebhookForbidden: "projectWebhookForbidden",
+    messagingGone: "messagingGone",
+    messagingRefused: "messagingRefused",
     failed: "failed"
 } as const;
 

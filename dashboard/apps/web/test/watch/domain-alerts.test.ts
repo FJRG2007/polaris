@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { domainHealthMessage } from "@/lib/notifications/domain-events";
-import { nextAlertState, type DomainHealth } from "@/lib/watch/health-probe";
+import { nextAlertState, type DomainHealth } from "@/lib/domain-health-probe";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 
@@ -168,7 +168,7 @@ describe("a recovery says how long it was down", () => {
  */
 describe("a domain probed by itself", () => {
     it("keeps alerting without waiting for a sweep", async () => {
-        const source = await readFile(`${SRC}lib/watch/health-probe.ts`, "utf8");
+        const source = await readFile(`${SRC}lib/domain-health-probe.ts`, "utf8");
         expect(source).toContain("else await notifyDomainHealthChanged(change);");
     });
 });

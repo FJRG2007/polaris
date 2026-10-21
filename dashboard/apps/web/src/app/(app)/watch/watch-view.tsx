@@ -81,7 +81,9 @@ export function WatchView({
                 count: alarm.forPeriods
             });
         }
-        return alarm.targetType === "domain" ? t("alarms.domainReachability") : t("alarms.serviceLiveness");
+        return alarm.targetType === "domain"
+            ? t("alarms.domainReachability")
+            : t("alarms.serviceLiveness");
     }
 
     return (
@@ -114,7 +116,9 @@ export function WatchView({
             </p>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">{t("overview.alarms")}</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">
+                    {t("overview.alarms")}
+                </h2>
                 {initialAlarms.length === 0 ? (
                     <p className="text-sm text-muted-foreground">{t("alarms.none")}</p>
                 ) : (
@@ -122,35 +126,62 @@ export function WatchView({
                         {initialAlarms.map((alarm) => (
                             <Card key={alarm.id}>
                                 <CardBody className="flex items-center justify-between gap-3 py-3">
-                                    <div className="flex items-center gap-2">
-                                        <Activity className="size-4 text-muted-foreground" />
+                                    <div className="flex min-w-0 items-center gap-2">
+                                        <Activity className="size-4 shrink-0 text-muted-foreground" />
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">{alarm.name}</p>
+                                            <p className="truncate text-sm font-medium">
+                                                {alarm.name}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {t("alarms.line", {
-                                                    target: targetName.get(alarm.targetId) ?? t("alarms.unknownTarget"),
+                                                    target:
+                                                        targetName.get(alarm.targetId) ??
+                                                        t("alarms.unknownTarget"),
                                                     summary: describe(alarm)
                                                 })}
                                             </p>
+                                            {alarm.carriedToId && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t("alarms.carried")}{" "}
+                                                    <Link
+                                                        className="text-primary hover:underline"
+                                                        href={`/automations/${alarm.carriedToId}`}
+                                                    >
+                                                        {t("alarms.carriedOpen")}
+                                                    </Link>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge className={cn(stateTone(alarm.state))}>
-                                            {alarmStateWord(t, alarm.state)}
-                                        </Badge>
-                                        <Switch
-                                            checked={alarm.enabled}
-                                            onChange={(next) =>
-                                                void setAlarmEnabledAction(alarm.id, next).then(() => router.refresh())
-                                            }
-                                            aria-label={alarm.enabled ? t("alarms.disable") : t("alarms.enable")}
-                                        />
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {!alarm.carriedToId && (
+                                            <Badge className={cn(stateTone(alarm.state))}>
+                                                {alarmStateWord(t, alarm.state)}
+                                            </Badge>
+                                        )}
+                                        {!alarm.carriedToId && (
+                                            <Switch
+                                                checked={alarm.enabled}
+                                                onChange={(next) =>
+                                                    void setAlarmEnabledAction(alarm.id, next).then(
+                                                        () => router.refresh()
+                                                    )
+                                                }
+                                                aria-label={
+                                                    alarm.enabled
+                                                        ? t("alarms.disable")
+                                                        : t("alarms.enable")
+                                                }
+                                            />
+                                        )}
                                         <button
                                             type="button"
                                             aria-label={t("alarms.delete")}
                                             className="text-muted-foreground hover:text-danger"
                                             onClick={() =>
-                                                void deleteAlarmAction(alarm.id).then(() => router.refresh())
+                                                void deleteAlarmAction(alarm.id).then(() =>
+                                                    router.refresh()
+                                                )
                                             }
                                         >
                                             <Trash2 className="size-4" />
@@ -171,8 +202,16 @@ export function WatchView({
                     <div className="flex flex-col gap-1">
                         {initialEvents.map((event) => (
                             <div key={event.id} className="flex items-center gap-2 text-sm">
-                                <Badge className={cn(event.kind === "triggered" ? "border-danger-edge text-danger" : "border-success-edge text-success")}>
-                                    {event.kind === "triggered" ? t("alarms.fired") : t("alarms.cleared")}
+                                <Badge
+                                    className={cn(
+                                        event.kind === "triggered"
+                                            ? "border-danger-edge text-danger"
+                                            : "border-success-edge text-success"
+                                    )}
+                                >
+                                    {event.kind === "triggered"
+                                        ? t("alarms.fired")
+                                        : t("alarms.cleared")}
                                 </Badge>
                                 <span className="font-medium">{event.alarmName}</span>
                                 <span className="truncate text-muted-foreground">
@@ -188,7 +227,14 @@ export function WatchView({
             </section>
 
             {creating && (
-                <CreateAlarmDialog targets={targets} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); router.refresh(); }} />
+                <CreateAlarmDialog
+                    targets={targets}
+                    onClose={() => setCreating(false)}
+                    onCreated={() => {
+                        setCreating(false);
+                        router.refresh();
+                    }}
+                />
             )}
         </div>
     );
@@ -221,10 +267,14 @@ function CreateAlarmDialog({
             : targetType === "host"
               ? targets.hosts.map((h) => ({ value: h.id, label: h.name }))
               : targets.domains.map((d) => ({ value: d.id, label: d.hostname }));
-    const chosenHost = targetType === "host" ? targets.hosts.find((host) => host.id === targetId) : undefined;
+    const chosenHost =
+        targetType === "host" ? targets.hosts.find((host) => host.id === targetId) : undefined;
     const metricOptions = metricsFor(targetType)
         // A server reached over SSH has no disk reading to judge.
-        .filter((entry) => entry !== "disk" || targetType !== "host" || !chosenHost || chosenHost.measuresDisk)
+        .filter(
+            (entry) =>
+                entry !== "disk" || targetType !== "host" || !chosenHost || chosenHost.measuresDisk
+        )
         .map((entry) => ({ value: entry, label: metricWord(t, entry) }));
     const unit = alarmUnit(metric, targetType);
 
@@ -286,7 +336,10 @@ function CreateAlarmDialog({
                                 setTargetId("");
                                 chooseMetric(metricsFor(next)[0] ?? "cpu", next);
                             }}
-                            options={ALARM_TARGET_TYPES.map((type) => ({ value: type, label: t(`labels.target.${type}`) }))}
+                            options={ALARM_TARGET_TYPES.map((type) => ({
+                                value: type,
+                                label: t(`labels.target.${type}`)
+                            }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
@@ -296,8 +349,12 @@ function CreateAlarmDialog({
                             onValueChange={(value) => {
                                 setTargetId(value);
                                 // A disk alarm cannot stay on a server that has no disk reading.
-                                const host = targetType === "host" ? targets.hosts.find((entry) => entry.id === value) : undefined;
-                                if (metric === "disk" && host && !host.measuresDisk) chooseMetric("cpu");
+                                const host =
+                                    targetType === "host"
+                                        ? targets.hosts.find((entry) => entry.id === value)
+                                        : undefined;
+                                if (metric === "disk" && host && !host.measuresDisk)
+                                    chooseMetric("cpu");
                             }}
                             placeholder={t("alarms.chooseOne")}
                             options={options}
@@ -305,7 +362,11 @@ function CreateAlarmDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("alarms.metric")}</span>
-                        <Select value={metric} onValueChange={(value) => chooseMetric(value as AlarmMetric)} options={metricOptions} />
+                        <Select
+                            value={metric}
+                            onValueChange={(value) => chooseMetric(value as AlarmMetric)}
+                            options={metricOptions}
+                        />
                     </label>
                     {metric === "disk" && targetType === "application" && (
                         <p className="text-xs text-muted-foreground">{t("alarms.volumesHint")}</p>
@@ -324,7 +385,9 @@ function CreateAlarmDialog({
                                 />
                             </label>
                             <label className="flex flex-1 flex-col gap-1 text-sm">
-                                <span className="font-medium">{t("alarms.threshold", { unit })}</span>
+                                <span className="font-medium">
+                                    {t("alarms.threshold", { unit })}
+                                </span>
                                 <Input
                                     type="number"
                                     min={0}
@@ -338,7 +401,11 @@ function CreateAlarmDialog({
                     )}
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("alarms.forChecks")}</span>
-                        <Input type="number" value={forPeriods} onChange={(event) => setForPeriods(event.target.value)} />
+                        <Input
+                            type="number"
+                            value={forPeriods}
+                            onChange={(event) => setForPeriods(event.target.value)}
+                        />
                     </label>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">

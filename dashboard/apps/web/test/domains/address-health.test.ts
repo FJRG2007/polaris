@@ -104,7 +104,7 @@ vi.mock("@/lib/notifications/dispatch", () => ({
     notify: (input: unknown) => notify(input as never)
 }));
 vi.mock("@/lib/deployment-addresses", () => ({ reachableAddresses: async () => addresses }));
-vi.mock("@/lib/watch/health-probe", () => ({
+vi.mock("@/lib/domain-health-probe", () => ({
     checkDomain: (target: { hostname: string }) => checkDomain(target)
 }));
 vi.mock("@/lib/polaris-tunnel-service", () => ({
@@ -128,9 +128,8 @@ vi.mock("@/lib/connectivity/outage-tracker", () => ({
 // Settling the public tunnel is its own concern (share-tunnel.test.ts).
 vi.mock("@/lib/public-reach", () => ({ settleShareTunnel: async () => "unchanged" }));
 
-const { checkConnectivityNow, checkedAddresses, sweepAddresses } = await import(
-    "../../src/lib/address-health"
-);
+const { checkConnectivityNow, checkedAddresses, sweepAddresses } =
+    await import("../../src/lib/address-health");
 
 /** A sweep, with the retry's wait fast-forwarded rather than waited out. */
 async function sweep(): Promise<void> {

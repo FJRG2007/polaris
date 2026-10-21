@@ -37,7 +37,7 @@ import { sweepUnsentPolarAttachments } from "@/lib/polar/attachments";
 import { sweepTemporaryPolarThreads } from "@/lib/polar/threads";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
-import { probeAllDomains } from "@/lib/watch/health-probe";
+import { probeAllDomains } from "@/lib/domain-health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
 import { tickDeployAutomations } from "@/lib/deploy/automations";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";

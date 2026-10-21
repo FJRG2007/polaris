@@ -220,7 +220,7 @@ vi.mock("@/lib/deploy-audit", () => ({
         state.audits.push(event.action);
     }
 }));
-vi.mock("@/lib/watch/health-probe", () => ({
+vi.mock("@/lib/domain-health-probe", () => ({
     checkDomain: async () => {
         state.probes += 1;
         return state.targetUp

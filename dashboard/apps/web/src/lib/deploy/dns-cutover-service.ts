@@ -19,7 +19,7 @@ import { checkPropagation } from "@/lib/dns/propagation";
 import { openText } from "@/lib/tls/managed-certificates";
 import { publicResolver } from "@/lib/dns/public-resolver";
 import { containerPortOf, syncAppRoutes } from "@/lib/deploy-service";
-import { checkDomain, type DomainHealth } from "@/lib/watch/health-probe";
+import { checkDomain, type DomainHealth } from "@/lib/domain-health-probe";
 import { provenDomainOf, type TokenCaller } from "@/lib/dns/zone-records";
 import { loadCloudflareToken } from "@/lib/integrations/cloudflare-account-service";
 

@@ -61,9 +61,8 @@ export async function register(): Promise<void> {
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
-    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } = await import(
-        "./lib/deploy-service"
-    );
+    const { syncAppRoutes, reconcileNasMounts, recoverAbandonedDeployments } =
+        await import("./lib/deploy-service");
     const { guardVacantReachable } = await import("./lib/deploy/router");
     //
     // Published at once - the routes are read from the database, so both dashboards
@@ -232,6 +231,17 @@ export async function register(): Promise<void> {
     // rotating the address took every one of them down silently.
     const { startZoneAddressSync } = await import("./lib/domain-address-sync");
     startZoneAddressSync();
+
+    // Carry Watch alarms into Automations, once each: an enabled alarm on a
+    // reading becomes a published automation and Watch stops evaluating it. After
+    // the predecessor so the two dashboards of an update do not both try; the
+    // unique legacyRef covers them if they do.
+    const { carryWatchAlarms } = await import("./lib/watch/alarm-carry");
+    void afterPredecessor()
+        .then(carryWatchAlarms)
+        .catch((error: unknown) =>
+            console.error("polaris: Watch alarms could not be carried to Automations:", error)
+        );
 
     // Domain health and Watch alarms used to start here, as two timers of their
     // own. They are scheduled jobs now - `domain-health` and `alarms` in

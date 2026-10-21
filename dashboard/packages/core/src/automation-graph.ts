@@ -679,6 +679,16 @@ export const noticeDeliverySchema = z
                 stamp: z.string().regex(/^[0-9a-f]{16}$/)
             })
             .nullable()
+            .default(null),
+        /** Webhooks of Deploy projects the account runs - the endpoints Watch alerts leave through. */
+        projectWebhooks: z.array(z.string().uuid()).max(10).default([]),
+        /** A connected messaging channel of the account, and who on it is told. */
+        messaging: z
+            .object({
+                channelId: z.string().uuid(),
+                peerId: z.string().trim().min(1).max(256)
+            })
+            .nullable()
             .default(null)
     })
     .refine(
@@ -686,7 +696,9 @@ export const noticeDeliverySchema = z
             delivery.bell ||
             delivery.email ||
             delivery.destinations.length > 0 ||
-            delivery.chat !== null,
+            delivery.chat !== null ||
+            delivery.projectWebhooks.length > 0 ||
+            delivery.messaging !== null,
         "noticeNoChannel"
     );
 export type NoticeDelivery = z.infer<typeof noticeDeliverySchema>;
@@ -696,7 +708,9 @@ export const DEFAULT_NOTICE_DELIVERY: NoticeDelivery = {
     bell: true,
     email: false,
     destinations: [],
-    chat: null
+    chat: null,
+    projectWebhooks: [],
+    messaging: null
 };
 
 /** How a threshold trigger compares a reading with its value. */

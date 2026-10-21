@@ -19,6 +19,26 @@ const mail = vi.hoisted(() => ({ channelId: null as string | null }));
 vi.mock("@/lib/notifications/dispatch", () => dispatch);
 vi.mock("@/lib/auth-mail", () => ({ getAuthMailStatus: async () => mail }));
 
+const targets = vi.hoisted(() => ({
+    mayUseProjectWebhook: vi.fn(async () => true),
+    mayUseMessagingChannel: vi.fn(async () => true)
+}));
+const deploy = vi.hoisted(() => ({
+    sendToProjectWebhook: vi.fn(async () => null as "gone" | "off" | "failed" | null)
+}));
+const bridge = vi.hoisted(() => ({ bridgeSend: vi.fn(async () => ({})) }));
+const db = vi.hoisted(() => ({ hookExists: true }));
+vi.mock("../../src/lib/automations/notice-targets", () => targets);
+vi.mock("@/lib/deploy-project-service", () => deploy);
+vi.mock("@/lib/messaging/bridge-client", () => bridge);
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        projectWebhook: {
+            findUnique: async () => (db.hookExists ? { id: "hook" } : null)
+        }
+    }
+}));
+
 const { deliverAutomationNotice } = await import("../../src/lib/automations/notice");
 const { StepError } = await import("../../src/lib/automations/types");
 
@@ -38,6 +58,11 @@ beforeEach(() => {
     dispatch.emailNotice.mockClear();
     dispatch.deliverToDestination.mockClear();
     mail.channelId = null;
+    targets.mayUseProjectWebhook.mockReset().mockResolvedValue(true);
+    targets.mayUseMessagingChannel.mockReset().mockResolvedValue(true);
+    deploy.sendToProjectWebhook.mockReset().mockResolvedValue(null);
+    bridge.bridgeSend.mockReset().mockResolvedValue({});
+    db.hookExists = true;
 });
 
 describe("an automation notice", () => {
@@ -100,5 +125,103 @@ describe("an automation notice", () => {
         });
         expect(result.delivered).toEqual(["bell"]);
         expect(result.missed).toEqual([{ channel: "destination", reason: "failed" }]);
+    });
+});
+
+const HOOK = "22222222-2222-4222-8222-222222222222";
+const CHANNEL = "33333333-3333-4333-8333-333333333333";
+const ONLY = { bell: false, email: false, destinations: [], chat: null };
+
+describe("the targets Watch alarms used", () => {
+    it("posts through a project webhook the account runs", async () => {
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: { ...ONLY, projectWebhooks: [HOOK], messaging: null }
+        });
+        expect(result).toEqual({ sent: true, delivered: ["projectWebhook"], missed: [] });
+        expect(deploy.sendToProjectWebhook).toHaveBeenCalledWith(
+            HOOK,
+            expect.objectContaining({ title: BASE.title, body: BASE.body })
+        );
+    });
+
+    it("does not post through a project webhook the account no longer runs", async () => {
+        targets.mayUseProjectWebhook.mockResolvedValue(false);
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
+        });
+        expect(deploy.sendToProjectWebhook).not.toHaveBeenCalled();
+        expect(result.missed).toEqual([
+            { channel: "projectWebhook", reason: "projectWebhookForbidden" }
+        ]);
+    });
+
+    it("says a deleted project webhook is gone", async () => {
+        targets.mayUseProjectWebhook.mockResolvedValue(false);
+        db.hookExists = false;
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
+        });
+        expect(result.missed).toEqual([
+            { channel: "projectWebhook", reason: "projectWebhookGone" }
+        ]);
+    });
+
+    it("says a switched-off project webhook is off, not deleted", async () => {
+        deploy.sendToProjectWebhook.mockResolvedValue("off");
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: { ...ONLY, bell: true, projectWebhooks: [HOOK], messaging: null }
+        });
+        expect(result.missed).toEqual([{ channel: "projectWebhook", reason: "projectWebhookOff" }]);
+    });
+
+    it("messages the peer on a channel the account owns", async () => {
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: {
+                ...ONLY,
+                projectWebhooks: [],
+                messaging: { channelId: CHANNEL, peerId: "12345" }
+            }
+        });
+        expect(result.delivered).toEqual(["messaging"]);
+        expect(bridge.bridgeSend).toHaveBeenCalledWith(CHANNEL, {
+            peerId: "12345",
+            text: `${BASE.title}\n${BASE.body}`
+        });
+    });
+
+    it("never sends through a channel somebody else owns", async () => {
+        targets.mayUseMessagingChannel.mockResolvedValue(false);
+        await expect(
+            deliverAutomationNotice({
+                ...BASE,
+                delivery: {
+                    ...ONLY,
+                    projectWebhooks: [],
+                    messaging: { channelId: CHANNEL, peerId: "12345" }
+                }
+            })
+        ).rejects.toMatchObject({
+            output: { missed: [{ channel: "messaging", reason: "messagingGone" }] }
+        });
+        expect(bridge.bridgeSend).not.toHaveBeenCalled();
+    });
+
+    it("counts a disconnected channel as a miss, not a failed step", async () => {
+        bridge.bridgeSend.mockRejectedValue(new Error("not connected"));
+        const result = await deliverAutomationNotice({
+            ...BASE,
+            delivery: {
+                ...ONLY,
+                bell: true,
+                projectWebhooks: [],
+                messaging: { channelId: CHANNEL, peerId: "12345" }
+            }
+        });
+        expect(result.missed).toEqual([{ channel: "messaging", reason: "messagingRefused" }]);
     });
 });

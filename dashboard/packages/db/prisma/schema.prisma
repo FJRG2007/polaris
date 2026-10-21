@@ -6204,6 +6204,10 @@ model Alarm {
     // Optional messaging channel + peer to also notify when the alarm fires.
     notifyChannelId String?   @db.Uuid
     notifyPeerId    String?
+    // The automation this alarm was carried into (lib/watch/alarm-carry.ts). Set,
+    // Watch no longer evaluates it: the automation tells the same people. No FK -
+    // deleting that automation must not delete the alarm the operator wrote.
+    carriedToId     String?   @db.Uuid
     createdAt       DateTime  @default(now())
     updatedAt       DateTime  @updatedAt
 
@@ -6212,6 +6216,7 @@ model Alarm {
     @@index([ownerId])
     @@index([enabled])
     @@index([targetType, targetId])
+    @@index([carriedToId])
 }
 
 // A state transition of an alarm - the event log Watch generates (fired/cleared).

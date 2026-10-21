@@ -20,6 +20,10 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import type { LegacyRunRow } from "@/lib/app-extensions/types";
 import type { RunActor } from "@/lib/automations/types";
 import type { ChatWebhookChoice } from "@/lib/chat/webhooks";
+import type {
+    MessagingChannelChoice,
+    ProjectWebhookChoice
+} from "@/lib/automations/notice-targets";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
@@ -725,21 +729,27 @@ export async function noticeChannelsAction(): Promise<
         canSetUpMail: boolean;
         destinations: readonly NoticeDestinationChoice[];
         webhooks: readonly ChatWebhookChoice[];
+        projectWebhooks: readonly ProjectWebhookChoice[];
+        messagingChannels: readonly MessagingChannelChoice[];
     }>
 > {
     try {
         const who = await actor();
-        const [{ getAuthMailStatus }, { listDestinations }, { webhooksToPostThrough }] =
+        const [{ getAuthMailStatus }, { listDestinations }, { webhooksToPostThrough }, targets] =
             await Promise.all([
                 import("@/lib/auth-mail"),
                 import("@/lib/notifications/destinations"),
-                import("@/lib/chat/webhooks")
+                import("@/lib/chat/webhooks"),
+                import("@/lib/automations/notice-targets")
             ]);
-        const [mail, destinations, webhooks] = await Promise.all([
-            getAuthMailStatus(),
-            listDestinations(who.id),
-            webhooksToPostThrough(who)
-        ]);
+        const [mail, destinations, webhooks, projectWebhooks, messagingChannels] =
+            await Promise.all([
+                getAuthMailStatus(),
+                listDestinations(who.id),
+                webhooksToPostThrough(who),
+                targets.projectWebhooksToPostThrough(who.id),
+                targets.messagingChannelsToPostThrough(who.id)
+            ]);
         return {
             ok: true,
             mail: mail.channelId !== null,
@@ -750,7 +760,9 @@ export async function noticeChannelsAction(): Promise<
                 targetHint: entry.targetHint,
                 enabled: entry.enabled
             })),
-            webhooks
+            webhooks,
+            projectWebhooks,
+            messagingChannels
         };
     } catch (caught) {
         return failure(caught);
