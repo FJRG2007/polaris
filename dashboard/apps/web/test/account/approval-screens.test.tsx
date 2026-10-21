@@ -76,7 +76,8 @@ describe("the command-line approval", () => {
         expect(await screen.findByText("Turned away.")).toBeTruthy();
         expect(answerCliSignInAction).toHaveBeenCalledWith({
             userCode: "BCDFGHJK",
-            approve: false
+            approve: false,
+            kind: "cli"
         });
     });
 });
