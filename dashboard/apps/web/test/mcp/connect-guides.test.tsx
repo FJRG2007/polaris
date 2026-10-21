@@ -28,9 +28,15 @@ function draw() {
     return render(<ConnectGuides urls={URLS} />, { wrapper: MessagesWrapper });
 }
 
+/** A value as shown. A highlighted block ends in the newline that gives its
+ *  last line a box of its own; that is layout, not part of the value. */
+function shown(node: Element): string {
+    return (node.textContent ?? "").replace(/\n$/, "");
+}
+
 /** Every value on screen that has a copy button. */
 function copied(): string[] {
-    return [...document.querySelectorAll("code")].map((node) => node.textContent ?? "");
+    return [...document.querySelectorAll("code")].map(shown);
 }
 
 describe("the client picker", () => {
@@ -72,7 +78,7 @@ describe("a client's guide", () => {
     function fields(step: HTMLElement): string[] {
         return [...step.querySelectorAll("code")].map((code) => {
             const label = code.parentElement?.previousElementSibling?.textContent;
-            return label ? `${label}: ${code.textContent}` : (code.textContent ?? "");
+            return label ? `${label}: ${shown(code)}` : shown(code);
         });
     }
 
