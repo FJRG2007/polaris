@@ -1,9 +1,9 @@
 /**
  * The plugin's three actions.
  *
- * - **Polaris key**: any key the catalogue offers - run, toggle, show or open -
+ * - **Action** (the key): any key the catalogue offers - run, toggle, show or open -
  *   set in its settings screen.
- * - **Polaris dial**: a dial the catalogue offers (a light's brightness),
+ * - **Device dial**: a dial the catalogue offers (a light's brightness),
  *   turned on the Stream Deck +; the level lands once the turning stops.
  * - **Timer**: a countdown or stopwatch kept in the plugin, on a key or a dial.
  */

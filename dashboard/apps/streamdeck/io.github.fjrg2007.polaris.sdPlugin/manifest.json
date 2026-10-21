@@ -28,7 +28,7 @@
     "UUID": "io.github.fjrg2007.polaris",
     "Actions": [
         {
-            "Name": "Polaris key",
+            "Name": "Action",
             "UUID": "io.github.fjrg2007.polaris.key",
             "Icon": "imgs/actions/key/icon",
             "Tooltip": "Runs a Polaris action or shows its live state.",
@@ -42,7 +42,7 @@
             ]
         },
         {
-            "Name": "Polaris dial",
+            "Name": "Device dial",
             "UUID": "io.github.fjrg2007.polaris.dial",
             "Icon": "imgs/actions/dial/icon",
             "Tooltip": "Adjusts a Polaris device, such as a light's brightness.",
