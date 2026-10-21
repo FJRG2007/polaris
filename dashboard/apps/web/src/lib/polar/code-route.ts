@@ -14,8 +14,8 @@ export async function codeAnswer(read: () => Promise<unknown>, path: string): Pr
     try {
         return NextResponse.json({ value: toWire(await read()) }, { headers: NO_STORE });
     } catch (caught) {
-        // i18n-ignore: status bodies no screen shows; the caller keeps what it had
         if (isRedirectError(caught))
+            // i18n-ignore: status bodies no screen shows; the caller keeps what it had
             return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: NO_STORE });
         console.error(`polaris: ${path} failed:`, caught);
         // i18n-ignore: as above

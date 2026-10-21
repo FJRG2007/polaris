@@ -83,6 +83,7 @@ import * as toolPrefs from "@/components/polar/tool-prefs";
 import { PolarCode, PolarModeSwitch, usePolarCode } from "@/components/polar/polar-code";
 import * as polarShared from "@/lib/polar/shared";
 import * as settingsPath from "@/lib/polar/settings-path";
+import { readStored, writeStored } from "@/lib/polar/stored";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
 import { usePolarSidebar } from "@/components/polar/use-polar-sidebar";
@@ -289,22 +290,6 @@ const WIDTH_KEY = "polar.width";
 const THREAD_KEY = "polar.thread";
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
-
-function readStored(key: string): string | null {
-    try {
-        return window.localStorage.getItem(key);
-    } catch {
-        return null;
-    }
-}
-
-function writeStored(key: string, value: string): void {
-    try {
-        window.localStorage.setItem(key, value);
-    } catch {
-        // A private window: the panel works, it just forgets.
-    }
-}
 
 export function PolarProvider({
     allowed = true,
@@ -1857,7 +1842,8 @@ export function PolarChat({
             hide={hide}
         />
     );
-    const sidebarShown = fullPage && wide && !collapsed && code.mode === "chat";
+    const chatMode = code.mode === "chat";
+    const sidebarShown = fullPage && wide && !collapsed && chatMode;
 
     const queueView =
         queue.length > 0 ? (
@@ -2206,7 +2192,7 @@ export function PolarChat({
                         !fullPage && "border-b border-border"
                     )}
                 >
-                    {fullPage && (!wide || collapsed) && code.mode === "chat" ? (
+                    {fullPage && (!wide || collapsed) && chatMode ? (
                         <MessageAction
                             ref={drawerButton}
                             label={t("history.show")}
@@ -2219,51 +2205,59 @@ export function PolarChat({
                     <span className="text-sm font-semibold text-foreground">{t("page.title")}</span>
                     <PolarModeSwitch code={code} />
                     <span className="flex-1" />
-                    <MessageAction
-                        label={temporary ? t("temporary.off") : t("temporary.on")}
-                        aria-pressed={temporary}
-                        className={cn(temporary && "bg-muted text-foreground")}
-                        onClick={() => {
-                            startNew();
-                            setTemporary(!temporary);
-                        }}
-                    >
-                        <Ghost />
-                    </MessageAction>
-                    <MessageAction label={t("commands.manage")} onClick={() => setManaging(true)}>
-                        <SquareSlash />
-                    </MessageAction>
-                    <MessageAction label={t("usage.title")} onClick={() => setShowUsage(true)}>
-                        <Gauge />
-                    </MessageAction>
-                    {/* A page, not a dialog: it holds every section and the
-                        connectors, which is more than a dialog over the chat
-                        reads well. The panel is hidden on Polar's own pages, so
-                        settings open in the main window and the browser's back
-                        returns to the page the panel was open on, still open. */}
-                    <MessageAction
-                        label={t("settings.open")}
-                        onClick={() => settingsPath.openFromChat((href) => router.push(href))}
-                    >
-                        <Settings2 />
-                    </MessageAction>
+                    {chatMode ? (
+                        <>
+                            <MessageAction
+                                label={temporary ? t("temporary.off") : t("temporary.on")}
+                                aria-pressed={temporary}
+                                className={cn(temporary && "bg-muted text-foreground")}
+                                onClick={() => {
+                                    startNew();
+                                    setTemporary(!temporary);
+                                }}
+                            >
+                                <Ghost />
+                            </MessageAction>
+                            <MessageAction label={t("commands.manage")} onClick={() => setManaging(true)}>
+                                <SquareSlash />
+                            </MessageAction>
+                            <MessageAction label={t("usage.title")} onClick={() => setShowUsage(true)}>
+                                <Gauge />
+                            </MessageAction>
+                            {/* A page, not a dialog: it holds every section and the
+                                connectors, which is more than a dialog over the chat
+                                reads well. The panel is hidden on Polar's own pages, so
+                                settings open in the main window and the browser's back
+                                returns to the page the panel was open on, still open. */}
+                            <MessageAction
+                                label={t("settings.open")}
+                                onClick={() => settingsPath.openFromChat((href) => router.push(href))}
+                            >
+                                <Settings2 />
+                            </MessageAction>
+                        </>
+                    ) : null}
                     {fullPage ? (
-                        !wide || collapsed ? (
+                        chatMode && (!wide || collapsed) ? (
                             <MessageAction label={t("actions.new")} onClick={() => startNew()}>
                                 <SquarePen />
                             </MessageAction>
                         ) : null
                     ) : (
                         <>
-                            <MessageAction label={t("actions.new")} onClick={() => startNew()}>
-                                <Plus />
-                            </MessageAction>
-                            <MessageAction
-                                label={t("history.title")}
-                                onClick={() => setShowHistory(true)}
-                            >
-                                <History />
-                            </MessageAction>
+                            {chatMode ? (
+                                <>
+                                    <MessageAction label={t("actions.new")} onClick={() => startNew()}>
+                                        <Plus />
+                                    </MessageAction>
+                                    <MessageAction
+                                        label={t("history.title")}
+                                        onClick={() => setShowHistory(true)}
+                                    >
+                                        <History />
+                                    </MessageAction>
+                                </>
+                            ) : null}
                             <Link
                                 href="/polar"
                                 aria-label={t("actions.openPage")}

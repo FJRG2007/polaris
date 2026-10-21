@@ -26,6 +26,7 @@ import { MessageAction } from "@/components/polar/elements/message";
 import { Button, cn, Input, SegmentedControl, Select, Textarea } from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { fromWire } from "@/lib/app-bundles/wire";
+import { readStored, writeStored } from "@/lib/polar/stored";
 import type {
     PolarCodeChoices,
     PolarCodeOverview,
@@ -47,23 +48,6 @@ const LIST_MS = 10_000;
 const THREAD_MS = 3000;
 /** A session title is at most this long (the start schema's own bound). */
 const TITLE_MAX = 80;
-
-function readStored(storage: () => Storage, key: string): string | null {
-    try {
-        return storage().getItem(key);
-    } catch {
-        return null;
-    }
-}
-
-function writeStored(storage: () => Storage, key: string, value: string): void {
-    try {
-        storage().setItem(key, value);
-    } catch {
-        // A private window or blocked storage: the switch still works, it is only
-        // not remembered.
-    }
-}
 
 /** A change sent to one of the `/api/polar/code` routes; rejects when it was
  *  not answered, the way `runAction` expects. */
@@ -100,8 +84,8 @@ export function usePolarCode(): PolarCodeState {
     const signal = useUnmountSignal();
 
     useEffect(() => {
-        if (readStored(() => window.localStorage, MODE_KEY) === "code") setPicked("code");
-        const cached = readStored(() => window.sessionStorage, OVERVIEW_KEY);
+        if (readStored(MODE_KEY) === "code") setPicked("code");
+        const cached = readStored(OVERVIEW_KEY, "session");
         if (!cached) return;
         try {
             setOverview(JSON.parse(cached) as PolarCodeOverview);
@@ -114,7 +98,7 @@ export function usePolarCode(): PolarCodeState {
         readPoll<PolarCodeOverview>("/api/polar/code", {}, signal())
             .then((answer) => {
                 setOverview(answer);
-                writeStored(() => window.sessionStorage, OVERVIEW_KEY, JSON.stringify(answer));
+                writeStored(OVERVIEW_KEY, JSON.stringify(answer), "session");
             })
             // Keep what was on screen: the next ask tries again.
             .catch(() => undefined);
@@ -135,7 +119,7 @@ export function usePolarCode(): PolarCodeState {
 
     const setMode = useCallback((next: PolarMode) => {
         setPicked(next);
-        writeStored(() => window.localStorage, MODE_KEY, next);
+        writeStored(MODE_KEY, next);
     }, []);
 
     return useMemo(() => ({ mode, setMode, overview, refresh }), [mode, setMode, overview, refresh]);
@@ -576,7 +560,7 @@ function CodeThread({
                             </p>
                         ) : null}
                         {thread.entries.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("code.quiet")}</p>
+                            live ? <p className="text-sm text-muted-foreground">{t("code.quiet")}</p> : null
                         ) : (
                             <ol className="space-y-2">
                                 {thread.entries.map((entry, index) =>

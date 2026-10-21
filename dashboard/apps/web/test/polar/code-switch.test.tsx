@@ -50,6 +50,7 @@ const { PolarCode, PolarModeSwitch, titleFromPrompt, usePolarCode } = await impo
 );
 
 let access: "none" | "read" | "manage" = "none";
+let thread: unknown = null;
 
 function Harness() {
     const code = usePolarCode();
@@ -63,6 +64,7 @@ function Harness() {
 
 beforeEach(() => {
     started.length = 0;
+    thread = null;
     // jsdom lays nothing out, so it has no scrolling to do.
     Element.prototype.scrollIntoView = () => undefined;
     // This environment has no storage of its own; the switch's memory needs one.
@@ -78,7 +80,7 @@ beforeEach(() => {
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string, init?: RequestInit) => {
-            if (url.startsWith("/api/polar/code/thread")) return answer(null);
+            if (url.startsWith("/api/polar/code/thread")) return answer(thread);
             if (url.startsWith("/api/polar/code/choices")) return answer(CHOICES);
             if (url.startsWith("/api/polar/code/start")) {
                 started.push(JSON.parse(String(init?.body)));
@@ -145,5 +147,30 @@ describe("the Chat / Code switch", () => {
         expect(await screen.findByText(/needs permission to manage Agents/)).toBeTruthy();
         const box = screen.getByRole("textbox", { name: "Task for the agent" }) as HTMLTextAreaElement;
         expect(box.disabled).toBe(true);
+    });
+
+    it("does not say the agent is getting ready on a session that ended", async () => {
+        access = "manage";
+        const row = {
+            id: "33333333-3333-4333-8333-333333333333",
+            title: "Fix the login form",
+            repo: "acme/web",
+            branch: "",
+            state: "stopped",
+            stateLabel: "Stopped",
+            live: false,
+            createdAt: "2026-01-01T00:00:00.000Z"
+        };
+        thread = { session: row, entries: [], error: null };
+        vi.mocked(fetch).mockImplementation(async (url) => {
+            if (String(url).startsWith("/api/polar/code/thread")) return answer(thread);
+            if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            return answer({ access, sessions: [row] });
+        });
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Fix the login form/ }));
+        expect(await screen.findByText(/This session has ended/)).toBeTruthy();
+        expect(screen.queryByText(/getting its machine ready/)).toBeNull();
     });
 });
