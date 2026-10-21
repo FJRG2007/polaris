@@ -131,7 +131,7 @@ export function WidgetRow({
         <li className="group flex items-center gap-1">
             <Link
                 href={href}
-                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted"
+                className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 {icon}
                 <span className="flex min-w-0 flex-1 flex-col">

@@ -82,13 +82,23 @@ export function AppWidgetBody({
     return (
         <ul className="-mx-1 flex flex-col divide-y divide-border">
             {readout.view.items.map((item) => (
-                <li key={item.id} className="flex flex-col gap-2 px-1 py-2 first:pt-0 last:pb-0">
+                // The title's link is stretched over the whole item, so the
+                // item opens wherever it is pressed; the controls sit above it
+                // and stay buttons of their own rather than nesting in a link.
+                <li
+                    key={item.id}
+                    className={cn(
+                        "relative flex flex-col gap-2 rounded-md px-1 py-2 first:pt-0 last:pb-0",
+                        item.href &&
+                            "transition-colors hover:bg-muted has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring"
+                    )}
+                >
                     <div className="flex min-w-0 items-center gap-2">
                         <div className="min-w-0 flex-1">
                             {item.href ? (
                                 <Link
                                     href={item.href}
-                                    className="block truncate text-sm font-medium hover:underline"
+                                    className="block truncate text-sm font-medium after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
                                     title={item.title}
                                 >
                                     {item.title}
@@ -134,7 +144,7 @@ export function AppWidgetBody({
                         </dl>
                     ) : null}
                     {item.controls.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <div className="relative z-10 flex flex-wrap items-center gap-x-4 gap-y-2">
                             {item.controls.map((control) => (
                                 <Control
                                     key={control.id}
