@@ -7,11 +7,12 @@
  * marks in a stretched box, every word in HTML around it so text never
  * distorts, the dashboard's series colours, and pointing at a column reading
  * out its values above the plot instead of in a floating box something could
- * clip.
+ * clip. The values are also there as a table only a screen reader reads,
+ * since a picture carries none of them to one.
  */
 
 import { useMemo, useState } from "react";
-import type { ChartView } from "@/lib/polar/visuals";
+import { visualGrid, type ChartView } from "@/lib/polar/visuals";
 import { MultiSeriesChart, SERIES_COLORS, cn } from "@polaris/ui";
 
 const DAY = /^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?$/;
@@ -34,6 +35,49 @@ function timesOf(view: ChartView): number[] | null {
 }
 
 export function VisualChart({ view, label }: { view: ChartView; label: string }) {
+    return (
+        <div className="min-w-0">
+            <ChartPicture view={view} label={label} />
+            <ChartValues view={view} label={label} />
+        </div>
+    );
+}
+
+/** The chart's values as a table, for a screen reader only. */
+function ChartValues({ view, label }: { view: ChartView; label: string }) {
+    const grid = useMemo(() => visualGrid(view), [view]);
+    if (!grid) return null;
+    return (
+        <table className="sr-only" aria-label={label}>
+            <thead>
+                <tr>
+                    {grid.header.map((cell, index) => (
+                        <th key={index} scope="col">
+                            {cell}
+                        </th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody>
+                {grid.rows.map((row, at) => (
+                    <tr key={at}>
+                        {row.map((cell, index) =>
+                            index === 0 ? (
+                                <th key={index} scope="row">
+                                    {cell}
+                                </th>
+                            ) : (
+                                <td key={index}>{format(typeof cell === "number" ? cell : null)}</td>
+                            )
+                        )}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+}
+
+function ChartPicture({ view, label }: { view: ChartView; label: string }) {
     const times = useMemo(() => timesOf(view), [view]);
     if (times) {
         return (

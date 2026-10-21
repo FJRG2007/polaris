@@ -459,6 +459,14 @@ function newId(): string {
     return crypto.randomUUID();
 }
 
+/** A message's words alone, without the views it drew: what is read aloud. */
+function wordsOf(message: UIMessage): string {
+    return message.parts
+        .map((part) => (part.type === "text" ? part.text : ""))
+        .join("")
+        .trim();
+}
+
 /** A message as text: its words, and each view it drew as Markdown. */
 function textOf(message: UIMessage): string {
     return message.parts
@@ -2871,7 +2879,7 @@ function MessageView({
                         </MessageAction>
                     ) : null}
                     {!mine ? <answerActions.AnswerMarks mark={mark} onMark={onMark} /> : null}
-                    {!mine && speech && textOf(message).trim() ? (
+                    {!mine && speech && wordsOf(message) ? (
                         <MessageAction
                             label={
                                 reading.active ? t("actions.stopReading") : t("actions.readAloud")
@@ -2884,7 +2892,7 @@ function MessageView({
                                     ? answerActions.stopReading()
                                     : answerActions.readAloud(
                                           message.id,
-                                          textOf(message),
+                                          wordsOf(message),
                                           payer,
                                           (error) =>
                                               toast.show({ title: t(`voice.errors.${error}`) })

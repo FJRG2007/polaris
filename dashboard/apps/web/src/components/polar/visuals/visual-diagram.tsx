@@ -6,7 +6,8 @@
  * leads to it (the layering step of Sugiyama-style layout, which Graphviz's
  * dot and dagre both start from), a loop is cut where it closes, and the
  * picture is one SVG that shrinks to the column and never grows past its own
- * size, so it cannot push the page wider.
+ * size. It stops shrinking where its words would become too small to read and
+ * scrolls sideways in its own box from there, so it cannot push the page wider.
  */
 
 import { useId, useMemo } from "react";
@@ -17,6 +18,8 @@ const NODE_H = 40;
 const GAP_ALONG = 56;
 const GAP_ACROSS = 24;
 const LABEL_MAX = 22;
+/** The smallest the picture is drawn at before it scrolls instead. */
+const MIN_SCALE = 0.85;
 
 interface Placed {
     id: string;
@@ -87,80 +90,83 @@ export function VisualDiagram({ view, label }: { view: DiagramView; label: strin
     }, [view, down]);
     const pad = 4;
     const arrow = `polar-arrow-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
+    const natural = width + pad * 2;
     return (
-        <svg
-            role="img"
-            aria-label={label}
-            viewBox={`${-pad} ${-pad} ${width + pad * 2} ${height + pad * 2}`}
-            className="mx-auto block h-auto w-full"
-            style={{ maxWidth: width + pad * 2 }}
-        >
-            <defs>
-                <marker id={arrow} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                    <path d="M0 0 L8 4 L0 8 z" fill="hsl(var(--muted-foreground))" />
-                </marker>
-            </defs>
-            {view.edges.map((edge, index) => {
-                const from = placed.get(edge.from)!;
-                const to = placed.get(edge.to)!;
-                const start = down
-                    ? { x: from.x + NODE_W / 2, y: from.y + NODE_H }
-                    : { x: from.x + NODE_W, y: from.y + NODE_H / 2 };
-                const end = down ? { x: to.x + NODE_W / 2, y: to.y } : { x: to.x, y: to.y + NODE_H / 2 };
-                const forward = down ? end.y > start.y : end.x > start.x;
-                // A step back, a loop or a step within one layer bends out of the way.
-                const bend = down ? { x: Math.max(start.x, end.x) + NODE_W / 2 + 12, y: (start.y + end.y) / 2 } : { x: (start.x + end.x) / 2, y: Math.max(start.y, end.y) + NODE_H };
-                const d = forward
-                    ? down
-                        ? `M${start.x} ${start.y} C${start.x} ${start.y + GAP_ALONG / 2} ${end.x} ${end.y - GAP_ALONG / 2} ${end.x} ${end.y}`
-                        : `M${start.x} ${start.y} C${start.x + GAP_ALONG / 2} ${start.y} ${end.x - GAP_ALONG / 2} ${end.y} ${end.x} ${end.y}`
-                    : `M${start.x} ${start.y} Q${bend.x} ${bend.y} ${end.x} ${end.y}`;
-                const middle = forward ? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } : bend;
-                return (
-                    <g key={index}>
-                        <path d={d} fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth={1.25} markerEnd={`url(#${arrow})`} />
-                        {edge.label ? (
-                            <text
-                                x={middle.x}
-                                y={middle.y}
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                fontSize={10}
-                                fill="hsl(var(--muted-foreground))"
-                                stroke="hsl(var(--card))"
-                                strokeWidth={4}
-                                paintOrder="stroke"
-                            >
-                                {shorten(edge.label)}
-                            </text>
-                        ) : null}
+        <div className="-mx-3 min-w-0 overflow-x-auto overscroll-x-contain px-3">
+            <svg
+                role="img"
+                aria-label={label}
+                viewBox={`${-pad} ${-pad} ${natural} ${height + pad * 2}`}
+                className="mx-auto block h-auto w-full"
+                style={{ maxWidth: natural, minWidth: Math.round(natural * MIN_SCALE) }}
+            >
+                <defs>
+                    <marker id={arrow} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0 0 L8 4 L0 8 z" fill="hsl(var(--muted-foreground))" />
+                    </marker>
+                </defs>
+                {view.edges.map((edge, index) => {
+                    const from = placed.get(edge.from)!;
+                    const to = placed.get(edge.to)!;
+                    const start = down
+                        ? { x: from.x + NODE_W / 2, y: from.y + NODE_H }
+                        : { x: from.x + NODE_W, y: from.y + NODE_H / 2 };
+                    const end = down ? { x: to.x + NODE_W / 2, y: to.y } : { x: to.x, y: to.y + NODE_H / 2 };
+                    const forward = down ? end.y > start.y : end.x > start.x;
+                    // A step back, a loop or a step within one layer bends out of the way.
+                    const bend = down ? { x: Math.max(start.x, end.x) + NODE_W / 2 + 12, y: (start.y + end.y) / 2 } : { x: (start.x + end.x) / 2, y: Math.max(start.y, end.y) + NODE_H };
+                    const d = forward
+                        ? down
+                            ? `M${start.x} ${start.y} C${start.x} ${start.y + GAP_ALONG / 2} ${end.x} ${end.y - GAP_ALONG / 2} ${end.x} ${end.y}`
+                            : `M${start.x} ${start.y} C${start.x + GAP_ALONG / 2} ${start.y} ${end.x - GAP_ALONG / 2} ${end.y} ${end.x} ${end.y}`
+                        : `M${start.x} ${start.y} Q${bend.x} ${bend.y} ${end.x} ${end.y}`;
+                    const middle = forward ? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } : bend;
+                    return (
+                        <g key={index}>
+                            <path d={d} fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth={1.25} markerEnd={`url(#${arrow})`} />
+                            {edge.label ? (
+                                <text
+                                    x={middle.x}
+                                    y={middle.y}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fontSize={10}
+                                    fill="hsl(var(--muted-foreground))"
+                                    stroke="hsl(var(--card))"
+                                    strokeWidth={4}
+                                    paintOrder="stroke"
+                                >
+                                    {shorten(edge.label)}
+                                </text>
+                            ) : null}
+                        </g>
+                    );
+                })}
+                {[...placed.values()].map((node) => (
+                    <g key={node.id}>
+                        <title>{node.label}</title>
+                        <rect
+                            x={node.x}
+                            y={node.y}
+                            width={NODE_W}
+                            height={NODE_H}
+                            rx={8}
+                            fill="hsl(var(--muted))"
+                            stroke="hsl(var(--border))"
+                        />
+                        <text
+                            x={node.x + NODE_W / 2}
+                            y={node.y + NODE_H / 2}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize={12}
+                            fill="hsl(var(--foreground))"
+                        >
+                            {shorten(node.label)}
+                        </text>
                     </g>
-                );
-            })}
-            {[...placed.values()].map((node) => (
-                <g key={node.id}>
-                    <title>{node.label}</title>
-                    <rect
-                        x={node.x}
-                        y={node.y}
-                        width={NODE_W}
-                        height={NODE_H}
-                        rx={8}
-                        fill="hsl(var(--muted))"
-                        stroke="hsl(var(--border))"
-                    />
-                    <text
-                        x={node.x + NODE_W / 2}
-                        y={node.y + NODE_H / 2}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fontSize={12}
-                        fill="hsl(var(--foreground))"
-                    >
-                        {shorten(node.label)}
-                    </text>
-                </g>
-            ))}
-        </svg>
+                ))}
+            </svg>
+        </div>
     );
 }

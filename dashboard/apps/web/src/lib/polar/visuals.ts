@@ -11,8 +11,8 @@
  * views in a sandboxed frame (MCP Apps, SEP-1865) are a separate, later path.
  *
  * Every view also reads as Markdown (`visualMarkdown`): what is copied, what an
- * export and a shared chat keep, and what the chat shows when a stored view no
- * longer passes these schemas.
+ * export and a shared chat keep, and what the chat shows when a view fails to
+ * draw. A stored view that no longer passes these schemas is left out.
  *
  * Shared by the server (tool input) and the browser (drawing a stored part).
  */
@@ -195,6 +195,16 @@ function viewProblem(view: PolarView): string | null {
         case "calculator": {
             const ids = new Set(view.fields.map((field) => field.id));
             if (ids.size !== view.fields.length) return "Two fields share an id.";
+            for (const field of view.fields) {
+                if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
+                    return `${field.label}: min is above max.`;
+                }
+                const below = field.min !== undefined && field.value < field.min;
+                const above = field.max !== undefined && field.value > field.max;
+                if (below || above) {
+                    return `${field.label}: its value is outside min and max.`;
+                }
+            }
             for (const output of view.outputs) {
                 const parsed = parseFormula(output.formula);
                 if (typeof parsed === "string") return `${output.label}: ${parsed}`;
@@ -209,7 +219,7 @@ function viewProblem(view: PolarView): string | null {
 }
 
 /** A stored part's view, or null when it is not one, is unfinished, or no
- *  longer passes the schema (the chat then shows its Markdown, if any). */
+ *  longer passes the schema (the chat then leaves it out). */
 export function visualOf(input: unknown): PolarVisual | null {
     const parsed = polarVisualSchema.safeParse(input);
     return parsed.success ? parsed.data : null;

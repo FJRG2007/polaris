@@ -106,6 +106,20 @@ describe("the catalogue", () => {
                     outputs: [{ label: "Y", formula: "constructor.constructor('alert(1)')()" }]
                 }
             },
+            {
+                view: {
+                    kind: "calculator",
+                    fields: [{ id: "x", label: "X", value: 0, min: 1, max: 10 }],
+                    outputs: [{ label: "Y", formula: "x * 2" }]
+                }
+            },
+            {
+                view: {
+                    kind: "calculator",
+                    fields: [{ id: "x", label: "X", value: 5, min: 10, max: 1 }],
+                    outputs: [{ label: "Y", formula: "x * 2" }]
+                }
+            },
             { view: { kind: "stats", items: Array.from({ length: 9 }, () => ({ label: "a", value: "1" })) } },
             { view: { kind: "steps", items: [{ title: "x".repeat(121) }] } }
         ];

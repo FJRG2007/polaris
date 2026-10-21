@@ -89,7 +89,7 @@ const VIEWS: Record<string, unknown> = {
 };
 
 describe("the frame", () => {
-    it.each(Object.keys(VIEWS))("holds %s to the column with no scroll but a table's", (kind) => {
+    it.each(Object.keys(VIEWS))("holds %s to the column with no scroll but a sideways one", (kind) => {
         const { container } = draw(VIEWS[kind]);
         const figure = container.querySelector("figure")!;
         expect(figure.className).toContain("max-w-full");
@@ -98,7 +98,7 @@ describe("the frame", () => {
         // Nothing scrolls up and down inside the chat's own scroll.
         expect(container.querySelector("[class*='overflow-y-auto'], [class*='overflow-auto']")).toBeNull();
         const sideways = container.querySelectorAll("[class*='overflow-x-auto']");
-        expect(sideways.length).toBe(kind === "table" || kind === "comparison" ? 1 : 0);
+        expect(sideways.length).toBe(["table", "comparison", "diagram"].includes(kind) ? 1 : 0);
     });
 
     it("scrolls a wide table inside its one box", () => {
@@ -131,8 +131,9 @@ describe("the frame", () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         chartThrows.on = true;
         const { container } = draw({ title: "Sales", view: { kind: "chart", type: "bar", categories: ["Jan"], series: [{ label: "S", values: [7] }] } });
-        // Polaris's Markdown shows a table as its source, which still reads.
-        expect(container.querySelector("figure")!.textContent).toContain("| Jan | 7 |");
+        const figure = container.querySelector("figure") as HTMLElement;
+        expect(within(figure).getByRole("cell", { name: "Jan" })).toBeTruthy();
+        expect(within(figure).getByRole("cell", { name: "7" })).toBeTruthy();
     });
 });
 
@@ -146,6 +147,8 @@ describe("the views", () => {
         const { container } = draw(VIEWS.diagram);
         const svg = container.querySelector("svg[role='img']")!;
         expect(svg.getAttribute("style")).toContain("max-width");
+        expect(svg.getAttribute("style")).toContain("min-width");
+        expect(svg.parentElement!.className).toContain("overflow-x-auto");
         expect(within(svg as unknown as HTMLElement).getAllByText("Browser").length).toBeGreaterThan(0);
     });
 
@@ -176,6 +179,14 @@ describe("the views", () => {
         expect(field.getAttribute("aria-invalid")).toBe("true");
         expect(screen.getByText("Between 0 and 10")).toBeTruthy();
         expect(screen.getByText("-")).toBeTruthy();
+    });
+
+    it("gives a screen reader a chart's values as a table", () => {
+        draw(VIEWS.chart);
+        const table = screen.getByRole("table", { name: "Chart" });
+        expect(within(table).getByRole("rowheader", { name: "a" })).toBeTruthy();
+        expect(within(table).getByRole("cell", { name: "3" })).toBeTruthy();
+        expect(within(table).getByRole("cell", { name: "-1" })).toBeTruthy();
     });
 
     it("draws a line over dates with the dashboard's time chart", () => {

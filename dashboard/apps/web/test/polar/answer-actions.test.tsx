@@ -240,6 +240,36 @@ describe("read aloud", () => {
         ]);
         expect(await screen.findByLabelText("Read aloud")).toBeTruthy();
     });
+
+    it("reads the words and leaves out the views the answer drew", async () => {
+        state.speech = true;
+        chat.messages[1] = {
+            id: "a1",
+            role: "assistant",
+            parts: [
+                { type: "text", text: "It is half full." },
+                {
+                    type: "tool-polar_show",
+                    toolCallId: "v1",
+                    state: "output-available",
+                    input: {
+                        view: { kind: "table", columns: [{ label: "Disk" }], rows: [["sda"]] }
+                    },
+                    output: { ok: true, text: "Shown to the person." }
+                } as never
+            ]
+        };
+        await mount();
+        fireEvent.click(await screen.findByLabelText("Read aloud"));
+        await waitFor(() =>
+            expect(calls.filter((call) => call.url === "/api/polar/speak")).toHaveLength(1)
+        );
+        expect(calls.find((call) => call.url === "/api/polar/speak")?.body).toEqual({
+            text: "It is half full.",
+            payer: null,
+            lang: expect.any(String)
+        });
+    });
 });
 
 describe("share up to here", () => {
