@@ -33,7 +33,7 @@ import { ThreadContextMenu } from "./thread-menu";
 import type { DisplayFormat } from "@polaris/core";
 import { RefusedMailboxes } from "./refused-notice";
 import { forwardSeed, replySeed } from "./answering";
-import { missingFolderRole, refusalOf } from "./refusal";
+import { missingFolderRole, refusalOf, refusalOrFailure } from "./refusal";
 import { UnsubscribeButton } from "./unsubscribe-button";
 import type { MailAction } from "@/lib/mailbox/messages";
 import { usePolarContext } from "@/components/polar/polar-panel";
@@ -266,6 +266,7 @@ export function MailView({
         composing,
         folders,
         identities,
+        labels,
         nudgeUnread,
         openComposer,
         refresh,
@@ -854,6 +855,18 @@ export function MailView({
                 if (preferences.afterFiling === "next") openNext(aimed);
                 else closeOpen();
             }
+            // The selection goes with the press as well: the rows have already
+            // changed, and a toolbar still saying "3 picked" over them, every
+            // button greyed out, read as the action waiting on the server. It
+            // comes back with the rows on a refusal.
+            const picked = selected;
+            setSelected([]);
+            const putBack = () => {
+                pending?.abandon();
+                counts?.abandon();
+                if (reopen) openAgain(reopen);
+                setSelected((held) => (held.length === 0 ? picked : held));
+            };
 
             startBusy(async () => {
                 const outcome = await actOnAction({
@@ -861,20 +874,22 @@ export function MailView({
                     action,
                     scope: scopeOf(action)
                 }).catch((caught: unknown) => {
-                    // Nothing answered: put every count back, then let the
-                    // busy state report it as it always has.
-                    pending?.abandon();
-                    counts?.abandon();
-                    throw caught;
+                    // Nothing answered. Everything goes back, and it is said: a
+                    // row quietly returning looks like the press never landed.
+                    console.error("polaris: a mail action failed:", caught);
+                    return null;
                 });
+                if (!outcome) {
+                    putBack();
+                    toast.show({ title: t("list.changeFailed") });
+                    return;
+                }
                 // This mailbox has no folder for what was asked. Ask which one it
                 // is and do the action again once it is settled, so the answer
                 // costs one question rather than the action being lost.
                 const missing = missingFolderRole(outcome);
                 if (missing) {
-                    pending?.abandon();
-                    counts?.abandon();
-                    if (reopen) openAgain(reopen);
+                    putBack();
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
                 }
@@ -884,9 +899,7 @@ export function MailView({
                     // the change after the server refused it would be lying about
                     // somebody's mail - and a reader taken out of a conversation
                     // that was never filed has to be put back in it.
-                    pending?.abandon();
-                    counts?.abandon();
-                    if (reopen) openAgain(reopen);
+                    putBack();
                     toast.show({ title: said });
                     return;
                 }
@@ -900,7 +913,6 @@ export function MailView({
                 // and still has the row in it - the effect on `threads` above is
                 // what lets it go, the first time a list comes back without it.
                 pending?.settle();
-                setSelected([]);
                 toast.show({ title: announce });
                 // Done from the list, but it may have been aimed at whatever is
                 // open beside it - the conversation's own row, or the whole
@@ -939,7 +951,9 @@ export function MailView({
             preferences.afterFiling,
             refreshMailbox,
             reloadLists,
+            selected,
             shown,
+            t,
             threads,
             threadsOf,
             toast,
@@ -994,23 +1008,29 @@ export function MailView({
                 else closeOpen();
             }
 
+            const picked = selected;
+            setSelected([]);
+            const putBack = () => {
+                pending?.abandon();
+                counts?.abandon();
+                if (reopen) openAgain(reopen);
+                setSelected((held) => (held.length === 0 ? picked : held));
+            };
+
             startBusy(async () => {
                 const outcome = await moveToFolderAction({
                     folderId,
                     messageIds: [...messageIds],
                     scope: "folder"
                 }).catch((caught: unknown) => {
-                    pending?.abandon();
-                    counts?.abandon();
-                    throw caught;
+                    console.error("polaris: filing mail failed:", caught);
+                    return null;
                 });
-                const said = refusalOf(outcome);
+                const said = outcome ? refusalOf(outcome) : t("list.changeFailed");
                 if (said) {
                     // Both halves back: the rows, and the reader who was taken
                     // out of a conversation that was never actually filed.
-                    pending?.abandon();
-                    counts?.abandon();
-                    if (reopen) openAgain(reopen);
+                    putBack();
                     toast.show({ title: said });
                     return;
                 }
@@ -1019,7 +1039,6 @@ export function MailView({
                 // go the first time a list comes back without it.
                 pending?.settle();
                 counts?.settle();
-                setSelected([]);
                 toast.show({
                     title: t("shell.moved", { count: messageIds.length, folder: folderName })
                 });
@@ -1041,7 +1060,9 @@ export function MailView({
             preferences.afterFiling,
             refreshMailbox,
             reloadLists,
+            selected,
             shown,
+            t,
             threads,
             threadsOf,
             toast,
@@ -1077,40 +1098,93 @@ export function MailView({
         ) => {
             if (messageIds.length === 0) return;
             const pending = patchUntilAnswered(threadsOf(messageIds), state);
+            const picked = selected;
+            setSelected([]);
             startBusy(async () => {
-                const outcome = await setConversationStateAction({
-                    messageIds: [...messageIds],
-                    ...state
-                });
-                const said = refusalOf(outcome);
+                const said = await refusalOrFailure(
+                    setConversationStateAction({ messageIds: [...messageIds], ...state }),
+                    t("list.changeFailed")
+                );
                 if (said) {
                     pending.abandon();
+                    setSelected((held) => (held.length === 0 ? picked : held));
                     toast.show({ title: said });
                     return;
                 }
                 pending.settle();
-                setSelected([]);
                 toast.show({ title: announce });
                 refreshMailbox();
             });
         },
-        [patchUntilAnswered, refreshMailbox, threadsOf, toast]
+        [patchUntilAnswered, refreshMailbox, selected, t, threadsOf, toast]
     );
 
+    /**
+     * Put conversations away until later.
+     *
+     * Out of the list now, with the unread they carried, the way filing them
+     * is: a snoozed conversation is not in this folder until it wakes. Back,
+     * counts and all, if the server refuses.
+     */
     const snooze = useCallback(
         (messageIds: readonly string[], until: Date) => {
+            if (messageIds.length === 0) return;
+            const aimed = threadsOf(messageIds);
+            const aimedRows = aimed.flatMap((id) => {
+                const row = threads.find((thread) => thread.id === id);
+                return row ? [shown(row)] : [];
+            });
+            const pending = patchUntilAnswered(aimed, { gone: true });
+            const counts = nudgeUnread(unreadNudges(aimedRows), aimed);
+            const leaving = openThread !== null && aimed.includes(openThread.id);
+            const reopen = leaving ? openThread.id : "";
+            if (leaving) {
+                if (preferences.afterFiling === "next") openNext(aimed);
+                else closeOpen();
+            }
+            const picked = selected;
+            setSelected([]);
             startBusy(async () => {
-                const outcome = await snoozeAction({ messageIds: [...messageIds], until });
-                const said = refusalOf(outcome);
+                const said = await refusalOrFailure(
+                    snoozeAction({ messageIds: [...messageIds], until }),
+                    t("list.changeFailed")
+                );
                 if (said) {
+                    pending.abandon();
+                    counts.abandon();
+                    if (reopen) openAgain(reopen);
+                    setSelected((held) => (held.length === 0 ? picked : held));
                     toast.show({ title: said });
                     return;
                 }
-                setSelected([]);
+                // Kept until a list comes back without the rows - see `act`.
+                pending.settle();
+                counts.settle();
+                if (leaving) {
+                    reloadLists();
+                    return;
+                }
                 refreshMailbox();
             });
         },
-        [refreshMailbox, toast]
+        [
+            closeOpen,
+            nudgeUnread,
+            openAgain,
+            openNext,
+            openThread,
+            patchUntilAnswered,
+            preferences.afterFiling,
+            refreshMailbox,
+            reloadLists,
+            selected,
+            shown,
+            t,
+            threads,
+            threadsOf,
+            toast,
+            unreadNudges
+        ]
     );
 
     const onRow = threads[Math.min(onIndex, threads.length - 1)] ?? null;
@@ -1251,21 +1325,34 @@ export function MailView({
 
     const label = useCallback(
         (labelId: string, messageIds: readonly string[]) => {
+            if (messageIds.length === 0) return;
+            const chosen = labels.find((one) => one.id === labelId);
+            // The chip goes on each row now, beside the labels that row already
+            // has - a change per row, because no two rows hold the same ones.
+            const pending = chosen
+                ? threadsOf(messageIds).flatMap((id) => {
+                      const row = threads.find((thread) => thread.id === id);
+                      if (!row) return [];
+                      const held = shown(row).labels;
+                      if (held.some((one) => one.id === labelId)) return [];
+                      return [patchUntilAnswered([id], { labels: [...held, chosen] })];
+                  })
+                : [];
             startBusy(async () => {
-                const outcome = await applyLabelAction({
-                    labelId,
-                    messageIds: [...messageIds],
-                    applied: true
-                });
-                const said = refusalOf(outcome);
+                const said = await refusalOrFailure(
+                    applyLabelAction({ labelId, messageIds: [...messageIds], applied: true }),
+                    t("list.changeFailed")
+                );
                 if (said) {
+                    for (const one of pending) one.abandon();
                     toast.show({ title: said });
                     return;
                 }
+                for (const one of pending) one.settle();
                 refreshMailbox();
             });
         },
-        [refreshMailbox, toast]
+        [labels, patchUntilAnswered, refreshMailbox, shown, t, threads, threadsOf, toast]
     );
 
     /**
@@ -1557,7 +1644,7 @@ export function MailView({
                         ) : (
                             <div className="flex min-w-0 flex-1 items-center gap-1">
                                 <span className="mr-1 shrink-0 text-[12px] text-muted-foreground tabular-nums">
-                                    {selected.length} picked
+                                    {t("list.picked", { count: selected.length })}
                                 </span>
                                 {context.canArchive ? (
                                     <Button
@@ -1918,6 +2005,41 @@ export function MailView({
                                 } else {
                                     pending.abandon();
                                     counts.abandon();
+                                }
+                            };
+                        }}
+                        // Starred, marked unread, pinned or labelled from its own
+                        // header: the row and the rail show it now as well.
+                        onChange={(change) => {
+                            const row = shown(openThread);
+                            const patch =
+                                typeof change === "string" ? optimistically(change) : change;
+                            const pending =
+                                patch && !patch.gone
+                                    ? patchUntilAnswered([openThread.id], patch)
+                                    : null;
+                            const counts =
+                                change === "read"
+                                    ? nudgeUnread(unreadNudges([row]), [row.id])
+                                    : change === "unread"
+                                      ? nudgeUnread(
+                                            unreadNudges([
+                                                {
+                                                    accountId: row.accountId,
+                                                    unreadCount: -(
+                                                        row.messageCount - row.unreadCount
+                                                    )
+                                                }
+                                            ])
+                                        )
+                                      : null;
+                            return (accepted) => {
+                                if (accepted) {
+                                    pending?.settle();
+                                    counts?.settle();
+                                } else {
+                                    pending?.abandon();
+                                    counts?.abandon();
                                 }
                             };
                         }}

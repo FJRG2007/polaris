@@ -19,6 +19,8 @@ export interface ThreadPatch {
     important?: boolean;
     pinned?: boolean;
     muted?: boolean;
+    /** The row's labels with one just applied. */
+    labels?: readonly { id: string; name: string; color: string }[];
     /** Taken out of this list. Drawn as gone at once and put back if the server
      *  refuses, rather than left sitting there while a mail server is asked. */
     gone?: boolean;
