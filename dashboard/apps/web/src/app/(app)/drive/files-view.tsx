@@ -44,6 +44,7 @@ import { matchesStructured, NAME_SEARCH, parseSearch, PATH_SEARCH } from "./sear
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { UserProfileDialog } from "@/components/user-profile-dialog";
 import { FilePreview, isViewable, type ViewerTarget } from "./file-viewer";
+import * as targetRules from "./menu-targets";
 import { filesToItems, gatherDropItems, type UploadItem } from "@/lib/drop-items";
 import { ITEM_ICONS, ITEM_ICON_COLORS, iconColorClass, iconComponent } from "./item-icons";
 import {
@@ -743,6 +744,9 @@ export function FilesView({
      *  End move through the list, which is the list's own and does not move. */
     function onListKeyDown(event: KeyboardEvent) {
         if (renaming) return;
+        // A key pressed in a row's menu or a dialog opened from it is theirs, not
+        // the listing's - Enter on "Move to..." also opened the selected file.
+        if (targetRules.fromOutside(event)) return;
         const pressed = (id: string) => shortcutPressed(event, id);
         const one = selectedEntries.length === 1 ? selectedEntries[0] : undefined;
         if (pressed("drive.clearSelection") && selectedEntries.length > 0) {
@@ -1174,7 +1178,7 @@ export function FilesView({
      * pointer was never on.
      */
     function menuTargets(entry: DriveEntry): DriveEntry[] {
-        return selected.has(entry.path) && selectedEntries.length > 1 ? selectedEntries : [entry];
+        return targetRules.menuTargets(selected, selectedEntries, entry);
     }
 
     /**
@@ -1601,6 +1605,8 @@ export function FilesView({
     /** Begin a marquee when the press lands on empty space, not on a row. */
     function onMarqueeDown(event: MouseEvent) {
         if (event.button !== 0) return;
+        // A press in a row's menu arrives here too - see `fromOutside`.
+        if (targetRules.fromOutside(event)) return;
         const el = scrollRef.current;
         if (!el) return;
         // Ignore presses on the scrollbar gutter and on any row (rows handle their
