@@ -27,6 +27,8 @@ import {
 } from "@/components/agents/agent-select";
 import { Bot, CircleDot, Loader2, Play, Server, Square } from "lucide-react";
 import { sessionChoicesAction, startSessionAction, stopSessionAction } from "./actions";
+import type { GithubInstallGap } from "@/lib/github-app-reach";
+import { GithubAppGapNotice } from "@/components/github-app-gap";
 import {
     Badge,
     Button,
@@ -216,6 +218,9 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     // rather than recording the default as a decision.
     const [unattended, setUnattended] = useState<boolean | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // The GitHub App is why the chosen repository cannot be cloned: drawn as
+    // the install button instead of a sentence.
+    const [gap, setGap] = useState<GithubInstallGap | null>(null);
     const [busy, startTransition] = useTransition();
     const router = useRouter();
 
@@ -234,6 +239,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
     const workspace = repoId === NO_REPO;
 
     const submit = () => {
+        setGap(null);
         startTransition(() => {
             void runAction(
                 () =>
@@ -262,7 +268,10 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                 // opening: the reason it failed is on it, and it is the only place
                 // that says what was attempted.
                 if (result.id) router.push(`/apps/agents/sessions/${result.id}`);
-                else if (result.error) setError(result.error);
+                else if (result.githubGap) {
+                    setGap(result.githubGap);
+                    setError(null);
+                } else if (result.error) setError(result.error);
                 else onClose();
             });
         });
@@ -298,7 +307,10 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         <span className="text-xs text-muted-foreground">{t("sessions.form.repository")}</span>
                         <Select
                             value={repoId}
-                            onValueChange={setRepoId}
+                            onValueChange={(value) => {
+                                setRepoId(value);
+                                setGap(null);
+                            }}
                             options={[
                                 // First, because it is the answer that needs
                                 // nothing set up. Somebody who just wants an
@@ -449,6 +461,7 @@ function StartDialog({ onClose }: { onClose: () => void }) {
                         <Switch checked={enigma} onChange={setEnigma} />
                     </div>
 
+                    {gap ? <GithubAppGapNotice gap={gap} checking={busy} onCheckAgain={submit} /> : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 

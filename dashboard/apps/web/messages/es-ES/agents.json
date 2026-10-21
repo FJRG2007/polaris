@@ -168,7 +168,9 @@
         "notEnabled": "Ese repositorio no está activado para ejecuciones del agente",
         "runNotFound": "Ejecución no encontrada",
         "poolNotYours": "Ese grupo de runners no es tuyo.",
-        "hasRules": "Ese repositorio ya tiene reglas."
+        "hasRules": "Ese repositorio ya tiene reglas.",
+        "githubAppMissing": "Polaris no está instalado en {owner} en GitHub, así que tu cuenta no llega a este repositorio. Instálalo allí y vuelve a probar.",
+        "githubRepoNotSelected": "{repository} no está entre los repositorios que Polaris tiene en {owner}. Añádelo a la instalación y vuelve a probar."
     },
     "sessions": {
         "errors": {

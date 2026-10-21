@@ -12,6 +12,7 @@ import { z } from "zod";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { resolveGithubRepo, searchGithubRepos, type GithubRepo } from "@/lib/github-service";
 import { githubCredentialsForUser, githubTokenForUser, listReposForUser } from "@/lib/github-access";
+import { githubInstallGapForRepo } from "@/lib/github-app-reach";
 
 export interface PickerRepoList {
     connected: boolean;
@@ -45,7 +46,11 @@ const repoQuerySchema = z.string().trim().min(2).max(200);
  * rate limited, no such repository - is an empty list rather than an error; the
  * field keeps showing whatever the local list already matched.
  */
-export async function pickerRepoSearch(userId: string, query: unknown): Promise<GithubRepo[]> {
+export async function pickerRepoSearch(
+    userId: string,
+    query: unknown,
+    options: { installGaps?: boolean } = {}
+): Promise<GithubRepo[]> {
     const parsed = repoQuerySchema.safeParse(query);
     if (!parsed.success) return [];
     try {
@@ -54,6 +59,14 @@ export async function pickerRepoSearch(userId: string, query: unknown): Promise<
             const token = await githubTokenForUser(userId, reference.owner);
             const repo = await resolveGithubRepo(reference.owner, reference.repo, token);
             if (repo) return [repo];
+            // A repository GitHub refuses only because Polaris's App is not on
+            // its owner is still offered, so the screen can say so and show the
+            // install button. Only for a screen that draws that step.
+            if (options.installGaps) {
+                const fullName = `${reference.owner}/${reference.repo}`;
+                if (await githubInstallGapForRepo(userId, fullName))
+                    return [{ fullName, defaultBranch: "main", private: true }];
+            }
         }
         return await searchGithubRepos(parsed.data, await githubTokenForUser(userId));
     } catch {

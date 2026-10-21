@@ -128,6 +128,7 @@ import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion"
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { repoStepOf } from "@/lib/polar/code-host";
+import { GithubAppGapNotice, gapsOf } from "@/components/github-app-gap";
 import { Queue, QueueItem, QueueSection } from "@/components/polar/elements/queue";
 import { learnPath, pathThrough, versionsOf, type VersionTree } from "@/lib/polar/versions";
 import { sendFile } from "@/components/transfers/move-file";
@@ -2752,6 +2753,22 @@ function MessageView({
         return step.detail ? t("web.searching", { query: step.detail }) : t("web.searched");
     };
     const sources = mine ? [] : sourcesOf(message.parts as never);
+    // A repository read refused over the GitHub App carries the step that fixes
+    // it; the answer relays the reason and this draws the button.
+    const gaps = mine
+        ? []
+        : gapsOf(
+              message.parts.flatMap((part) => {
+                  const tool = part as unknown as ToolPart;
+                  const name =
+                      part.type === "dynamic-tool" ? (tool.toolName ?? "") : part.type.slice(5);
+                  return part.type.startsWith("tool-") || part.type === "dynamic-tool"
+                      ? repoStepOf(name, tool.input) && tool.state === "output-available"
+                          ? [tool.output]
+                          : []
+                      : [];
+              })
+          );
     const { copied, copy } = useCopied();
     const toast = useToast();
     const reading = answerActions.useReading(message.id);
@@ -2923,6 +2940,13 @@ function MessageView({
             {sources.length > 0 ? (
                 <WebSources sources={sources} calls={webCallsOf(message.parts as never)} />
             ) : null}
+            {gaps.map((gap) => (
+                <GithubAppGapNotice
+                    key={`${gap.kind}:${gap.owner}:${gap.kind === "repo-not-selected" ? gap.repository : ""}`}
+                    gap={gap}
+                    onCheckAgain={!streaming && last && !busy ? () => onRegenerate({}) : undefined}
+                />
+            ))}
             {!mine && typeof meta.model === "string" ? (
                 <p className="text-xs text-foreground-subtle">
                     {t(meta.automatic ? "picker.autoPicked" : "picker.answeredBy", {

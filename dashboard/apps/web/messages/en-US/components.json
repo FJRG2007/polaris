@@ -1474,5 +1474,18 @@
         "description": "{provider} flagged this address as malicious or fraudulent. Only open it if you trust where it goes.",
         "goBack": "Go back",
         "continue": "Continue anyway"
+    },
+    "githubAppGap": {
+        "missingTitle": "Polaris is not installed on {owner}",
+        "missingBody": "Your GitHub account only reaches repositories where Polaris is installed. If {owner} is an organization, one of its owners may have to approve the request.",
+        "notSelectedTitle": "{repository} is not shared with Polaris",
+        "notSelectedBody": "Polaris is installed on {owner} for selected repositories only. Add this one to the installation.",
+        "noAccountTitle": "No GitHub account connected",
+        "noAccountBody": "Connect the GitHub account that can see this repository.",
+        "install": "Install Polaris on {owner}",
+        "choose": "Choose repositories",
+        "connect": "Connect GitHub",
+        "checkAgain": "Check again",
+        "noAppPage": "This Polaris has no GitHub app to install. An administrator connects one under Settings."
     }
 }

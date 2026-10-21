@@ -16,6 +16,11 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
+import {
+    githubInstallGapForRepo,
+    installGapKey,
+    type GithubInstallGap
+} from "@/lib/github-app-reach";
 import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import type { PickerModel } from "@/components/model-picker";
@@ -131,7 +136,7 @@ export async function listAgentRepoChoices(): Promise<{ connected: boolean; logi
  *  operator types. */
 export async function searchAgentRepoChoices(query: string): Promise<{ repos: GithubRepo[] }> {
     const user = await requirePermission("agents.manage");
-    return { repos: await pickerRepoSearch(user.id, query) };
+    return { repos: await pickerRepoSearch(user.id, query, { installGaps: true }) };
 }
 
 /**
@@ -152,13 +157,16 @@ export async function adviseRepoAction(input: unknown): Promise<{
     providers?: string[];
     defaults?: AgentRepoConfigInput;
     policy?: AgentPolicy;
+    /** The GitHub App is why this repository cannot be reached, found now
+     *  rather than at the save. */
+    githubGap?: GithubInstallGap;
     error?: string;
 }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoFullName: repoFullNameSchema, isPrivate: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: await say("text.pickRepository") };
 
-    const [pools, allPools, providers, policy] = await Promise.all([
+    const [pools, allPools, providers, policy, gap] = await Promise.all([
         poolsServing(user.id, parsed.data.repoFullName),
         prisma.runnerPool.findMany({
             where: { ownerId: user.id, enabled: true },
@@ -166,7 +174,8 @@ export async function adviseRepoAction(input: unknown): Promise<{
             orderBy: { name: "asc" }
         }),
         providersFor(user.id),
-        policyForNewRepo(user.id, parsed.data.repoFullName)
+        policyForNewRepo(user.id, parsed.data.repoFullName),
+        githubInstallGapForRepo(user.id, parsed.data.repoFullName)
     ]);
 
     // The first connected provider's model is only a starting point; the tiers
@@ -185,11 +194,31 @@ export async function adviseRepoAction(input: unknown): Promise<{
         allPools,
         providers,
         defaults,
-        policy
+        policy,
+        ...(gap ? { githubGap: gap } : {})
     };
 }
 
-export async function enableRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
+/** Why the GitHub App keeps this person from `repoFullName`, as the sentence and
+ *  the step that fixes it, or null when it does not. */
+async function installGap(
+    userId: string,
+    repoFullName: string
+): Promise<{ error: string; githubGap: GithubInstallGap } | null> {
+    const gap = await githubInstallGapForRepo(userId, repoFullName);
+    if (!gap) return null;
+    return {
+        error: await say(installGapKey(gap), {
+            owner: gap.owner,
+            repository: gap.kind === "repo-not-selected" ? gap.repository : repoFullName
+        }),
+        githubGap: gap
+    };
+}
+
+export async function enableRepoAction(
+    input: unknown
+): Promise<{ error?: string; warning?: string; githubGap?: GithubInstallGap }> {
     const user = await requirePermission("agents.manage");
     const parsed = enableAgentRepoSchema
         .extend({ isPrivate: z.boolean() })
@@ -206,7 +235,16 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     const reachable = await listReposForUser(user.id).catch(() => null);
     if (!reachable) return { error: await say("errors.accessUnchecked") };
     const match = reachable.find((repo) => repo.fullName.toLowerCase() === parsed.data.repoFullName.toLowerCase());
-    if (!match) return { error: await say("errors.unreachableRepo") };
+    // The usual reason an account that sees a repository on GitHub cannot reach
+    // it here is that Polaris's App is not installed on its owner, or not given
+    // this repository: say so, with the button, rather than "unreachable".
+    if (!match) {
+        return (
+            (await installGap(user.id, parsed.data.repoFullName)) ?? {
+                error: await say("errors.unreachableRepo")
+            }
+        );
+    }
 
     // A model whose provider is not connected produces a run that starts, asks for
     // a key, and fails. Refusing here costs a sentence instead of a failed run.
@@ -393,7 +431,9 @@ export async function removeAutomationAction(input: unknown): Promise<{ error?: 
 }
 
 /** Start a run by hand, with a prompt the operator writes. */
-export async function startRunAction(input: unknown): Promise<{ runId?: string; error?: string }> {
+export async function startRunAction(
+    input: unknown
+): Promise<{ runId?: string; error?: string; githubGap?: GithubInstallGap }> {
     const user = await requirePermission("agents.manage");
     const parsed = manualAgentRunSchema.safeParse(input);
     if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "text.sayWhat") };
@@ -402,6 +442,9 @@ export async function startRunAction(input: unknown): Promise<{ runId?: string; 
         where: { ownerId: user.id, repoFullName: parsed.data.repoFullName, enabled: true }
     });
     if (!repo) return { error: await say("errors.notEnabled") };
+    // Before a run exists: one that cannot reach its repository would only fail.
+    const gap = await installGap(user.id, repo.repoFullName);
+    if (gap) return gap;
 
     const result = await dispatchRun({
         repo,

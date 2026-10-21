@@ -168,7 +168,9 @@
         "notEnabled": "That repository is not enabled for agent runs",
         "runNotFound": "Run not found",
         "poolNotYours": "That runner pool is not one of yours.",
-        "hasRules": "That repository already has rules."
+        "hasRules": "That repository already has rules.",
+        "githubAppMissing": "Polaris is not installed on {owner} on GitHub, so your account cannot reach this repository. Install it there, then try again.",
+        "githubRepoNotSelected": "{repository} is not one of the repositories Polaris was given on {owner}. Add it to the installation, then try again."
     },
     "sessions": {
         "errors": {
