@@ -69,6 +69,8 @@ const setting = {
 
 /** Marking a whole event read, which is how the watcher puts its own alerts down. */
 const notificationUpdateMany = vi.fn(async () => ({ count: 0 }));
+/** Deleting a whole event, which is how a superseded "update ready" goes. */
+const notificationDeleteMany = vi.fn(async () => ({ count: 0 }));
 /** Bell rows and off-bell deliveries already out there, which is what decides
  *  whether an earlier alert is still standing for somebody. */
 interface BellRow {
@@ -133,7 +135,11 @@ let status: UpdateStatus;
 vi.mock("@polaris/db", () => ({
     prisma: {
         setting,
-        notification: { updateMany: notificationUpdateMany, findMany: notificationFindMany },
+        notification: {
+            updateMany: notificationUpdateMany,
+            deleteMany: notificationDeleteMany,
+            findMany: notificationFindMany
+        },
         notificationDelivery: { findMany: deliveryFindMany }
     }
 }));
@@ -175,9 +181,14 @@ interface MarkRead {
 /** Every clearing write that named this event. `system.update` alone is the
  *  watcher superseding its own standing alert; the pair is a build landing. */
 function cleared(event: string): MarkRead[] {
-    return notificationUpdateMany.mock.calls
-        .map(([input]) => input as unknown as MarkRead)
-        .filter((call) => call.where.type.in.includes(event));
+    return clearingWrites().filter((call) => call.where.type.in.includes(event));
+}
+
+/** Every write that put alerts down, marked read or deleted. */
+function clearingWrites(): MarkRead[] {
+    return [...notificationUpdateMany.mock.calls, ...notificationDeleteMany.mock.calls].map(
+        ([input]) => input as unknown as MarkRead
+    );
 }
 
 /** Every alert raised so far, by event id. */
@@ -198,6 +209,7 @@ beforeEach(() => {
     startHostUpdate.mockResolvedValue("started");
     lastUpdateOutcome.mockResolvedValue(null);
     notificationUpdateMany.mockClear();
+    notificationDeleteMany.mockClear();
     bellRows.length = 0;
     deliveryRows.length = 0;
     status = available();
@@ -236,6 +248,7 @@ describe("announcing a build", () => {
         );
         notify.mockClear();
         notificationUpdateMany.mockClear();
+        notificationDeleteMany.mockClear();
         status = available("def5678");
         await checkForUpdate();
         await checkForUpdate();
@@ -253,6 +266,7 @@ describe("announcing a build", () => {
         }
         notify.mockClear();
         notificationUpdateMany.mockClear();
+        notificationDeleteMany.mockClear();
         status = available("def5678");
         await checkForUpdate();
 
@@ -346,10 +360,13 @@ describe("announcing a build", () => {
         // Only the alert that says one is ready. Installing goes to the newest
         // build, never to the one the older alert named, so leaving it standing
         // is one instruction and one that is wrong.
-        const cleared = notificationUpdateMany.mock.calls.map(
-            ([input]) => input as unknown as MarkRead
-        );
+        const cleared = clearingWrites();
         expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
+        // Taken off the bell, not only marked read: a read one still sits in the
+        // list, and a day of builds was a list of fifty saying the same thing.
+        expect(notificationDeleteMany.mock.calls.at(-1)?.[0]).toEqual({
+            where: { type: { in: ["system.update"] }, userId: { in: ["user-1", "user-2"] } }
+        });
         // And never the ones that report what happened: a failure swept away by
         // the next build's announcement is a deployment that quietly stopped
         // updating and told nobody twice.
@@ -360,6 +377,7 @@ describe("announcing a build", () => {
         await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
         await checkForUpdate();
         notificationUpdateMany.mockClear();
+        notificationDeleteMany.mockClear();
 
         // The case the "did the build we announced land" check misses: somebody
         // installed while a newer build had already been announced, so what is
@@ -374,9 +392,7 @@ describe("announcing a build", () => {
         };
         await checkForUpdate();
 
-        const cleared = notificationUpdateMany.mock.calls.map(
-            ([input]) => input as unknown as MarkRead
-        );
+        const cleared = clearingWrites();
         expect(cleared.some((call) => call.where.type.in.includes("system.update"))).toBe(true);
         // And the row goes with it. Left behind, it names a build nothing is
         // running and nothing can install, which is a badge on Management that

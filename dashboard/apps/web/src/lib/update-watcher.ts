@@ -37,7 +37,7 @@ function inWords(say: (t: NamespaceTranslator<"notices">) => { title: string; bo
 }
 import { sweepExpiringModelKeys } from "@/lib/agents/model-key-expiry";
 import { refreshModelCatalogIfStale } from "@/lib/agents/model-catalog";
-import { markNotificationsReadByType } from "@/lib/notification-service";
+import { deleteNotificationsByType, markNotificationsReadByType } from "@/lib/notification-service";
 import { notifyGithubPermissionGap } from "@/lib/integrations/github-permission-notice";
 import {
     lastUpdateOutcome,
@@ -198,11 +198,12 @@ async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
     if (await claim(ANNOUNCED_KEY, sha, `${sha} ${now.toISOString()}`)) {
         const recipients = await recipientsFor(now, earlier);
         if (recipients.length === 0) return now;
-        // Before raising this one, put down the ones it replaces - they name
+        // Before raising this one, take away the ones it replaces - they name
         // builds this announcement supersedes. Done here rather than in the
         // reader so what reaches a phone or a chat webhook is superseded too,
-        // and so the bell holds the latest rather than the pile.
-        await markNotificationsReadByType([READY_EVENT], recipients);
+        // and so the bell holds the latest rather than the pile: marked read,
+        // each one stayed in the list.
+        await deleteNotificationsByType([READY_EVENT], recipients);
         await tellOperators({
             event: "system.update",
             recipients,
@@ -355,7 +356,7 @@ export async function checkForUpdate(): Promise<void> {
     await retireLandedNotices(status);
     // And the standing alert goes with it, whichever build it named, even where
     // another container got to the row first.
-    if (status.upToDate) await markNotificationsReadByType([READY_EVENT]);
+    if (status.upToDate) await deleteNotificationsByType([READY_EVENT]);
     // Only a published image that this deployment can actually move to. Anything
     // else - up to date, still building, a commit that failed its checks - is
     // nothing to announce and nothing to install.
