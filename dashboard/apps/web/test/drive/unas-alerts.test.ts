@@ -159,6 +159,11 @@ describe("unas-alerts watchUnasAlerts with the NAS watcher", () => {
         expect(bell.map((row) => row.metadata)).toEqual([meta("usage:md0")]);
     });
 
+    it("opens the NAS's own page in Places", async () => {
+        await tick(1);
+        expect(notify.mock.calls[0]![0]).toMatchObject({ href: `/places/nas/${NAS}` });
+    });
+
     it("does not ring again when the sample or the automation event keeps failing", async () => {
         recordNasSample.mockRejectedValue(new Error("sample"));
         emitAutomationEvent.mockRejectedValue(new Error("outbox"));
