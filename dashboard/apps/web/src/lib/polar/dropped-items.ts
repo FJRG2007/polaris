@@ -31,7 +31,11 @@ export const droppedItemSchema = z.discriminatedUnion("kind", [
 ]);
 export type DroppedItem = z.infer<typeof droppedItemSchema>;
 
-export const droppedItemsSchema = z.array(droppedItemSchema).min(1).max(POLAR_ATTACHMENT_MOST);
+/** One more than a message carries, so the composer can tell a drag of more
+ *  than fits from one that fits exactly, and say what was left out. */
+export const DRAG_MOST = POLAR_ATTACHMENT_MOST + 1;
+
+export const droppedItemsSchema = z.array(droppedItemSchema).min(1).max(DRAG_MOST);
 
 /** What a drag says it carries, for the drop highlight before the drop. */
 export function carriesItems(types: Iterable<string>): boolean {
@@ -44,7 +48,7 @@ export function writeDraggedItems(
     transfer: Pick<DataTransfer, "setData" | "effectAllowed">,
     items: readonly DroppedItem[]
 ): void {
-    const carried = items.slice(0, POLAR_ATTACHMENT_MOST);
+    const carried = items.slice(0, DRAG_MOST);
     if (carried.length === 0) return;
     transfer.setData(POLARIS_ITEM_TYPE, JSON.stringify(carried));
     if (transfer.effectAllowed === "move") transfer.effectAllowed = "copyMove";

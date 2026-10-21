@@ -15,9 +15,10 @@
  * only the browser's menu has.
  */
 
-import { ClipboardPaste, Copy, Search, Sparkles, TextSelect } from "lucide-react";
+import { ClipboardPaste, Copy, Search, TextSelect } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
+    AppLogo,
     DropdownMenu,
     DropdownMenuItem,
     DropdownMenuLabel,
@@ -110,8 +111,8 @@ function insertText(field: Element, text: string): void {
     }
 }
 
-/** Everything in the field, or in the page's main content - never the rail and
- *  the header with it. */
+/** Everything in the field, or in the page's main content or the dialog the
+ *  text is in - never the rail and the header with it. */
 function selectAll(menu: OpenMenu): void {
     const field = menu.found.field;
     if (isTextField(field)) {
@@ -119,8 +120,10 @@ function selectAll(menu: OpenMenu): void {
         field.select();
         return;
     }
-    const scope =
-        field ?? menu.range?.commonAncestorContainer.parentElement?.closest("main") ?? null;
+    const node = menu.range?.commonAncestorContainer ?? null;
+    const around =
+        node?.nodeType === Node.ELEMENT_NODE ? (node as Element) : (node?.parentElement ?? null);
+    const scope = field ?? around?.closest("main, [role=dialog]") ?? around;
     const selection = document.getSelection();
     if (!scope || !selection) return;
     if (field) field.focus({ preventScroll: true });
@@ -201,7 +204,7 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
             items.push({
                 id: "selection-ask-polar",
                 label: t("selectionMenu.askPolarSelection"),
-                icon: <Sparkles />,
+                icon: <AppLogo appId="polar" size={16} />,
                 onSelect: () => polar.ask(found.text)
             });
         }
@@ -278,7 +281,7 @@ export function SelectionMenu({ children }: { children: ReactNode }) {
                                 data-selection-ask-polar
                                 onSelect={() => polar.ask(menu.found.text)}
                             >
-                                <Sparkles />
+                                <AppLogo appId="polar" size={16} />
                                 {t("selectionMenu.askPolar")}
                             </DropdownMenuItem>
                         ) : null}

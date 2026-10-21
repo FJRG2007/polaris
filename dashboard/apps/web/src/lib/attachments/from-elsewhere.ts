@@ -21,7 +21,14 @@ import { follow, readCapped, safeUrl } from "@/lib/safe-fetch";
 
 /** Said to the reader when something cannot be fetched. Never the underlying
  *  error: those name hosts and paths nobody asked to publish. */
-export class AttachRefused extends Error {}
+export class AttachRefused extends Error {
+    constructor(
+        message: string,
+        readonly reason?: "too_large"
+    ) {
+        super(message);
+    }
+}
 
 /** A file, in memory. */
 export interface FetchedFile {
@@ -129,7 +136,7 @@ export async function openFromDrive(
     try {
         const stat = await driver.stat(path);
         if (stat.kind !== "file") throw new AttachRefused("That is a folder, not a file.");
-        if (maxBytes > 0 && Number(stat.size) > maxBytes) throw new AttachRefused(tooBig());
+        if (maxBytes > 0 && Number(stat.size) > maxBytes) throw tooBig();
         return {
             name: path.split("/").at(-1) || "attachment",
             type: stat.mime ?? "",
@@ -197,9 +204,9 @@ export async function fileFromDrive(
     try {
         const stat = await driver.stat(path);
         if (stat.kind !== "file") throw new AttachRefused("That is a folder, not a file.");
-        if (Number(stat.size) > maxBytes) throw new AttachRefused(tooBig());
+        if (Number(stat.size) > maxBytes) throw tooBig();
         const bytes = await collect(await driver.readStream(path), maxBytes);
-        if (!bytes) throw new AttachRefused(tooBig());
+        if (!bytes) throw tooBig();
         const name = path.split("/").at(-1) || "attachment";
         return { name, type: mimeForName(name) ?? "", bytes };
     } finally {
@@ -227,7 +234,7 @@ export async function fileFromAddress(address: string, maxBytes: number): Promis
         throw new AttachRefused("Nothing came back from that address.");
     }
     const bytes = await readCapped(response, maxBytes);
-    if (!bytes) throw new AttachRefused(tooBig());
+    if (!bytes) throw tooBig();
 
     const name = nameFrom(response, target);
     const declared = (response.headers.get("content-type") ?? "").split(";")[0]?.trim() ?? "";
@@ -241,8 +248,8 @@ export async function fileFromAddress(address: string, maxBytes: number): Promis
     };
 }
 
-function tooBig(): string {
-    return "That file is bigger than this will accept.";
+function tooBig(): AttachRefused {
+    return new AttachRefused("That file is bigger than this will accept.", "too_large");
 }
 
 /** What to call what came back: the name the server gave it, else the last part

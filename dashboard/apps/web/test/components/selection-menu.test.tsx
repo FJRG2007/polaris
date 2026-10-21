@@ -101,6 +101,44 @@ describe("selection menu", () => {
         expect(screen.queryByRole("menuitem", { name: "Ask Polar about this" })).toBeNull();
     });
 
+    it("selects all of the page's main content, not the shell around it", () => {
+        render(
+            <SelectionMenu>
+                <nav>Rail</nav>
+                <main>
+                    <p data-testid="text">Invoice 4411 is overdue</p>
+                    <p>Due Friday</p>
+                </main>
+            </SelectionMenu>,
+            { wrapper: MessagesWrapper }
+        );
+        select(screen.getByTestId("text").firstChild!);
+        rightClick(screen.getByTestId("text"));
+        fireEvent.click(screen.getByRole("menuitem", { name: /Select all/ }));
+        const selected = document.getSelection()!.toString();
+        expect(selected).toContain("Due Friday");
+        expect(selected).not.toContain("Rail");
+    });
+
+    it("selects all of a dialog outside the main content", () => {
+        render(
+            <SelectionMenu>
+                <main>Page</main>
+                <div role="dialog">
+                    <p data-testid="text">Invoice 4411 is overdue</p>
+                    <p>Due Friday</p>
+                </div>
+            </SelectionMenu>,
+            { wrapper: MessagesWrapper }
+        );
+        select(screen.getByTestId("text").firstChild!);
+        rightClick(screen.getByTestId("text"));
+        fireEvent.click(screen.getByRole("menuitem", { name: /Select all/ }));
+        const selected = document.getSelection()!.toString();
+        expect(selected).toContain("Due Friday");
+        expect(selected).not.toContain("Page");
+    });
+
     it("is not about an old selection somewhere else on the page", () => {
         page();
         select(screen.getByTestId("text"));

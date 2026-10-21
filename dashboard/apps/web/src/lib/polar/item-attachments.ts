@@ -16,6 +16,7 @@
 
 import { channelAccess } from "@/lib/chat/access";
 import { addressesFrom } from "@/lib/mailbox/json";
+import * as web from "@/lib/polar/web";
 import * as history from "@/lib/chat/history-visibility";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import type { DroppedItem } from "@/lib/polar/dropped-items";
@@ -37,25 +38,69 @@ export class ItemRefused extends Error {
     }
 }
 
+/** Elements dropped from a mail's text with everything inside them. */
+const DROPPED = new Set(["script", "style", "head"]);
+/** Tags that end a line of a mail's text. */
+const BREAKS = new Set([
+    "br",
+    "/p",
+    "/div",
+    "/li",
+    "/tr",
+    "/h1",
+    "/h2",
+    "/h3",
+    "/h4",
+    "/h5",
+    "/h6",
+    "/blockquote"
+]);
+
+/** Where `marker` (`</name`) next closes that element, not a longer name. */
+function closingAt(lower: string, marker: string, from: number): number {
+    let at = lower.indexOf(marker, from);
+    while (at >= 0 && /[a-z0-9]/.test(lower[at + marker.length] ?? "")) {
+        at = lower.indexOf(marker, at + marker.length);
+    }
+    return at;
+}
+
 /**
  * Text from a mail that only has HTML. Read by a model, never drawn, so tags
  * are dropped rather than interpreted: blocks become line breaks, scripts and
- * styles go with their contents, and the few entities mail is full of are
- * decoded.
+ * styles go with their contents, and entities are decoded. One pass over the
+ * tags, since a mail's HTML is its sender's and a backtracking pattern over it
+ * is quadratic on a body full of unclosed tags.
  */
 export function textFromHtml(html: string): string {
-    return html
-        .replace(/<(script|style|head)\b[\s\S]*?<\/\1\s*>/gi, " ")
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<\/(p|div|li|tr|h[1-6]|blockquote)\s*>/gi, "\n")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/&nbsp;/gi, " ")
-        .replace(/&lt;/gi, "<")
-        .replace(/&gt;/gi, ">")
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;/gi, "'")
-        .replace(/&amp;/gi, "&")
-        .replace(/[ \t]+/g, " ")
+    const lower = html.toLowerCase();
+    const pieces: string[] = [];
+    const closes = new Map<string, number>();
+    let at = 0;
+    for (const tag of web.tagsOf(lower)) {
+        if (tag.start < at) continue;
+        pieces.push(html.slice(at, tag.start));
+        at = tag.end;
+        if (DROPPED.has(tag.name)) {
+            const marker = `</${tag.name}`;
+            let close = closes.get(tag.name);
+            if (close === undefined || (close >= 0 && close < tag.end)) {
+                close = closingAt(lower, marker, tag.end);
+                closes.set(tag.name, close);
+            }
+            if (close >= 0) {
+                const end = lower.indexOf(">", close);
+                at = end < 0 ? lower.length : end + 1;
+            }
+            pieces.push(" ");
+        } else {
+            pieces.push(BREAKS.has(tag.name) ? "\n" : " ");
+        }
+    }
+    pieces.push(html.slice(at));
+    return web
+        .decodeEntities(pieces.join(""))
+        .replace(/[ \t\u00a0]+/g, " ")
         .replace(/ *\n */g, "\n")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
@@ -138,9 +183,7 @@ async function driveAttachment(
         file = await fileFromDrive(user.id, connectionId, path, POLAR_ATTACHMENT_MAX_BYTES);
     } catch (caught) {
         if (caught instanceof AttachRefused) {
-            // The guard's sentence says whether it was the size; nothing else of
-            // it is shown, it names the storage.
-            throw new ItemRefused(/bigger|large|MB/i.test(caught.message) ? "too_large" : "not_found");
+            throw new ItemRefused(caught.reason === "too_large" ? "too_large" : "not_found");
         }
         throw caught;
     }

@@ -14,6 +14,7 @@ import {
     itemLabel,
     readDraggedItems,
     writeDraggedItems,
+    DRAG_MOST,
     POLARIS_ITEM_TYPE
 } from "@/lib/polar/dropped-items";
 
@@ -49,7 +50,7 @@ describe("reading a drop", () => {
         ["a kind nobody defined", JSON.stringify([{ kind: "vault-secret", id: ID }])],
         ["an id that is not a row id", JSON.stringify([{ kind: "mail-message", id: "../../etc" }])],
         ["a Drive file without its storage", JSON.stringify([{ kind: "drive-file", path: "a" }])],
-        ["more than a message carries", JSON.stringify(Array(7).fill({ kind: "chat-attachment", id: ID }))]
+        ["more than a drag carries", JSON.stringify(Array(8).fill({ kind: "chat-attachment", id: ID }))]
     ])("refuses %s", (_, raw) => {
         expect(readDraggedItems(transfer({ [POLARIS_ITEM_TYPE]: raw }))).toBeNull();
     });
@@ -67,6 +68,14 @@ describe("writing a drag", () => {
         writeDraggedItems(drag, [{ kind: "mail-message", id: ID }]);
         expect(JSON.parse(data[POLARIS_ITEM_TYPE]!)).toEqual([{ kind: "mail-message", id: ID }]);
         expect(drag.effectAllowed).toBe("copyMove");
+    });
+
+    it("carries one past what a message holds, so the composer can say some were left out", () => {
+        const data: Record<string, string> = {};
+        const many = Array.from({ length: 20 }, () => ({ kind: "chat-attachment" as const, id: ID }));
+        writeDraggedItems(transfer(data), many);
+        expect(JSON.parse(data[POLARIS_ITEM_TYPE]!)).toHaveLength(DRAG_MOST);
+        expect(readDraggedItems(transfer(data))).toHaveLength(DRAG_MOST);
     });
 
     it("writes nothing for nothing", () => {

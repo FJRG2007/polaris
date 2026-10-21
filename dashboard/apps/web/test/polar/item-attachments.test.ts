@@ -34,11 +34,19 @@ vi.mock("@/lib/chat/attachments", () => ({
     readAttachment: async () => calls.chatFile
 }));
 vi.mock("@/lib/attachments/from-elsewhere", () => {
-    class AttachRefused extends Error {}
+    class AttachRefused extends Error {
+        constructor(
+            message: string,
+            readonly reason?: "too_large"
+        ) {
+            super(message);
+        }
+    }
     return {
         AttachRefused,
         fileFromDrive: async (userId: string) => {
             calls.readers.push(userId);
+            if (calls.drive === "too_large") throw new AttachRefused("Too much.", "too_large");
             if (!calls.drive) throw new AttachRefused("That file is not yours to attach.");
             return calls.drive;
         }
@@ -134,6 +142,15 @@ describe("a dropped Drive file", () => {
             )
         ).toBe("not_found");
         expect(calls.readers).toEqual(["user-1"]);
+    });
+
+    it("says when it is too big, from the guard's reason rather than its sentence", async () => {
+        calls.drive = "too_large";
+        expect(
+            await refusal(
+                attachDroppedItem(USER, { kind: "drive-file", connectionId: "nas", path: "a.png" })
+            )
+        ).toBe("too_large");
     });
 
     it("is refused when Polar cannot read its kind", async () => {
