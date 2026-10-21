@@ -1286,9 +1286,7 @@ export function PolarChat({
         if (session) {
             window.history.replaceState(null, "", window.location.pathname);
             code.open(session === "new" ? null : session);
-            return;
-        }
-        if (named || fresh) {
+        } else if (named || fresh) {
             window.history.replaceState(null, "", window.location.pathname);
             code.setMode("chat");
         }

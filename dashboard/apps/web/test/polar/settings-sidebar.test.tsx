@@ -14,6 +14,7 @@ import { SettingsWithSidebar } from "@/app/(app)/polar/settings/settings-sidebar
 const pushed: string[] = [];
 const kept = new Map<string, string>();
 const codeState = { mode: "chat" as "chat" | "code", access: "manage" as string | null };
+const codeEnabled: boolean[] = [];
 
 vi.mock("next/navigation", () => ({
     usePathname: () => "/polar/settings",
@@ -55,36 +56,40 @@ vi.mock("@/components/polar/use-polar-sidebar", () => ({
 
 vi.mock("@/components/polar/polar-code", () => ({
     StateDot: () => null,
-    usePolarCode: () => ({
-        mode: codeState.mode,
-        setMode: () => undefined,
-        access: codeState.access,
-        history: {
-            rows: [
-                {
-                    id: "s1",
-                    title: "Fix the login page",
-                    repo: "acme/web",
-                    branch: "main",
-                    state: "running",
-                    stateLabel: "Running",
-                    live: true,
-                    createdAt: new Date().toISOString()
-                }
-            ],
-            more: false,
-            loadingMore: false,
-            loadMore: () => undefined
-        },
-        selected: null,
-        open: () => undefined,
-        refresh: () => undefined
-    })
+    usePolarCode: ({ enabled }: { enabled: boolean }) => {
+        codeEnabled.push(enabled);
+        return {
+            mode: codeState.mode,
+            setMode: () => undefined,
+            access: codeState.access,
+            history: {
+                rows: [
+                    {
+                        id: "s1",
+                        title: "Fix the login page",
+                        repo: "acme/web",
+                        branch: "main",
+                        state: "running",
+                        stateLabel: "Running",
+                        live: true,
+                        createdAt: new Date().toISOString()
+                    }
+                ],
+                more: false,
+                loadingMore: false,
+                loadMore: () => undefined
+            },
+            selected: null,
+            open: () => undefined,
+            refresh: () => undefined
+        };
+    }
 }));
 
 beforeEach(() => {
     codeState.mode = "chat";
     codeState.access = "manage";
+    codeEnabled.length = 0;
     pushed.length = 0;
     kept.clear();
     const storage = {
@@ -159,6 +164,14 @@ describe("the settings page's conversation list", () => {
         fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
         expect(screen.getByText("Trip to Lisbon")).toBeTruthy();
         expect(kept.get("polar.sidebar")).toBe("shown");
+    });
+
+    it("reads no Code sessions while the list is put away", () => {
+        kept.set("polar.sidebar", "hidden");
+        draw();
+        expect(codeEnabled.at(-1)).toBe(false);
+        fireEvent.click(screen.getByRole("button", { name: "Show conversations" }));
+        expect(codeEnabled.at(-1)).toBe(true);
     });
 
     it("opens the list as a drawer on a narrow screen", async () => {

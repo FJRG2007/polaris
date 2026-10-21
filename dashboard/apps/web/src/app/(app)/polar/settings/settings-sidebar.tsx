@@ -27,8 +27,9 @@ export function SettingsWithSidebar({ children }: { children: ReactNode }) {
     const [drawer, setDrawer] = useState(false);
     const wide = useWide();
     useEffect(() => setHidden(readStored(SIDEBAR_KEY) === "hidden"), []);
-    const sidebar = usePolarSidebar({ enabled: !hidden || drawer, onRemoved: () => undefined });
-    const code = usePolarCode();
+    const listed = !hidden || drawer;
+    const sidebar = usePolarSidebar({ enabled: listed, onRemoved: () => undefined });
+    const code = usePolarCode({ enabled: listed });
     const codeMode = code.mode === "code";
     const hide = (next: boolean) => {
         setHidden(next);

@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 type Message = { id: string; role: string; parts: Array<{ type: string; text?: string }> };
 
@@ -165,5 +165,13 @@ describe("an address that names what /polar opens", () => {
         expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
         expect(stored.get("polar.mode")).toBe("code");
         expect(window.location.search).toBe("");
+    });
+
+    it("keeps the last chat behind a Code session opened from the address", async () => {
+        stored.set("polar.thread", "t-old");
+        await mountAt("/polar?session=new", "chat");
+        expect(await screen.findByRole("textbox", { name: "Task for the agent" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("radio", { name: /chat/i }));
+        expect(await screen.findByText("What was said before")).toBeTruthy();
     });
 });
