@@ -20,7 +20,5 @@ CREATE TABLE IF NOT EXISTS "NasSample" (
 
 CREATE INDEX IF NOT EXISTS "NasSample_ts_idx" ON "NasSample"("ts");
 
-DO $$ BEGIN
-    ALTER TABLE "NasSample" ADD CONSTRAINT "NasSample_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES "StorageConnection"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "NasSample" DROP CONSTRAINT IF EXISTS "NasSample_connectionId_fkey";
+ALTER TABLE "NasSample" ADD CONSTRAINT "NasSample_connectionId_fkey" FOREIGN KEY ("connectionId") REFERENCES "StorageConnection"("id") ON DELETE CASCADE ON UPDATE CASCADE;
