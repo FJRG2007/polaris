@@ -44,6 +44,9 @@ export interface ParkedLink {
     readonly email: string | null;
     /** Whether that account may use a vault at all, as the server last said. */
     readonly vault: boolean;
+    /** Whether it may use Polar, as the server last said; absent on a record
+     *  kept before the server said, which reads as yes. */
+    readonly polar?: boolean;
 }
 
 /**

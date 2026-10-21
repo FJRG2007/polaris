@@ -71,6 +71,17 @@ export function visibleEntries(target: MenuTarget): Record<MenuEntry["id"], bool
 /** Where the browser's menu shows Polaris at all: every context an entry has. */
 export const ROOT_CONTEXTS = ["editable", "selection", "link", "image", "page"] as const;
 
+/** What the menu is made of for an account: Polar's entries, and the contexts
+ *  they need, only when it may use Polar. */
+export function menuPlan(withPolar: boolean, t: Words = ENGLISH): {
+    contexts: readonly (typeof ROOT_CONTEXTS)[number][];
+    polar: readonly PolarMenuEntry[];
+} {
+    return withPolar
+        ? { contexts: ROOT_CONTEXTS, polar: polarMenuEntries(t) }
+        : { contexts: ["editable"], polar: [] };
+}
+
 /** The ids Polar's entries are created and answered under. */
 export const POLAR_MENU = {
     selection: "polaris-polar-selection",

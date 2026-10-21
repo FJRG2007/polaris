@@ -14,6 +14,7 @@ import {
     POLAR_MENU_ENTRIES,
     ROOT_CONTEXTS,
     isPolarEntry,
+    menuPlan,
     polarAskFor,
     polarMenuEntries,
     visibleEntries
@@ -48,6 +49,13 @@ describe("the right-click entries", () => {
 });
 
 describe("Polar's right-click entries", () => {
+    it("are left out for an account that cannot use Polar", () => {
+        expect(menuPlan(false)).toEqual({ contexts: ["editable"], polar: [] });
+        const allowed = menuPlan(true);
+        expect(allowed.contexts).toEqual(ROOT_CONTEXTS);
+        expect(allowed.polar).toHaveLength(POLAR_MENU_ENTRIES.length);
+    });
+
     it("shows each entry only where it has something to ask about", () => {
         const contexts = Object.fromEntries(
             POLAR_MENU_ENTRIES.map((entry) => [entry.id, entry.context])

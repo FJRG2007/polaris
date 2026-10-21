@@ -71,6 +71,10 @@ export interface LinkState {
     /** Whether this account may use a vault at all, so the popup offers one only
      *  where there is one to offer. */
     readonly vault: boolean;
+    /** Whether this account may use Polar, so its entries show only where it
+     *  can. True from a server too old to say: entries that were there before
+     *  that server's update do not vanish because it has not had one. */
+    readonly polar: boolean;
     /** Empty from a server too old to list them, which is also an account that
      *  belongs to none. */
     readonly organizations: readonly LinkOrganization[];
@@ -269,6 +273,8 @@ export async function checkLink(
         account,
         connectionName: typeof connection?.["name"] === "string" ? connection["name"] : "",
         vault: can?.["vault"] === true,
+        // Only an explicit false hides Polar; an older dashboard sends nothing.
+        polar: can?.["polar"] !== false,
         organizations: readOrganizations(body["organizations"]),
         locale: typeof account.locale === "string" ? account.locale : null
     };

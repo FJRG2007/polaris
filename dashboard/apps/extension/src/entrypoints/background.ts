@@ -31,7 +31,7 @@ import {
     menuEntries,
     visibleEntries,
     type MenuTarget,
-    ROOT_CONTEXTS,
+    menuPlan,
     isPolarEntry,
     polarAskFor,
     polarMenuEntries,
@@ -224,6 +224,9 @@ const LINK_ACCOUNT = storage.defineItem<messages.ExtensionAccount | null>("local
 });
 /** What the connection reaches, as the server last answered. */
 const LINK_VAULT = storage.defineItem<boolean>("local:link.vault", { fallback: true });
+/** Whether the connected account may use Polar - yes until the server says no,
+ *  and yes from a server too old to say (`checkLink`). */
+const LINK_POLAR = storage.defineItem<boolean>("local:link.polar", { fallback: true });
 /** The organizations the connected account belongs to, as the server last
  *  answered, with the vault each one holds. */
 const LINK_ORGS = storage.defineItem<link.LinkOrganization[]>("local:link.orgs", {
@@ -1006,6 +1009,7 @@ async function forgetLink(): Promise<void> {
         LINK_TOKEN.setValue(null),
         LINK_ACCOUNT.setValue(null),
         LINK_VAULT.setValue(true),
+        LINK_POLAR.setValue(true),
         LINK_CHECKED.setValue(null),
         LINK_WAITING.setValue(null),
         LINK_ORGS.setValue([]),
@@ -1082,6 +1086,7 @@ async function refreshLink(force = false): Promise<void> {
             email: state.account.email
         }),
         LINK_VAULT.setValue(state.vault),
+        LINK_POLAR.setValue(state.polar),
         LINK_ORGS.setValue([...state.organizations]),
         LINK_FACES.setValue({ self: self === undefined ? held.self : self, orgs }),
         // A shelf the account has since left goes back to its own.
@@ -1682,7 +1687,7 @@ function activeIdOf(
  * state right after signing out and while somebody is adding their second account.
  */
 async function activeAccount(): Promise<accounts.ParkedAccount | null> {
-    const [origin, email, refresh, wrapped, accountKey, who, linkToken, linkAccount, linkVault] =
+    const [origin, email, refresh, wrapped, accountKey, who, linkToken, linkAccount, linkVault, linkPolar] =
         await Promise.all([
             currentOrigin(),
             EMAIL.getValue(),
@@ -1692,7 +1697,8 @@ async function activeAccount(): Promise<accounts.ParkedAccount | null> {
             ACCOUNT.getValue(),
             LINK_TOKEN.getValue(),
             LINK_ACCOUNT.getValue(),
-            LINK_VAULT.getValue()
+            LINK_VAULT.getValue(),
+            LINK_POLAR.getValue()
         ]);
     // A connection with no vault session yet is still an account to set aside:
     // it is what switching to another server and back has to find again.
@@ -1714,7 +1720,8 @@ async function activeAccount(): Promise<accounts.ParkedAccount | null> {
                   token: linkToken,
                   name: linkAccount?.name ?? null,
                   email: linkAccount?.email ?? null,
-                  vault: linkVault
+                  vault: linkVault,
+                  polar: linkPolar
               }
             : null
     };
@@ -1851,6 +1858,7 @@ async function makeActive(account: accounts.ParkedAccount): Promise<void> {
             account.link ? { name: account.link.name, email: account.link.email } : null
         ),
         LINK_VAULT.setValue(account.link?.vault ?? true),
+        LINK_POLAR.setValue(account.link?.polar ?? true),
         // Another account's organizations, faces and open shelf are not this
         // one's. Emptied here and asked for again on the next check.
         LINK_ORGS.setValue([]),
@@ -2013,6 +2021,7 @@ async function status(): Promise<messages.VaultStatus> {
         linked: linkToken !== null,
         linkedAccount: linkAccount,
         canVault,
+        canPolar: await LINK_POLAR.getValue(),
         connected: refreshToken !== null,
         unreachable: refreshToken !== null && unreachableSince !== null,
         // Only ever left behind by an approval on the dashboard. A vault opened
@@ -3922,8 +3931,11 @@ async function setupMenus(): Promise<void> {
     await menus.removeAll();
     fitted = null;
     const t = await words();
+    // Polar's entries only for an account that can use Polar; without them the
+    // menu is the vault's, on boxes you can type into, as before.
+    const plan = menuPlan(polarAllowed, t);
     // i18n-ignore the product's name
-    menus.create({ id: MENU.root, title: "Polaris", contexts: [...ROOT_CONTEXTS] });
+    menus.create({ id: MENU.root, title: "Polaris", contexts: [...plan.contexts] });
     for (const entry of menuEntries(t)) {
         menus.create({
             id: entry.id,
@@ -3932,7 +3944,7 @@ async function setupMenus(): Promise<void> {
             contexts: ["editable"]
         });
     }
-    for (const entry of polarMenuEntries(t)) {
+    for (const entry of plan.polar) {
         menus.create({
             id: entry.id,
             parentId: MENU.root,
@@ -3972,6 +3984,15 @@ async function retitleMenus(): Promise<void> {
 let knownPolaris: string[] = [];
 /** The scope chosen in settings, once read. */
 let panelScope: polar.PanelScope = "all";
+/** Whether the connected account may use Polar, once read: yes until known. */
+let polarAllowed = true;
+
+/** The menus made again one at a time: making an id that exists is an error. */
+let menusTurn: Promise<void> = Promise.resolve();
+function rebuildMenus(): Promise<void> {
+    menusTurn = menusTurn.then(setupMenus).catch(() => undefined);
+    return menusTurn;
+}
 
 const PANEL_SCOPE = storage.defineItem<polar.PanelScope>(polar.PANEL_SCOPE_KEY, {
     fallback: "all"
@@ -4024,6 +4045,15 @@ function followPolar(): void {
             .catch(() => undefined);
     readOrigins();
     watchPolarisOrigins(readOrigins);
+    // Polar's right-click entries follow whether the account may use it.
+    const followAccess = (allowed: boolean | null): void => {
+        const next = allowed !== false;
+        if (next === polarAllowed) return;
+        polarAllowed = next;
+        void rebuildMenus();
+    };
+    void LINK_POLAR.getValue().then(followAccess);
+    LINK_POLAR.watch(followAccess);
     void PANEL_SCOPE.getValue().then((scope) => applyPanelScope(polar.readPanelScope(scope)));
     PANEL_SCOPE.watch((scope) => applyPanelScope(polar.readPanelScope(scope)));
 }
@@ -4051,6 +4081,10 @@ function polarFrom(
 ): void {
     if (!tab) return;
     const route = polar.routeFor(tab, knownPolaris, panelFor(tab));
+    // An account Polar is not for: a Polaris page shows it no Polar to open,
+    // and nothing is asked. Elsewhere the bare shortcut still opens the panel,
+    // where the dashboard says Polar is not available to this account.
+    if (!polarAllowed && (route === "polaris" || ask)) return;
     if (route === "polaris" && tab.id !== undefined) {
         polar.sendToPolarisTab(browser, tab.id, polar.polarisCommand(ask ?? undefined));
         return;
@@ -4087,7 +4121,7 @@ function polarFromMenu(
     click: MenuClick,
     tab: { id?: number; windowId?: number; url?: string } | undefined
 ): void {
-    if (!tab) return;
+    if (!tab || !polarAllowed) return;
     const english = polarAskFor(id, click);
     if (!english) return;
     if (polar.isPolarisTab(tab.url, knownPolaris) && tab.id !== undefined) {
@@ -4282,7 +4316,7 @@ export default defineBackground(() => {
 
     // The right-click entries, registered here for the same reason as the
     // command above: the build's stand-in browser has no menu API.
-    void setupMenus();
+    void rebuildMenus();
     browser.contextMenus?.onClicked.addListener((info, tab) => {
         // Polar's entries decide in the gesture, like the shortcut.
         if (isPolarEntry(info.menuItemId)) return polarFromMenu(info.menuItemId, info, tab);

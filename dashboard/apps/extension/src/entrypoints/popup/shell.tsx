@@ -487,7 +487,7 @@ export function Home({
                         </svg>
                     </button>
                 </li>
-                <PolarRow status={status} />
+                {status.canPolar === false ? null : <PolarRow status={status} />}
             </ul>
         </main>
     );

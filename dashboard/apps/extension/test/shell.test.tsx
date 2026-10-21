@@ -16,6 +16,7 @@ const STATUS: VaultStatus = {
     linked: true,
     linkedAccount: { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
     canVault: true,
+    canPolar: true,
     connected: true,
     unreachable: false,
     polarisSession: true,
@@ -111,6 +112,14 @@ describe("the home screen", () => {
         // The vault and Polar, nothing else.
         expect(markup.match(/class="section"/g)).toHaveLength(2);
         expect(markup).toContain("Open Polar beside the page");
+    });
+
+    it("leaves Polar out for an account that cannot use it", () => {
+        const markup = renderToStaticMarkup(
+            <Home status={{ ...STATUS, canPolar: false }} onOpen={() => {}} />
+        );
+        expect(markup).not.toContain("Open Polar beside the page");
+        expect(markup.match(/class="section"/g)).toHaveLength(1);
     });
 
     it("draws Polar as an app entry, its shortcut left to Settings", () => {
