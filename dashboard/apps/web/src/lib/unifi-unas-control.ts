@@ -124,9 +124,11 @@ export function unasAlerts(
 ): UnasAlert[] {
     const alerts: UnasAlert[] = [];
     for (const pool of metrics.pools) {
+        // Only a pool that lost a member is news. One built without redundancy
+        // (a single disk, RAID 0) is how its owner set it up, and saying so on
+        // every reading is noise nobody can act on.
         const degraded = pool.membersExpected > 0 && pool.membersPresent < pool.membersExpected;
-        const noRaid = !pool.raidLevel || pool.raidLevel === "raid0" || pool.raidLevel === "none";
-        if (degraded || noRaid || pool.raidState === "degraded") {
+        if (degraded || pool.raidState === "degraded") {
             alerts.push({
                 kind: "pool-unprotected",
                 key: `pool:${pool.device}`,
