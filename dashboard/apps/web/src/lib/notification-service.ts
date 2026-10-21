@@ -366,6 +366,24 @@ export async function markNotificationsReadByType(
     });
 }
 
+/**
+ * Take alerts of these types off the bell altogether, for every reader or only
+ * `userIds`. For an alert that is superseded rather than answered: marked read,
+ * it still sits in the list, and one a build is one more line saying something
+ * no longer true - a day of merges was a bell of fifty.
+ */
+export async function deleteNotificationsByType(
+    types: readonly string[],
+    userIds?: readonly string[]
+): Promise<void> {
+    await prisma.notification.deleteMany({
+        where: {
+            type: { in: [...types] },
+            ...(userIds ? { userId: { in: [...userIds] } } : {})
+        }
+    });
+}
+
 /** Mark a chosen set read. Scoped to the owner, so ids that arrive from a
  *  browser and belong to somebody else are simply not matched. */
 export async function markNotificationsRead(

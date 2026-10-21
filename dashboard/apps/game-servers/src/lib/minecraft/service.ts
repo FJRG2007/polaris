@@ -807,7 +807,7 @@ async function sendGameLines(
  * daemon's refusal for a container that is not up names a hash nobody has seen,
  * so that one is replaced.
  */
-function containerFailure(output: string, failure: string): string {
+export function containerFailure(output: string, failure: string): string {
     const said = output.trim();
     if (said.length === 0 || /is not running|no such container/i.test(said)) {
         return gameMessage("games", "lib.startFirst", { failure });

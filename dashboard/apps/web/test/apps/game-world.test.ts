@@ -57,6 +57,92 @@ describe("archive names", () => {
     });
 });
 
+describe("an archive tar finished while files moved", () => {
+    it("keeps a copy whose only complaint is the world folder or a player file being replaced", () => {
+        // What failed a backup of a real server: level.dat renamed over itself.
+        expect(world.onlyMovedUnderTar("java", 1, "tar: world: file changed as we read it\n")).toBe(
+            true
+        );
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                [
+                    "tar: world/playerdata/2c1e.dat: file changed as we read it",
+                    "tar: world/level4937727805970285630.dat: File removed before we read it"
+                ].join("\n")
+            )
+        ).toBe(true);
+    });
+
+    it("refuses one where the world's own file vanished before tar opened it", () => {
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world: file changed as we read it\ntar: world/level.dat: File removed before we read it"
+            )
+        ).toBe(false);
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world/playerdata/2c1e9d4a-0b6f-4a1e-9c3d-5e7f8a9b0c1d.dat: File removed before we read it"
+            )
+        ).toBe(false);
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                [
+                    "tar: world/level.dat_old: File removed before we read it",
+                    "tar: world/playerdata/2c1e9d4a-0b6f-4a1e-9c3d-5e7f8a9b0c1d-8123456789.dat: File removed before we read it"
+                ].join("\n")
+            )
+        ).toBe(true);
+    });
+
+    it("refuses one where a region file moved, because saving did not hold", () => {
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world: file changed as we read it\ntar: world/region/r.0.0.mca: file changed as we read it"
+            )
+        ).toBe(false);
+    });
+
+    it("refuses anything else tar said, and every other exit", () => {
+        expect(world.onlyMovedUnderTar("java", 1, "")).toBe(false);
+        expect(
+            world.onlyMovedUnderTar(
+                "java",
+                1,
+                "tar: world/region/r.1.1.mca: file shrank by 4096 bytes; padding with zeros"
+            )
+        ).toBe(false);
+        expect(world.onlyMovedUnderTar("java", 2, "tar: world: file changed as we read it")).toBe(
+            false
+        );
+        expect(world.onlyMovedUnderTar("java", 2, "gzip: stdout: No space left on device")).toBe(
+            false
+        );
+    });
+
+    it("refuses any file moving on Bedrock, whose LevelDB a fixed wait does not prove is still", () => {
+        expect(
+            world.onlyMovedUnderTar(
+                "bedrock",
+                1,
+                "tar: worlds/x/db/000123.log: file changed as we read it"
+            )
+        ).toBe(false);
+        expect(
+            world.onlyMovedUnderTar("bedrock", 1, "tar: worlds/x: file changed as we read it")
+        ).toBe(false);
+    });
+});
+
 describe("new level names", () => {
     it("stamps the name so two worlds never share a folder", () => {
         const name = world.newLevelName(new Date("2026-08-08T21:45:30.000Z"));
@@ -66,13 +152,19 @@ describe("new level names", () => {
 
     it("steps past a name that is already on disk", () => {
         const taken = ["world", "world-20260808-214530"];
-        expect(world.newLevelName(new Date("2026-08-08T21:45:30.000Z"), taken)).toBe("world-20260808-214530-2");
+        expect(world.newLevelName(new Date("2026-08-08T21:45:30.000Z"), taken)).toBe(
+            "world-20260808-214530-2"
+        );
     });
 });
 
 describe("level folders", () => {
     it("names all three Java dimensions and the one Bedrock directory", () => {
-        expect(world.levelDirs("java", "world")).toEqual(["world", "world_nether", "world_the_end"]);
+        expect(world.levelDirs("java", "world")).toEqual([
+            "world",
+            "world_nether",
+            "world_the_end"
+        ]);
         expect(world.levelDirs("bedrock", "Bedrock level")).toEqual(["worlds/Bedrock level"]);
     });
 
@@ -108,13 +200,19 @@ describe("level folders", () => {
     });
 
     it("reads a Bedrock level out of the worlds directory", () => {
-        expect(world.levelsFromMarkers("bedrock", "/data/worlds/Bedrock level/level.dat")).toEqual(["Bedrock level"]);
+        expect(world.levelsFromMarkers("bedrock", "/data/worlds/Bedrock level/level.dat")).toEqual([
+            "Bedrock level"
+        ]);
     });
 });
 
 describe("restore plan", () => {
     it("renames every dimension onto the new level, not just the overworld", () => {
-        const plan = world.restorePlan("java", ["world", "world_nether", "world_the_end"], "world-20260808-214530");
+        const plan = world.restorePlan(
+            "java",
+            ["world", "world_nether", "world_the_end"],
+            "world-20260808-214530"
+        );
         expect(plan).toEqual([
             { from: "world", to: "world-20260808-214530" },
             { from: "world_nether", to: "world-20260808-214530_nether" },
@@ -123,7 +221,11 @@ describe("restore plan", () => {
     });
 
     it("handles an archive taken from a level that was not called world", () => {
-        const plan = world.restorePlan("java", ["survival", "survival_nether"], "world-20260808-214530");
+        const plan = world.restorePlan(
+            "java",
+            ["survival", "survival_nether"],
+            "world-20260808-214530"
+        );
         expect(plan).toEqual([
             { from: "survival", to: "world-20260808-214530" },
             { from: "survival_nether", to: "world-20260808-214530_nether" }
@@ -218,7 +320,9 @@ describe("the shape of the world", () => {
             LEVEL_TYPE: "minecraft:large_biomes",
             GENERATOR_SETTINGS: ""
         });
-        expect(world.levelTypeEnv("java", "minecraft:single_biome_surface", "minecraft:desert")).toEqual({
+        expect(
+            world.levelTypeEnv("java", "minecraft:single_biome_surface", "minecraft:desert")
+        ).toEqual({
             LEVEL_TYPE: "minecraft:single_biome_surface",
             GENERATOR_SETTINGS: '{"biome":"minecraft:desert"}'
         });
@@ -227,7 +331,9 @@ describe("the shape of the world", () => {
     it("clears the settings rather than leaving the last world's behind", () => {
         // Written blank on purpose: a shape left over from the previous world would
         // quietly generate that one again under the new world's name.
-        expect(world.levelTypeEnv("java", "minecraft:normal", "minecraft:desert").GENERATOR_SETTINGS).toBe("");
+        expect(
+            world.levelTypeEnv("java", "minecraft:normal", "minecraft:desert").GENERATOR_SETTINGS
+        ).toBe("");
     });
 
     it("sets nothing on Bedrock, which names its own shapes differently", () => {
