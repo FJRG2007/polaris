@@ -12,10 +12,40 @@
 import { join } from "node:path";
 import { readdir, readFile } from "node:fs/promises";
 import { AppShell, shellScroller } from "@polaris/ui";
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    history.replaceState(null, "", "/");
+});
+
+/** Frames run when the test says so, not on a timer. */
+function stubFrames() {
+    const queue = new Map<number, FrameRequestCallback>();
+    let next = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+        queue.set(++next, callback);
+        return next;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => queue.delete(id));
+    return () =>
+        act(() => {
+            const due = [...queue.values()];
+            queue.clear();
+            for (const callback of due) callback(0);
+        });
+}
+
+function renderShell() {
+    render(
+        <AppShell switcher={null} account={null}>
+            <p>content</p>
+        </AppShell>
+    );
+    return screen.getByRole("main");
+}
 
 /** Every app's sources, the dashboard's own included. The extension is not
  *  drawn inside the shell. */
@@ -78,5 +108,73 @@ describe("the shell scrolls its content, not the window", () => {
             }
         }
         expect(offenders).toEqual([]);
+    });
+
+    it("puts the content back where it was when the user goes back to an address", () => {
+        const frame = stubFrames();
+        history.replaceState(null, "", "/admin/users?page=2");
+        const main = renderShell();
+        main.scrollTop = 840;
+        fireEvent.scroll(main);
+        frame();
+
+        history.pushState(null, "", "/admin/users/42");
+        main.scrollTop = 0;
+        fireEvent.scroll(main);
+        frame();
+
+        history.back = () => undefined;
+        history.replaceState(null, "", "/admin/users?page=2");
+        fireEvent.popState(window);
+        frame();
+        expect(main.scrollTop).toBe(840);
+    });
+
+    it("leaves the content alone on a return to an address it never saw", () => {
+        const frame = stubFrames();
+        const main = renderShell();
+        main.scrollTop = 120;
+        history.replaceState(null, "", "/elsewhere");
+        fireEvent.popState(window);
+        frame();
+        expect(main.scrollTop).toBe(120);
+    });
+
+    it("stops restoring the moment the user scrolls on their own", () => {
+        const frame = stubFrames();
+        history.replaceState(null, "", "/list");
+        const main = renderShell();
+        main.scrollTop = 500;
+        fireEvent.scroll(main);
+        frame();
+        history.replaceState(null, "", "/record");
+        main.scrollTop = 0;
+        history.replaceState(null, "", "/list");
+        fireEvent.popState(window);
+        fireEvent.wheel(window);
+        frame();
+        expect(main.scrollTop).toBe(0);
+    });
+
+    it("sends a scrolling key to the content when nothing has focus", () => {
+        const main = renderShell();
+        expect(main.tabIndex).toBe(-1);
+        expect(document.activeElement).toBe(document.body);
+        fireEvent.keyDown(document.body, { key: "PageDown" });
+        expect(document.activeElement).toBe(main);
+    });
+
+    it("leaves focus where it is when something already has it", () => {
+        render(
+            <AppShell switcher={null} account={null}>
+                <input aria-label="field" />
+            </AppShell>
+        );
+        const field = screen.getByLabelText("field");
+        field.focus();
+        fireEvent.keyDown(field, { key: " " });
+        expect(document.activeElement).toBe(field);
+        fireEvent.keyDown(document.body, { key: "a" });
+        expect(document.activeElement).toBe(field);
     });
 });
