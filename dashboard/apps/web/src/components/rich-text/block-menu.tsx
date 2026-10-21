@@ -148,6 +148,10 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
                 setActive((current) => stepPickable(rows, current, -1));
                 return true;
             }
+            // Tab takes the entry as Enter does. Neither sends anything: a
+            // conversation's command is only written into the message, so Tab
+            // is the autocomplete it is in Discord and ChatGPT, and sending it
+            // stays the next Enter's.
             if (event.key === "Enter" || event.key === "Tab") {
                 const item = items[active];
                 if (item) props.command(item);
@@ -170,6 +174,9 @@ const Menu = forwardRef<SuggestionHandle, SuggestionProps<BlockCommand>>(functio
         />
     );
 });
+
+/** The list itself, so its keys can be asserted without an editor. */
+export const BlockMenuList = Menu;
 
 /** A command a conversation answers, as the menu lists it. */
 export interface SlashCommand {

@@ -1771,9 +1771,26 @@ export function PolarChat({
         }
         if (match?.kind === "builtin") runCommand(match.command);
     };
+    /** Tab on the "/" list: the highlighted command's name goes into the box,
+     *  ready to run with Enter, and nothing runs - as in Discord and ChatGPT. */
+    const completeSlash = (index: number) => {
+        const key = slashItems[index]?.key;
+        if (!key) return;
+        const match = slashFound[index];
+        const name =
+            key === NEW_COMMAND || !match
+                ? input.slice(1)
+                : match.kind === "own"
+                  ? match.row.shortcut
+                  : match.command;
+        // The space after the name closes the list on its own.
+        setInput(`/${name}${key === NEW_COMMAND ? "" : " "}`);
+        textarea.current?.focus();
+    };
     // The keys the "/" list answers while it is open, as Chat's does: arrows
-    // walk the commands that can run, Enter and Tab run the highlighted one,
-    // Escape closes the list and leaves the text as it is.
+    // walk the commands that can run, Enter runs the highlighted one, Tab
+    // completes its name into the box without running it, and Escape closes
+    // the list and leaves the text as it is.
     const onComposerKey = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (event.nativeEvent.isComposing) return;
         if (!slashOpen) {
@@ -1793,7 +1810,11 @@ export function PolarChat({
             setSlashActive(
                 stepPickable(slashItems, slashHighlight, event.key === "ArrowDown" ? 1 : -1)
             );
-        } else if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+        } else if (event.key === "Tab" && !event.shiftKey) {
+            if (slashHighlight < 0) return;
+            event.preventDefault();
+            completeSlash(slashHighlight);
+        } else if (event.key === "Enter" && !event.shiftKey) {
             if (slashHighlight < 0) return;
             event.preventDefault();
             pickSlash(slashHighlight);
