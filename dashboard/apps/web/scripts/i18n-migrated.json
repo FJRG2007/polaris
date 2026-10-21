@@ -2126,6 +2126,13 @@
         "web/src/components/polar/shared-transcript.tsx",
         "web/src/app/(app)/polar/shared/[id]/page.tsx",
         "web/src/app/(app)/polar/shared/[id]/received-chat.tsx",
-        "web/src/lib/polar/share.ts"
+        "web/src/lib/polar/share.ts",
+        "web/src/app/api/polar/attachments/item/route.ts",
+        "web/src/components/selection-menu.tsx",
+        "web/src/lib/polar/dropped-items.ts",
+        "web/src/lib/polar/item-attachments.ts",
+        "web/src/lib/polar/shared.ts",
+        "web/src/lib/search/open-search.ts",
+        "web/src/lib/selection-menu.ts"
     ]
 }

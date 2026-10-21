@@ -26,6 +26,12 @@ export { MenuSurfaceProvider, useMenuSurface, type MenuSurfaceState } from "./li
 // whole application, which is exactly the kind of rule worth being able to assert
 // on directly - see the test that pins when the watch is and is not live.
 export { useReopenElsewhere } from "./lib/menu-reopen";
+export {
+    MenuExtrasProvider,
+    useMenuExtrasSource,
+    type MenuExtra,
+    type MenuExtrasSource
+} from "./lib/menu-extras";
 export { moved, useListOrder } from "./lib/list-order";
 export { Button, buttonVariants, type ButtonProps } from "./components/button";
 export { Input, type InputProps } from "./components/input";

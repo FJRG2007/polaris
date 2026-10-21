@@ -29,7 +29,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { calculate, calculationDigits, calculationText } from "@/lib/search/calculate";
-import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
+import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
     Dialog,
     DialogContent,
@@ -190,6 +190,8 @@ export function CommandPalette({
     const [open, setOpen] = useState(false);
     /** The scope the panel is to open on, when whatever opened it asked for one. */
     const presetRef = useRef<core.SearchScope | null>(null);
+    /** The text the panel is to open with, when whatever opened it asked for some. */
+    const presetQueryRef = useRef<string | null>(null);
     const [query, setQuery] = useState("");
     const [scope, setScope] = useState<SearchScopeDefinition | null>(null);
     const [active, setActive] = useState(0);
@@ -231,9 +233,12 @@ export function CommandPalette({
     useEffect(() => {
         function onOpenRequest(event: Event) {
             const wanted = requestedScope(event);
+            const typed = requestedQuery(event);
             presetRef.current = wanted;
+            presetQueryRef.current = typed;
             // Already open: the reset below does not run again, so narrow here.
             setScope(wanted ? searchScope(wanted) : null);
+            if (typed) setQuery(typed);
             setActive(0);
             setOpen(true);
         }
@@ -260,7 +265,8 @@ export function CommandPalette({
 
     useEffect(() => {
         if (!open) return;
-        setQuery("");
+        setQuery(presetQueryRef.current ?? "");
+        presetQueryRef.current = null;
         setScope(presetRef.current ? searchScope(presetRef.current) : null);
         presetRef.current = null;
         setActive(0);

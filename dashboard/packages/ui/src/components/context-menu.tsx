@@ -27,6 +27,7 @@ import {
     type ReactNode
 } from "react";
 import { MenuSurfaceProvider, useMenuSurface } from "../lib/menu-surface";
+import { useMenuExtrasSource } from "../lib/menu-extras";
 
 export const ContextMenu = RadixMenu.Root;
 export const ContextMenuTrigger = RadixMenu.Trigger;
@@ -74,7 +75,7 @@ export function ContextMenuSub({
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
     ComponentPropsWithoutRef<typeof RadixMenu.Content>
->(({ className, onFocus, collisionPadding = MENU_GUTTER, ...props }, ref) => {
+>(({ className, onFocus, collisionPadding = MENU_GUTTER, children, ...props }, ref) => {
     // The surface itself, in state rather than in a ref, and that is
     // load-bearing: this component sits in the tree whether or not its menu is
     // open - Radix gates on the open state inside the portal below - so a ref
@@ -114,11 +115,36 @@ export const ContextMenuContent = forwardRef<
                 // And once it has it, the pointer does not take it back off it -
                 // see `keepSearchFocus`.
                 onPointerMoveCapture={keepSearchFocus}
-            />
+            >
+                {children}
+                <ContextMenuExtras />
+            </RadixMenu.Content>
         </RadixMenu.Portal>
     );
 });
 ContextMenuContent.displayName = "ContextMenuContent";
+
+/**
+ * What the application adds to every right-click menu - see `menu-extras`.
+ * Asked once, on mount, which is the menu opening: the content is only mounted
+ * while it is open.
+ */
+function ContextMenuExtras() {
+    const source = useMenuExtrasSource();
+    const [extras] = useState(() => source?.() ?? []);
+    if (extras.length === 0) return null;
+    return (
+        <>
+            <ContextMenuSeparator />
+            {extras.map((extra) => (
+                <ContextMenuItem key={extra.id} onSelect={extra.onSelect}>
+                    {extra.icon}
+                    <span className="min-w-0 truncate">{extra.label}</span>
+                </ContextMenuItem>
+            ))}
+        </>
+    );
+}
 
 /**
  * Two refs on one node.
@@ -265,9 +291,9 @@ function unmeasureKeptSubmenu(trigger: HTMLElement): void {
     // Found by the label it points back at: Radix only sets `aria-controls` on
     // the trigger while its submenu is open, which is exactly when this skips.
     const content = trigger.id
-        ? Array.from(
-              trigger.ownerDocument.querySelectorAll<HTMLElement>("[aria-labelledby]")
-          ).find((node) => node.getAttribute("aria-labelledby") === trigger.id)
+        ? Array.from(trigger.ownerDocument.querySelectorAll<HTMLElement>("[aria-labelledby]")).find(
+              (node) => node.getAttribute("aria-labelledby") === trigger.id
+          )
         : undefined;
     if (!content) return;
     Object.defineProperty(content, "getBoundingClientRect", {

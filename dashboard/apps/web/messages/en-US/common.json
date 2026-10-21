@@ -67,5 +67,18 @@
         "refusedHere": "No storage would keep that file.",
         "failed": "That file could not be saved. Try again.",
         "withDetail": "{sentence} ({detail})"
+    },
+    "selectionMenu": {
+        "copy": "Copy",
+        "paste": "Paste",
+        "selectAll": "Select all",
+        "search": "Search",
+        "askPolar": "Ask Polar about this",
+        "copySelection": "Copy selected text",
+        "askPolarSelection": "Ask Polar about the selection",
+        "copied": "Copied to the clipboard",
+        "copyFailed": "Copying was blocked. Use your keyboard's copy shortcut.",
+        "pasteFailed": "The browser didn't allow pasting. Use your keyboard's paste shortcut.",
+        "browserMenu": "Shift+right-click opens the browser's own menu"
     }
 }

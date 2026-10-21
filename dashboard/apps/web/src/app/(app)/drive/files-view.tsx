@@ -16,6 +16,7 @@
 import Link from "next/link";
 import type { DriveEntry, ListingFailure } from "./types";
 import { FolderTree } from "./folder-tree";
+import * as droppedItems from "@/lib/polar/dropped-items";
 import { ListingError } from "./listing-error";
 import { fileIconFor } from "./file-icons";
 import { useRouter } from "next/navigation";
@@ -1123,7 +1124,21 @@ export function FilesView({
                 dragPath.current = entry.path;
                 event.dataTransfer.setData("application/x-polaris-path", entry.path);
                 event.dataTransfer.effectAllowed = "move";
-                const carried = draggedGroup(entry.path).length;
+                const group = draggedGroup(entry.path);
+                // The files among them can also be dropped on Polar. A folder
+                // is not something Polar can read.
+                droppedItems.writeDraggedItems(
+                    event.dataTransfer,
+                    group
+                        .filter((carried) => carried.kind === "file")
+                        .map((carried) => ({
+                            kind: "drive-file" as const,
+                            connectionId,
+                            path: carried.path,
+                            title: carried.name.slice(0, 255) || undefined
+                        }))
+                );
+                const carried = group.length;
                 if (carried > 1)
                     showCountDragImage(event, t("filesView.dragCount", { count: carried }));
             },

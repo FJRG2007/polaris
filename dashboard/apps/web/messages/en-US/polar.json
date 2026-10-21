@@ -270,7 +270,8 @@
             "too_large": "{name} is bigger than 10 MB.",
             "rate_limited": "Too many uploads. Wait a minute.",
             "storage_failed": "{name} couldn't be saved. Try again.",
-            "upload_failed": "{name} didn't upload. Try again."
+            "upload_failed": "{name} didn't upload. Try again.",
+            "not_found": "{name} couldn't be attached. It's gone, or it isn't yours."
         },
         "open": "Open {name}",
         "retry": "Retry {name}",

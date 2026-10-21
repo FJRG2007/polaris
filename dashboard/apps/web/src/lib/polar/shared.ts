@@ -91,6 +91,33 @@ export const pageContextSchema = z.object({
 });
 export type PageContext = z.infer<typeof pageContextSchema>;
 
+/** Most characters of selected text one "Ask Polar" carries into the composer. */
+export const SELECTION_QUOTE_MAX = 4000;
+
+/**
+ * Selected text as the composer quotes it: control characters other than line
+ * breaks removed, runs of blank lines folded, trimmed and capped. Null when
+ * nothing readable is left, so an empty selection never opens the panel.
+ */
+export function selectionQuote(text: string): string | null {
+    const cleaned = text
+        .replace(/\r\n?/g, "\n")
+        .replace(/[\u0000-\u0009\u000b-\u001f\u007f]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
+        .slice(0, SELECTION_QUOTE_MAX)
+        .trim();
+    return cleaned.length > 0 ? cleaned : null;
+}
+
+/** A quote as Markdown: every line of it, not only the first, behind `>`. */
+export function quoteBlock(quote: string): string {
+    return quote
+        .split("\n")
+        .map((line) => (line.length > 0 ? `> ${line}` : ">"))
+        .join("\n");
+}
+
 /** A message typed while a turn was still running. */
 export const queuedMessageSchema = z.object({
     id: z.string().min(1).max(64),

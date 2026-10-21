@@ -117,7 +117,7 @@ const NAMED: Readonly<Record<string, string>> = {
     hellip: "..."
 };
 
-function decodeEntities(text: string): string {
+export function decodeEntities(text: string): string {
     return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
         if (code[0] === "#") {
             const value =
@@ -176,7 +176,7 @@ function tagName(lower: string, at: number): string {
  * somebody else's input, and a backtracking pattern over it is quadratic on a
  * page full of unclosed tags.
  */
-function* tagsOf(lower: string): Generator<{ start: number; end: number; name: string }> {
+export function* tagsOf(lower: string): Generator<{ start: number; end: number; name: string }> {
     let at = 0;
     while (at < lower.length) {
         const start = lower.indexOf("<", at);
