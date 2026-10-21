@@ -120,9 +120,10 @@ function storedKind(raw: unknown): SignInKind {
  * parser recognises, so it is read here; anything else goes to the shared parser.
  */
 export function cliOs(userAgent: string | null): string {
-    const platform = /^polaris-(?:cli|streamdeck)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
-        userAgent ?? ""
-    )?.[1];
+    const platform =
+        /^polaris-(?:cli|streamdeck)\/\S+ \((win32|darwin|linux|freebsd|openbsd)\b/.exec(
+            userAgent ?? ""
+        )?.[1];
     if (platform === "win32") return "Windows";
     if (platform === "darwin") return "macOS";
     if (platform === "linux") return "Linux";
