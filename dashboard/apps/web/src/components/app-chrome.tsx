@@ -254,7 +254,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                             initial={launcherPrefs.favorites}
                                                             initialOrder={launcherPrefs.order}
                                                         >
-                                                            <ShortcutsProvider overrides={shortcuts}>
+                                                            <ShortcutsProvider
+                                                                overrides={shortcuts}
+                                                            >
                                                                 <KeyNamesProvider names={keyNames}>
                                                                     {/* Where everybody on screen is, asked once for
                                         the page rather than once per face. Above
@@ -279,7 +281,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                             >
                                                                                 <NotificationFavicon />
                                                                                 <SoundVolumeSeed
-                                                                                    volume={soundVolume}
+                                                                                    volume={
+                                                                                        soundVolume
+                                                                                    }
                                                                                 />
                                                                                 {/* An app granted or taken back is a
                                         switcher that lies until the page is drawn
@@ -304,7 +308,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     isAdmin={
                                                                                         user.isAdmin
                                                                                     }
-                                                                                    appIds={apps.ids}
+                                                                                    appIds={
+                                                                                        apps.ids
+                                                                                    }
                                                                                     held={held}
                                                                                     installed={
                                                                                         installed
@@ -324,7 +330,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                             loud before a click is refused by a server that
                                             no longer knows this bundle. */}
                                                                                     <NewBuildBanner
-                                                                                        served={build}
+                                                                                        served={
+                                                                                            build
+                                                                                        }
                                                                                     />
                                                                                     {/* Out here rather than inside Chat: a call you only
                                             hear about while looking at the conversation it
@@ -365,7 +373,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                         mail has not cancelled anything. */}
                                                                                 <TransfersView />
                                                                                 <SeasonalFrame
-                                                                                    allowed={seasonsOn}
+                                                                                    allowed={
+                                                                                        seasonsOn
+                                                                                    }
                                                                                     mutedPack={
                                                                                         seasonal.mutedPack
                                                                                     }
@@ -521,7 +531,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                             ) : null}
                                                                                         </PageNotices>
                                                                                         <RouteSkeletonCapture>
-                                                                                            {children}
+                                                                                            {
+                                                                                                children
+                                                                                            }
                                                                                         </RouteSkeletonCapture>
                                                                                         {user.viewingAs ? (
                                                                                             <ViewAsBanner

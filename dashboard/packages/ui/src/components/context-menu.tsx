@@ -291,9 +291,9 @@ function unmeasureKeptSubmenu(trigger: HTMLElement): void {
     // Found by the label it points back at: Radix only sets `aria-controls` on
     // the trigger while its submenu is open, which is exactly when this skips.
     const content = trigger.id
-        ? Array.from(
-              trigger.ownerDocument.querySelectorAll<HTMLElement>("[aria-labelledby]")
-          ).find((node) => node.getAttribute("aria-labelledby") === trigger.id)
+        ? Array.from(trigger.ownerDocument.querySelectorAll<HTMLElement>("[aria-labelledby]")).find(
+              (node) => node.getAttribute("aria-labelledby") === trigger.id
+          )
         : undefined;
     if (!content) return;
     Object.defineProperty(content, "getBoundingClientRect", {

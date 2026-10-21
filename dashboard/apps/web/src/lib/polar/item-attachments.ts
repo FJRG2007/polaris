@@ -142,7 +142,10 @@ function capped(text: string, max: number): Uint8Array {
 }
 
 function fileName(subject: string | null): string {
-    const base = (subject ?? "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").trim().slice(0, 120);
+    const base = (subject ?? "")
+        .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ")
+        .trim()
+        .slice(0, 120);
     return `${base || "Message"}.txt`;
 }
 

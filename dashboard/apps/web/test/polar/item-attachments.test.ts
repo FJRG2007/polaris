@@ -28,7 +28,9 @@ vi.mock("@/lib/mailbox/messages", () => ({
     loadBody: async () => ({ text: "", html: "" })
 }));
 vi.mock("@/lib/chat/access", () => ({ channelAccess: async () => (calls.access ? {} : null) }));
-vi.mock("@/lib/chat/history-visibility", () => ({ attachmentReadable: async () => calls.readable }));
+vi.mock("@/lib/chat/history-visibility", () => ({
+    attachmentReadable: async () => calls.readable
+}));
 vi.mock("@/lib/chat/attachments", () => ({
     channelOfAttachment: async () => calls.channel,
     readAttachment: async () => calls.chatFile
@@ -62,7 +64,13 @@ vi.mock("@/lib/polar/attachments", () => ({
         bytes: Uint8Array;
     }) => {
         calls.stored.push({ ...input, text: new TextDecoder().decode(input.bytes) });
-        return { id: "a", url: "/api/polar/attachments/a", filename: input.name, mediaType: input.mediaType, size: input.bytes.byteLength };
+        return {
+            id: "a",
+            url: "/api/polar/attachments/a",
+            filename: input.name,
+            mediaType: input.mediaType,
+            size: input.bytes.byteLength
+        };
     }
 }));
 
@@ -191,8 +199,8 @@ describe("a dropped chat picture", () => {
 
 describe("mail HTML as text", () => {
     it("keeps the words and drops the markup", () => {
-        expect(textFromHtml("<style>a{}</style><div>One</div><div>Two&nbsp;<b>three</b></div>")).toBe(
-            "One\nTwo three"
-        );
+        expect(
+            textFromHtml("<style>a{}</style><div>One</div><div>Two&nbsp;<b>three</b></div>")
+        ).toBe("One\nTwo three");
     });
 });

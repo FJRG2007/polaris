@@ -50,7 +50,10 @@ describe("reading a drop", () => {
         ["a kind nobody defined", JSON.stringify([{ kind: "vault-secret", id: ID }])],
         ["an id that is not a row id", JSON.stringify([{ kind: "mail-message", id: "../../etc" }])],
         ["a Drive file without its storage", JSON.stringify([{ kind: "drive-file", path: "a" }])],
-        ["more than a drag carries", JSON.stringify(Array(8).fill({ kind: "chat-attachment", id: ID }))]
+        [
+            "more than a drag carries",
+            JSON.stringify(Array(8).fill({ kind: "chat-attachment", id: ID }))
+        ]
     ])("refuses %s", (_, raw) => {
         expect(readDraggedItems(transfer({ [POLARIS_ITEM_TYPE]: raw }))).toBeNull();
     });
@@ -72,7 +75,10 @@ describe("writing a drag", () => {
 
     it("carries one past what a message holds, so the composer can say some were left out", () => {
         const data: Record<string, string> = {};
-        const many = Array.from({ length: 20 }, () => ({ kind: "chat-attachment" as const, id: ID }));
+        const many = Array.from({ length: 20 }, () => ({
+            kind: "chat-attachment" as const,
+            id: ID
+        }));
         writeDraggedItems(transfer(data), many);
         expect(JSON.parse(data[POLARIS_ITEM_TYPE]!)).toHaveLength(DRAG_MOST);
         expect(readDraggedItems(transfer(data))).toHaveLength(DRAG_MOST);

@@ -1226,11 +1226,7 @@ export function PolarChat({
         );
 
     /** One staged attachment, ready or failed once its store answers. */
-    const settle = async (
-        key: string,
-        name: string,
-        storing: Promise<AttachmentData | string>
-    ) => {
+    const settle = async (key: string, name: string, storing: Promise<AttachmentData | string>) => {
         const stored = await storing;
         if (typeof stored === "string") {
             const code: UploadError = (UPLOAD_ERRORS as readonly string[]).includes(stored)
