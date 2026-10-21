@@ -5404,6 +5404,11 @@ model ManagedDatabase {
     recoveryTarget      DateTime?
     // JSON: its private names, as on an application (`Application.privateNetwork`).
     privateNetwork      String   @default("{}")
+    /// Empty for an instance Polaris runs on a server; otherwise the cloud it
+    /// lives in (see `DATA_CLOUD_PROVIDERS`). Such a row never deploys.
+    provider            String   @default("")
+    /// The provider's id for an instance Polaris created there.
+    providerResourceId  String?
     // Set while it sits in the recycle bin: containers removed, data kept, hidden
     // from every list. Cleared by a restore; the row goes when it is purged.
     binnedAt            DateTime?

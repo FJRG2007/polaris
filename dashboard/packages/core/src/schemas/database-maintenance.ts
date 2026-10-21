@@ -10,6 +10,7 @@
  * interpolated into the script, so a path or a name cannot become a command.
  */
 
+import { DATA_ENGINE_INFO, dataEngineContainer, isDataEngine } from "./data-engines.js";
 import { z } from "zod";
 import type { DbPrivilege } from "./database.js";
 import { MANAGED_ENGINE_INFO, type ManagedEngine } from "./database.js";
@@ -104,6 +105,7 @@ export function databaseDataPath(engine: string, version: string): string {
     }
     if (engine === "mysql" || engine === "mariadb") return "/var/lib/mysql";
     if (engine === "mongo") return "/data/db";
+    if (isDataEngine(engine)) return DATA_ENGINE_INFO[engine].dataPath;
     return "/data";
 }
 
@@ -234,6 +236,15 @@ export interface ProbeTarget {
  * on a refused connection that reads like a wrong password.
  */
 export function readinessCommand(target: ProbeTarget): MaintenanceCommand {
+    // A data engine is ready when its own healthcheck passes.
+    if (isDataEngine(target.engine)) {
+        const test = dataEngineContainer(
+            target.engine,
+            { username: target.username, password: target.password, database: "" },
+            "localhost"
+        ).healthcheck.test;
+        return { argv: test.slice(1), describe: "Waiting for the engine" };
+    }
     switch (target.engine) {
         case "postgres":
             return {

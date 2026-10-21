@@ -22,6 +22,7 @@
  */
 
 import { ENV_VALUE_MAX } from "./env-values.js";
+import { dataEngineReferenceKeys, isDataEngine, type DataEndpoint } from "./schemas/data-engines.js";
 import { objectStorageReferenceKeys, OBJECT_STORAGE_REGION } from "./schemas/object-storage.js";
 
 /** One `${{ name.KEY }}`. Names are service slugs or `shared`; keys are what an
@@ -130,6 +131,8 @@ export function databaseReferenceKeys(connection: {
      *  Absent for anything that is not a cluster. */
     readonly clusterNodes?: readonly string[] | null;
     readonly readUri?: string | null;
+    /** A data engine's full endpoint (see `schemas/data-engines.ts`). */
+    readonly endpoint?: DataEndpoint | null;
 }): Record<string, string> {
     const port = String(connection.port);
     const keys: Record<string, string> = {
@@ -170,6 +173,8 @@ export function databaseReferenceKeys(connection: {
         Object.assign(keys, { REDIS_URL: connection.uri, REDISHOST: connection.host, REDISPORT: port });
         // A cluster's URL names one node; a cluster client wants every one.
         if (connection.clusterNodes?.length) keys.REDIS_CLUSTER_NODES = connection.clusterNodes.join(",");
+    } else if (isDataEngine(connection.engine)) {
+        if (connection.endpoint) Object.assign(keys, dataEngineReferenceKeys(connection.engine, connection.endpoint));
     } else if (connection.engine === "seaweedfs") {
         // An object store's account is an S3 key pair; it answers with the names
         // S3 clients read, the AWS SDKs' own among them.

@@ -95,6 +95,24 @@ export const PUBLIC_URL_PLACEHOLDER = "{{publicUrl}}";
 export const WORDPRESS_FORWARDED_HTTPS =
     "if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $_SERVER['HTTPS'] = 'on'; }";
 
+/**
+ * MinIO, Meilisearch, Typesense, ClickHouse, InfluxDB, CouchDB, Kafka and
+ * RabbitMQ are not here: they are data engines of the "new database" flow
+ * (`schemas/data-engines.ts`), where they can run on a server or in a cloud.
+ * A service created from one of their old templates is a plain service and
+ * keeps working as one.
+ */
+export const RETIRED_TEMPLATE_IDS = [
+    "kafka",
+    "meilisearch",
+    "minio",
+    "clickhouse",
+    "couchdb",
+    "influxdb",
+    "rabbitmq",
+    "typesense"
+] as const;
+
 export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
     {
         id: "code-server",
@@ -228,62 +246,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         firstRun: "No sign-in."
     },
     {
-        id: "kafka",
-        name: "Apache Kafka",
-        description:
-            "Event-streaming broker, with a web console for topics, messages and consumer groups.",
-        image: "ghcr.io/kafbat/kafka-ui:latest",
-        port: 8080,
-        env: {
-            KAFKA_CLUSTERS_0_NAME: "local",
-            KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "{{companion.POLARIS_PRIVATE_DOMAIN}}:9092",
-            DYNAMIC_CONFIG_ENABLED: "true",
-            AUTH_TYPE: "LOGIN_FORM",
-            SPRING_SECURITY_USER_NAME: "admin"
-        },
-        secrets: ["SPRING_SECURITY_USER_PASSWORD"],
-        volumes: [],
-        // KRaft mode, one node that is both broker and controller. The catalog's
-        // `kafka` host is the broker's own name, which here is its private domain.
-        companion: {
-            suffix: "broker",
-            label: "Kafka broker",
-            image: "apache/kafka:4.0.0",
-            port: 9092,
-            env: {
-                KAFKA_NODE_ID: "1",
-                KAFKA_PROCESS_ROLES: "broker,controller",
-                KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093",
-                KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://{{self.POLARIS_PRIVATE_DOMAIN}}:9092",
-                KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER",
-                KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT",
-                KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT",
-                KAFKA_CONTROLLER_QUORUM_VOTERS: "1@{{self.POLARIS_PRIVATE_DOMAIN}}:9093",
-                KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1",
-                KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1",
-                KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1",
-                KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0",
-                KAFKA_NUM_PARTITIONS: "3",
-                KAFKA_LOG_DIRS: "/var/lib/kafka/data"
-            },
-            secrets: [],
-            volumes: [{ name: "data", mountPath: "/var/lib/kafka/data" }]
-        },
-        firstRun:
-            "Sign in to the console as admin with the SPRING_SECURITY_USER_PASSWORD variable. Services in this environment reach the broker at its private domain, port 9092."
-    },
-    {
-        id: "meilisearch",
-        name: "Meilisearch",
-        description: "Typo-tolerant search engine with an HTTP API.",
-        image: "getmeili/meilisearch:v1.12",
-        port: 7700,
-        env: { MEILI_ENV: "production", MEILI_NO_ANALYTICS: "true" },
-        secrets: ["MEILI_MASTER_KEY"],
-        volumes: [{ name: "data", mountPath: "/meili_data" }],
-        firstRun: "Clients authenticate with the MEILI_MASTER_KEY variable."
-    },
-    {
         id: "metabase",
         name: "Metabase",
         description: "Business intelligence: dashboards and questions over your data.",
@@ -294,37 +256,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         volumes: [{ name: "data", mountPath: "/metabase-data" }],
         embedded: true,
         firstRun: "Create the admin account on the first visit."
-    },
-    {
-        id: "minio",
-        name: "MinIO",
-        description: "S3-compatible object storage with a web console.",
-        image: "minio/minio:latest",
-        port: 9001,
-        // Unwrapped: the image's entrypoint prepends `minio` to these, and a shell
-        // in front of them would be taken for a MinIO subcommand.
-        command: ["server", "/data", "--console-address", ":9001"],
-        env: {
-            MINIO_BROWSER_REDIRECT_URL: PUBLIC_URL_PLACEHOLDER,
-            MINIO_ROOT_USER: "minio",
-            OPENSHIP_BUCKET: "uploads"
-        },
-        secrets: ["MINIO_ROOT_PASSWORD"],
-        volumes: [{ name: "data", mountPath: "/data" }],
-        prepare: [
-            {
-                title: "Create the first bucket",
-                command:
-                    'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" > /dev/null && mc mb --ignore-existing "local/$OPENSHIP_BUCKET" > /dev/null && printf \'%s\' "$OPENSHIP_BUCKET"',
-                readiness: {
-                    test: 'mc alias set local http://127.0.0.1:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"',
-                    intervalMs: 1000,
-                    retries: 30
-                }
-            }
-        ],
-        firstRun:
-            "Sign in to the console as minio with the MINIO_ROOT_PASSWORD variable. The S3 API answers on port 9000 at the service's private domain, and the first bucket is named in OPENSHIP_BUCKET."
     },
     {
         id: "n8n",
@@ -497,29 +428,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
             "It has no sign-in: leave it without a public address and reach it on its private domain, port 8000."
     },
     {
-        id: "clickhouse",
-        name: "ClickHouse",
-        description: "Column-oriented database for fast analytics.",
-        image: "clickhouse/clickhouse-server:25.8-alpine",
-        port: 8123,
-        env: { CLICKHOUSE_USER: "default", CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" },
-        secrets: ["CLICKHOUSE_PASSWORD"],
-        volumes: [{ name: "data", mountPath: "/var/lib/clickhouse" }],
-        firstRun:
-            "Connect as default with the CLICKHOUSE_PASSWORD variable: HTTP on port 8123, native on 9000."
-    },
-    {
-        id: "couchdb",
-        name: "CouchDB",
-        description: "Document database that syncs over HTTP.",
-        image: "couchdb:3.5.3",
-        port: 5984,
-        env: { COUCHDB_USER: "admin" },
-        secrets: ["COUCHDB_PASSWORD"],
-        volumes: [{ name: "data", mountPath: "/opt/couchdb/data" }],
-        firstRun: "Open /_utils and sign in as admin with the COUCHDB_PASSWORD variable."
-    },
-    {
         id: "flowise",
         name: "Flowise",
         description: "Build LLM agents and flows with a visual editor.",
@@ -564,26 +472,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         volumes: [{ name: "config", mountPath: "/config" }],
         firstRun:
             "Open /admin right away and create the admin account - until then anyone who opens it can."
-    },
-    {
-        id: "influxdb",
-        name: "InfluxDB",
-        description: "Time-series database for metrics and sensor data.",
-        image: "influxdb:2.7",
-        port: 8086,
-        env: {
-            DOCKER_INFLUXDB_INIT_MODE: "setup",
-            DOCKER_INFLUXDB_INIT_USERNAME: "admin",
-            DOCKER_INFLUXDB_INIT_ORG: "main",
-            DOCKER_INFLUXDB_INIT_BUCKET: "default"
-        },
-        secrets: ["DOCKER_INFLUXDB_INIT_PASSWORD", "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN"],
-        volumes: [
-            { name: "data", mountPath: "/var/lib/influxdb2" },
-            { name: "config", mountPath: "/etc/influxdb2" }
-        ],
-        firstRun:
-            "Sign in as admin with the DOCKER_INFLUXDB_INIT_PASSWORD variable. Clients use the DOCKER_INFLUXDB_INIT_ADMIN_TOKEN variable."
     },
     {
         id: "jaeger",
@@ -915,18 +803,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         firstRun: "Choose a sign-in method on the first visit - until then anyone who opens it can."
     },
     {
-        id: "rabbitmq",
-        name: "RabbitMQ",
-        description: "Message broker, with its management console.",
-        image: "rabbitmq:4.3-management-alpine",
-        port: 15672,
-        env: { RABBITMQ_DEFAULT_USER: "admin" },
-        secrets: ["RABBITMQ_DEFAULT_PASS"],
-        volumes: [{ name: "data", mountPath: "/var/lib/rabbitmq" }],
-        firstRun:
-            "Sign in as admin with the RABBITMQ_DEFAULT_PASS variable. Services reach AMQP on its private domain, port 5672."
-    },
-    {
         id: "radarr",
         name: "Radarr",
         description: "Movie collection manager.",
@@ -966,18 +842,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
             { name: "downloads", mountPath: "/downloads" }
         ],
         firstRun: "Choose a sign-in method on the first visit - until then anyone who opens it can."
-    },
-    {
-        id: "typesense",
-        name: "Typesense",
-        description: "Instant search engine with an API.",
-        image: "typesense/typesense:30.1",
-        port: 8108,
-        command: ["--data-dir", "/data", "--enable-cors"],
-        env: {},
-        secrets: ["TYPESENSE_API_KEY"],
-        volumes: [{ name: "data", mountPath: "/data" }],
-        firstRun: "Clients authenticate with the TYPESENSE_API_KEY variable."
     },
     {
         id: "vikunja",
