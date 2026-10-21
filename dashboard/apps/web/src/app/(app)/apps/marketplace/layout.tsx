@@ -3,5 +3,9 @@ import { Messages } from "@/components/i18n/messages";
 
 /** The Marketplace draws its words from this namespace. */
 export default function MarketplaceLayout({ children }: { children: ReactNode }) {
-    return <Messages namespaces={["marketplace", "validation", "catalog"]}>{children}</Messages>;
+    return (
+        <Messages namespaces={["marketplace", "validation", "catalog", "deploy"]}>
+            {children}
+        </Messages>
+    );
 }

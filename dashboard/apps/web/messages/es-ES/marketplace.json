@@ -68,6 +68,7 @@
         "consent": "Instalar supone aceptar <link>{label}</link>.",
         "installedCount": "{count, plural, one {# instalada} other {# instaladas}}",
         "open": "Abrir",
+        "deploy": "Desplegar",
         "configureHint": "Elige antes el servidor, el almacenamiento y los ajustes",
         "configure": "Configurar",
         "installing": "Instalando",
@@ -97,6 +98,7 @@
     "detail": {
         "back": "Catálogo",
         "replaces": "Sustituye a",
+        "needsProject": "Un proyecto de Deploy donde ejecutarlo, y permiso para gestionar apps en él.",
         "screenshots": "Capturas",
         "screenshotAlt": "{name}, captura {index}",
         "about": "Info",
@@ -134,6 +136,16 @@
         "needsSettings": "Ajustes que rellenas: {fields}.",
         "needsOnce": "Una instalación sirve a todos en este Polaris.",
         "needsPermission": "Instalarla requiere permiso para gestionar apps."
+    },
+    "templateDeploy": {
+        "title": "Desplegar {name}",
+        "description": "Elige el proyecto al que va. Se añade allí como un servicio.",
+        "failed": "No se han podido leer tus proyectos. Vuelve a intentarlo.",
+        "noProjects": "Se despliega en un proyecto, y aún no tienes ninguno.",
+        "newProject": "Crear un proyecto",
+        "project": "Proyecto",
+        "environment": "Entorno",
+        "next": "Continuar"
     },
     "polaris": {
         "title": "Apps de Polaris",

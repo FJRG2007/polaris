@@ -11,17 +11,26 @@ import { APP_SECTIONS } from "@/lib/apps";
 import { MessagesWrapper } from "../setup/i18n";
 import { appsByCategory } from "@/lib/apps/catalog";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { SERVICE_TEMPLATES } from "@polaris/core";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import {
     builtInApps,
+    findStoreApp,
     listingHref,
+    primaryAction,
     polarisAppsHref,
     storeHome,
     storeScope
 } from "@/lib/apps/marketplace-store";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+// The template dialog reaches Deploy's server actions; nothing here deploys.
+vi.mock("@/app/(app)/apps/deploy/actions", () => ({
+    listTemplateTargetsAction: vi.fn(async () => []),
+    listDeployServersAction: vi.fn(async () => []),
+    createApplicationAction: vi.fn()
+}));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
     listInstallTargetsAction: vi.fn(async () => []),
@@ -63,22 +72,65 @@ describe("the user marketplace", () => {
         for (const id of polarisIds)
             expect(container.querySelector(`svg[data-app-logo="${id}"]`), id).toBeNull();
         expect(screen.queryByText("Ad blocker")).toBeNull();
+        expect(screen.queryByRole("region", { name: "Polaris apps" })).toBeNull();
     });
 
-    it("says so when it has nothing, and points an admin to Polaris apps", () => {
-        render(<MarketplaceView installed={[]} canBrowsePolaris />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
-        expect(screen.getByRole("link", { name: "Open Polaris apps" }).getAttribute("href")).toBe(
-            "/admin/apps"
+    it("lists every Deploy template, read from Deploy's own list, and OpenClaw and Hermes", () => {
+        render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
+        const shelf = screen.getByRole("region", { name: "From other developers" });
+        for (const template of SERVICE_TEMPLATES)
+            expect(
+                within(shelf).getAllByRole("link", { name: template.name }).length,
+                template.id
+            ).toBeGreaterThan(0);
+        for (const name of ["OpenClaw assistant", "Hermes assistant"])
+            expect(within(shelf).getAllByRole("link", { name }).length, name).toBeGreaterThan(0);
+    });
+
+    it("searches the templates and the wrapped apps together", () => {
+        render(<MarketplaceView installed={[]} canInstall />, { wrapper: MessagesWrapper });
+        const search = screen.getByRole("textbox", { name: "Search apps" });
+        fireEvent.change(search, { target: { value: "n8n" } });
+        expect(screen.getAllByRole("link", { name: "n8n" }).length).toBeGreaterThan(0);
+        expect(screen.queryByRole("link", { name: "OpenClaw assistant" })).toBeNull();
+        fireEvent.change(search, { target: { value: "openclaw" } });
+        expect(screen.getAllByRole("link", { name: "OpenClaw assistant" }).length).toBeGreaterThan(
+            0
         );
-        // Nothing to search through, so no search box.
-        expect(screen.queryByRole("textbox", { name: "Search apps" })).toBeNull();
+        expect(screen.queryByRole("link", { name: "n8n" })).toBeNull();
     });
 
-    it("offers no link to the admin screen to anybody else", () => {
-        render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("Nothing to deploy yet")).toBeTruthy();
-        expect(screen.queryByRole("link", { name: "Open Polaris apps" })).toBeNull();
+    it("files each template under a store category, Tools when it has none of its own", () => {
+        expect(findStoreApp("template-n8n")?.category).toBe("Productivity");
+        expect(findStoreApp("template-open-webui")?.category).toBe("AI");
+        expect(findStoreApp("template-kafka")?.category ?? "Tools").toBe("Tools");
+        expect(findStoreApp("template-no-such-template")).toBeUndefined();
+    });
+
+    it("leads a template with Deploy, and an announced wrapped app with Coming soon", () => {
+        expect(
+            primaryAction(findStoreApp("template-n8n")!, {
+                installs: [],
+                canInstall: true,
+                installing: false
+            })
+        ).toEqual({ kind: "deploy" });
+        expect(
+            primaryAction(findStoreApp("template-n8n")!, {
+                installs: [],
+                canInstall: false,
+                installing: false
+            })
+        ).toEqual({ kind: "locked" });
+        expect(
+            primaryAction(findStoreApp("openclaw")!, {
+                installs: [],
+                canInstall: true,
+                installing: false
+            })
+        ).toEqual({ kind: "comingSoon" });
+        expect(storeScope(findStoreApp("hermes")!)).toBe("deployable");
+        expect(listingHref(findStoreApp("template-n8n")!)).toBe("/apps/marketplace/template-n8n");
     });
 });
 
@@ -108,6 +160,12 @@ describe("the admin marketplace", () => {
             expect(within(row as HTMLElement).getByRole("link", { name: "Open" })).toBeTruthy();
         }
         expect(within(section).queryByText(/uninstall/i)).toBeNull();
+    });
+
+    it("lists no Deploy template or wrapped app", () => {
+        render(<MarketplaceView scope="polaris" installed={[]} />, { wrapper: MessagesWrapper });
+        expect(screen.queryByRole("link", { name: "n8n" })).toBeNull();
+        expect(screen.queryByRole("link", { name: "OpenClaw assistant" })).toBeNull();
     });
 
     it("keeps the user marketplace's apps off the built-in list", () => {

@@ -28,6 +28,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, Search, Store } from "lucide-react";
 import { AppMark } from "@/components/app-mark";
 import { ReplacesRow } from "./replaces-row";
+import { useLocalizeStoreApp } from "./use-store-words";
+import { TemplateDeployDialog } from "./template-deploy-dialog";
 import { UninstallDialog } from "./uninstall-dialog";
 import { appProvenance } from "@/lib/apps/provenance";
 import { appPreview } from "@/lib/apps/app-screenshots";
@@ -35,17 +37,12 @@ import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
-import {
-    appsByCategory,
-    findApp,
-    promptedEnvVars,
-    type AppCapability,
-    type AppManifest
-} from "@/lib/apps/catalog";
+import { findApp, promptedEnvVars, type AppCapability, type AppManifest } from "@/lib/apps/catalog";
 import {
     POLARIS_APPS_PATH,
     STORE_SORTS,
     builtInApps,
+    storeApps,
     featuredApps,
     listingHref,
     storeScope,
@@ -88,7 +85,7 @@ import {
     cn
 } from "@polaris/ui";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
-import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
+import { categoryLabel } from "@/lib/apps/app-words";
 import { validationMessage } from "@/components/i18n/validation-message";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -146,6 +143,7 @@ export function MarketplaceView({
     const navLabel = useNavLabel();
     const locale = useLocale();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
+    const [deploying, setDeploying] = useState<AppManifest | null>(null);
     const [removing, setRemoving] = useState<StoreInstallRow | null>(null);
     const [query, setQuery] = useState(initialQuery);
     const [category, setCategory] = useState<StoreCategory>("all");
@@ -153,14 +151,13 @@ export function MarketplaceView({
 
     // In the reader's words, so the cards and the search say what they read. An
     // app or a category named after a screen takes the rail's label for it.
+    const localize = useLocalizeStoreApp();
     const all = useMemo(
         () =>
-            appsByCategory().flatMap((group) =>
-                group.apps
-                    .filter((app) => storeScope(app) === scope)
-                    .map((app) => localizeApp(words, app, navLabel))
-            ),
-        [words, navLabel, scope]
+            storeApps()
+                .filter((app) => storeScope(app) === scope)
+                .map(localize),
+        [localize, scope]
     );
     const categories = useMemo(() => storeCategories(all), [all]);
     const shown = useMemo(
@@ -188,7 +185,7 @@ export function MarketplaceView({
             installing={installingId === app.id}
             disabled={installingId !== null}
             featured={featuredCard}
-            onInstall={() => install(app)}
+            onInstall={() => (app.deployTemplate ? setDeploying(app) : install(app))}
             onConfigure={() => setWizardApp(app)}
             onUninstall={setRemoving}
         />
@@ -311,6 +308,13 @@ export function MarketplaceView({
             )}
 
             {wizardApp && <InstallWizard app={wizardApp} onClose={() => setWizardApp(null)} />}
+            {deploying?.deployTemplate && (
+                <TemplateDeployDialog
+                    templateId={deploying.deployTemplate}
+                    name={deploying.name}
+                    onClose={() => setDeploying(null)}
+                />
+            )}
             {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
         </div>
     );

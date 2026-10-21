@@ -14,6 +14,12 @@ import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+// The template dialog reaches Deploy's server actions; nothing here deploys.
+vi.mock("@/app/(app)/apps/deploy/actions", () => ({
+    listTemplateTargetsAction: vi.fn(async () => []),
+    listDeployServersAction: vi.fn(async () => []),
+    createApplicationAction: vi.fn()
+}));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
     listInstallTargetsAction: vi.fn(async () => []),

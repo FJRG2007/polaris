@@ -9,7 +9,14 @@ import { POLARIS_APPS, type AppEntry } from "@/lib/apps";
 import { appProvenance } from "@/lib/apps/provenance";
 import { hasScreenshots } from "@/lib/apps/app-screenshots";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
-import { isInstallable, type AppCategory, type AppManifest } from "@/lib/apps/catalog";
+import { findTemplateApp, templateApps } from "@/lib/apps/template-apps";
+import {
+    appsByCategory,
+    findApp,
+    isInstallable,
+    type AppCategory,
+    type AppManifest
+} from "@/lib/apps/catalog";
 
 /** How the grid is ordered. `featured` is the catalog's own, deliberate order. */
 export type StoreSort = "featured" | "name" | "recent";
@@ -142,6 +149,7 @@ export interface StoreInstall {
  */
 export type PrimaryAction =
     | { readonly kind: "open"; readonly href: string }
+    | { readonly kind: "deploy" }
     | { readonly kind: "installing" }
     | { readonly kind: "install"; readonly configurable: boolean }
     | { readonly kind: "locked" }
@@ -161,6 +169,8 @@ export function primaryAction(
     if (app.comingSoon) return { kind: "comingSoon" };
     if (!isInstallable(app)) return { kind: "unavailable" };
     if (!state.canInstall) return { kind: "locked" };
+    // A template is a service in a project, not an install: Deploy's flow makes it.
+    if (app.installMethod === "deploy-template") return { kind: "deploy" };
     return { kind: "install", configurable: app.installMethod !== "builtin" };
 }
 
@@ -190,6 +200,16 @@ export type StoreScope = "deployable" | "polaris";
 
 export function storeScope(app: AppManifest): StoreScope {
     return storeShelf(app) === "polaris" ? "polaris" : "deployable";
+}
+
+/** Everything the two marketplaces list: the catalog's offered apps, then Deploy's templates. */
+export function storeApps(): AppManifest[] {
+    return [...appsByCategory().flatMap((group) => group.apps), ...templateApps()];
+}
+
+/** A catalog app or a template entry, by its store id. */
+export function findStoreApp(id: string): AppManifest | undefined {
+    return findApp(id) ?? findTemplateApp(id);
 }
 
 /** The admin marketplace's address, opened on one app when one is named. */

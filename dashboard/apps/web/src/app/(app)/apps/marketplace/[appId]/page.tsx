@@ -13,10 +13,9 @@
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { isNativeApp } from "@/lib/apps/native-apps";
-import { findApp } from "@/lib/apps/catalog";
 import { requirePermission } from "@/lib/session";
 import { AppInstallState } from "../store-installs";
-import { listingHref, storeScope } from "@/lib/apps/marketplace-store";
+import { listingHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 import { AppDetail, AppInstallPanelSkeleton } from "./app-detail";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +27,7 @@ export default async function MarketplaceAppPage({
 }) {
     const user = await requirePermission("deploy.read");
     const { appId } = await params;
-    const app = findApp(appId);
+    const app = findStoreApp(appId);
     // A helper another app runs is not offered on its own, here or in the grid.
     if (!app || app.internal) notFound();
     // Part of Servers on every Polaris: old links to its marketplace page open it.

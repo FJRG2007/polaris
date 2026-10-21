@@ -15,14 +15,13 @@
  * somebody here to install it; one naming a Polaris app lands on the admin screen.
  */
 
-import { findApp } from "@/lib/apps/catalog";
 import { redirect } from "next/navigation";
 import { storeInstalls } from "./store-installs";
 import { requirePermission } from "@/lib/session";
 import { MarketplaceView } from "./marketplace-view";
 import { adoptAppInstalls } from "@/lib/app-extensions/registry";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
-import { polarisAppsHref, storeScope } from "@/lib/apps/marketplace-store";
+import { polarisAppsHref, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +37,7 @@ export default async function MarketplacePage({
     // that was running before it was an app.
     await Promise.all([adoptAppInstalls(user.id), adoptMailServerApp()]);
     const { app } = await searchParams;
-    const focus = typeof app === "string" ? findApp(app) : undefined;
+    const focus = typeof app === "string" ? findStoreApp(app) : undefined;
     if (focus && storeScope(focus) === "polaris") redirect(polarisAppsHref(focus.id));
     const { installed, canInstall } = await storeInstalls(user, "deployable");
     return (

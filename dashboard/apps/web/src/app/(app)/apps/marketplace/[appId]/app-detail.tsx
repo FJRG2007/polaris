@@ -14,12 +14,12 @@ import { appProvenance } from "@/lib/apps/provenance";
 import { useMemo, useState, type ReactNode } from "react";
 import { appScreenshots } from "@/lib/apps/app-screenshots";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
-import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
+import { categoryLabel } from "@/lib/apps/app-words";
 import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
-import { findApp, promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
+import { promptedEnvVars, type AppManifest } from "@/lib/apps/catalog";
 import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import {
     CAPABILITY_KEYS,
@@ -33,6 +33,7 @@ import { AppPreview, PrimaryActionButton, StatusBadge } from "../store-card";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import {
     ADDED_ON,
+    findStoreApp,
     installBadge,
     primaryAction,
     storeHome,
@@ -41,15 +42,16 @@ import {
 import { GameLogo } from "@/components/game-logo";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { ReplacesRow } from "../replaces-row";
+import { useLocalizeStoreApp } from "../use-store-words";
+import { TemplateDeployDialog } from "../template-deploy-dialog";
 
 /** The manifest, in the reader's words. Null for an id the catalog does not know. */
 function useLocalizedApp(appId: string): AppManifest | null {
-    const words = useTranslations("catalog");
-    const navLabel = useNavLabel();
+    const localize = useLocalizeStoreApp();
     return useMemo(() => {
-        const app = findApp(appId);
-        return app ? localizeApp(words, app, navLabel) : null;
-    }, [appId, words, navLabel]);
+        const app = findStoreApp(appId);
+        return app ? localize(app) : null;
+    }, [appId, localize]);
 }
 
 /**
@@ -101,6 +103,7 @@ function imageVersion(image: string | undefined): string | null {
 export function appNeeds(t: NamespaceTranslator<"marketplace">, app: AppManifest): string[] {
     const lines: string[] = [];
     if (app.installMethod === "builtin") lines.push(t("detail.needsNothing"));
+    else if (app.installMethod === "deploy-template") lines.push(t("detail.needsProject"));
     else {
         lines.push(t("detail.needsServer"));
         const ports = app.template?.ports ?? [];
@@ -283,9 +286,10 @@ export function AppInstallPanel({
     const app = useLocalizedApp(appId);
     const { install, installingId, error } = useOneClickInstall();
     const [wizard, setWizard] = useState(false);
+    const [deploying, setDeploying] = useState(false);
     const [removing, setRemoving] = useState<DetailInstall | null>(null);
     if (!app) return null;
-    const manifest = findApp(appId) ?? app;
+    const manifest = findStoreApp(appId) ?? app;
     const openHref = (item: InstalledAppReaderView) => app.opensAt ?? `/apps/installed/${item.id}`;
     const action = primaryAction(app, {
         installs,
@@ -300,7 +304,9 @@ export function AppInstallPanel({
                 {action.kind !== "locked" && (
                     <PrimaryActionButton
                         action={action}
-                        onInstall={() => install(manifest)}
+                        onInstall={() =>
+                            manifest.deployTemplate ? setDeploying(true) : install(manifest)
+                        }
                         disabled={installingId !== null}
                         size="md"
                     />
@@ -377,6 +383,13 @@ export function AppInstallPanel({
             )}
 
             {wizard && <InstallWizard app={manifest} onClose={() => setWizard(false)} />}
+            {deploying && manifest.deployTemplate ? (
+                <TemplateDeployDialog
+                    templateId={manifest.deployTemplate}
+                    name={app.name}
+                    onClose={() => setDeploying(false)}
+                />
+            ) : null}
             {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
         </section>
     );

@@ -8,14 +8,13 @@
  * install it; one naming another developer's app lands on the user marketplace.
  */
 
-import { findApp } from "@/lib/apps/catalog";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/session";
 import { adoptAppInstalls } from "@/lib/app-extensions/registry";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
 import { storeInstalls } from "@/app/(app)/apps/marketplace/store-installs";
 import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
-import { DEPLOYABLE_APPS_PATH, storeScope } from "@/lib/apps/marketplace-store";
+import { DEPLOYABLE_APPS_PATH, storeScope, findStoreApp } from "@/lib/apps/marketplace-store";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +26,7 @@ export default async function PolarisAppsPage({
     const user = await requireAdmin();
     await Promise.all([adoptAppInstalls(user.id), adoptMailServerApp()]);
     const { app } = await searchParams;
-    const focus = typeof app === "string" ? findApp(app) : undefined;
+    const focus = typeof app === "string" ? findStoreApp(app) : undefined;
     if (focus && storeScope(focus) === "deployable")
         redirect(`${DEPLOYABLE_APPS_PATH}?app=${encodeURIComponent(focus.id)}`);
     const { installed, canInstall } = await storeInstalls(user, "polaris");

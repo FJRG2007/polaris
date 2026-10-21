@@ -1,8 +1,8 @@
 /**
  * What each app replaces: the products somebody already pays for or runs that
- * the app does the job of today. Keyed by the app's id - a marketplace app's
- * catalog id, or a built-in app's switcher id - and read by the app's store
- * page and its built-in row. An app with nothing here shows no row.
+ * the app does the job of today. Keyed by the app's store id - a marketplace
+ * app's catalog id, a Deploy template's `template-<id>`, or a built-in app's
+ * switcher id - and read by the app's store page and its built-in row. An app with nothing here shows no row.
  *
  * Only claims that are true of what the app does now. A product Polaris only
  * connects to (Gmail as a mailbox, Dropbox as storage) is listed where the app
@@ -81,7 +81,14 @@ export const APP_REPLACES: Readonly<Record<string, readonly ReplacedProduct[]>> 
     "status-pages": [product("Statuspage", "statuspage"), product("Instatus", "instatus")],
     "dns-blocker": [product("Pi-hole", "pi-hole"), product("AdGuard Home", "adguard")],
     "mail-server": [product("Microsoft 365", "microsoft")],
-    crm: [product("HubSpot", "hubspot")]
+    crm: [product("HubSpot", "hubspot")],
+    // Deploy templates in the user marketplace, by their store id.
+    "template-n8n": [product("Zapier", "zapier"), product("Make", "make")],
+    "template-nextcloud": [product("Google Drive", "google-drive"), product("Dropbox", "dropbox")],
+    "template-umami": [product("Google Analytics", "google-analytics")],
+    "template-open-webui": [product("ChatGPT", "openai")],
+    "template-mattermost": [product("Slack", "slack")],
+    "template-gitea": [product("GitHub", "github")]
 };
 
 /** What `appId` replaces, in the order it is listed; empty for nothing. */

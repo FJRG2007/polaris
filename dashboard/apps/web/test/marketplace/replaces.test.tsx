@@ -7,9 +7,8 @@
  */
 
 import { resolve } from "node:path";
-import { findApp } from "@/lib/apps/catalog";
 import { MessagesWrapper } from "../setup/i18n";
-import { builtInApps } from "@/lib/apps/marketplace-store";
+import { builtInApps, findStoreApp } from "@/lib/apps/marketplace-store";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -18,6 +17,12 @@ import { MarketplaceView } from "@/app/(app)/apps/marketplace/marketplace-view";
 import { APP_REPLACES, appReplaces, replacedLogoSrc } from "@/lib/apps/replaces";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+// The template dialog reaches Deploy's server actions; nothing here deploys.
+vi.mock("@/app/(app)/apps/deploy/actions", () => ({
+    listTemplateTargetsAction: vi.fn(async () => []),
+    listDeployServersAction: vi.fn(async () => []),
+    createApplicationAction: vi.fn()
+}));
 vi.mock("@/app/(app)/apps/marketplace/actions", () => ({
     installAppAction: vi.fn(),
     listInstallTargetsAction: vi.fn(async () => []),
@@ -35,10 +40,10 @@ const entries = Object.entries(APP_REPLACES);
 const logos = new Set(entries.flatMap(([, items]) => items.map((item) => item.logo)));
 
 describe("the replaces table", () => {
-    it("names only apps that exist: a marketplace app or a built-in one", () => {
+    it("names only apps that exist: a marketplace app, a Deploy template or a built-in one", () => {
         const builtIn = new Set(builtInApps().map((app) => app.id));
         for (const [id] of entries) {
-            const app = findApp(id);
+            const app = findStoreApp(id);
             expect(builtIn.has(id) || (app !== undefined && !app.internal), id).toBe(true);
         }
     });

@@ -138,6 +138,12 @@ export function PrimaryActionButton({
                     {t("card.install")}
                 </Button>
             );
+        case "deploy":
+            return (
+                <Button size={size} onClick={onInstall} disabled={disabled}>
+                    {t("card.deploy")}
+                </Button>
+            );
         case "locked":
             return (
                 <Button

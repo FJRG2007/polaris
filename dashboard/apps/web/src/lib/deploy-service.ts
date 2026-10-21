@@ -237,6 +237,24 @@ async function scopedProjectWhere(userId: string, orgId: string | null) {
     return { AND: [await visibleProjectWhere(userId), { orgId }] };
 }
 
+/** The projects on one shelf with their environments, names only: where a
+ *  template from the marketplace can be deployed. Each create is still checked
+ *  against the project on its own. */
+export async function listProjectTargets(userId: string, orgId: string | null) {
+    return prisma.project.findMany({
+        where: await scopedProjectWhere(userId, orgId),
+        orderBy: { createdAt: "asc" },
+        select: {
+            id: true,
+            name: true,
+            environments: {
+                select: { id: true, name: true, isDefault: true },
+                orderBy: { createdAt: "asc" }
+            }
+        }
+    });
+}
+
 /**
  * One service, if this user may read it at all. Same rule as the lists above, so a
  * screen never offers a service in its picker and then refuses to show it - which is
