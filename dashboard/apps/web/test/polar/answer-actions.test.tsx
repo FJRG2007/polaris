@@ -235,8 +235,8 @@ describe("read aloud", () => {
         expect(
             calls.filter((call) => call.url === "/api/polar/speak").map((call) => call.body)
         ).toEqual([
-            { text: "It is half full.", payer: null },
-            { text: "Clean the cache.", payer: null }
+            { text: "It is half full.", payer: null, lang: expect.any(String) },
+            { text: "Clean the cache.", payer: null, lang: expect.any(String) }
         ]);
         expect(await screen.findByLabelText("Read aloud")).toBeTruthy();
     });

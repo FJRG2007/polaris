@@ -1779,7 +1779,7 @@ export function PolarChat({
 
     const composer = (
         <div className="relative">
-            {slashOpen ? (
+            {slashOpen && !inCall ? (
                 <SuggestionList
                     id={ids.slash}
                     label={t("slash.title")}
@@ -1790,7 +1790,9 @@ export function PolarChat({
                     className="absolute bottom-full left-0 z-20 mb-2 w-full max-w-sm"
                 />
             ) : null}
-            <BorderBeam active={chat.status === "streaming"}>
+            {/* Voice mode takes the composer's place, as in ChatGPT; the
+                composer stays mounted, so a draft is still there after. */}
+            <BorderBeam active={chat.status === "streaming"} className={cn(inCall && "hidden")}>
                 <PromptInput
                     onSubmit={submit}
                     className={cn(dragging && "border-primary bg-primary/10")}
@@ -1973,6 +1975,8 @@ export function PolarChat({
                     speech={voice.speech}
                     payer={choice?.payer}
                     transcriber={voice.transcriber}
+                    transcribers={voice.transcribers}
+                    onTranscriber={chooseTranscriber}
                     tools={tools}
                     onSend={(text) => void sendSpoken(text)}
                     onStop={() => void chat.stop()}
@@ -1982,7 +1986,8 @@ export function PolarChat({
                     }}
                     onEnd={() => {
                         setInCall(false);
-                        textarea.current?.focus();
+                        // Once the composer is shown again.
+                        requestAnimationFrame(() => textarea.current?.focus());
                     }}
                 />
             ) : null}

@@ -302,11 +302,12 @@
             "rate_limited": "Demasiados intentos. Espera un minuto.",
             "too_large": "La grabación es demasiado larga.",
             "speak_failed": "Polar no ha podido leer esta respuesta. Está en pantalla.",
-            "no_speech_provider": "Polar no puede hablar sin una clave de OpenAI o Google AI. Sus respuestas siguen en pantalla.",
+            "no_speech_provider": "Este navegador no tiene voz y ninguna clave puede hablar. Las respuestas siguen en pantalla.",
             "usage_limit": "Has llegado al límite de la clave compartida. Usa una tuya."
         },
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
+        "browserVoice": "Hablando con la voz del navegador",
         "phase": {
             "listening": "Escuchando",
             "hearing": "Te escucho",
@@ -320,9 +321,6 @@
         "unmute": "Activar micrófono",
         "end": "Colgar",
         "interrupt": "Interrumpir",
-        "you": "Tú",
-        "polar": "Polar",
-        "captions": "Subtítulos",
         "dismiss": "Cerrar",
         "menu": {
             "open": "Micrófono y modelo",
