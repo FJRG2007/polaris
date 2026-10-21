@@ -35,6 +35,7 @@ import { EVENT_STATE_KEY } from "./events/catalog";
 import { formatBytes, gameOfServer } from "@polaris/core";
 import { OWNED_PROJECTS } from "../games-create";
 import {
+    containerFailure,
     onlinePlayers,
     withServerContainer,
     type MinecraftEdition,
@@ -504,10 +505,12 @@ async function writeBackup(ownerId: string, server: ServerContainer): Promise<Wo
     // under this name is invisible to it, and the move is what publishes the copy.
     const partial = `${world.BACKUP_DIR}/${name}${STAGING_SUFFIX}`;
     try {
-        await server.runOk(
-            ["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs],
-            gameMessage("games", "lib.run.writeBackup")
-        );
+        const archived = await server.run(["tar", "-czf", partial, "-C", world.DATA_DIR, ...dirs]);
+        if (archived.code !== 0 && !world.onlyMovedUnderTar(archived.code, archived.output)) {
+            throw new Error(
+                containerFailure(archived.output, gameMessage("games", "lib.run.writeBackup"))
+            );
+        }
         await server.runOk(
             ["mv", "--", partial, `${world.BACKUP_DIR}/${name}`],
             gameMessage("games", "lib.run.writeBackup")

@@ -206,6 +206,33 @@ export function backupName(at: Date): string {
     return `${at.toISOString().replace(/[:.]/g, "-").replace("Z", "")}.tar.gz`;
 }
 
+/**
+ * Whether `tar` wrote a whole archive and only noticed files moving under it.
+ *
+ * GNU tar exits 1, not 0, when a file changes or disappears while it reads, and
+ * still writes every member. With saving held the chunks stand still, but the
+ * server goes on replacing `level.dat` - a fresh copy renamed over it, which also
+ * changes the world folder itself - and a player leaving writes their own files
+ * the same way. A rename never tears what tar already opened, so those copies are
+ * sound: `tar: world: file changed as we read it` failed sound backups.
+ *
+ * A region file moving is different: it means saving did not hold, and that
+ * chunk may be half old and half new. Pure.
+ */
+export function onlyMovedUnderTar(code: number, output: string): boolean {
+    if (code !== 1) return false;
+    const lines = output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+    if (lines.length === 0) return false;
+    return lines.every((line) => {
+        const moved =
+            /^tar: (.+): (?:file changed as we read it|File removed before we read it)$/.exec(line);
+        return moved !== null && !moved[1]!.endsWith(".mca");
+    });
+}
+
 /** When a backup was taken, from its name. Null for anything else in the folder. */
 export function backupTakenAt(name: string): Date | null {
     if (!isBackupName(name)) return null;
