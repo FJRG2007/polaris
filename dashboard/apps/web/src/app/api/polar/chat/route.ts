@@ -43,6 +43,8 @@ import {
 } from "@/lib/polar/tool-relevance";
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { polarVisualTools } from "@/lib/polar/visual-tool";
+import { polarRepoTools } from "@/lib/polar/code-host-tools";
+import { aboutRepository } from "@/lib/polar/code-host";
 import {
     NATIVE_SEARCH_STAND_INS,
     WEB_APPROVAL,
@@ -218,6 +220,7 @@ export async function POST(request: Request): Promise<Response> {
         ...findToolsTool(catalog)
     };
     const visualTools = polarVisualTools();
+    const repoTools = polarRepoTools(user.id);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
@@ -225,6 +228,7 @@ export async function POST(request: Request): Promise<Response> {
             ...screenTools,
             ...memoryTools,
             ...visualTools,
+            ...repoTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
@@ -282,12 +286,16 @@ export async function POST(request: Request): Promise<Response> {
     // for a turn; either one off and the tools are simply not offered.
     const web = access.web && body.data.web;
     const webTools = web ? polarWebTools(resolved.credential.provider, resolved.option.model) : {};
+    // Reading a repository is reading the web, under the same switch. Always
+    // registered; sent while the page shared or the conversation names one.
+    const repoOffered = web && aboutRepository(body.data.context?.site?.url, messages);
     const tools = {
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
         ...visualTools,
         ...webTools,
+        ...(web ? repoTools : {}),
         ...(body.data.connectors
             ? Object.fromEntries(
                   Object.entries(connectorSet.tools).filter(([name]) => !off.has(name))
@@ -303,6 +311,7 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.keys(visualTools),
         ...Object.keys(remembers ? memoryTools : {}),
         ...Object.keys(webTools),
+        ...(repoOffered ? Object.keys(repoTools) : []),
         // A connector is one the person added on purpose: its tools are always sent.
         ...(body.data.connectors
             ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))

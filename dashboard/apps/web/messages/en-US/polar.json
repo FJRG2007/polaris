@@ -584,6 +584,13 @@
         "sources": "Sources",
         "calls": "{searches, plural, one {# search} other {# searches}} - {pages, plural, one {# page read} other {# pages read}}"
     },
+    "repo": {
+        "overview": "Looking at {repo}",
+        "list": "Browsing {path}",
+        "read": "Reading {path}",
+        "search": "Searching {repo} for {query}",
+        "commits": "Checking commits in {repo}"
+    },
     "control": {
         "busy": "Wait for the answer to finish first.",
         "empty": "Send a message first.",
