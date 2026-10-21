@@ -25,7 +25,11 @@ vi.mock("@polaris/config", async (original) => ({
     loadEnv: () => ({ POLARIS_REPO: "FJRG2007/polaris" })
 }));
 vi.mock("@/lib/app-releases", () => ({
-    streamDeckDownload: async () => ({ url: "https://github.com/x/y", version: "0.1.4", files: [] }),
+    streamDeckDownload: async () => ({
+        url: "https://github.com/x/y",
+        version: "0.1.4",
+        files: []
+    }),
     companionDownload: async () => null
 }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));

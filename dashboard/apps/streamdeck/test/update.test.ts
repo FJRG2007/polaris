@@ -44,7 +44,9 @@ describe("updateFor", () => {
     });
 
     it("never offers a link that leaves the Polaris it is connected to", () => {
-        expect(updateFor({ ...LATEST, downloadsPath: "//evil.example" }, "0.1.0.0", ADDRESS)).toBeNull();
+        expect(
+            updateFor({ ...LATEST, downloadsPath: "//evil.example" }, "0.1.0.0", ADDRESS)
+        ).toBeNull();
         expect(
             updateFor({ ...LATEST, downloadsPath: "https://evil.example/x" }, "0.1.0.0", ADDRESS)
         ).toBeNull();
@@ -65,7 +67,8 @@ describe("the catalogue's releases", () => {
 
     it("arrive with the catalogue, and are null from a Polaris older than the field", async () => {
         const answer = (body: unknown) =>
-            new PolarisClient("0.1.0", (async () => Response.json(body)) as unknown as typeof fetch);
+            new PolarisClient("0.1.0", (async () =>
+                Response.json(body)) as unknown as typeof fetch);
         const credentials = { address: ADDRESS, token: "plk_x" };
         expect(await answer({ actions: [], latest: LATEST }).listing(credentials)).toEqual({
             actions: [],

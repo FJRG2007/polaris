@@ -20,7 +20,10 @@ test("after a release the patch moves on, without a bump in package.json", () =>
 });
 
 test("versions sort as numbers, not as text", () => {
-    assert.equal(nextVersion(["streamdeck-v0.1.9", "streamdeck-v0.1.10"], PREFIX, "0.1.0"), "0.1.11");
+    assert.equal(
+        nextVersion(["streamdeck-v0.1.9", "streamdeck-v0.1.10"], PREFIX, "0.1.0"),
+        "0.1.11"
+    );
 });
 
 test("a package.json raised past every release is the next version", () => {
@@ -29,7 +32,13 @@ test("a package.json raised past every release is the next version", () => {
 });
 
 test("other apps' tags and prereleases are not releases of this one", () => {
-    const tags = ["companion-v3.0.0", "extension-v2.4.1", "streamdeck-v0.4.0-rc.1", "streamdeck-v0.1.2", "dashboard-v0.9.0"];
+    const tags = [
+        "companion-v3.0.0",
+        "extension-v2.4.1",
+        "streamdeck-v0.4.0-rc.1",
+        "streamdeck-v0.1.2",
+        "dashboard-v0.9.0"
+    ];
     assert.deepEqual(latestTagged(tags, PREFIX), [0, 1, 2]);
     assert.equal(nextVersion(tags, PREFIX, "0.1.0"), "0.1.3");
     assert.equal(nextVersion(tags, "companion-v", "1.0.0"), "3.0.1");
@@ -53,13 +62,26 @@ test("the script reads tags on stdin and stamps package.json and the manifest", 
     writeFileSync(pkg, JSON.stringify({ name: "x", version: "0.1.0" }));
     writeFileSync(manifest, JSON.stringify({ Name: "X", Version: "0.1.0.0" }));
 
-    const next = execFileSync(process.execPath, [SCRIPT, "next", "--prefix", PREFIX, "--package", pkg], {
-        input: "streamdeck-v0.1.0\nstreamdeck-v0.1.1\n",
-        encoding: "utf8"
-    }).trim();
+    const next = execFileSync(
+        process.execPath,
+        [SCRIPT, "next", "--prefix", PREFIX, "--package", pkg],
+        {
+            input: "streamdeck-v0.1.0\nstreamdeck-v0.1.1\n",
+            encoding: "utf8"
+        }
+    ).trim();
     assert.equal(next, "0.1.2");
 
-    execFileSync(process.execPath, [SCRIPT, "stamp", "--version", next, "--package", pkg, "--manifest", manifest]);
+    execFileSync(process.execPath, [
+        SCRIPT,
+        "stamp",
+        "--version",
+        next,
+        "--package",
+        pkg,
+        "--manifest",
+        manifest
+    ]);
     assert.equal(JSON.parse(readFileSync(pkg, "utf8")).version, "0.1.2");
     assert.equal(JSON.parse(readFileSync(manifest, "utf8")).Version, "0.1.2.0");
 });

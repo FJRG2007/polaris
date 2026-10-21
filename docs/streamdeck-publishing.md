@@ -30,17 +30,17 @@ shows on the Marketplace. Only the newest approved version is offered there.
 Checked against the [plugin guidelines](https://docs.elgato.com/guidelines/stream-deck/plugins)
 and the [product guidelines](https://docs.elgato.com/guidelines/products):
 
-| Requirement | Where |
-| --- | --- |
-| UUID holds the organisation and plugin name, actions prefixed by it, never changed after publishing | `io.github.fjrg2007.polaris`, `.key`, `.dial`, `.timer` |
-| Name without "Plugin", "Stream Deck" or the maker's name, 30 characters or fewer | `Polaris` (the brand name, which the maker-name rule exempts) |
-| Category set, same as the name | `Polaris` |
-| Action names without the author's name | `Action`, `Device dial`, `Timer` (renamed from "Polaris key" and "Polaris dial") |
-| Plugin icon, PNG 256x256 and 512x512 | `imgs/plugin/marketplace.png`, `marketplace@2x.png` |
-| Category icon 28x28, action icons 20x20, monochrome white SVG on transparent | `imgs/plugin/category-icon.svg`, `imgs/actions/*/icon.svg` |
-| Key images 72x72 SVG, drawn at 144 when updated from code | `imgs/actions/*/key.svg`, `src/render.ts` |
-| 2 to 30 actions, each with a settings screen and tooltip | 3 actions |
-| DRM: `@elgato/streamdeck` 2 or later, `SDKVersion` 3, minimum app 6.9 or later, manifest not read at runtime | 3.0.1, 3, `7.1`; the version comes from the app, never from the file |
+| Requirement                                                                                                  | Where                                                                            |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| UUID holds the organisation and plugin name, actions prefixed by it, never changed after publishing          | `io.github.fjrg2007.polaris`, `.key`, `.dial`, `.timer`                          |
+| Name without "Plugin", "Stream Deck" or the maker's name, 30 characters or fewer                             | `Polaris` (the brand name, which the maker-name rule exempts)                    |
+| Category set, same as the name                                                                               | `Polaris`                                                                        |
+| Action names without the author's name                                                                       | `Action`, `Device dial`, `Timer` (renamed from "Polaris key" and "Polaris dial") |
+| Plugin icon, PNG 256x256 and 512x512                                                                         | `imgs/plugin/marketplace.png`, `marketplace@2x.png`                              |
+| Category icon 28x28, action icons 20x20, monochrome white SVG on transparent                                 | `imgs/plugin/category-icon.svg`, `imgs/actions/*/icon.svg`                       |
+| Key images 72x72 SVG, drawn at 144 when updated from code                                                    | `imgs/actions/*/key.svg`, `src/render.ts`                                        |
+| 2 to 30 actions, each with a settings screen and tooltip                                                     | 3 actions                                                                        |
+| DRM: `@elgato/streamdeck` 2 or later, `SDKVersion` 3, minimum app 6.9 or later, manifest not read at runtime | 3.0.1, 3, `7.1`; the version comes from the app, never from the file             |
 
 ## Listing media
 
@@ -49,10 +49,10 @@ The listing needs files that do not ship inside the plugin. They are in
 the plugin's own key renderer (`src/render.ts`), so every key in them is a key
 the plugin really draws:
 
-| File | Marketplace field | Size |
-| --- | --- | --- |
-| `app-icon.png` | App icon | 288x288 PNG |
-| `thumbnail.png` | Thumbnail | 1920x960 PNG |
+| File                                                              | Marketplace field       | Size         |
+| ----------------------------------------------------------------- | ----------------------- | ------------ |
+| `app-icon.png`                                                    | App icon                | 288x288 PNG  |
+| `thumbnail.png`                                                   | Thumbnail               | 1920x960 PNG |
 | `gallery-1-keys.png`, `gallery-2-dial.png`, `gallery-3-timer.png` | Gallery (3 to 10 items) | 1920x960 PNG |
 
 A capture of the plugin running in the Stream Deck app can be added to the
