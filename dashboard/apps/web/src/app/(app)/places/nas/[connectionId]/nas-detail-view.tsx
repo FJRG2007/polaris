@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { formatBytes } from "@polaris/core";
 import { ArrowLeft, HardDrive, Play, Share2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -60,7 +60,9 @@ export function NasDetailView({
     const pathname = usePathname();
     const search = useSearchParams();
     const asked = search.get("tab");
-    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "") ? (asked as Tab) : "overview";
+    const tab: Tab = (TABS as readonly string[]).includes(asked ?? "")
+        ? (asked as Tab)
+        : "overview";
     const [range, setRange] = useState<nasView.NasRange>("1d");
     const [sharing, setSharing] = useState(false);
     const toast = useToast();
@@ -100,7 +102,10 @@ export function NasDetailView({
             aria-label={t("nas.chart.temperature")}
             value={range}
             onValueChange={setRange}
-            options={nasView.NAS_RANGES.map((key) => ({ value: key, label: t(`nas.ranges.${key}`) }))}
+            options={nasView.NAS_RANGES.map((key) => ({
+                value: key,
+                label: t(`nas.ranges.${key}`)
+            }))}
         />
     );
 
@@ -126,7 +131,10 @@ export function NasDetailView({
                                 onValueChange={(value) => void movePlace(value || null)}
                                 options={[
                                     { value: "", label: t("nas.place.none") },
-                                    ...places.map((place) => ({ value: place.id, label: place.name }))
+                                    ...places.map((place) => ({
+                                        value: place.id,
+                                        label: place.name
+                                    }))
                                 ]}
                             />
                         ) : null}
@@ -216,7 +224,8 @@ function NasNow({ answer }: { answer: NasAnswer | null }) {
     if (!answer) return <Skeleton className="h-24 w-full" />;
     if (!answer.status.ok) return null;
     const status = answer.status.value;
-    const usage = status.totalBytes > 0 ? Math.round((status.usedBytes / status.totalBytes) * 100) : null;
+    const usage =
+        status.totalBytes > 0 ? Math.round((status.usedBytes / status.totalBytes) * 100) : null;
     const days = Math.floor(status.uptimeSeconds / 86_400);
     const hours = Math.floor((status.uptimeSeconds % 86_400) / 3_600);
     const tiles: { key: string; label: string; value: string }[] = [
@@ -225,7 +234,10 @@ function NasNow({ answer }: { answer: NasAnswer | null }) {
         {
             key: "uptime",
             label: t("nas.status.uptime"),
-            value: days > 0 ? `${days} d ${hours} h` : t("nas.units.hours", { value: hours })
+            value:
+                days > 0
+                    ? t("nas.units.daysHours", { days, hours })
+                    : t("nas.units.hours", { value: hours })
         },
         {
             key: "cpuTemp",
@@ -292,19 +304,26 @@ function NasFan({
 }) {
     const t = useTranslations("servers");
     const toast = useToast();
-    const [chosen, setChosen] = useState<UnasFanProfile | null>(null);
+    const [chosen, setChosen] = useState<{
+        profile: UnasFanProfile;
+        seen: NasAnswer | null;
+    } | null>(null);
+    const latest = useRef(answer);
+    latest.current = answer;
     if (!answer) return <Skeleton className="h-10 w-72" />;
     const known = answer.fan.ok ? answer.fan.value : null;
-    const shown = chosen ?? known;
+    const shown =
+        chosen && (chosen.seen === null || chosen.seen === answer) ? chosen.profile : known;
     async function choose(next: UnasFanProfile) {
         if (next === shown) return;
-        setChosen(next);
+        setChosen({ profile: next, seen: null });
         const outcome = await setNasFanAction(id, next);
         if (!outcome.ok) {
             setChosen(null);
             toast.show({ key: `nas:${id}:fan`, title: t("nas.fan.failed") });
             return;
         }
+        setChosen({ profile: next, seen: latest.current });
         toast.show({ key: `nas:${id}:fan`, title: t("nas.fan.saved") });
         onChanged();
     }
@@ -315,9 +334,12 @@ function NasFan({
                 <SegmentedControl<UnasFanProfile>
                     size="sm"
                     aria-label={t("nas.fan.label")}
-                    value={shown ?? "balanced"}
+                    value={shown}
                     onValueChange={(next) => void choose(next)}
-                    options={FAN_PROFILES.map((key) => ({ value: key, label: t(`nas.fan.${key}`) }))}
+                    options={FAN_PROFILES.map((key) => ({
+                        value: key,
+                        label: t(`nas.fan.${key}`)
+                    }))}
                 />
             ) : (
                 <Badge variant="neutral">{t(`nas.fan.${shown ?? "unknown"}`)}</Badge>
@@ -366,7 +388,8 @@ function NasHistory({ answer, range }: { answer: NasAnswer | null; range: nasVie
         };
     }, [answer, t]);
     if (!charts) return <Skeleton className="h-48 w-full" />;
-    if (charts.empty) return <p className="text-sm text-muted-foreground">{t("nas.chart.empty")}</p>;
+    if (charts.empty)
+        return <p className="text-sm text-muted-foreground">{t("nas.chart.empty")}</p>;
     return (
         <>
             <div className="grid gap-4 lg:grid-cols-2">
@@ -524,25 +547,34 @@ function NasBays({ disks }: { disks: nasView.NasDisk[] | null }) {
                         {shown.map((disk) => (
                             <tr key={disk.slot}>
                                 <td className="px-3 py-2 tabular-nums">{disk.slot}</td>
-                                <td className="max-w-56 truncate px-3 py-2" title={disk.model ?? ""}>
+                                <td
+                                    className="max-w-56 truncate px-3 py-2"
+                                    title={disk.model ?? ""}
+                                >
                                     {disk.present ? (disk.model ?? "-") : t("nas.bays.noDrive")}
                                 </td>
                                 <td className="px-3 py-2">
                                     {disk.present ? (
                                         <Badge variant={disk.healthy ? "success" : "warning"}>
-                                            {t(`nas.bays.${disk.healthy ? "optimal" : "notOptimal"}`)}
+                                            {t(
+                                                `nas.bays.${disk.healthy ? "optimal" : "notOptimal"}`
+                                            )}
                                         </Badge>
                                     ) : (
                                         "-"
                                     )}
                                 </td>
-                                <td className="px-3 py-2 tabular-nums">{celsius(disk.temperature)}</td>
+                                <td className="px-3 py-2 tabular-nums">
+                                    {celsius(disk.temperature)}
+                                </td>
                                 {has("size") ? (
                                     <td className="px-3 py-2 tabular-nums">
                                         {disk.present ? formatBytes(disk.sizeBytes) : "-"}
                                     </td>
                                 ) : null}
-                                {has("pool") ? <td className="px-3 py-2">{disk.pool ?? "-"}</td> : null}
+                                {has("pool") ? (
+                                    <td className="px-3 py-2">{disk.pool ?? "-"}</td>
+                                ) : null}
                                 {has("powerOn") ? (
                                     <td className="px-3 py-2 tabular-nums">
                                         {disk.powerOnHours === null
@@ -551,7 +583,9 @@ function NasBays({ disks }: { disks: nasView.NasDisk[] | null }) {
                                     </td>
                                 ) : null}
                                 {has("serial") ? (
-                                    <td className="px-3 py-2 font-mono text-xs">{disk.serial ?? "-"}</td>
+                                    <td className="px-3 py-2 font-mono text-xs">
+                                        {disk.serial ?? "-"}
+                                    </td>
                                 ) : null}
                             </tr>
                         ))}
@@ -614,7 +648,10 @@ function NasTasks({
                                 className="flex flex-wrap items-center justify-between gap-3 px-3 py-2"
                             >
                                 <div className="flex min-w-0 flex-col gap-1">
-                                    <span className="truncate text-sm font-medium" title={task.name}>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={task.name}
+                                    >
                                         {task.name}
                                     </span>
                                     <span className="text-xs text-muted-foreground">

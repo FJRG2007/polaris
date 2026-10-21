@@ -18,13 +18,11 @@
 import { prisma } from "@polaris/db";
 import type { UnasMetrics } from "@/lib/unifi-unas";
 import {
-    listBackupTasks,
     newAlerts,
     unasAlerts,
     type UnasAlert,
     type UnasBackupTask
 } from "@/lib/unifi-unas-control";
-import { getUnasTarget } from "@/lib/storage-service";
 import { emitAutomationEvent } from "@/lib/automations/outbox";
 import { pruneNasSamples, recordNasSample } from "./nas-history";
 
@@ -32,6 +30,13 @@ import { pruneNasSamples, recordNasSample } from "./nas-history";
 export const NAS_EVENT_PREFIX = "nas.";
 /** The NAS answered nothing this tick. Not one of unasAlerts': it needs no snapshot. */
 export const OFFLINE_KEY = "offline";
+/** Missed polls in a row before the NAS counts as offline, so one timeout is not an outage. */
+export const OFFLINE_AFTER_MISSES = 2;
+/** The key prefixes of unasAlerts' backup conditions. */
+const BACKUP_KEY_PREFIXES = ["backup:", "overdue:"] as const;
+
+/** Polls missed in a row, per connection. In this process only: a restart counts again. */
+const misses = new Map<string, number>();
 
 export const NAS_EVENT_NAMES = [
     "nas.offline",
@@ -72,6 +77,23 @@ export function offlineAlert(nasName: string): UnasAlert {
     return { kind: "offline", key: OFFLINE_KEY, subject: nasName, value: null };
 }
 
+/**
+ * The stored keys this reading cannot speak to, kept as they were so they do
+ * not clear now and start again on the next reading. Offline keeps every
+ * condition the NAS was in; a reading without backup tasks keeps the backup
+ * ones. Pure.
+ */
+export function heldKeys(
+    previousKeys: readonly string[],
+    reading: "offline" | "no-tasks" | "full"
+): string[] {
+    if (reading === "full") return [];
+    if (reading === "offline") return previousKeys.filter((key) => key !== OFFLINE_KEY);
+    return previousKeys.filter((key) =>
+        BACKUP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))
+    );
+}
+
 interface WatchedNas {
     readonly id: string;
     readonly name: string;
@@ -79,7 +101,12 @@ interface WatchedNas {
     readonly nasAlertKeys: readonly string[];
 }
 
-async function send(nas: WatchedNas, alerts: readonly UnasAlert[], ts: Date): Promise<void> {
+async function send(
+    nas: WatchedNas,
+    alerts: readonly UnasAlert[],
+    held: readonly string[],
+    ts: Date
+): Promise<void> {
     const events = nasEvents(nas, nas.nasAlertKeys, alerts);
     for (const event of events) {
         await emitAutomationEvent("core.event", {
@@ -91,7 +118,7 @@ async function send(nas: WatchedNas, alerts: readonly UnasAlert[], ts: Date): Pr
             dedupeKey: `${event.name}:${nas.id}:${String(event.payload.subject)}:${ts.getTime()}`
         });
     }
-    const keys = alerts.map((alert) => alert.key).sort();
+    const keys = [...new Set([...alerts.map((alert) => alert.key), ...held])].sort();
     const before = [...nas.nasAlertKeys].sort();
     if (keys.join("\n") !== before.join("\n")) {
         await prisma.storageConnection.update({
@@ -103,13 +130,15 @@ async function send(nas: WatchedNas, alerts: readonly UnasAlert[], ts: Date): Pr
 
 /**
  * One NAS's tick, after Drive's own sample. `metrics` is null when the NAS did
- * not answer. Never throws: a NAS that cannot be charted or alerted on must
+ * not answer; `tasks` is null when its backup tasks could not be read, and is
+ * the same reading the owner's notices were worked out from. Never throws: a NAS that cannot be charted or alerted on must
  * not cost the other storage its sample.
  */
 export async function watchNas(
     connectionId: string,
     metrics: UnasMetrics | null,
-    ts: Date
+    ts: Date,
+    tasks: readonly UnasBackupTask[] | null
 ): Promise<void> {
     try {
         const nas = await prisma.storageConnection.findUnique({
@@ -119,17 +148,17 @@ export async function watchNas(
         if (!nas || nas.kind !== "unifi-unas" || !nas.ownerId) return;
         const watched: WatchedNas = { ...nas, ownerId: nas.ownerId };
         if (!metrics) {
-            await send(watched, [offlineAlert(nas.name)], ts);
+            const missed = (misses.get(nas.id) ?? 0) + 1;
+            misses.set(nas.id, missed);
+            if (missed < OFFLINE_AFTER_MISSES) return;
+            const held = heldKeys(nas.nasAlertKeys, "offline");
+            await send(watched, [offlineAlert(nas.name)], held, ts);
             return;
         }
+        misses.delete(nas.id);
         await recordNasSample(nas.id, metrics, ts);
-        let tasks: UnasBackupTask[] = [];
-        try {
-            tasks = await listBackupTasks(await getUnasTarget(nas.id, nas.ownerId));
-        } catch {
-            // A console without the backup endpoint still alerts on its disks.
-        }
-        await send(watched, unasAlerts(metrics, tasks, ts), ts);
+        const held = heldKeys(nas.nasAlertKeys, tasks === null ? "no-tasks" : "full");
+        await send(watched, unasAlerts(metrics, tasks ?? [], ts), held, ts);
         await pruneNasSamples(ts.getTime());
     } catch (error) {
         console.error("polaris: a NAS reading could not be kept:", error);

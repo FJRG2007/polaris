@@ -16,7 +16,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import { publishMetricTick } from "./metrics-live";
 import type { DockerDriver } from "@polaris/docker";
 import { recordMachineCores } from "./machine-cores";
-import { watchUnasAlerts } from "./unas-alerts";
+import { readBackupTasks, watchUnasAlerts } from "./unas-alerts";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { getServerMetrics } from "./server-metrics-service";
@@ -619,11 +619,13 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
                     diskUsedBytes: bigBytes(metrics.usedBytes),
                     diskTotalBytes: bigBytes(metrics.totalBytes)
                 });
-                await watchUnasAlerts({ id: conn.id, ownerId: conn.ownerId }, metrics);
+                const unas = { id: conn.id, ownerId: conn.ownerId };
+                const tasks = await readBackupTasks(unas);
+                await watchUnasAlerts(unas, metrics, tasks);
                 // Its Places charts and Automation events. Loaded on demand: it
                 // pulls in the automation outbox, which no other storage needs.
                 const { watchNas } = await import("./nas/nas-watch");
-                await watchNas(conn.id, metrics, ts);
+                await watchNas(conn.id, metrics, ts, tasks);
                 continue;
             }
             const driver = await getDriverForConnection(conn.id);
@@ -646,7 +648,7 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
             // Device unreachable or bad credentials - skip it this tick.
             if (conn.kind === "unifi-unas") {
                 const { watchNas } = await import("./nas/nas-watch");
-                await watchNas(conn.id, null, ts);
+                await watchNas(conn.id, null, ts, null);
             }
         }
     }

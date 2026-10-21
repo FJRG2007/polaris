@@ -34,7 +34,8 @@ export function SegmentedControl<T extends string>({
     className,
     "aria-label": ariaLabel
 }: {
-    value: T;
+    /** Null when none of the options is the current one: nothing reads as chosen. */
+    value: T | null;
     onValueChange: (value: T) => void;
     options: readonly SegmentedOption<T>[];
     size?: "sm" | "md";
@@ -51,6 +52,8 @@ export function SegmentedControl<T extends string>({
             }
         }
     };
+
+    const anyActive = options.some((option) => option.value === value);
 
     return (
         <div
@@ -82,7 +85,7 @@ export function SegmentedControl<T extends string>({
                         disabled={option.disabled}
                         // Only the chosen option is in the tab order: one stop for
                         // the group, then the arrow keys choose within it.
-                        tabIndex={active ? 0 : -1}
+                        tabIndex={active || (!anyActive && index === 0) ? 0 : -1}
                         onClick={() => onValueChange(option.value)}
                         onKeyDown={(event) => {
                             if (event.key === "ArrowRight" || event.key === "ArrowDown")

@@ -31,6 +31,9 @@ const OVERVIEW_HREF = "/drive/overview";
 
 const previous = new Map<string, readonly UnasAlert[]>();
 
+/** The kinds unasAlerts raises; offline is the NAS page watcher's alone. */
+type NoticeKind = Exclude<UnasAlertKind, "offline">;
+
 const TITLE = {
     "pool-unprotected": "unas.poolUnprotectedTitle",
     "pool-usage": "unas.poolUsageTitle",
@@ -38,7 +41,7 @@ const TITLE = {
     "disk-temperature": "unas.diskTemperatureTitle",
     "backup-failed": "unas.backupFailedTitle",
     "backup-overdue": "unas.backupOverdueTitle"
-} as const satisfies Record<UnasAlertKind, string>;
+} as const satisfies Record<NoticeKind, string>;
 
 const BODY = {
     "pool-unprotected": "unas.poolUnprotectedBody",
@@ -47,7 +50,7 @@ const BODY = {
     "disk-temperature": "unas.diskTemperatureBody",
     "backup-failed": "unas.backupFailedBody",
     "backup-overdue": "unas.backupOverdueBody"
-} as const satisfies Record<UnasAlertKind, string>;
+} as const satisfies Record<NoticeKind, string>;
 
 /**
  * The alerts the NAS is in now. When the backup tasks could not be read this
@@ -65,18 +68,26 @@ export function currentAlerts(
     return [...alerts, ...before.filter((alert) => alert.kind.startsWith("backup-"))];
 }
 
+/** The console's backup tasks, or null when it did not answer them this time. */
+export function readBackupTasks(connection: {
+    id: string;
+    ownerId: string;
+}): Promise<UnasBackupTask[] | null> {
+    return getUnasTarget(connection.id, connection.ownerId)
+        .then(listBackupTasks)
+        .catch(() => null);
+}
+
 /**
  * Raise a notice for each alert this reading started. Never throws: it runs
  * inside the metrics collector, and one NAS must not stop the others.
  */
 export async function watchUnasAlerts(
     connection: { id: string; ownerId: string },
-    metrics: UnasMetrics
+    metrics: UnasMetrics,
+    tasks: readonly UnasBackupTask[] | null
 ): Promise<void> {
     try {
-        const tasks = await getUnasTarget(connection.id, connection.ownerId)
-            .then(listBackupTasks)
-            .catch(() => null);
         const before = previous.get(connection.id) ?? [];
         const now = currentAlerts(metrics, tasks, before, new Date());
         previous.set(connection.id, now);
@@ -91,12 +102,14 @@ export async function watchUnasAlerts(
         const t = await wordsFor(connection.ownerId, "notices");
         await Promise.allSettled(
             fresh.map((alert) => {
+                if (alert.kind === "offline") return Promise.resolve();
+                const kind: NoticeKind = alert.kind;
                 const words = { name, subject: alert.subject, value: alert.value ?? 0 };
                 return notify({
                     userId: connection.ownerId,
                     event: "storage.nasAlert",
-                    title: t(TITLE[alert.kind], words),
-                    body: t(BODY[alert.kind], words),
+                    title: t(TITLE[kind], words),
+                    body: t(BODY[kind], words),
                     href: OVERVIEW_HREF,
                     level: "warning",
                     metadata: { connectionId: connection.id, alert: alert.key }

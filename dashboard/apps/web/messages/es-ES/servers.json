@@ -1282,6 +1282,7 @@
         },
         "units": {
             "celsius": "{value} C",
+            "daysHours": "{days} d {hours} h",
             "hours": "{value} h",
             "percent": "{value} %"
         }
