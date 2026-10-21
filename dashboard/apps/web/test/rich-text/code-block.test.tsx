@@ -64,9 +64,7 @@ describe("markup inside a fence", () => {
         // The shape somebody would actually try: end the code element early and
         // open an image whose error handler runs. It is one text node, so there
         // is nothing to close.
-        const markup = render(
-            "```js\n</code></pre><img src=x onerror=alert(1)>\n```"
-        );
+        const markup = render("```js\n</code></pre><img src=x onerror=alert(1)>\n```");
         expect(markup).not.toContain("<img");
         expect(markup).toContain("&lt;img");
     });
