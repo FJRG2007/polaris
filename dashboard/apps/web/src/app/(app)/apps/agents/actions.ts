@@ -16,6 +16,11 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import type { GithubRepo } from "@/lib/github-service";
 import { listReposForUser } from "@/lib/github-access";
+import {
+    githubInstallGapForRepo,
+    installGapMessage,
+    type GithubInstallGap
+} from "@/lib/github-app-reach";
 import { providersFor } from "@/lib/agents/model-keys";
 import { dispatchRun } from "@/lib/agents/agent-dispatch";
 import type { PickerModel } from "@/components/model-picker";
@@ -91,7 +96,9 @@ const AGENTS_PATH = "/apps/agents";
  *  another model is accepted, and an unknown one fails at dispatch naming
  *  itself. */
 const MODEL_DEFAULTS: Record<string, string> = Object.fromEntries(
-    MODEL_INTEGRATIONS.flatMap((entry) => (entry.defaultModel ? [[entry.slug, entry.defaultModel.slug] as const] : []))
+    MODEL_INTEGRATIONS.flatMap((entry) =>
+        entry.defaultModel ? [[entry.slug, entry.defaultModel.slug] as const] : []
+    )
 );
 
 /**
@@ -122,7 +129,11 @@ export async function agentModelChoices(): Promise<PickerModel[]> {
 
 /** Repositories this person can reach, for the picker. Asked as them, never with
  *  the instance's credentials: a repository list is personal. */
-export async function listAgentRepoChoices(): Promise<{ connected: boolean; login: string | null; repos: GithubRepo[] }> {
+export async function listAgentRepoChoices(): Promise<{
+    connected: boolean;
+    login: string | null;
+    repos: GithubRepo[];
+}> {
     const user = await requirePermission("agents.manage");
     return pickerRepoList(user.id);
 }
@@ -131,7 +142,7 @@ export async function listAgentRepoChoices(): Promise<{ connected: boolean; logi
  *  operator types. */
 export async function searchAgentRepoChoices(query: string): Promise<{ repos: GithubRepo[] }> {
     const user = await requirePermission("agents.manage");
-    return { repos: await pickerRepoSearch(user.id, query) };
+    return { repos: await pickerRepoSearch(user.id, query, { installGaps: true }) };
 }
 
 /**
@@ -152,13 +163,18 @@ export async function adviseRepoAction(input: unknown): Promise<{
     providers?: string[];
     defaults?: AgentRepoConfigInput;
     policy?: AgentPolicy;
+    /** The GitHub App is why this repository cannot be reached, found now
+     *  rather than at the save. */
+    githubGap?: GithubInstallGap;
     error?: string;
 }> {
     const user = await requirePermission("agents.manage");
-    const parsed = z.object({ repoFullName: repoFullNameSchema, isPrivate: z.boolean() }).safeParse(input);
+    const parsed = z
+        .object({ repoFullName: repoFullNameSchema, isPrivate: z.boolean() })
+        .safeParse(input);
     if (!parsed.success) return { error: await say("text.pickRepository") };
 
-    const [pools, allPools, providers, policy] = await Promise.all([
+    const [pools, allPools, providers, policy, gap] = await Promise.all([
         poolsServing(user.id, parsed.data.repoFullName),
         prisma.runnerPool.findMany({
             where: { ownerId: user.id, enabled: true },
@@ -166,7 +182,8 @@ export async function adviseRepoAction(input: unknown): Promise<{
             orderBy: { name: "asc" }
         }),
         providersFor(user.id),
-        policyForNewRepo(user.id, parsed.data.repoFullName)
+        policyForNewRepo(user.id, parsed.data.repoFullName),
+        githubInstallGapForRepo(user.id, parsed.data.repoFullName)
     ]);
 
     // The first connected provider's model is only a starting point; the tiers
@@ -185,16 +202,30 @@ export async function adviseRepoAction(input: unknown): Promise<{
         allPools,
         providers,
         defaults,
-        policy
+        policy,
+        ...(gap ? { githubGap: gap } : {})
     };
 }
 
-export async function enableRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
+/** Why the GitHub App keeps this person from `repoFullName`, as the sentence and
+ *  the step that fixes it, or null when it does not. */
+async function installGap(
+    userId: string,
+    repoFullName: string
+): Promise<{ error: string; githubGap: GithubInstallGap } | null> {
+    const gap = await githubInstallGapForRepo(userId, repoFullName);
+    if (!gap) return null;
+    const message = installGapMessage(gap, repoFullName);
+    return { error: await say(message.key, message.values), githubGap: gap };
+}
+
+export async function enableRepoAction(
+    input: unknown
+): Promise<{ error?: string; warning?: string; githubGap?: GithubInstallGap }> {
     const user = await requirePermission("agents.manage");
-    const parsed = enableAgentRepoSchema
-        .extend({ isPrivate: z.boolean() })
-        .safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
+    const parsed = enableAgentRepoSchema.extend({ isPrivate: z.boolean() }).safeParse(input);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     // The form's repository is a claim, not proof. Runs dispatch with the
     // instance's App installation token, which reaches every repository the App
@@ -205,8 +236,19 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     // form for the same reason: it decides the default shell policy.
     const reachable = await listReposForUser(user.id).catch(() => null);
     if (!reachable) return { error: await say("errors.accessUnchecked") };
-    const match = reachable.find((repo) => repo.fullName.toLowerCase() === parsed.data.repoFullName.toLowerCase());
-    if (!match) return { error: await say("errors.unreachableRepo") };
+    const match = reachable.find(
+        (repo) => repo.fullName.toLowerCase() === parsed.data.repoFullName.toLowerCase()
+    );
+    // The usual reason an account that sees a repository on GitHub cannot reach
+    // it here is that Polaris's App is not installed on its owner, or not given
+    // this repository: say so, with the button, rather than "unreachable".
+    if (!match) {
+        return (
+            (await installGap(user.id, parsed.data.repoFullName)) ?? {
+                error: await say("errors.unreachableRepo")
+            }
+        );
+    }
 
     // A model whose provider is not connected produces a run that starts, asks for
     // a key, and fails. Refusing here costs a sentence instead of a failed run.
@@ -263,10 +305,15 @@ export async function enableRepoAction(input: unknown): Promise<{ error?: string
     return warningText(error);
 }
 
-export async function updateRepoConfigAction(input: unknown): Promise<{ error?: string; warning?: string }> {
+export async function updateRepoConfigAction(
+    input: unknown
+): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
-    const parsed = z.object({ repoId: z.string().uuid(), config: agentRepoConfigSchema }).safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
+    const parsed = z
+        .object({ repoId: z.string().uuid(), config: agentRepoConfigSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     const existing = await getAgentRepo(user.id, parsed.data.repoId);
     if (!existing) return { error: await say("errors.repoNotFound") };
@@ -303,7 +350,9 @@ export async function updateRepoConfigAction(input: unknown): Promise<{ error?: 
     return warningText(error);
 }
 
-export async function setRepoEnabledAction(input: unknown): Promise<{ error?: string; warning?: string }> {
+export async function setRepoEnabledAction(
+    input: unknown
+): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid(), enabled: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: await say("errors.checkRequest") };
@@ -329,7 +378,9 @@ export async function setRepoEnabledAction(input: unknown): Promise<{ error?: st
     return warningText(error);
 }
 
-export async function removeRepoAction(input: unknown): Promise<{ error?: string; warning?: string }> {
+export async function removeRepoAction(
+    input: unknown
+): Promise<{ error?: string; warning?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: await say("errors.checkRequest") };
@@ -349,7 +400,8 @@ export async function removeRepoAction(input: unknown): Promise<{ error?: string
           ).error
         : undefined;
 
-    if (!(await removeAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
+    if (!(await removeAgentRepo(user.id, parsed.data.repoId)))
+        return { error: await say("errors.repoNotFound") };
     revalidatePath(AGENTS_PATH);
     revalidatePath(`${AGENTS_PATH}/repos`);
     return warningText(warning);
@@ -358,13 +410,19 @@ export async function removeRepoAction(input: unknown): Promise<{ error?: string
 export async function saveAutomationAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = z
-        .object({ id: z.string().uuid().optional(), repoId: z.string().uuid(), automation: agentAutomationSchema })
+        .object({
+            id: z.string().uuid().optional(),
+            repoId: z.string().uuid(),
+            automation: agentAutomationSchema
+        })
         .safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkRule") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkRule") };
 
     // The repository has to be one this person owns; an id from the form is a
     // claim, not proof.
-    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
+    if (!(await getAgentRepo(user.id, parsed.data.repoId)))
+        return { error: await say("errors.repoNotFound") };
 
     const data = {
         repoId: parsed.data.repoId,
@@ -375,7 +433,10 @@ export async function saveAutomationAction(input: unknown): Promise<{ error?: st
         enabled: parsed.data.automation.enabled
     };
     if (parsed.data.id) {
-        await prisma.agentAutomation.updateMany({ where: { id: parsed.data.id, repoId: data.repoId }, data });
+        await prisma.agentAutomation.updateMany({
+            where: { id: parsed.data.id, repoId: data.repoId },
+            data
+        });
     } else {
         await prisma.agentAutomation.create({ data });
     }
@@ -387,21 +448,29 @@ export async function removeAutomationAction(input: unknown): Promise<{ error?: 
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: await say("errors.checkRequest") };
-    await prisma.agentAutomation.deleteMany({ where: { id: parsed.data.id, repo: { ownerId: user.id } } });
+    await prisma.agentAutomation.deleteMany({
+        where: { id: parsed.data.id, repo: { ownerId: user.id } }
+    });
     revalidatePath(`${AGENTS_PATH}/automations`);
     return {};
 }
 
 /** Start a run by hand, with a prompt the operator writes. */
-export async function startRunAction(input: unknown): Promise<{ runId?: string; error?: string }> {
+export async function startRunAction(
+    input: unknown
+): Promise<{ runId?: string; error?: string; githubGap?: GithubInstallGap }> {
     const user = await requirePermission("agents.manage");
     const parsed = manualAgentRunSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "text.sayWhat") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "text.sayWhat") };
 
     const repo = await prisma.agentRepo.findFirst({
         where: { ownerId: user.id, repoFullName: parsed.data.repoFullName, enabled: true }
     });
     if (!repo) return { error: await say("errors.notEnabled") };
+    // Before a run exists: one that cannot reach its repository would only fail.
+    const gap = await installGap(user.id, repo.repoFullName);
+    if (gap) return gap;
 
     const result = await dispatchRun({
         repo,
@@ -442,7 +511,10 @@ export async function cancelRunAction(input: unknown): Promise<{ error?: string 
  * screen has a row to render rather than an empty state that hides where the
  * defaults come from.
  */
-export async function listAgentDefaultsAction(): Promise<{ tiers: AgentDefaultsView[]; owners: string[] }> {
+export async function listAgentDefaultsAction(): Promise<{
+    tiers: AgentDefaultsView[];
+    owners: string[];
+}> {
     const user = await requirePermission("agents.manage");
     const [tiers, repos] = await Promise.all([
         listAgentDefaults(user.id),
@@ -451,7 +523,9 @@ export async function listAgentDefaultsAction(): Promise<{ tiers: AgentDefaultsV
     // The accounts worth offering a tier for are the ones this person actually
     // has repositories in; anything else would be a list of every organization
     // on GitHub.
-    const owners = [...new Set(repos.map((repo) => scopeOf(repo.repoFullName)))].filter(Boolean).sort();
+    const owners = [...new Set(repos.map((repo) => scopeOf(repo.repoFullName)))]
+        .filter(Boolean)
+        .sort();
     return { tiers, owners };
 }
 
@@ -459,7 +533,8 @@ export async function listAgentDefaultsAction(): Promise<{ tiers: AgentDefaultsV
 export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("agents.manage");
     const parsed = agentDefaultsSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.checkSettings") };
 
     // Same refusal as the repository paths: a model whose provider has no stored
     // key produces runs that start, ask for one, and fail - and here it would do
@@ -467,7 +542,9 @@ export async function saveAgentDefaultsAction(input: unknown): Promise<{ error?:
     if (parsed.data.model) {
         const provider = providerForModel(parsed.data.model);
         if (provider && !(await providersFor(user.id)).includes(provider.slug)) {
-            return { error: await say("errors.connectProviderDefault", { provider: provider.name }) };
+            return {
+                error: await say("errors.connectProviderDefault", { provider: provider.name })
+            };
         }
     }
 
@@ -504,7 +581,8 @@ export async function addDefaultAutomationsAction(input: unknown): Promise<{ err
     const user = await requirePermission("agents.manage");
     const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: await say("errors.checkRequest") };
-    if (!(await getAgentRepo(user.id, parsed.data.repoId))) return { error: await say("errors.repoNotFound") };
+    if (!(await getAgentRepo(user.id, parsed.data.repoId)))
+        return { error: await say("errors.repoNotFound") };
 
     // Only onto an empty one. Running it twice would leave two rules for the same
     // event, which is two runs and two comments on one issue.

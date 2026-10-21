@@ -33,6 +33,11 @@ import {
 import { getTranslations } from "@/lib/i18n/request";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { agentText, knownAgentText } from "@/lib/agents/words";
+import {
+    githubInstallGapForRepo,
+    installGapMessage,
+    type GithubInstallGap
+} from "@/lib/github-app-reach";
 
 const SESSIONS_PATH = "/apps/agents/sessions";
 
@@ -114,7 +119,9 @@ export async function sessionDetailAction(sessionId: string): Promise<{
  * start is a session somebody can look at and read the reason on - rather than a
  * click that produced an error toast and no trace of what was attempted.
  */
-export async function startSessionAction(input: unknown): Promise<{ id?: string; error?: string }> {
+export async function startSessionAction(
+    input: unknown
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap }> {
     const user = await requirePermission("agents.manage");
     const parsed = core.startAgentSessionSchema.safeParse(input);
     const t = await getTranslations("agents");
@@ -132,9 +139,17 @@ export async function startSessionAction(input: unknown): Promise<{ id?: string;
     if (value.repoId) {
         const repo = await prisma.agentRepo.findFirst({
             where: { id: value.repoId, ownerId: user.id },
-            select: { id: true }
+            select: { id: true, repoFullName: true }
         });
         if (!repo) return { error: t("sessions.errors.repoNotConnected") };
+        // The clone goes out as this person's linked account, which reaches only
+        // what Polaris's App is installed on. Said now, with the button, rather
+        // than as a failed clone on a session row.
+        const gap = await githubInstallGapForRepo(user.id, repo.repoFullName);
+        if (gap) {
+            const message = installGapMessage(gap, repo.repoFullName);
+            return { error: t(message.key, message.values), githubGap: gap };
+        }
     }
 
     // The machine everybody shares only exists where an administrator said so.

@@ -22,6 +22,7 @@
 import { z } from "zod";
 import { fenceUntrusted } from "@/lib/polar/web";
 import { githubTokenForUser } from "@/lib/github-access";
+import { githubAppGap, type GithubAppGap } from "@/lib/github-app-reach";
 import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import { CONNECTIONS_HUB } from "@/lib/connections/hub-href";
 import {
@@ -133,8 +134,31 @@ function githubEmpty(reply: HostReply): boolean {
     return parsed.success && /repository is empty/i.test(parsed.data.message);
 }
 
-/** A refusal worded for the model, which relays it to the person. */
-class RepoFailure extends Error {}
+/** A refusal worded for the model, which relays it to the person. `access` is
+ *  the step that fixes it, which the chat draws as a button. */
+class RepoFailure extends Error {
+    constructor(
+        message: string,
+        readonly access?: GithubAppGap
+    ) {
+        super(message);
+    }
+}
+
+/**
+ * The sentence for a GitHub read refused over the App rather than over the
+ * repository, or null when the App is not why. Worded for the model: it says
+ * what to tell the person and that a button is already under the answer.
+ */
+export function gapSentence(gap: GithubAppGap, what: string): string {
+    if (gap.kind === "no-account") {
+        return `${what} was not found. If the repository is private, the person can link their GitHub account in Polaris under Connected accounts (${CONNECTIONS_HUB}) and ask again. A "Connect GitHub" button is shown under this answer.`;
+    }
+    if (gap.kind === "app-missing") {
+        return `${what} could not be read: the Polaris GitHub app is not installed on ${gap.owner}, and the person's linked GitHub account only reaches repositories where it is installed - seeing the repository on github.com is not enough. Polaris has to be installed on ${gap.owner} first; if ${gap.owner} is an organization and the person is not one of its owners, GitHub sends the request to an owner to approve. An "Install Polaris on ${gap.owner}" button is shown under this answer: tell the person to use it and then press "Check again". Do not answer from the page or guess the contents instead.`;
+    }
+    return `${what} could not be read: the Polaris GitHub app is installed on ${gap.owner}, but only on selected repositories, and ${gap.repository} is not one of them. Whoever manages that installation has to add it. A "Choose repositories" button is shown under this answer: tell the person to use it and then press "Check again". Do not answer from the page or guess the contents instead.`;
+}
 
 /** The person a call is made for. */
 interface Asker {
@@ -148,10 +172,29 @@ interface Asker {
  */
 class GithubClient {
     private token: string | null | undefined;
+    private gap: Promise<GithubAppGap | null> | undefined;
     constructor(
         private readonly asker: Asker,
-        private readonly owner: string
+        private readonly owner: string,
+        private readonly name: string
     ) {}
+
+    /** Whether the App is why this repository is out of reach. Asked once, and
+     *  only when the repository itself is: a missing path or ref inside one this
+     *  account can read is not the App's doing. */
+    private appGap(): Promise<GithubAppGap | null> {
+        this.gap ??= this.repositoryReadable()
+            .then((readable) =>
+                readable ? null : githubAppGap(this.asker.userId, this.owner, this.name)
+            )
+            .catch(() => null);
+        return this.gap;
+    }
+
+    private async repositoryReadable(): Promise<boolean> {
+        const reply = await this.get(`/repos/${this.owner}/${this.name}`);
+        return reply.status >= 200 && reply.status < 300;
+    }
 
     async signedIn(): Promise<boolean> {
         if (this.token === undefined) {
@@ -204,6 +247,15 @@ class GithubClient {
             }
         }
         if (githubEmpty(reply)) throw new RepoFailure("That repository is empty.");
+        if (reply.status === 403 && reply.headers.get("x-github-sso")) {
+            throw new RepoFailure(
+                `${this.owner} requires the person's linked GitHub account to authorize single sign-on before anything may read its repositories.`
+            );
+        }
+        if (reply.status === 404 || reply.status === 403) {
+            const gap = await this.appGap();
+            if (gap) throw new RepoFailure(gapSentence(gap, what), gap);
+        }
         if (reply.status === 404) {
             throw new RepoFailure(
                 signed
@@ -342,7 +394,7 @@ export async function locate(
     }
     const clients = {
         repo,
-        github: repo.host === "github" ? new GithubClient(asker, repo.owner) : null,
+        github: repo.host === "github" ? new GithubClient(asker, repo.owner, repo.name) : null,
         gitlab: repo.host === "gitlab" ? new GitlabClient() : null
     };
     const explicitPath = input.path === undefined ? undefined : cleanPath(input.path);
@@ -529,7 +581,7 @@ export type RepoToolResult =
           text: string;
           truncated?: boolean;
       }
-    | { ok: false; repository: string; text: string };
+    | { ok: false; repository: string; text: string; access?: GithubAppGap };
 
 async function overview(located: Located): Promise<RepoToolResult> {
     const { repo } = located;
@@ -1071,8 +1123,14 @@ async function guarded(
     try {
         return await run();
     } catch (error) {
-        if (error instanceof RepoFailure)
-            return { ok: false, repository: written.repository, text: error.message };
+        if (error instanceof RepoFailure) {
+            return {
+                ok: false,
+                repository: written.repository,
+                text: error.message,
+                ...(error.access ? { access: error.access } : {})
+            };
+        }
         console.error("polar: a repository read failed", error);
         return {
             ok: false,

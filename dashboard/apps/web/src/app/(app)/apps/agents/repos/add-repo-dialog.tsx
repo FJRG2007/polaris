@@ -4,6 +4,8 @@ import { Lock } from "lucide-react";
 import { runAction } from "@/lib/run-action";
 import { ExecutionPicker } from "./execution-picker";
 import { GitHubMark } from "@/components/brand-icons";
+import type { GithubInstallGap } from "@/lib/github-app-reach";
+import { GithubAppGapNotice } from "@/components/github-app-gap";
 import { ModelPicker } from "@/components/model-picker";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { useCallback, useState, useTransition } from "react";
@@ -67,6 +69,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
     const [push, setPush] = useState<AgentPushPolicy>("restricted");
     const [shell, setShell] = useState<AgentShellPolicy>("restricted");
     const [error, setError] = useState<string | null>(null);
+    const [gap, setGap] = useState<GithubInstallGap | null>(null);
     const [loading, setLoading] = useState(false);
     const [pending, startTransition] = useTransition();
 
@@ -78,6 +81,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
         setRepo(picked);
         setLoading(true);
         setError(null);
+        setGap(null);
         void (async () => {
             const result = await adviseRepoAction({
                 repoFullName: picked.fullName,
@@ -88,6 +92,7 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                 setError(result.error);
                 return;
             }
+            setGap(result.githubGap ?? null);
             setAdvice(result.advice ?? null);
             setPools(result.pools ?? []);
             setAllPools(result.allPools ?? []);
@@ -130,7 +135,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     setError
                 );
                 if (result && !result.error) onClose();
-                else if (result?.error) setError(result.error);
+                else if (result?.error) {
+                    setGap(result.githubGap ?? null);
+                    setError(result.githubGap ? null : result.error);
+                }
             })();
         });
     };
@@ -149,7 +157,9 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
 
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
+                        <label className="text-sm font-medium">
+                            {t("sessions.form.repository")}
+                        </label>
                         {repo ? (
                             <div className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2">
                                 <GitHubMark className="size-4 shrink-0 text-muted-foreground" />
@@ -214,12 +224,16 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                     }
                                 />
                                 {providers.length === 0 ? (
-                                    <p className="text-xs text-warning">{t("repoDialog.connectProvider")}</p>
+                                    <p className="text-xs text-warning">
+                                        {t("repoDialog.connectProvider")}
+                                    </p>
                                 ) : null}
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-sm font-medium">{t("repoDialog.effort")}</label>
+                                <label className="text-sm font-medium">
+                                    {t("repoDialog.effort")}
+                                </label>
                                 <Select
                                     value={effort}
                                     onValueChange={setEffort}
@@ -240,10 +254,19 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                                 onGate={setGate}
                             />
 
-                            <p className="text-xs text-muted-foreground">{t("repoDialog.startsRestricted")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("repoDialog.startsRestricted")}
+                            </p>
                         </>
                     ) : null}
 
+                    {gap ? (
+                        <GithubAppGapNotice
+                            gap={gap}
+                            checking={loading}
+                            onCheckAgain={repo ? () => pick(repo) : undefined}
+                        />
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
 
@@ -251,7 +274,10 @@ export function AddRepoDialog({ onClose }: { onClose: () => void }) {
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={!repo || !model || loading || pending}>
+                    <Button
+                        onClick={save}
+                        disabled={!repo || !model || loading || pending || gap !== null}
+                    >
                         {pending ? t("repoDialog.adding") : t("repoDialog.add")}
                     </Button>
                 </DialogFooter>

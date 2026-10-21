@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState, useTransition } from "react";
 import { cancelRunAction, startRunAction } from "../actions";
+import type { GithubInstallGap } from "@/lib/github-app-reach";
+import { GithubAppGapNotice } from "@/components/github-app-gap";
 import type { AgentRunView } from "@/lib/agents/agent-run-service";
 import { Check, ExternalLink, Loader2, Play, Square, TriangleAlert } from "lucide-react";
 import type { GateStepReport } from "@/lib/agents/agent-gate";
@@ -236,17 +238,22 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
     const [repoFullName, setRepoFullName] = useState(repos[0] ?? "");
     const [prompt, setPrompt] = useState("");
     const [error, setError] = useState<string | null>(null);
+    const [gap, setGap] = useState<GithubInstallGap | null>(null);
     const [pending, startTransition] = useTransition();
 
     const start = () => {
         startTransition(() => {
             void (async () => {
+                setGap(null);
                 const result = await runAction(
                     () => startRunAction({ repoFullName, prompt, issueNumber: null, mode: null }),
                     setError
                 );
                 if (result && !result.error) onClose();
-                else if (result?.error) setError(result.error);
+                else if (result?.error) {
+                    setGap(result.githubGap ?? null);
+                    setError(result.githubGap ? null : result.error);
+                }
             })();
         });
     };
@@ -259,10 +266,15 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium">{t("sessions.form.repository")}</label>
+                        <label className="text-sm font-medium">
+                            {t("sessions.form.repository")}
+                        </label>
                         <Select
                             value={repoFullName}
-                            onValueChange={setRepoFullName}
+                            onValueChange={(value) => {
+                                setRepoFullName(value);
+                                setGap(null);
+                            }}
                             options={repos.map((name) => ({ value: name, label: name }))}
                         />
                     </div>
@@ -275,6 +287,9 @@ function StartRunDialog({ repos, onClose }: { repos: string[]; onClose: () => vo
                             placeholder={t("runs.whatPlaceholder")}
                         />
                     </div>
+                    {gap ? (
+                        <GithubAppGapNotice gap={gap} checking={pending} onCheckAgain={start} />
+                    ) : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>

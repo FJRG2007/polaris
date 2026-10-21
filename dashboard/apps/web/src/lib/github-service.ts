@@ -791,6 +791,17 @@ export async function githubPermissionGap(): Promise<GithubPermissionGap> {
     };
 }
 
+/**
+ * The App's install page, where the person picks the account or organization
+ * to install it on (or asks an organization owner to). Null when this Polaris
+ * has no App to install.
+ */
+export async function githubAppInstallUrl(): Promise<string | null> {
+    const state = await getIntegrationState(PROVIDER);
+    const page = state ? appPageUrl(state.config) : null;
+    return page ? `${page}/installations/new` : null;
+}
+
 /** Where the App's own requested permissions are edited. Built from the slug,
  *  because GitHub's address for an App is its name. */
 function appPermissionsUrl(config: Record<string, unknown>): string | null {
@@ -1019,11 +1030,7 @@ export async function resolveGithubRepo(
  * all of them: git asks for a username, is refused a terminal, and stops.
  */
 export type RepoAccess =
-    | "reachable"
-    | "token-refused"
-    | "out-of-reach"
-    | "sso-required"
-    | "unknown";
+    "reachable" | "token-refused" | "out-of-reach" | "sso-required" | "unknown";
 
 /**
  * Ask GitHub about `owner/repo` as this token, and report which of the four it
@@ -1556,12 +1563,7 @@ export async function pullRequestIsOpen(
 /** The states GitHub accepts for a deployment. `error` is the one a cancel lands
  *  on: there is no cancelled state, and leaving it in progress is worse. */
 export type DeploymentState =
-    | "queued"
-    | "in_progress"
-    | "success"
-    | "failure"
-    | "error"
-    | "inactive";
+    "queued" | "in_progress" | "success" | "failure" | "error" | "inactive";
 
 /**
  * What GitHub did with an announcement.
