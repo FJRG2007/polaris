@@ -48,10 +48,7 @@ export default async function RetentionPage() {
         // Narrow: three settings and nothing wide, so the column is centred in
         // the content area rather than left against the rail.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("retention.title")}
-                description={t("retention.description")}
-            />
+            <PageHeader title={t("retention.title")} description={t("retention.description")} />
             <RetentionView policy={policy} />
             <div className="mt-4">
                 <MailBodyForm kept={mailBodyKeep(storedKeep)} />

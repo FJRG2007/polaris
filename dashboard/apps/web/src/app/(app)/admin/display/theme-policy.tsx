@@ -53,14 +53,16 @@ export function ThemePolicyCard({
                         // switch that waits for a round trip reads as broken.
                         setOn(next);
                         setError("");
-                        void runAction(() => setThemePolicyAction(next), setError).then((result) => {
-                            if (!result || result.error) {
-                                setOn(!next);
-                                return;
+                        void runAction(() => setThemePolicyAction(next), setError).then(
+                            (result) => {
+                                if (!result || result.error) {
+                                    setOn(!next);
+                                    return;
+                                }
+                                onChanged?.(next);
+                                router.refresh();
                             }
-                            onChanged?.(next);
-                            router.refresh();
-                        });
+                        );
                     }}
                 />
             </CardBody>

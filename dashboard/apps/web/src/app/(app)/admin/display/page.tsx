@@ -22,10 +22,7 @@ export default async function DisplayAdminPage() {
         // Narrow page: centre the column in the content area, header included, so
         // the form does not sit against the rail with the width beside it empty.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader
-                title={t("display.title")}
-                description={t("display.description")}
-            />
+            <PageHeader title={t("display.title")} description={t("display.description")} />
             {/* The form is the account page's too, and its words are there. */}
             <Messages namespaces={["account"]}>
                 <DisplayAdminPanel />
