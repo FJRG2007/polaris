@@ -18,6 +18,7 @@ import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 import type {
     AppAutomationsFilter,
+    AppDeckAction,
     AppExtension,
     AppFavorite,
     AppJob,
@@ -474,6 +475,25 @@ export async function appMcpTools(): Promise<{ app: string; tool: AppMcpTool }[]
                 return tools.map((tool) => ({ app: extension.id, tool }));
             } catch (caught) {
                 console.error(`polaris: ${extension.id} could not list its MCP tools:`, caught);
+                return [];
+            }
+        })
+    );
+    return lists.flat();
+}
+
+/**
+ * The keys and dials the installed apps offer a Stream Deck. Asked on every
+ * call, like the tools they are bound to; one app failing to say leaves its
+ * actions out and never anybody else's.
+ */
+export async function appDeckActions(): Promise<AppDeckAction[]> {
+    const lists = await Promise.all(
+        (await installedWith("deckActions")).map(async (extension) => {
+            try {
+                return [...((await extension.deckActions?.()) ?? [])];
+            } catch (caught) {
+                console.error(`polaris: ${extension.id} could not list its deck actions:`, caught);
                 return [];
             }
         })

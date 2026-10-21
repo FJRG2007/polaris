@@ -148,6 +148,9 @@ export const placesExtension: AppExtension = {
     // same rules as the screens.
     mcpTools: async () => (await import("./mcp-tools")).placesMcpTools(),
 
+    // Bound to the tools above, so a deck reaches what an assistant does.
+    deckActions: async () => (await import("./deck-actions")).placesDeckActions(),
+
     // What a person reads for each of those tools, in their language.
     mcpToolLabels: async (locale) =>
         (await import("../../messages")).placesCatalogs.catalogs[locale].mcpTools,

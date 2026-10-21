@@ -37,6 +37,7 @@ import { readInstallConfig } from "@/lib/apps/install-config-value";
 import type { InstalledSlotHost } from "@/components/app-extensions/installed-client";
 import type {
     AppAutomationsFilter,
+    AppDeckAction,
     AppExtension,
     AppJob,
     AppWidgetDefinition,
@@ -573,6 +574,7 @@ declare module "@polaris/app-host" {
     interface AppHostTypes {
         AppAutomationsFilter: AppAutomationsFilter;
         AppExtension: AppExtension;
+        AppDeckAction: AppDeckAction;
         AppJob: AppJob;
         AppWidgetDefinition: AppWidgetDefinition;
         AppWidgetView: AppWidgetView;
