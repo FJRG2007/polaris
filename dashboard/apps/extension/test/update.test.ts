@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { compareVersions, installKind, isNewer, noticeFor } from "../src/lib/update";
+import english from "../src/messages/en-US.json";
+import spanish from "../src/messages/es-ES.json";
+import {
+    badgeFor,
+    compareVersions,
+    COUNT_COLOR,
+    installKind,
+    isNewer,
+    managedByDesktop,
+    noticeFor,
+    publishedVersion,
+    UPDATE_COLOR,
+    type UpdateNotice
+} from "../src/lib/update";
 
 /**
  * Knowing a newer extension exists, and what to tell whoever is running the old
@@ -73,6 +86,13 @@ describe("how this build got here", () => {
         expect(installKind("sideload", true)).toBe("manual");
         expect(installKind("normal", true)).toBe("store");
     });
+
+    it("leaves the desktop app a kind of its own, which nothing produces yet", () => {
+        expect(installKind("development", true, true)).toBe("desktop");
+        expect(installKind("normal", false, true)).toBe("store");
+        // There is no desktop app: until there is, nothing may claim it.
+        expect(managedByDesktop()).toBe(false);
+    });
 });
 
 describe("what to show", () => {
@@ -109,5 +129,82 @@ describe("what to show", () => {
 
     it("tells a copy the updater keeps current that there is nothing to do", () => {
         expect(noticeFor(RELEASE, "0.1.0", "development", true)?.kind).toBe("auto");
+    });
+});
+
+describe("the newest version out", () => {
+    it("is read only from an answer that names one", () => {
+        expect(publishedVersion({ version: "0.2.0", url: null })).toBe("0.2.0");
+        expect(publishedVersion({ version: null })).toBeNull();
+        expect(publishedVersion({ version: 2 })).toBeNull();
+        expect(publishedVersion(null)).toBeNull();
+    });
+});
+
+describe("the toolbar badge", () => {
+    const notice = (kind: UpdateNotice["kind"]): UpdateNotice => ({
+        version: "0.2.0",
+        url: "https://example.test/r",
+        kind
+    });
+
+    it("shows the login count, and nothing else, with no update", () => {
+        expect(badgeFor("3", null)).toEqual({ text: "3", color: COUNT_COLOR, announce: null });
+        expect(badgeFor("", null)).toEqual({ text: "", color: COUNT_COLOR, announce: null });
+    });
+
+    it("marks a hand-loaded copy's update where there is no count to show", () => {
+        expect(badgeFor("", notice("manual"))).toEqual({
+            text: "!",
+            color: UPDATE_COLOR,
+            announce: "0.2.0"
+        });
+    });
+
+    it("lets the count win, and still names the update in the tooltip", () => {
+        expect(badgeFor("2", notice("manual"))).toEqual({
+            text: "2",
+            color: COUNT_COLOR,
+            announce: "0.2.0"
+        });
+    });
+
+    it("asks nothing of an install that updates without anybody", () => {
+        expect(badgeFor("", notice("store")).text).toBe("");
+        expect(badgeFor("", notice("auto")).text).toBe("");
+        expect(badgeFor("", notice("store")).announce).toBe("0.2.0");
+        // The desktop app says it itself.
+        expect(badgeFor("", notice("desktop"))).toEqual({
+            text: "",
+            color: COUNT_COLOR,
+            announce: null
+        });
+    });
+});
+
+describe("what the popup says about it", () => {
+    const all = [english, spanish];
+
+    it("has every line in both languages", () => {
+        for (const catalog of all) {
+            for (const key of ["byHand", "ready", "startNow", "startNowHint", "title"] as const)
+                expect(catalog.popup.update[key]).toBeTruthy();
+            for (const key of [
+                "running",
+                "current",
+                "available",
+                "store",
+                "auto",
+                "manual"
+            ] as const)
+                expect(catalog.popup.version[key]).toBeTruthy();
+        }
+    });
+
+    it("never asks anybody to run a command", () => {
+        // Polaris is used without a terminal. A shell, a line to paste or a
+        // script to run is a dead end on the screen that says it.
+        const text = JSON.stringify(all.map((catalog) => catalog.popup));
+        expect(text).not.toMatch(/PowerShell|Terminal|run this|ejecuta|command|comando/i);
     });
 });

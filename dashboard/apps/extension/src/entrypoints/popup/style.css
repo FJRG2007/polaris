@@ -1236,8 +1236,7 @@ button.danger {
     margin: 0;
 }
 
-/* The update line: the command, which scrolls sideways inside its own box
-   rather than widening the popup, and its copy button. */
+/* The update line: what is out, and the button that starts it. */
 .notice p {
     margin: 0 0 6px;
 }
@@ -1246,27 +1245,23 @@ button.danger {
     margin-bottom: 6px;
 }
 
-.install-line {
+/* Which version this is, and whether a newer one is out, at the foot of every
+   screen. Wraps rather than widening the popup. */
+.version-line {
     display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.install-line code {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow-x: auto;
-    padding: 4px 6px;
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    background: hsl(var(--field));
-    font-family: var(--font-mono);
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin: 0;
+    padding: 8px 16px;
+    border-top: 1px solid hsl(var(--border));
+    color: hsl(var(--muted-foreground));
     font-size: 11px;
-    white-space: pre;
 }
 
-.install-line button.icon {
-    flex: none;
+.version-line a {
+    color: hsl(var(--foreground));
+    text-decoration-color: hsl(var(--primary));
+    text-underline-offset: 2px;
 }
 
 /* The popup's own dropdown (picker.tsx), styled as the field it replaced. */
