@@ -1284,12 +1284,19 @@ export function PolarChat({
         setShowHistory(fullPage);
         setDrawer(false);
     };
-    // A chat named in the page's address (a shared chat just continued) opens
-    // once, and the address goes back to plain /polar. Otherwise the chat that
-    // was open before a reload opens again.
+    // A chat named in the page's address (a shared chat just continued, a
+    // chat picked beside the settings) opens once, and the address goes back
+    // to plain /polar; `new` starts one, in the project it names if any.
+    // Otherwise the chat that was open before a reload opens again.
     useEffect(() => {
-        const named = fullPage ? new URLSearchParams(window.location.search).get("thread") : null;
-        if (named) window.history.replaceState(null, "", window.location.pathname);
+        const params = fullPage ? new URLSearchParams(window.location.search) : null;
+        const named = params?.get("thread") ?? null;
+        const fresh = params?.get("new") ?? null;
+        if (named || fresh) window.history.replaceState(null, "", window.location.pathname);
+        if (fresh) {
+            startNew(fresh === "1" ? null : fresh);
+            return;
+        }
         const reopen = named ?? readStored(threadKey);
         if (reopen) void openThread(reopen);
     }, []);
