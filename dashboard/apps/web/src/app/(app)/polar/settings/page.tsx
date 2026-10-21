@@ -123,7 +123,7 @@ export default async function PolarSettingsPage({
                 <MemorySettings />
             </div>
             <div id="tools" className="scroll-mt-4">
-                <PolarToolSettings />
+                <PolarToolSettings connectorsListed={access.connectors && !user.viewingAs} />
             </div>
             <section id="permissions" className="flex scroll-mt-4 flex-col gap-2">
                 <div className="min-w-0">

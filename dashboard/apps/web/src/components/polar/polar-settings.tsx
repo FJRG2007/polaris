@@ -21,6 +21,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useSettingsModels } from "@/components/polar/settings-models";
 import { serversOffOf, useToolPrefs, type ToolPrefs } from "@/components/polar/tool-prefs";
 import {
     groupToolsByServer,
@@ -539,6 +540,7 @@ function ServerRow({
 export function ToolSettings({
     webAllowed,
     connectorsAllowed = false,
+    connectorsListed = true,
     tools,
     prefs,
     onWeb,
@@ -548,6 +550,8 @@ export function ToolSettings({
     webAllowed: boolean;
     /** Whether the deployment lets this person use their own MCP connectors. */
     connectorsAllowed?: boolean;
+    /** Whether this page shows the connectors section the link goes to. */
+    connectorsListed?: boolean;
     tools: Record<string, ServedTool>;
     prefs: ToolPrefs;
     onWeb: (on: boolean) => void;
@@ -584,7 +588,7 @@ export function ToolSettings({
                     />
                 ))}
             </ul>
-            {connectorsAllowed ? (
+            {connectorsAllowed && connectorsListed ? (
                 <p className="text-xs">
                     <a href="#connectors" className="text-primary hover:underline">
                         {t("settings.tools.manageConnectors")}
@@ -595,57 +599,32 @@ export function ToolSettings({
     );
 }
 
-interface ToolsAnswer {
-    tools: Record<string, ServedTool>;
-    web: boolean;
-    connectors: boolean;
-}
-
-const TOOLS_CACHE_KEY = "polar.settingsTools";
-
 /** The tools section on the settings page: the list as last seen at once,
- *  then the server's. */
-export function PolarToolSettings() {
+ *  then the server's. `connectorsListed` says whether the page shows the
+ *  connectors section the link under the list goes to. */
+export function PolarToolSettings({ connectorsListed = true }: { connectorsListed?: boolean }) {
     const { prefs, setWeb, setTool, setServer } = useToolPrefs();
-    const [answer, setAnswer] = useState<ToolsAnswer | null>(null);
+    const { answer, failed, retry } = useSettingsModels();
     const t = useTranslations("polar");
-    useEffect(() => {
-        try {
-            const cached = window.sessionStorage.getItem(TOOLS_CACHE_KEY);
-            if (cached) setAnswer(JSON.parse(cached) as ToolsAnswer);
-        } catch {
-            // Nothing cached; the skeleton stays until the answer.
-        }
-        void fetch("/api/polar/models")
-            .then((response) => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.json();
-            })
-            .then((data: Partial<ToolsAnswer>) => {
-                const next: ToolsAnswer = {
-                    tools: data.tools ?? {},
-                    // Not knowing is not a refusal: the chat route drops web
-                    // search where an administrator turned it off.
-                    web: data.web !== false,
-                    connectors: data.connectors === true
-                };
-                setAnswer(next);
-                try {
-                    window.sessionStorage.setItem(TOOLS_CACHE_KEY, JSON.stringify(next));
-                } catch {
-                    // Not cached; the next visit asks again.
-                }
-            })
-            .catch(() =>
-                setAnswer((current) => current ?? { tools: {}, web: true, connectors: false })
-            );
-    }, []);
     if (!answer) {
         return (
             <Section title={t("settings.tools.title")} description={t("settings.tools.intro")}>
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {failed ? (
+                    <div className="flex min-w-0 flex-wrap items-center gap-3" role="alert">
+                        <p className="min-w-0 flex-1 text-xs text-danger">
+                            {t("settings.tools.loadFailed")}
+                        </p>
+                        <Button size="sm" variant="outline" onClick={retry}>
+                            {t("settings.tools.retry")}
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                    </>
+                )}
             </Section>
         );
     }
@@ -653,6 +632,7 @@ export function PolarToolSettings() {
         <ToolSettings
             webAllowed={answer.web}
             connectorsAllowed={answer.connectors}
+            connectorsListed={connectorsListed}
             tools={answer.tools}
             prefs={prefs}
             onWeb={setWeb}

@@ -372,6 +372,8 @@
             "intro": "Lo que Polar puede usar en un chat. Si apagas una, no se le ofrece.",
             "webOff": "Tu administrador ha desactivado la búsqueda web.",
             "manageConnectors": "Añadir o gestionar conectores MCP",
+            "loadFailed": "No se pudieron cargar las herramientas. Revisa tu conexión y reinténtalo.",
+            "retry": "Reintentar",
             "polaris": "Polaris",
             "builtIn": "Integrado",
             "count": "{on} de {total} activas",

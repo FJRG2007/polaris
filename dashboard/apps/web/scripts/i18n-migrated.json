@@ -2114,6 +2114,8 @@
         "web/src/components/polar/polar-commands.tsx",
         "web/src/components/polar/polar-context.tsx",
         "web/src/components/polar/polar-display.tsx",
+        "web/src/components/polar/polar-helper-settings.tsx",
+        "web/src/components/polar/settings-models.ts",
         "web/src/components/rich-text/suggestion-list.tsx",
         "web/src/components/polar/elements/model-selector.tsx",
         "web/src/lib/polar/export.ts",

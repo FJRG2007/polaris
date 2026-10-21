@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { Switch, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useSettingsModels } from "@/components/polar/settings-models";
 import { helperModelOf, type PolarHelperModel } from "@/lib/polar/display";
 import { automaticChoice, isAutomatic, type ModelChoice } from "@/lib/polar/shared";
 import { changePolarDisplay, usePolarDisplay } from "@/components/polar/polar-display";
@@ -139,18 +140,6 @@ export function HelperSettings({ providers }: { providers: ModelSelectorProvider
 /** The extras section on the settings page, with the models this person can
  *  pick read from the server; until then a pick is not reported unavailable. */
 export function PolarHelperSettings() {
-    const [providers, setProviders] = useState<ModelSelectorProvider[] | null>(null);
-    useEffect(() => {
-        let live = true;
-        void fetch("/api/polar/models")
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { providers?: ModelSelectorProvider[] } | null) => {
-                if (live && data?.providers) setProviders(data.providers);
-            })
-            .catch(() => undefined);
-        return () => {
-            live = false;
-        };
-    }, []);
-    return <HelperSettings providers={providers} />;
+    const { answer } = useSettingsModels();
+    return <HelperSettings providers={answer?.providers ?? null} />;
 }
