@@ -268,7 +268,8 @@
             "deploy_redeploy": "Desplegar servicio",
             "deploy_restart": "Reiniciar servicio",
             "polaris_notifications": "Avisos",
-            "polaris_open": "Abrir una página"
+            "polaris_open": "Abrir una página",
+            "deploy_status": "Último despliegue"
         }
     }
 }

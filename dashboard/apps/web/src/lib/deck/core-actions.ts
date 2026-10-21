@@ -96,6 +96,24 @@ const alarmList = z.object({
     alarms: z.array(z.object({ state: z.string(), enabled: z.boolean() }).passthrough())
 });
 
+const deploymentList = z.object({
+    deployments: z.array(z.object({ status: z.string() }).passthrough())
+});
+
+/** A deployment's status as a key draws it: the status itself, in Deploy's
+ *  own words, under a colour for how it went. */
+export function deploymentState(status: string): DeckState {
+    const tone =
+        status === "running"
+            ? "ok"
+            : status === "failed"
+              ? "bad"
+              : status === "queued" || status === "building" || status === "deploying"
+                ? "warn"
+                : "idle";
+    return { tone, detail: status };
+}
+
 /** A service as Deploy's tools take it: an id, project/service or
  *  project/environment/service. The tool's own schema decides the rest. */
 const serviceRef = z.string().trim().min(1).max(200);
@@ -204,6 +222,25 @@ export function coreDeckActions(refused: string): readonly CoreDeckAction[] {
             fields: [{ name: "service", type: "text", required: true }],
             run: (options, caller) =>
                 viaTool(caller, "deploy_start", { service: options.service }, refused)
+        },
+        {
+            id: "deploy.status",
+            kind: "state",
+            area: "deploy",
+            icon: "rocket",
+            scope: "deploy.read",
+            options: z.object({ service: serviceRef }),
+            fields: [{ name: "service", type: "text", required: true }],
+            read: async (options, caller) => {
+                const outcome = await callTool(caller, "deploy_deployments", {
+                    service: options.service
+                });
+                if (!outcome.ok) return { tone: "idle" };
+                const parsed = deploymentList.safeParse(outcome.structured);
+                const newest = parsed.success ? parsed.data.deployments[0] : undefined;
+                return newest ? deploymentState(newest.status) : { tone: "idle" };
+            },
+            wakes: "clock"
         },
         {
             id: "deploy.restart",

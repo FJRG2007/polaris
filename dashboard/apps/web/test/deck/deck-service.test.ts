@@ -80,6 +80,7 @@ vi.mock("@/lib/mcp/catalog", () => {
 });
 
 const service = await import("@/lib/deck/deck-service");
+const core = await import("@/lib/deck/core-actions");
 
 const words = (key: string) => key;
 const CONVERSATION = "11111111-1111-4111-8111-111111111111";
@@ -264,6 +265,15 @@ describe("readDeckStates", () => {
             { key: "d", state: { tone: "warn", value: "3" } }
         ]);
         expect(chat).toBe(true);
+    });
+});
+
+describe("deploymentState", () => {
+    it("colours a deployment by how it went and keeps Deploy's word for it", () => {
+        expect(core.deploymentState("running")).toEqual({ tone: "ok", detail: "running" });
+        expect(core.deploymentState("failed")).toEqual({ tone: "bad", detail: "failed" });
+        expect(core.deploymentState("building")).toEqual({ tone: "warn", detail: "building" });
+        expect(core.deploymentState("cancelled")).toEqual({ tone: "idle", detail: "cancelled" });
     });
 });
 
