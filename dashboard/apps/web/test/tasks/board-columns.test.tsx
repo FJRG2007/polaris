@@ -148,3 +148,14 @@ describe("a column standing for more than one status", () => {
         expect(columnStatusIds(merged, "")).toEqual([""]);
     });
 });
+
+describe("reaching the columns past the right edge", () => {
+    // A board as tall as its longest column put its horizontal scrollbar below
+    // the fold. From a tablet up the board stops at the screen's height and each
+    // column scrolls its own cards, so the bar stays on screen.
+    it("scrolls sideways within the screen's height, each column scrolling its own cards", () => {
+        const markup = render(MANAGED);
+        expect(markup).toMatch(/class="[^"]*overflow-x-auto[^"]*sm:max-h-\[calc\(100dvh/);
+        expect(markup).toContain("sm:overflow-y-auto");
+    });
+});
