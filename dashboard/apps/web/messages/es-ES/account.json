@@ -1238,6 +1238,11 @@
             "mobile": "Android e iOS",
             "mobileHint": "Todavía no hay app. Instalar Polaris como app, arriba, lo pone en tu pantalla de inicio desde el navegador, que es casi lo mismo."
         },
+        "command": {
+            "title": "Una línea, y se mantiene al día sola",
+            "system": "En qué sistema la instalas",
+            "hint": "Pégala en {shell}. La primera vez, pulsa Cargar descomprimida y elige la carpeta que indica. Después busca una versión nueva cada pocas horas y la extensión se reinicia en ella sola. Firefox no está incluido: su complemento temporal desaparece al cerrar Firefox, así que no hay nada que un script pueda mantener al día."
+        },
         "steps": {
             "yourBrowser": "Tu navegador",
             "whichBrowser": "En qué navegador la cargas",
