@@ -37,39 +37,35 @@ It runs in Docker and manages the host it is installed on plus any machine you
 add over SSH. After the install, updates and settings are handled from the web
 interface.
 
-## What's in it
+## A look inside
 
-Screenshots of the real interface with sample data. Mobile versions are in
-[docs/assets/media](docs/assets/media). Each app is enabled per account and per role.
+Screenshots of the real interface with sample data. Most link to a page with
+the full feature list. Mobile versions are in
+[docs/assets/media](docs/assets/media).
 
 ### Talk
 
-#### Chat
-
-Spaces, channels, threads and direct messages. [Full feature list](docs/features/chat.md).
-
-<a href="docs/features/chat.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-en-desktop.webp">
-  <img src="docs/assets/media/chat-dark-en-desktop.webp" alt="Chat: spaces, channels, threads and direct messages">
-</picture>
-</a>
-
-- Servers and channels, direct messages and groups.
-- Voice messages, screen clips and scheduled messages.
-
-#### Calls
-
-Voice channels, meetings and calls in any chat. [Full feature list](docs/features/calls.md).
-
-<a href="docs/features/calls.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-en-desktop.webp">
-  <img src="docs/assets/media/in-call-dark-en-desktop.webp" alt="Calls: voice channels, meetings and calls in any chat">
-</picture>
-</a>
-
 <table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/chat.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-en-desktop.webp">
+        <img src="docs/assets/media/chat-dark-en-desktop.webp" alt="Chat: spaces, channels, threads and direct messages">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/chat.md"><b>Chat</b></a>: spaces, channels, threads and direct messages</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-en-desktop.webp">
+        <img src="docs/assets/media/in-call-dark-en-desktop.webp" alt="Calls: voice channels, meetings and calls in any chat">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.md"><b>Calls</b></a>: voice channels, meetings and calls in any chat</sub>
+    </td>
+  </tr>
   <tr>
     <td width="50%" valign="top">
       <a href="docs/features/calls.md">
@@ -78,7 +74,7 @@ Voice channels, meetings and calls in any chat. [Full feature list](docs/feature
         <img src="docs/assets/media/call-direct-dark-en-desktop.webp" alt="A video call in a direct message">
       </picture>
       </a>
-      <br><sub><b>Direct call</b>: face to face from any direct message</sub>
+      <br><sub><a href="docs/features/calls.md"><b>Direct call</b></a>: face to face from any direct message</sub>
     </td>
     <td width="50%" valign="top">
       <a href="docs/features/calls.md">
@@ -87,295 +83,170 @@ Voice channels, meetings and calls in any chat. [Full feature list](docs/feature
         <img src="docs/assets/media/call-group-dark-en-desktop.webp" alt="A group call with a shared screen, being recorded">
       </picture>
       </a>
-      <br><sub><b>Group call</b>: cameras, a shared screen and a recording</sub>
+      <br><sub><a href="docs/features/calls.md"><b>Group call</b></a>: cameras, a shared screen and a recording</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-en-desktop.webp">
+        <img src="docs/assets/media/soundboard-dark-en-desktop.webp" alt="The soundboard in a call: Polaris's own sounds and the space's">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calls.md"><b>Soundboard</b></a>: Polaris's own sounds and the space's, played into the call</sub>
     </td>
   </tr>
 </table>
 
-<a href="docs/features/calls.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-en-desktop.webp">
-  <img src="docs/assets/media/soundboard-dark-en-desktop.webp" alt="The soundboard in a call: Polaris's own sounds and the space's">
-</picture>
-</a>
-
-<sub><b>Soundboard</b>: Polaris's own sounds and the space's, played into the call</sub>
-
-- Calls and meetings from any channel or direct message.
-- Screen sharing and recording.
-- A soundboard with Polaris's own sounds and the space's.
-
-#### Inbox
-
-Telegram, WhatsApp, Discord and Slack conversations in one place.
-
 ### Work
 
-#### Tasks
-
-Lists, boards, sprints and goals. [Full feature list](docs/features/tasks.md).
-
-<a href="docs/features/tasks.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/tasks-light-en-desktop.webp">
-  <img src="docs/assets/media/tasks-dark-en-desktop.webp" alt="Tasks: lists, boards, sprints and goals">
-</picture>
-</a>
-
-- Spaces, lists, boards, sprints, goals and docs.
-- Custom fields, automations, forms and time tracking.
-
-#### Calendar
-
-Every calendar you have, synced both ways. [Full feature list](docs/features/calendar.md).
-
-<a href="docs/features/calendar.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/calendar-light-en-desktop.webp">
-  <img src="docs/assets/media/calendar-dark-en-desktop.webp" alt="Calendar: every calendar you have, synced both ways">
-</picture>
-</a>
-
-- Day, week, month and year views.
-- Sharing and public links.
-- Two-way sync with Google, Microsoft 365 and any CalDAV server or ICS feed.
-- Reminders, invitations, free/busy and meeting rooms.
-- Booking pages other people can reserve a slot on.
-- A Time area with alarms, timers, focus cycles, a stopwatch and a world clock.
-
-#### Mail
-
-Every mailbox in one inbox. [Full feature list](docs/features/mail.md).
-
-<a href="docs/features/mail.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-light-en-desktop.webp">
-  <img src="docs/assets/media/mail-dark-en-desktop.webp" alt="Mail: every mailbox in one inbox">
-</picture>
-</a>
-
-#### Office
-
-Documents, sheets, slides and diagrams. [Full feature list](docs/features/office.md).
-
-<a href="docs/features/office.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/office-light-en-desktop.webp">
-  <img src="docs/assets/media/office-dark-en-desktop.webp" alt="Office: documents, sheets, slides and diagrams">
-</picture>
-</a>
-
-#### Notes
-
-Nested notes.
-
-- Imports an Obsidian vault or a folder of Markdown.
-
-#### Organizations
-
-Teams with their own members and roles.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/tasks.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/tasks-light-en-desktop.webp">
+        <img src="docs/assets/media/tasks-dark-en-desktop.webp" alt="Tasks: lists, boards, sprints and goals">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/tasks.md"><b>Tasks</b></a>: lists, boards, sprints and goals</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/calendar.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/calendar-light-en-desktop.webp">
+        <img src="docs/assets/media/calendar-dark-en-desktop.webp" alt="Calendar: every calendar you have, synced both ways">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/calendar.md"><b>Calendar</b></a>: every calendar you have, synced both ways</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/mail.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-light-en-desktop.webp">
+        <img src="docs/assets/media/mail-dark-en-desktop.webp" alt="Mail: every mailbox in one inbox">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/mail.md"><b>Mail</b></a>: every mailbox in one inbox</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/office.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/office-light-en-desktop.webp">
+        <img src="docs/assets/media/office-dark-en-desktop.webp" alt="Office: documents, sheets, slides and diagrams">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/office.md"><b>Office</b></a>: documents, sheets, slides and diagrams</sub>
+    </td>
+  </tr>
+</table>
 
 ### Files and secrets
 
-#### Drive
-
-Your drive and every storage you own. [Full feature list](docs/features/drive.md).
-
-<a href="docs/features/drive.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/drive-light-en-desktop.webp">
-  <img src="docs/assets/media/drive-dark-en-desktop.webp" alt="Drive: your drive and every storage you own">
-</picture>
-</a>
-
-- A private drive per account and a shared one per organization.
-- Local disks, SFTP, S3-compatible storage, SMB/NFS, UniFi UNAS, Google Drive, OneDrive and Dropbox (WebDAV, Synology, QNAP and TrueNAS are coming).
-- Streaming transfers for large files.
-- Sharing with people and groups by role and expiry; public links with password and expiry.
-- Drop points for people without an account.
-- Viewers and editors for documents, spreadsheets, PDFs and media; thumbnails in the grid.
-
-#### Vault
-
-Passwords and one-time codes, Bitwarden compatible. [Full feature list](docs/features/vault.md).
-
-<a href="docs/features/vault.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-en-desktop.webp">
-  <img src="docs/assets/media/vault-dark-en-desktop.webp" alt="Vault: passwords and one-time codes, Bitwarden compatible">
-</picture>
-</a>
-
-- Works with the Bitwarden apps and extensions.
-- Encrypted in the browser; the server never sees the master password.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/drive.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/drive-light-en-desktop.webp">
+        <img src="docs/assets/media/drive-dark-en-desktop.webp" alt="Drive: your drive and every storage you own">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/drive.md"><b>Drive</b></a>: your drive and every storage you own</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/vault.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-en-desktop.webp">
+        <img src="docs/assets/media/vault-dark-en-desktop.webp" alt="Vault: passwords and one-time codes, Bitwarden compatible">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/vault.md"><b>Vault</b></a>: passwords and one-time codes, Bitwarden compatible</sub>
+    </td>
+  </tr>
+</table>
 
 ### Running things
 
-#### Deploy
-
-Apps, databases and domains on your machines. [Full feature list](docs/features/deploy.md).
-
-<a href="docs/features/deploy.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-project-light-en-desktop.webp">
-  <img src="docs/assets/media/deploy-project-dark-en-desktop.webp" alt="Deploy: apps, databases and domains on your machines">
-</picture>
-</a>
-
-- Deploy an app from a Git repository or an image.
-- Databases, volumes, environment variables, logs, a terminal, a file browser and a domain.
-- Public access through your own domain, a Cloudflare tunnel or DuckDNS.
-
-#### Marketplace
-
-Apps installed with one press. [Full feature list](docs/features/marketplace.md).
-
-<a href="docs/features/marketplace.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/marketplace-light-en-desktop.webp">
-  <img src="docs/assets/media/marketplace-dark-en-desktop.webp" alt="Marketplace: apps installed with one press">
-</picture>
-</a>
-
-- One-click installs of self-hosted apps.
-
-#### Game servers
-
-Minecraft, ARK and FiveM on your own machines. [Full feature list](docs/features/game-servers.md).
-
-<a href="docs/features/game-servers.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-en-desktop.webp">
-  <img src="docs/assets/media/games-dark-en-desktop.webp" alt="Game servers: Minecraft, ARK and FiveM on your own machines">
-</picture>
-</a>
-
-- Worlds, mods, resources, players, schedules and crash detection.
-- Minecraft challenges: daily, weekly, season pass, bingo and community goals.
-- Worlds can live on a NAS.
-
-#### Servers
-
-Enrol a machine over SSH with one generated command.
-
-- Its terminal, files, metrics and Docker engine from here.
-
-#### Containers and Backups
-
-What is running on every host, and scheduled backups of it with restore.
-
-#### Runners
-
-GitHub Actions compatible CI on your own machines.
-
-- Per-repo policy and budgets.
-
-#### Agents
-
-Coding agents on your repositories.
-
-- Headless runs that open pull requests and answer reviews with your own model keys.
-- Live sessions of Claude Code, Codex and other CLIs in a terminal you can watch and steer.
-- A task can be assigned to an agent, which updates it through Polaris's MCP server.
-
-#### Code
-
-The pull requests and issues you have open on GitHub, read as you.
-
-#### Databases
-
-Postgres, MySQL, MariaDB, MongoDB and Redis.
-
-- Browse, query and back up what you deployed.
-- Connect to one elsewhere, directly or through an SSH tunnel, via a registered server or a login typed into the connection.
-
-### Keeping an eye on it
-
-#### Watch
-
-Alerts on app health, spikes and outages.
-
-- Webhooks for every alert.
-- Uptime history and a 90-day heatmap.
-
-#### Analytics
-
-Cookieless web analytics for the sites you host.
-
-#### Firewall
-
-A rule per protection.
-
-- Allow and deny lists, country and network rules.
-- Bot and scraper defences, injection scanning, and automatic bans.
-
-#### Domain security
-
-Every domain Polaris knows, audited daily.
-
-- Spoofable mail: SPF, DKIM, DMARC, MTA-STS.
-- DNS exposure: DNSSEC, CAA, open zone transfers, dangling records.
-- Registration: expiry, transfer lock.
-- Web hardening: TLS, HSTS, security headers.
-- One-click fixes where Polaris manages the domain, and an alert when the daily check finds a regression.
-
-#### Places
-
-Cameras and device controls for each place.
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-en-desktop.webp">
-  <img src="docs/assets/media/places-dark-en-desktop.webp" alt="Places: a place's cameras beside each room's locks, lights and climate">
-</picture>
-
-- Live views, clips, detections and alerts delivered as messages.
-- Switches, plugs, lights, locks, air conditioners and purifiers from Tuya, TP-Link, Shelly, Hue, IKEA, Gree, Philips (Air+, HomeID and Dynalite), Home Assistant and SwitchBot.
-- Automations across all of them.
-- An alert when a camera goes offline.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/deploy.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-project-light-en-desktop.webp">
+        <img src="docs/assets/media/deploy-project-dark-en-desktop.webp" alt="Deploy: apps, databases and domains on your machines">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/deploy.md"><b>Deploy</b></a>: apps, databases and domains on your machines</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/marketplace.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/marketplace-light-en-desktop.webp">
+        <img src="docs/assets/media/marketplace-dark-en-desktop.webp" alt="Marketplace: apps installed with one press">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/marketplace.md"><b>Marketplace</b></a>: apps installed with one press</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/game-servers.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-en-desktop.webp">
+        <img src="docs/assets/media/games-dark-en-desktop.webp" alt="Game servers: Minecraft, ARK and FiveM on your own machines">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/game-servers.md"><b>Game servers</b></a>: Minecraft, ARK and FiveM on your own machines</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/places-light-en-desktop.webp">
+        <img src="docs/assets/media/places-dark-en-desktop.webp" alt="Places: a place's cameras beside each room's locks, lights and climate">
+      </picture>
+      <br><sub><b>Places</b>: cameras and device controls for each place</sub>
+    </td>
+  </tr>
+</table>
 
 ### Getting around
 
-#### App launcher
-
-Every app, and what is waiting in each. [Full feature list](docs/features/launcher.md).
-
-<a href="docs/features/launcher.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/launcher-light-en-desktop.webp">
-  <img src="docs/assets/media/launcher-dark-en-desktop.webp" alt="App launcher: every app, and what is waiting in each">
-</picture>
-</a>
-
-#### Settings
-
-The deployment's, and your own account's. [Full feature list](docs/features/settings.md).
-
-<a href="docs/features/settings.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-light-en-desktop.webp">
-  <img src="docs/assets/media/settings-dark-en-desktop.webp" alt="Settings: the deployment's, and your own account's">
-</picture>
-</a>
-
-<a href="docs/features/settings.md">
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-users-light-en-desktop.webp">
-  <img src="docs/assets/media/settings-users-dark-en-desktop.webp" alt="People: every account with its roles, limits and invitations">
-</picture>
-</a>
-
-- People and access: who is in, their roles and what limits them.
-
-#### The account itself
-
-Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
-sessions, API keys, access rules, privacy and notification settings. Claude,
-ChatGPT, Cursor, VS Code and any other MCP client can connect as you, limited to
-what you approve - see
-[`docs/connecting-ai-assistants.md`](docs/connecting-ai-assistants.md).
-
-What is built versus in progress is tracked in
-[`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/launcher.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/launcher-light-en-desktop.webp">
+        <img src="docs/assets/media/launcher-dark-en-desktop.webp" alt="App launcher: every app, and what is waiting in each">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/launcher.md"><b>App launcher</b></a>: every app, and what is waiting in each</sub>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/features/settings.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-light-en-desktop.webp">
+        <img src="docs/assets/media/settings-dark-en-desktop.webp" alt="Settings: the deployment's, and your own account's">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/settings.md"><b>Settings</b></a>: the deployment's, and your own account's</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/features/settings.md">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-users-light-en-desktop.webp">
+        <img src="docs/assets/media/settings-users-dark-en-desktop.webp" alt="People: every account with its roles, limits and invitations">
+      </picture>
+      </a>
+      <br><sub><a href="docs/features/settings.md"><b>People and access</b></a>: who is in, their roles and what limits them</sub>
+    </td>
+  </tr>
+</table>
 
 ## If you already pay for these
 
@@ -431,6 +302,93 @@ Then open `https://127.0.0.1/oauth/setup?token=` followed by the
 certificate is self-signed until a domain points here, so the browser warns once.
 
 To update, use the Update button in Settings.
+
+## What's in it
+
+Each app is enabled per account and per role.
+
+**Files and secrets**
+
+- **Drive** - a private drive per account and a shared one per organization,
+  across local disks, SFTP, S3-compatible storage, SMB/NFS, UniFi UNAS, Google
+  Drive, OneDrive and Dropbox (WebDAV, Synology, QNAP and TrueNAS are coming).
+  Streaming transfers for large files; sharing with people and groups by role
+  and expiry; public links with password and expiry; drop points for people
+  without an account; viewers and editors for documents, spreadsheets, PDFs and
+  media; thumbnails in the grid.
+- **Vault** - a password manager compatible with the Bitwarden apps and
+  extensions. Encrypted in the browser; the server never sees the master
+  password.
+
+**Running things**
+
+- **Deploy** - deploy an app from a Git repository or an image, with databases,
+  volumes, environment variables, logs, a terminal, a file browser and a domain.
+  Public access through your own domain, a Cloudflare tunnel or DuckDNS.
+- **Servers** - enrol a machine over SSH with one generated command, then use its
+  terminal, files, metrics and Docker engine from here.
+- **Containers** and **Backups** - what is running on every host, and scheduled
+  backups of it with restore.
+- **Marketplace** - one-click installs of self-hosted apps.
+- **Game servers** - Minecraft, ARK and FiveM, with worlds, mods, resources,
+  players, schedules, crash detection, and Minecraft challenges (daily, weekly,
+  season pass, bingo and community goals). Worlds can live on a NAS.
+- **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
+  policy and budgets.
+- **Agents** - coding agents on your repositories: headless runs that open pull
+  requests and answer reviews with your own model keys, and live sessions of
+  Claude Code, Codex and other CLIs in a terminal you can watch and steer. A
+  task can be assigned to an agent, which updates it through Polaris's MCP
+  server.
+- **Code** - the pull requests and issues you have open on GitHub, read as you.
+- **Databases** - Postgres, MySQL, MariaDB, MongoDB and Redis: browse, query and
+  back up what you deployed, or connect to one elsewhere - directly or through an
+  SSH tunnel, via a registered server or a login typed into the connection.
+
+**Work and people**
+
+- **Tasks** - spaces, lists, boards, sprints, goals, docs, custom fields,
+  automations, forms and time tracking.
+- **Calendar** - day, week, month and year views, sharing and public links,
+  two-way sync with Google, Microsoft 365 and any CalDAV server or ICS feed,
+  reminders, invitations, free/busy, meeting rooms and booking pages other
+  people can reserve a slot on, plus a Time area with alarms, timers, focus
+  cycles, a stopwatch and a world clock.
+- **Chat** - servers and channels, direct messages and groups, calls, meetings,
+  screen sharing and recording, a soundboard, voice messages, screen clips and
+  scheduled messages.
+- **Notes** - nested notes; imports an Obsidian vault or a folder of Markdown.
+- **Inbox** - Telegram, WhatsApp, Discord and Slack conversations in one place.
+- **Organizations** - teams with their own members and roles.
+
+**Keeping an eye on it**
+
+- **Watch** - alerts on app health, spikes and outages, with webhooks, plus
+  uptime history and a 90-day heatmap.
+- **Analytics** - cookieless web analytics for the sites you host.
+- **Firewall** - a rule per protection: allow and deny lists, country and network
+  rules, bot and scraper defences, injection scanning, and automatic bans.
+- **Domain security** - every domain Polaris knows, audited for spoofable mail
+  (SPF, DKIM, DMARC, MTA-STS), DNS exposure (DNSSEC, CAA, open zone transfers,
+  dangling records), registration (expiry, transfer lock) and web hardening
+  (TLS, HSTS, security headers), with one-click fixes where Polaris manages the
+  domain and an alert when the daily check finds a regression.
+- **Places** - cameras and smart devices per location: live views, clips,
+  detections and alerts delivered as messages; switches, plugs, lights, locks,
+  air conditioners and purifiers from Tuya, TP-Link, Shelly, Hue, IKEA, Gree,
+  Philips (Air+, HomeID and Dynalite), Home Assistant and SwitchBot; automations
+  across all of them; an alert when a camera goes offline.
+
+**The account itself**
+
+Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
+sessions, API keys, access rules, privacy and notification settings. Claude,
+ChatGPT, Cursor, VS Code and any other MCP client can connect as you, limited to
+what you approve - see
+[`docs/connecting-ai-assistants.md`](docs/connecting-ai-assistants.md).
+
+What is built versus in progress is tracked in
+[`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).
 
 ## Where it runs
 
