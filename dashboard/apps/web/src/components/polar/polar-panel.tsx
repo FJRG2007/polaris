@@ -2,7 +2,8 @@
 
 /**
  * Polar's panel: the provider every page can feed context to, the header
- * button that opens it (Ctrl/Cmd+J, free in the shortcut table), and the chat.
+ * button that opens it (Ctrl/Cmd+J, free in the shortcut table), and the
+ * Chat / Code switch at its top (see `./polar-code` for Code's own side).
  *
  * The panel sits right of the content and pushes it on wide screens, floats
  * over it on narrow ones and fills the screen on a phone. Its width is
