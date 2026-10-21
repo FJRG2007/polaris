@@ -1,0 +1,25 @@
+{
+    "name": "@polaris/streamdeck",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Polaris on a Stream Deck: keys and dials that run Polaris actions and show live Polaris state.",
+    "scripts": {
+        "build": "rollup -c",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "validate": "streamdeck validate io.github.fjrg2007.polaris.sdPlugin --no-update-check",
+        "pack": "streamdeck pack io.github.fjrg2007.polaris.sdPlugin --output dist --force --no-update-check"
+    },
+    "dependencies": {
+        "@elgato/streamdeck": "3.0.1",
+        "zod": "3.25.76"
+    },
+    "devDependencies": {
+        "@elgato/cli": "1.10.1",
+        "@rollup/plugin-commonjs": "29.0.3",
+        "@rollup/plugin-node-resolve": "16.0.3",
+        "@rollup/plugin-typescript": "12.3.0",
+        "rollup": "4.62.2"
+    }
+}

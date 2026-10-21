@@ -1,0 +1,109 @@
+/**
+ * The settings screens' words, in English and Spanish - the two languages
+ * Polaris speaks. Any other Stream Deck language reads English.
+ *
+ * A classic script setting one global rather than a module: the screen is
+ * opened from the plugin's folder, where a module import may be refused.
+ */
+(() => {
+    const WORDS = {
+        en: {
+            connection: "Polaris",
+            address: "Address",
+            addressHint: "The address you open Polaris at, for example polaris.example.com.",
+            connect: "Connect",
+            cancel: "Cancel",
+            disconnect: "Disconnect",
+            disconnectHint: "Disconnecting forgets the key here and revokes it in Polaris.",
+            connectedTo: "Connected to {address} as {account}.",
+            offline:
+                "Polaris cannot be reached right now. The keys show it and try again on their own.",
+            unauthorized:
+                "This deck's key no longer works: it was disconnected, revoked or expired. Connect again.",
+            waiting: "Approve this code in the browser that just opened:",
+            openAgain: "Open the page again",
+            failedAddress: "That is not an address Polaris can be reached at.",
+            failedDenied: "The request was turned away in Polaris.",
+            failedExpired: "The code expired before it was approved. Connect again for a new one.",
+            failedUnreachable: "Polaris could not be reached at that address.",
+            action: "Action",
+            pickAction: "Pick an action",
+            noActions:
+                "Nothing to pick: connect first, or this account has no access to anything a deck offers.",
+            name: "Name",
+            nameHint: "Optional. Drawn on the key instead of the action's name.",
+            required: "Required",
+            refresh: "Reload the list",
+            mode: "Mode",
+            countdown: "Countdown",
+            stopwatch: "Stopwatch",
+            minutes: "Minutes",
+            timerHint:
+                "Press to start or pause, hold to reset. On a dial, turn to set the minutes.",
+            areas: {
+                chat: "Chat",
+                status: "Status",
+                watch: "Watch",
+                deploy: "Deploy",
+                places: "Places",
+                polaris: "Polaris"
+            }
+        },
+        es: {
+            connection: "Polaris",
+            address: "Dirección",
+            addressHint: "La dirección en la que abres Polaris, por ejemplo polaris.example.com.",
+            connect: "Conectar",
+            cancel: "Cancelar",
+            disconnect: "Desconectar",
+            disconnectHint: "Al desconectar se olvida la clave aquí y se revoca en Polaris.",
+            connectedTo: "Conectado a {address} como {account}.",
+            offline:
+                "No se puede contactar con Polaris ahora. Las teclas lo indican y lo reintentan solas.",
+            unauthorized:
+                "La clave de este deck ya no funciona: se desconectó, se revocó o caducó. Vuelve a conectar.",
+            waiting: "Aprueba este código en el navegador que se acaba de abrir:",
+            openAgain: "Abrir la página otra vez",
+            failedAddress: "Esa no es una dirección en la que se pueda contactar con Polaris.",
+            failedDenied: "La solicitud se rechazó en Polaris.",
+            failedExpired:
+                "El código caducó antes de aprobarse. Vuelve a conectar para obtener uno nuevo.",
+            failedUnreachable: "No se pudo contactar con Polaris en esa dirección.",
+            action: "Acción",
+            pickAction: "Elige una acción",
+            noActions:
+                "No hay nada que elegir: conecta primero, o esta cuenta no tiene acceso a nada de lo que ofrece un deck.",
+            name: "Nombre",
+            nameHint: "Opcional. Se dibuja en la tecla en lugar del nombre de la acción.",
+            required: "Obligatorio",
+            refresh: "Recargar la lista",
+            mode: "Modo",
+            countdown: "Cuenta atrás",
+            stopwatch: "Cronómetro",
+            minutes: "Minutos",
+            timerHint:
+                "Pulsa para iniciar o pausar, mantén para reiniciar. En un dial, gira para fijar los minutos.",
+            areas: {
+                chat: "Chat",
+                status: "Estado",
+                watch: "Watch",
+                deploy: "Deploy",
+                places: "Lugares",
+                polaris: "Polaris"
+            }
+        }
+    };
+
+    window.PolarisWords = {
+        /** The words for a Stream Deck language code. */
+        wordsFor(language) {
+            return language === "es" ? WORDS.es : WORDS.en;
+        },
+        /** A message with its `{name}` placeholders filled. */
+        fill(text, values) {
+            return text.replace(/\{(\w+)\}/g, (whole, name) =>
+                name in values ? String(values[name]) : whole
+            );
+        }
+    };
+})();

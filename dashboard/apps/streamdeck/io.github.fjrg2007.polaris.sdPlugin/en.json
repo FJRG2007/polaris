@@ -1,0 +1,18 @@
+{
+    "Name": "Polaris",
+    "Description": "Keys and dials for your Polaris: send a message, set your status, see unread messages, alarms and deployments, and switch the devices in your places.",
+    "Category": "Polaris",
+    "io.github.fjrg2007.polaris.key": {
+        "Name": "Polaris key",
+        "Tooltip": "Runs a Polaris action or shows its live state."
+    },
+    "io.github.fjrg2007.polaris.dial": {
+        "Name": "Polaris dial",
+        "Tooltip": "Adjusts a Polaris device, such as a light's brightness."
+    },
+    "io.github.fjrg2007.polaris.timer": {
+        "Name": "Timer",
+        "Tooltip": "A countdown or stopwatch. Press to start or pause, hold to reset."
+    },
+    "Localization": {}
+}

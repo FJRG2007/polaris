@@ -1,0 +1,141 @@
+/*
+ * The settings screens, drawn to sit inside the Stream Deck app's own
+ * inspector: its dark panel, its small type, a label column and a control
+ * column.
+ */
+
+:root {
+    color-scheme: dark;
+    --text: #d8d8d8;
+    --muted: #969696;
+    --field: #3d3d3d;
+    --field-border: #4a4a4a;
+    --focus: #7c3aed;
+    --notice: #f5b14c;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    background: #2d2d2d;
+    color: var(--text);
+    font:
+        9pt -apple-system,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+}
+
+main {
+    padding: 8px 12px 16px 0;
+}
+
+section + section {
+    margin-top: 12px;
+    border-top: 1px solid #3a3a3a;
+    padding-top: 8px;
+}
+
+h2 {
+    margin: 4px 0 8px 12px;
+    font-size: 9pt;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+p {
+    margin: 4px 0 8px 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 30% minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.row label {
+    padding-top: 5px;
+    text-align: right;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+
+.required {
+    color: var(--muted);
+}
+
+.control {
+    min-width: 0;
+}
+
+.control p {
+    margin-left: 0;
+}
+
+input,
+select,
+button {
+    width: 100%;
+    min-height: 24px;
+    border: 1px solid var(--field-border);
+    border-radius: 3px;
+    background: var(--field);
+    color: var(--text);
+    font: inherit;
+    padding: 3px 6px;
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+    outline: 1px solid var(--focus);
+    outline-offset: 0;
+}
+
+button {
+    width: auto;
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 8px calc(30% + 8px);
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 8pt;
+}
+
+.notice {
+    color: var(--notice);
+}
+
+.code {
+    font:
+        600 18pt ui-monospace,
+        Menlo,
+        Consolas,
+        monospace;
+    letter-spacing: 0.15em;
+    color: #ffffff;
+}
