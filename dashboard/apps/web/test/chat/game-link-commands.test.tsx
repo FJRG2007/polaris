@@ -9,8 +9,14 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import { menuItems as blocksFor, type SlashCommand } from "@/components/rich-text/block-menu";
+import { createRef } from "react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+    BlockMenuList,
+    menuItems as blocksFor,
+    type SlashCommand
+} from "@/components/rich-text/block-menu";
+import type { SuggestionHandle } from "@/components/rich-text/suggestion";
 import { translatorFor } from "@/lib/i18n/translate";
 
 /** The list as an English reader is shown it. */
@@ -70,6 +76,44 @@ describe("the / list", () => {
         menuItems(COMMANDS, "on")[0]?.run(editor, { from: 1, to: 4 });
         expect(done).toEqual(["/online "]);
     });
+
+    it("completes the command on Tab, as Enter does, and sends nothing", () => {
+        for (const key of ["Tab", "Enter"]) {
+            const written: string[] = [];
+            const chain = {
+                focus: () => chain,
+                deleteRange: () => chain,
+                insertContent: (text: string) => {
+                    written.push(text);
+                    return chain;
+                },
+                run: () => true
+            };
+            const editor = { chain: () => chain } as never;
+            const items = menuItems(COMMANDS, "on");
+            const ref = createRef<SuggestionHandle>();
+            render(
+                <BlockMenuList
+                    ref={ref}
+                    {...({
+                        items,
+                        command: (item: (typeof items)[number]) =>
+                            item.run(editor, { from: 1, to: 4 })
+                    } as never)}
+                />
+            );
+            let taken = false;
+            act(() => {
+                taken = ref.current!.onKeyDown({
+                    event: new KeyboardEvent("keydown", { key })
+                } as never);
+            });
+            expect(taken).toBe(true);
+            // Only the text: a command is sent by the Enter after it.
+            expect(written).toEqual(["/online "]);
+            cleanup();
+        }
+    });
 });
 
 describe("the mark", () => {
@@ -97,7 +141,8 @@ describe("the mark", () => {
             <>
                 <GameLinkMark links={[]} />
                 <GameLinkChips links={[]} />
-            </>, { wrapper: MessagesWrapper }
+            </>,
+            { wrapper: MessagesWrapper }
         );
         expect(container.innerHTML).toBe("");
     });

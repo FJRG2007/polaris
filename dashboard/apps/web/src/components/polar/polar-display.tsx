@@ -110,9 +110,9 @@ export function DisplaySettings() {
     return (
         <section className="flex flex-col gap-2">
             <div className="min-w-0">
-                <h3 className="text-sm font-medium text-foreground">
+                <h2 className="text-sm font-medium text-foreground">
                     {t("settings.display.title")}
-                </h3>
+                </h2>
                 <p className="text-xs text-muted-foreground">{t("settings.display.intro")}</p>
             </div>
             <ul className="flex flex-col divide-y divide-border rounded-md border border-border">

@@ -1473,6 +1473,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: MessagesSquare,
             hidden: true,
             keywords: ["assistant", "ai", "ask", "chat", "history", "polar"]
+        },
+        {
+            label: "Polar settings", // i18n-ignore
+            href: "/polar/settings",
+            icon: Settings,
+            hidden: true,
+            keywords: ["memory", "tools", "mcp", "connectors", "web search", "polar"]
+        },
+        // What Polar may do without asking first: the "Always allow" answers
+        // from its approval card, each with Revoke.
+        {
+            label: "Polar permissions", // i18n-ignore
+            href: "/polar/settings#permissions",
+            icon: ShieldCheck,
+            hidden: true,
+            keywords: ["polar", "always allow", "approvals", "permissions", "assistant"]
         }
     ],
     notes: [
@@ -1778,15 +1794,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "connectors",
                 "oauth"
             ],
-            group: DEVELOPERS_GROUP
-        },
-        // What Polar may do without asking first: the "Always allow" answers
-        // from its approval card, each with Revoke.
-        {
-            label: "Polar permissions", // i18n-ignore
-            href: "/account/polar-tools",
-            icon: ShieldCheck,
-            keywords: ["polar", "always allow", "approvals", "permissions", "assistant"],
             group: DEVELOPERS_GROUP
         },
         {

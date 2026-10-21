@@ -62,6 +62,7 @@ afterEach(() => {
 });
 
 const { PolarChat } = await import("@/components/polar/polar-panel");
+const { PolarToolSettings } = await import("@/components/polar/polar-settings");
 
 const mount = () => render(<PolarChat />, { wrapper: MessagesWrapper });
 
@@ -91,11 +92,13 @@ const read: Part = {
 };
 
 describe("Polar on the web", () => {
-    it("keeps web search out of the composer, as a switch in Polar's settings", async () => {
+    it("keeps web search out of the composer, as a switch on Polar's settings page", async () => {
         mount();
         await screen.findByRole("textbox");
         expect(screen.queryByRole("button", { name: "Search the web" })).toBeNull();
-        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        expect(screen.queryByRole("switch", { name: "Search the web" })).toBeNull();
+        cleanup();
+        render(<PolarToolSettings />, { wrapper: MessagesWrapper });
         const toggle = await screen.findByRole("switch", { name: "Search the web" });
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         fireEvent.click(toggle);
@@ -105,22 +108,16 @@ describe("Polar on the web", () => {
 
     it("says the web is off, and cannot be switched on, where an administrator turned it off", async () => {
         webAllowed = false;
-        mount();
-        await screen.findByRole("textbox");
-        // Give the models answer its turn to land.
-        await new Promise((done) => setTimeout(done, 0));
-        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
-        const toggle = await screen.findByRole("switch", { name: "Search the web" });
+        render(<PolarToolSettings />, { wrapper: MessagesWrapper });
+        await screen.findByText("Your administrator has turned web search off.");
+        const toggle = screen.getByRole("switch", { name: "Search the web" });
         expect((toggle as HTMLButtonElement).disabled).toBe(true);
-        expect(screen.getByText("Your administrator has turned web search off.")).toBeTruthy();
     });
 
-    it("lists Polar's tools with a switch each, and remembers the ones switched off", async () => {
+    it("lists Polar's tools under Polaris, and remembers the ones switched off", async () => {
         tools = { read_tasks: { title: "Read tasks", writes: false, destructive: false } };
-        mount();
-        await screen.findByRole("textbox");
-        await new Promise((done) => setTimeout(done, 0));
-        fireEvent.click(screen.getByRole("button", { name: "Polar settings" }));
+        render(<PolarToolSettings />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Polaris/ }));
         const toggle = await screen.findByRole("switch", { name: "Read tasks" });
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         fireEvent.click(toggle);

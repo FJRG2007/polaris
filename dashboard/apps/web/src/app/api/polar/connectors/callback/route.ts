@@ -4,6 +4,7 @@
  * either way they land on the connectors screen, which says how it went.
  */
 
+import { POLAR_SETTINGS_PATH } from "@/lib/polar/settings-path";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { polarCaller } from "@/lib/polar/access";
@@ -21,7 +22,8 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request): Promise<Response> {
-    const back = new URL("/account/polar-tools", await appBaseUrl());
+    const back = new URL(POLAR_SETTINGS_PATH, await appBaseUrl());
+    back.hash = "connectors";
     const user = await polarCaller();
     const refused = user instanceof NextResponse ? user : await connectorGate(user, 20);
     if (user instanceof NextResponse || refused) {

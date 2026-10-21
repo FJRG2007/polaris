@@ -232,6 +232,31 @@ describe("the / commands", () => {
         expect(screen.queryByRole("listbox")).toBeNull();
     });
 
+    it("completes the highlighted command on Tab without running it, then Enter runs it", async () => {
+        mount();
+        await ready();
+        slash("/to");
+        const box = screen.getByLabelText("Message Polar") as HTMLTextAreaElement;
+        expect(highlighted()).toMatch(/^\/tools/);
+        fireEvent.keyDown(box, { key: "Tab" });
+        expect(box.value).toBe("/tools ");
+        expect(chat.sent).toEqual([]);
+        expect(screen.queryByRole("listbox")).toBeNull();
+        fireEvent.keyDown(box, { key: "Enter" });
+        expect(chat.sent).toHaveLength(1);
+    });
+
+    it("completes a command that acts on the chat on Tab, and does not act", async () => {
+        mount();
+        await ready();
+        slash("/memo");
+        const box = screen.getByLabelText("Message Polar") as HTMLTextAreaElement;
+        expect(highlighted()).toMatch(/^\/memory/);
+        fireEvent.keyDown(box, { key: "Tab" });
+        expect(box.value).toBe("/memory ");
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
     it("closes on Escape and leaves the text", async () => {
         mount();
         await ready();

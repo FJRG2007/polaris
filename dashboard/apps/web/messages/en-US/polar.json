@@ -371,8 +371,13 @@
             "title": "Polar's tools",
             "intro": "What Polar may use in a chat. One switched off is never offered to it.",
             "webOff": "Your administrator has turned web search off.",
-            "connectors": "Your connectors",
-            "manageConnectors": "Add or manage MCP connectors"
+            "manageConnectors": "Add or manage MCP connectors",
+            "polaris": "Polaris",
+            "builtIn": "Built in",
+            "count": "{on} of {total} on",
+            "serverOff": "Switched off",
+            "serverToggle": "Use {server}",
+            "offNote": "Every tool here stays off while {server} is off. Your choices below are kept."
         },
         "data": {
             "title": "Your chats",
@@ -398,6 +403,10 @@
             "modelHint": "Automatic uses the fastest model you have.",
             "unavailable": "That model is not available now, so Automatic is used.",
             "failed": "Couldn't save that setting. Try again."
+        },
+        "back": "Back to chat",
+        "nav": {
+            "permissions": "Permissions and connectors"
         }
     },
     "temporary": {
