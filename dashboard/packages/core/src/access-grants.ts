@@ -72,7 +72,8 @@ export const GRANT_SUBJECTS = [
     "office.document",
     "place.device",
     "place.camera",
-    "place.ups"
+    "place.ups",
+    "place.nas"
 ] as const;
 
 export type GrantSubject = (typeof GRANT_SUBJECTS)[number];
@@ -126,7 +127,11 @@ export const GRANT_CAPABILITIES = {
     // itself draws - Home Assistant's NUT integration reads with no login and
     // offers commands only to a NUT user with instant-command rights
     // (https://www.home-assistant.io/integrations/nut).
-    "place.ups": ["view", "control"]
+    "place.ups": ["view", "control"],
+    // A NAS: its status, storage and history, or also its fan profile and
+    // running its backup tasks. Its connection, shares and settings stay with
+    // whoever connected it.
+    "place.nas": ["view", "control"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
@@ -145,7 +150,9 @@ export type GrantCapability = (typeof GRANT_CAPABILITIES)[GrantSubject][number];
  * - a device: `open` (unlock, unlatch), `close` (lock) and `operate`
  *   (everything a switch, a light or an air conditioner does);
  * - a camera: `watch`;
- * - a UPS: `watch` (status, history) and `control` (commands, variables, test).
+ * - a UPS: `watch` (status, history) and `control` (commands, variables, test);
+ * - a NAS: `watch` (status, storage, history), `fan` (its fan profile) and
+ *   `backup` (running one of its backup tasks).
  *
  * `watch` is what `view` reaches; every other action needs `control`.
  */
@@ -158,7 +165,8 @@ export const GRANT_ACTIONS = {
     "office.document": [],
     "place.device": ["open", "close", "operate"],
     "place.camera": ["watch"],
-    "place.ups": ["watch", "control"]
+    "place.ups": ["watch", "control"],
+    "place.nas": ["watch", "fan", "backup"]
 } as const satisfies Record<GrantSubject, readonly string[]>;
 
 /**

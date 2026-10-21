@@ -68,8 +68,7 @@ function subjectOf(value: unknown): core.GrantSubject {
  * every screen and already redraw themselves on the caller's own next move.
  */
 function settled(subject: core.GrantSubject): void {
-    if (subject === "place.device" || subject === "place.camera" || subject === "place.ups")
-        revalidatePath("/places");
+    if (subject.startsWith("place.")) revalidatePath("/places");
 }
 
 export async function listGrantsAction(

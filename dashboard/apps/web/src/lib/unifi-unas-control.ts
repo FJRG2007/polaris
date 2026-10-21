@@ -20,6 +20,9 @@ import {
     type UnasMetrics,
     type UnasTarget
 } from "@/lib/unifi-unas";
+import { backupFailed, backupOverdue } from "@/lib/nas/nas-view";
+
+export { BACKUP_OVERDUE_GRACE_MS, backupFailed, backupOverdue } from "@/lib/nas/nas-view";
 
 /** How long one console request may take before it is given up on. */
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -30,9 +33,6 @@ export const FAN_CONTROL_PATH = "/proxy/drive/api/v2/systems/fan-control";
 export const BACKUP_TASKS_PATH = "/proxy/drive/api/v2/remote-backup/tasks";
 export const backupRunPath = (taskId: string) =>
     `/proxy/drive/api/v2/remote-backup/run-task/${encodeURIComponent(taskId)}`;
-
-/** A scheduled backup counts as overdue once its next run is this far behind. */
-export const BACKUP_OVERDUE_GRACE_MS = 60 * 60 * 1000;
 
 export type UnasFanProfile = "quiet" | "balanced" | "cooling";
 /** Option -> value the Drive API takes (Balanced is sent as `default`). */
@@ -91,22 +91,9 @@ export function parseBackupTasks(data: unknown): UnasBackupTask[] {
     });
 }
 
-export function backupFailed(task: UnasBackupTask): boolean {
-    return task.errorCodes.length > 0;
-}
-
-export function backupOverdue(
-    task: UnasBackupTask,
-    now: Date,
-    graceMs = BACKUP_OVERDUE_GRACE_MS
-): boolean {
-    if (!task.scheduleEnabled || task.lastStatus === "pending" || task.lastStatus === "in-progress")
-        return false;
-    const next = task.nextRun ? Date.parse(task.nextRun) : Number.NaN;
-    return Number.isFinite(next) && now.getTime() - next > graceMs;
-}
-
 export type UnasAlertKind =
+    /** Raised by the watcher when the console does not answer, not by unasAlerts. */
+    | "offline"
     | "pool-unprotected"
     | "pool-usage"
     | "disk-unhealthy"

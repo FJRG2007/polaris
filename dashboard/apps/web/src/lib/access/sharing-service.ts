@@ -82,6 +82,16 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             }
             return;
+        case "place.nas": {
+            // A NAS is lent by whoever connected it, the same account its
+            // console password belongs to.
+            const nas = await prisma.storageConnection.findFirst({
+                where: { id: subjectId, kind: "unifi-unas", ownerId: user.id },
+                select: { id: true }
+            });
+            if (!nas) throw new GrantError("You cannot share that");
+            return;
+        }
     }
 }
 
@@ -264,7 +274,12 @@ function orgOf(row: { orgId: string | null } | null): string | null {
  * and a form nobody can answer is a form nobody fills in.
  */
 export function shareIsBounded(subject: core.GrantSubject): boolean {
-    return subject === "place.device" || subject === "place.camera" || subject === "place.ups";
+    return (
+        subject === "place.device" ||
+        subject === "place.camera" ||
+        subject === "place.ups" ||
+        subject === "place.nas"
+    );
 }
 
 /** What each capability is called and what it means, for the picker. Kept beside

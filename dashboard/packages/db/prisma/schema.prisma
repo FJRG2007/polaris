@@ -2006,9 +2006,35 @@ model StorageConnection {
     deployVolumes      Volume[]
     backupDestinations BackupDestination[]
     transfers          DriveTransfer[]
+    nasSamples         NasSample[]
+    // A NAS (unifi-unas) is also a device of a Places place. A bare uuid, per the
+    // Ups.placeId precedent: Places can be uninstalled and Drive keeps the NAS.
+    placeId            String?  @db.Uuid
+    // The NAS alert conditions the last poll found (UnasAlert.key), so an
+    // Automation event is sent when one starts, not on every poll.
+    nasAlertKeys       String[] @default([])
 
     @@index([ownerId])
     @@index([orgId])
+    @@index([placeId])
+}
+
+// One reading of a NAS's temperatures and usage, for its Places charts. Kept
+// NAS_SAMPLE_RETENTION_DAYS (lib/nas/nas-history.ts); the 1M range is the widest.
+model NasSample {
+    connectionId String            @db.Uuid
+    ts           DateTime          @default(now())
+    cpuTempC     Float?
+    diskTempMaxC Float?
+    diskTempAvgC Float?
+    usedBytes    BigInt?
+    totalBytes   BigInt?
+    // Bay number -> that drive's temperature, for the per-bay lines.
+    diskTemps    Json?
+    connection   StorageConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+    @@id([connectionId, ts])
+    @@index([ts])
 }
 
 // A deletion scheduled for a future time. Polaris has no always-on scheduler, so

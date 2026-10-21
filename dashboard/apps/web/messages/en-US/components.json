@@ -567,7 +567,9 @@
             "close": "Lock",
             "operate": "Switch",
             "watch": "Watch",
-            "control": "Control"
+            "control": "Control",
+            "fan": "Fan speed",
+            "backup": "Run backups"
         },
         "capabilities": {
             "guest": {
