@@ -64,8 +64,9 @@ export interface ApiKeyView {
      *  carries its owner's permissions like any other key. */
     projectId: string | null;
     projectName: string | null;
-    /** What issued it: "cli" for the credential `plr login` was handed, "key"
-     *  for everything else. See `ApiKeyKind`. */
+    /** What issued it: "cli" for the credential `plr login` was handed,
+     *  "streamdeck" for a connected Stream Deck, "key" for everything else. See
+     *  `ApiKeyKind`. */
     kind: ApiKeyKind;
     /** Calls answered today, and over the window the counter keeps. Two numbers
      *  because one of them answers "is this still in use" and the other answers
@@ -80,7 +81,12 @@ export interface ApiKeyView {
  * revocable and narrowed to its owner the same way; the kind only says where it
  * came from, so the list can label it and the CLI can end its own sign-in.
  */
-export type ApiKeyKind = "key" | "cli";
+export type ApiKeyKind = "key" | "cli" | "streamdeck";
+
+/** The kind a stored row names, with anything unknown read as an ordinary key. */
+export function apiKeyKindOf(stored: string): ApiKeyKind {
+    return stored === "cli" || stored === "streamdeck" ? stored : "key";
+}
 
 /** A verified key: who it acts as, what it may do, and where it may be used from. */
 export interface VerifiedApiKey {
@@ -244,7 +250,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         createdAt: row.createdAt.toISOString(),
         projectId: row.projectId,
         projectName: row.project?.name ?? null,
-        kind: row.kind === "cli" ? "cli" : "key",
+        kind: apiKeyKindOf(row.kind),
         usedToday: row.usage.find((day) => day.day === today)?.calls ?? 0,
         usedRecently: row.usage.reduce((total, day) => total + day.calls, 0)
     }));
@@ -393,7 +399,7 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
             deniedUserAgents: parseStringList(row.deniedUserAgents)
         },
         projectId: row.projectId,
-        kind: row.kind === "cli" ? "cli" : "key",
+        kind: apiKeyKindOf(row.kind),
         lastUsedIp: row.lastUsedIp,
         pinToAddress: row.pinToAddress,
         clientOs: row.clientOs
