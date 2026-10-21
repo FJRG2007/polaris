@@ -71,7 +71,9 @@ export interface StoreFilter {
  */
 export function filterStoreApps(apps: readonly AppManifest[], filter: StoreFilter): AppManifest[] {
     const inCategory =
-        filter.category === "all" ? [...apps] : apps.filter((app) => app.category === filter.category);
+        filter.category === "all"
+            ? [...apps]
+            : apps.filter((app) => app.category === filter.category);
     const term = filter.query.trim();
     const matched = term ? searchItems(inCategory, term, APP_FIELDS) : inCategory;
     const order = new Map(apps.map((app, index) => [app.id, index]));

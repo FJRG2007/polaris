@@ -138,7 +138,10 @@ export function ScreenshotGallery({ name, shots }: { name: string; shots: AppScr
                         >
                             {(["dark", "light"] as const).map((theme) => (
                                 <picture key={theme} className={styles[theme]}>
-                                    <source media="(max-width: 640px)" srcSet={shot[theme].mobile} />
+                                    <source
+                                        media="(max-width: 640px)"
+                                        srcSet={shot[theme].mobile}
+                                    />
                                     {/* eslint-disable-next-line @next/next/no-img-element -- static webp, no optimizer needed */}
                                     <img
                                         src={shot[theme].desktop}

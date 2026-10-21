@@ -26,7 +26,10 @@ describe("filtering and sorting the listing", () => {
         for (const category of storeCategories(all)) {
             const shown = filterStoreApps(all, { query: "", category, sort: "featured" });
             expect(shown.length, category).toBeGreaterThan(0);
-            expect(shown.every((item) => item.category === category), category).toBe(true);
+            expect(
+                shown.every((item) => item.category === category),
+                category
+            ).toBe(true);
         }
         expect(filterStoreApps(all, { query: "", category: "all", sort: "featured" })).toHaveLength(
             all.length
@@ -35,9 +38,9 @@ describe("filtering and sorting the listing", () => {
 
     it("searches inside the chosen category only", () => {
         const all = offered();
-        expect(ids(filterStoreApps(all, { query: "dns", category: "Tools", sort: "featured" }))).toContain(
-            "dns-blocker"
-        );
+        expect(
+            ids(filterStoreApps(all, { query: "dns", category: "Tools", sort: "featured" }))
+        ).toContain("dns-blocker");
         expect(
             filterStoreApps(all, { query: "calendar", category: "Game servers", sort: "featured" })
         ).toEqual([]);
@@ -57,7 +60,8 @@ describe("filtering and sorting the listing", () => {
     });
 
     it("puts the most recently added first, and every offered app has its date", () => {
-        for (const item of offered()) expect(ADDED_ON[item.id], item.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        for (const item of offered())
+            expect(ADDED_ON[item.id], item.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
         const shown = filterStoreApps(offered(), { query: "", category: "all", sort: "recent" });
         const dates = shown.filter((item) => !item.comingSoon).map((item) => ADDED_ON[item.id]!);
         expect(dates).toEqual([...dates].sort().reverse());
@@ -121,7 +125,10 @@ describe("the action a card leads with", () => {
             kind: "install",
             configurable: true
         });
-        expect(primaryAction(app("calendar"), base)).toEqual({ kind: "install", configurable: false });
+        expect(primaryAction(app("calendar"), base)).toEqual({
+            kind: "install",
+            configurable: false
+        });
     });
 
     it("says why instead of offering Install to a reader without the permission", () => {

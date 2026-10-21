@@ -100,13 +100,17 @@ export function appNeeds(t: NamespaceTranslator<"marketplace">, app: AppManifest
         if (ports.length > 0)
             lines.push(
                 t("detail.needsPorts", {
-                    ports: ports.map((port) => `${port.host ?? port.container}/${port.protocol}`).join(", ")
+                    ports: ports
+                        .map((port) => `${port.host ?? port.container}/${port.protocol}`)
+                        .join(", ")
                 })
             );
         const volumes = app.template?.volumes ?? [];
         if (volumes.length > 0)
             lines.push(
-                t("detail.needsStorage", { volumes: volumes.map((volume) => volume.label).join(", ") })
+                t("detail.needsStorage", {
+                    volumes: volumes.map((volume) => volume.label).join(", ")
+                })
             );
         const fields = promptedEnvVars(app);
         if (fields.length > 0)
@@ -161,7 +165,11 @@ export function AppDetail({ appId, children }: { appId: string; children: ReactN
             {shots.length > 0 ? (
                 <ScreenshotGallery name={app.name} shots={shots} />
             ) : (
-                <AppPreview app={app} shot={null} className="max-w-2xl rounded-lg border border-border" />
+                <AppPreview
+                    app={app}
+                    shot={null}
+                    className="max-w-2xl rounded-lg border border-border"
+                />
             )}
 
             {app.id === GAME_SERVERS_APP_ID ? <SupportedGames /> : null}

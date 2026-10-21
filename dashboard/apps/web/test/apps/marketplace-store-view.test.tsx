@@ -34,7 +34,9 @@ describe("the store listing", () => {
     it("shows a real capture where one exists and the placeholder where none does", () => {
         render(<MarketplaceView installed={[]} />, { wrapper: MessagesWrapper });
         const calendar = cardOf("Calendar");
-        expect(calendar.querySelector('img[src="/marketplace/calendar-dark-en-desktop.webp"]')).not.toBeNull();
+        expect(
+            calendar.querySelector('img[src="/marketplace/calendar-dark-en-desktop.webp"]')
+        ).not.toBeNull();
         expect(calendar.querySelector('[data-preview="placeholder"]')).toBeNull();
         const crm = cardOf("CRM");
         expect(crm.querySelector("img")).toBeNull();

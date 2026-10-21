@@ -563,7 +563,11 @@ function StoreCard({
                     )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                    <PrimaryActionButton action={action} onInstall={onInstall} disabled={disabled} />
+                    <PrimaryActionButton
+                        action={action}
+                        onInstall={onInstall}
+                        disabled={disabled}
+                    />
                     <OverflowMenu label={t("card.more", { name: app.name })} entries={entries} />
                 </div>
             </div>

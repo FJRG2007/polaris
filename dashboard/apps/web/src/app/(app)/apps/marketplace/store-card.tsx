@@ -76,7 +76,9 @@ export function AppPreview({
             <span className="rounded-xl bg-background/90 p-2 shadow-sm">
                 <AppMark app={app} size={44} />
             </span>
-            <span className="max-w-full truncate text-sm font-semibold" title={app.name}>{app.name}</span>
+            <span className="max-w-full truncate text-sm font-semibold" title={app.name}>
+                {app.name}
+            </span>
             <span className="line-clamp-2 max-w-[28ch] text-xs opacity-80">{app.summary}</span>
         </div>
     );
