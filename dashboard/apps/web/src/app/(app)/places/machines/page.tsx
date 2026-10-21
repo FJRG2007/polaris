@@ -61,34 +61,68 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
     return (
         <section className="flex flex-col gap-3">
             <h2 className="text-sm font-medium">{title}</h2>
-            <Suspense fallback={<Skeleton className="h-28 w-full rounded-xl" />}>{children}</Suspense>
+            <Suspense fallback={<Skeleton className="h-28 w-full rounded-xl" />}>
+                {children}
+            </Suspense>
         </section>
     );
 }
 
-async function Servers({ ownerId, userId, borrows }: { ownerId: string | null; userId: string; borrows: boolean }) {
+async function Servers({
+    ownerId,
+    userId,
+    borrows
+}: {
+    ownerId: string | null;
+    userId: string;
+    borrows: boolean;
+}) {
     const t = await getTranslations("servers");
     const [own, lent] = await Promise.all([
         ownerId ? machines.machineServers(ownerId) : [],
         borrows ? machines.lentMachineServers(userId, t("machines.lent")) : []
     ]);
     const cards = [...own, ...lent];
-    return <WatchCardList cards={cards} empty={t("machines.noServers")} label={t("machines.servers")} />;
+    return (
+        <WatchCardList
+            cards={cards}
+            empty={t("machines.noServers")}
+            label={t("machines.servers")}
+        />
+    );
 }
 
 async function Containers({ ownerId }: { ownerId: string }) {
-    const [t, cards] = await Promise.all([getTranslations("servers"), machines.machineContainers(ownerId)]);
-    return <WatchCardList cards={cards} empty={t("machines.noContainers")} label={t("machines.containers")} />;
+    const [t, cards] = await Promise.all([
+        getTranslations("servers"),
+        machines.machineContainers(ownerId)
+    ]);
+    return (
+        <WatchCardList
+            cards={cards}
+            empty={t("machines.noContainers")}
+            label={t("machines.containers")}
+        />
+    );
 }
 
-async function Domains({ ownerId, userId, borrows }: { ownerId: string | null; userId: string; borrows: boolean }) {
+async function Domains({
+    ownerId,
+    userId,
+    borrows
+}: {
+    ownerId: string | null;
+    userId: string;
+    borrows: boolean;
+}) {
     const [t, own, lent] = await Promise.all([
         getTranslations("servers"),
         ownerId ? machines.machineDomains(ownerId) : [],
         borrows ? machines.lentMachineDomains(userId) : []
     ]);
     const rows = [...own, ...lent];
-    if (rows.length === 0) return <p className="text-sm text-muted-foreground">{t("machines.noDomains")}</p>;
+    if (rows.length === 0)
+        return <p className="text-sm text-muted-foreground">{t("machines.noDomains")}</p>;
     return (
         <ul className="flex flex-col divide-y rounded-md border">
             {rows.map((row) => (
@@ -100,7 +134,11 @@ async function Domains({ ownerId, userId, borrows }: { ownerId: string | null; u
                         <span
                             aria-hidden
                             className={`size-2 shrink-0 rounded-full ${
-                                row.status === "up" ? "bg-success" : row.status === "down" ? "bg-danger" : "bg-muted-foreground"
+                                row.status === "up"
+                                    ? "bg-success"
+                                    : row.status === "down"
+                                      ? "bg-danger"
+                                      : "bg-muted-foreground"
                             }`}
                         />
                         <span className="min-w-0 flex-1 truncate" title={row.hostname}>

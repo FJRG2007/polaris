@@ -25,7 +25,11 @@ import { DowntimeHeatmap, spanWith } from "@/components/metrics/downtime-heatmap
 import { dailyDowntime, type DayDowntime } from "@/lib/connectivity/outages";
 import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { episodesFrom, mergedSpans, type AlarmEventPoint } from "@/lib/machines/alarm-episodes";
-import { breakdownTitle, MetricBreakdownDialog, type OpenBreakdown } from "@/components/metrics/metric-breakdown";
+import {
+    breakdownTitle,
+    MetricBreakdownDialog,
+    type OpenBreakdown
+} from "@/components/metrics/metric-breakdown";
 
 type Kind = "server" | "container" | "domain";
 
@@ -58,7 +62,8 @@ export function MachineDetailView({
     const tw = useTranslations("watch");
     const [opened, setOpened] = useState<OpenBreakdown | null>(null);
     const [sharing, setSharing] = useState(false);
-    const shareSubject = kind === "server" ? "place.server" : kind === "domain" ? "place.domain" : null;
+    const shareSubject =
+        kind === "server" ? "place.server" : kind === "domain" ? "place.domain" : null;
 
     const metrics = useMemo(
         () =>
@@ -69,7 +74,8 @@ export function MachineDetailView({
                     ...metric,
                     breakdown: {
                         label: breakdownTitle(tw, offered),
-                        open: (window: { from: number; to: number }) => setOpened({ metric: offered, ...window })
+                        open: (window: { from: number; to: number }) =>
+                            setOpened({ metric: offered, ...window })
                     }
                 };
             }),
@@ -79,12 +85,15 @@ export function MachineDetailView({
     const elsewhere = lent
         ? null
         : kind === "server"
-            ? { href: "/apps/servers", label: t("machines.openServers") }
-            : kind === "container"
-              ? { href: container?.href ?? "/apps/containers", label: t("machines.openContainers") }
-              : domain
-                ? { href: `/apps/deploy/${domain.projectId}?service=${domain.serviceId}`, label: t("machines.openDeploy") }
-                : null;
+          ? { href: "/apps/servers", label: t("machines.openServers") }
+          : kind === "container"
+            ? { href: container?.href ?? "/apps/containers", label: t("machines.openContainers") }
+            : domain
+              ? {
+                    href: `/apps/deploy/${domain.projectId}?service=${domain.serviceId}`,
+                    label: t("machines.openDeploy")
+                }
+              : null;
 
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -96,7 +105,10 @@ export function MachineDetailView({
                     >
                         <ArrowLeft className="size-3 shrink-0" /> {t("machines.back")}
                     </Link>
-                    <h1 title={name} className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight">
+                    <h1
+                        title={name}
+                        className="mt-1 truncate text-[1.0625rem] font-semibold tracking-tight"
+                    >
                         {name}
                     </h1>
                     {detail ? (
@@ -132,7 +144,11 @@ export function MachineDetailView({
                         live={`/api/watch/hosts/${id}/metrics/stream`}
                         metrics={metrics}
                     />
-                    <MetricBreakdownDialog subject={{ kind: "server", id }} open={opened} onClose={() => setOpened(null)} />
+                    <MetricBreakdownDialog
+                        subject={{ kind: "server", id }}
+                        open={opened}
+                        onClose={() => setOpened(null)}
+                    />
                 </section>
             ) : null}
 
@@ -157,7 +173,9 @@ export function MachineDetailView({
 function Reading({ label, value }: { label: string; value: string }) {
     return (
         <div className="min-w-0 rounded-lg border border-border/60 px-3 py-2">
-            <p className="truncate text-xs text-muted-foreground" title={label}>{label}</p>
+            <p className="truncate text-xs text-muted-foreground" title={label}>
+                {label}
+            </p>
             <p className="truncate text-sm font-medium" title={value}>
                 {value}
             </p>
@@ -171,7 +189,10 @@ function ContainerNow({ card }: { card: WatchCard }) {
     return (
         <div className="grid gap-2 sm:grid-cols-3">
             <Reading label={t("machines.status")} value={card.stateLabel} />
-            <Reading label={t("machines.cpu")} value={card.cpuPercent == null ? none : `${card.cpuPercent}%`} />
+            <Reading
+                label={t("machines.cpu")}
+                value={card.cpuPercent == null ? none : `${card.cpuPercent}%`}
+            />
             <Reading
                 label={t("machines.memory")}
                 value={card.memUsedBytes == null ? none : formatBytes(card.memUsedBytes)}
@@ -186,10 +207,22 @@ function DomainNow({ domain }: { domain: DomainDevice }) {
     const none = t("machines.unknown");
     return (
         <div className="grid gap-2 sm:grid-cols-4">
-            <Reading label={t("machines.status")} value={t(`machines.${domain.status ?? "unknown"}`)} />
-            <Reading label={t("machines.code")} value={domain.code == null ? none : String(domain.code)} />
-            <Reading label={t("machines.latency")} value={domain.latencyMs == null ? none : `${domain.latencyMs} ms`} />
-            <Reading label={t("machines.checked")} value={domain.checkedAt ? display.dateTime(domain.checkedAt) : none} />
+            <Reading
+                label={t("machines.status")}
+                value={t(`machines.${domain.status ?? "unknown"}`)}
+            />
+            <Reading
+                label={t("machines.code")}
+                value={domain.code == null ? none : String(domain.code)}
+            />
+            <Reading
+                label={t("machines.latency")}
+                value={domain.latencyMs == null ? none : `${domain.latencyMs} ms`}
+            />
+            <Reading
+                label={t("machines.checked")}
+                value={domain.checkedAt ? display.dateTime(domain.checkedAt) : none}
+            />
         </div>
     );
 }
@@ -207,7 +240,10 @@ function AlarmHistory({ history }: { history: { since: number; events: AlarmEven
         [episodes, now, display.preferences.timeZone]
     );
     const shown = selected
-        ? episodes.filter((episode) => episode.startedAt < selected.end && (episode.endedAt ?? now) > selected.start)
+        ? episodes.filter(
+              (episode) =>
+                  episode.startedAt < selected.end && (episode.endedAt ?? now) > selected.start
+          )
         : episodes;
 
     return (
@@ -238,15 +274,27 @@ function AlarmHistory({ history }: { history: { since: number; events: AlarmEven
                         </thead>
                         <tbody>
                             {shown.map((episode) => (
-                                <tr key={`${episode.alarmId}-${episode.startedAt}`} className="border-t border-border/40">
-                                    <td className="max-w-56 truncate px-3 py-2" title={episode.alarmName}>
+                                <tr
+                                    key={`${episode.alarmId}-${episode.startedAt}`}
+                                    className="border-t border-border/40"
+                                >
+                                    <td
+                                        className="max-w-56 truncate px-3 py-2"
+                                        title={episode.alarmName}
+                                    >
                                         {episode.alarmName}
                                     </td>
-                                    <td className="whitespace-nowrap px-3 py-2">{display.dateTime(new Date(episode.startedAt).toISOString())}</td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                        {display.dateTime(
+                                            new Date(episode.startedAt).toISOString()
+                                        )}
+                                    </td>
                                     <td className="whitespace-nowrap px-3 py-2">
                                         {episode.endedAt === null
                                             ? t("machines.ongoing")
-                                            : display.dateTime(new Date(episode.endedAt).toISOString())}
+                                            : display.dateTime(
+                                                  new Date(episode.endedAt).toISOString()
+                                              )}
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-2">
                                         {span((episode.endedAt ?? now) - episode.startedAt)}

@@ -96,7 +96,10 @@ export async function lentMachineDomains(userId: string, id?: string): Promise<D
 }
 
 export async function machineDomains(ownerId: string, id?: string): Promise<DomainDevice[]> {
-    return readDomains({ ...(id ? { id } : {}), application: { environment: { project: { ownerId } } } });
+    return readDomains({
+        ...(id ? { id } : {}),
+        application: { environment: { project: { ownerId } } }
+    });
 }
 
 async function readDomains(where: Prisma.DomainWhereInput): Promise<DomainDevice[]> {

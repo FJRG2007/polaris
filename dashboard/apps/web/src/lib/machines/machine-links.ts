@@ -17,7 +17,10 @@ export function machineHref(kind: MachineKind, id: string): string {
  *  links it with, so the local machine keeps its address. */
 export function inPlaces(card: WatchCard): WatchCard {
     if (card.kind === "server") {
-        return { ...card, href: card.href.replace(/^\/watch\/server\//, "/places/machines/server/") };
+        return {
+            ...card,
+            href: card.href.replace(/^\/watch\/server\//, "/places/machines/server/")
+        };
     }
     return card.kind === "container" ? { ...card, href: machineHref("container", card.id) } : card;
 }

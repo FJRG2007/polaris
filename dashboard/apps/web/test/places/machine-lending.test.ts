@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const hosts = new Map<string, { id: string; ownerId: string; name: string; address: string; dockerId: string | null }>();
+const hosts = new Map<
+    string,
+    { id: string; ownerId: string; name: string; address: string; dockerId: string | null }
+>();
 const domains = new Map<string, { id: string; hostname: string; ownerId: string }>();
 const grants = new Map<string, { capability: string; actions: string[] }[]>();
 
@@ -14,10 +17,14 @@ const DOMAIN = "0190a000-0000-7000-8000-0000000000d1";
 vi.mock("@polaris/db", () => ({
     prisma: {
         host: {
-            findUnique: vi.fn(async ({ where }: { where: { id: string } }) => hosts.get(where.id) ?? null),
+            findUnique: vi.fn(
+                async ({ where }: { where: { id: string } }) => hosts.get(where.id) ?? null
+            ),
             findFirst: vi.fn(
                 async ({ where }: { where: { id: string; ownerId: string } }) =>
-                    [...hosts.values()].find((host) => host.id === where.id && host.ownerId === where.ownerId) ?? null
+                    [...hosts.values()].find(
+                        (host) => host.id === where.id && host.ownerId === where.ownerId
+                    ) ?? null
             )
         },
         domain: {
@@ -48,8 +55,13 @@ vi.mock("@/lib/access/grants", () => ({
     grantedSubjects: vi.fn(async () => new Map())
 }));
 vi.mock("@/lib/local-machine", () => ({
-    localMachineIdentity: vi.fn(async () => ({ hostId: LOCAL_ROW, dockerId: null, addresses: new Set() })),
-    isLocalMachine: (host: { id?: string }, identity: { hostId: string }) => host.id === identity.hostId
+    localMachineIdentity: vi.fn(async () => ({
+        hostId: LOCAL_ROW,
+        dockerId: null,
+        addresses: new Set()
+    })),
+    isLocalMachine: (host: { id?: string }, identity: { hostId: string }) =>
+        host.id === identity.hostId
 }));
 vi.mock("@/lib/session", () => ({
     sessionCan: vi.fn(async (user: { id: string }) => user.id === OWNER)
@@ -90,8 +102,20 @@ beforeEach(() => {
     domains.clear();
     grants.clear();
     hosts.set(LENT, { id: LENT, ownerId: OWNER, name: "Web", address: "10.0.0.2", dockerId: null });
-    hosts.set(OTHER, { id: OTHER, ownerId: OWNER, name: "Db", address: "10.0.0.3", dockerId: null });
-    hosts.set(LOCAL_ROW, { id: LOCAL_ROW, ownerId: OWNER, name: "Box", address: "10.0.0.1", dockerId: null });
+    hosts.set(OTHER, {
+        id: OTHER,
+        ownerId: OWNER,
+        name: "Db",
+        address: "10.0.0.3",
+        dockerId: null
+    });
+    hosts.set(LOCAL_ROW, {
+        id: LOCAL_ROW,
+        ownerId: OWNER,
+        name: "Box",
+        address: "10.0.0.1",
+        dockerId: null
+    });
     domains.set(DOMAIN, { id: DOMAIN, hostname: "app.example.test", ownerId: OWNER });
     vi.mocked(getMetricSeries).mockClear();
 });
@@ -113,13 +137,19 @@ describe("servers and domains lent to watch", () => {
     it("lets the owner lend a server and a domain, and nobody else", async () => {
         await expect(requireMayShare(owner, "place.server", LENT)).resolves.toBeUndefined();
         await expect(requireMayShare(owner, "place.domain", DOMAIN)).resolves.toBeUndefined();
-        await expect(requireMayShare(visitor, "place.server", LENT)).rejects.toThrow("You cannot share that");
-        await expect(requireMayShare(visitor, "place.domain", DOMAIN)).rejects.toThrow("You cannot share that");
+        await expect(requireMayShare(visitor, "place.server", LENT)).rejects.toThrow(
+            "You cannot share that"
+        );
+        await expect(requireMayShare(visitor, "place.domain", DOMAIN)).rejects.toThrow(
+            "You cannot share that"
+        );
     });
 
     it("never lends the machine Polaris runs on, by any of its ids", async () => {
         for (const id of [core.LOCAL_SERVER_ID, LOCAL_HOST_SUBJECT, LOCAL_ROW]) {
-            await expect(requireMayShare(owner, "place.server", id)).rejects.toThrow("You cannot share that");
+            await expect(requireMayShare(owner, "place.server", id)).rejects.toThrow(
+                "You cannot share that"
+            );
         }
         lend("place.server", LOCAL_ROW);
         expect(await borrowedServer(VISITOR, LOCAL_ROW)).toBeNull();
@@ -161,7 +191,10 @@ describe("the load routes", () => {
         lend("place.server", LENT);
         const lent = await call(history, LENT);
         expect(lent.status).toBe(200);
-        expect(vi.mocked(getMetricSeries).mock.calls[0]![0]).toMatchObject({ subjectId: LENT, ownerId: OWNER });
+        expect(vi.mocked(getMetricSeries).mock.calls[0]![0]).toMatchObject({
+            subjectId: LENT,
+            ownerId: OWNER
+        });
         expect((await call(stream, LENT)).status).toBe(200);
 
         for (const id of [OTHER, core.LOCAL_SERVER_ID]) {

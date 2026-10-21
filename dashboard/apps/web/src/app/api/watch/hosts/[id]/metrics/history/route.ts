@@ -1,4 +1,3 @@
-
 import { getMetricSeries } from "@/lib/metrics-history-service";
 import { apiUser } from "@/lib/api-session";
 import { serverMetricsOwner } from "@/lib/machines/machine-access";
@@ -20,7 +19,11 @@ export async function GET(
     if (user instanceof Response) return user;
     const { id } = await params;
     const ownerId = await serverMetricsOwner(user, id);
-    if (!ownerId) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
+    if (!ownerId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.notFound") },
+            { status: 404 }
+        );
     const url = new URL(request.url);
     const { from, to } = resolveRange(
         url.searchParams.get("range"),
@@ -34,6 +37,10 @@ export async function GET(
         from,
         to
     });
-    if (points === null) return Response.json({ error: (await readerWords("api"))("errors.notFound") }, { status: 404 });
+    if (points === null)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.notFound") },
+            { status: 404 }
+        );
     return Response.json({ points });
 }

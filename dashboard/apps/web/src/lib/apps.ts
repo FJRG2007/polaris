@@ -1176,7 +1176,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Server,
             // Open to everyone, as NAS is: a server or a domain can be lent to
             // somebody without Deploy, and this is the only way they reach it.
-            keywords: ["server", "container", "domain", "cpu", "memory", "uptime", "outage", "watch"]
+            keywords: [
+                "server",
+                "container",
+                "domain",
+                "cpu",
+                "memory",
+                "uptime",
+                "outage",
+                "watch"
+            ]
         },
         {
             label: "Automations", // i18n-ignore

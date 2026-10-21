@@ -27,7 +27,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Pure: whether any of these live grants lets them watch. */
 export function watchesFrom(subject: LentMachine, held: readonly LiveGrant[]): boolean {
-    return held.some((grant) => core.allowsAction(subject, grant.capability, grant.actions, "watch"));
+    return held.some((grant) =>
+        core.allowsAction(subject, grant.capability, grant.actions, "watch")
+    );
 }
 
 /** Whether a server id names the machine Polaris runs on by its reserved ids. */
@@ -39,7 +41,9 @@ export function isLocalServerId(id: string): boolean {
  * The host row a server id names, when it is one that can be lent: a registered
  * server that is not the machine Polaris runs on. Null otherwise.
  */
-export async function lendableServer(id: string): Promise<{ id: string; ownerId: string; name: string } | null> {
+export async function lendableServer(
+    id: string
+): Promise<{ id: string; ownerId: string; name: string } | null> {
     if (isLocalServerId(id) || !UUID.test(id)) return null;
     const host = await prisma.host.findUnique({
         where: { id },
@@ -50,18 +54,26 @@ export async function lendableServer(id: string): Promise<{ id: string; ownerId:
 }
 
 /** The account a domain belongs to, through its project. Null for no domain. */
-export async function domainOwner(id: string): Promise<{ id: string; ownerId: string; hostname: string } | null> {
+export async function domainOwner(
+    id: string
+): Promise<{ id: string; ownerId: string; hostname: string } | null> {
     if (!UUID.test(id)) return null;
     const domain = await prisma.domain.findUnique({
         where: { id },
         select: {
             id: true,
             hostname: true,
-            application: { select: { environment: { select: { project: { select: { ownerId: true } } } } } }
+            application: {
+                select: { environment: { select: { project: { select: { ownerId: true } } } } }
+            }
         }
     });
     if (!domain) return null;
-    return { id: domain.id, ownerId: domain.application.environment.project.ownerId, hostname: domain.hostname };
+    return {
+        id: domain.id,
+        ownerId: domain.application.environment.project.ownerId,
+        hostname: domain.hostname
+    };
 }
 
 /** A server lent to this account to watch, and whose it is. Null for one that
@@ -72,7 +84,9 @@ export async function borrowedServer(
 ): Promise<{ id: string; ownerId: string; name: string } | null> {
     const host = await lendableServer(id);
     if (!host || host.ownerId === userId) return null;
-    return watchesFrom("place.server", await liveGrants(userId, "place.server", host.id)) ? host : null;
+    return watchesFrom("place.server", await liveGrants(userId, "place.server", host.id))
+        ? host
+        : null;
 }
 
 /** A domain lent to this account to watch, and whose it is. */
@@ -82,7 +96,9 @@ export async function borrowedDomain(
 ): Promise<{ id: string; ownerId: string; hostname: string } | null> {
     const domain = await domainOwner(id);
     if (!domain || domain.ownerId === userId) return null;
-    return watchesFrom("place.domain", await liveGrants(userId, "place.domain", domain.id)) ? domain : null;
+    return watchesFrom("place.domain", await liveGrants(userId, "place.domain", domain.id))
+        ? domain
+        : null;
 }
 
 /**

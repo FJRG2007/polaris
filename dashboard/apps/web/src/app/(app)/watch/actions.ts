@@ -36,7 +36,9 @@ export async function watchStateAction(): Promise<{
     return { alarms, events, targets };
 }
 
-export async function createAlarmAction(input: AlarmInput): Promise<{ error?: string; id?: string }> {
+export async function createAlarmAction(
+    input: AlarmInput
+): Promise<{ error?: string; id?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = alarmInputSchema.safeParse(input);
     const t = await getTranslations("watch");
@@ -49,11 +51,16 @@ export async function createAlarmAction(input: AlarmInput): Promise<{ error?: st
         revalidatePath("/watch");
         return { id };
     } catch (caught) {
-        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.createFailed") };
+        return {
+            error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.createFailed")
+        };
     }
 }
 
-export async function setAlarmEnabledAction(id: string, enabled: boolean): Promise<{ error?: string }> {
+export async function setAlarmEnabledAction(
+    id: string,
+    enabled: boolean
+): Promise<{ error?: string }> {
     const user = await requirePermission("deploy.manage");
     try {
         await setAlarmEnabled(user.id, id, enabled);
@@ -61,7 +68,9 @@ export async function setAlarmEnabledAction(id: string, enabled: boolean): Promi
         return {};
     } catch (caught) {
         const t = await getTranslations("watch");
-        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.updateFailed") };
+        return {
+            error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.updateFailed")
+        };
     }
 }
 
@@ -73,6 +82,8 @@ export async function deleteAlarmAction(id: string): Promise<{ error?: string }>
         return {};
     } catch (caught) {
         const t = await getTranslations("watch");
-        return { error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.deleteFailed") };
+        return {
+            error: caught instanceof Error ? watchText(t, caught.message) : t("alarms.deleteFailed")
+        };
     }
 }

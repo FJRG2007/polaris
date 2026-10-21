@@ -9,12 +9,21 @@ import { episodesFrom, mergedSpans } from "@/lib/machines/alarm-episodes";
 const HOUR = 3_600_000;
 const since = Date.UTC(2026, 9, 1);
 const at = (hours: number) => since + hours * HOUR;
-const event = (alarmId: string, kind: string, hours: number) => ({ alarmId, alarmName: alarmId, kind, at: at(hours) });
+const event = (alarmId: string, kind: string, hours: number) => ({
+    alarmId,
+    alarmName: alarmId,
+    kind,
+    at: at(hours)
+});
 
 describe("alarm episodes", () => {
     it("pairs a trigger with its resolve and keeps one still firing open", () => {
         const episodes = episodesFrom(
-            [event("cpu", "triggered", 1), event("cpu", "resolved", 3), event("cpu", "triggered", 10)],
+            [
+                event("cpu", "triggered", 1),
+                event("cpu", "resolved", 3),
+                event("cpu", "triggered", 10)
+            ],
             since
         );
         expect(episodes).toEqual([
@@ -25,7 +34,12 @@ describe("alarm episodes", () => {
 
     it("starts a resolve with no trigger in the window at the window, and ignores a repeated trigger", () => {
         const episodes = episodesFrom(
-            [event("http", "resolved", 2), event("mem", "triggered", 4), event("mem", "triggered", 5), event("mem", "resolved", 6)],
+            [
+                event("http", "resolved", 2),
+                event("mem", "triggered", 4),
+                event("mem", "triggered", 5),
+                event("mem", "resolved", 6)
+            ],
             since
         );
         expect(episodes.map((one) => [one.alarmId, one.startedAt, one.endedAt])).toEqual([
@@ -36,7 +50,12 @@ describe("alarm episodes", () => {
 
     it("joins overlapping alarms so a day is not shaded twice", () => {
         const episodes = episodesFrom(
-            [event("a", "triggered", 1), event("b", "triggered", 2), event("a", "resolved", 3), event("b", "resolved", 4)],
+            [
+                event("a", "triggered", 1),
+                event("b", "triggered", 2),
+                event("a", "resolved", 3),
+                event("b", "resolved", 4)
+            ],
             since
         );
         const spans = mergedSpans(episodes, at(30));
@@ -64,13 +83,16 @@ describe("machines in Places", () => {
             spark: [],
             alarms: 0
         };
-        expect(inPlaces({ ...base, id: "h1", kind: "server", href: "/watch/server/local" }).href).toBe(
-            "/places/machines/server/local"
+        expect(
+            inPlaces({ ...base, id: "h1", kind: "server", href: "/watch/server/local" }).href
+        ).toBe("/places/machines/server/local");
+        expect(
+            inPlaces({ ...base, id: "local:abc", kind: "container", href: "/apps/containers?c=x" })
+                .href
+        ).toBe(machineHref("container", "local:abc"));
+        expect(machineHref("container", "local:abc")).toBe(
+            "/places/machines/container/local%3Aabc"
         );
-        expect(inPlaces({ ...base, id: "local:abc", kind: "container", href: "/apps/containers?c=x" }).href).toBe(
-            machineHref("container", "local:abc")
-        );
-        expect(machineHref("container", "local:abc")).toBe("/places/machines/container/local%3Aabc");
     });
 
     it("is a Places device screen anybody can open, so a lent machine can be reached", () => {
@@ -83,7 +105,9 @@ describe("machines in Places", () => {
     });
 
     it("keeps the Overview's usage card and opens it in Places", () => {
-        expect(OVERVIEW_WIDGETS.find((widget) => widget.id === "usage")?.href).toBe("/places/machines");
+        expect(OVERVIEW_WIDGETS.find((widget) => widget.id === "usage")?.href).toBe(
+            "/places/machines"
+        );
     });
 });
 

@@ -72,8 +72,7 @@ const env: Adapter = {
             });
             for (const [key, item] of Object.entries(body.items)) {
                 const envelope = item[core.SECRET_FIELD] as
-                    | { c?: string; n?: string; k?: string }
-                    | undefined;
+                    { c?: string; n?: string; k?: string } | undefined;
                 const data =
                     item.secret === true
                         ? {

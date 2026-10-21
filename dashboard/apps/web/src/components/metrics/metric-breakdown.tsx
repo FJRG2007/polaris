@@ -124,7 +124,12 @@ export function MetricBreakdownDialog({
                         ))}
                     </div>
                 ) : result.unavailable ? (
-                    <EmptyState bare icon={<SearchX />} title={t("breakdown.nothingToRank")} description={result.unavailable} />
+                    <EmptyState
+                        bare
+                        icon={<SearchX />}
+                        title={t("breakdown.nothingToRank")}
+                        description={result.unavailable}
+                    />
                 ) : result.rows.length === 0 ? (
                     <EmptyState
                         bare
@@ -143,7 +148,9 @@ export function MetricBreakdownDialog({
                 {result && (result.note || age !== null) ? (
                     <p className="mt-3 text-xs text-muted-foreground">
                         {result.note}
-                        {age !== null && age > STALE_AFTER_MS ? ` ${t("breakdown.readAgo", { age: formatAge(age) })}` : ""}
+                        {age !== null && age > STALE_AFTER_MS
+                            ? ` ${t("breakdown.readAgo", { age: formatAge(age) })}`
+                            : ""}
                     </p>
                 ) : null}
             </DialogContent>
@@ -158,7 +165,11 @@ export function MetricBreakdownDialog({
  * by definition, and "100% in total" is a sentence that tells nobody anything -
  * so it says what the percentages mean instead.
  */
-function summarize(t: NamespaceTranslator<"watch">, open: OpenBreakdown | null, result: Breakdown): string {
+function summarize(
+    t: NamespaceTranslator<"watch">,
+    open: OpenBreakdown | null,
+    result: Breakdown
+): string {
     if (!open || result.total === null) return t("breakdown.heaviestFirst");
     if (open.metric === "cpu") return t("breakdown.shareOfMachine");
     return t("breakdown.inTotal", { total: BREAKDOWN_FORMAT[open.metric](result.total) });

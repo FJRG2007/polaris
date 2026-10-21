@@ -17,7 +17,11 @@ export const dynamic = "force-dynamic";
  * owner scope as Watch, which this replaces - and a server or a domain lent to
  * the reader, read as its owner's with what is behind it left out.
  */
-export default async function MachinePage({ params }: { params: Promise<{ kind: string; id: string }> }) {
+export default async function MachinePage({
+    params
+}: {
+    params: Promise<{ kind: string; id: string }>;
+}) {
     const [{ kind, id: raw }, user] = await Promise.all([params, requireUser()]);
     const id = decodeURIComponent(raw);
     const owns = await sessionCan(user, "deploy.read");
@@ -53,7 +57,10 @@ export default async function MachinePage({ params }: { params: Promise<{ kind: 
         }
         // An alarm on the local machine names the server row it was enrolled as,
         // or - before it was - its reserved subject. Both are this page.
-        const targets = id === LOCAL_SERVER_ID ? [...(localHost ? [localHost.id] : []), LOCAL_HOST_SUBJECT] : [id];
+        const targets =
+            id === LOCAL_SERVER_ID
+                ? [...(localHost ? [localHost.id] : []), LOCAL_HOST_SUBJECT]
+                : [id];
         const [breakdowns, history] = await Promise.all([
             offeredBreakdowns({ id: user.id, canReadMachine }, { kind: "server", id }),
             machines.machineAlarmEvents(user.id, targets)
@@ -76,7 +83,15 @@ export default async function MachinePage({ params }: { params: Promise<{ kind: 
         if (!owns) notFound();
         const card = await machines.machineContainer(user.id, id);
         if (!card) notFound();
-        return <MachineDetailView kind="container" id={id} name={card.name} detail={card.detail} container={card} />;
+        return (
+            <MachineDetailView
+                kind="container"
+                id={id}
+                name={card.name}
+                detail={card.detail}
+                container={card}
+            />
+        );
     }
 
     if (kind === "domain") {
@@ -85,7 +100,9 @@ export default async function MachinePage({ params }: { params: Promise<{ kind: 
         const lent = own ? null : await borrowedDomain(user.id, id);
         const [domain] = own ? [own] : lent ? await machines.lentMachineDomains(user.id, id) : [];
         if (!domain) notFound();
-        const history = await machines.machineAlarmEvents(lent ? lent.ownerId : user.id, [domain.id]);
+        const history = await machines.machineAlarmEvents(lent ? lent.ownerId : user.id, [
+            domain.id
+        ]);
         return (
             <MachineDetailView
                 kind="domain"

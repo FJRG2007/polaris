@@ -105,7 +105,8 @@ export async function requireMayShare(
         case "place.domain": {
             // A domain is lent by whoever owns the project it answers for.
             const domain = await domainOwner(subjectId);
-            if (!domain || domain.ownerId !== user.id) throw new GrantError("You cannot share that");
+            if (!domain || domain.ownerId !== user.id)
+                throw new GrantError("You cannot share that");
             return;
         }
     }

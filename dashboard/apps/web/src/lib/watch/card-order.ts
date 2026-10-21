@@ -82,5 +82,7 @@ export const ORDER_STORAGE_KEY = "polaris.machines.order";
 /** A remembered order, or busiest first for anything else - nothing saved, a
  *  value from a build that offered other orders, or storage that would not answer. */
 export function storedOrder(value: string | null | undefined): ConsumptionOrder {
-    return CONSUMPTION_ORDERS.includes(value as ConsumptionOrder) ? (value as ConsumptionOrder) : "cpu";
+    return CONSUMPTION_ORDERS.includes(value as ConsumptionOrder)
+        ? (value as ConsumptionOrder)
+        : "cpu";
 }
