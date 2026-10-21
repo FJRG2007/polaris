@@ -1201,7 +1201,7 @@ function TotpCell({
     return (
         <button
             type="button"
-            className="field code-field"
+            className="field"
             title={t("popup.items.copyCode")}
             aria-label={t("popup.items.copyCode")}
             onClick={onCopy}
