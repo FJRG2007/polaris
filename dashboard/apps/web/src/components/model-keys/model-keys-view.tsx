@@ -664,9 +664,15 @@ function KeyDialog({
             {
                 name: existing.name,
                 expiry: asDateValue(existing.expiresAt ?? null),
-                gateway: entry?.isGateway ? readGateway(existing) : null
+                gateway: entry?.isGateway ? readGateway(existing) : null,
+                workspace: storedWorkspace.trim()
             },
-            { name, expiry, gateway: entry?.isGateway ? gateway : null }
+            {
+                name: name.trim(),
+                expiry,
+                gateway: entry?.isGateway ? gateway : null,
+                workspace: typedWorkspace
+            }
         );
 
     const submit = async () => {

@@ -300,7 +300,6 @@ export function ConnectionDialog({
 
     // The connection as it was opened: an edit that ends where it started saves nothing.
     const loaded = useRef(draft).current;
-    const unchanged = connection !== null && !isDirty(loaded, draft);
 
     // The same schema the action parses. A field with nothing in it yet is
     // incomplete rather than wrong, so its message is held back until something
@@ -376,6 +375,9 @@ export function ConnectionDialog({
     // unanswered: a connection quietly becoming a direct one is nobody's choice.
     const jumpGone = saved?.mode === "manual" && saved.jumpMissing;
     const jumpUnpicked = ssh?.mode === "manual" && jumpGone && jumpId === JUMP_UNPICKED;
+    // A removed jump server is the exception: answering its picker repairs a
+    // reference the draft cannot show, even when the draft reads the same.
+    const unchanged = connection !== null && !jumpGone && !isDirty(loaded, draft);
 
     // The same for a tunnel through a registered server that was removed.
     const serverGone = saved?.mode === "server" && saved.hostId === null;
