@@ -9,7 +9,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import type { AppDownload } from "@/lib/app-releases";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { DeckFile } from "@/app/(app)/account/downloads/streamdeck-section";
+import { DeckFile, StreamDeckSection } from "@/app/(app)/account/downloads/streamdeck-section";
 import { DeckInstallSteps, detectDeckHost } from "@/app/(app)/account/downloads/deck-install-steps";
 
 // The section's disconnect button reaches the API keys' server action, which
@@ -39,6 +39,7 @@ function steps(userAgent: string, address: string | null = "https://polaris.exam
     render(
         <DeckInstallSteps
             address={address}
+            repo="example-org/example-repo"
             pluginFile={<a href="/plugin">plugin file</a>}
             moduleFile={<a href="/module">module file</a>}
         />,
@@ -61,6 +62,38 @@ describe("the app a deck is installed in", () => {
         expect(screen.queryByRole("link", { name: "module file" })).toBeNull();
         expect(screen.getByText("Connect")).toBeTruthy();
         expect(screen.queryByText("Install from file")).toBeNull();
+    });
+
+    it("takes somebody new to the Stream Deck app from the actions list to a working key", () => {
+        steps("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+        // Where the plugin's actions are, and what the action is called there.
+        expect(screen.getByText(/actions list on the right/)).toBeTruthy();
+        expect(screen.getByText("Polaris")).toBeTruthy();
+        // Dragged from the list, then picked in the key's settings.
+        expect(screen.getAllByText("Action", { selector: "b" })).toHaveLength(2);
+        // Where a key's settings open, and the address they ask for.
+        expect(screen.getByText(/bottom of the window/)).toBeTruthy();
+        expect(screen.getByText("Address")).toBeTruthy();
+        expect(screen.getByText("https://polaris.example.com")).toBeTruthy();
+        expect(screen.getByText(/approve it/)).toBeTruthy();
+        expect(screen.getByText(/choose what it does/)).toBeTruthy();
+    });
+
+    it("offers the one-line install for the system the reader is on", () => {
+        steps("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+        expect(
+            screen.getByText(
+                /curl -fsSL .*\/example-org\/example-repo\/main\/dashboard\/apps\/streamdeck\/scripts\/install\.sh \| sh/
+            )
+        ).toBeTruthy();
+        cleanup();
+        steps("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+        expect(screen.getByText(/^irm .*streamdeck\/scripts\/install\.ps1 \| iex$/)).toBeTruthy();
+    });
+
+    it("offers no line for OpenDeck, whose plugins folder is not documented", () => {
+        steps("Mozilla/5.0 (X11; Linux x86_64)");
+        expect(screen.queryByText(/streamdeck\/scripts\/install/)).toBeNull();
     });
 
     it("tells OpenDeck on Linux what Node.js it needs and where its file button is", () => {
@@ -124,5 +157,15 @@ describe("the file each choice downloads", () => {
         });
         expect(screen.queryByRole("link")).toBeNull();
         expect(screen.getByText("No version has been published yet.")).toBeTruthy();
+    });
+});
+
+describe("the Elgato Marketplace row", () => {
+    it("says the plugin is not there yet, and links nothing until it is", () => {
+        render(<StreamDeckSection decks={[]} install={null} />, { wrapper: MessagesWrapper });
+        expect(screen.getByText("From the Elgato Marketplace")).toBeTruthy();
+        expect(screen.getByText("Not there yet")).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "Open in Marketplace" })).toBeNull();
+        expect(screen.getByText("Install it yourself")).toBeTruthy();
     });
 });

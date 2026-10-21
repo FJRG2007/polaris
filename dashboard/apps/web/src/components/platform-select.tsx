@@ -16,13 +16,16 @@ export function PlatformSelect({
     value,
     onChange,
     label,
-    className
+    className,
+    platforms = INSTALL_PLATFORMS
 }: {
     value: InstallPlatform;
     onChange: (platform: InstallPlatform) => void;
     /** What the picker is for, for a screen reader. */
     label: string;
     className?: string;
+    /** The systems offered, when a line exists for only some of them. */
+    platforms?: readonly InstallPlatform[];
 }) {
     return (
         <Select
@@ -30,7 +33,7 @@ export function PlatformSelect({
             value={value}
             aria-label={label}
             onValueChange={(next) => onChange(next as InstallPlatform)}
-            options={INSTALL_PLATFORMS.map((platform) => ({
+            options={platforms.map((platform) => ({
                 value: platform,
                 label: PLATFORM_LABELS[platform],
                 icon: <SystemMark os={PLATFORM_LABELS[platform]} />

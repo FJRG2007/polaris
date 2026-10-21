@@ -83,6 +83,11 @@ gallery later, as a 1920x960 PNG or a 1920x1080 MP4 under 250 MB.
    - **Release notes**: the notes of that GitHub release.
 6. Leave **Automatically publish after being approved** ticked, and submit.
    Elgato answers by email from maker@elgato.com.
+7. Once the listing is approved, open it on the Marketplace and copy its
+   address into `STREAMDECK_MARKETPLACE_URL` in
+   `dashboard/apps/web/src/lib/deck/marketplace.ts` (it is `null` until then).
+   The Downloads screen then shows **Open in Marketplace** where it says "Not
+   there yet" today.
 
 ### Listing text
 

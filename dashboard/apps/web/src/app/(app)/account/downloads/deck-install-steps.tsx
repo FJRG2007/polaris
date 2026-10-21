@@ -5,8 +5,11 @@
  *
  * Built like the extension's steps: the likely choice is preselected from the
  * reader's system but stays a picker, and each choice names its controls the
- * way that app names them. Only what works today is offered - the Elgato
- * Marketplace joins the list once the plugin is actually published there.
+ * way that app names them. The Stream Deck app's steps are written for
+ * somebody who has never opened it: where the actions list is, where a key's
+ * settings open, and what to press there, in the words the plugin and Elgato's
+ * own guide use. The one-line install sits above them, for the two systems the
+ * app runs on.
  *
  * The download buttons wait on GitHub, so they arrive as nodes the page wraps
  * in their own boundaries; the picker and the steps draw at once.
@@ -14,6 +17,7 @@
 
 import { Select } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
+import { DeckCommand } from "./deck-command";
 import { CopyButton } from "@/components/copy-button";
 import { detectPlatform } from "@/lib/install-platform";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -51,10 +55,23 @@ function Press({ text }: { text: string }) {
     return <b className="font-medium text-foreground">{text}</b>;
 }
 
+/** This Polaris's address, to copy into a settings field. */
+function AddressBox({ address }: { address: string }) {
+    return (
+        <span className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+            <code className="min-w-0 flex-1 truncate text-foreground" title={address}>
+                {address}
+            </code>
+            <CopyButton value={address} />
+        </span>
+    );
+}
+
 export function DeckInstallSteps({
     pluginFile,
     moduleFile,
-    address
+    address,
+    repo
 }: {
     /** The `.streamDeckPlugin` button, for the Stream Deck app and OpenDeck. */
     pluginFile: React.ReactNode;
@@ -62,6 +79,8 @@ export function DeckInstallSteps({
     moduleFile: React.ReactNode;
     /** This Polaris's address, which Companion's connection asks for, or null to use the one the page is on. */
     address: string | null;
+    /** The repository the plugin's releases and install scripts come from. */
+    repo: string;
 }) {
     const t = useTranslations("account");
     const [host, setHost] = useState<DeckHost>("streamdeck");
@@ -103,14 +122,23 @@ export function DeckInstallSteps({
             </label>
 
             {host === "streamdeck" ? (
-                <ol className="ml-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
-                    <li className="flex flex-col gap-2">
-                        {t("downloads.streamdeck.install.downloadPlugin")}
-                        {pluginFile}
-                    </li>
-                    <li>{t("downloads.streamdeck.install.openFile")}</li>
-                    <li>{t.rich("downloads.streamdeck.install.connectKey", { press })}</li>
-                </ol>
+                <>
+                    <DeckCommand repo={repo} />
+                    <ol className="ml-5 flex list-decimal flex-col gap-4 text-sm leading-relaxed marker:text-muted-foreground">
+                        <li className="flex flex-col gap-2">
+                            {t("downloads.streamdeck.install.orFile")}
+                            {pluginFile}
+                        </li>
+                        <li>{t.rich("downloads.streamdeck.install.openApp", { press })}</li>
+                        <li>{t.rich("downloads.streamdeck.install.dragAction", { press })}</li>
+                        <li>
+                            {t.rich("downloads.streamdeck.install.keySettings", { press })}
+                            <AddressBox address={origin} />
+                        </li>
+                        <li>{t("downloads.streamdeck.install.approveKey")}</li>
+                        <li>{t.rich("downloads.streamdeck.install.pickAction", { press })}</li>
+                    </ol>
+                </>
             ) : null}
 
             {host === "opendeck" ? (
@@ -148,15 +176,7 @@ export function DeckInstallSteps({
                     <li>{t.rich("downloads.streamdeck.install.importModule", { press })}</li>
                     <li>
                         {t.rich("downloads.streamdeck.install.addConnection", { press })}
-                        <span className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-                            <code
-                                className="min-w-0 flex-1 truncate text-foreground"
-                                title={origin}
-                            >
-                                {origin}
-                            </code>
-                            <CopyButton value={origin} />
-                        </span>
+                        <AddressBox address={origin} />
                     </li>
                     <li>{t("downloads.streamdeck.install.approveCode")}</li>
                     <li>{t.rich("downloads.streamdeck.install.lockCompanion", { press })}</li>

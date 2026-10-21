@@ -1285,7 +1285,6 @@
             "install": {
                 "where": "Dónde lo instalas",
                 "downloadPlugin": "Descarga el plugin.",
-                "openFile": "Abre el archivo descargado y confirma la instalación en la app de Stream Deck.",
                 "connectKey": "Arrastra una tecla de Polaris al deck, pulsa <press>Conectar</press> en sus ajustes y aprueba el código que se abre en tu navegador.",
                 "node": "Instala Node.js 20 o posterior en este equipo, desde <link>nodejs.org</link> o la tienda de software de tu sistema. OpenDeck ejecuta el plugin con él y solo vale una instalación nativa: el Flatpak de Node.js no se usa.",
                 "fromFile": "En OpenDeck, abre <press>Plugins</press>, pulsa <press>Install from file</press> y elige el archivo descargado.",
@@ -1293,7 +1292,21 @@
                 "importModule": "En Companion, abre <press>Modules</press>, pulsa <press>Import module package</press> y elige el archivo descargado.",
                 "addConnection": "Abre <press>Connections</press>, busca Polaris en la lista, añádelo y escribe esta dirección en sus ajustes:",
                 "approveCode": "El estado de la conexión muestra entonces un código y la página donde aprobarlo. Abre esa página, inicia sesión y aprueba el código. Usa tu cuenta: solo puede hacer lo que tú puedes, y aparece abajo en Decks conectados, donde puedes desconectarlo.",
-                "lockCompanion": "Las páginas de Companion suelen abrirse desde cualquier equipo de tu red, y cualquiera allí podría pulsar estas teclas. En Companion, abre <press>Settings</press> y luego <press>Advanced</press>, activa <press>Admin UI Password</press> y pon una contraseña."
+                "lockCompanion": "Las páginas de Companion suelen abrirse desde cualquier equipo de tu red, y cualquiera allí podría pulsar estas teclas. En Companion, abre <press>Settings</press> y luego <press>Advanced</press>, activa <press>Admin UI Password</press> y pon una contraseña.",
+                "orFile": "O descarga el plugin y abre el archivo: la app de Stream Deck pide instalarlo. Una copia instalada así no se actualiza sola.",
+                "openApp": "Abre la app de Stream Deck. En la lista de acciones de la derecha, busca la categoría <press>Polaris</press>.",
+                "dragAction": "Arrastra <press>Acción</press> desde ahí a una tecla de tu deck, a la izquierda.",
+                "keySettings": "Selecciona esa tecla: sus ajustes se abren abajo en la ventana. Escribe esta dirección en <press>Dirección</press> y pulsa <press>Conectar</press>:",
+                "approveKey": "Se abre en tu navegador una página de este Polaris con un código. Inicia sesión, comprueba que es el código que muestran los ajustes de la tecla y apruébalo. La tecla actúa como tú y solo puede hacer lo que tú puedes.",
+                "pickAction": "De vuelta en los ajustes de la tecla, elige qué hace en <press>Acción</press>. Más teclas se añaden igual y usan la misma conexión."
+            },
+            "store": "Desde el Elgato Marketplace",
+            "storeHint": "Instalarlo tú mismo abajo lo mantiene igual de al día, así que no hace falta esperar al Marketplace.",
+            "openStore": "Abrir en Marketplace",
+            "installYourself": "Instálalo tú mismo",
+            "command": {
+                "title": "Una línea, y se mantiene al día sola",
+                "hint": "Pégala en {shell} en el ordenador al que está conectado el deck. Instala el plugin, reinicia la app de Stream Deck si está abierta y busca una versión nueva cada 6 horas. Sin permisos de administrador y sin nada más que ejecutar."
             }
         }
     },

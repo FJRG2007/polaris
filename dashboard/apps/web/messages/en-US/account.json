@@ -1285,7 +1285,6 @@
             "install": {
                 "where": "Where you install it",
                 "downloadPlugin": "Download the plugin.",
-                "openFile": "Open the downloaded file and confirm the install in the Stream Deck app.",
                 "connectKey": "Drag a Polaris key onto the deck, press <press>Connect</press> in its settings and approve the code that opens in your browser.",
                 "node": "Install Node.js 20 or newer on this computer, from <link>nodejs.org</link> or your system's software store. OpenDeck runs the plugin with it, and only a native install works: the Node.js Flatpak is not used.",
                 "fromFile": "In OpenDeck, open <press>Plugins</press>, press <press>Install from file</press> and pick the downloaded file.",
@@ -1293,7 +1292,21 @@
                 "importModule": "In Companion, open <press>Modules</press>, press <press>Import module package</press> and pick the downloaded file.",
                 "addConnection": "Open <press>Connections</press>, find Polaris in the list, add it and type this address in its settings:",
                 "approveCode": "The connection's status then shows a code and the page to approve it on. Open that page, sign in and approve the code. It uses your account: it can do only what you can, and it shows under Connected decks below, where you can disconnect it.",
-                "lockCompanion": "Companion's pages can usually be opened from any computer on your network, and anyone there could press these keys. In Companion, open <press>Settings</press>, then <press>Advanced</press>, turn on <press>Admin UI Password</press> and set a password."
+                "lockCompanion": "Companion's pages can usually be opened from any computer on your network, and anyone there could press these keys. In Companion, open <press>Settings</press>, then <press>Advanced</press>, turn on <press>Admin UI Password</press> and set a password.",
+                "orFile": "Or download the plugin and open the file: the Stream Deck app asks to install it. A copy installed this way does not update itself.",
+                "openApp": "Open the Stream Deck app. In the actions list on the right, find the <press>Polaris</press> category.",
+                "dragAction": "Drag <press>Action</press> from it onto a key of your deck, on the left.",
+                "keySettings": "Select that key: its settings open at the bottom of the window. Type this address under <press>Address</press> and press <press>Connect</press>:",
+                "approveKey": "A page of this Polaris opens in your browser with a code. Sign in, check it is the code the key's settings show, and approve it. The key acts as you and can do only what you can.",
+                "pickAction": "Back in the key's settings, choose what it does under <press>Action</press>. More keys are added the same way and use the same connection."
+            },
+            "store": "From the Elgato Marketplace",
+            "storeHint": "Installing it yourself below keeps it just as current, so there is no need to wait for the Marketplace.",
+            "openStore": "Open in Marketplace",
+            "installYourself": "Install it yourself",
+            "command": {
+                "title": "One line, and it keeps itself up to date",
+                "hint": "Paste it into {shell} on the computer the deck is plugged into. It installs the plugin, restarts the Stream Deck app if it is open, and checks for a new version every 6 hours. No administrator rights, and nothing else to run."
             }
         }
     },

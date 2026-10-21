@@ -165,7 +165,12 @@ jobs:
           name: polaris-streamdeck
           # Repo-relative: `defaults.run.working-directory` applies to `run` steps
           # and to nothing else.
-          path: dashboard/apps/streamdeck/dist/*.streamDeckPlugin
+          # The install scripts ride along: the job the one-line install sets
+          # up runs the copy attached to the release it installed.
+          path: |
+            dashboard/apps/streamdeck/dist/*.streamDeckPlugin
+            dashboard/apps/streamdeck/scripts/install.ps1
+            dashboard/apps/streamdeck/scripts/install.sh
           if-no-files-found: error
 
   release:
@@ -194,4 +199,7 @@ jobs:
           # This repository releases the dashboard too, and that is what "latest"
           # should keep meaning.
           make_latest: "false"
-          files: package/*.streamDeckPlugin
+          files: |
+            package/dist/*.streamDeckPlugin
+            package/scripts/install.ps1
+            package/scripts/install.sh
