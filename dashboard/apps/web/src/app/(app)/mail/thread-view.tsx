@@ -867,7 +867,9 @@ function LabelMenu({
                                 void (async () => {
                                     // On the conversation now, beside the ones
                                     // it already has, and off again on a refusal.
-                                    const answered = thread.labels.some((one) => one.id === label.id)
+                                    const answered = thread.labels.some(
+                                        (one) => one.id === label.id
+                                    )
                                         ? undefined
                                         : onChange?.({ labels: [...thread.labels, label] });
                                     const said = await refusalOrFailure(

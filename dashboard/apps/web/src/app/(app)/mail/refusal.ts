@@ -20,7 +20,8 @@ export function refusalOf(outcome: unknown): string {
  * telling somebody their archive failed.
  */
 export function missingFolderRole(outcome: unknown): { role: string; accountId: string } | null {
-    if (typeof outcome !== "object" || outcome === null || !("needsFolderRole" in outcome)) return null;
+    if (typeof outcome !== "object" || outcome === null || !("needsFolderRole" in outcome))
+        return null;
     const held = (outcome as { needsFolderRole?: unknown }).needsFolderRole;
     if (typeof held !== "object" || held === null) return null;
     const { role, accountId } = held as { role?: unknown; accountId?: unknown };

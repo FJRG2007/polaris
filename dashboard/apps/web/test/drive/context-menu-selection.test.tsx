@@ -28,7 +28,10 @@ vi.mock("@/app/(app)/drive/actions", () => ({}));
 vi.mock("@/app/(app)/drive/share-actions", () => ({}));
 vi.mock("@/app/(app)/drive/activity-actions", () => ({}));
 // The viewer is never opened here, and it pulls in the office editors.
-vi.mock("@/app/(app)/drive/file-viewer", () => ({ FilePreview: () => null, isViewable: () => false }));
+vi.mock("@/app/(app)/drive/file-viewer", () => ({
+    FilePreview: () => null,
+    isViewable: () => false
+}));
 
 // The virtualizer measures its scroll container via getBoundingClientRect; jsdom
 // reports every element as 0x0, which would windows the list down to nothing.
@@ -71,7 +74,10 @@ const C = file("gamma.txt");
 
 const noop = () => {};
 
-function renderFilesView(entries: DriveEntry[], onMove: (entries: DriveEntry[], dest: string) => void = noop) {
+function renderFilesView(
+    entries: DriveEntry[],
+    onMove: (entries: DriveEntry[], dest: string) => void = noop
+) {
     return render(
         <FilesView
             connectionId="c1"

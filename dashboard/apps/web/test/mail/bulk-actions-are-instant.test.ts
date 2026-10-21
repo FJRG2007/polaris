@@ -19,7 +19,12 @@ import { readFile } from "node:fs/promises";
 import { refusalOrFailure } from "@/app/(app)/mail/refusal";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { optimistically } from "@/app/(app)/mail/optimistic";
-import { beginChange, overlaysFor, pendingChanges, resetPendingChanges } from "@/app/(app)/mail/pending-changes";
+import {
+    beginChange,
+    overlaysFor,
+    pendingChanges,
+    resetPendingChanges
+} from "@/app/(app)/mail/pending-changes";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
 const source = (name: string) => readFile(`${SCREENS}${name}`, "utf8");
@@ -79,7 +84,10 @@ describe("what a failed change says", () => {
 describe("the list screen", () => {
     it("lets the selection go with the press and puts it back on a refusal", async () => {
         const view = await source("mail-view.tsx");
-        const act = view.slice(view.indexOf("const act = useCallback("), view.indexOf("const fileMail"));
+        const act = view.slice(
+            view.indexOf("const act = useCallback("),
+            view.indexOf("const fileMail")
+        );
         // Cleared before the server is asked, not after it answers.
         expect(act.indexOf("setSelected([])")).toBeLessThan(act.indexOf("startBusy("));
         expect(act).toMatch(/const putBack = \(\) => \{[\s\S]*?setSelected\(/);
@@ -98,7 +106,9 @@ describe("the list screen", () => {
     it("puts a label on the rows before the server answers", async () => {
         const view = await source("mail-view.tsx");
         const label = view.slice(view.indexOf("const label = useCallback("));
-        expect(label.slice(0, label.indexOf("startBusy("))).toContain("patchUntilAnswered([id], { labels:");
+        expect(label.slice(0, label.indexOf("startBusy("))).toContain(
+            "patchUntilAnswered([id], { labels:"
+        );
     });
 
     it("says how many are picked through the catalogue", async () => {
@@ -113,6 +123,8 @@ describe("the reading pane", () => {
         expect(pane).toMatch(/const answered = onChange\?\.\(state\)/);
         expect(pane).toMatch(/onChange\?\.\(\{ labels: \[\.\.\.thread\.labels, label\] \}\)/);
         const view = await source("mail-view.tsx");
-        expect(view).toMatch(/onChange=\{\(change\) => \{[\s\S]*?patchUntilAnswered\(\[openThread\.id\], patch\)/);
+        expect(view).toMatch(
+            /onChange=\{\(change\) => \{[\s\S]*?patchUntilAnswered\(\[openThread\.id\], patch\)/
+        );
     });
 });

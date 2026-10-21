@@ -36,7 +36,9 @@ beforeEach(() => {
         suggestions: [
             { address: "ana@example.test", name: "Ana Example" },
             { address: "andres@example.test", name: "" }
-        ].filter((one) => one.address.startsWith(needle) || one.name.toLowerCase().startsWith(needle))
+        ].filter(
+            (one) => one.address.startsWith(needle) || one.name.toLowerCase().startsWith(needle)
+        )
     }));
 });
 

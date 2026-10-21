@@ -24,7 +24,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ContactSuggestionList, SUGGESTIONS_SELECTOR, useContactSuggestions } from "./contact-suggestions";
+import {
+    ContactSuggestionList,
+    SUGGESTIONS_SELECTOR,
+    useContactSuggestions
+} from "./contact-suggestions";
 
 /** How long typing settles before the address changes. Long enough that a
  *  sentence is one navigation, short enough that it feels immediate. */
@@ -172,7 +176,8 @@ function SearchFilters({
         return () => document.removeEventListener("mousedown", onDown);
     }, [onClose]);
 
-    const set = (change: Partial<core.MailSearchTerms>) => setTerms((held) => ({ ...held, ...change }));
+    const set = (change: Partial<core.MailSearchTerms>) =>
+        setTerms((held) => ({ ...held, ...change }));
     /** A field that holds a list, edited as the one value people actually type
      *  into it. Two `from:` in one search is possible and rare; the box is where
      *  somebody writes that. */
@@ -242,7 +247,11 @@ function SearchFilters({
                     checked={terms.hasAttachment}
                     onChange={(next) => set({ hasAttachment: next })}
                 />
-                <Tick label={t("searchBox.link")} checked={terms.hasLink} onChange={(next) => set({ hasLink: next })} />
+                <Tick
+                    label={t("searchBox.link")}
+                    checked={terms.hasLink}
+                    onChange={(next) => set({ hasLink: next })}
+                />
                 <Tick
                     label={t("labels.filter.unread")}
                     checked={terms.unread === true}
