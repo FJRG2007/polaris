@@ -189,7 +189,10 @@ describe("Registered games", () => {
 describe("reaching the page", () => {
     const HREF = "/account/privacy/activity";
 
-    it("is in the account menu", async () => {
+    // The avatar menu is for the account itself; this page and Drive's shared
+    // links are one click away in their own rails, so the menu no longer
+    // carries them.
+    it("is not in the account menu, and neither are shared links", async () => {
         const user = userEvent.setup();
         render(
             <AccountMenu
@@ -206,8 +209,14 @@ describe("reaching the page", () => {
             { wrapper: MessagesWrapper }
         );
         await user.click(screen.getByRole("button", { name: "Your account" }));
-        const item = await screen.findByRole("menuitem", { name: "Activity sharing" });
-        expect(item.getAttribute("href")).toBe(HREF);
+        await screen.findByRole("menuitem", { name: "My account" });
+        expect(screen.queryByRole("menuitem", { name: "Activity sharing" })).toBeNull();
+        expect(screen.queryByRole("menuitem", { name: "Shared links" })).toBeNull();
+    });
+
+    it("leaves shared links in the Drive rail", () => {
+        const entry = (APP_SECTIONS.drive ?? []).find((section) => section.href === "/drive/shared-links");
+        expect(entry?.label).toBe("Shared links");
     });
 
     it("is a page of its own in the Privacy group of the rail, lit on its own", () => {
