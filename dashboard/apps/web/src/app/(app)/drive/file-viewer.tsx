@@ -275,7 +275,7 @@ export function FileViewer({
         <Dialog open={target !== null} onOpenChange={changeOpen}>
             <DialogContent
                 ref={content}
-                className="flex max-h-[90vh] w-full max-w-6xl flex-col gap-0 overflow-hidden p-0"
+                className="flex max-h-[90vh] max-w-6xl flex-col gap-0 overflow-hidden p-0"
                 onKeyDown={(event) => {
                     if (!stepping || keyBelongsToTarget(event)) return;
                     if (canBack && shortcutPressed(event, "viewer.previousFile")) {

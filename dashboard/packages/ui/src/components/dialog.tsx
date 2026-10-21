@@ -51,7 +51,9 @@ export const DialogContent = forwardRef<
                 // Capping it and letting the content scroll is what keeps a long
                 // one (a confirmation that explains itself, a form with options)
                 // usable on a laptop in a small window and on a phone.
-                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated p-5 shadow-modal",
+                // Its width leaves a margin on each side, so in a narrow window
+                // (a phone, the extension's side panel) it never touches the edges.
+                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated p-5 shadow-modal",
                 CENTRED_MOTION,
                 className
             )}
