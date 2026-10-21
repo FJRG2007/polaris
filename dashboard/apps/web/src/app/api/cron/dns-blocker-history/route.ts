@@ -1,5 +1,5 @@
 /**
- * Roll the ad blocker's finished days up into its long-term statistics
+ * Roll the network filter's finished days up into its long-term statistics
  * - on demand.
  *
  * Polaris' own scheduler runs this every hour (see

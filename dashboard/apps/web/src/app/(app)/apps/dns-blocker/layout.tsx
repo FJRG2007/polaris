@@ -1,5 +1,5 @@
 /**
- * Every screen of the Ad blocker (/apps/dns-blocker and its sections).
+ * Every screen of the Network filter (/apps/dns-blocker and its sections).
  *
  * A marketplace app: until it is installed every section offers the install.
  * The settings are one row, read here once and shared by the sections, so moving

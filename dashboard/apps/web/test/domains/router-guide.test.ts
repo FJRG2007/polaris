@@ -394,7 +394,7 @@ describe("the routers people actually have", () => {
     const dns = routerBrandsFor("dns").map((brand) => brand.id);
 
     it("offers UniFi and OpenWrt for forwarding now that their docs were read", () => {
-        // They were only in the ad blocker's picker, so the Domains page had no
+        // They were only in the network filter's picker, so the Domains page had no
         // entry for two of the most common self-hosted routers.
         expect(forward).toEqual(expect.arrayContaining(["unifi", "openwrt"]));
         expect(routerGuide("unifi").forwardPath).toContain("Policy Engine > Port Forwarding");
@@ -416,7 +416,7 @@ describe("the routers people actually have", () => {
         expect(routerGuide("vodafone").forwardPath).toContain("Modo Experto");
     });
 
-    it("keeps a provider box out of the ad blocker's picker when its build locks the DNS", () => {
+    it("keeps a provider box out of the network filter's picker when its build locks the DNS", () => {
         // A Livebox hands out itself and cannot be told otherwise; Movistar's portal
         // has no DNS field and its advanced menu reverts. Listing them would send
         // somebody to a field that is not there.

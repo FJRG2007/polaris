@@ -1,5 +1,5 @@
 /**
- * Where the ad blocker's DNS server is published on this machine.
+ * Where the network filter's DNS server is published on this machine.
  *
  * Exactly port 53, on both transports: a router can only be pointed at an
  * address, never a port, and DNS falls back to TCP for long answers. Bound to the

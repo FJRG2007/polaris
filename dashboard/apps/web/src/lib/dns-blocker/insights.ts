@@ -158,7 +158,7 @@ function cachedLog(
 async function blocky(target: Engine, args: readonly string[]): Promise<string> {
     const result = await target.ports.runIn(target.container, [BLOCKY, ...args]);
     if (result.code !== 0) {
-        console.error("polaris: ad blocker command failed:", result.output);
+        console.error("polaris: network filter command failed:", result.output);
         throw new DnsBlockerRefusal("notAnswering");
     }
     return result.output;
@@ -246,7 +246,7 @@ export async function lookupName(domain: string): Promise<DnsLookup> {
     ]);
     const lookup = result.code === 0 ? parseLookup(domain, result.output) : null;
     if (!lookup) {
-        console.error("polaris: ad blocker lookup failed:", result.output);
+        console.error("polaris: network filter lookup failed:", result.output);
         throw new DnsBlockerRefusal("notAnswering");
     }
     return lookup;

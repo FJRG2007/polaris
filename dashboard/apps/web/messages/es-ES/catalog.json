@@ -102,7 +102,7 @@
         },
         "dns-blocker": {
             "summary": "Bloquea anuncios, rastreadores y malware en todos los dispositivos de tu red.",
-            "description": "Un servidor DNS para toda tu red que se niega a resolver dominios de anuncios, rastreadores y malware, así móviles, teles y consolas quedan protegidos sin instalarles nada. Elige listas por categoría, permite o bloquea tus propios dominios, elige un resolutor cifrado y pon nombre a los dispositivos de tu red. Instalarlo no descarga nada: el bloqueador arranca en esta máquina, en el puerto 53, cuando lo enciendes."
+            "description": "Un servidor DNS para toda tu red que se niega a resolver dominios de anuncios, rastreadores y malware, así móviles, teles y consolas quedan protegidos sin instalarles nada. Elige listas por categoría, permite o bloquea tus propios dominios, elige un resolutor cifrado y pon nombre a los dispositivos de tu red. Instalarlo no descarga nada: el filtro arranca en esta máquina, en el puerto 53, cuando lo enciendes."
         },
         "mail-server": {
             "summary": "Correo en tus propios dominios, con el DNS escrito y comprobado por ti.",

@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Everything the Ad blocker screen asks for and changes.
+ * Everything the Network filter screen asks for and changes.
  *
  * Administrators only: the blocker answers every device's lookups. Each action
  * validates its input against the schema the screen validates with, and a
@@ -31,7 +31,7 @@ async function failed(error: unknown): Promise<{ error: string }> {
     const t = await getTranslations("dnsBlocker");
     if (error instanceof blocker.DnsBlockerRefusal) return { error: t(`errors.${error.code}`) };
     if (error instanceof z.ZodError) return { error: t("errors.invalid") };
-    console.error("polaris: ad blocker action failed:", error);
+    console.error("polaris: network filter action failed:", error);
     return { error: t("errors.generic") };
 }
 

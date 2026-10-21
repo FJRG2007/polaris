@@ -596,10 +596,13 @@ const NETWORK_GROUP = "Network";
 const DATA_GROUP = "Data & services";
 const OBSERVABILITY_GROUP = "Observability";
 
-/** What people call the Ad blocker when they search for it: the rail and the
+/** What people call the Network filter when they search for it: the rail and the
  *  store both find it by these. */
 export const DNS_BLOCKER_KEYWORDS: readonly string[] = [
     "dns",
+    "dns filter",
+    "ad blocker",
+    "adblock",
     "pi-hole",
     "adguard",
     "blocklist",
@@ -919,7 +922,7 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             // With the tunnels and the firewall: a service the operator runs for
             // their network. Only here once it is installed, and only for an
             // administrator - it answers every device's lookups.
-            label: "Ad blocker", // i18n-ignore
+            label: "Network filter", // i18n-ignore
             href: "/apps/dns-blocker",
             adminOnly: true,
             requiresApp: "dns-blocker",
@@ -2500,7 +2503,7 @@ export const APP_SUBAPPS: AppSubapp[] = [
         // has run one looks for each of these. Every screen is the installed
         // app's and an administrator's, like the Apps entry that leads here.
         id: "dns-blocker",
-        label: "Ad blocker", // i18n-ignore
+        label: "Network filter", // i18n-ignore
         icon: ShieldBan,
         base: "/apps/dns-blocker",
         parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore

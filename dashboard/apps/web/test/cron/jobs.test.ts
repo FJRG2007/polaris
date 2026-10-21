@@ -119,7 +119,7 @@ describe("the work Polaris runs on a schedule", () => {
             "deploy-recycle-bin",
             // Two passes would each sweep the same low disk at once.
             "disk-watch",
-            // Two passes would each redeploy the ad blocker's DNS server after a
+            // Two passes would each redeploy the network filter's DNS server after a
             // daylight-saving change.
             "dns-blocker-clock",
             // Two passes would each read the same days of log from the DNS server.

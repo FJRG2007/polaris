@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /**
  * One router catalogue, three screens: the Domains forward, the game-port forward
- * and the ad blocker's "point your network at it". Each renders from the same
- * guide, and the ad blocker's check reads who actually asked it in the last 24 hours.
+ * and the network filter's "point your network at it". Each renders from the same
+ * guide, and the network filter's check reads who actually asked it in the last 24 hours.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -43,7 +43,7 @@ describe("who is using the blocker", () => {
     });
 });
 
-describe("the ad blocker's router steps", () => {
+describe("the network filter's router steps", () => {
     it("names each documented brand's own menu, field and source", () => {
         for (const brand of routerBrandsFor("dns")) {
             const html = renderToStaticMarkup(
@@ -144,7 +144,7 @@ describe("the forward guides on the Domains page", () => {
         expect(screen.queryByText("Protocol")).toBeNull();
     });
 
-    it("offers the app-only mesh systems to the ad blocker with their app's path", () => {
+    it("offers the app-only mesh systems to the network filter with their app's path", () => {
         expect(brands.map((brand) => brand.value)).toEqual(
             expect.arrayContaining(["googlewifi", "eero"])
         );

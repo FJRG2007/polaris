@@ -1,5 +1,5 @@
 /**
- * Give the ad blocker's DNS server its schedules again after a daylight-saving
+ * Give the network filter's DNS server its schedules again after a daylight-saving
  * change - on demand.
  *
  * Polaris' own scheduler runs this every fifteen minutes (see

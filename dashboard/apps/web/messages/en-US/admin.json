@@ -816,7 +816,7 @@
             "livebox": {
                 "signIn": "`admin`, with the password on the sticker on the back of the Livebox.",
                 "remotePath": "Look for Remote management, Web access from WAN or Remote administration.",
-                "caution": "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the ad blocker has to be set on each device instead.",
+                "caution": "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the network filter has to be set on each device instead.",
                 "reserve": {
                     "path": "the DHCP or LAN settings, under a name like Address Reservation, DHCP Binding or Static Lease",
                     "add": "the button that adds an entry",

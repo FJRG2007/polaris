@@ -1,5 +1,5 @@
 /**
- * The Overview's ad blocker card, in each state it can be drawn in: still
+ * The Overview's network filter card, in each state it can be drawn in: still
  * reading, unreadable, not running, blocking, and paused - in English and in
  * Spanish.
  */
@@ -36,13 +36,13 @@ function draw(data: OverviewDnsBlocker | null | undefined, locale?: "es-ES"): st
     return renderToStaticMarkup(withMessages(<DnsBlockerWidget data={data} />, locale));
 }
 
-describe("the ad blocker card", () => {
+describe("the network filter card", () => {
     it("holds the figures' shape while they are read", () => {
         expect(draw(undefined)).toContain('aria-busy="true"');
     });
 
     it("says when it could not be read", () => {
-        expect(draw(null)).toContain("The ad blocker could not be read just now.");
+        expect(draw(null)).toContain("The network filter could not be read just now.");
     });
 
     it("says blocking is off and links to the app when the DNS server is not running", () => {

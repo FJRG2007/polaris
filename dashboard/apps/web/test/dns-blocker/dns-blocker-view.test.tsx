@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The Ad blocker screen's status card offers the one action that fits where the
+ * The Network filter screen's status card offers the one action that fits where the
  * blocker stands: Turn on when it is off, Try again when port 53 was taken or held,
  * Turn off once it exists, and Retry on the check itself when that failed.
  */
@@ -407,7 +407,7 @@ describe("DnsBlockerView unchanged settings", () => {
     });
 });
 
-describe("Ad blocker sections", () => {
+describe("Network filter sections", () => {
     it("opens the log on a device picked on the Overview", async () => {
         standing("blocking");
         await shown();
@@ -451,7 +451,7 @@ describe("Ad blocker sections", () => {
     });
 });
 
-describe("Ad blocker rail", () => {
+describe("Network filter rail", () => {
     it("gives every section its own screen in the rail", async () => {
         const nav = await import("@/lib/apps");
         const subapp = nav.resolveSubapp("/apps/dns-blocker/lists");

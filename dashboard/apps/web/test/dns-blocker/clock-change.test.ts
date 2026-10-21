@@ -1,5 +1,5 @@
 /**
- * Applying the ad blocker's configuration again after a daylight-saving change:
+ * Applying the network filter's configuration again after a daylight-saving change:
  * only when the clock is the whole difference, and never with no server to take it.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Whether the ad blocker's DNS server should be given its configuration again
+ * Whether the network filter's DNS server should be given its configuration again
  * because the operator's clock moved.
  *
  * Schedules are written for the engine in UTC with the zone's offset at the

@@ -218,7 +218,7 @@ jobs:
           has '^dashboard/services/camera-relay/' && out relay true || out relay false
           # The broker is Mosquitto plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/mqtt-broker/' && out broker true || out broker false
-          # The network ad blocker is Blocky plus an entrypoint; nothing else feeds it.
+          # The network filter is Blocky plus an entrypoint; nothing else feeds it.
           has '^dashboard/services/dns-blocker/' && out dnsblock true || out dnsblock false
           # The worker bundles part of @polaris/core - the zone geometry, the
           # detector's decoder and the tracker - so a change to those is a change
@@ -667,7 +667,7 @@ jobs:
           provenance: false
           sbom: false
 
-  # The network ad blocker: Blocky with the configuration Polaris renders, which
+  # The network filter: Blocky with the configuration Polaris renders, which
   # the stock image (built from scratch, no shell) has no way to read from the
   # environment. Published so a house does not build a DNS server the first
   # time somebody turns ad blocking on.
@@ -859,7 +859,7 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-mqtt-broker:latest \
             ghcr.io/fjrg2007/polaris-mqtt-broker@${{ needs.broker.outputs.digest }}
-      - name: Tag the network ad blocker
+      - name: Tag the network filter
         if: ${{ env.PUBLISH == 'true' && needs.dnsblock.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest-service-dns-blocker \

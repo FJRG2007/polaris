@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The save at the foot of every Ad blocker section that edits its settings.
+ * The save at the foot of every Network filter section that edits its settings.
  *
  * The form is one row shared by every section, so an edit made on Lists is
  * still waiting when Settings is opened, and Save here saves both. It is also

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Local DNS: names it answers itself, aliases of them, and
+ * The Network filter's Local DNS: names it answers itself, aliases of them, and
  * domains asked of another server.
  */
 

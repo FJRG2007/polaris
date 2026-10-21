@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * What every section of the Ad blocker shares: where the blocker stands, the one
+ * What every section of the Network filter shares: where the blocker stands, the one
  * settings row as edited, and the save that applies it.
  *
  * It sits in the layout, so moving between sections keeps an unsaved edit and

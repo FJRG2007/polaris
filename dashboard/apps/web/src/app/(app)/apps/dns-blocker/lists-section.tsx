@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Lists: the blocklists it follows, your own allow and block
+ * The Network filter's Lists: the blocklists it follows, your own allow and block
  * rules, services blocked by name, and the hours a list is only on at.
  */
 

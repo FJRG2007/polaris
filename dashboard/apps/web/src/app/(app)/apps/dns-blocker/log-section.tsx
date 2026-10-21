@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Ad blocker's Query log: every lookup with its filters and the live view.
+ * The Network filter's Query log: every lookup with its filters and the live view.
  * A link carries the filter (`?client=`, `?domain=`, `?outcome=`, `?type=`), so
  * the device list and the Overview can open it already narrowed.
  */

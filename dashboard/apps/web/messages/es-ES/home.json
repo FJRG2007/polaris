@@ -90,7 +90,7 @@
             "description": "Lo que se ha hecho con tu cuenta, y desde dónde."
         },
         "dnsBlocker": {
-            "label": "Antianuncios",
+            "label": "Filtro de red",
             "description": "Las consultas de las últimas 24 horas en tu red y cuántas se han bloqueado."
         }
     },
@@ -202,9 +202,9 @@
         "decrease": "Bajar {label} en {name}"
     },
     "dnsBlocker": {
-        "unavailable": "No se ha podido leer Antianuncios ahora mismo.",
+        "unavailable": "No se ha podido leer Filtro de red ahora mismo.",
         "off": "El bloqueo está apagado y todavía no se filtra nada.",
-        "open": "Abrir Antianuncios",
+        "open": "Abrir Filtro de red",
         "active": "Bloqueando",
         "paused": "En pausa",
         "pausedFor": "En pausa {minutes} min",

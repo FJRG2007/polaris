@@ -1,5 +1,5 @@
 /**
- * The network ad blocker: its settings, turning it on and off, and where it
+ * The network filter: its settings, turning it on and off, and where it
  * stands.
  *
  * Two installs. The `dns-blocker` app is the screen and holds the settings (as
@@ -243,7 +243,7 @@ async function apply(
     if (address) await bindEngineTo(engine, address);
     await ensureLogVolume(engine).catch((error: unknown) =>
         // History is worth keeping, never worth a resolver that does not start.
-        console.error("polaris: could not give the ad blocker's log a volume:", error)
+        console.error("polaris: could not give the network filter's log a volume:", error)
     );
     await setEnvVar("application", engine.applicationId, engine.ownerId, {
         key: DNS_CONFIG_ENV,
@@ -259,7 +259,7 @@ async function apply(
             });
         }
     } catch (error) {
-        console.error("polaris: the ad blocker's DNS server did not deploy:", error);
+        console.error("polaris: the network filter's DNS server did not deploy:", error);
         await prisma.installedApp.update({ where: { id: engine.id }, data: { status: "failed" } });
         throw new DnsBlockerRefusal(isPortTaken(messageOf(error)) ? "portBusy" : "notApplied");
     }
@@ -352,7 +352,7 @@ export async function turnOn(actorId: string): Promise<void> {
             actorId,
             {
                 catalogId: DNS_ENGINE_APP,
-                name: "Ad blocker DNS server", // i18n-ignore
+                name: "Network filter DNS server", // i18n-ignore
                 serverId: "local",
                 storage: [],
                 env: []
@@ -415,7 +415,7 @@ export async function reapplyAfterClockChange(
     if (again?.config !== row.config || storedAgain?.value !== stored?.value)
         return { applied: false };
     console.info(
-        `polaris: the ad blocker's schedules moved with the clock in ${settings.timeZone}; applying them again`
+        `polaris: the network filter's schedules moved with the clock in ${settings.timeZone}; applying them again`
     );
     await apply(engine, decision.encoded, engine.ownerId, await getHostLanIp().catch(() => null));
     return { applied: true };

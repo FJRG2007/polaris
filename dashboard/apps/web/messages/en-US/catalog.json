@@ -102,7 +102,7 @@
         },
         "dns-blocker": {
             "summary": "Blocks ads, trackers and malware for every device on your network.",
-            "description": "A DNS server for your whole network that refuses to look up ad, tracker and malware domains, so phones, TVs and consoles are covered without installing anything on them. Pick blocklists by category, allow or block your own domains, choose an encrypted resolver, and name devices on your network. Installing downloads nothing: the blocker starts on this machine, on port 53, when you turn it on."
+            "description": "A DNS server for your whole network that refuses to look up ad, tracker and malware domains, so phones, TVs and consoles are covered without installing anything on them. Pick blocklists by category, allow or block your own domains, choose an encrypted resolver, and name devices on your network. Installing downloads nothing: the filter starts on this machine, on port 53, when you turn it on."
         },
         "mail-server": {
             "summary": "Mail at your own domains, with its DNS written and checked for you.",

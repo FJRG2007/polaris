@@ -1,5 +1,5 @@
 /**
- * What the network ad blocker is told to do, as the operator chose it.
+ * What the network filter is told to do, as the operator chose it.
  *
  * Pure and client-safe: the settings screen validates against the same schema
  * the save path does, and the configuration renderer (`render.ts`) reads only
@@ -18,7 +18,7 @@ import { z } from "zod";
  */
 export const DNS_CHECK_NAME = "blocking-check.polaris.invalid";
 
-/** The app that puts the Ad blocker screen here. Runs nothing itself. */
+/** The app that puts the Network filter screen here. Runs nothing itself. */
 export const DNS_BLOCKER_APP = "dns-blocker";
 /** The DNS server it starts when blocking is turned on. */
 export const DNS_ENGINE_APP = "dns-blocker-engine";

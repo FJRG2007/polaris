@@ -1,4 +1,4 @@
-/** Ad blocker, Query log (/apps/dns-blocker/log). The layout carries the settings. */
+/** Network filter, Query log (/apps/dns-blocker/log). The layout carries the settings. */
 
 import { requireAdmin } from "@/lib/session";
 import { DnsLogSection } from "../log-section";

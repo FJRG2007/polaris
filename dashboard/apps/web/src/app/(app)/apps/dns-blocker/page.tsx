@@ -1,5 +1,5 @@
 /**
- * Ad blocker (/apps/dns-blocker): the Overview. A DNS server for the whole
+ * Network filter (/apps/dns-blocker): the Overview. A DNS server for the whole
  * network that leaves out ads, trackers and malware: where it stands, what it has
  * been doing, and what to type into the router. The other sections sit beside it
  * in the rail; the layout carries the settings and the install.

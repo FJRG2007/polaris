@@ -170,7 +170,7 @@ export interface AppManifest {
     /**
      * Other words the store search finds this app by: what people call the
      * thing it is when that is in neither its name nor its summary. Somebody
-     * looking for a DNS blocker types "dns" or "pi-hole", not "Ad blocker".
+     * looking for a DNS blocker types "dns" or "pi-hole", not "Network filter".
      */
     keywords?: readonly string[];
     installMethod: AppInstallMethod;
@@ -403,7 +403,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         // presses Turn on in it - a DNS server answers for every device on the
         // network, so it is never something an install or an update starts.
         id: "dns-blocker",
-        name: "Ad blocker",
+        name: "Network filter",
         category: "Tools",
         icon: ShieldBan,
         opensAt: "/apps/dns-blocker",
@@ -418,19 +418,19 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         instanceWide: true
     },
     {
-        // The DNS engine behind the Ad blocker. Never offered on its own: the Ad
+        // The DNS engine behind the Network filter. Never offered on its own: the Ad
         // blocker installs it when somebody turns blocking on and removes it when
         // they turn it off. Its ports are pinned to 53 by that caller, because a
         // DNS server on any other port is one no router can be pointed at.
         id: "dns-blocker-engine",
-        name: "Ad blocker DNS server",
+        name: "Network filter DNS server",
         internal: true,
         ownedBy: "dns-blocker",
         category: "Tools",
         icon: ShieldBan,
         summary: "The DNS server that answers for your network and leaves out what is blocked.",
         description:
-            "The resolver behind the Ad blocker. It answers every lookup on your network, refuses the domains your blocklists name and forwards the rest to the resolver you chose.", // i18n-ignore
+            "The resolver behind the Network filter. It answers every lookup on your network, refuses the domains your blocklists name and forwards the rest to the resolver you chose.", // i18n-ignore
         docsUrl: "https://0xerr0r.github.io/blocky/",
         installMethod: "compose-template",
         capabilities: ["dns-blocker"],

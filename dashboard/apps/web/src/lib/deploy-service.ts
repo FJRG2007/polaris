@@ -3086,7 +3086,7 @@ async function buildAppPlan(
     const storedHostPort = typeof source.hostPort === "number" ? source.hostPort : undefined;
     const hostProtocol = source.hostProtocol === "udp" ? "udp" : undefined;
     // The one host address every published port binds, when not all of them: the
-    // ad blocker's DNS server takes port 53 on the LAN address only, so it does not
+    // network filter's DNS server takes port 53 on the LAN address only, so it does not
     // collide with the machine's own resolver on a loopback address of :53.
     const hostIp =
         typeof source.hostIp === "string" && isIP(source.hostIp) !== 0 ? source.hostIp : undefined;

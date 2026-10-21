@@ -1,5 +1,5 @@
 /**
- * The ad blocker's long-term statistics: each finished UTC day of the query log
+ * The network filter's long-term statistics: each finished UTC day of the query log
  * folded into one bounded row before the DNS server deletes that day's file,
  * and those rows added back up over a range for the Overview.
  *

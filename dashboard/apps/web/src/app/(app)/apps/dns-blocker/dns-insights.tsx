@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * What the Ad blocker has been doing over a range: the totals, lookups over
+ * What the Network filter has been doing over a range: the totals, lookups over
  * time permitted against blocked, the busiest devices over time, query types,
  * who answered, the top names and devices, and the query log with a live view
  * and allow or block on every row. Pausing blocking lives here too.

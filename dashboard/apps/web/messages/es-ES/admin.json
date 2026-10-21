@@ -816,7 +816,7 @@
             "livebox": {
                 "signIn": "`admin`, con la contraseña de la pegatina de la parte trasera del Livebox.",
                 "remotePath": "Busca Remote management, Web access from WAN o Remote administration.",
-                "caution": "La interfaz solo está en español. Los puertos reenviados siguen cerrados mientras el cortafuegos del Livebox esté en nivel medio o alto: ponlo en el más bajo. Acepta un puerto por regla, no rangos. Su servidor DNS no se puede cambiar, así que el bloqueador de anuncios hay que ponerlo en cada dispositivo.",
+                "caution": "La interfaz solo está en español. Los puertos reenviados siguen cerrados mientras el cortafuegos del Livebox esté en nivel medio o alto: ponlo en el más bajo. Acepta un puerto por regla, no rangos. Su servidor DNS no se puede cambiar, así que el filtro de red hay que ponerlo en cada dispositivo.",
                 "reserve": {
                     "path": "los ajustes de DHCP o de LAN, con un nombre como Address Reservation, DHCP Binding o Static Lease",
                     "add": "el botón que añade una entrada",

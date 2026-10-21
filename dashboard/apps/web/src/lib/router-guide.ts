@@ -69,7 +69,7 @@ export interface RouterDnsSetting {
 }
 
 /**
- * How devices on this network end up asking the ad blocker.
+ * How devices on this network end up asking the network filter.
  *
  * `direct` routers hand this server's address to devices with their lease, so the
  * blocker sees each device. `relay` routers only let the router's own upstream be
@@ -124,7 +124,7 @@ export interface RouterBrandGuide {
     /** The vendor document the forwarding steps were checked against. Null for the
      *  guides written from the device's own pages before sources were recorded. */
     readonly forwardSource: string | null;
-    /** Pointing devices at the ad blocker, when this brand's docs say how. */
+    /** Pointing devices at the network filter, when this brand's docs say how. */
     readonly dns: RouterDnsGuide | null;
     /** The name its admin page answers on, when it has one besides the gateway IP. */
     readonly admin: string | null;
@@ -765,7 +765,7 @@ export const ROUTER_BRANDS: readonly RouterBrandGuide[] = [
         forwardSave: "Añadir",
         forwardEnable: null,
         caution:
-            "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the ad blocker has to be set on each device instead."
+            "The interface is only in Spanish. Forwarded ports stay closed while the Livebox firewall is on a medium or high level - set it to the lowest one. It takes one port per rule, not a range. Its DNS server cannot be changed, so the network filter has to be set on each device instead."
     },
     {
         id: "vodafone",

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * What the Ad blocker screen shows before the app is installed: what it is, and
+ * What the Network filter screen shows before the app is installed: what it is, and
  * the install. Installing runs nothing; the DNS server starts only when somebody
  * turns blocking on afterwards.
  */
