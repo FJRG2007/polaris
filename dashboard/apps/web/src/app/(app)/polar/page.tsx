@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PAGE_BLEED, cn } from "@polaris/ui";
 import { redirect } from "next/navigation";
 import { polarAccessFor } from "@/lib/polar/access";
 import { homePathForUser, requireUser } from "@/lib/session";
@@ -15,7 +16,7 @@ export default async function PolarPage() {
     const user = await requireUser();
     if (!(await polarAccessFor(user.id)).use) redirect(await homePathForUser(user));
     return (
-        <div className="-m-3 flex h-below-header overflow-hidden bg-card sm:-m-4 md:-mx-6 md:-my-5">
+        <div className={cn(PAGE_BLEED, "flex bg-card")}>
             <PolarChat fullPage />
         </div>
     );

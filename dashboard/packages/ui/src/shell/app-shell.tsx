@@ -8,6 +8,7 @@
  */
 
 import { cn } from "../lib/cn";
+import { ShellMain } from "./shell-main";
 import type { ReactNode } from "react";
 
 export function AppShell({
@@ -37,8 +38,13 @@ export function AppShell({
     children: ReactNode;
 }) {
     return (
-        <div className="relative flex min-h-dvh flex-col bg-background">
-            <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
+        // The window never scrolls: the shell is exactly the viewport, and the
+        // content area under the header is the one thing that does. When the
+        // document scrolled under a sticky header, the window's scrollbar ran
+        // the full height of the screen - up beside the header, as if the bar
+        // itself were part of what scrolls.
+        <div className="relative flex h-dvh flex-col overflow-hidden bg-background">
+            <header className="z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
                     {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
@@ -59,34 +65,32 @@ export function AppShell({
                 ) : null}
                 <div className="flex shrink-0 items-center gap-1 sm:gap-2">{account}</div>
             </header>
-            <div className="flex flex-1">
+            <div className="flex min-h-0 flex-1">
                 {sidebar ? (
-                    // Pinned under the sticky header and scrolling on its own, so the rail
-                    // stays reachable however far down the content the user is. An app
-                    // with no sections renders nothing, and `empty:hidden` keeps that
-                    // from leaving a bare column beside the content.
-                    //
-                    // `overscroll-contain` is what stops the wheel here from moving
-                    // the page. This shell scrolls the DOCUMENT - the header and this
-                    // rail are sticky over it - so a scroll that this element cannot
-                    // use is passed up to the document by default. The rail's entries
-                    // usually fit, so there was nothing here to scroll and every turn
-                    // of the wheel over it scrolled the page instead, while the rail
-                    // itself stayed exactly where it was. It looks like a fixed panel,
-                    // so it has to behave like one.
+                    // Scrolling on its own beside the content, so the rail stays
+                    // reachable however far down the content the user is. An app
+                    // with no sections renders nothing, and `empty:hidden` keeps
+                    // that from leaving a bare column beside the content.
+                    // `overscroll-contain` keeps a wheel the rail cannot use from
+                    // being handed on to the page.
                     <aside
                         data-tour="shell.sidebar"
-                        className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block"
+                        className="hidden w-56 shrink-0 overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block"
                     >
                         {sidebar}
                     </aside>
                 ) : null}
                 {/* `--page-inset` is main's own vertical padding, published so a
                     page that wants to fill the viewport can subtract it without
-                    hard-coding numbers that live here. See PAGE_FILL. */}
-                <main className="min-w-0 flex-1 p-3 [--page-inset:1.5rem] sm:p-4 sm:[--page-inset:2rem] md:px-6 md:py-5 md:[--page-inset:2.5rem]">
+                    hard-coding numbers that live here. See PAGE_FILL.
+                    `data-shell-scroll` names the box that scrolls, for the few
+                    screens that measure against it (see shellScroller). The
+                    scroll padding matches the padding, so the router bringing a
+                    new screen into view lands on its top rather than 20px into
+                    it. */}
+                <ShellMain className="min-w-0 flex-1 scroll-pt-3 overflow-y-auto overscroll-contain p-3 [--page-inset:1.5rem] sm:scroll-pt-4 sm:p-4 sm:[--page-inset:2rem] md:scroll-pt-5 md:px-6 md:py-5 md:[--page-inset:2.5rem]">
                     {children}
-                </main>
+                </ShellMain>
                 {aside}
             </div>
         </div>
@@ -94,18 +98,29 @@ export function AppShell({
 }
 
 /**
+ * The box a screen inside the shell scrolls in, or null outside the shell.
+ *
+ * The window does not scroll under AppShell, so anything that measures or
+ * listens to "the page" - a windowed list, a region sized to the bottom of the
+ * screen - has to ask this element instead of `window`.
+ */
+export function shellScroller(element: Element): HTMLElement | null {
+    return element.closest<HTMLElement>("[data-shell-scroll]");
+}
+
+/**
  * A screen that fills what is left of the window and scrolls inside itself.
  *
  * For the handful of screens that are a workspace rather than a document - a
  * conversation with its composer pinned at the bottom, a terminal, a file
- * browser with its own panes. Everything else scrolls the page, which is right
- * for a page.
+ * browser with its own panes. Everything else scrolls with the content area,
+ * which is right for a page.
  *
  * The height is the viewport less the header less main's own padding, and that
  * last term is why this lives here: a page that did the arithmetic itself would
  * be silently a few pixels too tall the day the shell's padding changed, and the
- * symptom - a composer just below the fold, a scrollbar on the window as well as
- * on the list - reads as a layout bug in the page rather than as the coupling it
+ * symptom - a composer just below the fold, a scrollbar on the content area as
+ * well as on the list - reads as a layout bug in the page rather than as the coupling it
  * is.
  *
  * Height and clipping only. It deliberately does not say `flex` or a direction:
@@ -135,8 +150,8 @@ export const PAGE_FILL =
  * auto width absorbs the negative margins and grows into them, and a fixed width
  * would push the same distance off the right-hand edge instead.
  *
- * `page-bleed` is a marker, not a style: while one is on the page the window
- * itself does not scroll (see tokens.css), because a screen like this owns every
+ * `page-bleed` is a marker, not a style: while one is on the page the content
+ * area itself does not scroll (see tokens.css), because a screen like this owns every
  * scrollbar in it and a second one on the window moves all of its panes at once.
  */
 export const PAGE_BLEED =
@@ -151,7 +166,7 @@ export const PAGE_BLEED =
  * Whoever renders it publishes its height as `--notice-height` on the root, and
  * PAGE_FILL and PAGE_BLEED subtract it: a screen that fills the window is that
  * much shorter while a notice is up, rather than pushed off the bottom of a
- * window that does not scroll. Empty, it is not drawn and takes no room.
+ * content area that does not scroll. Empty, it is not drawn and takes no room.
  */
 export const PAGE_NOTICES =
     "flex flex-col gap-2 empty:hidden -mx-3 -mt-3 mb-3 px-3 pb-2 pt-3 sm:-mx-4 sm:-mt-4 sm:mb-4 sm:px-4 md:-mx-6 md:-mt-5 md:mb-5 md:px-6";

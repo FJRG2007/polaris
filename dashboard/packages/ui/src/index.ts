@@ -132,7 +132,8 @@ export {
     PageHeader,
     PAGE_FILL,
     PAGE_BLEED,
-    PAGE_NOTICES
+    PAGE_NOTICES,
+    shellScroller
 } from "./shell/app-shell";
 export {
     fitBoard,

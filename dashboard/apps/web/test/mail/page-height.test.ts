@@ -44,7 +44,8 @@ describe("the window under a screen like this", () => {
         // Measured in Chrome with the real chrome and CSS: anything that adds
         // height outside the screen (a banner, a notice) let one wheel move the
         // window and every pane on it together. The marker survives the merge,
-        // and the root rule stops the window scrolling while it is on the page.
+        // and the rule stops the shell's content area scrolling while it is on
+        // the page.
         expect(cn(PAGE_BLEED, "flex min-h-0 overflow-hidden").split(" ")).toContain("page-bleed");
         const tokens = await readFile(
             fileURLToPath(
@@ -52,7 +53,9 @@ describe("the window under a screen like this", () => {
             ),
             "utf8"
         );
-        expect(tokens).toMatch(/html:has\(\.page-bleed\) \{\s*overflow: hidden;/);
+        expect(tokens).toMatch(
+            /html:has\(\.page-bleed\),\s*\[data-shell-scroll\]:has\(\.page-bleed\) \{\s*overflow: hidden;/
+        );
     });
 });
 

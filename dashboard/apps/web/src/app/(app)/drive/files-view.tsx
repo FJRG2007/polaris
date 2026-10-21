@@ -93,6 +93,7 @@ import {
     ShortcutHint,
     shortcutBindings,
     shortcutPressed,
+    shellScroller,
     useShortcutHint
 } from "@polaris/ui";
 import {
@@ -1497,18 +1498,20 @@ export function FilesView({
      * Measured rather than written as a fraction of the viewport, because where
      * the listing starts depends on how many lines the breadcrumb and the toolbar
      * above it wrapped onto - which changes with the window and with the path.
-     * The document position is what is measured (viewport top plus how far the
-     * page is scrolled), so the answer does not move as the page scrolls under
-     * it.
+     * The position inside the shell's scrolling area is what is measured (its
+     * top on screen plus how far that area is scrolled), so the answer does not
+     * move as the page scrolls under it.
      */
     const listingRef = useRef<HTMLDivElement>(null);
     const [listingFloor, setListingFloor] = useState(0);
     useEffect(() => {
         const measure = () => {
             const element = listingRef.current;
-            if (!element) return;
-            const top = element.getBoundingClientRect().top + window.scrollY;
-            setListingFloor(Math.max(0, Math.round(window.innerHeight - top - 16)));
+            const scroller = element ? shellScroller(element) : null;
+            if (!element || !scroller) return;
+            const top = element.getBoundingClientRect().top + scroller.scrollTop;
+            const bottom = scroller.getBoundingClientRect().bottom;
+            setListingFloor(Math.max(0, Math.round(bottom - top - 16)));
         };
         measure();
         window.addEventListener("resize", measure);

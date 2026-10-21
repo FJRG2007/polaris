@@ -28,7 +28,7 @@ describe("the notices above a page", () => {
 
     it("sit in main's top padding and give it back below", async () => {
         const shell = await source("../../../../packages/ui/src/shell/app-shell.tsx");
-        const main = shell.match(/<main className="([^"]+)"/)?.[1].split(" ") ?? [];
+        const main = shell.match(/<ShellMain[^>]*className="([^"]+)"/)?.[1].split(" ") ?? [];
         const notices = PAGE_NOTICES.split(" ");
         // main: p-3 sm:p-4 md:px-6 md:py-5 - the strip mirrors each step of it.
         const steps: [string, string, string][] = [
