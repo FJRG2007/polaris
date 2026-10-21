@@ -34,7 +34,8 @@ export function ChannelCard({
     error?: string | null;
     /** The line shown when the channel is working, or null when it is not. */
     ready: string | null;
-    onManage: () => void;
+    /** Opens the channel's settings; left out for a viewer who cannot change it. */
+    onManage?: () => void;
 }) {
     const t = useTranslations("admin");
     return (
@@ -62,9 +63,11 @@ export function ChannelCard({
                             <CheckCircle2 className="size-3.5" /> {ready}
                         </span>
                     ) : null}
-                    <Button size="sm" variant="secondary" onClick={onManage}>
-                        <Settings2 className="size-4" /> {t("inboxChannels.manage.button")}
-                    </Button>
+                    {onManage ? (
+                        <Button size="sm" variant="secondary" onClick={onManage}>
+                            <Settings2 className="size-4" /> {t("inboxChannels.manage.button")}
+                        </Button>
+                    ) : null}
                 </div>
             </CardBody>
         </Card>

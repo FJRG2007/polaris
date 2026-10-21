@@ -2369,26 +2369,31 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "certification"
             ]
         },
-        ...ADMIN_AREAS.slice(0, 2).map(areaEntry),
-        {
-            // The messaging bridge's two-way chat. Only here once the bridge is
-            // installed: without it nothing on these screens can connect or send.
-            label: "Inbox", // i18n-ignore
-            href: "/admin/inbox",
-            requiresApp: "messaging-bridge",
-            group: ADMIN_AREAS_GROUP,
-            icon: MessagesSquare,
-            keywords: [
-                "conversations",
-                "chats",
-                "messages",
-                "whatsapp",
-                "telegram",
-                "slack",
-                "contacts"
-            ]
-        },
-        ...ADMIN_AREAS.slice(2).map(areaEntry)
+        ...ADMIN_AREAS.flatMap((area) =>
+            area.id === "admin-communication"
+                ? [
+                      areaEntry(area),
+                      {
+                          // The messaging bridge's two-way chat. Only here once the bridge is
+                          // installed: without it nothing on these screens can connect or send.
+                          label: "Inbox", // i18n-ignore
+                          href: "/admin/inbox",
+                          requiresApp: "messaging-bridge",
+                          group: ADMIN_AREAS_GROUP,
+                          icon: MessagesSquare,
+                          keywords: [
+                              "conversations",
+                              "chats",
+                              "messages",
+                              "whatsapp",
+                              "telegram",
+                              "slack",
+                              "contacts"
+                          ]
+                      }
+                  ]
+                : [areaEntry(area)]
+        )
     ]
 };
 

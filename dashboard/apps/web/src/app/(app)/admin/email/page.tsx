@@ -8,7 +8,7 @@
  */
 
 import { PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, sessionCan } from "@/lib/session";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { listEmailChannels } from "@/lib/mail-service";
 import { getTranslations } from "@/lib/i18n/request";
@@ -21,8 +21,9 @@ export const dynamic = "force-dynamic";
 
 export default async function EmailPage() {
     const user = await requirePermission("inbox.read");
-    const [t, senders, smsSenders, everyChannel, status] = await Promise.all([
+    const [t, canManage, senders, smsSenders, everyChannel, status] = await Promise.all([
         getTranslations("admin"),
+        sessionCan(user, "inbox.manage"),
         listEmailChannels(user.id),
         listSmsSenders(user.id),
         user.isAdmin ? listEmailChannels() : Promise.resolve([]),
@@ -31,8 +32,8 @@ export default async function EmailPage() {
     return (
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
             <PageHeader title={t("email.title")} description={t("email.description")} />
-            <EmailSendersView initialSenders={senders} />
-            <SmsSenderCard senders={smsSenders} />
+            <EmailSendersView initialSenders={senders} canManage={canManage} />
+            <SmsSenderCard senders={smsSenders} canManage={canManage} />
             {status ? <AccountMailView channels={everyChannel} selectedId={status.channelId} /> : null}
         </div>
     );

@@ -20,7 +20,8 @@ export function ConnectChannelView({
     bridgeHref
 }: {
     bridgeReady: boolean;
-    /** The installed bridge's own page, where it is started, when it is stopped. */
+    /** The installed bridge's own page, where it is started, when it is stopped
+     *  and this viewer can open it. */
     bridgeHref?: string;
 }) {
     const t = useTranslations("admin");
@@ -58,17 +59,19 @@ export function ConnectChannelView({
                     <p className="text-xs text-muted-foreground">
                         {t("inboxChannels.connectPage.messagingHint")}
                     </p>
-                    {!bridgeReady && bridgeHref ? (
+                    {bridgeReady ? null : (
                         <p className="mt-1 text-xs text-warning">
-                            {t.rich("inboxChannels.connectPage.bridgeStopped", {
-                                link: (chunks) => (
-                                    <Link key="link" href={bridgeHref} className="underline">
-                                        {chunks}
-                                    </Link>
-                                )
-                            })}
+                            {bridgeHref
+                                ? t.rich("inboxChannels.connectPage.bridgeStopped", {
+                                      link: (chunks) => (
+                                          <Link key="link" href={bridgeHref} className="underline">
+                                              {chunks}
+                                          </Link>
+                                      )
+                                  })
+                                : t("inboxChannels.connectPage.bridgeStoppedNoAccess")}
                         </p>
-                    ) : null}
+                    )}
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {channelCatalog(t).map((entry) => (

@@ -16,7 +16,14 @@ import { EmailChannelDialog } from "./email-channel-dialog";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-export function EmailSendersView({ initialSenders }: { initialSenders: EmailChannelView[] }) {
+export function EmailSendersView({
+    initialSenders,
+    canManage
+}: {
+    initialSenders: EmailChannelView[];
+    /** Whether this viewer holds inbox.manage, which every sender change needs. */
+    canManage: boolean;
+}) {
     const t = useTranslations("admin");
     const [senders, setSenders] = useState(initialSenders);
     // "new" while adding one; the saved sender once it exists, so its test is next.
@@ -28,10 +35,15 @@ export function EmailSendersView({ initialSenders }: { initialSenders: EmailChan
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium">{t("email.senders.title")}</h2>
                     <p className="text-xs text-muted-foreground">{t("email.senders.hint")}</p>
+                    {canManage ? null : (
+                        <p className="text-xs text-muted-foreground">{t("email.readOnly")}</p>
+                    )}
                 </div>
-                <Button size="sm" onClick={() => setEditing("new")}>
-                    <Plus className="size-4" /> {t("email.senders.add")}
-                </Button>
+                {canManage ? (
+                    <Button size="sm" onClick={() => setEditing("new")}>
+                        <Plus className="size-4" /> {t("email.senders.add")}
+                    </Button>
+                ) : null}
             </div>
             {senders.length === 0 ? (
                 <Card>
@@ -60,12 +72,12 @@ export function EmailSendersView({ initialSenders }: { initialSenders: EmailChan
                                     ? t("inboxChannels.readyToSend")
                                     : null
                             }
-                            onManage={() => setEditing(sender)}
+                            onManage={canManage ? () => setEditing(sender) : undefined}
                         />
                     ))}
                 </div>
             )}
-            {editing && (
+            {canManage && editing && (
                 <EmailChannelDialog
                     channel={editing === "new" ? null : editing}
                     onClose={() => setEditing(null)}

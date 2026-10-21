@@ -40,7 +40,14 @@ import {
 /** Only one provider exists today; the catalogue keeps the form data-driven. */
 const PROVIDER = SMS_PROVIDER_INFO.twilio;
 
-export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
+export function SmsSenderCard({
+    senders,
+    canManage
+}: {
+    senders: SmsSenderView[];
+    /** Whether this viewer holds inbox.manage, which every sender change needs. */
+    canManage: boolean;
+}) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [editing, setEditing] = useState<SmsSenderView | "new" | null>(null);
@@ -55,7 +62,7 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                         {t("inboxChannels.sms.hint", { summary: PROVIDER.summary })}
                     </p>
                 </div>
-                {senders.length === 0 ? (
+                {canManage && senders.length === 0 ? (
                     <Button size="sm" variant="secondary" onClick={() => setEditing("new")}>
                         <Plus className="size-4" />
                         {t("inbox.connect.connect")}
@@ -93,27 +100,31 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                                                 ? t("inboxChannels.sms.working")
                                                 : t("inboxChannels.sms.notWorking")}
                                         </Badge>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => setEditing(sender)}
-                                        >
-                                            {t("inboxChannels.sms.edit")}
-                                        </Button>
-                                        <button
-                                            type="button"
-                                            aria-label={t("inboxChannels.sms.remove")}
-                                            title={t("inboxChannels.sms.remove")}
-                                            onClick={() =>
-                                                startTransition(async () => {
-                                                    await deleteSmsSenderAction(sender.id);
-                                                    router.refresh();
-                                                })
-                                            }
-                                            className="rounded p-1 text-muted-foreground transition-colors hover:text-danger"
-                                        >
-                                            <Trash2 className="size-4" />
-                                        </button>
+                                        {canManage ? (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => setEditing(sender)}
+                                                >
+                                                    {t("inboxChannels.sms.edit")}
+                                                </Button>
+                                                <button
+                                                    type="button"
+                                                    aria-label={t("inboxChannels.sms.remove")}
+                                                    title={t("inboxChannels.sms.remove")}
+                                                    onClick={() =>
+                                                        startTransition(async () => {
+                                                            await deleteSmsSenderAction(sender.id);
+                                                            router.refresh();
+                                                        })
+                                                    }
+                                                    className="rounded p-1 text-muted-foreground transition-colors hover:text-danger"
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </button>
+                                            </>
+                                        ) : null}
                                     </div>
                                 </div>
                                 {sender.error ? (
@@ -125,7 +136,7 @@ export function SmsSenderCard({ senders }: { senders: SmsSenderView[] }) {
                 )}
             </CardBody>
 
-            {editing ? (
+            {canManage && editing ? (
                 <SmsSenderDialog
                     sender={editing === "new" ? null : editing}
                     onClose={() => setEditing(null)}
