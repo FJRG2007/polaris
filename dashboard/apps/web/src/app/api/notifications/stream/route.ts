@@ -27,12 +27,17 @@ import {
 } from "@/lib/notifications/live-clients";
 import { openShelfFor } from "@/lib/workspace-scope";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { doNotDisturbOf } from "@/lib/presence-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** How often the feed is checked for a change. Fast enough to read as live, cheap enough to hold open. */
 const POLL_MS = 5000;
+
+/** How often do not disturb is worked out again on an open stream. It costs a
+ *  presence read, and a few ticks late is far under anybody noticing. */
+const QUIET_EVERY_MS = 15_000;
 
 /** What kind of Polaris is asking. A value nobody recognises is not refused - the
  *  kind only decides which client makes a sound, and getting it wrong must never
@@ -72,6 +77,7 @@ export async function GET(request: Request): Promise<Response> {
     let timer: ReturnType<typeof setInterval> | null = null;
     let closed = false;
     let previous = "";
+    let quiet = { on: false, at: 0 };
     const feed = createFeedReader(userId, shelf);
 
     function stop(): void {
@@ -91,6 +97,13 @@ export async function GET(request: Request): Promise<Response> {
                 // out from under itself for being quiet.
                 if (kind) touchLiveClient(userId, connection, kind, rings);
                 let payload: string;
+                if (Date.now() - quiet.at >= QUIET_EVERY_MS) {
+                    // A failed read keeps the last answer rather than unmuting.
+                    const on = await doNotDisturbOf(userId)
+                        .then((view) => view.on)
+                        .catch(() => quiet.on);
+                    quiet = { on, at: Date.now() };
+                }
                 try {
                     payload = JSON.stringify({
                         items: await feed.read(),
@@ -100,7 +113,11 @@ export async function GET(request: Request): Promise<Response> {
                         // desktop app opening takes it off a browser tab - and the
                         // frame is the only thing the client is already listening
                         // to.
-                        chime: kind === null || liveClientChimes(userId, connection)
+                        chime: kind === null || liveClientChimes(userId, connection),
+                        // Do not disturb, as the server works it out. The client
+                        // stays silent for anything but a critical arrival while
+                        // it is on, so a tab that missed the change cannot ring.
+                        quiet: quiet.on
                     });
                 } catch {
                     return; // Transient database error: hold the connection and retry.

@@ -1911,5 +1911,7 @@
         "join": "Join",
         "joined": "Joined",
         "goTo": "Go to server"
-    }
+    },
+    "callDoNotDisturb": "{name} is in Do Not Disturb",
+    "callDoNotDisturbBody": "They see the call, but it does not ring for them."
 }

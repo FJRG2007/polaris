@@ -24,6 +24,7 @@ import { useAppUnread } from "@/components/app-unread";
 import { useAdminWaiting } from "@/components/admin-waiting";
 import { tabWaiting } from "@/lib/waiting-counts";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
+import { useDoNotDisturb } from "@/components/do-not-disturb";
 import { applyFavicon, currentFavicon, drawFavicon, type FaviconLink } from "@/lib/favicon";
 import {
     DEFAULT_FAVICON_STYLE,
@@ -49,6 +50,9 @@ export function NotificationFavicon() {
     // The plain icon the page was served with. Kept so a feed that empties puts
     // back the crisp vector rather than a drawn copy of it.
     const plain = useRef<FaviconLink | null>(null);
+    // In do not disturb the tab's title carries no count: the icon still does,
+    // quietly, but a title that changes is the tab asking to be looked at.
+    const quiet = useDoNotDisturb();
 
     useEffect(() => {
         const read = () => setStyle(faviconStyle());
@@ -68,7 +72,7 @@ export function NotificationFavicon() {
     }, [style, waiting]);
 
     useEffect(() => {
-        const badge = faviconBadge(style, waiting);
+        const badge = quiet ? null : faviconBadge(style, waiting);
         const apply = () => {
             const next = titleWithBadge(document.title, badge);
             if (next !== document.title) document.title = next;
@@ -83,7 +87,7 @@ export function NotificationFavicon() {
             watcher.disconnect();
             document.title = titleWithBadge(document.title, null);
         };
-    }, [style, waiting]);
+    }, [style, waiting, quiet]);
 
     useEffect(() => () => {
         if (plain.current) applyFavicon(plain.current);

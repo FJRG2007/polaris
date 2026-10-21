@@ -1911,5 +1911,7 @@
         "join": "Unirse",
         "joined": "Dentro",
         "goTo": "Ir al servidor"
-    }
+    },
+    "callDoNotDisturb": "{name} está en No molestar",
+    "callDoNotDisturbBody": "Ve la llamada, pero no le suena."
 }

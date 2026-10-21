@@ -284,6 +284,31 @@ export async function presenceFor(
     return answer;
 }
 
+/** Whether an account is in do not disturb right now, why, and until when. */
+export interface DoNotDisturbView {
+    readonly on: boolean;
+    /** What put it there: picked by hand, a weekly schedule, a call, a meeting. */
+    readonly reason: "chosen" | "schedule" | "call" | "meeting" | null;
+    /** When it ends, when that is known. */
+    readonly until: string | null;
+}
+
+const NOT_QUIET: DoNotDisturbView = { on: false, reason: null, until: null };
+
+/**
+ * Do not disturb, worked out the one way every screen draws it: the account's
+ * own dot is "busy". So a chosen status, a schedule and automatic status all
+ * count, and the paths that sound or raise a notice - the bell's stream, a call
+ * placed to somebody - ask this rather than trusting what a tab last heard.
+ */
+export async function doNotDisturbOf(userId: string): Promise<DoNotDisturbView> {
+    const view = (await presenceFor({ id: userId, isAdmin: false }, [userId])).get(userId);
+    if (!view || view.status !== "busy") return NOT_QUIET;
+    if (view.auto?.busy) return { on: true, reason: view.auto.reason, until: view.auto.until };
+    const mine = await presenceChoiceOf(userId);
+    return { on: true, reason: mine.scheduled ? "schedule" : "chosen", until: mine.until };
+}
+
 /** One person's own, for the picker that sets it, with the moment it lapses. */
 export interface PresenceChoiceView {
     readonly choice: PresenceChoice;

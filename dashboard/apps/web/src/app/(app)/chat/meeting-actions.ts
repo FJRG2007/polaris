@@ -23,6 +23,7 @@ import * as meetings from "@/lib/chat/meetings";
 import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
+import { presenceFor } from "@/lib/presence-service";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { translatorFor } from "@/lib/i18n/translate";
@@ -71,7 +72,7 @@ export async function callsUnavailableAction(): Promise<string | null> {
  */
 export async function startCallAction(
     channelId: string
-): Promise<{ meetingId?: string; rang?: boolean; error?: string }> {
+): Promise<{ meetingId?: string; rang?: boolean; inDoNotDisturb?: boolean; error?: string }> {
     const user = await requirePermission("chat.use");
     if (!(await can(user.id, "chat.call"))) return { error: NO_CALLS };
     const off = await calls.callsUnavailable();
@@ -95,9 +96,21 @@ export async function startCallAction(
     const result = await guard(() =>
         meetings.startOrJoin({ id: user.id, name: user.name }, channelId)
     );
-    return result.error
-        ? { error: result.error }
-        : { meetingId: result.value!.meetingId, rang: result.value!.rang ?? false };
+    if (result.error) return { error: result.error };
+    const rang = result.value!.rang ?? false;
+    // The person rung is told without a sound in do not disturb, so the caller
+    // is told why nobody may pick up. Only in a one-to-one, where the call was
+    // placed to one person, and read as this caller may see them: somebody whose
+    // presence is hidden from them reads as offline here too, so nothing leaks.
+    // A failed read says nothing rather than guess.
+    const inDoNotDisturb =
+        rang && other
+            ? await presenceFor({ id: user.id, isAdmin: Boolean(user.isAdmin) }, [other]).then(
+                  (found) => found.get(other)?.status === "busy",
+                  () => false
+              )
+            : false;
+    return { meetingId: result.value!.meetingId, rang, inDoNotDisturb };
 }
 
 /**

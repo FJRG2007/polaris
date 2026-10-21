@@ -5,6 +5,7 @@
  * older on demand.
  */
 
+import { doNotDisturbOf } from "@/lib/presence-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { listDeliveries } from "@/lib/notification-service";
@@ -32,7 +33,8 @@ export default async function NotificationsPage() {
         inGameReady,
         account,
         quietHours,
-        display
+        display,
+        paused
     ] = await Promise.all([
         describeNotificationRules(user.id),
         listDestinations(user.id),
@@ -47,7 +49,10 @@ export default async function NotificationsPage() {
             select: { messagesInGame: true, badgesClearOnVisit: true }
         }),
         getQuietHours(user.id),
-        resolveDisplayPreferencesFor(user.id)
+        resolveDisplayPreferencesFor(user.id),
+        // Said at the top of the page, because "why did nothing ring" is the
+        // question somebody in do not disturb opens it with.
+        doNotDisturbOf(user.id).catch(() => null)
     ]);
 
     return (
@@ -68,6 +73,7 @@ export default async function NotificationsPage() {
                 }
                 inGameReady={inGameReady}
                 quiet={{ hours: quietHours, timeZone: display.timeZone }}
+                paused={paused?.on ? paused : null}
                 // Only an administrator has a badge a visit can clear: the
                 // Management queue. Chat and Mail clear by being read.
                 badgesClearOnVisit={

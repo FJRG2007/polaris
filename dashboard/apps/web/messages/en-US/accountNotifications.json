@@ -689,5 +689,14 @@
                 "username": "No colons or line breaks."
             }
         }
+    },
+    "dnd": {
+        "paused": "Paused by Do Not Disturb",
+        "pausedUntil": "Paused by Do Not Disturb until {time}",
+        "chosen": "You turned it on.",
+        "schedule": "Your weekly schedule turned it on.",
+        "call": "You are in a call.",
+        "meeting": "You are in a meeting.",
+        "critical": "Everything still lands in the bell, without sounds or notices. Critical alerts, such as security ones, still come through."
     }
 }
