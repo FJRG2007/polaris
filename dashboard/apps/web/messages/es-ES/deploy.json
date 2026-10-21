@@ -353,7 +353,30 @@
             "privilegesHint": "Lo que este usuario puede hacer dentro de su propia base de datos.",
             "passwordHint": "En blanco se genera una segura y se guarda cifrada.",
             "generated": "Generada",
-            "add": "Añadir base"
+            "add": "Añadir base",
+            "cloud": {
+                "where": "Dónde se ejecuta",
+                "onServer": "En un servidor",
+                "mode": "En la nube",
+                "connect": "Conectar uno existente",
+                "create": "Crearlo allí",
+                "openConsole": "Créalo en la consola del proveedor y conéctalo aquí.",
+                "connectSubmit": "Probar y conectar",
+                "createSubmit": "Crear en CloudAMQP",
+                "field_url": "Dirección",
+                "field_url_kafka": "Brokers de arranque",
+                "field_username": "Usuario",
+                "field_password": "Contraseña",
+                "field_token": "Clave API o token",
+                "field_database": "Bucket o base",
+                "field_org": "Organización",
+                "field_region": "Región",
+                "field_managementUrl": "Dirección de gestión",
+                "field_saslMechanism": "Mecanismo SASL",
+                "apiKey": "Clave API CloudAMQP",
+                "plan": "Plan",
+                "region": "Región"
+            }
         },
         "autoDeployDialog": {
             "title": "Despliegue automático - {name}",

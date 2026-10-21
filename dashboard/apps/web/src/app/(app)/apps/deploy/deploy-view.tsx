@@ -26,6 +26,7 @@ import { DatabaseManageDialog } from "./database-panel";
 import { RepoConfigPreview } from "./repo-config-preview";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { dbEngineOptions } from "@/components/db-engine-select";
+import { CloudDatabaseForm } from "./cloud-database-form";
 import { isLocalDomain, isTunnelEntry, primaryDomain } from "./domain-rank";
 import { stageDatabaseDeleteAction } from "./project-actions";
 import type { ServiceAttention } from "@/lib/deploy/attention";
@@ -60,6 +61,10 @@ import {
 import {
     databaseCreateSchema,
     dbEngineLabel,
+    cloudProvidersFor,
+    engineGroup,
+    ENGINE_GROUPS,
+    isDataEngine,
     dbVersionCaveat,
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
@@ -92,7 +97,13 @@ import {
     Trash2
 } from "lucide-react";
 
-const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(MANAGED_ENGINES);
+// Grouped the way the picker reads: relational, key-value, documents, search,
+// analytics, object storage, messaging.
+const ENGINE_OPTIONS: SelectOption[] = dbEngineOptions(
+    [...MANAGED_ENGINES].sort(
+        (left, right) => ENGINE_GROUPS.indexOf(engineGroup(left)) - ENGINE_GROUPS.indexOf(engineGroup(right))
+    )
+);
 
 type DbInstance = Awaited<ReturnType<typeof deployActions.listDatabaseInstancesAction>>[number];
 type DbConnection = NonNullable<
@@ -1615,6 +1626,8 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     const [privileges, setPrivileges] = useState("owner");
     const [redisLayout, setRedisLayout] = useState(SINGLE);
     const [topology, setTopology] = useState<TopologyValue>(SINGLE_TOPOLOGY);
+    /** "server", or the id of the cloud provider a data engine lives with. */
+    const [where, setWhere] = useState("server");
 
     const info = MANAGED_ENGINE_INFO[engine];
     const hosted = instanceId !== DEDICATED;
@@ -1627,6 +1640,7 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
     // so is the layout, which each engine offers differently.
     useEffect(() => {
         setInstanceId(DEDICATED);
+        setWhere("server");
         setTopology(SINGLE_TOPOLOGY);
         setRedisLayout(SINGLE);
         if (!info.namedDatabases) {
@@ -1682,6 +1696,48 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
         });
     }
 
+    if (isDataEngine(engine) && where !== "server") {
+        return (
+        <div className="flex flex-col gap-3">
+            <Field label={t("view.name")}>
+                <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    // i18n-ignore: an example database name
+                    placeholder="my-db"
+                    autoFocus
+                />
+            </Field>
+            <Field label={t("view.database.engine")}>
+                <Select
+                    value={engine}
+                    onValueChange={(value) => setEngine(value as ManagedEngine)}
+                    options={ENGINE_OPTIONS}
+                />
+            </Field>
+            {isDataEngine(engine) && (
+                <Field label={t("view.database.cloud.where")}>
+                    <Select
+                        value={where}
+                        onValueChange={setWhere}
+                        options={[
+                            { value: "server", label: t("view.database.cloud.onServer") },
+                            ...cloudProvidersFor(engine).map((one) => ({ value: one.id, label: one.label }))
+                        ]}
+                    />
+                </Field>
+            )}
+            <CloudDatabaseForm
+                environmentId={environmentId}
+                engine={engine}
+                name={name}
+                provider={where}
+                onDone={onDone}
+            />
+        </div>
+        );
+    }
+
     return (
         <div className="flex flex-col gap-3">
             <Field label={t("view.name")}>
@@ -1700,6 +1756,18 @@ function NewDatabaseForm({ environmentId, onDone }: { environmentId: string; onD
                     options={ENGINE_OPTIONS}
                 />
             </Field>
+            {isDataEngine(engine) && (
+                <Field label={t("view.database.cloud.where")}>
+                    <Select
+                        value={where}
+                        onValueChange={setWhere}
+                        options={[
+                            { value: "server", label: t("view.database.cloud.onServer") },
+                            ...cloudProvidersFor(engine).map((one) => ({ value: one.id, label: one.label }))
+                        ]}
+                    />
+                </Field>
+            )}
             {engine === "redis" && (
                 <Field
                     label={t("view.database.runsAs")}

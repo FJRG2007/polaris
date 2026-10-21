@@ -405,7 +405,7 @@ export async function revertUpgrade(databaseId: string, ownerId: string, actorId
 /** Refuse when the instance holds databases (or PostgreSQL accounts) nobody
  *  told Polaris about - they would stay behind on the old volume. */
 async function refuseUnknown(context: InstanceContext, children: readonly InstanceContext[]): Promise<void> {
-    if (context.engine === "redis" || context.engine === "seaweedfs") return;
+    if (context.engine === "redis" || context.engine === "seaweedfs" || core.isDataEngine(context.engine)) return;
     const engine = context.engine;
     await withPorts(context, async (ports) => {
         await waitReady(ports, context);

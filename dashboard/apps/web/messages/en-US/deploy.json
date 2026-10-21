@@ -353,7 +353,30 @@
             "privilegesHint": "What this user may do inside its own database.",
             "passwordHint": "Blank generates a strong one and stores it encrypted.",
             "generated": "Generated",
-            "add": "Add database"
+            "add": "Add database",
+            "cloud": {
+                "where": "Where it runs",
+                "onServer": "On a server",
+                "mode": "In the cloud",
+                "connect": "Connect an existing one",
+                "create": "Create it there",
+                "openConsole": "Create it in the provider's console, then connect it here.",
+                "connectSubmit": "Test and connect",
+                "createSubmit": "Create in CloudAMQP",
+                "field_url": "Address",
+                "field_url_kafka": "Bootstrap servers",
+                "field_username": "User",
+                "field_password": "Password",
+                "field_token": "API key or token",
+                "field_database": "Bucket or database",
+                "field_org": "Organization",
+                "field_region": "Region",
+                "field_managementUrl": "Management address",
+                "field_saslMechanism": "SASL mechanism",
+                "apiKey": "CloudAMQP API key",
+                "plan": "Plan",
+                "region": "Region"
+            }
         },
         "autoDeployDialog": {
             "title": "Auto-deploy - {name}",

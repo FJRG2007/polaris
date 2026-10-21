@@ -118,6 +118,10 @@ import {
     canHostMount,
     subjectCommentSchema,
     databaseCreateSchema,
+    cloudConnectSchema,
+    cloudAmqpCreateSchema,
+    type CloudConnectInput,
+    type CloudAmqpCreateInput,
     environmentCreateSchema,
     DB_ENGINES,
     normalizeRelPath,
@@ -1936,6 +1940,46 @@ export async function createDatabaseAction(
         return {
             error: caught instanceof Error ? caught.message : await reply("databases.createFailed")
         };
+    }
+}
+
+/** Connect a data engine that already runs in a cloud, after testing it. */
+export async function connectCloudDatabaseAction(
+    input: CloudConnectInput
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = cloudConnectSchema.safeParse(input);
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "databases.invalid") };
+    try {
+        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "databases.manage");
+        const target = await getOrCreateLocalTarget(access.ownerId);
+        const { connectCloudDatabase } = await import("@/lib/data-cloud/service");
+        const database = await connectCloudDatabase(access.ownerId, input, target.id);
+        await recordDeployAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : await reply("databases.createFailed") };
+    }
+}
+
+/** Create a RabbitMQ in CloudAMQP with the user's own API key. */
+export async function createCloudAmqpDatabaseAction(
+    input: CloudAmqpCreateInput
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = cloudAmqpCreateSchema.safeParse(input);
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "databases.invalid") };
+    try {
+        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "databases.manage");
+        const target = await getOrCreateLocalTarget(access.ownerId);
+        const { createCloudAmqpDatabase } = await import("@/lib/data-cloud/service");
+        const database = await createCloudAmqpDatabase(access.ownerId, input, target.id);
+        await recordDeployAudit({ actorId: user.id, action: "deploy.db.create", targetType: "database", targetId: database.id });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return { error: caught instanceof Error ? caught.message : await reply("databases.createFailed") };
     }
 }
 

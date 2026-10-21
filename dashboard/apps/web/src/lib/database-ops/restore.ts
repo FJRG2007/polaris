@@ -11,6 +11,7 @@
 
 import type { RuntimePorts } from "@polaris/deploy";
 import {
+    isDataEngine,
     redisReplicateFrom,
     redisReplicationInfo,
     redisRestoreFinish,
@@ -85,6 +86,10 @@ export async function restoreDumpInto(
             if (engine === "redis") {
                 await loadRedis(ports, context, inside, operation);
                 return;
+            }
+            // No dump of a data engine is taken, so there is none to load.
+            if (isDataEngine(engine)) {
+                throw new DatabaseOperationError(`Polaris cannot restore a ${engine} instance from a dump`);
             }
             const steps = restoreCommands({
                 engine,

@@ -63,6 +63,11 @@ export interface DbCredentials {
     clusterKey?: string;
     /** MySQL with read replicas: the replication account's password. */
     replicationPassword?: string;
+    /** InfluxDB's admin API token. */
+    token?: string;
+    /** An instance that lives in a cloud: how it is reached, and - for one
+     *  Polaris created there - the key that manages it. */
+    cloud?: { endpoint: core.DataEndpoint; apiKey?: string };
 }
 
 /** What decides the command an instance runs with, beyond its credentials. */
@@ -83,7 +88,8 @@ interface EngineSpec {
     readonly defaultVersion: string;
     readonly port: number;
     image(version: string): string;
-    env(creds: DbCredentials): Record<string, string>;
+    /** `host` is the container's own name, for an engine that advertises it. */
+    env(creds: DbCredentials, host?: string): Record<string, string>;
     /** Entrypoint arguments, for an engine that is not configured by environment
      *  or whose settings (a Redis mode, a replica set, archiving) live there. */
     command?(creds: DbCredentials, row: EngineRow): string[] | undefined;
@@ -174,8 +180,49 @@ const ENGINES: Record<ManagedEngine, EngineSpec> = {
         }),
         // The image's entrypoint adds `-dir=/data` to `server`.
         command: () => ["server", "-s3", "-s3.port=8333"]
-    }
+    },
+    ...(Object.fromEntries(
+        core.DATA_ENGINES.map((engine): [core.DataEngine, EngineSpec] => [
+            engine,
+            {
+                defaultVersion: core.DATA_ENGINE_INFO[engine].versions[0]!,
+                port: core.DATA_ENGINE_INFO[engine].port,
+                image: core.DATA_ENGINE_INFO[engine].image,
+                env: (creds: DbCredentials, host?: string) =>
+                    core.dataEngineContainer(engine, creds, host ?? "").env,
+                command: (creds: DbCredentials) => core.dataEngineContainer(engine, creds, "").command
+            }
+        ])
+    ) as Record<core.DataEngine, EngineSpec>)
 };
+
+/** What a data engine's account is made of when Polaris generates it. */
+export function dataEngineCredentials(engine: core.DataEngine, slug: string): DbCredentials {
+    switch (engine) {
+        case "minio":
+            return {
+                username: generateAccessKey(),
+                password: generateSecretKey(),
+                // A bucket name: lower-case letters, digits and dashes, 3 to 63.
+                database: `${slug}-data`.slice(0, 63)
+            };
+        case "meilisearch":
+        case "typesense":
+        case "kafka":
+            return { username: "", password: generatePassword(), database: "" };
+        case "influxdb":
+            return {
+                username: "polaris",
+                password: generatePassword(),
+                database: slug,
+                token: randomBytes(32).toString("base64url")
+            };
+        case "clickhouse":
+            return { username: "polaris", password: generatePassword(), database: toIdentifier(slug) };
+        default:
+            return { username: "polaris", password: generatePassword(), database: "" };
+    }
+}
 
 /**
  * What a running (not recovering) PostgreSQL instance starts with: the archive
@@ -310,7 +357,9 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     // stored credentials reads a store's the same way.
     const creds: DbCredentials = core.isStorageEngine(parsed.engine)
         ? { username: generateAccessKey(), password: generateSecretKey(), database: "" }
-        : {
+        : core.isDataEngine(parsed.engine)
+          ? dataEngineCredentials(parsed.engine, slug)
+          : {
               username: parsed.username ?? (parent ? toIdentifier(slug) : "polaris"),
               password: parsed.password ?? generatePassword(),
               database: parsed.databaseName ?? toIdentifier(slug),
@@ -457,6 +506,42 @@ export interface DatabaseConnection {
     /** MySQL with read replicas: a URI for reading from them, over the name
      *  they share. */
     readonly readUri: string | null;
+    /** A data engine's full endpoint, which its reference keys are read from. */
+    readonly endpoint?: core.DataEndpoint;
+}
+
+/** The connection of a data engine, wherever it runs. */
+function dataConnection(slug: string, endpoint: core.DataEndpoint): DatabaseConnection {
+    return {
+        host: endpoint.host,
+        port: endpoint.port,
+        database: endpoint.database,
+        username: endpoint.username,
+        password: endpoint.password || endpoint.token,
+        uri: endpoint.url,
+        exposedPort: null,
+        reference: `\${{${slug}.URL}}`,
+        cluster: null,
+        hosts: [endpoint.host],
+        replicaSet: null,
+        readUri: null,
+        endpoint
+    };
+}
+
+/** An instance in a cloud is reached where its stored endpoint says. */
+function cloudConnection(
+    row: { readonly slug: string; readonly status: string },
+    creds: DbCredentials
+): DatabaseConnection {
+    if (!creds.cloud?.endpoint.url) {
+        throw new Error(
+            row.status === "provisioning"
+                ? "The provider is still creating this instance"
+                : "This instance has no address"
+        );
+    }
+    return dataConnection(row.slug, creds.cloud.endpoint);
 }
 
 /**
@@ -488,6 +573,7 @@ export async function databaseConnection(
         }
     });
     if (!row) throw new Error("Database not found");
+    if (row.provider) return cloudConnection(row, await databaseCredentials(databaseId, ownerId));
     const host = row.parent ? row.parent.containerName : row.containerName;
     if (!host) throw new Error("This database has not been provisioned yet");
     // A hosted database is reached the way its instance is.
@@ -523,6 +609,12 @@ export async function databaseConnection(
                   ? `postgresql://${user}:${secret}@${host}:${port}/${creds.database}`
                   : `mysql://${user}:${secret}@${host}:${port}/${creds.database}`;
 
+    if (core.isDataEngine(engine)) {
+        return {
+            ...dataConnection(row.slug, core.selfHostedEndpoint(engine, host, creds)),
+            exposedPort: row.exposePort ?? null
+        };
+    }
     const nodes = row.parent ? null : databaseClusterNodes(row);
     return {
         host,
@@ -647,6 +739,7 @@ export async function deployDatabase(
         include: { environment: { include: { project: true } }, target: true }
     });
     if (!db) throw new Error("Database not found");
+    if (db.provider) throw new Error("This instance runs in a cloud, so there is nothing to deploy");
 
     // A database inside another instance has no container to bring up; it is
     // provisioned by statements, which is fast enough to do inline instead of
@@ -735,12 +828,18 @@ export async function deployDatabase(
     const plan: DbDeployPlan = {
         ref: { name, project },
         image: db.image,
-        env: spec.env(creds),
+        env: spec.env(creds, name),
         command: spec.command?.(creds, db),
         volumeName,
         dataPath: core.databaseDataPath(db.engine, db.version),
         exposePort: db.exposePort ?? undefined,
         limits: limitsOf(db),
+        ...(core.isDataEngine(db.engine)
+            ? {
+                  containerPort: spec.port,
+                  healthcheck: core.dataEngineContainer(db.engine, creds, name).healthcheck
+              }
+            : {}),
         ...(nodes
             ? {
                   nodes: nodes.map((node, index) => ({
@@ -917,6 +1016,18 @@ export async function deleteDatabase(databaseId: string, ownerId: string): Promi
         }
     });
     if (!db) throw new Error("Database not found");
+
+    // An instance in a cloud has no container here. One Polaris created there
+    // is deleted there first, so it does not go on billing the user.
+    if (db.provider) {
+        const { deleteCloudInstance } = await import("./data-cloud/service");
+        await deleteCloudInstance(db.provider, db.providerResourceId, await databaseCredentials(db.id, ownerId));
+        await prisma.deployment.deleteMany({
+            where: { deployableType: "database", deployableId: databaseId }
+        });
+        await prisma.managedDatabase.delete({ where: { id: databaseId } });
+        return;
+    }
 
     // A database inside another instance is removed by dropping it there. The
     // container it lived in belongs to the instance and stays exactly as it was.

@@ -181,14 +181,12 @@ describe("a template with a database", () => {
 
 describe("a template with a companion", () => {
     it("creates the companion beside the service and brings it up first", async () => {
-        const parts = await setup.addTemplateParts({ template: serviceTemplate("kafka")!, service, ownerId: OWNER, keepReleases: false });
-        expect(parts.companion).toEqual({ id: "companion-1", name: "blog-broker" });
-        expect(variables.get("companion-1")?.find((entry) => entry.key === "KAFKA_ADVERTISED_LISTENERS")?.value).toBe(
-            "PLAINTEXT://${{blog-broker.POLARIS_PRIVATE_DOMAIN}}:9092"
-        );
+        // Kafka, the companion template this used to be, is a database engine now.
+        const parts = await setup.addTemplateParts({ template: serviceTemplate("open-webui")!, service, ownerId: OWNER, keepReleases: false });
+        expect(parts.companion).toEqual({ id: "companion-1", name: "blog-ollama" });
 
         calls.length = 0;
-        await setup.firstTemplateDeploy({ template: serviceTemplate("kafka")!, applicationId: APP, parts, ownerId: OWNER, userId: USER });
+        await setup.firstTemplateDeploy({ template: serviceTemplate("open-webui")!, applicationId: APP, parts, ownerId: OWNER, userId: USER });
         expect(calls).toEqual(["deploy and wait companion-1", `deploy ${APP}`]);
     });
 });
