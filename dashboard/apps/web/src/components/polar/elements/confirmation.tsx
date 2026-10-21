@@ -131,12 +131,14 @@ export function Confirmation({
     let outcome: ReactNode = null;
     if (!requested) {
         outcome = approval.approved ? (
-            <p className="inline-flex items-center gap-1 text-xs text-success-ink">
-                <Check className="h-3.5 w-3.5" /> {t("approval.accepted")}
+            <p className="flex min-w-0 items-start gap-1.5 text-xs text-success-ink">
+                <Check className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 break-words">{t("approval.accepted")}</span>
             </p>
         ) : (
-            <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <X className="h-3.5 w-3.5" /> {t("approval.rejected")}
+            <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                <X className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 break-words">{t("approval.rejected")}</span>
             </p>
         );
     }
@@ -159,12 +161,14 @@ export function Confirmation({
                 </p>
             ) : null}
             {destructive ? (
-                <p className="inline-flex items-center gap-1 text-xs text-warning-ink">
-                    <ShieldAlert className="h-3.5 w-3.5 shrink-0" /> {t("approval.destructive")}
+                <p className="flex min-w-0 items-start gap-1.5 text-xs text-warning-ink">
+                    <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 break-words">{t("approval.destructive")}</span>
                 </p>
             ) : null}
-            <p className="inline-flex items-center gap-1 text-xs text-foreground-subtle">
-                <UserRound className="h-3.5 w-3.5 shrink-0" /> {t("approval.runsAsYou")}
+            <p className="flex min-w-0 items-start gap-1.5 text-xs text-foreground-subtle">
+                <UserRound className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 break-words">{t("approval.runsAsYou")}</span>
             </p>
             <details className="text-xs text-muted-foreground">
                 <summary className="cursor-pointer select-none">{t("approval.details")}</summary>

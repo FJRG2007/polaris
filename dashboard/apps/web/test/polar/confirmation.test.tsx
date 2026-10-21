@@ -57,6 +57,21 @@ function card(destructive: boolean, onApprove = vi.fn()) {
 }
 
 describe("the approval card", () => {
+    it("puts the warning and who it runs as on lines of their own, never run together", () => {
+        card(true);
+        const warning = screen.getByText("This can't be undone from here.");
+        const runsAs = screen.getByText("Runs as you");
+        // Each sentence is its own element in its own block-level row, so the
+        // two can neither touch nor share a line.
+        expect(warning.parentElement).not.toBe(runsAs.parentElement);
+        for (const text of [warning, runsAs]) {
+            const row = text.parentElement as HTMLElement;
+            expect(row.tagName).toBe("P");
+            expect(row.className.split(" ")).toContain("flex");
+            expect(row.className).not.toContain("inline-flex");
+        }
+    });
+
     it("paints the input with the JSON highlighter", async () => {
         const { container } = card(false);
         await waitFor(() => expect(container.querySelector("[class^='hljs-']")).not.toBeNull());
